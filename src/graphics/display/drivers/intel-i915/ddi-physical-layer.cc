@@ -325,7 +325,7 @@ bool ComboDdiTigerLake::Initialize() {
         break;
       default:
         zxlogf(WARNING, "DDI %d process monitor reports undocumented process variation %" PRIu32,
-               ddi_id(), procmon_status.process_select());
+               ddi_id(), static_cast<unsigned int>(procmon_status.process_select()));
         process_name = "dot-undocumented";
     };
 
@@ -342,7 +342,7 @@ bool ComboDdiTigerLake::Initialize() {
         break;
       default:
         zxlogf(WARNING, "DDI %d process monitor reports undocumented voltage variation %" PRIu32,
-               ddi_id(), procmon_status.voltage_select());
+               ddi_id(), static_cast<unsigned int>(procmon_status.voltage_select()));
         voltage_name = "undocumented-v";
     };
 
@@ -409,7 +409,7 @@ bool ComboDdiTigerLake::Initialize() {
            "input DCC code: %d thermal %d",
            ddi_id(), static_cast<int>(lane), transmitter_dcc.reg_value(),
            transmitter_dcc.output_duty_cycle_correction_clock_select(),
-           transmitter_dcc.output_duty_cycle_correction_clock_divider_select(),
+           static_cast<int>(transmitter_dcc.output_duty_cycle_correction_clock_divider_select()),
            transmitter_dcc.output_duty_cycle_correction_code_override_valid() ? "valid" : "invalid",
            transmitter_dcc.output_duty_cycle_correction_code_override(),
            transmitter_dcc.output_duty_cycle_correction_lower_limit(),
@@ -429,7 +429,7 @@ bool ComboDdiTigerLake::Initialize() {
            "transmiter de-emphasis %d, TBC as symbol clock %s",
            ddi_id(), static_cast<int>(lane), physical_coding1.reg_value(),
            physical_coding1.power_gate_powered_down() ? "yes" : "no",
-           physical_coding1.duty_cycle_correction_schedule_select(),
+           static_cast<int>(physical_coding1.duty_cycle_correction_schedule_select()),
            physical_coding1.force_transmitter_duty_cycle_correction_calibration() ? "yes" : "no",
            physical_coding1.duty_cycle_correction_calibration_bypassed() ? "enabled" : "disabled",
            physical_coding1.duty_cycle_correction_calibration_on_wake() ? "yes" : "no",
@@ -598,7 +598,7 @@ DdiPhysicalLayer::PhysicalLayerInfo TypeCDdiTigerLake::ReadPhysicalLayerInfo() c
       break;
     default:
       ZX_ASSERT_MSG(false, "DDI %d: unsupported type C live state (0x%x)", ddi_id(),
-                    type_c_live_state);
+                    static_cast<unsigned int>(type_c_live_state));
   }
 
   return physical_layer_info;

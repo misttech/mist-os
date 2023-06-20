@@ -79,7 +79,8 @@ bool GraphicsPipeline::Init() {
   vk::PipelineLayoutCreateInfo pipeline_layout_info;
   auto rv_layout = device_->createPipelineLayout(pipeline_layout_info);
   if (vk::Result::eSuccess != rv_layout.result) {
-    RTN_MSG(false, "VK Error: 0x%x - Failed to create pipeline layout.\n", rv_layout.result);
+    RTN_MSG(false, "VK Error: 0x%x - Failed to create pipeline layout.\n",
+            static_cast<unsigned int>(rv_layout.result));
   }
   pipeline_layout_ = rv_layout.value;
 
@@ -101,7 +102,8 @@ bool GraphicsPipeline::Init() {
   auto [rv_pipelines, pipelines] =
       device_->createGraphicsPipelines(vk::PipelineCache(), {pipeline_info});
   if (vk::Result::eSuccess != rv_pipelines) {
-    RTN_MSG(false, "VK Error: 0x%x - Failed to create pipelines.\n", rv_pipelines);
+    RTN_MSG(false, "VK Error: 0x%x - Failed to create pipelines.\n",
+            static_cast<unsigned int>(rv_pipelines));
   }
   pipeline_ = pipelines[0];
 

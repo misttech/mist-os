@@ -86,7 +86,8 @@ void MsdIntelRegisterIo::CheckForcewakeForRange(const Range& range, uint32_t reg
   }
   if (forcewake_token_count(range.forcewake_domain) == 0) {
     MAGMA_LOG(WARNING, "Access missing forcewake: register 0x%x domain %d range 0x%x - 0x%x",
-              register_offset, range.forcewake_domain, range.start_offset, range.end_offset);
+              register_offset, static_cast<int>(range.forcewake_domain), range.start_offset,
+              range.end_offset);
     DASSERT(false);
   }
 }

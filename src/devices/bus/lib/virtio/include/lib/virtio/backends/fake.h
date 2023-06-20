@@ -36,11 +36,11 @@ class FakeBackend : public Backend {
   void Unbind() override {}
   zx_status_t ConfirmFeatures() override { return ZX_OK; }
   void DriverStatusOk() override {
-    ZX_ASSERT_MSG(state_ == State::DEVICE_STATUS_ACK, "State: %d", state_);
+    ZX_ASSERT_MSG(state_ == State::DEVICE_STATUS_ACK, "State: %d", static_cast<int>(state_));
     state_ = State::DRIVER_OK;
   }
   void DriverStatusAck() override {
-    ZX_ASSERT_MSG(state_ == State::DEVICE_RESET, "State: %d", state_);
+    ZX_ASSERT_MSG(state_ == State::DEVICE_RESET, "State: %d", static_cast<int>(state_));
     state_ = State::DEVICE_STATUS_ACK;
   }
   void DeviceReset() override {
@@ -48,7 +48,7 @@ class FakeBackend : public Backend {
     kicked_queues_.clear();
   }
   void WaitForDeviceReset() override {
-    ZX_ASSERT_MSG(state_ == State::DEVICE_RESET, "State: %d", state_);
+    ZX_ASSERT_MSG(state_ == State::DEVICE_RESET, "State: %d", static_cast<int>(state_));
   }
   void ReadDeviceConfig(uint16_t offset, uint8_t* value) override {
     auto shifted_offset = static_cast<uint16_t>(offset + kISRStatus + 1);
@@ -92,7 +92,7 @@ class FakeBackend : public Backend {
     return ZX_OK;
   }
   void RingKick(uint16_t ring_index) override {
-    ZX_ASSERT_MSG(state_ == State::DRIVER_OK, "State: %d", state_);
+    ZX_ASSERT_MSG(state_ == State::DRIVER_OK, "State: %d", static_cast<int>(state_));
     ZX_ASSERT_MSG(queue_sizes_.count(ring_index) > 0, "index-%xh", ring_index);
     kicked_queues_.insert(ring_index);
   }

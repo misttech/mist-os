@@ -289,7 +289,7 @@ static int hid_input_thread(void* arg) {
   } else if (args->command == Command::descriptor) {
     status = parse_rpt_descriptor(args);
   } else {
-    lprintf("hid: thread found wrong command %d\n", args->command);
+    lprintf("hid: thread found wrong command %d\n", static_cast<int>(args->command));
   }
   fflush(stdout);
 

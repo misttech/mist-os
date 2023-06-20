@@ -148,7 +148,7 @@ void MediaApp::SetupPayloadCoefficients() {
       sample_size_ = sizeof(float);
       break;
     default:
-      printf("Unknown AudioSampleFormat: %u\n", sample_format_);
+      printf("Unknown AudioSampleFormat: %u\n", static_cast<unsigned int>(sample_format_));
       Shutdown();
       return;
   }

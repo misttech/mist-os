@@ -104,11 +104,12 @@ int CreateLogo() {
       printf("Width:  Support: %u Recieved: %d \n", kWidth, display_config.width);
       printf("Height: Support: %u Recieved: %d \n", kHeight, display_config.height);
       printf("Format: Support: %d Recieved: %d \n",
-             fuchsia_hardware_dotmatrixdisplay::wire::PixelFormat::kMonochrome,
-             display_config.format);
-      printf("Layout: Support: %d Recieved: %d \n",
-             fuchsia_hardware_dotmatrixdisplay::wire::ScreenLayout::kColumnTbRowLr,
-             display_config.layout);
+             static_cast<int>(fuchsia_hardware_dotmatrixdisplay::wire::PixelFormat::kMonochrome),
+             static_cast<int>(display_config.format));
+      printf(
+          "Layout: Support: %d Recieved: %d \n",
+          static_cast<int>(fuchsia_hardware_dotmatrixdisplay::wire::ScreenLayout::kColumnTbRowLr),
+          static_cast<int>(display_config.layout));
       return 1;
     }
 

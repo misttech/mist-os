@@ -70,8 +70,8 @@ __attribute__((constructor)) void init_packet_socket_provider() {
       {
         zx_status_t status =
             composed_dir.Serve(kServeFlags, std::move(server), composed_dir_loop.dispatcher());
-        ZX_ASSERT_MSG(status == ZX_OK, "composed_dir.Serve(0x%x, _, _): %s", kServeFlags,
-                      zx_status_get_string(status));
+        ZX_ASSERT_MSG(status == ZX_OK, "composed_dir.Serve(0x%x, _, _): %s",
+                      static_cast<unsigned int>(kServeFlags), zx_status_get_string(status));
       }
     };
 
@@ -158,13 +158,13 @@ __attribute__((constructor)) void init_packet_socket_provider() {
 
         composed_root_dir.AddService(
             svc_dir_path.filename().c_str(),
-            std::make_unique<vfs::Service>(
-                [](zx::channel request, async_dispatcher_t* dispatcher) mutable {
-                  zx_status_t status =
-                      composed_svc_dir.Serve(kServeFlags, std::move(request), dispatcher);
-                  ZX_ASSERT_MSG(status == ZX_OK, "composed_svc_dir.Serve(0x%x, _, _): %s",
-                                kServeFlags, zx_status_get_string(status));
-                }));
+            std::make_unique<vfs::Service>([](zx::channel request,
+                                              async_dispatcher_t* dispatcher) mutable {
+              zx_status_t status =
+                  composed_svc_dir.Serve(kServeFlags, std::move(request), dispatcher);
+              ZX_ASSERT_MSG(status == ZX_OK, "composed_svc_dir.Serve(0x%x, _, _): %s",
+                            static_cast<unsigned int>(kServeFlags), zx_status_get_string(status));
+            }));
 
         {
           zx_status_t status = fdio_ns_unbind(ns, root.c_str());

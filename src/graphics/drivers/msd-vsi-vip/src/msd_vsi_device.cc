@@ -333,7 +333,7 @@ void MsdVsiDevice::HangCheckTimeout() {
   MAGMA_LOG(WARNING, "last_interrupt_timestamp %lu", last_interrupt_timestamp_.load());
 
 #if defined(MSD_VSI_VIP_ENABLE_SUSPEND)
-  MAGMA_LOG(WARNING, "Power state %u", power_state_);
+  MAGMA_LOG(WARNING, "Power state %u", static_cast<unsigned int>(power_state_));
 #endif
 
   for (auto& str : dump) {
@@ -477,7 +477,8 @@ magma::Status MsdVsiDevice::ProcessInterrupt() {
   // in progress. To prevent the crash we do PowerOn() here as a temporary measure
   // to reduce the impact of having the driver crash in the field.
   if (power_state() != PowerState::kOn) {
-    MAGMA_LOG(ERROR, "Processing Interrupt with power state 0x%x", power_state());
+    MAGMA_LOG(ERROR, "Processing Interrupt with power state 0x%x",
+              static_cast<unsigned int>(power_state()));
     PowerOn();
   }
 
@@ -542,7 +543,7 @@ magma::Status MsdVsiDevice::ProcessInterrupt() {
     std::vector<std::string> dump;
     DumpToString(&dump, mmu_exception /* fault_present */);
 #if defined(MSD_VSI_VIP_ENABLE_SUSPEND)
-    MAGMA_LOG(WARNING, "Power state %u", power_state_);
+    MAGMA_LOG(WARNING, "Power state %u", static_cast<unsigned int>(power_state_));
 #endif
     for (auto& str : dump) {
       MAGMA_LOG(WARNING, "%s", str.c_str());

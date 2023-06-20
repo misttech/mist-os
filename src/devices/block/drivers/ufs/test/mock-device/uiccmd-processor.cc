@@ -21,7 +21,8 @@ void UicCmdProcessor::HandleUicCmd(UicCommandOpcode value) {
   } else {
     // TODO(fxbug.dev/124835): Revisit it when UICCMD error handling logic is implemented in the
     // driver.
-    zxlogf(ERROR, "UFS MOCK: uiccmd value: 0x%x is not supported", value);
+    zxlogf(ERROR, "UFS MOCK: uiccmd value: 0x%x is not supported",
+           static_cast<unsigned int>(value));
   }
 
   InterruptStatusReg::Get()

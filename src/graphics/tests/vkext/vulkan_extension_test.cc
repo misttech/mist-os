@@ -450,7 +450,7 @@ bool VulkanExtensionTest::ExecBuffer(uint32_t size) {
   vk::Result result1 =
       ctx_->device()->createBufferCollectionFUCHSIA(&import_info, nullptr, &collection, loader_);
   if (result1 != vk::Result::eSuccess) {
-    RTN_MSG(false, "Failed to create buffer collection: %d\n", result1);
+    RTN_MSG(false, "Failed to create buffer collection: %d\n", static_cast<int>(result1));
   }
 
   vk::BufferConstraintsInfoFUCHSIA constraints;
@@ -462,7 +462,7 @@ bool VulkanExtensionTest::ExecBuffer(uint32_t size) {
       ctx_->device()->setBufferCollectionBufferConstraintsFUCHSIA(collection, constraints, loader_);
 
   if (result1 != vk::Result::eSuccess) {
-    RTN_MSG(false, "Failed to set buffer constraints: %d\n", result1);
+    RTN_MSG(false, "Failed to set buffer constraints: %d\n", static_cast<int>(result1));
   }
 
   auto buffer_collection_info = AllocateSysmemCollection({}, std::move(local_token));
@@ -478,7 +478,7 @@ bool VulkanExtensionTest::ExecBuffer(uint32_t size) {
     auto [result, vk_buffer] = ctx_->device()->createBufferUnique(buffer_create_info, nullptr);
 
     if (result != vk::Result::eSuccess) {
-      RTN_MSG(false, "vkCreateBuffer failed: %d\n", result);
+      RTN_MSG(false, "vkCreateBuffer failed: %d\n", static_cast<int>(result));
     }
     vk_buffer_ = std::move(vk_buffer);
   }

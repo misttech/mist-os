@@ -1264,7 +1264,7 @@ inline SwitchBlockConfig Switches0Reg::SwitchBlockConfigFor(
       return SwitchBlockConfig::kOpen;
     };
   }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid CC pin ID: %" PRIu8, cc_pin_id);
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid CC pin ID: %" PRIu8, static_cast<unsigned char>(cc_pin_id));
 }
 
 inline Switches0Reg& Switches0Reg::SetSwitchBlockConfig(usb_pd::ConfigChannelPinId cc_pin_id,
@@ -1282,7 +1282,7 @@ inline Switches0Reg& Switches0Reg::SetSwitchBlockConfig(usb_pd::ConfigChannelPin
       break;
     };
   }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid CC pin ID: %" PRIu8, cc_pin_id);
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid CC pin ID: %" PRIu8, static_cast<unsigned char>(cc_pin_id));
   return *this;
 }
 

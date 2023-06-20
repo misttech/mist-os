@@ -250,7 +250,7 @@ void InputReport::GetFeatureReport(GetFeatureReportCompleter::Sync& completer) {
     auto result = device->ParseFeatureReport(report_data.data(), report_size, allocator, report);
     if (result != hid_input_report::ParseResult::kOk &&
         result != hid_input_report::ParseResult::kNotImplemented) {
-      zxlogf(ERROR, "ParseFeatureReport failed with %u", result);
+      zxlogf(ERROR, "ParseFeatureReport failed with %u", static_cast<unsigned int>(result));
       completer.ReplyError(ZX_ERR_INTERNAL);
       return;
     }
@@ -279,7 +279,7 @@ void InputReport::SetFeatureReport(SetFeatureReportRequestView request,
       continue;
     }
     if (result != hid_input_report::ParseResult::kOk) {
-      zxlogf(ERROR, "SetFeatureReport failed with %u", result);
+      zxlogf(ERROR, "SetFeatureReport failed with %u", static_cast<unsigned int>(result));
       completer.ReplyError(ZX_ERR_INTERNAL);
       return;
     }

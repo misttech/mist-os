@@ -98,7 +98,8 @@ bool VkLoopTest::InitBuffer() {
 
   auto rvt_buffer = device->createBufferUnique(buffer_info);
   if (vk::Result::eSuccess != rvt_buffer.result) {
-    RTN_MSG(false, "VK Error: 0x%x - Create buffer.\n", rvt_buffer.result);
+    RTN_MSG(false, "VK Error: 0x%x - Create buffer.\n",
+            static_cast<unsigned int>(rvt_buffer.result));
   }
   buffer_ = std::move(rvt_buffer.value);
 
@@ -125,7 +126,8 @@ bool VkLoopTest::InitBuffer() {
 
   auto rvt_memory = device->allocateMemoryUnique(alloc_info);
   if (vk::Result::eSuccess != rvt_memory.result) {
-    RTN_MSG(false, "VK Error: 0x%x - Create buffer memory.\n", rvt_memory.result);
+    RTN_MSG(false, "VK Error: 0x%x - Create buffer memory.\n",
+            static_cast<unsigned int>(rvt_memory.result));
   }
   buffer_memory_ = std::move(rvt_memory.value);
 
@@ -134,7 +136,7 @@ bool VkLoopTest::InitBuffer() {
   auto rv_map =
       device->mapMemory(*buffer_memory_, 0 /* offset */, kBufferSize, vk::MemoryMapFlags(), &addr);
   if (vk::Result::eSuccess != rv_map) {
-    RTN_MSG(false, "VK Error: 0x%x - Map buffer memory.\n", rv_map);
+    RTN_MSG(false, "VK Error: 0x%x - Map buffer memory.\n", static_cast<unsigned int>(rv_map));
   }
 
   // Set to 1 so the shader will ping pong about zero.
@@ -146,12 +148,13 @@ bool VkLoopTest::InitBuffer() {
 
   auto rv_flush = device->flushMappedMemoryRanges(1, &memory_range);
   if (vk::Result::eSuccess != rv_flush) {
-    RTN_MSG(false, "VK Error: 0x%x - Flush buffer memory range.\n", rv_flush);
+    RTN_MSG(false, "VK Error: 0x%x - Flush buffer memory range.\n",
+            static_cast<unsigned int>(rv_flush));
   }
 
   auto rv_bind = device->bindBufferMemory(*buffer_, *buffer_memory_, 0 /* offset */);
   if (vk::Result::eSuccess != rv_bind) {
-    RTN_MSG(false, "VK Error: 0x%x - Bind buffer memory.\n", rv_bind);
+    RTN_MSG(false, "VK Error: 0x%x - Bind buffer memory.\n", static_cast<unsigned int>(rv_bind));
   }
 
   return true;
@@ -164,7 +167,8 @@ bool VkLoopTest::InitCommandBuffer() {
 
   auto rvt_command_pool = ctx_->device()->createCommandPoolUnique(command_pool_info);
   if (vk::Result::eSuccess != rvt_command_pool.result) {
-    RTN_MSG(false, "VK Error: 0x%x - Create command pool.\n", rvt_command_pool.result);
+    RTN_MSG(false, "VK Error: 0x%x - Create command pool.\n",
+            static_cast<unsigned int>(rvt_command_pool.result));
   }
   command_pool_ = std::move(rvt_command_pool.value);
 
@@ -175,14 +179,15 @@ bool VkLoopTest::InitCommandBuffer() {
 
   auto rvt_alloc_cmd_bufs = ctx_->device()->allocateCommandBuffersUnique(cmd_buff_alloc_info);
   if (vk::Result::eSuccess != rvt_alloc_cmd_bufs.result) {
-    RTN_MSG(false, "VK Error: 0x%x - Allocate command buffers.\n", rvt_alloc_cmd_bufs.result);
+    RTN_MSG(false, "VK Error: 0x%x - Allocate command buffers.\n",
+            static_cast<unsigned int>(rvt_alloc_cmd_bufs.result));
   }
   command_buffers_ = std::move(rvt_alloc_cmd_bufs.value);
   vk::UniqueCommandBuffer &command_buffer = command_buffers_.front();
 
   auto rv_begin = command_buffer->begin(vk::CommandBufferBeginInfo{});
   if (vk::Result::eSuccess != rv_begin) {
-    RTN_MSG(false, "VK Error: 0x%x - Begin command buffer.\n", rv_begin);
+    RTN_MSG(false, "VK Error: 0x%x - Begin command buffer.\n", static_cast<unsigned int>(rv_begin));
   }
 
   vk::ShaderModuleCreateInfo sh_info;
@@ -205,7 +210,7 @@ bool VkLoopTest::InitCommandBuffer() {
 
   auto csm = ctx_->device()->createShaderModuleUnique(sh_info);
   if (vk::Result::eSuccess != csm.result) {
-    RTN_MSG(false, "vkCreateShaderModule failed: %d\n", csm.result);
+    RTN_MSG(false, "vkCreateShaderModule failed: %d\n", static_cast<int>(csm.result));
   }
   compute_shader_module_ = std::move(csm.value);
 
@@ -221,7 +226,7 @@ bool VkLoopTest::InitCommandBuffer() {
 
   auto dsl = ctx_->device()->createDescriptorSetLayoutUnique(descriptor_set_layout_create_info);
   if (vk::Result::eSuccess != dsl.result) {
-    RTN_MSG(false, "vkCreateDescriptorSetLayout failed: %d\n", dsl.result);
+    RTN_MSG(false, "vkCreateDescriptorSetLayout failed: %d\n", static_cast<int>(dsl.result));
   }
   descriptor_set_layout_ = std::move(dsl.value);
 
@@ -233,7 +238,7 @@ bool VkLoopTest::InitCommandBuffer() {
 
   auto dp = ctx_->device()->createDescriptorPoolUnique(descriptor_pool_create_info);
   if (vk::Result::eSuccess != dp.result) {
-    RTN_MSG(false, "vkCreateDescriptorPool failed: %d\n", dp.result);
+    RTN_MSG(false, "vkCreateDescriptorPool failed: %d\n", static_cast<int>(dp.result));
   }
   descriptor_pool_ = std::move(dp.value);
 
@@ -288,14 +293,15 @@ bool VkLoopTest::InitCommandBuffer() {
 
   auto compute_pipeline = ctx_->device()->createComputePipelineUnique(nullptr, pipeline_info);
   if (vk::Result::eSuccess != compute_pipeline.result) {
-    RTN_MSG(false, "vkCreateComputePipelines failed: %d\n", compute_pipeline.result);
+    RTN_MSG(false, "vkCreateComputePipelines failed: %d\n",
+            static_cast<int>(compute_pipeline.result));
   }
   vk_compute_pipeline_ = std::move(compute_pipeline.value);
 
   if (hang_on_event_) {
     auto evt = ctx_->device()->createEventUnique(vk::EventCreateInfo());
     if (vk::Result::eSuccess != evt.result) {
-      RTN_MSG(false, "VK Error: 0x%x - Create event.\n", evt.result);
+      RTN_MSG(false, "VK Error: 0x%x - Create event.\n", static_cast<unsigned int>(evt.result));
     }
     vk_event_ = std::move(evt.value);
 
@@ -317,7 +323,7 @@ bool VkLoopTest::InitCommandBuffer() {
 
   auto rv_end = command_buffer->end();
   if (vk::Result::eSuccess != rv_end) {
-    RTN_MSG(false, "VK Error: 0x%x - End command buffer.\n", rv_end);
+    RTN_MSG(false, "VK Error: 0x%x - End command buffer.\n", static_cast<unsigned int>(rv_end));
   }
 
   return true;
@@ -326,7 +332,7 @@ bool VkLoopTest::InitCommandBuffer() {
 bool VkLoopTest::Exec(bool kill_driver, AllowSuccess allow_success) {
   auto rv_wait = ctx_->queue().waitIdle();
   if (vk::Result::eSuccess != rv_wait) {
-    RTN_MSG(false, "VK Error: 0x%x - Queue wait idle.\n", rv_wait);
+    RTN_MSG(false, "VK Error: 0x%x - Queue wait idle.\n", static_cast<unsigned int>(rv_wait));
   }
 
   // Submit command buffer and wait for it to complete.
@@ -337,7 +343,7 @@ bool VkLoopTest::Exec(bool kill_driver, AllowSuccess allow_success) {
 
   auto rv = ctx_->queue().submit(1 /* submitCt */, &submit_info, nullptr /* fence */);
   if (rv != vk::Result::eSuccess) {
-    RTN_MSG(false, "VK Error: 0x%x - vk::Queue submit failed.\n", rv);
+    RTN_MSG(false, "VK Error: 0x%x - vk::Queue submit failed.\n", static_cast<unsigned int>(rv));
   }
 
   if (kill_driver) {
@@ -355,7 +361,8 @@ bool VkLoopTest::Exec(bool kill_driver, AllowSuccess allow_success) {
     EXPECT_TRUE(vk::Result::eErrorDeviceLost == rv_wait || vk::Result::eSuccess == rv_wait)
         << static_cast<int>(rv_wait);
   } else if (vk::Result::eErrorDeviceLost != rv_wait) {
-    RTN_MSG(false, "VK Error: Result was 0x%x instead of vk::Result::eErrorDeviceLost\n", rv_wait);
+    RTN_MSG(false, "VK Error: Result was 0x%x instead of vk::Result::eErrorDeviceLost\n",
+            static_cast<unsigned int>(rv_wait));
   }
 
   return true;

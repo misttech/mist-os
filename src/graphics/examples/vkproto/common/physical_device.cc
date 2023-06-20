@@ -58,7 +58,8 @@ bool PhysicalDevice::Init() {
 
   auto [r_phys_devices, phys_devices] = instance_->enumeratePhysicalDevices();
   if (vk::Result::eSuccess != r_phys_devices || phys_devices.empty()) {
-    RTN_MSG(false, "VK Error: 0x%x - No physical device found.\n", r_phys_devices);
+    RTN_MSG(false, "VK Error: 0x%x - No physical device found.\n",
+            static_cast<unsigned int>(r_phys_devices));
   }
 
   for (const auto &phys_device : phys_devices) {

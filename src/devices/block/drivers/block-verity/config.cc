@@ -21,7 +21,8 @@ zx_status_t CheckConfig(const fuchsia_hardware_block_verified::wire::Config& con
     case fuchsia_hardware_block_verified::wire::HashFunction::kSha256:
       break;
     default:
-      zxlogf(WARNING, "Unknown hash function enum value %hhu", config.hash_function());
+      zxlogf(WARNING, "Unknown hash function enum value %hhu",
+             static_cast<unsigned char>(config.hash_function()));
       return ZX_ERR_INVALID_ARGS;
   }
 
@@ -43,7 +44,8 @@ zx_status_t CheckConfig(const fuchsia_hardware_block_verified::wire::Config& con
       }
       break;
     default:
-      zxlogf(WARNING, "Unknown block size enum value %hhu", config.block_size());
+      zxlogf(WARNING, "Unknown block size enum value %hhu",
+             static_cast<unsigned char>(config.block_size()));
       return ZX_ERR_INVALID_ARGS;
   }
 

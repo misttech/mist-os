@@ -78,8 +78,8 @@ void PortWatcher::Watch(WatchCompleter::Sync& completer) {
 }
 
 zx_status_t PortWatcher::QueueEvent(const PortWatcher::Event& event) {
-  LOGF_TRACE("PortWatcher::%s(%ld); queue = %ld", __FUNCTION__, event.event().Which(),
-             event_queue_.size());
+  LOGF_TRACE("PortWatcher::%s(%ld); queue = %ld", __FUNCTION__,
+             static_cast<long>(event.event().Which()), event_queue_.size());
   if (event_queue_.size() == kMaximumQueuedEvents) {
     return ZX_ERR_CANCELED;
   }

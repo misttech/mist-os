@@ -255,7 +255,8 @@ zx_status_t RadarUtil::ConnectToDevice(fidl::ClientEnd<BurstReaderProvider> devi
     return result.status();
   }
   if (result->is_error()) {
-    fprintf(stderr, "Radar device failed to bind: %u\n", result->error_value());
+    fprintf(stderr, "Radar device failed to bind: %u\n",
+            static_cast<unsigned int>(result->error_value()));
     return ZX_ERR_INTERNAL;
   }
 
@@ -300,7 +301,7 @@ zx_status_t RadarUtil::RegisterVmos() {
     return result.status();
   }
   if (result->is_error()) {
-    fprintf(stderr, "Failed to register VMOs: %d\n", result->error_value());
+    fprintf(stderr, "Failed to register VMOs: %d\n", static_cast<int>(result->error_value()));
     return ZX_ERR_INTERNAL;
   }
 
@@ -322,7 +323,7 @@ zx_status_t RadarUtil::UnregisterVmos() {
     return result.status();
   }
   if (result->is_error()) {
-    fprintf(stderr, "Failed to register VMOs: %d\n", result->error_value());
+    fprintf(stderr, "Failed to register VMOs: %d\n", static_cast<int>(result->error_value()));
     return ZX_ERR_INTERNAL;
   }
 

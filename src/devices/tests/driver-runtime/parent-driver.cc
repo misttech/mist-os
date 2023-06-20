@@ -116,7 +116,8 @@ void Device::HandleRuntimeRequest(fdf_dispatcher_t* dispatcher, fdf::ChannelRead
       HandleGetDataRequest(dispatcher, std::move(read_return->arena), txid);
       return;
     default:
-      zxlogf(ERROR, "HandleRuntimeRequest got unknown type: %u\n", req_type);
+      zxlogf(ERROR, "HandleRuntimeRequest got unknown type: %u\n",
+             static_cast<unsigned int>(req_type));
       return;
   }
 }

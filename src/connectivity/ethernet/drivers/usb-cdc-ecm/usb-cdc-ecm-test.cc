@@ -192,8 +192,8 @@ class NetworkDeviceInterface {
                   Received frame type: %hu\
                   Expected frame type: %hu",
           buffer.data().port_id().base, port_id_.value().base, buffer.data().port_id().salt,
-          buffer.data().port_id().salt, buffer.data().frame_type(),
-          fuchsia_hardware_network::wire::FrameType::kEthernet);
+          buffer.data().port_id().salt, static_cast<unsigned short>(buffer.data().frame_type()),
+          static_cast<unsigned short>(fuchsia_hardware_network::wire::FrameType::kEthernet));
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
     std::vector<uint8_t> output;

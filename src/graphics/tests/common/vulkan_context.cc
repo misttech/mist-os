@@ -126,7 +126,7 @@ bool VulkanContext::InitInstance() {
   }
 
   if (vk::Result::eSuccess != rv_instance.result) {
-    RTN_MSG(false, "VK Error - Create instance: %d (%s)\n", rv_instance.result,
+    RTN_MSG(false, "VK Error - Create instance: %d (%s)\n", static_cast<int>(rv_instance.result),
             vk::to_string(rv_instance.result).data());
   }
   instance_ = std::move(rv_instance.value);
@@ -136,8 +136,8 @@ bool VulkanContext::InitInstance() {
     auto rv_messenger =
         instance_->createDebugUtilsMessengerEXTUnique(debug_info_, nullptr, loader_);
     if (rv_messenger.result != vk::Result::eSuccess) {
-      RTN_MSG(false, "VK Error - CreateDebugUtilsMessenger: %d (%s)\n", rv_messenger.result,
-              vk::to_string(rv_messenger.result).data());
+      RTN_MSG(false, "VK Error - CreateDebugUtilsMessenger: %d (%s)\n",
+              static_cast<int>(rv_messenger.result), vk::to_string(rv_messenger.result).data());
     }
     messenger_ = std::move(rv_messenger.value);
   }
@@ -154,8 +154,8 @@ bool VulkanContext::InitQueueFamily() {
   }
   auto [r_physical_devices, physical_devices] = instance_->enumeratePhysicalDevices();
   if (vk::Result::eSuccess != r_physical_devices || physical_devices.empty()) {
-    RTN_MSG(false, "VK Error - No physical device found: %d (%s)\n", r_physical_devices,
-            vk::to_string(r_physical_devices).data());
+    RTN_MSG(false, "VK Error - No physical device found: %d (%s)\n",
+            static_cast<int>(r_physical_devices), vk::to_string(r_physical_devices).data());
   }
   physical_device_ = physical_devices[physical_device_index_];
 
@@ -191,7 +191,7 @@ bool VulkanContext::InitDevice() {
     rv_device = physical_device_.createDeviceUnique(device_info_);
   }
   if (vk::Result::eSuccess != rv_device.result) {
-    RTN_MSG(false, "VK Error - Create device: %d (%s)\n", rv_device.result,
+    RTN_MSG(false, "VK Error - Create device: %d (%s)\n", static_cast<int>(rv_device.result),
             vk::to_string(rv_device.result).data());
   }
   device_ = std::move(rv_device.value);

@@ -102,7 +102,7 @@ zx_status_t InStreamHttp::ResetToStartInternal(zx::time just_fail_deadline) {
   have_response_event.Wait(zx::deadline_after(zx::sec(30)));
 
   if (http_response.has_error()) {
-    fprintf(stderr, "*response.error: %d\n", http_response.error());
+    fprintf(stderr, "*response.error: %d\n", static_cast<int>(http_response.error()));
   }
 
   // test only

@@ -95,8 +95,8 @@ zx_status_t LightsCli::Summary() {
       case fuchsia_hardware_light::wire::Capability::kSimple:
         break;
       default:
-        printf("Unknown capability %u for light number %u.\n", result2->value()->info.capability,
-               i);
+        printf("Unknown capability %u for light number %u.\n",
+               static_cast<unsigned int>(result2->value()->info.capability), i);
         continue;
     };
 

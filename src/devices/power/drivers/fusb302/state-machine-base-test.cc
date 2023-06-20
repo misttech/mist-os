@@ -57,7 +57,7 @@ class MockStateMachine : public StateMachineBase<MockStateMachine, MockState, co
       case MockState::kLoopDone:
         return "LoopDone";
     }
-    ZX_DEBUG_ASSERT_MSG(false, "Invalid MockState: %" PRId32, state);
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid MockState: %" PRId32, static_cast<int>(state));
     return nullptr;
   }
 

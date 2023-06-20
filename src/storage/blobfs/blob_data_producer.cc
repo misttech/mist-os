@@ -91,7 +91,7 @@ DecompressBlobDataProducer::DecompressBlobDataProducer(
 zx::result<DecompressBlobDataProducer> DecompressBlobDataProducer::Create(
     BlobCompressor& compressor, uint64_t decompressed_size) {
   ZX_ASSERT_MSG(compressor.algorithm() == CompressionAlgorithm::kChunked, "%u",
-                compressor.algorithm());
+                static_cast<unsigned int>(compressor.algorithm()));
   std::unique_ptr<SeekableDecompressor> decompressor;
   const size_t compressed_size = compressor.Size();
   if (zx_status_t status = SeekableChunkedDecompressor::CreateDecompressor(

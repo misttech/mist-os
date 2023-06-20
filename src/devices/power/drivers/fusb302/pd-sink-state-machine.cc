@@ -127,7 +127,7 @@ void SinkPolicyEngineStateMachine::EnterState(SinkPolicyEngineState state) {
       return;
   }
 
-  zxlogf(ERROR, "Invalid state: %d", state);
+  zxlogf(ERROR, "Invalid state: %d", static_cast<int>(state));
 }
 
 SinkPolicyEngineState SinkPolicyEngineStateMachine::NextState(SinkPolicyEngineInput input,
@@ -221,7 +221,7 @@ SinkPolicyEngineState SinkPolicyEngineStateMachine::NextState(SinkPolicyEngineIn
       return SinkPolicyEngineState::kWaitForCapabilities;
   }
 
-  zxlogf(ERROR, "Invalid state: %d", current_state);
+  zxlogf(ERROR, "Invalid state: %d", static_cast<int>(current_state));
   return current_state;
 }
 
@@ -248,7 +248,7 @@ void SinkPolicyEngineStateMachine::ExitState(SinkPolicyEngineState state) {
       return;
   }
 
-  zxlogf(ERROR, "Invalid state: %d", state);
+  zxlogf(ERROR, "Invalid state: %d", static_cast<int>(state));
 }
 
 void SinkPolicyEngineStateMachine::InitializeProtocolLayer() {
@@ -407,7 +407,7 @@ const char* SinkPolicyEngineStateMachine::StateToString(SinkPolicyEngineState st
       return "SoftReset";
   }
 
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid SinkPolicyEngineState: %" PRId32, state);
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid SinkPolicyEngineState: %" PRId32, static_cast<int>(state));
   return nullptr;
 }
 

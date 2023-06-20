@@ -1253,7 +1253,8 @@ zx_status_t AmlClock::GetMesonRateClock(const uint32_t clk, MesonRateClock** out
       *out = &cpu_clks_[clkid];
       return ZX_OK;
     default:
-      zxlogf(ERROR, "%s: Unsupported clock type, type = 0x%hx\n", __func__, type);
+      zxlogf(ERROR, "%s: Unsupported clock type, type = 0x%hx\n", __func__,
+             static_cast<unsigned short>(type));
       return ZX_ERR_NOT_SUPPORTED;
   }
 

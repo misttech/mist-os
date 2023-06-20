@@ -1342,7 +1342,7 @@ class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
         }
 
         default:
-          ZX_ASSERT_MSG(false, "generated p_type %#x ???", phdr.type());
+          ZX_ASSERT_MSG(false, "generated p_type %#x ???", static_cast<unsigned int>(phdr.type()));
       }
     }
 

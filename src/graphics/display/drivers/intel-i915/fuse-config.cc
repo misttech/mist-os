@@ -39,9 +39,11 @@ int CoreClockLimitKhzSkylake(registers::DisplayFuses::CoreClockLimit clock_limit
   static_assert(registers::DisplayFuses::CoreClockLimit::k675Mhz <
                 registers::DisplayFuses::CoreClockLimit::k337_5Mhz);
   ZX_DEBUG_ASSERT_MSG(clock_limit >= registers::DisplayFuses::CoreClockLimit::k675Mhz,
-                      "clock_limit should be a 2-bit field, but is %d", clock_limit);
+                      "clock_limit should be a 2-bit field, but is %d",
+                      static_cast<int>(clock_limit));
   ZX_DEBUG_ASSERT_MSG(clock_limit <= registers::DisplayFuses::CoreClockLimit::k337_5Mhz,
-                      "clock_limit should be a 2-bit field, but is %d", clock_limit);
+                      "clock_limit should be a 2-bit field, but is %d",
+                      static_cast<int>(clock_limit));
 
   switch (clock_limit) {
     case registers::DisplayFuses::CoreClockLimit::k675Mhz:

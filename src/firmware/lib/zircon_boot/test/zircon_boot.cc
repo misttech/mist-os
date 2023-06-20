@@ -492,7 +492,8 @@ struct VerifiedBootOsAbrTestCase {
     static char buffer[512];
     snprintf(buffer, sizeof(buffer), "%s_to_%s_mode%d_lock%d",
              AbrGetSlotSuffix(initial_active_slot),
-             expected_slot ? AbrGetSlotSuffix(*expected_slot) : "null", boot_mode, lock_status);
+             expected_slot ? AbrGetSlotSuffix(*expected_slot) : "null", boot_mode,
+             static_cast<int>(lock_status));
     return std::string(buffer);
   }
 };

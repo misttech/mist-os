@@ -136,7 +136,8 @@ void DoRegisterAssignment(const fxl::RefPtr<EvalContext>& context, const ExprVal
                           const ExprValue& source, EvalCallback cb) {
   const RegisterInfo* info = debug::InfoForRegister(dest.register_id());
   if (!info)
-    return cb(Err("Assignment to invalid register %u.", dest.register_id()));
+    return cb(
+        Err("Assignment to invalid register %u.", static_cast<unsigned int>(dest.register_id())));
 
   // Transforms a register write callback (Err only) to a EvalCallback (ErrOr<ExprValue>).
   SymbolDataProvider::WriteCallback write_cb = [source,

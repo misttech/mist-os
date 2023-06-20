@@ -123,7 +123,8 @@ zx_status_t CrgUdc::HandleXferEvent(TRBlock* event) {
       completion_code == TrbCmplCode::kCmplCodeDisabledLengthInvalid ||
       completion_code == TrbCmplCode::kCmplCodeHalted ||
       completion_code == TrbCmplCode::kCmplCodeHaltedLengthInvalid) {
-    zxlogf(INFO, "completion_code = %d(STOPPED/HALTED/DISABLED)", completion_code);
+    zxlogf(INFO, "completion_code = %d(STOPPED/HALTED/DISABLED)",
+           static_cast<int>(completion_code));
   } else {
     UpdateDequeuePt(ep, event);
   }
@@ -197,17 +198,18 @@ zx_status_t CrgUdc::HandleXferEvent(TRBlock* event) {
     case TrbCmplCode::kCmplCodeIsochBufferOverrun:
     case TrbCmplCode::kCmplCodeUsbTransErr:
     case TrbCmplCode::kCmplCodeTrbErr: {
-      zxlogf(ERROR, "XFER event error, cmpl_code = 0x%x", completion_code);
+      zxlogf(ERROR, "XFER event error, cmpl_code = 0x%x",
+             static_cast<unsigned int>(completion_code));
       SetEpHalt(ep);
       break;
     }
     case TrbCmplCode::kCmplCodeStopped:
     case TrbCmplCode::kCmplCodeStoppedLengthInvalid: {
-      zxlogf(ERROR, "STOP, cmpl_code = 0x%x", completion_code);
+      zxlogf(ERROR, "STOP, cmpl_code = 0x%x", static_cast<unsigned int>(completion_code));
       break;
     }
     default: {
-      zxlogf(INFO, "UNKNOWN cmpl_code = 0x%x", completion_code);
+      zxlogf(INFO, "UNKNOWN cmpl_code = 0x%x", static_cast<unsigned int>(completion_code));
       break;
     }
   }
@@ -567,7 +569,7 @@ void CrgUdc::UdcQueueCtrl(Endpoint* ep, uint32_t need_trbs_num) {
   uint8_t dir = 0;
 
   if (ep->ep_state != EpState::kEpStateRunning) {
-    zxlogf(ERROR, "UdcQueueCtrl: EP status = %d", ep->ep_state);
+    zxlogf(ERROR, "UdcQueueCtrl: EP status = %d", static_cast<int>(ep->ep_state));
     return;
   }
 

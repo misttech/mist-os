@@ -429,7 +429,7 @@ VkResult ImagePipeSwapchain::AcquireNextImage(uint64_t timeout_ns, VkSemaphore s
       return timeout_ns == 0ul ? VK_NOT_READY : VK_TIMEOUT;
 
     if (result != PlatformEvent::WaitResult::Ok) {
-      fprintf(stderr, "PlatformEvent::WaitResult failed %d\n", result);
+      fprintf(stderr, "PlatformEvent::WaitResult failed %d\n", static_cast<int>(result));
       return VK_ERROR_DEVICE_LOST;
     }
   }

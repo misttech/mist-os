@@ -1192,7 +1192,8 @@ void LogicalBufferCollection::MaybeAllocate() {
             LogClientError(FROM_HERE, node_properties,
                            "Sub-tree has zero clients remaining - failure_propagation_mode(): %u "
                            "is_allocate_attempted_: %u",
-                           node_properties->error_propagation_mode(), is_allocate_attempted_);
+                           static_cast<unsigned int>(node_properties->error_propagation_mode()),
+                           is_allocate_attempted_);
           }
           // This may fail the parent failure domain, possibly including the root, depending on
           // error_propagation_mode() and possibly is_allocate_attempted_.  If that happens,

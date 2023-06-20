@@ -160,7 +160,8 @@ struct Netdevice {
               case fuchsia_hardware_network::DeviceClass::kPpp:
               case fuchsia_hardware_network::DeviceClass::kWlanAp:
                 printf("netifc: ignoring netdevice port (%d:%d) with class %hu\n", port_id.base,
-                       port_id.salt, port_info.base_info().port_class());
+                       port_id.salt,
+                       static_cast<unsigned short>(port_info.base_info().port_class()));
                 return;
             }
           }

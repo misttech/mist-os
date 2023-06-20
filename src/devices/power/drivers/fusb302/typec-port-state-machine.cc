@@ -24,7 +24,7 @@ void TypeCPortStateMachine::EnterState(TypeCPortState state) {
       return;
   }
 
-  zxlogf(ERROR, "Invalid state: %d", state);
+  zxlogf(ERROR, "Invalid state: %d", static_cast<int>(state));
 }
 
 void TypeCPortStateMachine::ExitState(TypeCPortState state) {}
@@ -60,7 +60,7 @@ TypeCPortState TypeCPortStateMachine::NextState(TypeCPortInput input,
       return current_state;
   }
 
-  zxlogf(ERROR, "Invalid state: %" PRId32, current_state);
+  zxlogf(ERROR, "Invalid state: %" PRId32, static_cast<int>(current_state));
 }
 
 const char* TypeCPortStateMachine::StateToString(TypeCPortState state) const {
@@ -73,7 +73,7 @@ const char* TypeCPortStateMachine::StateToString(TypeCPortState state) const {
       return "SourceAttached";
   }
 
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid TypeCPortStateMachine: %" PRId32, state);
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid TypeCPortStateMachine: %" PRId32, static_cast<int>(state));
   return nullptr;
 }
 

@@ -88,7 +88,7 @@ void NandBroker::ShowInfo() const {
       "Page size: %d\nPages per block: %d\nTotal Blocks: %d\nOOB size: %d\nECC bits: %d\n"
       "Nand class: %d\n",
       info_.page_size(), info_.pages_per_block(), info_.num_blocks(), info_.oob_size(),
-      info_.ecc_bits(), info_.nand_class());
+      info_.ecc_bits(), static_cast<int>(info_.nand_class()));
 }
 
 bool NandBroker::ReadPages(uint32_t first_page, uint32_t count) const {

@@ -343,7 +343,7 @@ vk::Result VulkanImageCreator::CreateCollection(
     auto result = device_->createBufferCollectionFUCHSIAUnique(collection_create_info,
                                                                nullptr /*pAllocator*/, loader_);
     if (result.result != vk::Result::eSuccess) {
-      LOG_VERBOSE("Failed to create buffer collection: %d", result.result);
+      LOG_VERBOSE("Failed to create buffer collection: %d", static_cast<int>(result.result));
       return result.result;
     }
 
@@ -521,8 +521,9 @@ zx_status_t VulkanImageCreator::GetImageInfo(uint32_t width, uint32_t height, zx
       image_info_out->coherency_domain = MAGMA_COHERENCY_DOMAIN_INACCESSIBLE;
       break;
     default:
-      LOG_VERBOSE("Unhandled coherency domain: %u",
-                  collection_info.settings.buffer_settings.coherency_domain);
+      LOG_VERBOSE(
+          "Unhandled coherency domain: %u",
+          static_cast<unsigned int>(collection_info.settings.buffer_settings.coherency_domain));
       return ZX_ERR_INTERNAL;
   }
 

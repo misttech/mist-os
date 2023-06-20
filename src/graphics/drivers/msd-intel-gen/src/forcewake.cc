@@ -28,7 +28,7 @@ bool ForceWake::IsActive(MsdIntelRegisterIo* reg_io, ForceWakeDomain domain) {
 
 bool ForceWake::Reset(MsdIntelRegisterIo* reg_io, ForceWakeDomain domain) {
   TRACE_DURATION("magma", "ForceWakeReset");
-  DLOG("ForceWake::Reset domain %d", domain);
+  DLOG("ForceWake::Reset domain %d", static_cast<int>(domain));
 
   registers::ForceWakeRequest::reset(reg_io, get_request_offset(domain));
 
@@ -41,7 +41,7 @@ bool ForceWake::Request(MsdIntelRegisterIo* reg_io, ForceWakeDomain domain) {
   if (IsActive(reg_io, domain))
     return true;
 
-  DLOG("ForceWake::Request domain %d", domain);
+  DLOG("ForceWake::Request domain %d", static_cast<int>(domain));
 
   registers::ForceWakeRequest::write(reg_io, get_request_offset(domain), 1 << kThreadShift,
                                      1 << kThreadShift);
@@ -55,7 +55,7 @@ bool ForceWake::Release(MsdIntelRegisterIo* reg_io, ForceWakeDomain domain) {
   if (!IsActive(reg_io, domain))
     return true;
 
-  DLOG("ForceWake::Release domain %d", domain);
+  DLOG("ForceWake::Release domain %d", static_cast<int>(domain));
 
   registers::ForceWakeRequest::write(reg_io, get_request_offset(domain), 1 << kThreadShift, 0);
 
@@ -77,6 +77,7 @@ bool ForceWake::Wait(MsdIntelRegisterIo* register_io, ForceWakeDomain domain, bo
 
     std::this_thread::sleep_for(std::chrono::microseconds(kRetryDelayUs));
   }
-  MAGMA_LOG(WARNING, "Timed out waiting for forcewake domain %d set %d", domain, set);
+  MAGMA_LOG(WARNING, "Timed out waiting for forcewake domain %d set %d", static_cast<int>(domain),
+            set);
   return false;
 }

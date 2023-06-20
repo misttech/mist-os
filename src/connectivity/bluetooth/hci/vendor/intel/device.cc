@@ -145,7 +145,7 @@ zx_status_t Device::LoadSecureFirmware(zx::channel* cmd, zx::channel* acl) {
   if (hci_status == pw::bluetooth::emboss::StatusCode::UNKNOWN_COMMAND) {
     infof("Ignoring \"Unknown Command\" error while in bootloader mode");
   } else if (hci_status != pw::bluetooth::emboss::StatusCode::SUCCESS) {
-    errorf("HCI_Reset failed (status: 0x%02hhx)", hci_status);
+    errorf("HCI_Reset failed (status: 0x%02hhx)", static_cast<unsigned char>(hci_status));
     return ZX_ERR_BAD_STATE;
   }
 
@@ -216,7 +216,7 @@ zx_status_t Device::LoadLegacyFirmware(zx::channel* cmd, zx::channel* acl) {
   // Bring the controller to a well-defined default state.
   auto hci_status = hci.SendHciReset();
   if (hci_status != pw::bluetooth::emboss::StatusCode::SUCCESS) {
-    errorf("HCI_Reset failed (status: 0x%02hhx)", hci_status);
+    errorf("HCI_Reset failed (status: 0x%02hhx)", static_cast<unsigned char>(hci_status));
     return ZX_ERR_BAD_STATE;
   }
 

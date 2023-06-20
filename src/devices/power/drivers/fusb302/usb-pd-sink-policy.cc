@@ -85,7 +85,8 @@ PowerRequestData SinkPolicy::GetPowerRequest() const {
         break;
       }
       default:
-        zxlogf(WARNING, "Skipping unsupported power type %" PRIu8, power_data.supply_type());
+        zxlogf(WARNING, "Skipping unsupported power type %" PRIu8,
+               static_cast<unsigned char>(power_data.supply_type()));
         break;
     }
   }

@@ -18,7 +18,7 @@ const HostChannel* HostChannelManager::AddChannel(zx::channel channel, Controlle
   const HostChannel* existing_host_channel = HostChannelFromWriteId(write_id);
   if (existing_host_channel != nullptr) {
     zxlogf(ERROR, "Failed to allocate HostChannel - id %d already allocated to %s channel",
-           write_id, existing_host_channel->name());
+           static_cast<int>(write_id), existing_host_channel->name());
     return nullptr;
   }
 

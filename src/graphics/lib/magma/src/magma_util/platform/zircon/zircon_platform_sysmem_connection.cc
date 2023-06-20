@@ -55,7 +55,7 @@ class ZirconPlatformBufferDescription : public PlatformBufferDescription {
 
       default:
         return DRETF(false, "Unsupported coherency domain: %d",
-                     settings_.buffer_settings.coherency_domain);
+                     static_cast<int>(settings_.buffer_settings.coherency_domain));
     }
     return true;
   }

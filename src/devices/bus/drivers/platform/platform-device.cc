@@ -634,7 +634,7 @@ zx_status_t PlatformDevice::Start() {
         dev_str_props.emplace_back(dev_str_prop.value());
       } else {
         zxlogf(WARNING, "Node '%s' has unsupported property key type %lu.", name,
-               prop.key().Which());
+               static_cast<unsigned long>(prop.key().Which()));
       }
     }
   }

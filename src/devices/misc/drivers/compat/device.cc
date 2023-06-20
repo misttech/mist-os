@@ -590,7 +590,7 @@ zx_status_t Device::CreateNode() {
                          Name());
               } else {
                 FDF_LOGL(ERROR, *logger_, "Failed to add device: NodeError: '%s': %u", Name(),
-                         *error);
+                         static_cast<unsigned int>(*error));
               }
             }
           })

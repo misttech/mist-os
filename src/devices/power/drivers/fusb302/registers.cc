@@ -17,7 +17,7 @@ const char* SwitchBlockConfigToString(SwitchBlockConfig config) {
     case SwitchBlockConfig::kConnectorVoltage:
       return "VCONN";
   }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid SwitchBlockConfig: %" PRId8, config);
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid SwitchBlockConfig: %" PRId8, static_cast<char>(config));
   return nullptr;
 }
 
@@ -32,7 +32,7 @@ const char* Fusb302RoleDetectionModeToString(Fusb302RoleDetectionMode mode) {
     case Fusb302RoleDetectionMode::kSourceOnly:
       return "only Source";
   }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid Fusb302RoleDetectionMode: %" PRId8, mode);
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid Fusb302RoleDetectionMode: %" PRId8, static_cast<char>(mode));
   return nullptr;
 }
 

@@ -146,7 +146,8 @@ zx_vm_option_t HostPointerAccessModeToVmoOptions(HostPointerAccessMode host_poin
     case HostPointerAccessMode::kReadWrite:
       return ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
     default:
-      ZX_ASSERT_MSG(false, "Invalid HostPointerAccessMode %u", host_pointer_access_mode);
+      ZX_ASSERT_MSG(false, "Invalid HostPointerAccessMode %u",
+                    static_cast<unsigned int>(host_pointer_access_mode));
   }
 }
 

@@ -26,7 +26,7 @@ TestSynchronizedDispatcher::TestSynchronizedDispatcher(DispatcherType type) {
     return;
   }
 
-  ZX_ASSERT_MSG(false, "Unknown DispatcherType: %d", type);
+  ZX_ASSERT_MSG(false, "Unknown DispatcherType: %d", static_cast<int>(type));
 }
 
 TestSynchronizedDispatcher::~TestSynchronizedDispatcher() {

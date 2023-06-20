@@ -761,7 +761,8 @@ bool Controller::ReadMemoryLatencyInfo() {
 
   const MemorySubsystemInfo::GlobalInfo& global_info = memory_info.value().global_info;
   zxlogf(TRACE, "PCU memory subsystem info: DRAM type %d, %d channels, %d SAGV points",
-         global_info.ram_type, global_info.memory_channel_count, global_info.agent_point_count);
+         static_cast<int>(global_info.ram_type), global_info.memory_channel_count,
+         global_info.agent_point_count);
   for (int point_index = 0; point_index < global_info.agent_point_count; ++point_index) {
     const MemorySubsystemInfo::AgentPoint& point_info = memory_info.value().points[point_index];
     zxlogf(TRACE, "SAGV point %d info: DRAM clock %d kHz, tRP %d, tRCD %d, tRDPRE %d, tRAS %d",

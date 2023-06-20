@@ -937,7 +937,7 @@ DdiPllConfig DpllManagerTigerLake::LoadStateForComboDdi(DdiId ddi_id) {
     zxlogf(
         ERROR,
         "Loaded DDI %d DPLL %d config: DPLL uses genlock clock reference %d. Genlock not supported!",
-        ddi_id, pll_id, dpll_dco_dividers.reference_clock_select());
+        ddi_id, pll_id, static_cast<int>(dpll_dco_dividers.reference_clock_select()));
     return DdiPllConfig{};
   }
 

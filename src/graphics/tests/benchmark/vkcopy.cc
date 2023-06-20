@@ -118,7 +118,8 @@ bool VkCopyTest::InitBuffers(uint32_t buffer_size) {
 
     auto rvt_query_pool = device->createQueryPoolUnique(query_pool_info);
     if (vk::Result::eSuccess != rvt_query_pool.result) {
-      RTN_MSG(false, "VK Error: 0x%x - Create query pool.\n", rvt_query_pool.result);
+      RTN_MSG(false, "VK Error: 0x%x - Create query pool.\n",
+              static_cast<unsigned int>(rvt_query_pool.result));
     }
     query_pool_ = std::move(rvt_query_pool.value);
   }
@@ -150,7 +151,8 @@ bool VkCopyTest::InitBuffers(uint32_t buffer_size) {
 
     auto rvt_buffer = device->createBufferUnique(buffer_info);
     if (vk::Result::eSuccess != rvt_buffer.result) {
-      RTN_MSG(false, "VK Error: 0x%x - Create buffer.\n", rvt_buffer.result);
+      RTN_MSG(false, "VK Error: 0x%x - Create buffer.\n",
+              static_cast<unsigned int>(rvt_buffer.result));
     }
     buffer.buffer = std::move(rvt_buffer.value);
 
@@ -160,7 +162,8 @@ bool VkCopyTest::InitBuffers(uint32_t buffer_size) {
 
     auto rvt_memory = device->allocateMemoryUnique(alloc_info);
     if (vk::Result::eSuccess != rvt_memory.result) {
-      RTN_MSG(false, "VK Error: 0x%x - Create buffer memory.\n", rvt_memory.result);
+      RTN_MSG(false, "VK Error: 0x%x - Create buffer memory.\n",
+              static_cast<unsigned int>(rvt_memory.result));
     }
     buffer.memory = std::move(rvt_memory.value);
 
@@ -168,7 +171,7 @@ bool VkCopyTest::InitBuffers(uint32_t buffer_size) {
     rv = device->mapMemory(*(buffer.memory), 0 /* offset */, buffer_size, vk::MemoryMapFlags(),
                            &addr);
     if (vk::Result::eSuccess != rv) {
-      RTN_MSG(false, "VK Error: 0x%x - Map buffer memory.\n", rv);
+      RTN_MSG(false, "VK Error: 0x%x - Map buffer memory.\n", static_cast<unsigned int>(rv));
     }
 
     uint8_t index = (buffer.usage == vk::BufferUsageFlagBits::eTransferSrc) ? 0 : 1;
@@ -183,7 +186,7 @@ bool VkCopyTest::InitBuffers(uint32_t buffer_size) {
 
     rv = device->bindBufferMemory(*(buffer.buffer), *(buffer.memory), 0 /* offset */);
     if (rv != vk::Result::eSuccess) {
-      RTN_MSG(false, "VK Error: 0x%x - Bind buffer memory.\n", rv);
+      RTN_MSG(false, "VK Error: 0x%x - Bind buffer memory.\n", static_cast<unsigned int>(rv));
     }
   }
 
@@ -192,7 +195,8 @@ bool VkCopyTest::InitBuffers(uint32_t buffer_size) {
 
   auto rvt_command_pool = device->createCommandPoolUnique(command_pool_info);
   if (vk::Result::eSuccess != rvt_command_pool.result) {
-    RTN_MSG(false, "VK Error: 0x%x - Create command pool.\n", rvt_command_pool.result);
+    RTN_MSG(false, "VK Error: 0x%x - Create command pool.\n",
+            static_cast<unsigned int>(rvt_command_pool.result));
   }
   command_pool_ = std::move(rvt_command_pool.value);
 
@@ -203,14 +207,15 @@ bool VkCopyTest::InitBuffers(uint32_t buffer_size) {
 
   auto rvt_alloc_cmd_bufs = device->allocateCommandBuffers(cmd_buff_alloc_info);
   if (vk::Result::eSuccess != rvt_alloc_cmd_bufs.result) {
-    RTN_MSG(false, "VK Error: 0x%x - Allocate command buffers.\n", rvt_alloc_cmd_bufs.result);
+    RTN_MSG(false, "VK Error: 0x%x - Allocate command buffers.\n",
+            static_cast<unsigned int>(rvt_alloc_cmd_bufs.result));
   }
   command_buffers_ = std::move(rvt_alloc_cmd_bufs.value);
   vk::CommandBuffer &command_buffer = command_buffers_.front();
 
   auto rv_begin = command_buffer.begin(vk::CommandBufferBeginInfo{});
   if (vk::Result::eSuccess != rv_begin) {
-    RTN_MSG(false, "VK Error: 0x%x - Begin command buffer.\n", rv_begin);
+    RTN_MSG(false, "VK Error: 0x%x - Begin command buffer.\n", static_cast<unsigned int>(rv_begin));
   }
 
   if (is_timestamp_supported_) {
@@ -229,7 +234,7 @@ bool VkCopyTest::InitBuffers(uint32_t buffer_size) {
 
   auto rv_end = command_buffer.end();
   if (vk::Result::eSuccess != rv_end) {
-    RTN_MSG(false, "VK Error: 0x%x - End command buffer.\n", rv_end);
+    RTN_MSG(false, "VK Error: 0x%x - End command buffer.\n", static_cast<unsigned int>(rv_end));
   }
 
   return true;
@@ -245,7 +250,7 @@ bool VkCopyTest::Exec() {
 
   auto rv = ctx_->queue().submit(1 /* submitCt */, &submit_info, nullptr /* fence */);
   if (rv != vk::Result::eSuccess) {
-    RTN_MSG(false, "VK Error: 0x%x - vk::Queue submit failed.\n", rv);
+    RTN_MSG(false, "VK Error: 0x%x - vk::Queue submit failed.\n", static_cast<unsigned int>(rv));
   }
 
   RTN_IF_VKH_ERR(false, ctx_->queue().waitIdle(), "waitIdle failed\n");
@@ -299,7 +304,8 @@ bool VkCopyTest::Validate() {
   RTN_IF_VKH_ERR(false, device->invalidateMappedMemoryRanges(1, &range),
                  "invalidateMappedMemoryRanges failed\n");
   if (vk::Result::eSuccess != rv_map) {
-    RTN_MSG(false, "VK Error: 0x%x - Map buffer memory, value test.\n", rv_map);
+    RTN_MSG(false, "VK Error: 0x%x - Map buffer memory, value test.\n",
+            static_cast<unsigned int>(rv_map));
   }
   if (*(static_cast<uint8_t *>(dst_addr)) != kSrcValue) {
     RTN_MSG(false, "Dst buffer contents don't match src buffer - copy failed.\n");

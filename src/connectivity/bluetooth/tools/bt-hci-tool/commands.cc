@@ -46,8 +46,8 @@ template <typename T>
 void LogCommandResult(pw::bluetooth::emboss::StatusCode status,
                       ::bt::hci::CommandChannel::TransactionId id,
                       const std::string& event_name = "Command Complete") {
-  std::cout << fxl::StringPrintf("  %s - status: 0x%02hhx (id=%lu)\n", event_name.c_str(), status,
-                                 id);
+  std::cout << fxl::StringPrintf("  %s - status: 0x%02hhx (id=%lu)\n", event_name.c_str(),
+                                 static_cast<unsigned char>(status), id);
 }
 
 template <typename T>
@@ -759,13 +759,14 @@ bool HandleBRScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
       ::bt::hci_spec::kInquiryResultEventCode, std::move(inquiry_result_cb)));
 
   // The callback invoked for an Inquiry Complete response.
-  auto inquiry_complete_cb = [cleanup_cb = cleanup_cb.share()](
-                                 const ::bt::hci::EmbossEventPacket& event) mutable {
-    auto view = event.view<::pw::bluetooth::emboss::InquiryCompleteEventView>();
-    std::cout << fxl::StringPrintf("  Inquiry Complete - status: 0x%02hhx\n", view.status().Read());
-    cleanup_cb();
-    return ::bt::hci::CommandChannel::EventCallbackResult::kContinue;
-  };
+  auto inquiry_complete_cb =
+      [cleanup_cb = cleanup_cb.share()](const ::bt::hci::EmbossEventPacket& event) mutable {
+        auto view = event.view<::pw::bluetooth::emboss::InquiryCompleteEventView>();
+        std::cout << fxl::StringPrintf("  Inquiry Complete - status: 0x%02hhx\n",
+                                       static_cast<unsigned char>(view.status().Read()));
+        cleanup_cb();
+        return ::bt::hci::CommandChannel::EventCallbackResult::kContinue;
+      };
 
   event_handler_ids->push_back(cmd_data->cmd_channel()->AddEventHandler(
       ::bt::hci_spec::kInquiryCompleteEventCode, std::move(inquiry_complete_cb)));

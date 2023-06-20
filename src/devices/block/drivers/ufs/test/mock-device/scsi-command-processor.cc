@@ -111,7 +111,8 @@ zx_status_t ScsiCommandProcessor::HandleScsiCommand(
       data = std::move(*result);
     }
   } else {
-    zxlogf(ERROR, "UFS MOCK: scsi command opcode: 0x%x is not supported", opcode);
+    zxlogf(ERROR, "UFS MOCK: scsi command opcode: 0x%x is not supported",
+           static_cast<unsigned int>(opcode));
     BuildSenseData(response_upiu, kIllegalRequest);
     return ZX_ERR_NOT_SUPPORTED;
   }

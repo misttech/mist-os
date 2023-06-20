@@ -41,7 +41,8 @@ constexpr display::DisplayId kDisplayId{1};
 
 zx_status_t ResponseTypeToZxStatus(virtio_abi::ControlType type) {
   if (type != virtio_abi::ControlType::kEmptyResponse) {
-    zxlogf(ERROR, "Unexpected response type: %s (0x%04x)", ControlTypeToString(type), type);
+    zxlogf(ERROR, "Unexpected response type: %s (0x%04x)", ControlTypeToString(type),
+           static_cast<unsigned int>(type));
     return ZX_ERR_NO_MEMORY;
   }
   return ZX_OK;
@@ -464,7 +465,8 @@ zx_status_t GpuDevice::get_display_info() {
   send_command_response(&command, &response);
   if (response->header.type != virtio_abi::ControlType::kDisplayInfoResponse) {
     zxlogf(ERROR, "Expected DisplayInfo response, got %s (0x%04x)",
-           ControlTypeToString(response->header.type), response->header.type);
+           ControlTypeToString(response->header.type),
+           static_cast<unsigned int>(response->header.type));
     return ZX_ERR_NOT_FOUND;
   }
 

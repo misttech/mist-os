@@ -116,7 +116,7 @@ void InputReportsReader::ReceiveReport(const uint8_t* raw_report, size_t raw_rep
           device->ParseInputReport(raw_report, raw_report_size, report_allocator_, report);
       result != hid_input_report::ParseResult::kOk) {
     zxlogf(ERROR, "ReceiveReport: Device failed to parse report correctly %s (%d)",
-           ParseResultGetString(result), result);
+           ParseResultGetString(result), static_cast<int>(result));
     hexdump(cpp20::span<const uint8_t>{raw_report, raw_report_size});
     return;
   }

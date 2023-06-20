@@ -21,7 +21,7 @@ zx::result<std::optional<uint64_t>> GetMappedKey(
       // Is not unmapped at this point.
       return zx::ok(std::nullopt);
     default:
-      zxlogf(ERROR, "Unrecogonized buffer type %lu", buffer.Which());
+      zxlogf(ERROR, "Unrecogonized buffer type %lu", static_cast<unsigned long>(buffer.Which()));
       return zx::error(ZX_ERR_INTERNAL);
   }
 }

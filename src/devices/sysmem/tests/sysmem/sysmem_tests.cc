@@ -2496,7 +2496,8 @@ TEST(Sysmem, SystemRamHeapSupportsAllDomainsV1) {
     ASSERT_OK(collection->SetConstraints(true, std::move(constraints)));
 
     auto allocate_result = collection->WaitForBuffersAllocated();
-    ASSERT_OK(allocate_result, "Failed Allocate(): domain supported = %u", domain);
+    ASSERT_OK(allocate_result, "Failed Allocate(): domain supported = %u",
+              static_cast<unsigned int>(domain));
 
     ASSERT_EQ(
         domain,
@@ -3487,7 +3488,7 @@ TEST(Sysmem, HeapAmlogicSecureOnlySupportsInaccessibleV1) {
     } else {
       ASSERT_TRUE(allocate_result.status() != ZX_OK || allocate_result.value().status != ZX_OK,
                   "Sysmem should not allocate memory from secure heap with coherency domain %u",
-                  domain);
+                  static_cast<unsigned int>(domain));
     }
   }
 }

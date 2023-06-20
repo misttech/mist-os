@@ -17,7 +17,7 @@ const char* PowerRoleToString(PowerRole power_role) {
     case PowerRole::kSource:
       return "Source";
   }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid PowerRole: %" PRId8, power_role);
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid PowerRole: %" PRId8, static_cast<char>(power_role));
   return nullptr;
 }
 
@@ -28,7 +28,7 @@ const char* DataRoleToString(DataRole data_role) {
     case DataRole::kUpstreamFacingPort:
       return "UFP";
   }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid DataRole: %" PRId8, data_role);
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid DataRole: %" PRId8, static_cast<char>(data_role));
   return nullptr;
 }
 
@@ -39,7 +39,7 @@ const char* ConfigChannelPinIdToString(ConfigChannelPinId pin_id) {
     case ConfigChannelPinId::kCc2:
       return "CC2";
   }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid ConfigChannelPinId: %" PRId8, pin_id);
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid ConfigChannelPinId: %" PRId8, static_cast<char>(pin_id));
   return nullptr;
 }
 
@@ -52,7 +52,8 @@ const char* ConfigChannelPinSwitchToString(ConfigChannelPinSwitch cc_switch) {
     case ConfigChannelPinSwitch::kCc2:
       return "CC2";
   }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid ConfigChannelPinSwitch: %" PRId8, cc_switch);
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid ConfigChannelPinSwitch: %" PRId8,
+                      static_cast<char>(cc_switch));
   return nullptr;
 }
 
@@ -73,7 +74,8 @@ const char* ConfigChannelTerminationToString(ConfigChannelTermination terminatio
     case ConfigChannelTermination::kRp3000mA:
       return "Rp (3.0A Type C Power / SinkTxNG)";
   }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid ConfigChannelTermination: %" PRId8, termination);
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid ConfigChannelTermination: %" PRId8,
+                      static_cast<char>(termination));
   return nullptr;
 }
 

@@ -447,7 +447,8 @@ void Dispatcher::ShutdownAsync() {
       case DispatcherState::kDestroyed:
         return;
       default:
-        ZX_ASSERT_MSG(false, "Dispatcher::ShutdownAsync got unknown dispatcher state %d", state_);
+        ZX_ASSERT_MSG(false, "Dispatcher::ShutdownAsync got unknown dispatcher state %d",
+                      static_cast<int>(state_));
     }
 
     // Move the requests into a separate queue so we will be able to enter an idle state.
