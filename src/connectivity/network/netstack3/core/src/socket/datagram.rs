@@ -484,20 +484,20 @@ pub(crate) trait DatagramSocketSpec<A: SocketMapAddrSpec>:
 
 pub(crate) struct InUseError;
 
-pub(crate) fn create_unbound<
+pub(crate) fn create<
     A: SocketMapAddrSpec,
     S: DatagramSocketStateSpec,
     C,
     SC: DatagramStateContext<A, C, S>,
 >(
     sync_ctx: &mut SC,
-) -> S::UnboundId
+) -> DatagramSocketId<S>
 where
     Bound<S>: Tagged<AddrVec<A>>,
 {
     sync_ctx.with_sockets_mut(
         |_sync_ctx, DatagramSockets { bound_state: _, unbound, bound: _ }, _allocator| {
-            unbound.push(UnboundSocketState::default()).into()
+            DatagramSocketId::Unbound(unbound.push(UnboundSocketState::default()).into())
         },
     )
 }
@@ -608,12 +608,12 @@ pub(crate) fn listen<
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    id: S::UnboundId,
+    id: DatagramSocketId<S>,
     addr: Option<
         ZonedAddr<A::IpAddr, <SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId>,
     >,
     local_id: Option<A::LocalIdentifier>,
-) -> Result<S::ListenerId, LocalAddressError>
+) -> Result<DatagramSocketId<S>, Either<ExpectedUnboundError, LocalAddressError>>
 where
     Bound<S>: Tagged<AddrVec<A>>,
     S::ListenerAddrState:
@@ -621,8 +621,14 @@ where
     S::UnboundSharingState: Clone + Into<S::ListenerSharingState>,
     S::ListenerSharingState: Default,
 {
+    let id = match id {
+        DatagramSocketId::Unbound(id) => id,
+        DatagramSocketId::Bound(_) => return Err(Either::Left(ExpectedUnboundError)),
+    };
     sync_ctx.with_sockets_mut(|sync_ctx, sockets, _allocator| {
         listen_inner::<A, C, _, S>(sync_ctx, ctx, sockets, id, addr, local_id)
+            .map(|id| DatagramSocketId::Bound(SocketId::Listener(id)))
+            .map_err(Either::Right)
     })
 }
 
@@ -1782,6 +1788,34 @@ where
     })
 }
 
+pub(crate) fn update_sharing<
+    A: SocketMapAddrSpec,
+    SC: DatagramStateContext<A, C, S>,
+    C: DatagramStateNonSyncContext<A, S>,
+    S: DatagramSocketSpec<A, UnboundSharingState = Sharing>,
+    Sharing: Clone,
+>(
+    sync_ctx: &mut SC,
+    id: DatagramSocketId<S>,
+    new_sharing: Sharing,
+) -> Result<(), ExpectedUnboundError>
+where
+    Bound<S>: Tagged<AddrVec<A>>,
+{
+    let id = match id {
+        DatagramSocketId::Unbound(id) => id,
+        DatagramSocketId::Bound(_) => return Err(ExpectedUnboundError),
+    };
+    sync_ctx.with_sockets_mut(|_sync_ctx, sockets, _allocator| {
+        let DatagramSockets { bound_state: _, unbound, bound: _ } = sockets;
+
+        let UnboundSocketState { device: _, sharing, ip_options: _ } =
+            unbound.get_mut(id.get_key_index()).expect("unbound datagram socket not found");
+        *sharing = new_sharing;
+        Ok(())
+    })
+}
+
 pub(crate) fn get_sharing<
     A: SocketMapAddrSpec,
     SC: DatagramStateContext<A, C, S>,
@@ -2152,18 +2186,21 @@ mod test {
         let mut sync_ctx = FakeSyncCtx::<I, FakeDeviceId>::with_sockets(DatagramSockets::default());
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
-        let unbound = create_unbound(&mut sync_ctx);
+        let unbound = create(&mut sync_ctx);
         const EXPECTED_HOP_LIMITS: HopLimits =
             HopLimits { unicast: nonzero!(45u8), multicast: nonzero!(23u8) };
 
-        update_ip_hop_limit(&mut sync_ctx, &mut non_sync_ctx, unbound, |limits| {
+        update_ip_hop_limit(&mut sync_ctx, &mut non_sync_ctx, unbound.clone(), |limits| {
             *limits = SocketHopLimits {
                 unicast: Some(EXPECTED_HOP_LIMITS.unicast),
                 multicast: Some(EXPECTED_HOP_LIMITS.multicast),
             }
         });
 
-        assert_eq!(get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound), EXPECTED_HOP_LIMITS);
+        assert_eq!(
+            get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound.clone()),
+            EXPECTED_HOP_LIMITS
+        );
     }
 
     #[ip_test]
@@ -2178,8 +2215,8 @@ mod test {
         );
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
-        let unbound = create_unbound(&mut sync_ctx);
-        set_device(&mut sync_ctx, &mut non_sync_ctx, unbound.into(), Some(&FakeDeviceId)).unwrap();
+        let unbound = create(&mut sync_ctx);
+        set_device(&mut sync_ctx, &mut non_sync_ctx, unbound.clone(), Some(&FakeDeviceId)).unwrap();
 
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
         unicast = unicast.checked_add(1).unwrap();
@@ -2192,14 +2229,17 @@ mod test {
             *default_hop_limit = unicast;
         }
         assert_eq!(
-            get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound),
+            get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound.clone()),
             HopLimits { unicast, multicast }
         );
 
         // If the device is removed, use default hop limits.
         AsMut::<FakeIpDeviceIdCtx<_>>::as_mut(&mut sync_ctx.inner.get_mut())
             .set_device_removed(FakeDeviceId, true);
-        assert_eq!(get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound), DEFAULT_HOP_LIMITS);
+        assert_eq!(
+            get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound.clone()),
+            DEFAULT_HOP_LIMITS
+        );
     }
 
     #[ip_test]
@@ -2207,24 +2247,33 @@ mod test {
         let mut sync_ctx = FakeSyncCtx::<I, _>::with_sockets(DatagramSockets::default());
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
-        let unbound = create_unbound(&mut sync_ctx);
-        assert_eq!(get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound), DEFAULT_HOP_LIMITS);
+        let unbound = create(&mut sync_ctx);
+        assert_eq!(
+            get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound.clone()),
+            DEFAULT_HOP_LIMITS
+        );
 
-        update_ip_hop_limit(&mut sync_ctx, &mut non_sync_ctx, unbound, |limits| {
+        update_ip_hop_limit(&mut sync_ctx, &mut non_sync_ctx, unbound.clone(), |limits| {
             *limits =
                 SocketHopLimits { unicast: Some(nonzero!(1u8)), multicast: Some(nonzero!(1u8)) }
         });
 
         // The limits no longer match the default.
-        assert_ne!(get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound), DEFAULT_HOP_LIMITS);
+        assert_ne!(
+            get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound.clone()),
+            DEFAULT_HOP_LIMITS
+        );
 
         // Clear the hop limits set on the socket.
-        update_ip_hop_limit(&mut sync_ctx, &mut non_sync_ctx, unbound, |limits| {
+        update_ip_hop_limit(&mut sync_ctx, &mut non_sync_ctx, unbound.clone(), |limits| {
             *limits = Default::default()
         });
 
         // The values should be back at the defaults.
-        assert_eq!(get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound), DEFAULT_HOP_LIMITS);
+        assert_eq!(
+            get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound.clone()),
+            DEFAULT_HOP_LIMITS
+        );
     }
 
     #[ip_test]
@@ -2232,15 +2281,15 @@ mod test {
         let mut sync_ctx = FakeSyncCtx::<I, _>::with_sockets(DatagramSockets::default());
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
-        let unbound = create_unbound(&mut sync_ctx);
+        let unbound = create(&mut sync_ctx);
 
-        set_device(&mut sync_ctx, &mut non_sync_ctx, unbound.into(), Some(&FakeDeviceId)).unwrap();
+        set_device(&mut sync_ctx, &mut non_sync_ctx, unbound.clone(), Some(&FakeDeviceId)).unwrap();
         assert_eq!(
-            get_bound_device(&mut sync_ctx, &non_sync_ctx, unbound),
+            get_bound_device(&mut sync_ctx, &non_sync_ctx, unbound.clone()),
             Some(FakeWeakDeviceId(FakeDeviceId))
         );
 
-        set_device(&mut sync_ctx, &mut non_sync_ctx, unbound.into(), None).unwrap();
+        set_device(&mut sync_ctx, &mut non_sync_ctx, unbound.clone(), None).unwrap();
         assert_eq!(get_bound_device(&mut sync_ctx, &non_sync_ctx, unbound), None);
     }
 
@@ -2256,13 +2305,13 @@ mod test {
         );
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
-        let unbound = create_unbound(&mut sync_ctx);
+        let unbound = create(&mut sync_ctx);
         let body = Buf::new(Vec::new(), ..);
 
         let new_id = send_to(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            unbound.into(),
+            unbound,
             I::FAKE_CONFIG.remote_ip.into(),
             'a',
             IpProto::Udp.into(),
@@ -2285,14 +2334,14 @@ mod test {
         );
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
-        let unbound = create_unbound(&mut sync_ctx);
+        let unbound = create(&mut sync_ctx);
         let body = Buf::new(Vec::new(), ..);
 
         assert_matches!(
             send_to(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
-                unbound.into(),
+                unbound,
                 I::FAKE_CONFIG.remote_ip.into(),
                 'a',
                 IpProto::Udp.into(),
