@@ -70,9 +70,11 @@
             rights: [ "rx*" ],
         },
         {
-            storage: "data",
+            storage: "fxfs_tests_data",
             from: "self",
-            to: "#drm-tests",
+            as: "data",
+            to: [ "#drm-tests" ],
+            rights: [ "rw*" ],
         },
         {
             directory: "root-ssl-certificates",

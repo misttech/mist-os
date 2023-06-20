@@ -628,6 +628,7 @@ Possible values of `test_type`:
 
 | Value | Description |
 | ----- | ----------- |
+| `drm` | [DRM tests] |
 | `system` | [Legacy non hermetic realm][system-test-realm] with access to some system capabilities. |
 | `test_arch` | [Test Architecture Tests] |
 | `vfs-compliance` | [VFS compliance tests] |
@@ -681,7 +682,6 @@ Possible values of `fuchsia.test.type`:
 | `chromium-system` | Chromium system test realm |
 | `cts` | [CTF test realm] |
 | `devices` | Device test realm. |
-| `drm` | DRM test realm |
 | `google` | Google test realm |
 | `media` | Media test realm |
 | `starnix` | Starnix test realm |
@@ -831,6 +831,7 @@ offer: [
 [create-test-realm]: /docs/development/testing/components/create_test_realm.md
 [CTF test realm]: /docs/development/testing/ctf/test_collection.md
 [custom-artifact-example]: /examples/tests/rust/custom_artifact_test.rs
+[DRM tests]: /src/media/testing/drm_test_realm.shard.cml
 [ffx]: /docs/development/tools/ffx/overview.md
 [fidl-test-manager]: /sdk/fidl/fuchsia.test.manager/test_manager.fidl
 [fidl-test-suite]: /sdk/fidl/fuchsia.test/suite.fidl
