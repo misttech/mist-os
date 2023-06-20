@@ -11,7 +11,6 @@ import (
 
 	spdx "github.com/spdx/tools-golang/spdx/v2_2"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
-	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project/readme"
 )
 
@@ -28,11 +27,6 @@ type Project struct {
 	SearchableRegularFiles []*file.File
 	ReadmeFile             *readme.Readme
 
-	LicenseFileSearchResults        []*license.SearchResult
-	LicenseFileSearchResultsDeduped map[string]*license.SearchResult
-	RegularFileSearchResults        []*license.SearchResult
-	RegularFileSearchResultsDeduped map[string]*license.SearchResult
-
 	// Projects that this project depends on.
 	// Constructed from the GN dependency tree.
 	Children map[string]*Project
@@ -40,6 +34,10 @@ type Project struct {
 	// SPDX fields
 	Package *spdx.Package "json:'package'"
 	SPDXID  string        `json:"spdxid"`
+
+	// Compliance fields.
+	BeingSurfaced      bool
+	SourceCodeIncluded bool
 }
 
 // Order implements sort.Interface for []*Project based on the Root field.
@@ -69,16 +67,14 @@ func NewProject(r *readme.Readme, projectRootPath string) (*Project, error) {
 	}
 
 	p := &Project{
-		Root:                            projectRootPath,
-		Name:                            r.Name,
-		URL:                             r.URL,
-		ReadmeFile:                      r,
-		LicenseFiles:                    make([]*file.File, 0),
-		RegularFiles:                    make([]*file.File, 0),
-		SearchableRegularFiles:          make([]*file.File, 0),
-		Children:                        make(map[string]*Project, 0),
-		LicenseFileSearchResults:        make([]*license.SearchResult, 0),
-		LicenseFileSearchResultsDeduped: make(map[string]*license.SearchResult, 0),
+		Root:                   projectRootPath,
+		Name:                   r.Name,
+		URL:                    r.URL,
+		ReadmeFile:             r,
+		LicenseFiles:           make([]*file.File, 0),
+		RegularFiles:           make([]*file.File, 0),
+		SearchableRegularFiles: make([]*file.File, 0),
+		Children:               make(map[string]*Project, 0),
 	}
 
 	for _, l := range r.Licenses {

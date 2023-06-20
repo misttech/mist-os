@@ -23,11 +23,25 @@ type ResultConfig struct {
 
 	Checks    []*Check `json:"checks"`
 	CheckURLs bool
+
+	AllowLists []*AllowList `json::allowlists"`
 }
 
 type Template struct {
 	Paths []string `json:"paths"`
 	Notes []string `json:"notes"`
+}
+
+type AllowList struct {
+	Name      string            `json:"name"`
+	MatchType string            `json:"matchType"`
+	Entries   []*AllowListEntry `json:"entries"`
+}
+
+type AllowListEntry struct {
+	Projects []string `json:"projects"`
+	Bug      string   `json:"bug"`
+	Notes    []string `json:"notes"`
 }
 
 var Config *ResultConfig
@@ -37,6 +51,7 @@ func NewConfig() *ResultConfig {
 		Outputs:           make([]string, 0),
 		Templates:         make([]*Template, 0),
 		Checks:            make([]*Check, 0),
+		AllowLists:        make([]*AllowList, 0),
 		OutputLicenseFile: false,
 		RunAnalysis:       false,
 	}
@@ -80,4 +95,6 @@ func (c *ResultConfig) Merge(other *ResultConfig) {
 	}
 	c.Checks = append(c.Checks, other.Checks...)
 	c.CheckURLs = c.CheckURLs || other.CheckURLs
+
+	c.AllowLists = append(c.AllowLists, other.AllowLists...)
 }

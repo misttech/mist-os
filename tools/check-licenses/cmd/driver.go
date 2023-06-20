@@ -14,7 +14,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/directory"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
-	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project/readme"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/result"
@@ -112,9 +111,6 @@ func initialize() error {
 		return err
 	}
 	if err := readme.Initialize(); err != nil {
-		return err
-	}
-	if err := license.Initialize(Config.License); err != nil {
 		return err
 	}
 	if err := project.Initialize(Config.Project); err != nil {

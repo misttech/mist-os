@@ -17,8 +17,9 @@ const (
 )
 
 var (
-	AllFiles map[string]*File
-	urlRegex *regexp.Regexp
+	AllFiles        map[string]*File
+	AllLicenseFiles map[string]*File
+	urlRegex        *regexp.Regexp
 
 	spdxFileIndex     int
 	spdxFileDataIndex int
@@ -28,6 +29,7 @@ var (
 
 func init() {
 	AllFiles = make(map[string]*File, 0)
+	AllLicenseFiles = make(map[string]*File, 0)
 	Config = NewConfig()
 
 }

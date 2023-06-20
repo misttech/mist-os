@@ -37,14 +37,17 @@ func expandTemplates() (string, error) {
 			name := filepath.Join(expansionOutDir, o)
 			f, err := os.Create(name)
 			if err != nil {
-				return "", fmt.Errorf("Failed to create template file %v: %v", name, err)
+				b.WriteString(fmt.Sprintf("Failed to create template file %v: %v\n", name, err))
+				continue
 			}
 			if err := t.Execute(f, w); err != nil {
-				return "", fmt.Errorf("Failed to expand template %v: %v", name, err)
+				b.WriteString(fmt.Sprintf("Failed to expand template %v: %v\n", name, err))
+				continue
 			}
 			if Config.Zip {
 				if err := compressGZ(name); err != nil {
-					return "", fmt.Errorf("Failed to compress template %v: %v", name, err)
+					b.WriteString(fmt.Sprintf("Failed to compress template %v: %v\n", name, err))
+					continue
 				}
 			}
 			b.WriteString(fmt.Sprintf(" ⦿ Executed template -> %v", name))

@@ -30,6 +30,13 @@
           },
           {
             "projects": [
+              "third_party/rust_crates/vendor/bstr-1.5.0"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
               "prebuilt/third_party/rust/linux-x64"
             ],
             "bug": "",

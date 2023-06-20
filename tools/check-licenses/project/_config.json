@@ -53,6 +53,7 @@
                     "third_party/bazel_rules_rust/examples/third_party",
                     "third_party/rust_crates/mirrors/serde_json5/third_party",
                     "third_party/grpc/third_party",
+                    "third_party/llvm-libc/src/src/math/gpu/vendor",
                     "third_party/grpc/third_party/upb/third_party",
                     "third_party/dart-pkg/pub/csslib/third_party",
                     "third_party/dart-pkg/pub/characters/third_party",

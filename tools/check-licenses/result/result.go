@@ -21,7 +21,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/directory"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
-	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project"
 )
 
@@ -34,12 +33,6 @@ func SaveResults(cmdConfig interface{}, cmdMetrics MetricsInterface) (string, er
 	var b strings.Builder
 
 	s, err := savePackageInfo("cmd", cmdConfig, cmdMetrics)
-	if err != nil {
-		return "", err
-	}
-	b.WriteString(s)
-
-	s, err = savePackageInfo("license", license.Config, license.Metrics)
 	if err != nil {
 		return "", err
 	}

@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
-	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project/readme"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/util"
 )
@@ -29,26 +28,19 @@ var (
 	ctx context.Context
 
 	spdxIndex int
-
-	// Flag for testing license classifier usage.
-	useLicenseClassifier bool
 )
 
 func init() {
-	useLicenseClassifier = false
-
 	AllProjects = make(map[string]*Project, 0)
 	FilteredProjects = make(map[string]*Project, 0)
 	DedupedLicenseData = make([][]*file.FileData, 0)
 
 	UnknownProject = &Project{
-		Name:                            "unknown",
-		LicenseFiles:                    make([]*file.File, 0),
-		RegularFiles:                    make([]*file.File, 0),
-		SearchableRegularFiles:          make([]*file.File, 0),
-		Children:                        make(map[string]*Project, 0),
-		LicenseFileSearchResults:        make([]*license.SearchResult, 0),
-		LicenseFileSearchResultsDeduped: make(map[string]*license.SearchResult, 0),
+		Name:                   "unknown",
+		LicenseFiles:           make([]*file.File, 0),
+		RegularFiles:           make([]*file.File, 0),
+		SearchableRegularFiles: make([]*file.File, 0),
+		Children:               make(map[string]*Project, 0),
 	}
 }
 
@@ -88,7 +80,9 @@ func initializeCustomReadmes() error {
 					return err
 				}
 
-				if info.Name() == "README.fuchsia" {
+				if info.Name() == "README.fuchsia" ||
+					info.Name() == "README.chromium" ||
+					info.Name() == "README.crashpad" {
 					plusVal(NumInitCustomProjects, currentPath)
 					projectRoot := filepath.Dir(currentPath)
 					projectRoot, err = filepath.Rel(readmePath, projectRoot)

@@ -20,7 +20,6 @@ go_library("project") {
     "//third_party/golibs:github.com/spdx/tools-golang(//build/toolchain:host_x64)",
     "//third_party/golibs:golang.org/x/sync",
     "//tools/check-licenses/file",
-    "//tools/check-licenses/license",
     "//tools/check-licenses/project/readme",
     "//tools/check-licenses/util",
     "//tools/lib/logger",

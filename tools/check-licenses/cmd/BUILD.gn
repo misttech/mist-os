@@ -19,7 +19,6 @@ go_library("main") {
   deps = [
     "//tools/check-licenses/directory",
     "//tools/check-licenses/file",
-    "//tools/check-licenses/license",
     "//tools/check-licenses/project",
     "//tools/check-licenses/project/readme",
     "//tools/check-licenses/result",

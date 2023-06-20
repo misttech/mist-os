@@ -22,7 +22,6 @@ group("tests") {
     "cmd:tests",
     "directory:tests",
     "file:tests",
-    "license:tests",
     "project:tests",
     "result:tests",
     "util:tests",

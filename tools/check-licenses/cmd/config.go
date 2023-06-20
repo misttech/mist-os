@@ -13,7 +13,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/directory"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
-	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/result"
 )
@@ -71,7 +70,6 @@ type CheckLicensesConfig struct {
 	// The following variables represent Config files for the
 	// check-licenses subpackage of the same name.
 	File      *file.FileConfig           `json:"file"`
-	License   *license.LicenseConfig     `json:"license"`
 	Project   *project.ProjectConfig     `json:"project"`
 	Directory *directory.DirectoryConfig `json:"directory"`
 	Result    *result.ResultConfig       `json:"result"`
@@ -107,7 +105,6 @@ func NewCheckLicensesConfigJson(configJson string) (*CheckLicensesConfig, error)
 
 	c := &CheckLicensesConfig{
 		File:      file.NewConfig(),
-		License:   license.NewConfig(),
 		Project:   project.NewConfig(),
 		Directory: directory.NewConfig(),
 		Result:    result.NewConfig(),
@@ -159,7 +156,6 @@ func (c *CheckLicensesConfig) Merge(other *CheckLicensesConfig) error {
 	}
 
 	c.File.Merge(other.File)
-	c.License.Merge(other.License)
 	c.Project.Merge(other.Project)
 	c.Directory.Merge(other.Directory)
 	c.Result.Merge(other.Result)

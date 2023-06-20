@@ -18,9 +18,9 @@ go_library("result") {
     "world.go",
   ]
   deps = [
+    "//third_party/golibs:github.com/google/licenseclassifier",
     "//third_party/golibs:github.com/spdx/tools-golang",
     "//tools/check-licenses/directory",
-    "//tools/check-licenses/license",
     "//tools/check-licenses/project",
     "//tools/lib/logger",
   ]

@@ -90,6 +90,9 @@ func LoadFile(path string, ft FileType, projectName string) (*File, error) {
 	f.spdxID = fmt.Sprintf("LicenseRef-file-%x", h.Sum([]byte{}))
 
 	AllFiles[path] = f
+	if ft != RegularFile {
+		AllLicenseFiles[path] = f
+	}
 	return f, nil
 }
 

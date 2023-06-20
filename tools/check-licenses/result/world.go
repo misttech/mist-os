@@ -10,7 +10,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/directory"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
-	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project"
 )
 
@@ -34,13 +33,7 @@ type world struct {
 	DedupedLicenseData []*DedupedLicense
 
 	// license
-	AllPatterns                 []*license.Pattern
-	AllCopyrightPatterns        []*license.Pattern
-	AllSearchResults            []*license.SearchResult
-	AllLicenseFileSearchResults []*license.SearchResult
-	AllowlistPatternMap         map[string][]string
-	Unrecognized                *license.Pattern
-	Empty                       *license.Pattern
+	AllowlistPatternMap map[string][]string
 }
 
 type DedupedLicense struct {
@@ -103,13 +96,5 @@ func getWorldStruct() *world {
 		FilteredProjects:   project.FilteredProjects,
 		LicenseData:        licenseDataList,
 		DedupedLicenseData: dedupedLicenseDataList,
-
-		AllPatterns:                 license.AllPatterns,
-		AllCopyrightPatterns:        license.AllCopyrightPatterns,
-		AllSearchResults:            license.AllSearchResults,
-		AllLicenseFileSearchResults: license.AllLicenseFileSearchResults,
-		AllowlistPatternMap:         license.AllowlistPatternMap,
-		Unrecognized:                license.Unrecognized,
-		Empty:                       license.Empty,
 	}
 }

@@ -7,7 +7,6 @@ package directory
 import (
 	"encoding/json"
 
-	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project"
 )
 
@@ -34,9 +33,6 @@ func Initialize(c *DirectoryConfig) error {
 	patternSkips := &Skip{
 		Paths: []string{},
 		Notes: []string{"Always skip license.PatternRoot paths."},
-	}
-	for _, r := range license.Config.PatternRoots {
-		patternSkips.Paths = append(patternSkips.Paths, r.Paths...)
 	}
 	c.Skips = append(c.Skips, patternSkips)
 

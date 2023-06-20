@@ -22,7 +22,7 @@ const (
 )
 
 var (
-	AllReadmes = []*Readme{}
+	AllReadmes = map[string]*Readme{}
 
 	knownDirectives = map[string]bool{
 		"Name":                true,
@@ -144,6 +144,10 @@ func NewReadmeCustom(projectRoot string) (*Readme, error) {
 
 // NewReadme creates a new Readme object from an io.Reader.
 func NewReadme(r io.Reader, path string) (*Readme, error) {
+	if r, ok := AllReadmes[path]; ok {
+		return r, nil
+	}
+
 	readme := &Readme{
 		Licenses:       make([]*ReadmeLicense, 0),
 		MalformedLines: make([]string, 0),
@@ -195,11 +199,9 @@ func NewReadme(r io.Reader, path string) (*Readme, error) {
 		case "Security Critical":
 			readme.SecurityCritical = strings.ToLower(value) == "yes"
 		case "Description":
-			getNextLine = false
-			directive, value, readme.Description = parseReadmeMultiLineDirective(s, value)
+			directive, value, readme.Description, getNextLine = parseReadmeMultiLineDirective(s, value)
 		case "Modifications", "Local Modifications":
-			getNextLine = false
-			directive, value, readme.LocalModifications = parseReadmeMultiLineDirective(s, value)
+			directive, value, readme.LocalModifications, getNextLine = parseReadmeMultiLineDirective(s, value)
 
 		// Deprecated but still in use currently
 		case "check-licenses":
@@ -245,7 +247,7 @@ func NewReadme(r io.Reader, path string) (*Readme, error) {
 		}
 	}
 
-	AllReadmes = append(AllReadmes, readme)
+	AllReadmes[path] = readme
 	return readme, nil
 }
 
@@ -293,23 +295,25 @@ func parseReadmeLine(line string) (string, string, error) {
 
 // Some directives can span multiple lines (e.g. "Description").
 // In this case, keep parsing until we find another directive, or we reach the end of the file.
-func parseReadmeMultiLineDirective(s *bufio.Scanner, value string) (string, string, string) {
+func parseReadmeMultiLineDirective(s *bufio.Scanner, value string) (string, string, string, bool) {
 	var err error
 	var b strings.Builder
 	var line, directive string
 
 	b.WriteString(fmt.Sprintf("%s\n", value))
+	eof := true
 	for s.Scan() {
 		line = s.Text()
 		directive, value, err = parseReadmeLine(line)
 		if err == nil {
+			eof = false
 			break
 		} else {
 			b.WriteString(fmt.Sprintf("%s\n", line))
 		}
 	}
 
-	return directive, value, b.String()
+	return directive, value, b.String(), eof
 }
 
 // README.fuchsia files should exist for all projects in the filesystem, and

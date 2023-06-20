@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	classifierLib "github.com/google/licenseclassifier/v2"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/directory"
-	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project/readme"
 )
@@ -24,6 +24,9 @@ type Check struct {
 
 func RunChecks() error {
 	if err := AllFuchsiaAuthorSourceFilesMustHaveCopyrightHeaders(); err != nil {
+		return err
+	}
+	if err := AllFilesAndFoldersMustBeIncludedInAProject(); err != nil {
 		return err
 	}
 	if err := AllLicenseTextsMustBeRecognized(); err != nil {
@@ -38,11 +41,8 @@ func RunChecks() error {
 	if err := AllProjectsMustHaveALicense(); err != nil {
 		return err
 	}
-	if err := AllFilesAndFoldersMustBeIncludedInAProject(); err != nil {
-		fmt.Printf("========\nWarning: this will soon become an error\n\n%v\n========\n", err)
-	}
 	if err := AllReadmeFuchsiaFilesMustBeFormattedCorrectly(); err != nil {
-		fmt.Printf("========\nWarning: this will soon become an error\n\n%v\n========\n", err)
+		return err
 	}
 	return nil
 }
@@ -50,6 +50,18 @@ func RunChecks() error {
 // =============================================================================
 
 func AllFuchsiaAuthorSourceFilesMustHaveCopyrightHeaders() error {
+	name := "AllFuchsiaAuthorSourceFilesMustHaveCopyrightHeaders"
+
+	// Retrieve allowlists from config files
+	allowlist := make(map[string]bool, 0)
+	for _, c := range Config.Checks {
+		if c.Name == name {
+			for k, v := range c.Allowlist {
+				allowlist[k] = v
+			}
+		}
+	}
+
 	var b strings.Builder
 	b.WriteString("All source files owned by The Fuchsia Authors must contain a copyright header.\n")
 	b.WriteString("The following files have missing or incorrectly worded copyright header information:\n\n")
@@ -66,19 +78,28 @@ func AllFuchsiaAuthorSourceFilesMustHaveCopyrightHeaders() error {
 		return fmt.Errorf("Couldn't find Fuchsia project to verify this check!!\n")
 	}
 	count := 0
+OUTER:
 	for _, f := range fuchsia.SearchableRegularFiles {
+		if _, ok := allowlist[f.RelPath()]; ok {
+			continue
+		}
+
 		fdList, err := f.Data()
 		if err != nil {
 			return fmt.Errorf("Found a file that hasn't been parsed yet?? %v | %v\n", f.AbsPath(), err)
 		}
-	OUTER:
+
 		for _, fd := range fdList {
-			for _, p := range license.AllCopyrightPatterns {
-				if _, ok := p.PreviousMatches[fd.Hash()]; ok {
-					continue OUTER
+			results := fd.SearchResults()
+			if results != nil {
+				for _, m := range results.Matches {
+					if m.Name == "FuchsiaCopyright" {
+						continue OUTER
+					}
 				}
 			}
-			b.WriteString(fmt.Sprintf("-> %v\n", fd.File().RelPath()))
+
+			b.WriteString(fmt.Sprintf("-> %v\n", f.RelPath()))
 			count = count + 1
 		}
 	}
@@ -106,14 +127,23 @@ func AllLicenseTextsMustBeRecognized() error {
 	}
 
 	b.WriteString("Found unrecognized license texts - please add the relevant license pattern(s) to //tools/check-licenses/license/patterns/* and have it(them) reviewed by the OSRB team:\n\n")
-	for _, m := range license.Unrecognized.Matches {
-		if _, ok := allowlist[m.File().RelPath()]; ok {
-			continue
-		}
 
-		foundUnrecognizedMatch = true
-		b.WriteString(fmt.Sprintf("-> Line %v of %v\n", m.LineNumber(), m.File().RelPath()))
-		b.WriteString(fmt.Sprintf("\n%v\n\n", string(m.Data())))
+	for _, p := range project.FilteredProjects {
+		for _, l := range p.LicenseFiles {
+			data, err := l.Data()
+			if err != nil {
+				return err
+			}
+
+			for _, fd := range data {
+				results := fd.SearchResults()
+				if results == nil {
+					foundUnrecognizedMatch = true
+					b.WriteString(fmt.Sprintf("-> %s\n", l.RelPath()))
+					continue
+				}
+			}
+		}
 	}
 
 	if foundUnrecognizedMatch {
@@ -130,47 +160,48 @@ func AllLicensePatternUsagesMustBeApproved() error {
 	// Retrieve allowlists from config files
 	allowlist := make(map[string]bool, 0)
 	for _, c := range Config.Checks {
-		if c.Name == name {
-			for k, v := range c.Allowlist {
-				allowlist[k] = v
-			}
+		if c.Name != name {
+			continue
+		}
+		for k, v := range c.Allowlist {
+			allowlist[k] = v
 		}
 	}
 
-OUTER:
-	for _, sr := range license.AllSearchResults {
-		if _, ok := allowlist[sr.LicenseData.File().RelPath()]; ok {
-			continue
-		}
-
-		// TODO(fxbug.dev/126193): Remove this clause.
-		if sr.Pattern.Name == "_unrecognized" {
-			continue
-		}
-		if sr.Pattern.Name == "_empty" {
-			continue
-		}
-		if sr.Pattern.Category == "approved_production" {
-			continue
-		}
-		if sr.Pattern.Category == "approved_development" {
-			if !(strings.Contains(Config.BuildInfoProduct, "user") || strings.Contains(Config.BuildInfoBoard, "user")) {
+	for _, p := range project.FilteredProjects {
+		for _, l := range p.LicenseFiles {
+			if _, ok := allowlist[l.RelPath()]; ok {
 				continue
 			}
-		}
-
-		filepath := sr.LicenseData.File().RelPath()
-		for _, allowlist := range sr.Pattern.Allowlist {
-			for _, entry := range allowlist.Entries {
-				for _, project := range entry.Projects {
-					if sr.ProjectRoot == project {
-						continue OUTER
+			data, _ := l.Data()
+			for _, fd := range data {
+				results := fd.SearchResults()
+				if results == nil {
+					continue
+				}
+				for _, m := range results.Matches {
+					if _, ok := allowlist[l.RelPath()]; ok {
+						continue
 					}
+
+					switch {
+					case m.MatchType == "Copyright":
+						continue
+					case m.MatchType == "Approved":
+						continue
+					case strings.HasPrefix(m.MatchType, "_"):
+						continue
+					}
+
+					if isProjectAllowlisted(p.Root, m) {
+						continue
+					}
+					b.WriteString(fmt.Sprintf("File %v from project %s was not approved to use license pattern %s (%s | %s)\n",
+						l.RelPath(), p.Root, m.Name, m.MatchType, m.Variant))
+
 				}
 			}
 		}
-		b.WriteString(fmt.Sprintf("File %v from project %s was not approved to use license pattern %v\n",
-			filepath, sr.ProjectRoot, sr.Pattern.RelPath))
 	}
 
 	result := b.String()
@@ -178,6 +209,23 @@ OUTER:
 		return fmt.Errorf("Encountered license texts that were not approved for usage:\n%v", result)
 	}
 	return nil
+}
+
+func isProjectAllowlisted(relpath string, m *classifierLib.Match) bool {
+	for _, al := range Config.AllowLists {
+		if al.MatchType != m.MatchType || al.Name != m.Name {
+			continue
+		}
+		for _, e := range al.Entries {
+			for _, p := range e.Projects {
+				if p == relpath {
+					return true
+				}
+			}
+		}
+	}
+	return false
+
 }
 
 func AllComplianceWorksheetLinksAreGood() error {
@@ -188,30 +236,31 @@ func AllComplianceWorksheetLinksAreGood() error {
 
 	numBadLinks := 0
 	checkedURLs := make(map[string]bool, 0)
-	for _, sr := range license.AllSearchResults {
-		if strings.HasPrefix(sr.Pattern.Name, "_") {
-			fmt.Printf("Not checking URL for pattern %s\n", sr.Pattern.Name)
-			continue
-		}
-		url := sr.LicenseData.URL()
-		if checkedURLs[url] {
-			continue
-		}
-		if strings.Contains(url, "3rd party library") {
-			continue
-		}
-		if url != "" {
-			fmt.Printf(" -> %s\n", url)
-			resp, err := http.Get(url)
-			if err != nil {
-				fmt.Printf("%v-%v %v: %v \n", sr.ProjectRoot, sr.Pattern.Name, url, err)
-				numBadLinks = numBadLinks + 1
-			} else if resp.Status != "200 OK" {
-				fmt.Printf("%v-%v %v: %v\n", sr.ProjectRoot, sr.Pattern.Name, url, resp.Status)
-				numBadLinks = numBadLinks + 1
+	for _, p := range project.FilteredProjects {
+		for _, l := range p.LicenseFiles {
+			data, _ := l.Data()
+			for _, fd := range data {
+				url := fd.URL()
+				if checkedURLs[url] {
+					continue
+				}
+				if strings.Contains(url, "3rd party library") {
+					continue
+				}
+				if url != "" {
+					fmt.Printf(" -> %s\n", url)
+					resp, err := http.Get(url)
+					if err != nil {
+						fmt.Printf("%v-%v %v: %v \n", p.Root, l.RelPath(), url, err)
+						numBadLinks = numBadLinks + 1
+					} else if resp.Status != "200 OK" {
+						fmt.Printf("%v-%v %v: %v\n", p.Root, l.RelPath(), url, resp.Status)
+						numBadLinks = numBadLinks + 1
+					}
+					checkedURLs[url] = true
+					time.Sleep(200 * time.Millisecond)
+				}
 			}
-			checkedURLs[url] = true
-			time.Sleep(200 * time.Millisecond)
 		}
 	}
 
@@ -267,7 +316,6 @@ func AllFilesAndFoldersMustBeIncludedInAProject() error {
 	name := "AllFilesAndFoldersMustBeIncludedInAProject"
 
 	var b strings.Builder
-	var recurse func(*directory.Directory)
 	count := 0
 
 	// Retrieve allowlists from config files
@@ -284,19 +332,14 @@ func AllFilesAndFoldersMustBeIncludedInAProject() error {
 	b.WriteString("This means a license file needs to accompany all first and third party projects,\n")
 	b.WriteString("and a README.fuchsia file must exist and specify where the license file lives.\n")
 	b.WriteString("The following directories are not included in a project:\n\n")
-	recurse = func(d *directory.Directory) {
+	for _, d := range directory.AllDirectories {
 		if d.Project == project.UnknownProject && len(d.Files) > 0 {
 			if _, ok := allowlist[d.Path]; !ok {
 				b.WriteString(fmt.Sprintf("-> %s\n", d.Path))
 				count = count + 1
-				return
 			}
 		}
-		for _, child := range d.Children {
-			recurse(child)
-		}
 	}
-	recurse(directory.RootDirectory)
 
 	b.WriteString("\nPlease add a LICENSE file to the above projects, and point to them in an associated README.fuchsia file.\n")
 	b.WriteString("If this is urgent and you cannot complete the above steps, add the above paths to the relevant allowlist\n")
