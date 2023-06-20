@@ -45,7 +45,9 @@ void TouchSourceWithLocalHit::Watch(std::vector<fuchsia::ui::pointer::TouchRespo
     out_events.reserve(events.size());
     for (auto& event : events) {
       if (!event.local_hit.has_value()) {
-        FX_LOGS(WARNING) << "Local hit not set!";  // "impossible" but still happens
+        if (!event.touch_event.has_interaction_result()) {
+          FX_LOGS(WARNING) << "Local hit not set!";  // "impossible" but still happens
+        }
         event.local_hit = {.local_viewref_koid = ZX_KOID_INVALID, .local_point = {0.f, 0.f}};
       }
 
