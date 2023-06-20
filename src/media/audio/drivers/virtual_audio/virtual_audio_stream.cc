@@ -371,14 +371,12 @@ zx_status_t VirtualAudioStream::SetGain(const audio::audio_proto::SetGainReq& re
   return ZX_OK;
 }
 
-// Drivers *must* report the time (on CLOCK_MONOTONIC timeline) at which the first frame will be
-// clocked out, not including any external delay.
+// Drivers *must* return the start_time (on CLOCK_MONOTONIC timeline) at which the ring buffer
+// start to be written to or read from. Internal or external delays are unrelated to
+// `start_time`, since they occur beyond the ring buffer.
 zx_status_t VirtualAudioStream::Start(uint64_t* out_start_time) {
   zx_status_t status = reference_clock_.read(ref_start_time_.get_address());
   ZX_ASSERT_MSG(status == ZX_OK, "reference_clock::read returned error (%d)", status);
-
-  // Incorporate delay caused by driver_transfer_bytes_
-  ref_start_time_ += zx::duration((zx::sec(1) * driver_transfer_bytes_) / bytes_per_sec_);
 
   ref_time_to_running_frame_ =
       affine::Transform(ref_start_time_.get(), 0, affine::Ratio(frame_rate_, ZX_SEC(1)));
