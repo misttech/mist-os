@@ -34,8 +34,7 @@
 #include <dev/power.h>
 #include <dev/uart.h>
 #include <explicit-memory/bytes.h>
-#include <fbl/auto_lock.h>
-#include <fbl/ref_ptr.h>
+#include <fbl/array.h>
 #include <kernel/cpu_distance_map.h>
 #include <kernel/dpc.h>
 #include <kernel/jtrace_config.h>
@@ -45,7 +44,6 @@
 #include <ktl/algorithm.h>
 #include <ktl/atomic.h>
 #include <ktl/byte.h>
-#include <ktl/span.h>
 #include <lk/init.h>
 #include <lk/main.h>
 #include <object/resource_dispatcher.h>
@@ -72,34 +70,36 @@
 
 #define LOCAL_TRACE 0
 
-// TODO-rvbringup: remove this when building lib/syscalls/ddk.cc
-#ifdef KERNEL_NO_USERABI
-zx_paddr_t gAcpiRsdp = 0;
-zx_paddr_t gSmbiosPhys = 0;
-#endif
+namespace {
 
-static void* ramdisk_base;
-static size_t ramdisk_size;
+// Enable feature to probe for parked cpu cores via SBI to build
+// a fallback topology tree in case one was not passed in from
+// the bootloader.
+// TODO(fxb/129255): Remove this hack once boot shim detects cpus via device tree.
+constexpr bool ENABLE_SBI_TOPOLOGY_DETECT_FALLBACK = false;
 
-static bool uart_disabled = false;
+void* ramdisk_base;
+size_t ramdisk_size;
+
+bool uart_disabled = false;
 
 // all of the configured memory arenas from the zbi
-static constexpr size_t kNumArenas = 16;
-static pmm_arena_info_t mem_arena[kNumArenas];
-static size_t arena_count = 0;
+constexpr size_t kNumArenas = 16;
+pmm_arena_info_t mem_arena[kNumArenas];
+size_t arena_count = 0;
 
-static ktl::atomic<int> panic_started;
-static ktl::atomic<int> halted;
+ktl::atomic<int> panic_started;
+ktl::atomic<int> halted;
 
-namespace {
 lazy_init::LazyInit<RamMappableCrashlog, lazy_init::CheckType::None,
                     lazy_init::Destructor::Disabled>
     ram_mappable_crashlog;
-}
+
+}  // anonymous namespace
 
 bool IsEfiExpected() { return false; }
 
-static void halt_other_cpus(void) {
+static void halt_other_cpus() {
   if (halted.exchange(1) == 0) {
     // stop the other cpus
     printf("stopping other cpus\n");
@@ -190,12 +190,125 @@ static constexpr zbi_topology_node_v2_t fallback_topology = {
 };
 // clang-format on
 
+static zx::result<fbl::Array<zbi_topology_node_v2_t>> sbi_detect_topology(size_t max_cpus) {
+  DEBUG_ASSERT(max_cpus > 0 && max_cpus <= SMP_MAX_CPUS);
+
+  arch::HartId detected_harts[SMP_MAX_CPUS]{};
+
+  // record the first known hart, that we're by definition running on
+  detected_harts[0] = riscv64_curr_hart_id();
+  size_t detected_hart_count = 1;
+
+  DEBUG_ASSERT(arch_curr_cpu_num() == 0);
+
+  dprintf(INFO, "RISCV: probing for stopped harts\n");
+
+  // probe the first SMP_MAX_CPUS harts and see which ones are present according to SBI
+  // NOTE: assumes that harts are basically 0 numbered, which will not be the case always.
+  // This may also detect harts that we're not supposed to run on, such as machine mode only
+  // harts intended for embedded use.
+  for (arch::HartId i = 0; i < SMP_MAX_CPUS; i++) {
+    // Stop if we've detected the clamped max cpus, including the boot cpu
+    if (detected_hart_count == max_cpus) {
+      break;
+    }
+
+    // skip the current cpu, it's known to be present
+    if (i == riscv64_curr_hart_id()) {
+      continue;
+    }
+
+    arch::RiscvSbiRet ret = arch::RiscvSbi::HartGetStatus(i);
+    if (ret.error != arch::RiscvSbiError::kSuccess) {
+      continue;
+    }
+
+    if (ret.value == static_cast<intptr_t>(arch::RiscvSbiHartState::kStopped)) {
+      // this is a core that exists but is stopped, add it to the list
+      detected_harts[detected_hart_count] = i;
+      detected_hart_count++;
+      dprintf(INFO, "RISCV: detected stopped hart %lu\n", i);
+    }
+  }
+
+  // Construct a flat topology tree based on what was found
+  fbl::AllocChecker ac;
+  auto nodes = fbl::MakeArray<zbi_topology_node_v2_t>(&ac, detected_hart_count);
+  if (!ac.check()) {
+    return zx::error_result(ZX_ERR_NO_MEMORY);
+  }
+  for (size_t i = 0; i < detected_hart_count; i++) {
+    // clang-format off
+    nodes[i] = {
+      .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
+      .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      .entity = {
+        .processor = {
+          .logical_ids = { static_cast<uint16_t>(i) },
+          .logical_id_count = 1,
+          .flags = static_cast<uint16_t>((i == 0) ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY : 0),
+          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_RISCV64,
+          .architecture_info = {
+            .riscv64 = {
+              .hart_id = detected_harts[i],
+            }
+          }
+        }
+      }
+    };
+    // clang-format on
+  }
+
+  return zx::ok(std::move(nodes));
+}
+
 static void init_topology(uint level) {
   ktl::span handoff = gPhysHandoff->cpu_topology.get();
 
-  auto result = system_topology::Graph::InitializeSystemTopology(handoff.data(), handoff.size());
+  // Read the max cpu count from the command line and clamp it to reasonable values.
+  uint32_t max_cpus = gBootOptions->smp_max_cpus;
+  if (max_cpus != SMP_MAX_CPUS) {
+    dprintf(INFO, "SMP: command line setting maximum cpus to %u\n", max_cpus);
+  }
+  if (max_cpus > SMP_MAX_CPUS || max_cpus == 0) {
+    printf("SMP: invalid kernel.smp.maxcpus value (%u), clamping to %d\n", max_cpus, SMP_MAX_CPUS);
+    max_cpus = SMP_MAX_CPUS;
+  }
+
+  // TODO-rvbringup: clamp the topology tree passed from the bootloader to max_cpus.
+
+  // Try to initialize the system topology from a tree passed from the bootloader.
+  zx_status_t result =
+      system_topology::Graph::InitializeSystemTopology(handoff.data(), handoff.size());
   if (result != ZX_OK) {
-    printf("Failed to initialize system topology! error: %d, using fallback topology\n", result);
+    // Only attempt to use the SBI fallback if our global allow define is set and we're
+    // running on QEMU.
+    if (ENABLE_SBI_TOPOLOGY_DETECT_FALLBACK && gPhysHandoff->platform_id.has_value() &&
+        strcmp(gPhysHandoff->platform_id->board_name, "qemu-riscv64") == 0) {
+      printf(
+          "SMP: Failed to initialize system topolgy from handoff data, probing for secondary cpus via SBI\n");
+
+      // Use SBI to try to detect secondary cpus.
+      zx::result<fbl::Array<zbi_topology_node_v2_t>> topo = sbi_detect_topology(max_cpus);
+      if (topo.is_ok()) {
+        // Assume the synthesized topology tree only contains processor nodes and thus
+        // the size of the array is the total detected cpu count.
+        const size_t detected_hart_count = topo->size();
+        DEBUG_ASSERT(detected_hart_count > 0 && detected_hart_count <= max_cpus);
+
+        // Set the detected topology.
+        result =
+            system_topology::Graph::InitializeSystemTopology(topo->data(), detected_hart_count);
+        ASSERT(result == ZX_OK);
+      } else {
+        result = topo.error_value();
+      }
+    }
+  }
+
+  if (result != ZX_OK) {
+    printf("SMP: Failed to initialize system topology, error: %d, using fallback topology\n",
+           result);
 
     // Try to fallback to a topology of just this processor.
     result = system_topology::Graph::InitializeSystemTopology(&fallback_topology, 1);
@@ -204,11 +317,13 @@ static void init_topology(uint level) {
 
   arch_set_num_cpus(static_cast<uint>(system_topology::GetSystemTopology().processor_count()));
 
-  // TODO(fxbug.dev/32903) Print the whole topology of the system.
+  // Print the detected cpu topology.
   if (DPRINTF_ENABLED_FOR_LEVEL(INFO)) {
+    size_t cpu_num = 0;
     for (auto* proc : system_topology::GetSystemTopology().processors()) {
       auto& info = proc->entity.processor.architecture_info.riscv64;
-      dprintf(INFO, "System topology: CPU Hart %lu\n", info.hart_id);
+      dprintf(INFO, "System topology: CPU %zu Hart %lu%s\n", cpu_num++, info.hart_id,
+              (info.hart_id == riscv64_curr_hart_id()) ? " boot" : "");
     }
   }
 }
@@ -350,7 +465,7 @@ static void ProcessPhysHandoff() {
   process_mem_ranges(gPhysHandoff->mem_config.get());
 }
 
-void platform_early_init(void) {
+void platform_early_init() {
   // is the cmdline option to bypass dlog set ?
   dlog_bypass_init();
 

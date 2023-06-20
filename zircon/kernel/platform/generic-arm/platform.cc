@@ -272,7 +272,6 @@ static void init_topology(uint level) {
 
   arch_set_num_cpus(static_cast<uint>(system_topology::GetSystemTopology().processor_count()));
 
-  // TODO(fxbug.dev/32903) Print the whole topology of the system.
   if (DPRINTF_ENABLED_FOR_LEVEL(INFO)) {
     for (auto* proc : system_topology::GetSystemTopology().processors()) {
       auto& info = proc->entity.processor.architecture_info.arm64;
