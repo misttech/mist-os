@@ -139,7 +139,12 @@ void* platform_get_ramdisk(size_t* size) {
   }
 }
 
-void platform_halt_cpu(void) {}
+void platform_halt_cpu() {
+  arch::RiscvSbiRet result = sbi_hart_stop();
+
+  // Should not have returned
+  panic("sbi_hart_stop returned %ld\n", result.error);
+}
 
 static void topology_cpu_init() {
   DEBUG_ASSERT(arch_max_num_cpus() > 0);
@@ -482,9 +487,7 @@ void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_
     printf("reboot-recovery failed\n");
   } else if (suggested_action == HALT_ACTION_SHUTDOWN) {
     power_shutdown();
-
-    // TODO-rvbringup: remove this call here and have SBI register via the power pdev
-    sbi_shutdown();
+    printf("shutdown failed\n");
   }
 
   if (reason == ZirconCrashReason::Panic) {

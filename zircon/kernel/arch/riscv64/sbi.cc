@@ -11,6 +11,7 @@
 #include <trace.h>
 
 #include <arch/riscv64/mp.h>
+#include <pdev/power.h>
 
 #define LOCAL_TRACE 0
 
@@ -87,6 +88,17 @@ void riscv64_sbi_early_init() {
   };
 
   for_every_extension(probe_and_set_extension);
+
+  // Register with the pdev power driver.
+  static const pdev_power_ops sbi_ops = {
+      .reboot = [](reboot_flags flags) { sbi_reset(); },
+      .shutdown = []() { sbi_shutdown(); },
+      // Null the cpu on/off with default hooks and use sbi directly for now.
+      // Their api isn't expressive enough for the sbi arguments.
+      .cpu_off = []() -> uint32_t { PANIC_UNIMPLEMENTED; },
+      .cpu_on = [](uint64_t mpid, paddr_t entry) -> uint32_t { PANIC_UNIMPLEMENTED; }};
+
+  pdev_register_power(&sbi_ops);
 }
 
 void riscv64_sbi_init() {
@@ -123,6 +135,11 @@ arch::RiscvSbiRet sbi_hart_start(arch::HartId hart_id, paddr_t start_addr, uint6
   return arch::RiscvSbi::HartStart(hart_id, start_addr, priv);
 }
 
+arch::RiscvSbiRet sbi_hart_stop() {
+  LTRACEF("local hart %u\n", riscv64_curr_hart_id());
+  return arch::RiscvSbi::HartStop();
+}
+
 arch::RiscvSbiRet sbi_remote_sfence_vma(cpu_mask_t cpu_mask, uintptr_t start, uintptr_t size) {
   arch::HartMask hart_mask = riscv64_cpu_mask_to_hart_mask(cpu_mask);
   arch::HartMaskBase hart_mask_base = 0;
@@ -149,4 +166,12 @@ void sbi_shutdown() {
 
   // If we get here the shutdown call must have failed
   panic("SBI: failed to shutdown\n");
+}
+
+void sbi_reset() {
+  arch::RiscvSbi::SystemReset(arch::RiscvSbiResetType::kWarmReboot,
+                              arch::RiscvSbiResetReason::kNone);
+
+  // If we get here the reset call must have failed
+  panic("SBI: failed to reset\n");
 }

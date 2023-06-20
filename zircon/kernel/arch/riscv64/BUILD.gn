@@ -91,6 +91,7 @@ if (toolchain_base_environment == "kernel") {
       "code-patches:headers",
       "//sdk/lib/zbi-format",
       "//zircon/kernel/dev/iommu/dummy",
+      "//zircon/kernel/dev/pdev/power",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/console",
       "//zircon/kernel/lib/counters",
