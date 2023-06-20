@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_binary("bin") {
   output_name = "battery_manager"
@@ -62,9 +61,4 @@ group("tests") {
     ":battery-manager-tests",
     "//src/power/battery-manager/tests:battery-manager-gotests",
   ]
-}
-
-# TODO(fxbug.dev/122864) Remove transitional labels
-core_shard("battery-manager-core-shard") {
-  shard_file = "meta/battery_manager.core_shard.cml"
 }
