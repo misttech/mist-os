@@ -4,5 +4,8 @@
 
 group("tests") {
   testonly = true
-  public_deps = [ "test_soft_reboot:soft_reboot_test($host_toolchain)" ]
+  public_deps = [
+    "test_soft_reboot:soft_reboot_test($host_toolchain)",
+    "test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+  ]
 }

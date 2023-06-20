@@ -20,4 +20,20 @@ if (is_host) {
 
     environments = [ emu_env ]
   }
+
+  python_mobly_test("soft_reboot_test_fc") {
+    main_source = "test_soft_reboot.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
+    ]
+
+    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
+
+    params_source = "params.yaml"
+    local_config_source = "../testbeds/One-FEmu.yaml"
+    transport = "fuchsia-controller"
+
+    environments = [ emu_env ]
+  }
 }

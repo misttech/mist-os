@@ -16,3 +16,8 @@ group("pye2e_fyi") {
   testonly = true
   public_deps = [ ":pye2e" ]
 }
+
+group("pye2e_fc_fyi") {
+  testonly = true
+  public_deps = [ "//src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)" ]
+}
