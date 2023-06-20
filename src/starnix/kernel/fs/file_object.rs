@@ -879,6 +879,14 @@ impl FileObject {
         // TODO(steveaustin) - omit updating time_access to allow info to be immutable
         // and thus allow simultaneous reads.
         self.name.update_atime()?;
+
+        if bytes_read > 0 {
+            if let Some(parent) = self.name.entry.parent() {
+                parent.node.watchers.notify(IN_ACCESS, &self.name.entry.local_name());
+            }
+            self.node().watchers.notify(IN_ACCESS, &FsString::default());
+        }
+
         Ok(bytes_read)
     }
 
@@ -936,6 +944,12 @@ impl FileObject {
         self.node().clear_suid_and_sgid_bits(current_task)?;
         let bytes_written = write()?;
         self.node().update_ctime_mtime()?;
+        if bytes_written > 0 {
+            if let Some(parent) = self.name.entry.parent() {
+                parent.node.watchers.notify(IN_MODIFY, &self.name.entry.local_name());
+            }
+            self.node().watchers.notify(IN_MODIFY, &FsString::default());
+        }
         Ok(bytes_written)
     }
 

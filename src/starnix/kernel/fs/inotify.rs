@@ -272,7 +272,7 @@ impl InotifyWatchers {
     }
 
     /// Notifies all watchers that have the specified event mask.
-    pub fn notify(&self, event_mask: u32) {
+    pub fn notify(&self, event_mask: u32, name: &FsString) {
         // Clone inotify references so that we don't hold watchers lock when notifying.
         let mut watch_id_to_files: Vec<(WdNumber, Arc<FileObject>)> = vec![];
         {
@@ -290,7 +290,7 @@ impl InotifyWatchers {
             let inotify = file
                 .downcast_file::<inotify::InotifyFileObject>()
                 .expect("failed to downcast to inotify");
-            inotify.notify(watch_id, event_mask, 0, FsString::default());
+            inotify.notify(watch_id, event_mask, 0, name.clone());
         }
     }
 }
@@ -341,7 +341,7 @@ mod tests {
         }
 
         // Generate 1 event.
-        root.node.watchers.notify(IN_ACCESS);
+        root.node.watchers.notify(IN_ACCESS, &"".into());
 
         assert_eq!(inotify.available(), DATA_SIZE);
         {
@@ -351,7 +351,7 @@ mod tests {
         }
 
         // Generate another event.
-        root.node.watchers.notify(IN_ATTRIB);
+        root.node.watchers.notify(IN_ATTRIB, &"".into());
 
         assert_eq!(inotify.available(), DATA_SIZE * 2);
         {
