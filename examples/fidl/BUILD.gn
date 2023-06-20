@@ -8,11 +8,19 @@ group("fidl") {
     ":tests",
     "calculator:all",
     "cpp:all",
-    "dart:all",
-    "go:all",
     "hlcpp:all",
     "rust:all",
   ]
+
+  if (current_cpu != "riscv64") {
+    deps += [
+      # TODO(fxbug.dev/129033): Move above once Dart toolchain support RISC-V.
+      "dart:all",
+
+      # The Go toolchain does not support RISC-V.
+      "go:all",
+    ]
+  }
 }
 
 group("tests") {
@@ -20,10 +28,18 @@ group("tests") {
   deps = [
     "calculator:tests",
     "cpp:tests",
-    "dart:tests",
     "echo-realm:tests",
-    "go:tests",
     "hlcpp:tests",
     "new:tests",
   ]
+
+  if (current_cpu != "riscv64") {
+    deps += [
+      # TODO(fxbug.dev/129033): Move above once Dart toolchain support RISC-V.
+      "dart:tests",
+
+      # The Go toolchain does not support RISC-V.
+      "go:tests",
+    ]
+  }
 }

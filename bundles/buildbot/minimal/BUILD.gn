@@ -22,8 +22,8 @@ group("additional_build_targets") {
   testonly = true
 
   deps = [
-    # TODO(fxbug.dev/128952): Enable after https://fxrev.dev/870816 lands.
-    # "//examples",
+    "//examples",
+    "//examples:tests",
 
     # TODO(fxbug.dev/128952): Enable after fxbug.dev/129033 is fixed or the
     # Flutter deps are removed on RISC-V.

@@ -4,6 +4,8 @@
 
 import("//build/components.gni")
 
+assert(current_cpu != "riscv64", "The Go toolchain does not support RISC-V.")
+
 group("all") {
   testonly = true
   deps = [

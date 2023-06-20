@@ -40,12 +40,10 @@ group("tests") {
     ":echo-cpp-wire-client-shared-test",
     ":echo-cpp-wire-client-sync-test",
     ":echo-cpp-wire-client-test",
-    ":echo-go-client-test",
     ":echo-hlcpp-client-sync-test",
     ":echo-hlcpp-client-test",
     ":echo-hlcpp-multi-client-test",
     ":echo-launcher-cpp-wire-test",
-    ":echo-launcher-go-test",
     ":echo-launcher-hlcpp-test",
     ":echo-launcher-rust-test",
     ":echo-rust-client-sync-test",
@@ -54,25 +52,37 @@ group("tests") {
     ":echo-service-hlcpp-test",
     ":echo-service-rust-test",
   ]
+
+  if (current_cpu != "riscv64") {
+    # The Go toolchain does not support RISC-V.
+    deps += [
+      ":echo-go-client-test",
+      ":echo-launcher-go-test",
+    ]
+  }
 }
 
-# Go example integration test packages
-fuchsia_test_package("echo-go-client-test") {
-  test_components = [ ":fidl_examples_test" ]
-  deps = [
-    "//examples/fidl/echo-realm:echo_realm",
-    "//examples/fidl/go/client:echo-client",
-    "//examples/fidl/go/server:echo-server",
-  ]
-}
+if (current_cpu != "riscv64") {
+  # The Go toolchain does not support RISC-V.
 
-fuchsia_test_package("echo-launcher-go-test") {
-  test_components = [ ":fidl_examples_test" ]
-  deps = [
-    "//examples/fidl/echo-realm:echo_realm",
-    "//examples/fidl/go/request_pipelining/client:echo-client",
-    "//examples/fidl/go/request_pipelining/server:echo-server",
-  ]
+  # Go example integration test packages
+  fuchsia_test_package("echo-go-client-test") {
+    test_components = [ ":fidl_examples_test" ]
+    deps = [
+      "//examples/fidl/echo-realm:echo_realm",
+      "//examples/fidl/go/client:echo-client",
+      "//examples/fidl/go/server:echo-server",
+    ]
+  }
+
+  fuchsia_test_package("echo-launcher-go-test") {
+    test_components = [ ":fidl_examples_test" ]
+    deps = [
+      "//examples/fidl/echo-realm:echo_realm",
+      "//examples/fidl/go/request_pipelining/client:echo-client",
+      "//examples/fidl/go/request_pipelining/server:echo-server",
+    ]
+  }
 }
 
 # HLCPP example integration test packages
