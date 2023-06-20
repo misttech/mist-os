@@ -595,6 +595,7 @@ template("assembled_system") {
       }
 
       fxfs_blob = fxfs_blob
+      fxfs_vmex = fxfs_blob
     }
   }
 

@@ -42,7 +42,6 @@ rustc_library("fshost_test_fixture") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/bin/blobfs:blobfs-component",
     "//src/storage/bin/minfs:minfs-component",
-    "//src/storage/fxfs:fxfs_component",
     "//src/storage/fxfs-crypt",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/testing/rust:storage-isolated-driver-manager",
