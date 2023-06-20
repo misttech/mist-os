@@ -112,7 +112,7 @@ struct SeEnforce {
 }
 impl BytesFileOps for SeEnforce {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let enforce_data = parse_int(&data)?;
+        let enforce_data = parse_u32_file(&data)?;
         let enforce_opt = match enforce_data {
             0 => Some(false),
             1 => Some(true),
@@ -125,8 +125,7 @@ impl BytesFileOps for SeEnforce {
     }
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        let enforce = format!("{}", *self.enforce.lock() as u8);
-        Ok(enforce.as_bytes().to_vec().into())
+        Ok(serialize_u32_file(*self.enforce.lock() as u32).into())
     }
 }
 
@@ -153,7 +152,7 @@ impl BytesFileOps for SeCreate {
 struct SeCheckReqProt;
 impl BytesFileOps for SeCheckReqProt {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let checkreqprot = parse_int(&data)?;
+        let checkreqprot = parse_u32_file(&data)?;
         not_implemented!("selinux checkreqprot: {}", checkreqprot);
         Ok(())
     }
@@ -349,11 +348,6 @@ impl BytesFileOps for AttrNode {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         Ok(self.attr.access_on_task(&self.task, |attr| attr.clone()).into())
     }
-}
-
-fn parse_int(buf: &[u8]) -> Result<u32, Errno> {
-    let i = buf.iter().position(|c| !char::from(*c).is_ascii_digit()).unwrap_or(buf.len());
-    std::str::from_utf8(&buf[..i]).unwrap().parse::<u32>().map_err(|_| errno!(EINVAL))
 }
 
 pub fn selinux_fs(kern: &Kernel, options: FileSystemOptions) -> &FileSystemHandle {

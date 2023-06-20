@@ -6,6 +6,7 @@ use fuchsia_zircon as zx;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::borrow::Cow;
 use std::{ffi::CString, sync::Arc};
 
 use crate::{
@@ -92,6 +93,9 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry(b"ns", NsDirectory { task: task.clone() }, mode!(IFDIR, 0o777));
     dir.entry(b"mountinfo", ProcMountinfoFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"mounts", ProcMountsFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"oom_adj", OomAdjFile::new_node(task), mode!(IFREG, 0o744));
+    dir.entry(b"oom_score", OomScoreFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"oom_score_adj", OomScoreAdjFile::new_node(task), mode!(IFREG, 0o744));
     dir.dir_creds(task.as_fscred());
     dir
 }
@@ -741,5 +745,96 @@ impl DynamicFileSource for StatusFile {
         writeln!(sink, "Threads:\t{}", std::cmp::max(1, threads))?;
 
         Ok(())
+    }
+}
+
+struct OomScoreFile(Arc<Task>);
+
+impl OomScoreFile {
+    fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        BytesFile::new_node(Self(task.clone()))
+    }
+}
+
+impl BytesFileOps for OomScoreFile {
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        let _task = &self.0;
+        // TODO: Compute this score from the amount of memory used by the task.
+        // See https://man7.org/linux/man-pages/man5/proc.5.html for the algorithm.
+        Ok(serialize_i32_file(0).into())
+    }
+}
+
+// Redefine these constants as i32 to avoid conversions below.
+const OOM_ADJUST_MAX: i32 = uapi::OOM_ADJUST_MAX as i32;
+const OOM_SCORE_ADJ_MAX: i32 = uapi::OOM_SCORE_ADJ_MAX as i32;
+
+struct OomAdjFile(Arc<Task>);
+impl OomAdjFile {
+    fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        BytesFile::new_node(Self(task.clone()))
+    }
+}
+
+impl BytesFileOps for OomAdjFile {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        let value = parse_i32_file(&data)?;
+        let oom_score_adj = if value == OOM_DISABLE {
+            OOM_SCORE_ADJ_MIN
+        } else {
+            if !(OOM_ADJUST_MIN..=OOM_ADJUST_MAX).contains(&value) {
+                return error!(EINVAL);
+            }
+            let fraction = (value - OOM_ADJUST_MIN) / (OOM_ADJUST_MAX - OOM_ADJUST_MIN);
+            fraction * (OOM_SCORE_ADJ_MAX - OOM_SCORE_ADJ_MIN) + OOM_SCORE_ADJ_MIN
+        };
+        if !current_task.creds().has_capability(CAP_SYS_RESOURCE) {
+            return error!(EPERM);
+        }
+        let task = &self.0;
+        task.write().oom_score_adj = oom_score_adj;
+        Ok(())
+    }
+
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        let task = &self.0;
+        let oom_score_adj = task.read().oom_score_adj;
+        let oom_adj = if oom_score_adj == OOM_SCORE_ADJ_MIN {
+            OOM_DISABLE
+        } else {
+            let fraction =
+                (oom_score_adj - OOM_SCORE_ADJ_MIN) / (OOM_SCORE_ADJ_MAX - OOM_SCORE_ADJ_MIN);
+            fraction * (OOM_ADJUST_MAX - OOM_ADJUST_MIN) + OOM_ADJUST_MIN
+        };
+        Ok(serialize_i32_file(oom_adj).into())
+    }
+}
+
+struct OomScoreAdjFile(Arc<Task>);
+
+impl OomScoreAdjFile {
+    fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        BytesFile::new_node(Self(task.clone()))
+    }
+}
+
+impl BytesFileOps for OomScoreAdjFile {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        let value = parse_i32_file(&data)?;
+        if !(OOM_SCORE_ADJ_MIN..=OOM_SCORE_ADJ_MAX).contains(&value) {
+            return error!(EINVAL);
+        }
+        if !current_task.creds().has_capability(CAP_SYS_RESOURCE) {
+            return error!(EPERM);
+        }
+        let task = &self.0;
+        task.write().oom_score_adj = value;
+        Ok(())
+    }
+
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        let task = &self.0;
+        let oom_score_adj = task.read().oom_score_adj;
+        Ok(serialize_i32_file(oom_score_adj).into())
     }
 }

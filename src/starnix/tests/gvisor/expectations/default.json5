@@ -514,11 +514,6 @@
                 "ProcNetUnix.FilesystemBindAcceptConnect",
                 "ProcNetUnix.DgramSocketStateConnectingOnConnect",
 
-                // proc_pid_oomscore_test
-                "ProcPidOomscoreTest.BasicRead",
-                "ProcPidOomscoreAdjTest.BasicWrite",
-                "ProcPidOomscoreAdjTest.BasicRead",
-
                 // proc_pid_smaps_test
                 "ProcPidSmapsTest.GvisorFields",
 
