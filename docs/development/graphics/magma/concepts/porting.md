@@ -52,9 +52,12 @@ and PCI devices.
 
 * SoCs generally have platform devices. These are not plug and play, but
   require a [board driver][boarddriver] to delegate the appropriate resources
-  to them. Platform devices need a [magma_pdev_entry][magma_pdev_entry] GN target.
+  to them.
 * PCI devices are on the PCI bus and are delegated resources
-  by the PCI bus driver. PCI drivers need special GN targets.
+  by the PCI bus driver.
+
+Both of these are supported by the Fuchsia driver framework, so they can be
+created and bound as normal Fuchsia drivers.
 
 ### Splitting responsibilities? (SoC version)
 
@@ -355,7 +358,6 @@ the system driver using the Zircon DDK.
 [fdio]: /docs/concepts/filesystems/life_of_an_open.md#fdio
 [versionscript]: /src/graphics/lib/magma/scripts/libvulkan.version
 [allowlist]: /src/graphics/lib/magma/gnbuild/imported_symbols.allowlist
-[magma_pdev_entry]: /src/graphics/lib/magma/src/magma_util/platform/zircon/driver_entry.gni
 [vmo]: /docs/reference/kernel_objects/vm_object.md
 [msdheader]: /src/graphics/lib/magma/include/msd/msd_cc.h
 [magmaheader]: /sdk/lib/magma_client/include/lib/magma/magma.h

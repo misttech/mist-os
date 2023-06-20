@@ -6,8 +6,6 @@ import("//build/config.gni")
 import("//build/cpp/extract_imported_symbols.gni")
 import("//build/cpp/verify_imported_symbols.gni")
 import("//build/testing/environments.gni")
-import(
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon/driver_entry.gni")
 
 declare_args() {
   magma_build_root = "//src/graphics/lib/magma"
