@@ -153,6 +153,7 @@ rustc_test("audio_decoder_test_bin") {
     ":decoder_test_data",
     ":stream_processor_test_lib",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
+    "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
   ]

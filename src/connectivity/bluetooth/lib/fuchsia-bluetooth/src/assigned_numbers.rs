@@ -8,6 +8,7 @@ use self::constants::{
 use crate::types::Uuid;
 
 pub(crate) mod constants;
+pub mod ltv;
 
 /// An assigned number, code, or identifier for a concept in the Bluetooth wireless standard.
 /// Includes an associated abbreviation and human-readable name for the number.

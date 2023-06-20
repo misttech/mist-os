@@ -9,6 +9,7 @@ use audio_decoder_test_lib::{cvsd::*, lc3::*, sbc::*, test_suite::*};
 use decoder_test_data::*;
 use fidl_fuchsia_media::*;
 use fuchsia_async as fasync;
+use fuchsia_bluetooth::assigned_numbers::ltv::*;
 use std::rc::Rc;
 use stream_processor_test::*;
 
@@ -166,12 +167,14 @@ fn lc3_simple_decode() -> Result<()> {
     const FRAME_SIZE: u32 = 240;
     const NBYTES: usize = 58;
 
-    let oob_bytes = vec![
-        0x02, 0x01, 0x06, // 32kHz sampling freq.
-        0x02, 0x02, 0x00, // 7.5ms frame duration.
-        0x05, 0x03, 0x00, 0x00, 0x00, 0x01, // LF.
-        0x03, 0x04, 0x00, 58, // 58 octets per codec frame.
-    ];
+    let oob_bytes = CodecSpecificConfigLTV {
+        sampling_frequency: Some(SamplingFrequency::F32000Hz),
+        frame_duration: Some(FrameDuration::D7p5Ms),
+        audio_channel_alloc: Some(AudioLocation::FRONT_LEFT),
+        octets_per_codec_frame: Some(58),
+        ..Default::default()
+    }
+    .to_be_bytes();
 
     let output_format = FormatDetails {
         format_details_version_ordinal: Some(1),
