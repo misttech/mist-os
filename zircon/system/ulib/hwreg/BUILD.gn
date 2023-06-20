@@ -66,6 +66,14 @@ sdk_source_set("hwreg_sdk") {
 
   include_dirs = [ "include" ]
 
+  public_deps = [
+    # <hwreg/mmio.h> has #include <lib/mmio-ptr/mmio-ptr.h>.
+    "//zircon/system/ulib/mmio-ptr",
+
+    # <hwreg/internal.h> has #include <lib/stdcompat/atomic.h>.
+    "//sdk/lib/stdcompat",
+  ]
+
   sources = [
     "include/hwreg/bitfields.h",
     "include/hwreg/internal.h",
