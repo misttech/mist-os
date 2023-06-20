@@ -333,7 +333,7 @@ MsdIntelAbiContext::~MsdIntelAbiContext() {
 }
 
 magma_status_t MsdIntelAbiContext::ExecuteCommandBufferWithResources(
-    magma_command_buffer* cmd_buf, magma_exec_resource* exec_resources, msd::Buffer** buffers,
+    msd::magma_command_buffer* cmd_buf, magma_exec_resource* exec_resources, msd::Buffer** buffers,
     msd::Semaphore** wait_semaphores, msd::Semaphore** signal_semaphores) {
   auto command_buffer = CommandBuffer::Create(ptr(), cmd_buf, exec_resources, buffers,
                                               wait_semaphores, signal_semaphores);

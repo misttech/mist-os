@@ -221,7 +221,7 @@ void MsdIntelConnection::ReleaseBuffer(
 }
 
 std::unique_ptr<MsdIntelConnection> MsdIntelConnection::Create(Owner* owner,
-                                                               msd_client_id_t client_id) {
+                                                               msd::msd_client_id_t client_id) {
   return std::unique_ptr<MsdIntelConnection>(
       new MsdIntelConnection(owner, PerProcessGtt::Create(owner), client_id));
 }

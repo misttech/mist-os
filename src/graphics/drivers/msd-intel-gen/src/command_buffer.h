@@ -24,7 +24,7 @@ class CommandBuffer : public MappedBatch {
   // holds a shared reference to the buffers backing |abi_cmd_buf| and |exec_buffers| for the
   // lifetime of this object
   static std::unique_ptr<CommandBuffer> Create(std::weak_ptr<MsdIntelContext> context,
-                                               magma_command_buffer* cmd_buf,
+                                               msd::magma_command_buffer* cmd_buf,
                                                magma_exec_resource* exec_resources,
                                                msd::Buffer** msd_buffers,
                                                msd::Semaphore** msd_wait_semaphores,
@@ -67,7 +67,7 @@ class CommandBuffer : public MappedBatch {
   uint64_t GetFlags() const { return command_buffer_->flags; }
 
   CommandBuffer(std::weak_ptr<MsdIntelContext> context,
-                std::unique_ptr<magma_command_buffer> command_buffer);
+                std::unique_ptr<msd::magma_command_buffer> command_buffer);
 
   uint32_t batch_buffer_resource_index() const {
     DASSERT(num_resources() > 0);
@@ -106,7 +106,7 @@ class CommandBuffer : public MappedBatch {
 
  private:
   const std::weak_ptr<MsdIntelContext> context_;
-  const std::unique_ptr<magma_command_buffer> command_buffer_;
+  const std::unique_ptr<msd::magma_command_buffer> command_buffer_;
   const uint64_t nonce_;
 
   // Set on connection thread; valid only when prepared_to_execute_ is true

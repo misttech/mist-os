@@ -204,7 +204,7 @@ TEST_F(MagmaDriverStarted, DependencyInjection) {
     mock_device = static_cast<MsdMockDevice*>((*driver)->magma_system_device()->msd_dev());
   });
   mock_device->WaitForMemoryPressureSignal();
-  EXPECT_EQ(MAGMA_MEMORY_PRESSURE_LEVEL_WARNING, mock_device->memory_pressure_level());
+  EXPECT_EQ(msd::MAGMA_MEMORY_PRESSURE_LEVEL_WARNING, mock_device->memory_pressure_level());
 }
 
 }  // namespace

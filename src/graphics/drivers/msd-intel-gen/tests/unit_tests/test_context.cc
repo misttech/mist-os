@@ -224,7 +224,7 @@ void MsdIntelContextSubmit::SubmitCommandBuffer(bool shutdown_early) {
     // Don't need a fully initialized command buffer
     std::shared_ptr<MsdIntelBuffer> command_buffer_content =
         MsdIntelBuffer::Create(PAGE_SIZE, "test");
-    magma_command_buffer* command_buffer_desc;
+    msd::magma_command_buffer* command_buffer_desc;
     ASSERT_TRUE(command_buffer_content->platform_buffer()->MapCpu(
         reinterpret_cast<void**>(&command_buffer_desc)));
 

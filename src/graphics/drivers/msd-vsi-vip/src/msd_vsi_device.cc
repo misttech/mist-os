@@ -1339,7 +1339,7 @@ magma::Status MsdVsiDevice::ProcessBatch(std::unique_ptr<MappedBatch> batch, boo
   return MAGMA_STATUS_OK;
 }
 
-std::unique_ptr<MsdVsiConnection> MsdVsiDevice::OpenVsiConnection(msd_client_id_t client_id) {
+std::unique_ptr<MsdVsiConnection> MsdVsiDevice::OpenVsiConnection(msd::msd_client_id_t client_id) {
   uint32_t page_table_array_slot;
   if (!page_table_slot_allocator_->Alloc(&page_table_array_slot)) {
     MAGMA_LOG(ERROR, "couldn't allocate page table slot");
@@ -1357,7 +1357,7 @@ std::unique_ptr<MsdVsiConnection> MsdVsiDevice::OpenVsiConnection(msd_client_id_
   return std::make_unique<MsdVsiConnection>(this, std::move(address_space), client_id);
 }
 
-std::unique_ptr<msd::Connection> MsdVsiDevice::Open(msd_client_id_t client_id) {
+std::unique_ptr<msd::Connection> MsdVsiDevice::Open(msd::msd_client_id_t client_id) {
   auto connection = OpenVsiConnection(client_id);
   if (connection) {
     return std::make_unique<MsdVsiAbiConnection>(std::move(connection));
@@ -1537,7 +1537,7 @@ magma_status_t MsdVsiDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint
 
 void MsdVsiDevice::DumpStatus(uint32_t dump_type) { DumpStatusToLog(); }
 
-magma_status_t MsdVsiDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) {
+magma_status_t MsdVsiDevice::GetIcdList(std::vector<msd::msd_icd_info_t>* icd_info_out) {
   const char* kSuffixes[] = {"_test", ""};
   auto& icd_info = *icd_info_out;
   icd_info.clear();
@@ -1547,7 +1547,7 @@ magma_status_t MsdVsiDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_info_ou
            fbl::StringPrintf("fuchsia-pkg://fuchsia.com/libopencl_vsi_vip%s#meta/opencl.cm",
                              kSuffixes[i])
                .c_str());
-    icd_info[i].support_flags = ICD_SUPPORT_FLAG_OPENCL;
+    icd_info[i].support_flags = msd::ICD_SUPPORT_FLAG_OPENCL;
   }
   return MAGMA_STATUS_OK;
 }

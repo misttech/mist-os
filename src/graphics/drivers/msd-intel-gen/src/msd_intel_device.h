@@ -56,9 +56,9 @@ class MsdIntelDevice : public msd::Device,
 
   // msd::Device impl.
   magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
-  magma_status_t GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) override;
+  magma_status_t GetIcdList(std::vector<msd::msd_icd_info_t>* icd_info_out) override;
   void DumpStatus(uint32_t dump_flags) override;
-  std::unique_ptr<msd::Connection> Open(msd_client_id_t client_id) override;
+  std::unique_ptr<msd::Connection> Open(msd::msd_client_id_t client_id) override;
 
   uint32_t device_id() override { return device_id_; }  // provided for EngineCommandStreamer
   uint32_t revision() { return revision_; }

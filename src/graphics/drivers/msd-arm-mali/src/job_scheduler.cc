@@ -403,8 +403,8 @@ JobScheduler::Clock::duration JobScheduler::GetCurrentTimeoutDuration() {
   return timeout_time - clock_callback_();
 }
 
-std::vector<msd_client_id_t> JobScheduler::GetSignalingClients(uint64_t semaphore_koid) {
-  std::vector<msd_client_id_t> signaling_clients;
+std::vector<msd::msd_client_id_t> JobScheduler::GetSignalingClients(uint64_t semaphore_koid) {
+  std::vector<msd::msd_client_id_t> signaling_clients;
   for (auto it = atoms_.begin(); it != atoms_.end(); ++it) {
     auto soft_atom = MsdArmSoftAtom::cast(*it);
     if (!soft_atom)
@@ -479,7 +479,7 @@ void JobScheduler::HandleTimedOutAtoms() {
       uint64_t semaphore_koid = soft_atom->platform_semaphore()->id();
       MAGMA_LOG(WARNING, "Timing out hung semaphore on client id %ld, koid %ld", client_id,
                 semaphore_koid);
-      std::vector<msd_client_id_t> clients = GetSignalingClients(semaphore_koid);
+      std::vector<msd::msd_client_id_t> clients = GetSignalingClients(semaphore_koid);
       for (auto client_id : clients) {
         MAGMA_LOG(WARNING, "Signaled by atom on client id %ld", client_id);
         found_signaler_atoms_for_testing_++;

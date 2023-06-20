@@ -19,15 +19,15 @@ namespace {
 class TestOwner : public magma::MagmaDependencyInjectionDevice::Owner {
  public:
   // Will be called on an arbitrary thread.
-  void SetMemoryPressureLevel(MagmaMemoryPressureLevel level) override {
+  void SetMemoryPressureLevel(msd::MagmaMemoryPressureLevel level) override {
     level_ = level;
     sync_completion_signal(&completion_);
   }
-  MagmaMemoryPressureLevel level() const { return level_; }
+  msd::MagmaMemoryPressureLevel level() const { return level_; }
   sync_completion_t& completion() { return completion_; }
 
  private:
-  MagmaMemoryPressureLevel level_{MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL};
+  msd::MagmaMemoryPressureLevel level_{msd::MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL};
   sync_completion_t completion_;
 };
 
@@ -84,7 +84,7 @@ TEST(DependencyInjection, Load) {
                 .status());
 
   sync_completion_wait(&owner.completion(), ZX_TIME_INFINITE);
-  EXPECT_EQ(owner.level(), MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL);
+  EXPECT_EQ(owner.level(), msd::MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL);
 
   fidl_loop.Shutdown();
 

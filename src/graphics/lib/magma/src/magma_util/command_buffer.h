@@ -28,7 +28,7 @@ class CommandBuffer : public MappedBatch<Context, typename GpuMapping::BufferTyp
   using GpuMappingView = GpuMappingView<Buffer>;
 
   CommandBuffer(std::weak_ptr<Context> context, uint64_t connection_id,
-                std::unique_ptr<magma_command_buffer> command_buffer)
+                std::unique_ptr<msd::magma_command_buffer> command_buffer)
       : context_(context),
         command_buffer_(std::move(command_buffer)),
         connection_id_(connection_id),
@@ -128,7 +128,7 @@ class CommandBuffer : public MappedBatch<Context, typename GpuMapping::BufferTyp
   void UnmapResourcesGpu() { exec_resource_mappings_.clear(); }
 
   const std::weak_ptr<Context> context_;
-  const std::unique_ptr<magma_command_buffer> command_buffer_;
+  const std::unique_ptr<msd::magma_command_buffer> command_buffer_;
   const uint64_t connection_id_;
   const uint64_t nonce_;
 

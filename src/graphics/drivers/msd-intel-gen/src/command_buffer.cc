@@ -13,7 +13,7 @@
 #include "platform_trace.h"
 
 std::unique_ptr<CommandBuffer> CommandBuffer::Create(std::weak_ptr<MsdIntelContext> context,
-                                                     magma_command_buffer* cmd_buf,
+                                                     msd::magma_command_buffer* cmd_buf,
                                                      magma_exec_resource* exec_resources,
                                                      msd::Buffer** msd_buffers,
                                                      msd::Semaphore** msd_wait_semaphores,
@@ -51,7 +51,7 @@ std::unique_ptr<CommandBuffer> CommandBuffer::Create(std::weak_ptr<MsdIntelConte
   }
 
   auto command_buffer = std::unique_ptr<CommandBuffer>(
-      new CommandBuffer(context, std::make_unique<magma_command_buffer>(*cmd_buf)));
+      new CommandBuffer(context, std::make_unique<msd::magma_command_buffer>(*cmd_buf)));
 
   if (!command_buffer->InitializeResources(std::move(resources), std::move(wait_semaphores),
                                            std::move(signal_semaphores)))
@@ -61,7 +61,7 @@ std::unique_ptr<CommandBuffer> CommandBuffer::Create(std::weak_ptr<MsdIntelConte
 }
 
 CommandBuffer::CommandBuffer(std::weak_ptr<MsdIntelContext> context,
-                             std::unique_ptr<magma_command_buffer> cmd_buf)
+                             std::unique_ptr<msd::magma_command_buffer> cmd_buf)
     : MappedBatch(COMMAND_BUFFER),
       context_(context),
       command_buffer_(std::move(cmd_buf)),

@@ -26,13 +26,13 @@ class MsdIntelConnection {
     virtual void DestroyContext(std::shared_ptr<MsdIntelContext> client_context) = 0;
   };
 
-  static std::unique_ptr<MsdIntelConnection> Create(Owner* owner, msd_client_id_t client_id);
+  static std::unique_ptr<MsdIntelConnection> Create(Owner* owner, msd::msd_client_id_t client_id);
 
   virtual ~MsdIntelConnection() {}
 
   std::shared_ptr<PerProcessGtt> per_process_gtt() { return ppgtt_; }
 
-  msd_client_id_t client_id() { return client_id_; }
+  msd::msd_client_id_t client_id() { return client_id_; }
 
   void SubmitBatch(std::unique_ptr<MappedBatch> batch) { owner_->SubmitBatch(std::move(batch)); }
 
@@ -72,7 +72,8 @@ class MsdIntelConnection {
   static constexpr size_t kMaxUint64PerChannelSend = 510;
 
  private:
-  MsdIntelConnection(Owner* owner, std::shared_ptr<PerProcessGtt> ppgtt, msd_client_id_t client_id)
+  MsdIntelConnection(Owner* owner, std::shared_ptr<PerProcessGtt> ppgtt,
+                     msd::msd_client_id_t client_id)
       : owner_(owner), ppgtt_(std::move(ppgtt)), client_id_(client_id) {}
 
   bool sent_context_killed() { return sent_context_killed_; }
@@ -86,7 +87,7 @@ class MsdIntelConnection {
 
   Owner* owner_;
   std::shared_ptr<PerProcessGtt> ppgtt_;
-  msd_client_id_t client_id_;
+  msd::msd_client_id_t client_id_;
   bool sent_context_killed_ = false;
   std::list<std::shared_ptr<MsdIntelContext>> context_list_;
 

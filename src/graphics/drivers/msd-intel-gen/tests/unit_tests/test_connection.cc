@@ -260,7 +260,7 @@ class TestMsdIntelConnection : public ::testing::Test,
     }
 
     // Send a command buffer
-    auto command = std::make_unique<magma_command_buffer>();
+    auto command = std::make_unique<msd::magma_command_buffer>();
     command->resource_count = 1;
     command->batch_buffer_resource_index = 0;
     command->batch_start_offset = 0;

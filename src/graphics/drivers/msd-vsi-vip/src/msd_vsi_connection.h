@@ -26,7 +26,7 @@ class MsdVsiConnection {
   };
 
   explicit MsdVsiConnection(Owner* owner, std::shared_ptr<AddressSpace> address_space,
-                            msd_client_id_t client_id)
+                            msd::msd_client_id_t client_id)
       : owner_(owner), address_space_(std::move(address_space)), client_id_(client_id) {}
 
   magma::Status MapBufferGpu(std::shared_ptr<MsdVsiBuffer> buffer, uint64_t gpu_va,
@@ -54,7 +54,7 @@ class MsdVsiConnection {
   // Submit pending release mappings on the given context
   bool SubmitPendingReleaseMappings(std::shared_ptr<MsdVsiContext> context);
 
-  msd_client_id_t client_id() { return client_id_; }
+  msd::msd_client_id_t client_id() { return client_id_; }
 
   std::shared_ptr<AddressSpace> address_space() { return address_space_; }
 
@@ -71,7 +71,7 @@ class MsdVsiConnection {
 
   Owner* owner_;
   std::shared_ptr<AddressSpace> address_space_;
-  msd_client_id_t client_id_;
+  msd::msd_client_id_t client_id_;
 
   std::vector<std::unique_ptr<magma::PlatformBusMapper::BusMapping>> mappings_to_release_;
   bool address_space_dirty_ = false;

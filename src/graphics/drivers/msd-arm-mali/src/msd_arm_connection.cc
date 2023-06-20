@@ -44,7 +44,7 @@ namespace {
 // the address of the first struct if so. current_ptr is modified to point to first byte after the
 // returned region.
 template <typename T>
-T* GetNextDataPtr(uint8_t*& current_ptr, msd_client_id_t client_id,
+T* GetNextDataPtr(uint8_t*& current_ptr, msd::msd_client_id_t client_id,
                   size_t* remaining_data_size_in_out, size_t count) {
   if (count == 0)
     return nullptr;
@@ -282,7 +282,7 @@ magma_status_t MsdArmContext::ExecuteImmediateCommands(
   return MAGMA_STATUS_OK;
 }
 
-std::shared_ptr<MsdArmConnection> MsdArmConnection::Create(msd_client_id_t client_id,
+std::shared_ptr<MsdArmConnection> MsdArmConnection::Create(msd::msd_client_id_t client_id,
                                                            Owner* owner) {
   auto connection = std::shared_ptr<MsdArmConnection>(new MsdArmConnection(client_id, owner));
   if (!connection->Init())
@@ -307,7 +307,7 @@ bool MsdArmConnection::Init() {
   return true;
 }
 
-MsdArmConnection::MsdArmConnection(msd_client_id_t client_id, Owner* owner)
+MsdArmConnection::MsdArmConnection(msd::msd_client_id_t client_id, Owner* owner)
     : client_id_(client_id), owner_(owner) {}
 
 MsdArmConnection::~MsdArmConnection() {
@@ -873,7 +873,7 @@ void MsdArmConnection::ReleaseJitMemory(const std::shared_ptr<MsdArmSoftAtom>& a
 
 size_t MsdArmConnection::FreeUnusedJitRegionsIfNeeded() {
   auto memory_pressure_level = owner_->GetCurrentMemoryPressureLevel();
-  if (memory_pressure_level != MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL) {
+  if (memory_pressure_level != msd::MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL) {
     return 0;
   }
   size_t removed_size = 0;

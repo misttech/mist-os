@@ -65,13 +65,13 @@ MagmaMemoryPressureLevel DependencyInjectionServer::GetMagmaLevel(
     fuchsia_memorypressure::wire::Level level) {
   switch (level) {
     case fuchsia_memorypressure::wire::Level::kNormal:
-      return MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
+      return msd::MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
     case fuchsia_memorypressure::wire::Level::kWarning:
-      return MAGMA_MEMORY_PRESSURE_LEVEL_WARNING;
+      return msd::MAGMA_MEMORY_PRESSURE_LEVEL_WARNING;
     case fuchsia_memorypressure::wire::Level::kCritical:
-      return MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL;
+      return msd::MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL;
     default:
-      return MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
+      return msd::MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
   }
 }
 

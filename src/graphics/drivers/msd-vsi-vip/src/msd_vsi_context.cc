@@ -21,7 +21,7 @@ std::shared_ptr<MsdVsiContext> MsdVsiContext::Create(std::weak_ptr<MsdVsiConnect
 }
 
 std::unique_ptr<MappedBatch> MsdVsiContext::CreateBatch(std::shared_ptr<MsdVsiContext> context,
-                                                        magma_command_buffer* cmd_buf,
+                                                        msd::magma_command_buffer* cmd_buf,
                                                         magma_exec_resource* exec_resources,
                                                         msd::Buffer** msd_buffers,
                                                         msd::Semaphore** msd_wait_semaphores,
@@ -51,9 +51,9 @@ std::unique_ptr<MappedBatch> MsdVsiContext::CreateBatch(std::shared_ptr<MsdVsiCo
 
   // The CommandBuffer does not support batches with zero resources.
   if (resources.size() > 0) {
-    auto command_buffer = CommandBuffer::Create(context, connection->client_id(),
-                                                std::make_unique<magma_command_buffer>(*cmd_buf),
-                                                std::move(resources), std::move(signal_semaphores));
+    auto command_buffer = CommandBuffer::Create(
+        context, connection->client_id(), std::make_unique<msd::magma_command_buffer>(*cmd_buf),
+        std::move(resources), std::move(signal_semaphores));
     if (!command_buffer) {
       MAGMA_LOG(ERROR, "Failed to create command buffer");
       return nullptr;
@@ -113,7 +113,7 @@ void MsdVsiContext::Kill() {
 }
 
 magma_status_t MsdVsiAbiContext::ExecuteCommandBufferWithResources(
-    magma_command_buffer* cmd_buf, magma_exec_resource* exec_resources, msd::Buffer** buffers,
+    msd::magma_command_buffer* cmd_buf, magma_exec_resource* exec_resources, msd::Buffer** buffers,
     msd::Semaphore** wait_semaphores, msd::Semaphore** signal_semaphores) {
   if (cmd_buf->flags) {
     MAGMA_LOG(ERROR, "Flags not supported");

@@ -44,7 +44,8 @@ TEST(TestCommandBuffer, SequenceNumber) {
   constexpr uint64_t kConnectionId = 1234;
   auto context = std::make_shared<Context>();
 
-  CommandBuffer command_buffer(context, kConnectionId, std::make_unique<magma_command_buffer>());
+  CommandBuffer command_buffer(context, kConnectionId,
+                               std::make_unique<msd::magma_command_buffer>());
 
   EXPECT_TRUE(command_buffer.IsCommandBuffer());
   EXPECT_EQ(context, command_buffer.GetContext().lock());
@@ -76,7 +77,7 @@ TEST(TestCommandBuffer, InitializeResources) {
   {
     CommandBuffer command_buffer(
         context, kConnectionId,
-        std::make_unique<magma_command_buffer>(magma_command_buffer{
+        std::make_unique<msd::magma_command_buffer>(msd::magma_command_buffer{
             .resource_count = static_cast<uint32_t>(resources.size()) - 1,
             .batch_buffer_resource_index = 0,
             .batch_start_offset = 0,
@@ -91,7 +92,7 @@ TEST(TestCommandBuffer, InitializeResources) {
   {
     CommandBuffer command_buffer(
         context, kConnectionId,
-        std::make_unique<magma_command_buffer>(magma_command_buffer{
+        std::make_unique<msd::magma_command_buffer>(msd::magma_command_buffer{
             .resource_count = static_cast<uint32_t>(resources.size()),
             .batch_buffer_resource_index = 0,
             .batch_start_offset = 0,
@@ -106,7 +107,7 @@ TEST(TestCommandBuffer, InitializeResources) {
   {
     CommandBuffer command_buffer(
         context, kConnectionId,
-        std::make_unique<magma_command_buffer>(magma_command_buffer{
+        std::make_unique<msd::magma_command_buffer>(msd::magma_command_buffer{
             .resource_count = static_cast<uint32_t>(resources.size()),
             .batch_buffer_resource_index = 0,
             .batch_start_offset = 0,
@@ -121,7 +122,7 @@ TEST(TestCommandBuffer, InitializeResources) {
   {
     CommandBuffer command_buffer(
         context, kConnectionId,
-        std::make_unique<magma_command_buffer>(magma_command_buffer{
+        std::make_unique<msd::magma_command_buffer>(msd::magma_command_buffer{
             .resource_count = static_cast<uint32_t>(resources.size()),
             .batch_buffer_resource_index = 0,
             .batch_start_offset = 0,
@@ -156,7 +157,7 @@ TEST(TestCommandBuffer, PrepareForExecution) {
 
   auto command_buffer = std::make_unique<CommandBuffer>(
       context, kConnectionId,
-      std::make_unique<magma_command_buffer>(magma_command_buffer{
+      std::make_unique<msd::magma_command_buffer>(msd::magma_command_buffer{
           .resource_count = static_cast<uint32_t>(resources.size()),
           .batch_buffer_resource_index = 0,
           .batch_start_offset = 0,

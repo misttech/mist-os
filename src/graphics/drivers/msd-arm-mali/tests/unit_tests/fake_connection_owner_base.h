@@ -24,9 +24,9 @@ class FakeConnectionOwnerBase : public MsdArmConnection::Owner {
     return reply;
   }
   std::thread::id GetDeviceThreadId() override { return std::this_thread::get_id(); }
-  MagmaMemoryPressureLevel GetCurrentMemoryPressureLevel() override {
+  msd::MagmaMemoryPressureLevel GetCurrentMemoryPressureLevel() override {
     // Only for testing.
-    return MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
+    return msd::MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
   }
 };
 

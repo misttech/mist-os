@@ -28,7 +28,7 @@ class MagmaDependencyInjectionDevice
  public:
   class Owner {
    public:
-    virtual void SetMemoryPressureLevel(MagmaMemoryPressureLevel level) = 0;
+    virtual void SetMemoryPressureLevel(msd::MagmaMemoryPressureLevel level) = 0;
   };
   // Parent should be the GPU device itself. That way this device is released before the parent
   // device is released.

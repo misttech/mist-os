@@ -67,9 +67,9 @@ class CommandBufferHelper final : public msd::NotificationHandler {
   msd::Semaphore** msd_wait_semaphores() { return msd_wait_semaphores_.data(); }
   msd::Semaphore** msd_signal_semaphores() { return msd_signal_semaphores_.data(); }
 
-  magma_command_buffer* abi_cmd_buf() {
+  msd::magma_command_buffer* abi_cmd_buf() {
     MAGMA_DASSERT(buffer_data_);
-    return reinterpret_cast<magma_command_buffer*>(buffer_data_);
+    return reinterpret_cast<msd::magma_command_buffer*>(buffer_data_);
   }
 
   uint64_t* abi_wait_semaphore_ids() { return reinterpret_cast<uint64_t*>(abi_cmd_buf() + 1); }
@@ -86,7 +86,7 @@ class CommandBufferHelper final : public msd::NotificationHandler {
   void set_command_buffer_flags(uint64_t flags) { abi_cmd_buf()->flags = flags; }
 
   bool Execute() {
-    auto command_buffer = std::make_unique<magma_command_buffer>(*abi_cmd_buf());
+    auto command_buffer = std::make_unique<msd::magma_command_buffer>(*abi_cmd_buf());
     std::vector<magma_exec_resource> resources;
     for (uint32_t i = 0; i < kNumResources; i++) {
       resources.emplace_back(abi_resources()[i]);
@@ -133,7 +133,8 @@ class CommandBufferHelper final : public msd::NotificationHandler {
         connection_(std::move(connection)),
         ctx_(ctx) {
     connection_->SetNotificationCallback(this);
-    uint64_t buffer_size = sizeof(magma_command_buffer) + sizeof(uint64_t) * kSignalSemaphoreCount +
+    uint64_t buffer_size = sizeof(msd::magma_command_buffer) +
+                           sizeof(uint64_t) * kSignalSemaphoreCount +
                            sizeof(magma_exec_resource) * kNumResources;
 
     buffer_ = magma::PlatformBuffer::Create(buffer_size, "command-buffer-backing");

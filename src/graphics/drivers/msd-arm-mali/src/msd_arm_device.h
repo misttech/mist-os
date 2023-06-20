@@ -52,18 +52,18 @@ class MsdArmDevice : public msd::Device,
   virtual ~MsdArmDevice();
 
   // msd::Device impl.
-  void SetMemoryPressureLevel(MagmaMemoryPressureLevel level) override;
+  void SetMemoryPressureLevel(msd::MagmaMemoryPressureLevel level) override;
   magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
-  magma_status_t GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) override;
+  magma_status_t GetIcdList(std::vector<msd::msd_icd_info_t>* icd_info_out) override;
   void DumpStatus(uint32_t dump_flags) override;
-  std::unique_ptr<msd::Connection> Open(msd_client_id_t client_id) override;
+  std::unique_ptr<msd::Connection> Open(msd::msd_client_id_t client_id) override;
 
   void set_inspect(inspect::Node node) { inspect_ = std::move(node); }
 
   bool Init(msd::DeviceHandle* device_handle);
   bool Init(ParentDevice* platform_device, std::unique_ptr<magma::PlatformBusMapper> bus_mapper);
 
-  std::shared_ptr<MsdArmConnection> OpenArmConnection(msd_client_id_t client_id);
+  std::shared_ptr<MsdArmConnection> OpenArmConnection(msd::msd_client_id_t client_id);
 
   uint64_t GpuId() { return gpu_features_.gpu_id.reg_value(); }
 
@@ -145,7 +145,7 @@ class MsdArmDevice : public msd::Device,
   PerformanceCounters* performance_counters() override { return perf_counters_.get(); }
   std::shared_ptr<DeviceRequest::Reply> RunTaskOnDeviceThread(FitCallbackTask task) override;
   std::thread::id GetDeviceThreadId() override { return device_thread_.get_id(); }
-  MagmaMemoryPressureLevel GetCurrentMemoryPressureLevel() override {
+  msd::MagmaMemoryPressureLevel GetCurrentMemoryPressureLevel() override {
     std::lock_guard lock(connection_list_mutex_);
     return current_memory_pressure_level_;
   }
@@ -329,7 +329,8 @@ class MsdArmDevice : public msd::Device,
   FIT_GUARDED(connection_list_mutex_)
   std::vector<std::weak_ptr<MsdArmConnection>> connection_list_;
   FIT_GUARDED(connection_list_mutex_)
-  MagmaMemoryPressureLevel current_memory_pressure_level_ = MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
+  msd::MagmaMemoryPressureLevel current_memory_pressure_level_ =
+      msd::MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
   FIT_GUARDED(connection_list_mutex_)
   uint32_t scheduled_memory_pressure_task_count_ = 0;
   FIT_GUARDED(connection_list_mutex_)

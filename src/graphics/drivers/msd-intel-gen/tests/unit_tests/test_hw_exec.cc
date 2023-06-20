@@ -84,7 +84,7 @@ class TestExec : public testing::TestWithParam<CommandBufferFlags> {
       void* vaddr;
       ASSERT_TRUE(buffer->platform_buffer()->MapCpu(&vaddr));
 
-      auto cmd_buf = static_cast<magma_command_buffer*>(vaddr);
+      auto cmd_buf = static_cast<msd::magma_command_buffer*>(vaddr);
       cmd_buf->batch_buffer_resource_index = 0;
       cmd_buf->batch_start_offset = 0;
       cmd_buf->resource_count = 1;
@@ -158,7 +158,7 @@ class TestExec : public testing::TestWithParam<CommandBufferFlags> {
       void* vaddr;
       ASSERT_TRUE(buffer->platform_buffer()->MapCpu(&vaddr));
 
-      auto cmd_buf = static_cast<magma_command_buffer*>(vaddr);
+      auto cmd_buf = static_cast<msd::magma_command_buffer*>(vaddr);
       cmd_buf->batch_buffer_resource_index = 0;
       cmd_buf->batch_start_offset = 0;
       cmd_buf->resource_count = 2;
@@ -228,7 +228,7 @@ class TestExec : public testing::TestWithParam<CommandBufferFlags> {
       void* vaddr;
       ASSERT_TRUE(buffer->platform_buffer()->MapCpu(&vaddr));
 
-      auto cmd_buf = static_cast<magma_command_buffer*>(vaddr);
+      auto cmd_buf = static_cast<msd::magma_command_buffer*>(vaddr);
       cmd_buf->batch_buffer_resource_index = 0;
       cmd_buf->batch_start_offset = 0;
       cmd_buf->resource_count = 2;

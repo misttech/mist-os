@@ -79,7 +79,7 @@ class JobScheduler {
     return count;
   }
   void ValidateCanSwitchProtected();
-  std::vector<msd_client_id_t> GetSignalingClients(uint64_t semaphore_koid);
+  std::vector<msd::msd_client_id_t> GetSignalingClients(uint64_t semaphore_koid);
 
   Owner* owner_;
   ClockCallback clock_callback_;

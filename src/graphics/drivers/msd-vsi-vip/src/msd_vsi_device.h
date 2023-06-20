@@ -77,11 +77,11 @@ class MsdVsiDevice : public msd::Device,
   bool StopRingbuffer();
 
   magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
-  magma_status_t GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) override;
+  magma_status_t GetIcdList(std::vector<msd::msd_icd_info_t>* icd_info_out) override;
   void DumpStatus(uint32_t dump_flags) override;
-  std::unique_ptr<msd::Connection> Open(msd_client_id_t client_id) override;
+  std::unique_ptr<msd::Connection> Open(msd::msd_client_id_t client_id) override;
 
-  std::unique_ptr<MsdVsiConnection> OpenVsiConnection(msd_client_id_t client_id);
+  std::unique_ptr<MsdVsiConnection> OpenVsiConnection(msd::msd_client_id_t client_id);
 
   magma_status_t ChipIdentity(magma_vsi_vip_chip_identity* out_identity);
   magma_status_t ChipOption(magma_vsi_vip_chip_option* out_option);

@@ -148,7 +148,7 @@ void MsdIntelDevice::Destroy() {
   interrupt_manager_.reset();
 }
 
-std::unique_ptr<msd::Connection> MsdIntelDevice::Open(msd_client_id_t client_id) {
+std::unique_ptr<msd::Connection> MsdIntelDevice::Open(msd::msd_client_id_t client_id) {
   return std::make_unique<MsdIntelAbiConnection>(MsdIntelConnection::Create(this, client_id));
 }
 
@@ -1280,12 +1280,12 @@ void MsdIntelDevice::CheckEngines() {
 
 void MsdIntelDevice::DumpStatus(uint32_t dump_flags) { DumpStatusToLog(); }
 
-magma_status_t MsdIntelDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) {
+magma_status_t MsdIntelDevice::GetIcdList(std::vector<msd::msd_icd_info_t>* icd_info_out) {
   const char* kSuffixes[] = {"_test", ""};
   constexpr uint32_t kMediaIcdCount = 1;
   constexpr uint32_t kTotalIcdCount = std::size(kSuffixes) + kMediaIcdCount;
 
-  std::vector<msd_icd_info_t> icd_info;
+  std::vector<msd::msd_icd_info_t> icd_info;
   icd_info.resize(kTotalIcdCount);
 
   for (uint32_t i = 0; i < std::size(kSuffixes); i++) {
@@ -1294,7 +1294,7 @@ magma_status_t MsdIntelDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_info_
                               kSuffixes[i])
                 .c_str(),
             sizeof(icd_info[i].component_url) - 1);
-    icd_info[i].support_flags = ICD_SUPPORT_FLAG_VULKAN;
+    icd_info[i].support_flags = msd::ICD_SUPPORT_FLAG_VULKAN;
   }
 
   {
@@ -1302,7 +1302,7 @@ magma_status_t MsdIntelDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_info_
     strncpy(icd_info[media_index].component_url,
             "fuchsia-pkg://fuchsia.com/codec_runner_intel_gen#meta/codec_runner_intel_gen.cm",
             sizeof(icd_info[media_index].component_url) - 1);
-    icd_info[media_index].support_flags = ICD_SUPPORT_FLAG_MEDIA_CODEC_FACTORY;
+    icd_info[media_index].support_flags = msd::ICD_SUPPORT_FLAG_MEDIA_CODEC_FACTORY;
   }
 
   icd_info.swap(*icd_info_out);

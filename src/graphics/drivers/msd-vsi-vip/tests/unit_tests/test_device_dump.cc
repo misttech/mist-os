@@ -261,7 +261,7 @@ TEST_F(TestDeviceDump, DumpCommandBufferMultipleResources) {
                                                desc.map_page_count, desc.gpu_addr, &bufs[i]));
   }
 
-  auto command_buffer = std::make_unique<magma_command_buffer>(magma_command_buffer{
+  auto command_buffer = std::make_unique<msd::magma_command_buffer>(msd::magma_command_buffer{
       .resource_count = kResourcesCount,
       .batch_buffer_resource_index = 0,
       .batch_start_offset = 0,

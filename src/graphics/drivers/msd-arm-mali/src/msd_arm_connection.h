@@ -56,14 +56,14 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
     virtual PerformanceCounters* performance_counters() = 0;
     virtual std::shared_ptr<DeviceRequest::Reply> RunTaskOnDeviceThread(FitCallbackTask task) = 0;
     virtual std::thread::id GetDeviceThreadId() = 0;
-    virtual MagmaMemoryPressureLevel GetCurrentMemoryPressureLevel() = 0;
+    virtual msd::MagmaMemoryPressureLevel GetCurrentMemoryPressureLevel() = 0;
   };
 
-  static std::shared_ptr<MsdArmConnection> Create(msd_client_id_t client_id, Owner* owner);
+  static std::shared_ptr<MsdArmConnection> Create(msd::msd_client_id_t client_id, Owner* owner);
 
   virtual ~MsdArmConnection();
 
-  msd_client_id_t client_id() { return client_id_; }
+  msd::msd_client_id_t client_id() { return client_id_; }
 
   void InitializeInspectNode(inspect::Node* parent);
 
@@ -172,7 +172,7 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
     std::vector<uint64_t> enabled_performance_counters_;
   };
 
-  MsdArmConnection(msd_client_id_t client_id, Owner* owner);
+  MsdArmConnection(msd::msd_client_id_t client_id, Owner* owner);
 
   bool Init();
 
@@ -197,7 +197,7 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
 
   magma::PlatformBusMapper* GetBusMapper() override { return owner_->GetBusMapper(); }
 
-  msd_client_id_t client_id_;
+  msd::msd_client_id_t client_id_;
 
   inspect::Node node_;
   inspect::Node jit_regions_;

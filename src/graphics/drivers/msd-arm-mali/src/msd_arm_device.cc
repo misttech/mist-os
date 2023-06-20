@@ -371,7 +371,7 @@ void MsdArmDevice::EnableAllCores() {
   power_manager_->EnableCores(register_io_.get(), enabled_cores);
 }
 
-std::shared_ptr<MsdArmConnection> MsdArmDevice::OpenArmConnection(msd_client_id_t client_id) {
+std::shared_ptr<MsdArmConnection> MsdArmDevice::OpenArmConnection(msd::msd_client_id_t client_id) {
   auto connection = MsdArmConnection::Create(client_id, this);
   if (connection) {
     connection->InitializeInspectNode(&inspect_);
@@ -381,7 +381,7 @@ std::shared_ptr<MsdArmConnection> MsdArmDevice::OpenArmConnection(msd_client_id_
   return connection;
 }
 
-std::unique_ptr<msd::Connection> MsdArmDevice::Open(msd_client_id_t client_id) {
+std::unique_ptr<msd::Connection> MsdArmDevice::Open(msd::msd_client_id_t client_id) {
   return std::make_unique<MsdArmAbiConnection>(OpenArmConnection(client_id));
 }
 
@@ -392,14 +392,14 @@ void MsdArmDevice::DeregisterConnection() {
                          connection_list_.end());
 }
 
-void MsdArmDevice::SetMemoryPressureLevel(MagmaMemoryPressureLevel level) {
+void MsdArmDevice::SetMemoryPressureLevel(msd::MagmaMemoryPressureLevel level) {
   {
     std::lock_guard<std::mutex> lock(connection_list_mutex_);
     current_memory_pressure_level_ = level;
     memory_pressure_level_property_.Set(level);
   }
 
-  if (level == MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL) {
+  if (level == msd::MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL) {
     // Run instantly to free up memory as quickly as possible, even if another callback is already
     // scheduled.
     PeriodicCriticalMemoryPressureCallback(true);
@@ -408,7 +408,7 @@ void MsdArmDevice::SetMemoryPressureLevel(MagmaMemoryPressureLevel level) {
 
 void MsdArmDevice::PeriodicCriticalMemoryPressureCallback(bool force_instant) {
   std::vector<std::weak_ptr<MsdArmConnection>> connection_list_copy;
-  MagmaMemoryPressureLevel level;
+  msd::MagmaMemoryPressureLevel level;
   {
     std::lock_guard<std::mutex> lock(connection_list_mutex_);
     DASSERT(scheduled_memory_pressure_task_count_ >= 0);
@@ -429,12 +429,13 @@ void MsdArmDevice::PeriodicCriticalMemoryPressureCallback(bool force_instant) {
     released_size += locked->PeriodicMemoryPressureCallback();
   }
 
-  if ((released_size > 0) && (level == MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL) && force_instant) {
+  if ((released_size > 0) && (level == msd::MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL) &&
+      force_instant) {
     MAGMA_LOG(INFO, "Transitioned to critical, released %ld bytes", released_size);
   }
   {
     std::lock_guard<std::mutex> lock(connection_list_mutex_);
-    if (current_memory_pressure_level_ == MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL &&
+    if (current_memory_pressure_level_ == msd::MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL &&
         !scheduled_memory_pressure_task_count_) {
       scheduled_memory_pressure_task_count_++;
       // 5 seconds is somewhat arbitrary. It's chosen to help clear out stale memory in a reasonable
@@ -1713,7 +1714,7 @@ magma_status_t MsdArmDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint
 
 void MsdArmDevice::DumpStatus(uint32_t dump_flags) { DumpStatusToLog(); }
 
-magma_status_t MsdArmDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) {
+magma_status_t MsdArmDevice::GetIcdList(std::vector<msd::msd_icd_info_t>* icd_info_out) {
   struct variant {
     const char* suffix;
     const char* url;
@@ -1728,7 +1729,7 @@ magma_status_t MsdArmDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_info_ou
            StringPrintf("fuchsia-pkg://%s/libvulkan_arm_mali_%lx%s#meta/vulkan.cm",
                         kVariants[i].url, GpuId(), kVariants[i].suffix)
                .c_str());
-    icd_info[i].support_flags = ICD_SUPPORT_FLAG_VULKAN;
+    icd_info[i].support_flags = msd::ICD_SUPPORT_FLAG_VULKAN;
   }
   return MAGMA_STATUS_OK;
 }

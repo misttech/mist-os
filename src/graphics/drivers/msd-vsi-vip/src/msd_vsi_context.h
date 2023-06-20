@@ -35,7 +35,7 @@ class MsdVsiContext {
   // context state buffer, which will be executed before the batch buffer if |context|
   // differs from the context of the last executed command buffer.
   static std::unique_ptr<MappedBatch> CreateBatch(std::shared_ptr<MsdVsiContext> context,
-                                                  magma_command_buffer* cmd_buf,
+                                                  msd::magma_command_buffer* cmd_buf,
                                                   magma_exec_resource* exec_resources,
                                                   msd::Buffer** msd_buffers,
                                                   msd::Semaphore** msd_wait_semaphores,
@@ -65,7 +65,7 @@ class MsdVsiAbiContext : public msd::Context {
     return context;
   }
 
-  magma_status_t ExecuteCommandBufferWithResources(magma_command_buffer* command_buffer,
+  magma_status_t ExecuteCommandBufferWithResources(msd::magma_command_buffer* command_buffer,
                                                    magma_exec_resource* exec_resources,
                                                    msd::Buffer** buffers,
                                                    msd::Semaphore** wait_semaphores,

@@ -64,14 +64,16 @@ class FakeConnectionOwner : public FakeConnectionOwnerBase {
     return kArmMaliCacheCoherencyAce;
   }
   void SetCurrentThreadToDefaultPriority() override { got_set_to_default_priority_ = true; }
-  virtual MagmaMemoryPressureLevel GetCurrentMemoryPressureLevel() override {
+  virtual msd::MagmaMemoryPressureLevel GetCurrentMemoryPressureLevel() override {
     return memory_pressure_level_;
   }
 
   const std::vector<MsdArmConnection*>& cancel_atoms_list() { return cancel_atoms_list_; }
   const std::vector<std::shared_ptr<MsdArmAtom>>& atoms_list() { return atoms_list_; }
   bool got_set_to_default_priority() const { return got_set_to_default_priority_; }
-  void set_memory_pressure_level(MagmaMemoryPressureLevel level) { memory_pressure_level_ = level; }
+  void set_memory_pressure_level(msd::MagmaMemoryPressureLevel level) {
+    memory_pressure_level_ = level;
+  }
 
  private:
   TestAddressSpaceObserver observer_;
@@ -79,7 +81,7 @@ class FakeConnectionOwner : public FakeConnectionOwnerBase {
   std::vector<MsdArmConnection*> cancel_atoms_list_;
   std::vector<std::shared_ptr<MsdArmAtom>> atoms_list_;
   bool got_set_to_default_priority_ = false;
-  MagmaMemoryPressureLevel memory_pressure_level_ = MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
+  msd::MagmaMemoryPressureLevel memory_pressure_level_ = msd::MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
 };
 
 class DeregisterConnectionOwner : public FakeConnectionOwner {
@@ -1242,7 +1244,7 @@ class TestConnection {
       EXPECT_EQ(2u, connection->jit_memory_regions_.size());
     }
 
-    owner.set_memory_pressure_level(MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL);
+    owner.set_memory_pressure_level(msd::MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL);
 
     // ID 1 has 1 committed page.
     EXPECT_EQ(ZX_PAGE_SIZE, connection->PeriodicMemoryPressureCallback());

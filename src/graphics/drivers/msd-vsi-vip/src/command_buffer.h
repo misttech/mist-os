@@ -22,8 +22,8 @@ class CommandBuffer : public magma::CommandBuffer<MsdVsiContext, GpuMapping> {
   static constexpr uint32_t kMaxAllowedResources = 2;
 
   static std::unique_ptr<CommandBuffer> Create(
-      std::shared_ptr<MsdVsiContext> context, msd_client_id_t client_id,
-      std::unique_ptr<magma_command_buffer> cmd_buf, std::vector<ExecResource> resources,
+      std::shared_ptr<MsdVsiContext> context, msd::msd_client_id_t client_id,
+      std::unique_ptr<msd::magma_command_buffer> cmd_buf, std::vector<ExecResource> resources,
       std::vector<std::shared_ptr<magma::PlatformSemaphore>> signal_semaphores) {
     if (cmd_buf->resource_count > kMaxAllowedResources) {
       MAGMA_LOG(ERROR, "Invalid resource count, only 1 additional context state is supported");
@@ -44,7 +44,7 @@ class CommandBuffer : public magma::CommandBuffer<MsdVsiContext, GpuMapping> {
   }
 
   CommandBuffer(std::weak_ptr<MsdVsiContext> context, uint64_t connection_id,
-                std::unique_ptr<magma_command_buffer> command_buffer,
+                std::unique_ptr<msd::magma_command_buffer> command_buffer,
                 std::optional<uint32_t> csb_resource_index = std::nullopt)
       : magma::CommandBuffer<MsdVsiContext, GpuMapping>(context, connection_id,
                                                         std::move(command_buffer)),
