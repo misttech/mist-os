@@ -263,7 +263,7 @@ be visible to Driver Manager. These package labels are also considered to be in 
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:21
+From //products/common/bringup.gni:20
 
 **Overridden from the default:** `[]`
 
@@ -271,7 +271,7 @@ From //BUILD.gn:39
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:21
+From //products/common/bringup.gni:20
 
 **Overridden from the default:** `[]`
 
@@ -453,7 +453,7 @@ The number of pager threads to spawn for blobfs.
 
 **Current value (from the default):** `2`
 
-From //src/storage/bin/blobfs/BUILD.gn:22
+From //src/storage/bin/blobfs/BUILD.gn:23
 
 ### blobfs_page_in_metrics_recording
 
@@ -609,7 +609,7 @@ Board files can set this to true if they have a package with a mali libvulkan VC
 
 **Current value (from the default):** `false`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:45
+From //src/graphics/lib/magma/gnbuild/magma.gni:43
 
 ### board_host_labels
 
@@ -951,7 +951,7 @@ Targets that will be built as IMG vulkan ICDS.
 
 **Current value (from the default):** `[]`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:42
+From //src/graphics/lib/magma/gnbuild/magma.gni:40
 
 ### build_libvulkan_vsi_vip
 
@@ -959,7 +959,7 @@ Targets that will be built as verisilicon vulkan ICDS.
 
 **Current value (from the default):** `[]`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:39
+From //src/graphics/lib/magma/gnbuild/magma.gni:37
 
 ### build_pb_v1
 
@@ -3045,7 +3045,7 @@ From //zircon/vdso/vdso.gni:9
 
 **Current value (from the default):** `"//third_party/expat"`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:14
+From //src/graphics/lib/magma/gnbuild/magma.gni:12
 
 ### experimental_cxx_version
 
@@ -3916,7 +3916,7 @@ change test environments so Vulkan tests run on boards with Mali GPUs.
 
 **Current value (from the default):** `false`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:34
+From //src/graphics/lib/magma/gnbuild/magma.gni:32
 
 ### host_byteorder
 
@@ -4589,7 +4589,7 @@ From //build/config/BUILDCONFIG.gn:1422
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:22
+From //products/common/bringup.gni:21
 
 **Overridden from the default:** `[]`
 
@@ -4597,7 +4597,7 @@ From //BUILD.gn:40
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:22
+From //products/common/bringup.gni:21
 
 **Overridden from the default:** `[]`
 
@@ -4607,7 +4607,7 @@ From //BUILD.gn:40
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:25
+From //products/common/bringup.gni:24
 
 **Overridden from the default:** `[]`
 
@@ -4615,7 +4615,7 @@ From //BUILD.gn:48
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:25
+From //products/common/bringup.gni:24
 
 **Overridden from the default:** `[]`
 
@@ -4625,7 +4625,7 @@ From //BUILD.gn:48
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:28
+From //products/common/bringup.gni:27
 
 **Overridden from the default:** `[]`
 
@@ -4633,7 +4633,7 @@ From //BUILD.gn:57
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:28
+From //products/common/bringup.gni:27
 
 **Overridden from the default:** `[]`
 
@@ -4667,7 +4667,7 @@ From //BUILD.gn:74
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:31
+From //products/common/bringup.gni:30
 
 **Overridden from the default:** `[]`
 
@@ -4675,7 +4675,7 @@ From //BUILD.gn:66
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:31
+From //products/common/bringup.gni:30
 
 **Overridden from the default:** `[]`
 
@@ -4726,7 +4726,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:35
 
 **Current value (from the default):** `"//src/graphics/lib/magma"`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:13
+From //src/graphics/lib/magma/gnbuild/magma.gni:11
 
 ### magma_debug
 
@@ -4740,7 +4740,7 @@ Enable this to include fuchsia tracing capability
 
 **Current value (from the default):** `true`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:21
+From //src/graphics/lib/magma/gnbuild/magma.gni:19
 
 ### magma_openvx_include
 
@@ -4748,7 +4748,7 @@ The path to OpenVX headers
 
 **Current value (from the default):** `""`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:27
+From //src/graphics/lib/magma/gnbuild/magma.gni:25
 
 ### magma_openvx_package
 
@@ -4756,13 +4756,13 @@ The path to an OpenVX implementation
 
 **Current value (from the default):** `""`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:30
+From //src/graphics/lib/magma/gnbuild/magma.gni:28
 
 ### magma_python_path
 
 **Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/third_party/mako"`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:18
+From //src/graphics/lib/magma/gnbuild/magma.gni:16
 
 ### max_blob_contents_size
 
@@ -4877,7 +4877,7 @@ they must be separated into their own list.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:19
+From //products/common/bringup.gni:18
 
 **Overridden from the default:** `[]`
 
@@ -4885,7 +4885,7 @@ From //build/images/args.gni:99
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:19
+From //products/common/bringup.gni:18
 
 **Overridden from the default:** `[]`
 
@@ -4978,13 +4978,13 @@ From //src/graphics/drivers/msd-arm-mali/src/BUILD.gn:23
 
 **Current value (from the default):** `"//src/graphics/drivers"`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:15
+From //src/graphics/lib/magma/gnbuild/magma.gni:13
 
 ### msd_intel_gen_build_root
 
 **Current value (from the default):** `"//src/graphics/drivers/msd-intel-gen"`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:16
+From //src/graphics/lib/magma/gnbuild/magma.gni:14
 
 ### msd_intel_gen_enable_hardware_unit_tests
 
@@ -5622,7 +5622,7 @@ package flavors.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:33
+From //products/common/bringup.gni:32
 
 **Overridden from the default:** `[]`
 
@@ -5630,7 +5630,7 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:33
+From //products/common/bringup.gni:32
 
 **Overridden from the default:** `[]`
 
@@ -5843,13 +5843,13 @@ The path to a prebuilt libvulkan.so for an IMG GPU.
 
 **Current value (from the default):** `""`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:24
+From //src/graphics/lib/magma/gnbuild/magma.gni:22
 
 ### product_bootfs_labels
 
 A list of binary labels to include in ZBIs built for this product.
 
-**Current value for `target_cpu = "arm64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
+**Current value for `target_cpu = "arm64"`:** `["//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
 From //products/bringup.gni:14
 
@@ -5857,7 +5857,7 @@ From //products/bringup.gni:14
 
 From //build/product.gni:14
 
-**Current value for `target_cpu = "x64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
+**Current value for `target_cpu = "x64"`:** `["//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
 From //products/bringup.gni:14
 
@@ -7635,7 +7635,7 @@ an extension mechanism for SDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:35
+From //products/common/bringup.gni:34
 
 **Overridden from the default:** `[]`
 
@@ -7643,7 +7643,7 @@ From //BUILD.gn:90
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:35
+From //products/common/bringup.gni:34
 
 **Overridden from the default:** `[]`
 
