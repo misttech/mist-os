@@ -1346,6 +1346,9 @@
                 "select03",
                 "setrlimit02",
                 "tst_fuzzy_sync01",
+                "tst_fuzzy_sync02",
+                "tst_fuzzy_sync03",
+                "writev03",
 
                 // These tests hang
                 "creat07",
