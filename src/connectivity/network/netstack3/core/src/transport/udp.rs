@@ -17,7 +17,6 @@ use lock_order::{Locked, Unlocked};
 
 use derivative::Derivative;
 use either::Either;
-use explicit::ResultExt as _;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv6},
     MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
@@ -53,8 +52,9 @@ use crate::{
         datagram::{
             self, AddrEntry, ConnState, ConnectError, DatagramBoundId, DatagramFlowId,
             DatagramSocketId, DatagramSocketSpec, DatagramSocketStateSpec, DatagramSockets,
-            DatagramStateContext, DatagramStateNonSyncContext, FoundSockets, InUseError,
-            ListenerState, LocalIdentifierAllocator, MulticastMembershipInterfaceSelector,
+            DatagramStateContext, DatagramStateNonSyncContext, ExpectedConnError,
+            ExpectedUnboundError, FoundSockets, InUseError, ListenerState,
+            LocalIdentifierAllocator, MulticastMembershipInterfaceSelector,
             SendError as DatagramSendError, SetMulticastMembershipError, Shutdown, ShutdownType,
             SocketHopLimits, SocketInfo as DatagramSocketInfo, UnboundSocketState,
         },
@@ -996,39 +996,12 @@ impl<I: Ip> From<ConnId<I>> for SocketId<I> {
     }
 }
 
-/// A connected socket was expected.
-#[derive(Copy, Clone, Debug, Default, Eq, GenericOverIp, PartialEq)]
-pub struct ExpectedConnError;
-/// An unbound socket was expected.
-#[derive(Copy, Clone, Debug, Default, Eq, GenericOverIp, PartialEq)]
-pub struct ExpectedUnboundError;
-
-impl<I: Ip> TryFrom<BoundId<I>> for ConnId<I> {
-    type Error = ExpectedConnError;
-    fn try_from(id: BoundId<I>) -> Result<Self, Self::Error> {
-        match id {
-            BoundId::Connected(id) => Ok(id),
-            BoundId::Listening(_) => Err(ExpectedConnError),
-        }
-    }
-}
-
 impl<I: Ip> TryFrom<SocketId<I>> for UnboundId<I> {
     type Error = ExpectedUnboundError;
     fn try_from(SocketId(id): SocketId<I>) -> Result<Self, Self::Error> {
         match id {
             SocketIdInner::Unbound(id) => Ok(id),
             SocketIdInner::Bound(_) => Err(ExpectedUnboundError),
-        }
-    }
-}
-
-impl<I: Ip> TryFrom<SocketId<I>> for ConnId<I> {
-    type Error = ExpectedConnError;
-    fn try_from(SocketId(id): SocketId<I>) -> Result<Self, Self::Error> {
-        match id {
-            SocketIdInner::Bound(id) => id.try_into(),
-            SocketIdInner::Unbound(_) => Err(ExpectedConnError),
         }
     }
 }
@@ -1367,11 +1340,20 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
 
     fn get_udp_multicast_hop_limit(&mut self, ctx: &C, id: SocketId<I>) -> NonZeroU8;
 
-    fn disconnect_udp_connected(&mut self, ctx: &mut C, id: ConnId<I>) -> ListenerId<I>;
+    fn disconnect_connected(
+        &mut self,
+        ctx: &mut C,
+        id: SocketId<I>,
+    ) -> Result<SocketId<I>, ExpectedConnError>;
 
-    fn shutdown(&mut self, ctx: &C, id: ConnId<I>, which: ShutdownType);
+    fn shutdown(
+        &mut self,
+        ctx: &C,
+        id: SocketId<I>,
+        which: ShutdownType,
+    ) -> Result<(), ExpectedConnError>;
 
-    fn get_shutdown(&mut self, ctx: &C, id: ConnId<I>) -> Option<ShutdownType>;
+    fn get_shutdown(&mut self, ctx: &C, id: SocketId<I>) -> Option<ShutdownType>;
 
     fn remove_udp(
         &mut self,
@@ -1495,16 +1477,25 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         crate::socket::datagram::get_ip_hop_limits(self, ctx, id).multicast
     }
 
-    fn disconnect_udp_connected(&mut self, ctx: &mut C, id: ConnId<I>) -> ListenerId<I> {
-        datagram::disconnect_connected(self, ctx, id)
+    fn disconnect_connected(
+        &mut self,
+        ctx: &mut C,
+        id: SocketId<I>,
+    ) -> Result<SocketId<I>, ExpectedConnError> {
+        datagram::disconnect_connected(self, ctx, id.into()).map(Into::into)
     }
 
-    fn shutdown(&mut self, ctx: &C, id: ConnId<I>, which: ShutdownType) {
-        datagram::shutdown_connected(self, ctx, id, which)
+    fn shutdown(
+        &mut self,
+        ctx: &C,
+        id: SocketId<I>,
+        which: ShutdownType,
+    ) -> Result<(), ExpectedConnError> {
+        datagram::shutdown_connected(self, ctx, id.into(), which)
     }
 
-    fn get_shutdown(&mut self, ctx: &C, id: ConnId<I>) -> Option<ShutdownType> {
-        datagram::get_shutdown_connected(self, ctx, id)
+    fn get_shutdown(&mut self, ctx: &C, id: SocketId<I>) -> Option<ShutdownType> {
+        datagram::get_shutdown_connected(self, ctx, id.into())
     }
 
     fn remove_udp(
@@ -1546,12 +1537,12 @@ pub enum SendError {
 pub(crate) trait BufferSocketHandler<I: IpExt, C, B: BufferMut>:
     SocketHandler<I, C>
 {
-    fn send_udp_conn(
+    fn send(
         &mut self,
         ctx: &mut C,
-        conn: ConnId<I>,
+        conn: SocketId<I>,
         body: B,
-    ) -> Result<(), (B, SendError)>;
+    ) -> Result<(), (B, Either<SendError, ExpectedConnError>)>;
 
     fn send_to(
         &mut self,
@@ -1573,15 +1564,18 @@ impl<
         SC: BufferStateContext<I, C, B>,
     > BufferSocketHandler<I, C, B> for SC
 {
-    fn send_udp_conn(
+    fn send(
         &mut self,
         ctx: &mut C,
-        conn: ConnId<I>,
+        id: SocketId<I>,
         body: B,
-    ) -> Result<(), (B, SendError)> {
-        datagram::send_conn(self, ctx, conn, body).map_err(|send_error| match send_error {
-            DatagramSendError::NotWriteable(b) => (b, SendError::NotWriteable),
-            DatagramSendError::IpSock(body, err) => (body.into_inner(), SendError::IpSock(err)),
+    ) -> Result<(), (B, Either<SendError, ExpectedConnError>)> {
+        datagram::send_conn(self, ctx, id.into(), body).map_err(|send_error| match send_error {
+            DatagramSendError::NotConnected(b) => (b, Either::Right(ExpectedConnError)),
+            DatagramSendError::NotWriteable(b) => (b, Either::Left(SendError::NotWriteable)),
+            DatagramSendError::IpSock(body, err) => {
+                (body.into_inner(), Either::Left(SendError::IpSock(err)))
+            }
         })
     }
 
@@ -1638,22 +1632,17 @@ pub fn send_udp<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
     body: B,
 ) -> Result<(), (B, Either<SendError, ExpectedConnError>)> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    let conn: ConnId<I> = match id.clone().try_into() {
-        Ok(id) => id,
-        Err(e) => return Err((body, Either::Right(e))),
-    };
+
     I::map_ip::<_, Result<_, _>>(
-        (IpInvariant((&mut sync_ctx, ctx, body)), conn),
-        |(IpInvariant((sync_ctx, ctx, body)), conn)| {
-            BufferSocketHandler::<Ipv4, _, _>::send_udp_conn(sync_ctx, ctx, conn, body)
-                .map_err(IpInvariant)
+        (IpInvariant((&mut sync_ctx, ctx, body)), id.clone()),
+        |(IpInvariant((sync_ctx, ctx, body)), id)| {
+            BufferSocketHandler::<Ipv4, _, _>::send(sync_ctx, ctx, id, body).map_err(IpInvariant)
         },
-        |(IpInvariant((sync_ctx, ctx, body)), conn)| {
-            BufferSocketHandler::<Ipv6, _, _>::send_udp_conn(sync_ctx, ctx, conn, body)
-                .map_err(IpInvariant)
+        |(IpInvariant((sync_ctx, ctx, body)), id)| {
+            BufferSocketHandler::<Ipv6, _, _>::send(sync_ctx, ctx, id, body).map_err(IpInvariant)
         },
     )
-    .map_err(|IpInvariant((b, e))| (b, Either::Left(e)))
+    .map_err(|IpInvariant(e)| e)
 }
 
 /// Sends a UDP packet to the provided destination address.
@@ -2131,18 +2120,15 @@ pub fn disconnect_udp_connected<I: IpExt, C: crate::NonSyncContext>(
     id: &SocketId<I>,
 ) -> Result<SocketId<I>, ExpectedConnError> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    let id: ConnId<I> = id.clone().try_into()?;
-
-    let id: ListenerId<I> = I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx)), id),
+    I::map_ip(
+        (IpInvariant((&mut sync_ctx, ctx)), id.clone()),
         |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv4, _>::disconnect_udp_connected(sync_ctx, ctx, id)
+            SocketHandler::<Ipv4, _>::disconnect_connected(sync_ctx, ctx, id)
         },
         |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv6, _>::disconnect_udp_connected(sync_ctx, ctx, id)
+            SocketHandler::<Ipv6, _>::disconnect_connected(sync_ctx, ctx, id)
         },
-    );
-    Ok(id.into())
+    )
 }
 
 /// Shuts down a socket for reading and/or writing.
@@ -2161,17 +2147,16 @@ pub fn shutdown<I: IpExt, C: crate::NonSyncContext>(
     which: ShutdownType,
 ) -> Result<(), ExpectedConnError> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    let id: ConnId<I> = id.clone().try_into()?;
 
-    Ok(I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx, which)), id),
+    I::map_ip(
+        (IpInvariant((&mut sync_ctx, ctx, which)), id.clone()),
         |(IpInvariant((sync_ctx, ctx, which)), id)| {
             SocketHandler::<Ipv4, _>::shutdown(sync_ctx, ctx, id, which)
         },
         |(IpInvariant((sync_ctx, ctx, which)), id)| {
             SocketHandler::<Ipv6, _>::shutdown(sync_ctx, ctx, id, which)
         },
-    ))
+    )
 }
 
 /// Get the shutdown state for a socket.
@@ -2188,10 +2173,9 @@ pub fn get_shutdown<I: IpExt, C: crate::NonSyncContext>(
     id: &SocketId<I>,
 ) -> Option<ShutdownType> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    let id: ConnId<I> = id.clone().try_into().ok_checked::<ExpectedConnError>()?;
 
     I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx)), id),
+        (IpInvariant((&mut sync_ctx, ctx)), id.clone()),
         |(IpInvariant((sync_ctx, ctx)), id)| {
             SocketHandler::<Ipv4, _>::get_shutdown(sync_ctx, ctx, id)
         },
@@ -2829,10 +2813,10 @@ mod tests {
         assert_eq!(pkt.body, &body[..]);
 
         // Now try to send something over this new connection.
-        BufferSocketHandler::send_udp_conn(
+        BufferSocketHandler::send(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            conn.try_into().unwrap(),
+            conn,
             Buf::new(body.to_vec(), ..),
         )
         .expect("send_udp_conn returned an error");
@@ -3380,14 +3364,14 @@ mod tests {
         frames.set_should_error_for_frame(|_frame_meta| true);
 
         // Now try to send something over this new connection:
-        let (_, send_err) = BufferSocketHandler::send_udp_conn(
+        let (_, send_err) = BufferSocketHandler::send(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            conn.try_into().unwrap(),
+            conn,
             Buf::new(Vec::new(), ..),
         )
         .unwrap_err();
-        assert_eq!(send_err, SendError::IpSock(IpSockSendError::Mtu));
+        assert_eq!(send_err, Either::Left(SendError::IpSock(IpSockSendError::Mtu)));
     }
 
     #[ip_test]
@@ -3419,17 +3403,19 @@ mod tests {
                 true,
                 Err((
                     Buf::new(Vec::new(), ..),
-                    SendError::IpSock(IpSockSendError::Unroutable(ResolveRouteError::Unreachable)),
+                    Either::Left(SendError::IpSock(IpSockSendError::Unroutable(
+                        ResolveRouteError::Unreachable,
+                    ))),
                 )),
             ),
         ] {
             set_device_removed(&mut sync_ctx, device_removed);
 
             assert_eq!(
-                BufferSocketHandler::send_udp_conn(
+                BufferSocketHandler::send(
                     &mut sync_ctx,
                     &mut non_sync_ctx,
-                    conn.try_into().unwrap(),
+                    conn,
                     Buf::new(Vec::new(), ..),
                 ),
                 expected_res,
@@ -3455,13 +3441,13 @@ mod tests {
             remote_ip: Option<ZonedAddr<I::Addr, SC::DeviceId>>,
             sync_ctx: &mut SC,
             non_sync_ctx: &mut FakeUdpNonSyncCtx<I>,
-            conn: ConnId<I>,
+            id: SocketId<I>,
         ) -> Result<(), NotWriteableError> {
             match remote_ip {
                 Some(remote_ip) => BufferSocketHandler::send_to(
                     sync_ctx,
                     non_sync_ctx,
-                    conn.into(),
+                    id,
                     remote_ip,
                     REMOTE_PORT,
                     Buf::new(Vec::new(), ..),
@@ -3470,13 +3456,13 @@ mod tests {
                 .map_err(
                     |(_, e)| assert_matches!(e, Either::Right((None, SendToError::NotWriteable)) => NotWriteableError)
                 ),
-                None => BufferSocketHandler::send_udp_conn(
+                None => BufferSocketHandler::send(
                     sync_ctx,
                     non_sync_ctx,
-                    conn,
+                    id,
                     Buf::new(Vec::new(), ..),
                 )
-                .map_err(|(_, e)| assert_matches!(e, SendError::NotWriteable => NotWriteableError)),
+                .map_err(|(_, e)| assert_matches!(e, Either::Left(SendError::NotWriteable) => NotWriteableError)),
             }
         }
 
@@ -3496,12 +3482,12 @@ mod tests {
         )
         .expect("connect failed");
 
-        send(send_to_ip, &mut sync_ctx, &mut non_sync_ctx, conn.try_into().unwrap())
-            .expect("can send");
-        SocketHandler::shutdown(&mut sync_ctx, &non_sync_ctx, conn.try_into().unwrap(), shutdown);
+        send(send_to_ip, &mut sync_ctx, &mut non_sync_ctx, conn).expect("can send");
+        SocketHandler::shutdown(&mut sync_ctx, &non_sync_ctx, conn, shutdown)
+            .expect("is connected");
 
         assert_matches!(
-            send(send_to_ip, &mut sync_ctx, &mut non_sync_ctx, conn.try_into().unwrap()),
+            send(send_to_ip, &mut sync_ctx, &mut non_sync_ctx, conn),
             Err(NotWriteableError)
         );
     }
@@ -3550,7 +3536,7 @@ mod tests {
         );
 
         assert_matches!(&non_sync_ctx.state().conn_data[..], [_]);
-        SocketHandler::shutdown(&mut sync_ctx, &non_sync_ctx, conn.try_into().unwrap(), which);
+        SocketHandler::shutdown(&mut sync_ctx, &non_sync_ctx, conn, which).expect("is connected");
         receive_udp_packet(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -3564,12 +3550,8 @@ mod tests {
         assert_matches!(&non_sync_ctx.state().conn_data[..], [_]);
 
         // Calling shutdown for the send direction doesn't change anything.
-        SocketHandler::shutdown(
-            &mut sync_ctx,
-            &non_sync_ctx,
-            conn.try_into().unwrap(),
-            ShutdownType::Send,
-        );
+        SocketHandler::shutdown(&mut sync_ctx, &non_sync_ctx, conn, ShutdownType::Send)
+            .expect("is connected");
         receive_udp_packet(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -4441,6 +4423,25 @@ mod tests {
             match id {
                 SocketIdInner::Unbound(_) => Err(ExpectedBoundError),
                 SocketIdInner::Bound(id) => Ok(id.into()),
+            }
+        }
+    }
+    impl<I: Ip> TryFrom<SocketId<I>> for ConnId<I> {
+        type Error = ExpectedConnError;
+        fn try_from(SocketId(id): SocketId<I>) -> Result<Self, Self::Error> {
+            match id {
+                SocketIdInner::Bound(id) => id.try_into(),
+                SocketIdInner::Unbound(_) => Err(ExpectedConnError),
+            }
+        }
+    }
+
+    impl<I: Ip> TryFrom<BoundId<I>> for ConnId<I> {
+        type Error = ExpectedConnError;
+        fn try_from(id: BoundId<I>) -> Result<Self, Self::Error> {
+            match id {
+                BoundId::Connected(id) => Ok(id),
+                BoundId::Listening(_) => Err(ExpectedConnError),
             }
         }
     }
@@ -6003,14 +6004,11 @@ where {
             Some(FakeWeakDeviceId(FakeDeviceId))
         );
 
-        let listener = SocketHandler::disconnect_udp_connected(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            conn.try_into().unwrap(),
-        );
+        let listener = SocketHandler::disconnect_connected(&mut sync_ctx, &mut non_sync_ctx, conn)
+            .expect("was connected");
 
         assert_eq!(
-            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, listener.into()),
+            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, listener),
             bind_device.map(FakeWeakDeviceId),
         );
     }
@@ -6053,13 +6051,10 @@ where {
             Some(FakeWeakDeviceId(FakeDeviceId))
         );
 
-        let listener = SocketHandler::disconnect_udp_connected(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            conn.try_into().unwrap(),
-        );
+        let listener = SocketHandler::disconnect_connected(&mut sync_ctx, &mut non_sync_ctx, conn)
+            .expect("was connected");
         assert_eq!(
-            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, listener.into()),
+            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, listener),
             Some(FakeWeakDeviceId(FakeDeviceId))
         );
     }
@@ -6105,13 +6100,10 @@ where {
         SocketHandler::set_device(&mut sync_ctx, &mut non_sync_ctx, conn, Some(&FakeDeviceId))
             .expect("binding same device should succeed");
 
-        let listener = SocketHandler::disconnect_udp_connected(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            conn.try_into().unwrap(),
-        );
+        let listener = SocketHandler::disconnect_connected(&mut sync_ctx, &mut non_sync_ctx, conn)
+            .expect("was connected");
         assert_eq!(
-            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, listener.into()),
+            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, listener),
             Some(FakeWeakDeviceId(FakeDeviceId))
         );
     }

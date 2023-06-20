@@ -34,11 +34,11 @@ use netstack3_core::{
     error::{LocalAddressError, SocketError},
     ip::{icmp, IpExt},
     socket::datagram::{
-        ConnectError, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
-        SetMulticastMembershipError, ShutdownType,
+        ConnectError, ExpectedConnError, ExpectedUnboundError, MulticastInterfaceSelector,
+        MulticastMembershipInterfaceSelector, SetMulticastMembershipError, ShutdownType,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
-    transport::udp::{self, ExpectedConnError, ExpectedUnboundError},
+    transport::udp,
     BufferNonSyncContext, NonSyncContext, SyncCtx,
 };
 use packet::{Buf, BufferMut};

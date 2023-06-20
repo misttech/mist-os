@@ -959,6 +959,14 @@ where
     })
 }
 
+/// A connected socket was expected.
+#[derive(Copy, Clone, Debug, Default, Eq, GenericOverIp, PartialEq)]
+pub struct ExpectedConnError;
+
+/// An unbound socket was expected.
+#[derive(Copy, Clone, Debug, Default, Eq, GenericOverIp, PartialEq)]
+pub struct ExpectedUnboundError;
+
 pub(crate) fn disconnect_connected<
     A: SocketMapAddrSpec,
     C: DatagramStateNonSyncContext<A, S>,
@@ -967,8 +975,8 @@ pub(crate) fn disconnect_connected<
 >(
     sync_ctx: &mut SC,
     _ctx: &mut C,
-    id: S::ConnId,
-) -> S::ListenerId
+    id: DatagramSocketId<S>,
+) -> Result<DatagramSocketId<S>, ExpectedConnError>
 where
     Bound<S>: Tagged<AddrVec<A>>,
     S::ListenerAddrState:
@@ -976,7 +984,13 @@ where
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
     S::ConnSharingState: Into<S::ListenerSharingState>,
 {
-    sync_ctx.with_sockets_mut(|_sync_ctx, state, _allocator| {
+    let id = match id {
+        DatagramSocketId::Unbound(_) | DatagramSocketId::Bound(SocketId::Listener(_)) => {
+            return Err(ExpectedConnError)
+        }
+        DatagramSocketId::Bound(SocketId::Connection(id)) => id,
+    };
+    Ok(sync_ctx.with_sockets_mut(|_sync_ctx, state, _allocator| {
         let DatagramSockets { bound_state, bound, unbound: _ } = state;
         let (state, sharing, addr): (_, S::ConnSharingState, _) = Connection::from_socket_state(
             bound_state
@@ -996,7 +1010,7 @@ where
 
         let addr = ListenerAddr { ip: ListenerIpAddr { addr: Some(local_ip), identifier }, device };
 
-        bound
+        let id = bound
             .listeners_mut()
             .try_insert(addr, sharing.into(), |addr, sharing| {
                 let entry = bound_state.push_entry(
@@ -1006,8 +1020,10 @@ where
                 Listener::from_socket_id_ref(entry.key()).clone()
             })
             .expect("inserting listener for disconnected socket failed")
-            .id()
-    })
+            .id();
+
+        DatagramSocketId::Bound(SocketId::Listener(id))
+    }))
 }
 
 /// Which direction(s) to shut down for a socket.
@@ -1029,12 +1045,19 @@ pub(crate) fn shutdown_connected<
 >(
     sync_ctx: &mut SC,
     _ctx: &C,
-    id: S::ConnId,
+    id: DatagramSocketId<S>,
     which: ShutdownType,
-) where
+) -> Result<(), ExpectedConnError>
+where
     Bound<S>: Tagged<AddrVec<A>>,
 {
-    sync_ctx.with_sockets_mut(|_sync_ctx, state, _allocator| {
+    let id = match id {
+        DatagramSocketId::Unbound(_) | DatagramSocketId::Bound(SocketId::Listener(_)) => {
+            return Err(ExpectedConnError)
+        }
+        DatagramSocketId::Bound(SocketId::Connection(id)) => id,
+    };
+    Ok(sync_ctx.with_sockets_mut(|_sync_ctx, state, _allocator| {
         let DatagramSockets { bound_state, bound: _, unbound: _ } = state;
         let (ConnState { socket: _, clear_device_on_disconnect: _, shutdown }, _sharing, _addr) =
             Connection::from_socket_state_mut(
@@ -1048,7 +1071,7 @@ pub(crate) fn shutdown_connected<
         let Shutdown { send, receive } = shutdown;
         *send |= shutdown_send;
         *receive |= shutdown_receive;
-    })
+    }))
 }
 
 pub(crate) fn get_shutdown_connected<
@@ -1059,11 +1082,17 @@ pub(crate) fn get_shutdown_connected<
 >(
     sync_ctx: &mut SC,
     _ctx: &C,
-    id: S::ConnId,
+    id: DatagramSocketId<S>,
 ) -> Option<ShutdownType>
 where
     Bound<S>: Tagged<AddrVec<A>>,
 {
+    let id = match id {
+        DatagramSocketId::Unbound(_) | DatagramSocketId::Bound(SocketId::Listener(_)) => {
+            return None
+        }
+        DatagramSocketId::Bound(SocketId::Connection(id)) => id,
+    };
     sync_ctx.with_sockets(|_sync_ctx, state| {
         let DatagramSockets { bound_state, bound: _, unbound: _ } = state;
         let (ConnState { socket: _, clear_device_on_disconnect: _, shutdown }, _sharing, _addr) =
@@ -1082,6 +1111,8 @@ where
 
 /// Error encountered when sending a datagram on a socket.
 pub enum SendError<B, S> {
+    /// The socket is not connected,
+    NotConnected(B),
     /// The socket is not writeable.
     NotWriteable(B),
     /// There was a problem sending the IP packet.
@@ -1097,12 +1128,18 @@ pub(crate) fn send_conn<
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    id: S::ConnId,
+    id: DatagramSocketId<S>,
     body: B,
 ) -> Result<(), SendError<B, S::Serializer<B>>>
 where
     Bound<S>: Tagged<AddrVec<A>>,
 {
+    let id = match id {
+        DatagramSocketId::Unbound(_) | DatagramSocketId::Bound(SocketId::Listener(_)) => {
+            return Err(SendError::NotConnected(body))
+        }
+        DatagramSocketId::Bound(SocketId::Connection(id)) => id,
+    };
     sync_ctx.with_sockets_buf_mut(|sync_ctx, state, _allocator| {
         let DatagramSockets { bound: _, unbound: _, bound_state } = state;
         let (
