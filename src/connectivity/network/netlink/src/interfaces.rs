@@ -86,6 +86,9 @@ pub(crate) struct AddressAndInterfaceArgs {
 pub(crate) struct NewAddressArgs {
     /// The address to be added and the interface to add it to.
     pub address_and_interface_id: AddressAndInterfaceArgs,
+    /// Indicates whether or not an on-link route should be added for the
+    /// address's subnet.
+    pub add_subnet_route: bool,
 }
 
 /// Arguments for an RTM_DELADDR [`Request`].
@@ -433,6 +436,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
         interfaces_proxy: &fnet_root::InterfacesProxy,
         NewAddressArgs {
             address_and_interface_id: AddressAndInterfaceArgs { address, interface_id },
+            add_subnet_route,
         }: NewAddressArgs,
     ) -> Result<(), RequestError> {
         let control = Self::get_interface_control(interfaces_proxy, interface_id);
@@ -443,7 +447,12 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
         control
             .add_address(
                 &mut address.into_ext(),
-                fnet_interfaces_admin::AddressParameters::default(),
+                fnet_interfaces_admin::AddressParameters {
+                    // TODO(https://fxbug.dev/123319): Update how we add subnet
+                    // routes for addresses.
+                    add_subnet_route: Some(add_subnet_route),
+                    ..fnet_interfaces_admin::AddressParameters::default()
+                },
                 asp_server_end,
             )
             .map_err(|e| {
@@ -2194,6 +2203,7 @@ mod tests {
                 if is_new {
                     RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
                         address_and_interface_id,
+                        add_subnet_route: false,
                     }))
                 } else {
                     RequestArgs::Address(AddressRequestArgs::Del(DelAddressArgs {
@@ -2231,6 +2241,11 @@ mod tests {
         )
     }
 
+    enum AddressRequestKind {
+        New { add_subnet_route: bool },
+        Del,
+    }
+
     /// A test helper that calls the callback with a
     /// [`fnet_interfaces_admin::ControlRequest`] as they arrive.
     async fn test_interface_request<
@@ -2238,20 +2253,24 @@ mod tests {
         F: FnMut(fnet_interfaces_admin::ControlRequest) -> Fut,
     >(
         address: AddrSubnetEither,
-        is_new: bool,
+        kind: AddressRequestKind,
         mut control_request_handler: F,
     ) -> TestRequestResult {
         let interface_id = NonZeroU32::new(ETH_INTERFACE_ID.try_into().unwrap()).unwrap();
         let address_and_interface_id = AddressAndInterfaceArgs { address, interface_id };
         test_request(
-            if is_new {
-                RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
-                    address_and_interface_id,
-                }))
-            } else {
-                RequestArgs::Address(AddressRequestArgs::Del(DelAddressArgs {
-                    address_and_interface_id,
-                }))
+            match kind {
+                AddressRequestKind::New { add_subnet_route } => {
+                    RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
+                        address_and_interface_id,
+                        add_subnet_route,
+                    }))
+                }
+                AddressRequestKind::Del => {
+                    RequestArgs::Address(AddressRequestArgs::Del(DelAddressArgs {
+                        address_and_interface_id,
+                    }))
+                }
             },
             |interfaces_request_stream| async {
                 interfaces_request_stream
@@ -2286,9 +2305,10 @@ mod tests {
         F: Fn(fnet_interfaces_admin::AddressStateProviderRequestStream) -> Fut,
     >(
         address: AddrSubnetEither,
+        add_subnet_route: bool,
         asp_handler: F,
     ) -> TestRequestResult {
-        test_interface_request(address, true, |req| async {
+        test_interface_request(address, AddressRequestKind::New { add_subnet_route }, |req| async {
             match req {
                 fnet_interfaces_admin::ControlRequest::AddAddress {
                     address: got_address,
@@ -2299,7 +2319,10 @@ mod tests {
                     pretty_assertions::assert_eq!(got_address, address.into_ext());
                     pretty_assertions::assert_eq!(
                         parameters,
-                        fnet_interfaces_admin::AddressParameters::default()
+                        fnet_interfaces_admin::AddressParameters {
+                            add_subnet_route: Some(add_subnet_route),
+                            ..fnet_interfaces_admin::AddressParameters::default()
+                        },
                     );
                     asp_handler(address_state_provider.into_stream().unwrap()).await
                 }
@@ -2316,7 +2339,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_new_addr_drop_asp_immediately(address: AddrSubnetEither) {
         pretty_assertions::assert_eq!(
-            test_new_addr_asp_helper(address, |_asp_request_stream| async {}).await,
+            test_new_addr_asp_helper(address, false, |_asp_request_stream| async {}).await,
             TestRequestResult {
                 messages: Vec::new(),
                 waiter_result: Err(RequestError::UnrecognizedInterface),
@@ -2330,7 +2353,7 @@ mod tests {
         address: AddrSubnetEither,
         reason: AddressRemovalReason,
     ) -> TestRequestResult {
-        test_new_addr_asp_helper(address, |asp_request_stream| async move {
+        test_new_addr_asp_helper(address, true, |asp_request_stream| async move {
             asp_request_stream.control_handle().send_on_address_removed(reason).unwrap()
         })
         .await
@@ -2401,9 +2424,10 @@ mod tests {
         F: Fn(fnet_interfaces_admin::AddressStateProviderRequestStream) -> Fut,
     >(
         address: AddrSubnetEither,
+        add_subnet_route: bool,
         asp_handler: F,
     ) -> TestRequestResult {
-        test_new_addr_asp_helper(address, |mut asp_request_stream| async {
+        test_new_addr_asp_helper(address, add_subnet_route, |mut asp_request_stream| async {
             let _: fnet_interfaces_admin::AddressStateProviderControlHandle = asp_request_stream
                 .next()
                 .await
@@ -2423,7 +2447,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_new_addr_drop_asp_after_detach(address: AddrSubnetEither) {
         pretty_assertions::assert_eq!(
-            test_new_addr_asp_detach_handled_helper(address, |_asp_stream| async {}).await,
+            test_new_addr_asp_detach_handled_helper(address, false, |_asp_stream| async {}).await,
             TestRequestResult {
                 messages: Vec::new(),
                 waiter_result: Err(RequestError::UnrecognizedInterface),
@@ -2437,16 +2461,22 @@ mod tests {
     #[fuchsia::test]
     async fn test_new_addr_with_state_update(address: AddrSubnetEither) {
         pretty_assertions::assert_eq!(
-            test_new_addr_asp_detach_handled_helper(address, |mut asp_request_stream| async move {
-                let responder = asp_request_stream
-                    .next()
-                    .await
-                    .expect("eventloop watches for address assignment state before dropping ASP")
-                    .expect("unexpected error while waiting for event from event loop")
-                    .into_watch_address_assignment_state()
-                    .expect("eventloop only makes WatchAddressAssignmentState request");
-                responder.send(AddressAssignmentState::Assigned).unwrap();
-            })
+            test_new_addr_asp_detach_handled_helper(
+                address,
+                true,
+                |mut asp_request_stream| async move {
+                    let responder = asp_request_stream
+                        .next()
+                        .await
+                        .expect(
+                            "eventloop watches for address assignment state before dropping ASP",
+                        )
+                        .expect("unexpected error while waiting for event from event loop")
+                        .into_watch_address_assignment_state()
+                        .expect("eventloop only makes WatchAddressAssignmentState request");
+                    responder.send(AddressAssignmentState::Assigned).unwrap();
+                }
+            )
             .await,
             TestRequestResult { messages: Vec::new(), waiter_result: Ok(()) },
         )
@@ -2477,21 +2507,22 @@ mod tests {
         address: AddrSubnetEither,
         removal_reason: InterfaceRemovedReason,
     ) {
-        let _: TestRequestResult = test_interface_request(address, false, |req| async {
-            match req {
-                fnet_interfaces_admin::ControlRequest::RemoveAddress {
-                    address: got_address,
-                    responder,
-                } => {
-                    pretty_assertions::assert_eq!(got_address, address.into_ext());
-                    let control_handle = responder.control_handle();
-                    control_handle.send_on_interface_removed(removal_reason).unwrap();
-                    control_handle.shutdown();
+        let _: TestRequestResult =
+            test_interface_request(address, AddressRequestKind::Del, |req| async {
+                match req {
+                    fnet_interfaces_admin::ControlRequest::RemoveAddress {
+                        address: got_address,
+                        responder,
+                    } => {
+                        pretty_assertions::assert_eq!(got_address, address.into_ext());
+                        let control_handle = responder.control_handle();
+                        control_handle.send_on_interface_removed(removal_reason).unwrap();
+                        control_handle.shutdown();
+                    }
+                    req => panic!("unexpected request {req:?}"),
                 }
-                req => panic!("unexpected request {req:?}"),
-            }
-        })
-        .await;
+            })
+            .await;
     }
 
     /// Test RTM_DELADDR with all interesting responses to remove address.
@@ -2526,7 +2557,7 @@ mod tests {
         waiter_result: Result<(), RequestError>,
     ) {
         pretty_assertions::assert_eq!(
-            test_interface_request(address, false, |req| async {
+            test_interface_request(address, AddressRequestKind::Del, |req| async {
                 match req {
                     fnet_interfaces_admin::ControlRequest::RemoveAddress {
                         address: got_address,

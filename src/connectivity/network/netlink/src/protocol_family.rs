@@ -74,14 +74,14 @@ pub mod route {
     use netlink_packet_route::rtnl::{
         address::{nlas::Nla as AddressNla, AddressMessage},
         constants::{
-            AF_INET, AF_INET6, AF_UNSPEC, RTNLGRP_DCB, RTNLGRP_DECNET_IFADDR, RTNLGRP_DECNET_ROUTE,
-            RTNLGRP_DECNET_RULE, RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV4_MROUTE, RTNLGRP_IPV4_MROUTE_R,
-            RTNLGRP_IPV4_NETCONF, RTNLGRP_IPV4_ROUTE, RTNLGRP_IPV4_RULE, RTNLGRP_IPV6_IFADDR,
-            RTNLGRP_IPV6_IFINFO, RTNLGRP_IPV6_MROUTE, RTNLGRP_IPV6_MROUTE_R, RTNLGRP_IPV6_NETCONF,
-            RTNLGRP_IPV6_PREFIX, RTNLGRP_IPV6_ROUTE, RTNLGRP_IPV6_RULE, RTNLGRP_LINK, RTNLGRP_MDB,
-            RTNLGRP_MPLS_NETCONF, RTNLGRP_MPLS_ROUTE, RTNLGRP_ND_USEROPT, RTNLGRP_NEIGH,
-            RTNLGRP_NONE, RTNLGRP_NOP2, RTNLGRP_NOP4, RTNLGRP_NOTIFY, RTNLGRP_NSID,
-            RTNLGRP_PHONET_IFADDR, RTNLGRP_PHONET_ROUTE, RTNLGRP_TC,
+            AF_INET, AF_INET6, AF_UNSPEC, IFA_F_NOPREFIXROUTE, RTNLGRP_DCB, RTNLGRP_DECNET_IFADDR,
+            RTNLGRP_DECNET_ROUTE, RTNLGRP_DECNET_RULE, RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV4_MROUTE,
+            RTNLGRP_IPV4_MROUTE_R, RTNLGRP_IPV4_NETCONF, RTNLGRP_IPV4_ROUTE, RTNLGRP_IPV4_RULE,
+            RTNLGRP_IPV6_IFADDR, RTNLGRP_IPV6_IFINFO, RTNLGRP_IPV6_MROUTE, RTNLGRP_IPV6_MROUTE_R,
+            RTNLGRP_IPV6_NETCONF, RTNLGRP_IPV6_PREFIX, RTNLGRP_IPV6_ROUTE, RTNLGRP_IPV6_RULE,
+            RTNLGRP_LINK, RTNLGRP_MDB, RTNLGRP_MPLS_NETCONF, RTNLGRP_MPLS_ROUTE,
+            RTNLGRP_ND_USEROPT, RTNLGRP_NEIGH, RTNLGRP_NONE, RTNLGRP_NOP2, RTNLGRP_NOP4,
+            RTNLGRP_NOTIFY, RTNLGRP_NSID, RTNLGRP_PHONET_IFADDR, RTNLGRP_PHONET_ROUTE, RTNLGRP_TC,
         },
         RtnlMessage,
     };
@@ -145,13 +145,18 @@ pub mod route {
         pub(crate) v6_routes_request_sink: mpsc::Sender<routes::Request<S>>,
     }
 
+    struct ExtractedAddressRequest {
+        address_and_interface_id: interfaces::AddressAndInterfaceArgs,
+        addr_flags: u32,
+    }
+
     fn extract_if_id_and_addr_from_addr_message(
         message: &AddressMessage,
         client: &impl Display,
         req: &RtnlMessage,
         // `true` for new address requests; `false` for delete address requests.
         is_new: bool,
-    ) -> Option<interfaces::AddressAndInterfaceArgs> {
+    ) -> Option<ExtractedAddressRequest> {
         let kind = if is_new { "new" } else { "del" };
 
         let interface_id = match NonZeroU32::new(message.header.index) {
@@ -165,14 +170,16 @@ pub mod route {
             }
         };
 
-        let address_bytes = message.nlas.iter().find_map(|nla| match nla {
-            AddressNla::Local(bytes) => Some(bytes),
+        let mut address_bytes = None;
+        let mut addr_flags = None;
+        message.nlas.iter().for_each(|nla| match nla {
+            AddressNla::Local(bytes) => address_bytes = Some(bytes),
+            AddressNla::Flags(flags) => addr_flags = Some(*flags),
             nla => {
                 warn!(
                     "unexpected Address NLA in {} request from {}: {:?}; req = {:?}",
                     kind, client, nla, req,
                 );
-                None
             }
         });
         let address_bytes = match address_bytes {
@@ -228,7 +235,10 @@ pub mod route {
             }
         };
 
-        Some(interfaces::AddressAndInterfaceArgs { address, interface_id })
+        Some(ExtractedAddressRequest {
+            address_and_interface_id: interfaces::AddressAndInterfaceArgs { address, interface_id },
+            addr_flags: addr_flags.unwrap_or_else(|| message.header.flags.into()),
+        })
     }
 
     #[async_trait]
@@ -313,7 +323,10 @@ pub mod route {
                     client.send_unicast(new_done(req_header))
                 }
                 NewAddress(ref message) => {
-                    let address_and_interface_id = match extract_if_id_and_addr_from_addr_message(
+                    let ExtractedAddressRequest {
+                        address_and_interface_id,
+                        addr_flags,
+                    } = match extract_if_id_and_addr_from_addr_message(
                         message,
                         client,
                         &req,
@@ -326,11 +339,13 @@ pub mod route {
                     };
 
                     let (completer, waiter) = oneshot::channel();
+                    let add_subnet_route = addr_flags & IFA_F_NOPREFIXROUTE != IFA_F_NOPREFIXROUTE;
                     interfaces_request_sink.send(interfaces::Request {
                         args: interfaces::RequestArgs::Address(
                             interfaces::AddressRequestArgs::New(
                                 interfaces::NewAddressArgs {
                                     address_and_interface_id,
+                                    add_subnet_route,
                                 },
                             ),
                         ),
@@ -346,7 +361,10 @@ pub mod route {
                     }
                 }
                 DelAddress(ref message) => {
-                    let address_and_interface_id = match extract_if_id_and_addr_from_addr_message(
+                    let ExtractedAddressRequest {
+                        address_and_interface_id,
+                        addr_flags: _,
+                    } = match extract_if_id_and_addr_from_addr_message(
                         message,
                         client,
                         &req,
@@ -636,7 +654,7 @@ mod test {
     use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP};
     use netlink_packet_route::{
         rtnl::address::nlas::Nla as AddressNla, AddressMessage, LinkMessage, RouteMessage,
-        RtnlMessage, TcMessage, AF_INET, AF_INET6, AF_PACKET, AF_UNSPEC,
+        RtnlMessage, TcMessage, AF_INET, AF_INET6, AF_PACKET, AF_UNSPEC, IFA_F_NOPREFIXROUTE,
     };
     use test_case::test_case;
 
@@ -983,9 +1001,13 @@ mod test {
         )
     }
 
+    enum AddressRequestKind {
+        New { add_subnet_route: bool },
+        Del,
+    }
+
     struct TestAddrCase {
-        // `true` for new address requests; `false` for delete address requests.
-        is_new: bool,
+        kind: AddressRequestKind,
         flags: u16,
         family: u16,
         nlas: Vec<AddressNla>,
@@ -1012,21 +1034,24 @@ mod test {
     }
 
     fn valid_new_del_addr_request(
-        // `true` for new address requests; `false` for delete address requests.
-        is_new: bool,
+        kind: AddressRequestKind,
         ack: bool,
         addr: AddrSubnetEither,
+        extra_nlas: impl IntoIterator<Item = AddressNla>,
         interface_id: u64,
         response: Result<(), interfaces::RequestError>,
     ) -> TestAddrCase {
         TestAddrCase {
-            is_new,
+            kind,
             flags: if ack { NLM_F_ACK } else { 0 },
             family: match addr {
                 AddrSubnetEither::V4(_) => AF_INET,
                 AddrSubnetEither::V6(_) => AF_INET6,
             },
-            nlas: vec![AddressNla::Local(bytes_from_addr(addr))],
+            nlas: [AddressNla::Local(bytes_from_addr(addr))]
+                .into_iter()
+                .chain(extra_nlas)
+                .collect(),
             prefix_len: prefix_from_addr(addr),
             interface_id: interface_id_as_u32(interface_id),
             expected_request_args: Some(RequestAndResponse {
@@ -1040,13 +1065,30 @@ mod test {
         }
     }
 
+    fn valid_new_addr_request_with_extra_nlas(
+        ack: bool,
+        addr: AddrSubnetEither,
+        extra_nlas: impl IntoIterator<Item = AddressNla>,
+        interface_id: u64,
+        response: Result<(), interfaces::RequestError>,
+    ) -> TestAddrCase {
+        valid_new_del_addr_request(
+            AddressRequestKind::New { add_subnet_route: true },
+            ack,
+            addr,
+            extra_nlas,
+            interface_id,
+            response,
+        )
+    }
+
     fn valid_new_addr_request(
         ack: bool,
         addr: AddrSubnetEither,
         interface_id: u64,
         response: Result<(), interfaces::RequestError>,
     ) -> TestAddrCase {
-        valid_new_del_addr_request(true, ack, addr, interface_id, response)
+        valid_new_addr_request_with_extra_nlas(ack, addr, None, interface_id, response)
     }
 
     fn invalid_new_addr_request(
@@ -1067,7 +1109,7 @@ mod test {
         interface_id: u64,
         response: Result<(), interfaces::RequestError>,
     ) -> TestAddrCase {
-        valid_new_del_addr_request(false, ack, addr, interface_id, response)
+        valid_new_del_addr_request(AddressRequestKind::Del, ack, addr, None, interface_id, response)
     }
 
     fn invalid_del_addr_request(
@@ -1108,6 +1150,28 @@ mod test {
             interfaces::testutil::test_addr_subnet_v6(),
             interfaces::testutil::ETH_INTERFACE_ID,
             Ok(())); "new_v6_ok_no_ack")]
+    #[test_case(
+        TestAddrCase {
+            kind: AddressRequestKind::New { add_subnet_route: true },
+            ..valid_new_addr_request_with_extra_nlas(
+                false,
+                interfaces::testutil::test_addr_subnet_v4(),
+                [AddressNla::Flags(0)],
+                interfaces::testutil::ETH_INTERFACE_ID,
+                Ok(()),
+            )
+        }; "new_v4_with_route_ok_no_ack")]
+    #[test_case(
+        TestAddrCase {
+            kind: AddressRequestKind::New { add_subnet_route: false },
+            ..valid_new_addr_request_with_extra_nlas(
+                true,
+                interfaces::testutil::test_addr_subnet_v6(),
+                [AddressNla::Flags(IFA_F_NOPREFIXROUTE)],
+                interfaces::testutil::LO_INTERFACE_ID,
+                Ok(()),
+            )
+        }; "new_v6_without_route_ok_ack")]
     #[test_case(
         TestAddrCase {
             expected_response: Some(Err(NackErrorCode::INVALID)),
@@ -1472,7 +1536,7 @@ mod test {
     #[fuchsia::test]
     async fn test_new_del_addr(test_case: TestAddrCase) {
         let TestAddrCase {
-            is_new,
+            kind,
             flags,
             family,
             nlas,
@@ -1492,30 +1556,40 @@ mod test {
             message
         };
 
-        pretty_assertions::assert_eq!(
-            test_request(
-                NetlinkMessage::new(
-                    header,
-                    NetlinkPayload::InnerMessage(if is_new {
-                        RtnlMessage::NewAddress(address_message)
-                    } else {
-                        RtnlMessage::DelAddress(address_message)
-                    }),
-                ),
+        let (message, request) = match kind {
+            AddressRequestKind::New { add_subnet_route } => (
+                RtnlMessage::NewAddress(address_message),
                 expected_request_args.map(|RequestAndResponse { request, response }| {
                     RequestAndResponse {
-                        request: interfaces::RequestArgs::Address(if is_new {
+                        request: interfaces::RequestArgs::Address(
                             interfaces::AddressRequestArgs::New(interfaces::NewAddressArgs {
                                 address_and_interface_id: request,
-                            })
-                        } else {
-                            interfaces::AddressRequestArgs::Del(interfaces::DelAddressArgs {
-                                address_and_interface_id: request,
-                            })
-                        }),
+                                add_subnet_route,
+                            }),
+                        ),
                         response,
                     }
                 }),
+            ),
+            AddressRequestKind::Del => (
+                RtnlMessage::DelAddress(address_message),
+                expected_request_args.map(|RequestAndResponse { request, response }| {
+                    RequestAndResponse {
+                        request: interfaces::RequestArgs::Address(
+                            interfaces::AddressRequestArgs::Del(interfaces::DelAddressArgs {
+                                address_and_interface_id: request,
+                            }),
+                        ),
+                        response,
+                    }
+                }),
+            ),
+        };
+
+        pretty_assertions::assert_eq!(
+            test_request(
+                NetlinkMessage::new(header, NetlinkPayload::InnerMessage(message),),
+                request,
             )
             .await,
             expected_response
