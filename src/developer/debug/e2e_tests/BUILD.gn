@@ -145,11 +145,5 @@ if (is_host) {
 group("tests") {
   testonly = true
 
-  deps = []
-
-  # TODO(https://fxbug.dev/119944): Flaky test disabled on coverage.
-  # Please fix the flake and remove the condition below.
-  if (!is_coverage) {
-    deps += [ ":zxdb_e2e_tests($host_toolchain)" ]
-  }
+  deps = [ ":zxdb_e2e_tests($host_toolchain)" ]
 }

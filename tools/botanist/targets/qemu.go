@@ -53,7 +53,7 @@ const (
 	//
 	// No host-side disk blocks are allocated on extension (by use of the `fvm`
 	// host tool), so the operation is cheap regardless of the size we extend to.
-	storageFullMinSize int64 = 10000000000 // 10Gb
+	storageFullMinSize int64 = 17179869184 // 16 GiB
 
 	// Minimum number of bytes of entropy bits required for the kernel's PRNG.
 	minEntropyBytes uint = 32 // 256 bits
