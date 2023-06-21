@@ -629,6 +629,7 @@ Possible values of `test_type`:
 | Value | Description |
 | ----- | ----------- |
 | `drm` | [DRM tests] |
+| `starnix` | [Starnix tests] |
 | `system` | [Legacy non hermetic realm][system-test-realm] with access to some system capabilities. |
 | `test_arch` | [Test Architecture Tests] |
 | `vfs-compliance` | [VFS compliance tests] |
@@ -684,7 +685,6 @@ Possible values of `fuchsia.test.type`:
 | `devices` | Device test realm. |
 | `google` | Google test realm |
 | `media` | Media test realm |
-| `starnix` | Starnix test realm |
 | `system-validation` | system validation apps test realm |
 
 ## Restricted logs
@@ -844,6 +844,7 @@ offer: [
 [resolvers]:  /docs/concepts/components/v2/capabilities/resolvers.md
 [restricted-logs]: /docs/development/diagnostics/test_and_logs.md#restricting_log_severity
 [runners]: /docs/concepts/components/v2/capabilities/runners.md
+[Starnix tests]: /src/sys/testing/meta/starnix-tests.shard.cml
 [subpackages]: /docs/concepts/components/v2/subpackaging.md
 [sys-migration-guide]: /docs/development/components/v2/migration/tests.md
 [system-test-realm]: /src/sys/testing/meta/system-tests.shard.cml

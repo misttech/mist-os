@@ -22,25 +22,27 @@ fuchsia_test_component_with_expectations("adbd_test") {
     "//src/connectivity/network/netstack:component",
     "//src/starnix/tests:starnix_test_with_expectations",
   ]
+  test_type = "starnix"
 }
 
 fuchsia_test_component_with_expectations("libutils_test") {
   manifest = "meta/libutils_test.cml"
   expectations = "expectations/libutils_test.json5"
   deps = [ "//src/starnix/tests:starnix_test_with_expectations" ]
+  test_type = "starnix"
 }
 
-fuchsia_component("sh_test") {
-  testonly = true
+fuchsia_test_component("sh_test") {
   check_references = false
   manifest = "meta/sh_test.cml"
   deps = [ "//src/starnix/tests:starnix_test" ]
+  test_type = "starnix"
 }
 
-fuchsia_component("boringssl_self_test64") {
-  testonly = true
+fuchsia_test_component("boringssl_self_test64") {
   check_references = false
   manifest = "meta/boringssl_self_test64.cml"
+  test_type = "starnix"
 }
 
 group("container_resources") {

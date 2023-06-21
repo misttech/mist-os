@@ -464,6 +464,7 @@ foreach(test_name, gvisor_tests) {
     use_gen_manifest = true
     use_expectations = true
     run_as_root = false
+    test_type = "starnix"
   }
 }
 
@@ -475,6 +476,7 @@ foreach(test_name, gvisor_tests_run_as_root) {
     use_gen_manifest = true
     use_expectations = true
     run_as_root = true
+    test_type = "starnix"
   }
 }
 
@@ -487,6 +489,7 @@ foreach(test_name, gvisor_tests_custom_manifest) {
     use_gen_manifest = false
     use_expectations = true
     run_as_root = false
+    test_type = "starnix"
   }
 }
 

@@ -6,6 +6,7 @@ import("fuchsia_component.gni")
 
 _type_moniker_map = {
   drm = "/core/testing:drm-tests"
+  starnix = "/core/testing:starnix-tests"
   system = "/core/testing:system-tests"
   test_arch = "/core/testing:test-arch-tests"
   vfs_compliance = "/core/testing:vfs-compliance-tests"

@@ -81,6 +81,6 @@ ffx test run --realm "/path/to/test/realm/moniker" <test_url>
 [sample_test_realm]: /src/sys/testing/meta/test_realm.cml
 [system-test-realm]: /src/sys/testing/meta/system-tests.shard.cml
 [realm_builder.shard.cml]: /sdk/lib/sys/component/realm_builder.shard.cml
-[standard-runners]: /src/sys/testing/meta/standard-test-runners.shard.cml
+[standard-runners]: /src/sys/testing/meta/runners/standard-test-runners.shard.cml
 [test_type_map]: /build/components/fuchsia_test_component.gni
 [non-hermetic-tests]: /docs/development/testing/components/test_runner_framework.md#non-hermetic_tests
