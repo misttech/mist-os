@@ -76,7 +76,7 @@ namespace {
 // a fallback topology tree in case one was not passed in from
 // the bootloader.
 // TODO(fxb/129255): Remove this hack once boot shim detects cpus via device tree.
-constexpr bool ENABLE_SBI_TOPOLOGY_DETECT_FALLBACK = false;
+constexpr bool ENABLE_SBI_TOPOLOGY_DETECT_FALLBACK = true;
 
 void* ramdisk_base;
 size_t ramdisk_size;
