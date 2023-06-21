@@ -11,7 +11,7 @@ use crate::{
         },
     },
     logging::{log_trace, log_warn},
-    mm::MemoryAccessor,
+    mm::{MemoryAccessor, MemoryAccessorExt},
     signals::*,
     syscalls::SyscallResult,
     task::*,
@@ -263,10 +263,9 @@ pub fn dispatch_signal_handler(
 pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(), Errno> {
     // Read the signal stack frame from memory.
     let signal_frame_address = align_stack_pointer(current_task.registers.stack_pointer_register());
-    let mut signal_stack_bytes = [0; SIG_STACK_SIZE];
-    current_task
+    let signal_stack_bytes = current_task
         .mm
-        .read_memory(UserAddress::from(signal_frame_address), &mut signal_stack_bytes)?;
+        .read_memory_to_array::<SIG_STACK_SIZE>(UserAddress::from(signal_frame_address))?;
 
     // Grab the registers state from the stack frame.
     let signal_stack_frame = SignalStackFrame::from_bytes(signal_stack_bytes);

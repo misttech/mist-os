@@ -4,7 +4,6 @@
 
 use fuchsia_zircon as zx;
 use std::{convert::TryInto, mem::size_of};
-use zerocopy::AsBytes;
 
 use super::*;
 use crate::{
@@ -80,8 +79,7 @@ fn parse_socket_address(
         return error!(EINVAL);
     }
 
-    let mut address = vec![0u8; address_length];
-    task.mm.read_memory(user_socket_address, &mut address)?;
+    let address = task.mm.read_memory_to_vec(user_socket_address, address_length)?;
 
     SocketAddress::from_bytes(address)
 }
@@ -589,10 +587,8 @@ fn sendmsg_internal(
         if space < header_size {
             break;
         }
-        let mut cmsg = cmsghdr::default();
-        current_task
-            .mm
-            .read_memory(message_header.msg_control + next_message_offset, cmsg.as_bytes_mut())?;
+        let cmsg_ref = UserRef::<cmsghdr>::from(message_header.msg_control + next_message_offset);
+        let cmsg = current_task.mm.read_object(cmsg_ref)?;
         // If the message header is not long enough to fit the required fields of the
         // control data, return EINVAL.
         if cmsg.cmsg_len < header_size {
@@ -600,10 +596,9 @@ fn sendmsg_internal(
         }
 
         let data_size = std::cmp::min(cmsg.cmsg_len - header_size, space);
-        let mut data = vec![0u8; data_size];
-        current_task.mm.read_memory(
+        let data = current_task.mm.read_memory_to_vec(
             message_header.msg_control + next_message_offset + header_size,
-            &mut data,
+            data_size,
         )?;
         next_message_offset += round_up_to_increment(header_size + data.len(), size_of::<usize>())?;
         ancillary_data.push(AncillaryData::from_cmsg(
@@ -711,8 +706,7 @@ pub fn sys_getsockopt(
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
 
     let optlen = current_task.mm.read_object(user_optlen)?;
-    let mut optval = vec![0u8; optlen as usize];
-    current_task.mm.read_memory(user_optval, &mut optval)?;
+    let optval = current_task.mm.read_memory_to_vec(user_optval, optlen as usize)?;
 
     let opt_value = if socket.domain.is_inet() && IpTables::can_handle_getsockopt(level, optname) {
         current_task.kernel().iptables.read().getsockopt(socket, optname, optval)?

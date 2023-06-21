@@ -398,8 +398,10 @@ pub fn sys_rt_tgsigqueueinfo(
     unchecked_signal: UncheckedSignal,
     siginfo_ref: UserAddress,
 ) -> Result<(), Errno> {
-    let mut siginfo_mem = [0u8; SI_MAX_SIZE as usize];
-    current_task.mm.read_memory(siginfo_ref, &mut siginfo_mem)?;
+    // Rust will let us do this cast in a const assignment but not in a const generic constraint.
+    const SI_MAX_SIZE_AS_USIZE: usize = SI_MAX_SIZE as usize;
+
+    let siginfo_mem = current_task.mm.read_memory_to_array::<SI_MAX_SIZE_AS_USIZE>(siginfo_ref)?;
 
     let header = SignalInfoHeader::read_from(&siginfo_mem[..SI_HEADER_SIZE]).unwrap();
 

@@ -13,7 +13,7 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         *,
     },
-    mm::{MemoryAccessor, ProcMapsFile, ProcSmapsFile, PAGE_SIZE},
+    mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, PAGE_SIZE},
     selinux::selinux_proc_attrs,
     task::{CurrentTask, Task, TaskStateCode, ThreadGroup},
     types::*,
@@ -334,9 +334,8 @@ fn fill_buf_from_addr_range(
 ) -> Result<(), Errno> {
     #[allow(clippy::manual_saturating_arithmetic)]
     let len = range_end.ptr().checked_sub(range_start.ptr()).unwrap_or(0);
-    let mut buf = vec![0u8; len];
-    let len = task.mm.read_memory_partial(range_start, &mut buf)?;
-    sink.write(&buf[..len]);
+    let buf = task.mm.read_memory_partial_to_vec(range_start, len)?;
+    sink.write(&buf[..]);
     Ok(())
 }
 

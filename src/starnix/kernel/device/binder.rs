@@ -5272,16 +5272,15 @@ pub mod tests {
         let data_buffer = buffers.data;
 
         // Read back the translated objects from the receiver's memory.
-        let mut translated_objects = [binder_buffer_object::default(); 2];
-        test.receiver_task
+        let translated_objects = test
+            .receiver_task
             .mm
-            .read_objects(UserRef::new(data_buffer.address), &mut translated_objects)
+            .read_objects_to_array::<binder_buffer_object, 2>(UserRef::new(data_buffer.address))
             .expect("read output");
 
         // Check that the second buffer is the string "foo".
         let foo_addr = UserAddress::from(translated_objects[1].buffer);
-        let mut str = [0u8; 3];
-        test.receiver_task.mm.read_memory(foo_addr, &mut str).expect("read buffer 1");
+        let str = test.receiver_task.mm.read_memory_to_array::<3>(foo_addr).expect("read buffer 1");
         assert_eq!(&str, b"foo");
 
         // Check that the first buffer points to the string "foo".
@@ -6725,10 +6724,8 @@ pub mod tests {
         for i in 0..vector_size {
             vector.push((i & 255) as u8);
         }
-        let mut other_vector = Vec::new();
-        other_vector.resize(vector_size, 0);
-        remote_binder_task
-            .read_memory((vector.as_ptr() as u64).into(), &mut other_vector)
+        let other_vector = remote_binder_task
+            .read_memory_to_vec((vector.as_ptr() as u64).into(), vector_size)
             .expect("read_memory");
         assert_eq!(vector[1], 1);
         assert_eq!(vector, other_vector);

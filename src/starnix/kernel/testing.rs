@@ -16,7 +16,7 @@ use crate::{
     },
     mm::{
         syscalls::{do_mmap, sys_mremap},
-        MemoryAccessor, MemoryManager, PAGE_SIZE,
+        MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE,
     },
     syscalls::*,
     task::*,
@@ -152,10 +152,10 @@ pub fn fill_page(current_task: &CurrentTask, addr: UserAddress, data: char) {
 /// number in the event of a panic. This makes it easier to find test regressions.
 #[track_caller]
 pub fn check_page_eq(current_task: &CurrentTask, addr: UserAddress, data: char) {
-    let mut buf = vec![0; *PAGE_SIZE as usize];
-    if let Err(err) = current_task.mm.read_memory(addr, &mut buf) {
-        panic!("read page: failed to read page @ {addr:?}: {err:?}");
-    }
+    let buf = match current_task.mm.read_memory_to_vec(addr, *PAGE_SIZE as usize) {
+        Ok(b) => b,
+        Err(err) => panic!("read page: failed to read page @ {addr:?}: {err:?}"),
+    };
     assert!(
         buf.into_iter().all(|c| c == data as u8),
         "unexpected payload: page @ {addr:?} should be filled with {data:?}"
@@ -169,10 +169,10 @@ pub fn check_page_eq(current_task: &CurrentTask, addr: UserAddress, data: char) 
 /// number in the event of a panic. This makes it easier to find test regressions.
 #[track_caller]
 pub fn check_page_ne(current_task: &CurrentTask, addr: UserAddress, data: char) {
-    let mut buf = vec![0; *PAGE_SIZE as usize];
-    if let Err(err) = current_task.mm.read_memory(addr, &mut buf) {
-        panic!("read page: failed to read page @ {addr:?}: {err:?}");
-    }
+    let buf = match current_task.mm.read_memory_to_vec(addr, *PAGE_SIZE as usize) {
+        Ok(b) => b,
+        Err(err) => panic!("read page: failed to read page @ {addr:?}: {err:?}"),
+    };
     assert!(
         !buf.into_iter().all(|c| c == data as u8),
         "unexpected payload: page @ {addr:?} should not be filled with {data:?}"
@@ -186,9 +186,8 @@ pub fn check_page_ne(current_task: &CurrentTask, addr: UserAddress, data: char) 
 /// number in the event of a panic. This makes it easier to find test regressions.
 #[track_caller]
 pub fn check_unmapped(current_task: &CurrentTask, addr: UserAddress) {
-    let mut buf = vec![0; *PAGE_SIZE as usize];
-    match current_task.mm.read_memory(addr, &mut buf) {
-        Ok(()) => panic!("read page: page @ {addr:?} should be unmapped"),
+    match current_task.mm.read_memory_to_vec(addr, *PAGE_SIZE as usize) {
+        Ok(_) => panic!("read page: page @ {addr:?} should be unmapped"),
         Err(err) if err == crate::types::errno::EFAULT => {}
         Err(err) => {
             panic!("read page: expected EFAULT reading page @ {addr:?} but got {err:?} instead")

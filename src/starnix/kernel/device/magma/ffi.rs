@@ -26,15 +26,8 @@ use crate::{
     types::*,
 };
 
-/// Returns a vector of at least one `T`. The vector will be of length `item_count` if > 0.
-fn at_least_one<T>(item_count: usize) -> Vec<T>
-where
-    T: Default + Clone,
-{
-    vec![T::default(); std::cmp::max(1, item_count)]
-}
-
-/// Reads a sequence of objects starting at `addr`.
+/// Reads a sequence of objects starting at `addr`, ensuring at least one element is in the returned
+/// Vec.
 ///
 /// # Parameters
 ///   - `current_task`: The task from which to read the objects.
@@ -49,12 +42,12 @@ fn read_objects<T>(
 where
     T: Default + Clone + FromBytes,
 {
-    let mut items = at_least_one::<T>(item_count);
-    if item_count > 0 {
+    Ok(if item_count > 0 {
         let user_ref: UserRef<T> = addr.into();
-        current_task.mm.read_objects(user_ref, &mut items)?;
-    }
-    Ok(items)
+        current_task.mm.read_objects_to_vec(user_ref, item_count)?
+    } else {
+        vec![T::default()]
+    })
 }
 
 /// Creates a connection for a given device.

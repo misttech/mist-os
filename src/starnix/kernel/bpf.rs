@@ -114,8 +114,8 @@ fn read_attr<Attr: FromBytes>(
 
     // Verify that the extra is all zeros.
     if attr_size > sizeof_attr {
-        let mut tail = vec![0u8; attr_size - sizeof_attr];
-        current_task.mm.read_memory(attr_addr + sizeof_attr, &mut tail)?;
+        let tail =
+            current_task.mm.read_memory_to_vec(attr_addr + sizeof_attr, attr_size - sizeof_attr)?;
         for byte in tail {
             if byte != 0 {
                 return error!(E2BIG);
@@ -218,13 +218,15 @@ pub fn sys_bpf(
             let map = get_bpf_fd(current_task, elem_attr.map_fd)?;
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
 
-            let mut key = vec![0u8; map.key_size as usize];
-            current_task.mm.read_memory(UserAddress::from(elem_attr.key), &mut key)?;
-            let mut value = vec![0u8; map.value_size as usize];
+            let key = current_task
+                .mm
+                .read_memory_to_vec(UserAddress::from(elem_attr.key), map.key_size as usize)?;
             // SAFETY: this union object was created with FromBytes so it's safe to access any
-            // variant (right?)
+            // variant because all variants must be valid with all bit patterns.
             let value_addr = unsafe { elem_attr.__bindgen_anon_1.value };
-            current_task.mm.read_memory(UserAddress::from(value_addr), &mut value)?;
+            let value = current_task
+                .mm
+                .read_memory_to_vec(UserAddress::from(value_addr), map.value_size as usize)?;
 
             map.entries.lock().insert(key, value);
             Ok(SUCCESS)
@@ -238,8 +240,9 @@ pub fn sys_bpf(
             let map = get_bpf_fd(current_task, elem_attr.map_fd)?;
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
             let key = if elem_attr.key != 0 {
-                let mut key = vec![0u8; map.key_size as usize];
-                current_task.mm.read_memory(UserAddress::from(elem_attr.key), &mut key)?;
+                let key = current_task
+                    .mm
+                    .read_memory_to_vec(UserAddress::from(elem_attr.key), map.key_size as usize)?;
                 Some(key)
             } else {
                 None
@@ -363,8 +366,9 @@ pub fn sys_bpf(
         bpf_cmd_BPF_BTF_LOAD => {
             let btf_attr: bpf_attr__bindgen_ty_12 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_BTF_LOAD {:?}", btf_attr);
-            let mut data = vec![0u8; btf_attr.btf_size as usize];
-            current_task.mm.read_memory(UserAddress::from(btf_attr.btf), &mut data)?;
+            let data = current_task
+                .mm
+                .read_memory_to_vec(UserAddress::from(btf_attr.btf), btf_attr.btf_size as usize)?;
             install_bpf_fd(current_task, BpfTypeFormat { data })
         }
 

@@ -578,8 +578,7 @@ pub fn sys_sched_setaffinity(
         return error!(EINVAL);
     }
 
-    let mut mask: CpuAffinityMask = 0;
-    current_task.mm.read_memory(user_mask, mask.as_bytes_mut())?;
+    let mask = current_task.mm.read_object::<CpuAffinityMask>(user_mask.into())?;
 
     // Specified mask must include at least one valid CPU.
     if mask & get_default_cpumask() == 0 {
@@ -677,8 +676,7 @@ pub fn sys_prctl(
         }
         PR_SET_NAME => {
             let addr = UserAddress::from(arg2);
-            let mut name = [0u8; 16];
-            current_task.mm.read_memory(addr, &mut name)?;
+            let mut name = current_task.mm.read_memory_to_array::<16>(addr)?;
             // The name is truncated to 16 bytes (including the nul)
             name[15] = 0;
             // this will succeed, because we set 0 at end above
@@ -1011,8 +1009,8 @@ pub fn sys_capset(
 
     let (new_permitted, new_effective, new_inheritable) = match header.version {
         _LINUX_CAPABILITY_VERSION_3 => {
-            let mut data: [__user_cap_data_struct; 2] = Default::default();
-            current_task.mm.read_objects(user_data, &mut data)?;
+            let data =
+                current_task.mm.read_objects_to_array::<__user_cap_data_struct, 2>(user_data)?;
             (
                 Capabilities::from_abi_v3((data[0].permitted, data[1].permitted)),
                 Capabilities::from_abi_v3((data[0].effective, data[1].effective)),
@@ -1111,8 +1109,7 @@ pub fn sys_setgroups(
     if size > NGROUPS_MAX as usize {
         return error!(EINVAL);
     }
-    let mut groups: Vec<gid_t> = vec![0; size];
-    current_task.mm.read_memory(groups_addr, groups.as_mut_slice().as_bytes_mut())?;
+    let groups = current_task.mm.read_objects_to_vec::<gid_t>(groups_addr.into(), size)?;
     let mut creds = current_task.creds();
     if !creds.is_superuser() {
         return error!(EPERM);
@@ -1436,9 +1433,8 @@ mod tests {
         assert_eq!(SUCCESS, result);
 
         let name_length = name.len();
-        let mut out_name = vec![0u8; name_length];
 
-        current_task.mm.read_memory(mapped_address, &mut out_name).unwrap();
+        let out_name = current_task.mm.read_memory_to_vec(mapped_address, name_length).unwrap();
         assert_eq!(name.as_bytes(), &out_name);
     }
 

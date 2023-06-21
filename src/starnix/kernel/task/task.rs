@@ -1495,8 +1495,8 @@ impl CurrentTask {
             return Err(errno!(EINVAL));
         }
 
-        let mut code: Vec<sock_filter> = vec![Default::default(); fprog.len as usize];
-        self.read_objects(fprog.filter.into(), code.as_mut_slice())?;
+        let code: Vec<sock_filter> =
+            self.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
 
         let new_filter = SeccompFilter::from_cbpf(
             &code,

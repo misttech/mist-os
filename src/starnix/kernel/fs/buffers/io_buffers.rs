@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    mm::{MemoryAccessor, MemoryManager},
+    mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager},
     types::{errno, error, Errno, UserAddress, UserBuffer},
 };
 use zerocopy::FromBytes;
@@ -269,8 +269,7 @@ impl<'a> InputBuffer for UserBuffersInputBuffer<'a> {
             if buffer.is_null() {
                 continue;
             }
-            let mut bytes = vec![0; buffer.length];
-            self.mm.read_memory(buffer.address, &mut bytes)?;
+            let bytes = self.mm.read_memory_to_vec(buffer.address, buffer.length)?;
             let result = callback(&bytes)?;
             if result > buffer.length {
                 return error!(EINVAL);
@@ -546,8 +545,7 @@ mod tests {
             assert_eq!(output_buffer.bytes_written(), 37);
             assert!(output_buffer.write_all(&data[37..50]).is_err());
 
-            let mut buffer = [0; 128];
-            mm.read_memory(addr, &mut buffer).expect("failed to write test data");
+            let buffer = mm.read_memory_to_array::<128>(addr).expect("failed to write test data");
             assert_eq!(&data[0..25], &buffer[0..25]);
             assert_eq!(&data[25..37], &buffer[64..76]);
         }

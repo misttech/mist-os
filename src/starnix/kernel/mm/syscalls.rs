@@ -459,8 +459,7 @@ mod tests {
         assert_eq!(sys_munmap(&current_task, mapped_address, *PAGE_SIZE as usize), Ok(()));
 
         // Verify that the memory is no longer readable.
-        let mut data: [u8; 5] = [0; 5];
-        assert_eq!(current_task.mm.read_memory(mapped_address, &mut data), error!(EFAULT));
+        assert_eq!(current_task.mm.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
     }
 
     /// It is ok to call munmap on an unmapped range.
@@ -494,8 +493,7 @@ mod tests {
         );
 
         // Verify that the memory is still readable.
-        let mut data: [u8; 5] = [0; 5];
-        assert_eq!(current_task.mm.read_memory(mapped_address, &mut data), Ok(()));
+        assert!(current_task.mm.read_memory_to_array::<5>(mapped_address).is_ok());
     }
 
     /// The entire page should be unmapped, not just the range [address, address + length).
@@ -507,10 +505,9 @@ mod tests {
         assert_eq!(sys_munmap(&current_task, mapped_address, (*PAGE_SIZE as usize) / 2), Ok(()));
 
         // Verify that memory can't be read in either half of the page.
-        let mut data: [u8; 5] = [0; 5];
-        assert_eq!(current_task.mm.read_memory(mapped_address, &mut data), error!(EFAULT));
+        assert_eq!(current_task.mm.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
         assert_eq!(
-            current_task.mm.read_memory(mapped_address + (*PAGE_SIZE - 2), &mut data),
+            current_task.mm.read_memory_to_array::<5>(mapped_address + (*PAGE_SIZE - 2)),
             error!(EFAULT)
         );
     }
@@ -524,10 +521,9 @@ mod tests {
         assert_eq!(sys_munmap(&current_task, mapped_address, (*PAGE_SIZE as usize) + 1), Ok(()));
 
         // Verify that neither page is readable.
-        let mut data: [u8; 5] = [0; 5];
-        assert_eq!(current_task.mm.read_memory(mapped_address, &mut data), error!(EFAULT));
+        assert_eq!(current_task.mm.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
         assert_eq!(
-            current_task.mm.read_memory(mapped_address + *PAGE_SIZE + 1u64, &mut data),
+            current_task.mm.read_memory_to_array::<5>(mapped_address + *PAGE_SIZE + 1u64),
             error!(EFAULT)
         );
     }
@@ -541,12 +537,11 @@ mod tests {
         assert_eq!(sys_munmap(&current_task, mapped_address, (*PAGE_SIZE as usize) - 1), Ok(()));
 
         // Verify that the second page is still readable.
-        let mut data: [u8; 5] = [0; 5];
-        assert_eq!(current_task.mm.read_memory(mapped_address, &mut data), error!(EFAULT));
-        assert_eq!(
-            current_task.mm.read_memory(mapped_address + *PAGE_SIZE + 1u64, &mut data),
-            Ok(())
-        );
+        assert_eq!(current_task.mm.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
+        assert!(current_task
+            .mm
+            .read_memory_to_array::<5>(mapped_address + *PAGE_SIZE + 1u64)
+            .is_ok());
     }
 
     /// Unmap the middle page of a mapping.
@@ -561,16 +556,12 @@ mod tests {
         );
 
         // Verify that the first and third pages are still readable.
-        let mut data: [u8; 5] = [0; 5];
-        assert_eq!(current_task.mm.read_memory(mapped_address, &mut data), Ok(()));
+        assert!(current_task.mm.read_memory_to_vec(mapped_address, 5).is_ok());
         assert_eq!(
-            current_task.mm.read_memory(mapped_address + *PAGE_SIZE, &mut data),
+            current_task.mm.read_memory_to_vec(mapped_address + *PAGE_SIZE, 5),
             error!(EFAULT)
         );
-        assert_eq!(
-            current_task.mm.read_memory(mapped_address + (*PAGE_SIZE * 2), &mut data),
-            Ok(())
-        );
+        assert!(current_task.mm.read_memory_to_vec(mapped_address + (*PAGE_SIZE * 2), 5).is_ok());
     }
 
     /// Unmap a range of pages that includes disjoint mappings.
@@ -590,9 +581,8 @@ mod tests {
         assert_eq!(sys_munmap(&current_task, min_address, unmap_length), Ok(()));
 
         // Verify that none of the mapped pages are readable.
-        let mut data: [u8; 5] = [0; 5];
         for mapped_address in mapped_addresses {
-            assert_eq!(current_task.mm.read_memory(mapped_address, &mut data), error!(EFAULT));
+            assert_eq!(current_task.mm.read_memory_to_vec(mapped_address, 5), error!(EFAULT));
         }
     }
 

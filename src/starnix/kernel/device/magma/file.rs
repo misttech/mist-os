@@ -640,13 +640,12 @@ impl FileOps for MagmaFile {
                     read_control_and_response(current_task, &command)?;
 
                 let num_items = control.count as usize / std::mem::size_of::<StarnixPollItem>();
-                let items_ref = UserRef::new(UserAddress::from(control.items));
+                let items_ref = UserRef::<StarnixPollItem>::new(UserAddress::from(control.items));
                 // Read the poll items as `StarnixPollItem`, since they contain a union. Also note
                 // that the minimum length of the vector is 1, to always have a valid reference for
                 // `magma_poll`.
-                let mut starnix_items =
-                    vec![StarnixPollItem::default(); std::cmp::max(num_items, 1)];
-                current_task.mm.read_objects(items_ref, &mut starnix_items)?;
+                let starnix_items =
+                    current_task.mm.read_objects_to_vec(items_ref, std::cmp::max(num_items, 1))?;
                 // Then convert each item "manually" into `magma_poll_item_t`.
                 let mut magma_items: Vec<magma_poll_item_t> =
                     starnix_items.iter().map(|item| item.as_poll_item()).collect();

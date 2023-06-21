@@ -1106,12 +1106,38 @@ pub trait MemoryAccessor {
 }
 
 pub trait MemoryAccessorExt: MemoryAccessor {
-    fn read_buffer(&self, buffer: &UserBuffer) -> Result<Vec<u8>, Errno> {
-        let mut buf = vec![0u8; buffer.length];
-        self.read_memory(buffer.address, &mut buf)?;
-        Ok(buf)
+    /// Read exactly `len` bytes of memory, returning them as a a Vec.
+    fn read_memory_to_vec(&self, addr: UserAddress, len: usize) -> Result<Vec<u8>, Errno> {
+        let mut buffer = vec![0u8; len];
+        self.read_memory(addr, &mut buffer[..])?;
+        Ok(buffer)
     }
 
+    /// Read up to `max_len` bytes from `addr`, returning them as a Vec.
+    fn read_memory_partial_to_vec(
+        &self,
+        addr: UserAddress,
+        max_len: usize,
+    ) -> Result<Vec<u8>, Errno> {
+        let mut buffer = vec![0u8; max_len];
+        let bytes_read = self.read_memory_partial(addr, &mut buffer[..])?;
+        buffer.truncate(bytes_read);
+        Ok(buffer)
+    }
+
+    /// Read exactly `N` bytes from `addr`, returning them as an array.
+    fn read_memory_to_array<const N: usize>(&self, addr: UserAddress) -> Result<[u8; N], Errno> {
+        let mut buffer = [0u8; N];
+        self.read_memory(addr, &mut buffer[..])?;
+        Ok(buffer)
+    }
+
+    /// Read the contents of `buffer`, returning them as a Vec.
+    fn read_buffer(&self, buffer: &UserBuffer) -> Result<Vec<u8>, Errno> {
+        self.read_memory_to_vec(buffer.address, buffer.length)
+    }
+
+    /// Read an instance of T from `user`.
     fn read_object<T: FromBytes>(&self, user: UserRef<T>) -> Result<T, Errno> {
         // SAFETY: T is FromBytes, which means that any bit pattern is valid. Interpreting T as u8
         // is safe because T's alignment requirements are larger than u8.
@@ -1162,6 +1188,30 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         Ok(())
     }
 
+    /// Read exactly `len` objects from `user`, returning them as a Vec.
+    fn read_objects_to_vec<T: Clone + FromBytes>(
+        &self,
+        user: UserRef<T>,
+        len: usize,
+    ) -> Result<Vec<T>, Errno> {
+        let mut objects = vec![T::new_zeroed(); len];
+        self.read_objects(user, &mut objects[..])?;
+        Ok(objects)
+    }
+
+    /// Read exactly `N` objects from `user`, returning them as an array.
+    fn read_objects_to_array<T: Copy + FromBytes, const N: usize>(
+        &self,
+        user: UserRef<T>,
+    ) -> Result<[T; N], Errno> {
+        let mut objects = [T::new_zeroed(); N];
+        self.read_objects(user, &mut objects[..])?;
+        Ok(objects)
+    }
+
+    /// Read exactly `iovec_count` `UserBuffer`s from `iovec_addr`, returning them as a Vec.
+    ///
+    /// Fails if `iovec_count` is greater than `UIO_MAXIOV`.
     fn read_iovec(
         &self,
         iovec_addr: UserAddress,
@@ -1172,9 +1222,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
             return error!(EINVAL);
         }
 
-        let mut data = vec![UserBuffer::default(); iovec_count];
-        self.read_memory(iovec_addr, data.as_mut_slice().as_bytes_mut())?;
-        Ok(data)
+        self.read_objects_to_vec(iovec_addr.into(), iovec_count)
     }
 
     fn read_c_string_vec(&self, string: UserCString, max_size: usize) -> Result<Vec<u8>, Errno> {
@@ -2368,8 +2416,8 @@ mod tests {
         mm.write_memory(test_addr, &data).expect("failed to write test data");
 
         // Read it back.
-        let mut data_readback = vec![0u8; data.len()];
-        mm.read_memory(test_addr, &mut data_readback).expect("failed to read test data");
+        let data_readback =
+            mm.read_memory_to_vec(test_addr, data.len()).expect("failed to read test data");
         assert_eq!(&data, &data_readback);
     }
 
@@ -2380,24 +2428,24 @@ mod tests {
 
         let page_size = *PAGE_SIZE;
         let addr = map_memory(&current_task, UserAddress::default(), page_size);
-        let mut buf = vec![0u8; page_size as usize];
+        let buf = vec![0u8; page_size as usize];
 
         // Verify that accessing data that is only partially mapped is an error.
         let partial_addr_before = addr - page_size / 2;
         assert_eq!(mm.write_memory(partial_addr_before, &buf), error!(EFAULT));
-        assert_eq!(mm.read_memory(partial_addr_before, &mut buf), error!(EFAULT));
+        assert_eq!(mm.read_memory_to_vec(partial_addr_before, buf.len()), error!(EFAULT));
         let partial_addr_after = addr + page_size / 2;
         assert_eq!(mm.write_memory(partial_addr_after, &buf), error!(EFAULT));
-        assert_eq!(mm.read_memory(partial_addr_after, &mut buf), error!(EFAULT));
+        assert_eq!(mm.read_memory_to_vec(partial_addr_after, buf.len()), error!(EFAULT));
 
         // Verify that accessing unmapped memory is an error.
         let unmapped_addr = addr + 10 * page_size;
         assert_eq!(mm.write_memory(unmapped_addr, &buf), error!(EFAULT));
-        assert_eq!(mm.read_memory(unmapped_addr, &mut buf), error!(EFAULT));
+        assert_eq!(mm.read_memory_to_vec(unmapped_addr, buf.len()), error!(EFAULT));
 
         // However, accessing zero bytes in unmapped memory is not an error.
         mm.write_memory(unmapped_addr, &[]).expect("failed to write no data");
-        mm.read_memory(unmapped_addr, &mut []).expect("failed to read no data");
+        mm.read_memory_to_vec(unmapped_addr, 0).expect("failed to read no data");
     }
 
     #[::fuchsia::test]
@@ -2642,8 +2690,9 @@ mod tests {
         let items_written = vec![0, 2, 3, 7, 1];
         mm.write_objects(items_ref, &items_written).expect("Failed to write object array.");
 
-        let mut items_read = vec![0; items_written.len()];
-        mm.read_objects(items_ref, &mut items_read).expect("Failed to read object array.");
+        let items_read = mm
+            .read_objects_to_vec(items_ref, items_written.len())
+            .expect("Failed to read object array.");
 
         assert_eq!(items_written, items_read);
     }
@@ -2657,8 +2706,9 @@ mod tests {
         let items_written = vec![];
         mm.write_objects(items_ref, &items_written).expect("Failed to write empty object array.");
 
-        let mut items_read = vec![0; items_written.len()];
-        mm.read_objects(items_ref, &mut items_read).expect("Failed to read empty object array.");
+        let items_read = mm
+            .read_objects_to_vec(items_ref, items_written.len())
+            .expect("Failed to read empty object array.");
 
         assert_eq!(items_written, items_read);
     }
@@ -2716,13 +2766,16 @@ mod tests {
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let second_map = map_memory(&current_task, addr + *PAGE_SIZE, *PAGE_SIZE);
 
-        let mut bytes = vec![0xf; (*PAGE_SIZE * 2) as usize];
+        let bytes = vec![0xf; (*PAGE_SIZE * 2) as usize];
         assert!(mm.write_memory(addr, &bytes).is_ok());
         mm.state
             .write()
             .protect(second_map, *PAGE_SIZE as usize, ProtectionFlags::empty())
             .unwrap();
-        assert_eq!(mm.state.read().read_memory_partial(addr, &mut bytes), Ok(*PAGE_SIZE as usize));
+        assert_eq!(
+            mm.read_memory_partial_to_vec(addr, bytes.len()).unwrap().len(),
+            *PAGE_SIZE as usize,
+        );
     }
 
     fn map_memory_growsdown(current_task: &CurrentTask, length: u64) -> UserAddress {
@@ -2897,21 +2950,20 @@ mod tests {
         mm.snapshot_to(&target.mm).expect("snapshot_to failed");
 
         // Make sure it has what we wrote.
-        let mut buf = vec![0u8; 3];
-        target.mm.read_memory(addr, &mut buf).expect("read_memory failed");
+        let buf = target.mm.read_memory_to_vec(addr, 3).expect("read_memory failed");
         assert_eq!(buf, b"foo");
 
         // Write something to both source and target and make sure they are forked.
         mm.write_memory(addr, b"bar").expect("write_memory failed");
 
-        target.mm.read_memory(addr, &mut buf).expect("read_memory failed");
+        let buf = target.mm.read_memory_to_vec(addr, 3).expect("read_memory failed");
         assert_eq!(buf, b"foo");
 
         target.mm.write_memory(addr, b"baz").expect("write_memory failed");
-        mm.read_memory(addr, &mut buf).expect("read_memory failed");
+        let buf = mm.read_memory_to_vec(addr, 3).expect("read_memory failed");
         assert_eq!(buf, b"bar");
 
-        target.mm.read_memory(addr, &mut buf).expect("read_memory failed");
+        let buf = target.mm.read_memory_to_vec(addr, 3).expect("read_memory failed");
         assert_eq!(buf, b"baz");
 
         port.queue(&zx::Packet::from_user_packet(0, 0, zx::UserPacket::from_u8_array([0; 32])))
