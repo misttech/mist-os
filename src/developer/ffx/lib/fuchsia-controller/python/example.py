@@ -10,7 +10,7 @@ import asyncio
 
 
 async def echo():
-    ctx = Context({"foo": "bar"})
+    ctx = Context()
     echo_proxy = fd_ffx.Echo.Client(
         ctx.connect_daemon_protocol(fd_ffx.Echo.MARKER))
     result = await echo_proxy.echo_string(value="foobar")

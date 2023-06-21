@@ -40,36 +40,15 @@ void Context_dealloc(Context *self) {
   Py_TYPE(self)->tp_free(reinterpret_cast<PyObject *>(self));
 }
 
-int Context_init(Context *self, PyObject *args, PyObject *kwds) {
+std::pair<std::unique_ptr<ffx_config_t[]>, Py_ssize_t> build_config(PyObject *config) {
   static const char TYPE_ERROR[] = "`config` must be a dictionary of string key/value pairs";
-  static const char *kwlist[] = {"config", "isolate_dir", nullptr};
-  PyObject *config = nullptr;
-  PyObject *isolate = nullptr;
-  if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O", const_cast<char **>(kwlist), &config,
-                                   &isolate)) {
-    return -1;
-  }
-  if (!config) {
-    return -1;
-  }
-  if (isolate &&
-      !PyObject_IsInstance(isolate, reinterpret_cast<PyObject *>(&isolate::IsolateDirType))) {
-    PyErr_SetString(PyExc_TypeError, "isolate must be a fuchsia_controller_py.IsolateDir type");
-    return -1;
-  }
-  // This temp incref/decref stuff is just derived from the tutorial:
-  // https://docs.python.org/3/extending/newtypes_tutorial.html
-  PyObject *tmp = self->isolate_dir;
-  Py_XINCREF(isolate);
-  self->isolate_dir = isolate;
-  Py_XDECREF(tmp);
   if (!PyDict_Check(config)) {
     PyErr_SetString(PyExc_TypeError, TYPE_ERROR);
-    return -1;
+    return std::make_pair(nullptr, 0);
   }
   Py_ssize_t config_len = PyDict_Size(config);
   if (config_len < 0) {
-    return -1;
+    return std::make_pair(nullptr, 0);
   }
   std::unique_ptr<ffx_config_t[]> ffx_config;
   if (config_len > 0) {
@@ -83,24 +62,57 @@ int Context_init(Context *self, PyObject *args, PyObject *kwds) {
   for (Py_ssize_t i = 0; PyDict_Next(config, &pos, &py_key, &py_value); ++i) {
     if (!PyUnicode_Check(py_key)) {
       PyErr_SetString(PyExc_TypeError, TYPE_ERROR);
-      return -1;
+      return std::make_pair(nullptr, 0);
     }
     const char *key = PyUnicode_AsUTF8(py_key);
     if (key == nullptr) {
-      return -1;
+      return std::make_pair(nullptr, 0);
     }
     if (!PyUnicode_Check(py_value)) {
       PyErr_SetString(PyExc_TypeError, TYPE_ERROR);
-      return -1;
+      return std::make_pair(nullptr, 0);
     }
     const char *value = PyUnicode_AsUTF8(py_value);
     if (value == nullptr) {
-      return -1;
+      return std::make_pair(nullptr, 0);
     }
     ffx_config[i] = {
         .key = key,
         .value = value,
     };
+  }
+  return std::make_pair(std::move(ffx_config), config_len);
+}
+
+int Context_init(Context *self, PyObject *args, PyObject *kwds) {
+  static const char *kwlist[] = {"config", "isolate_dir", nullptr};
+  PyObject *config = nullptr;
+  PyObject *isolate = nullptr;
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OO", const_cast<char **>(kwlist), &config,
+                                   &isolate)) {
+    return -1;
+  }
+  if (isolate &&
+      !PyObject_IsInstance(isolate, reinterpret_cast<PyObject *>(&isolate::IsolateDirType))) {
+    PyErr_SetString(PyExc_TypeError, "isolate must be a fuchsia_controller_py.IsolateDir type");
+    return -1;
+  }
+  // This temp incref/decref stuff is just derived from the tutorial:
+  // https://docs.python.org/3/extending/newtypes_tutorial.html
+  PyObject *tmp = self->isolate_dir;
+  Py_XINCREF(isolate);
+  self->isolate_dir = isolate;
+  Py_XDECREF(tmp);
+
+  std::unique_ptr<ffx_config_t[]> ffx_config;
+  Py_ssize_t config_len = 0;
+  if (config) {
+    auto pair = build_config(config);
+    if (pair.first == nullptr) {
+      return -1;
+    }
+    ffx_config = std::move(pair.first);
+    config_len = pair.second;
   }
   const char *isolate_dir = nullptr;
   if (isolate) {
