@@ -86,7 +86,7 @@ fuchsia_unittest_package("scenic-stress-tests") {
     ":scenic-stressor-bin",
     "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
     "//src/lib/vulkan/validation_layers",
-    "//src/ui/scenic:component_v2_with_supplied_display_provider_for_test",
+    "//src/ui/scenic:scenic_with_default_config",
   ]
 
   if (escher_use_runtime_glsl) {
@@ -117,7 +117,7 @@ fuchsia_unittest_package("scenic-stress-tests-short") {
     ":scenic-stressor-bin",
     "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
     "//src/lib/vulkan/validation_layers",
-    "//src/ui/scenic:component_v2_with_supplied_display_provider_for_test",
+    "//src/ui/scenic:scenic_with_default_config",
   ]
 
   if (escher_use_runtime_glsl) {
@@ -147,7 +147,7 @@ source_set("stress-test-flatland") {
     ":scenic-stressor-flatland-bin",
     "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
     "//src/lib/vulkan/validation_layers",
-    "//src/ui/scenic:component_v2_with_supplied_display_provider_for_test",
+    "//src/ui/scenic:scenic_with_default_config",
   ]
 
   if (escher_use_runtime_glsl) {

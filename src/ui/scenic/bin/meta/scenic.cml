@@ -2,10 +2,96 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/ui/scenic/bin/meta/scenic.shard.cml" ],
-    use: [
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+        "trace/client.shard.cml",
+        "vulkan/client.shard.cml",
+    ],
+    program: {
+        runner: "elf",
+        binary: "bin/scenic",
+    },
+    capabilities: [
         {
-            protocol: [ "fuchsia.hardware.display.Provider" ],
+            protocol: [
+                "fuchsia.ui.annotation.Registry",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.composition.FlatlandDisplay",
+                "fuchsia.ui.composition.internal.ScreenCapture",
+                "fuchsia.ui.composition.ScreenCapture",
+                "fuchsia.ui.composition.Screenshot",
+                "fuchsia.ui.display.color.Converter",
+                "fuchsia.ui.display.internal.DisplayPower",
+                "fuchsia.ui.display.singleton.Info",
+                "fuchsia.ui.focus.FocusChainListenerRegistry",
+                "fuchsia.ui.input.accessibility.PointerEventRegistry",
+                "fuchsia.ui.lifecycle.LifecycleController",
+                "fuchsia.ui.observation.scope.Registry",
+                "fuchsia.ui.observation.test.Registry",
+                "fuchsia.ui.pointer.augment.GlobalMouse",
+                "fuchsia.ui.pointer.augment.LocalHit",
+                "fuchsia.ui.pointerinjector.Registry",
+                "fuchsia.ui.scenic.Scenic",
+                "fuchsia.ui.views.ViewRefInstalled",
+            ],
         },
     ],
+    use: [
+        {
+            directory: "config-data",
+            rights: [ "r*" ],
+            path: "/config/data",
+        },
+        {
+            storage: "tmp",
+            path: "/tmp",
+        },
+        {
+            protocol: [
+                "fuchsia.hardware.display.Provider",
+                "fuchsia.media.ProfileProvider",
+                "fuchsia.metrics.MetricEventLoggerFactory",
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.sysmem.Allocator",
+            ],
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.ui.annotation.Registry",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.composition.FlatlandDisplay",
+                "fuchsia.ui.composition.internal.ScreenCapture",
+                "fuchsia.ui.composition.ScreenCapture",
+                "fuchsia.ui.composition.Screenshot",
+                "fuchsia.ui.display.color.Converter",
+                "fuchsia.ui.display.internal.DisplayPower",
+                "fuchsia.ui.display.singleton.Info",
+                "fuchsia.ui.focus.FocusChainListenerRegistry",
+                "fuchsia.ui.input.accessibility.PointerEventRegistry",
+                "fuchsia.ui.lifecycle.LifecycleController",
+                "fuchsia.ui.observation.scope.Registry",
+                "fuchsia.ui.observation.test.Registry",
+                "fuchsia.ui.pointer.augment.GlobalMouse",
+                "fuchsia.ui.pointer.augment.LocalHit",
+                "fuchsia.ui.pointerinjector.Registry",
+                "fuchsia.ui.scenic.Scenic",
+                "fuchsia.ui.views.ViewRefInstalled",
+            ],
+            from: "self",
+        },
+    ],
+    config: {
+        frame_scheduler_min_predicted_frame_duration_in_us: { type: "uint64" },
+        i_can_haz_flatland: { type: "bool" },
+        enable_allocator_for_flatland: { type: "bool" },
+        pointer_auto_focus: { type: "bool" },
+        flatland_enable_display_composition: { type: "bool" },
+        i_can_haz_display_id: { type: "int64" },
+        i_can_haz_display_mode: { type: "int64" },
+    },
 }

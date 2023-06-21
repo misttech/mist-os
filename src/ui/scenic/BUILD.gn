@@ -352,41 +352,10 @@ fuchsia_package("scenic_pkg") {
   ]
 }
 
-fuchsia_component_manifest("scenic_with_supplied_display_provider_manifest") {
-  component_name = "scenic"
-  manifest = "bin/meta/scenic_with_supplied_display_provider.cml"
-}
-
-# Scenic V2 component where |fuchsia.hardware.display.Provider| is a required
-# capability. This should be used in test environments where a fake hardware
-# display controller provider is provided.
-fuchsia_component("component_v2_with_supplied_display_provider") {
-  cm_label = ":scenic_with_supplied_display_provider_manifest"
-  deps = [ "bin" ]
-
-  if (escher_use_runtime_glsl) {
-    deps += [ "//src/ui/lib/escher/shaders:escher_shaders_resources" ]
-  } else {
-    deps += [ "//src/ui/lib/escher/shaders:escher_shaders_spirv_resources" ]
-  }
-
-  if (scenic_enable_vulkan_validation) {
-    deps += [ "//src/lib/vulkan:vulkan_validation_layers" ]
-  }
-}
-
-fuchsia_structured_config_values(
-    "config_with_supplied_display_provider_for_test") {
-  cm_label = ":scenic_with_supplied_display_provider_manifest"
-  values_source = "config/default_for_test.json5"
-}
-
-# TODO(fxbug.dev/106573): Remove test-only target when
-# default config values are available.
-group("component_v2_with_supplied_display_provider_for_test") {
+group("scenic_with_default_config") {
   deps = [
-    ":component_v2_with_supplied_display_provider",
-    ":config_with_supplied_display_provider_for_test",
+    ":component_v2",
+    ":scenic_config",
   ]
 }
 

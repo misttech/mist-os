@@ -73,7 +73,7 @@ fuchsia_component("scenic_only") {
   deps = [
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
     "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-child-component",
-    "//src/ui/scenic:component_v2_with_supplied_display_provider_for_test",
+    "//src/ui/scenic:scenic_with_default_config",
   ]
 }
 
@@ -100,7 +100,7 @@ fuchsia_component("scene_manager_scene") {
     "//src/ui/bin/scene_manager:scene_manager_component_for_test",
     "//src/ui/bin/text:text_manager_comp",
     "//src/ui/bin/virtual_keyboard_manager:virtual_keyboard_component",
-    "//src/ui/scenic:component_v2_with_supplied_display_provider_for_test",
+    "//src/ui/scenic:component_v2",
     "//src/ui/testing/input_helper:input-helper-component",
     "//src/ui/testing/scene_provider:scene-provider-deps",
   ]
