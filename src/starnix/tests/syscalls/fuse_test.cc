@@ -234,6 +234,12 @@ TEST_F(FuseTest, Symlink) {
   struct stat stats;
   ASSERT_EQ(lstat(link.c_str(), &stats), 0);
   ASSERT_TRUE(S_ISLNK(stats.st_mode));
+  std::vector<char> buffer;
+  buffer.resize(100);
+  ASSERT_EQ(readlink(link.c_str(), &buffer[0], buffer.size()),
+            static_cast<ssize_t>(witness.size()));
+  buffer.resize(witness.size());
+  ASSERT_EQ(memcmp(&buffer[0], &witness[0], witness.size()), 0);
 }
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_

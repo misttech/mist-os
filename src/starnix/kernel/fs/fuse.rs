@@ -559,13 +559,15 @@ impl FsNodeOps for Arc<FuseNode> {
         self.fs_node_from_entry(node, response)
     }
 
-    fn readlink(
-        &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-    ) -> Result<SymlinkTarget, Errno> {
-        not_implemented!("FsNodeOps::readlink");
-        error!(ENOTSUP)
+    fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
+        let response =
+            self.connection.execute_operation(current_task, self, FuseOperation::Readlink)?;
+        let read_out = if let FuseResponse::Read(read_out) = response {
+            read_out
+        } else {
+            return error!(EINVAL);
+        };
+        Ok(SymlinkTarget::Path(read_out))
     }
 
     fn link(
@@ -983,6 +985,7 @@ enum FuseOperation {
     Open(OpenFlags),
     Poll(uapi::fuse_poll_in),
     Read(uapi::fuse_read_in),
+    Readlink,
     Release(uapi::fuse_open_out),
     Seek(uapi::fuse_lseek_in),
     Statfs,
@@ -1024,7 +1027,7 @@ impl FuseOperation {
                     uapi::fuse_flush_in { fh: open_in.fh, unused: 0, padding: 0, lock_owner: 0 };
                 data.write_all(message.as_bytes())
             }
-            Self::GetAttr | Self::Statfs => Ok(0),
+            Self::GetAttr | Self::Readlink | Self::Statfs => Ok(0),
             Self::Init => {
                 let message = uapi::fuse_init_in {
                     major: uapi::FUSE_KERNEL_VERSION,
@@ -1099,6 +1102,7 @@ impl FuseOperation {
             Self::Open(_) => uapi::fuse_opcode_FUSE_OPEN,
             Self::Poll(_) => uapi::fuse_opcode_FUSE_POLL,
             Self::Read(_) => uapi::fuse_opcode_FUSE_READ,
+            Self::Readlink => uapi::fuse_opcode_FUSE_READLINK,
             Self::Release(_) => uapi::fuse_opcode_FUSE_RELEASE,
             Self::Seek(_) => uapi::fuse_opcode_FUSE_LSEEK,
             Self::Statfs => uapi::fuse_opcode_FUSE_STATFS,
@@ -1110,7 +1114,7 @@ impl FuseOperation {
     fn len(&self) -> u32 {
         match self {
             Self::Flush(_) => std::mem::size_of::<uapi::fuse_flush_in>() as u32,
-            Self::GetAttr | Self::Statfs => 0,
+            Self::GetAttr | Self::Readlink | Self::Statfs => 0,
             Self::Init => std::mem::size_of::<uapi::fuse_init_in>() as u32,
             Self::Interrupt(_) => std::mem::size_of::<uapi::fuse_interrupt_in>() as u32,
             Self::Lookup(name) => (name.as_bytes().len() + 1) as u32,
@@ -1165,7 +1169,7 @@ impl FuseOperation {
             Self::Poll(_) => {
                 Ok(FuseResponse::Poll(Self::to_response::<uapi::fuse_poll_out>(&buffer)))
             }
-            Self::Read(_) => Ok(FuseResponse::Read(buffer)),
+            Self::Read(_) | Self::Readlink => Ok(FuseResponse::Read(buffer)),
             Self::Release(_) | Self::Flush(_) => Ok(FuseResponse::None),
             Self::Statfs => {
                 Ok(FuseResponse::Statfs(Self::to_response::<uapi::fuse_statfs_out>(&buffer)))
