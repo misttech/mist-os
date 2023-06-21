@@ -14,8 +14,10 @@ No.
 
 constants.rs is updated to use fixed values rather then pulling them from libc. These
 values are present in libc on Linux, but not Fuchsia.
+https://github.com/rust-netlink/netlink-packet-generic/pull/7 fixes this upstream.
 
-https://github.com/rust-netlink/netlink-packet-generic/pull/7 introduces these changes upstream.
+ctrl/nlas/mod.rs is patched to fix broken output when mcast groups are in use.
+https://github.com/rust-netlink/netlink-packet-generic/pull/8 fixes this upstream.
 
 TODO(fxbug.dev/129217): Move this out of forks/ when changes are upstreamed.
 
