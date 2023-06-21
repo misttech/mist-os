@@ -21,6 +21,10 @@ class FileBackedBlockDevice : public block_client::BlockDevice {
 
   zx::result<std::string> GetDevicePath() const final { return zx::error(ZX_ERR_NOT_SUPPORTED); }
 
+  fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const override {
+    ZX_ASSERT(false);
+  }
+
   zx_status_t VolumeGetInfo(
       fuchsia_hardware_block_volume::wire::VolumeManagerInfo* out_manager_info,
       fuchsia_hardware_block_volume::wire::VolumeInfo* out_volume_info) const final {
