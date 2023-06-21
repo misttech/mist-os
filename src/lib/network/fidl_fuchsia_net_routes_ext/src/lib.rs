@@ -12,6 +12,7 @@
 
 #![deny(missing_docs)]
 
+pub mod admin;
 pub mod testutil;
 
 use std::collections::HashSet;
