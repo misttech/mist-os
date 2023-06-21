@@ -1,0 +1,28 @@
+Name: netlink-packet-generic
+License File: LICENSE-MIT
+Description:
+
+# What is this crate used for?
+
+At time of writing, parsing netlink messages for generic-type subsystems.
+
+# Are there any use restrictions? i.e. only for development hosts
+
+No.
+
+# What differs from upstream?
+
+constants.rs is updated to use fixed values rather then pulling them from libc. These
+values are present in libc on Linux, but not Fuchsia.
+
+https://github.com/rust-netlink/netlink-packet-generic/pull/7 introduces these changes upstream.
+
+TODO(fxbug.dev/129217): Move this out of forks/ when changes are upstreamed.
+
+# Are there any restrictions to how it should be rolled?
+
+No.
+
+# Is there anything else which makes this dependency "special"?
+
+No.

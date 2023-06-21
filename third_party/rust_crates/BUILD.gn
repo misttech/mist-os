@@ -487,6 +487,10 @@ group("netlink-packet-core") {
   public_deps = [ ":netlink-packet-core-v0_5_0" ]
 }
 
+group("netlink-packet-generic") {
+  public_deps = [ ":netlink-packet-generic-v0_3_2" ]
+}
+
 group("netlink-packet-route") {
   public_deps = [ ":netlink-packet-route-v0_15_0" ]
 }
@@ -6217,6 +6221,32 @@ rust_library("netlink-packet-core-v0_5_0") {
     "--edition=2018",
     "-Cmetadata=4e717aad4a69254f",
     "-Cextra-filename=-4e717aad4a69254f",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("netlink-packet-generic-v0_3_2") {
+  crate_name = "netlink_packet_generic"
+  crate_root =
+      "//third_party/rust_crates/forks/netlink-packet-generic/src/lib.rs"
+  output_name = "netlink_packet_generic-39f9d30fc44caa08"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":anyhow-v1_0_57" ]
+  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":libc-v0_2_142" ]
+  deps += [ ":netlink-packet-core-v0_5_0" ]
+  deps += [ ":netlink-packet-utils-v0_5_2" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=39f9d30fc44caa08",
+    "-Cextra-filename=-39f9d30fc44caa08",
   ]
 
   visibility = [ ":*" ]

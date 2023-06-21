@@ -1,0 +1,2 @@
+include /src/connectivity/wlan/OWNERS
+include /src/connectivity/network/netlink/OWNERS

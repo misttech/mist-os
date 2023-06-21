@@ -141,6 +141,7 @@ mockall = "0.9"
 netlink-packet-core = "0.5.0"
 netlink-packet-route = "0.15.0"
 netlink-packet-utils = "0.5.2"
+netlink-packet-generic = "0.3.2"
 nix = "0.26.2"
 nom = { version = "5.0.0", default-features = false, features = ["std", "regexp_macros"] }
 nom_locate = "2.0.0"
@@ -347,6 +348,7 @@ fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
 hound = { path = "forks/hound" }
 libm = { path = "forks/libm" }
+netlink-packet-generic = { path = "forks/netlink-packet-generic" }
 # FIXME(121001): Revert once pull request is accepted and rolled into a crates.io release.
 nix = { path = "forks/nix" }
 notify = { path = "forks/notify" }
