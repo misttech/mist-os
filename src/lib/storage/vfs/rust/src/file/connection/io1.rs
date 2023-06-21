@@ -547,10 +547,12 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 let res = self.handle_get_extended_attribute(name).await.map_err(|s| s.into_raw());
                 responder.send(res)?;
             }
-            fio::FileRequest::SetExtendedAttribute { name, value, responder } => {
+            fio::FileRequest::SetExtendedAttribute { name, value, mode, responder } => {
                 fuchsia_trace::duration!("storage", "File::SetExtendedAttribute");
-                let res =
-                    self.handle_set_extended_attribute(name, value).await.map_err(|s| s.into_raw());
+                let res = self
+                    .handle_set_extended_attribute(name, value, mode)
+                    .await
+                    .map_err(|s| s.into_raw());
                 responder.send(res)?;
             }
             fio::FileRequest::RemoveExtendedAttribute { name, responder } => {
@@ -777,12 +779,13 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         &mut self,
         name: Vec<u8>,
         value: fio::ExtendedAttributeValue,
+        mode: fio::SetExtendedAttributeMode,
     ) -> Result<(), zx::Status> {
         if name.iter().any(|c| *c == 0) {
             return Err(zx::Status::INVALID_ARGS);
         }
         let val = decode_extended_attribute_value(value)?;
-        self.file.set_extended_attribute(name, val).await
+        self.file.set_extended_attribute(name, val, mode).await
     }
 
     async fn handle_remove_extended_attribute(&mut self, name: Vec<u8>) -> Result<(), zx::Status> {

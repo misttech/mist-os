@@ -11,7 +11,10 @@ use {
     futures::lock::Mutex,
     fxfs_testing::TestFixture,
     std::{collections::HashMap, sync::Arc},
-    syncio::{zxio, zxio_node_attr_has_t, zxio_node_attributes_t, OpenOptions, SeekOrigin, Zxio},
+    syncio::{
+        zxio, zxio_node_attr_has_t, zxio_node_attributes_t, OpenOptions, SeekOrigin, XattrSetMode,
+        Zxio,
+    },
     vfs::{
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
@@ -124,23 +127,11 @@ async fn test_xattr_dir() {
     fasync::unblock(|| {
         let foo_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
 
-        {
-            let mut value = vec![0u8; 5];
-            assert_matches!(
-                foo_zxio.xattr_get(b"security.selinux", &mut value),
-                Err(zx::Status::NOT_FOUND)
-            );
-            assert_eq!(value, b"\0\0\0\0\0");
-        }
+        assert_matches!(foo_zxio.xattr_get(b"security.selinux"), Err(zx::Status::NOT_FOUND));
 
-        foo_zxio.xattr_set(b"security.selinux", b"bar").unwrap();
+        foo_zxio.xattr_set(b"security.selinux", b"bar", XattrSetMode::Set).unwrap();
 
-        {
-            let mut value = vec![0u8; 5];
-            let actual_value_len = foo_zxio.xattr_get(b"security.selinux", &mut value).unwrap();
-            assert_eq!(actual_value_len, 3);
-            assert_eq!(value, b"bar\0\0");
-        }
+        assert_eq!(foo_zxio.xattr_get(b"security.selinux").unwrap(), b"bar");
 
         {
             let names = foo_zxio.xattr_list().unwrap();
@@ -149,14 +140,7 @@ async fn test_xattr_dir() {
 
         foo_zxio.xattr_remove(b"security.selinux").unwrap();
 
-        {
-            let mut value = vec![0u8; 5];
-            assert_matches!(
-                foo_zxio.xattr_get(b"security.selinux", &mut value),
-                Err(zx::Status::NOT_FOUND)
-            );
-            assert_eq!(value, b"\0\0\0\0\0");
-        }
+        assert_matches!(foo_zxio.xattr_get(b"security.selinux"), Err(zx::Status::NOT_FOUND));
 
         {
             let names = foo_zxio.xattr_list().unwrap();
@@ -207,7 +191,7 @@ async fn test_xattr_dir_multiple_attributes() {
         ];
 
         for (name, value) in names.iter().zip(values.iter()) {
-            foo_zxio.xattr_set(&name, &value).unwrap();
+            foo_zxio.xattr_set(&name, &value, XattrSetMode::Set).unwrap();
         }
 
         let mut listed_names = foo_zxio.xattr_list().unwrap();
@@ -318,8 +302,22 @@ impl File for XattrFile {
         let map = self.extended_attributes.lock().await;
         map.get(&name).cloned().ok_or(zx::Status::NOT_FOUND)
     }
-    async fn set_extended_attribute(&self, name: Vec<u8>, value: Vec<u8>) -> Result<(), Status> {
+    async fn set_extended_attribute(
+        &self,
+        name: Vec<u8>,
+        value: Vec<u8>,
+        mode: fio::SetExtendedAttributeMode,
+    ) -> Result<(), Status> {
         let mut map = self.extended_attributes.lock().await;
+        match mode {
+            fio::SetExtendedAttributeMode::Create if map.contains_key(&name) => {
+                return Err(Status::ALREADY_EXISTS)
+            }
+            fio::SetExtendedAttributeMode::Replace if !map.contains_key(&name) => {
+                return Err(Status::NOT_FOUND)
+            }
+            _ => (),
+        }
         Ok(map.insert(name, value).map(|_| ()).unwrap_or(()))
     }
     async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
@@ -351,12 +349,9 @@ async fn test_xattr_file_large_attribute() {
 
         let value_len = fio::MAX_INLINE_ATTRIBUTE_VALUE as usize + 64;
         let value = std::iter::repeat(0xff).take(value_len).collect::<Vec<u8>>();
-        foo_zxio.xattr_set(b"user.big_attribute", &value).unwrap();
+        foo_zxio.xattr_set(b"user.big_attribute", &value, XattrSetMode::Set).unwrap();
 
-        let mut value_buf = vec![0u8; value_len];
-        let actual_value_len = foo_zxio.xattr_get(b"user.big_attribute", &mut value_buf).unwrap();
-        assert_eq!(actual_value_len, value_len);
-        assert_eq!(value_buf, value);
+        assert_eq!(foo_zxio.xattr_get(b"user.big_attribute").unwrap(), value);
     })
     .await;
 }

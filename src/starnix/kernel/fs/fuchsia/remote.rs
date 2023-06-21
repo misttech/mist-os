@@ -9,7 +9,8 @@ use std::sync::Arc;
 use syncio::{
     zxio,
     zxio::{zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_SYMLINK},
-    zxio_node_attr_has_t, zxio_node_attributes_t, DirentIterator, Zxio, ZxioDirent, ZxioSignals,
+    zxio_node_attr_has_t, zxio_node_attributes_t, DirentIterator, XattrSetMode, Zxio, ZxioDirent,
+    ZxioSignals,
 };
 
 use crate::{
@@ -489,6 +490,44 @@ impl FsNodeOps for RemoteNode {
             FsNodeInfo::new(attrs.id, get_mode(&attrs)?, owner),
         );
         Ok(symlink)
+    }
+
+    fn get_xattr(&self, _node: &FsNode, name: &FsStr) -> Result<FsString, Errno> {
+        let value = self.zxio.xattr_get(name).map_err(|status| match status {
+            zx::Status::NOT_FOUND => errno!(ENODATA),
+            status => from_status_like_fdio!(status),
+        })?;
+        Ok(value)
+    }
+
+    fn set_xattr(
+        &self,
+        _node: &FsNode,
+        name: &FsStr,
+        value: &FsStr,
+        op: XattrOp,
+    ) -> Result<(), Errno> {
+        let mode = match op {
+            XattrOp::Set => XattrSetMode::Set,
+            XattrOp::Create => XattrSetMode::Create,
+            XattrOp::Replace => XattrSetMode::Replace,
+        };
+
+        self.zxio.xattr_set(name, value, mode).map_err(|status| match status {
+            zx::Status::NOT_FOUND => errno!(ENODATA),
+            status => from_status_like_fdio!(status),
+        })
+    }
+
+    fn remove_xattr(&self, _node: &FsNode, name: &FsStr) -> Result<(), Errno> {
+        self.zxio.xattr_remove(name).map_err(|status| match status {
+            zx::Status::NOT_FOUND => errno!(ENODATA),
+            _ => from_status_like_fdio!(status),
+        })
+    }
+
+    fn list_xattrs(&self, _node: &FsNode) -> Result<Vec<FsString>, Errno> {
+        self.zxio.xattr_list().map_err(|status| from_status_like_fdio!(status))
     }
 }
 

@@ -71,6 +71,7 @@ class FileConnection final : public Connection, public fuchsia::io::File {
   }
   void SetExtendedAttribute(std::vector<uint8_t> attribute,
                             fuchsia::io::ExtendedAttributeValue value,
+                            fuchsia::io::SetExtendedAttributeMode mode,
                             SetExtendedAttributeCallback callback) override {
     callback(fuchsia::io::Node2_SetExtendedAttribute_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
   }

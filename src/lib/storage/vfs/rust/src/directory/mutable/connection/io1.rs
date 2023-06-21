@@ -166,10 +166,12 @@ impl MutableConnection {
                 let res = this.handle_get_extended_attribute(name).await.map_err(|s| s.into_raw());
                 responder.send(res)?;
             }
-            fio::DirectoryRequest::SetExtendedAttribute { name, value, responder } => {
+            fio::DirectoryRequest::SetExtendedAttribute { name, value, mode, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::SetExtendedAttribute");
-                let res =
-                    this.handle_set_extended_attribute(name, value).await.map_err(|s| s.into_raw());
+                let res = this
+                    .handle_set_extended_attribute(name, value, mode)
+                    .await
+                    .map_err(|s| s.into_raw());
                 responder.send(res)?;
             }
             fio::DirectoryRequest::RemoveExtendedAttribute { name, responder } => {
@@ -284,12 +286,13 @@ impl MutableConnection {
         &self,
         name: Vec<u8>,
         value: fio::ExtendedAttributeValue,
+        mode: fio::SetExtendedAttributeMode,
     ) -> Result<(), zx::Status> {
         if name.iter().any(|c| *c == 0) {
             return Err(zx::Status::INVALID_ARGS);
         }
         let val = decode_extended_attribute_value(value)?;
-        self.base.directory.set_extended_attribute(name, val).await
+        self.base.directory.set_extended_attribute(name, val, mode).await
     }
 
     async fn handle_remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), zx::Status> {

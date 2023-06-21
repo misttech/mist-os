@@ -15,6 +15,7 @@ use {
             transaction::{LockKey, Options, TransactionHandler},
             volume::root_volume,
             BasicObjectHandle, Directory, HandleOptions, ObjectDescriptor, ObjectStore,
+            SetExtendedAttributeMode,
         },
     },
     fxfs_crypto::Crypt,
@@ -256,5 +257,7 @@ pub async fn set_extended_attribute_for_node(
     let filename = path.file_name().unwrap().to_str().unwrap();
     let (node_id, _) = dir.lookup(filename).await?.ok_or(FxfsError::NotFound)?;
     let handle = BasicObjectHandle::new(vol.clone(), node_id);
-    handle.set_extended_attribute(name.to_vec(), value.to_vec()).await
+    handle
+        .set_extended_attribute(name.to_vec(), value.to_vec(), SetExtendedAttributeMode::Set)
+        .await
 }

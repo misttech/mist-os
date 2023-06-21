@@ -333,6 +333,19 @@ closed protocol Node2 {
     strict SetExtendedAttribute(resource struct {
         name ExtendedAttributeName;
         value ExtendedAttributeValue;
+        /// Specifies the behavior based on the current state of the attribute.
+        mode @generated_name("SetExtendedAttributeMode") strict enum {
+            /// Set the value of the extended attribute regardless of whether it
+            /// already exists.
+            SET = 1;
+
+            /// Create a new extended attribute. Fail if it already exists.
+            CREATE = 2;
+
+            /// Replace the value of an existing extended attribute. Fail if it
+            /// doesn't already exist.
+            REPLACE = 3;
+        };
     }) -> () error zx.Status;
 
     /// Remove the specified extended attribute.

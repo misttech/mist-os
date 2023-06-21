@@ -447,11 +447,12 @@ class Remote : public HasIo {
   zx_status_t XattrList(void (*callback)(void* context, const uint8_t* name, size_t name_len),
                         void* context);
 
-  zx_status_t XattrGet(const uint8_t* name, size_t name_len, uint8_t* value, size_t value_capacity,
-                       size_t* out_value_actual);
+  zx_status_t XattrGet(const uint8_t* name, size_t name_len,
+                       zx_status_t (*callback)(void* context, zxio_xattr_data_t data),
+                       void* context);
 
-  zx_status_t XattrSet(const uint8_t* name, size_t name_len, const uint8_t* value,
-                       size_t value_len);
+  zx_status_t XattrSet(const uint8_t* name, size_t name_len, const uint8_t* value, size_t value_len,
+                       zxio_xattr_set_mode_t mode);
 
   zx_status_t XattrRemove(const uint8_t* name, size_t name_len);
 
@@ -1282,8 +1283,10 @@ zx_status_t Remote<Protocol>::XattrList(void (*callback)(void* context, const ui
 }
 
 template <typename Protocol>
-zx_status_t Remote<Protocol>::XattrGet(const uint8_t* name, size_t name_len, uint8_t* value,
-                                       size_t value_capacity, size_t* out_value_actual) {
+zx_status_t Remote<Protocol>::XattrGet(const uint8_t* name, size_t name_len,
+                                       zx_status_t (*callback)(void* context,
+                                                               zxio_xattr_data_t data),
+                                       void* context) {
 #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
@@ -1301,33 +1304,28 @@ zx_status_t Remote<Protocol>::XattrGet(const uint8_t* name, size_t name_len, uin
   }
 
   const fuchsia_io::wire::ExtendedAttributeValue* value_resp = response.value();
+  zxio_xattr_data_t data;
   if (value_resp->is_bytes()) {
     const fidl::VectorView value_bytes = value_resp->bytes();
-    // Always return the length. If the buffer is too small, it will provide a hint for the caller.
-    *out_value_actual = value_bytes.count();
-    if (value_bytes.count() > value_capacity) {
-      return ZX_ERR_BUFFER_TOO_SMALL;
-    }
-
-    memcpy(value, value_bytes.data(), value_bytes.count());
+    data = {
+        .data = value_bytes.data(),
+        .vmo = ZX_HANDLE_INVALID,
+        .len = value_bytes.count(),
+    };
   } else {
     const zx::vmo& value_vmo = value_resp->buffer();
     uint64_t value_size;
     if (zx_status_t status = value_vmo.get_prop_content_size(&value_size); status != ZX_OK) {
       return status;
     }
-    // Always return the length. If the buffer is too small, it will provide a hint for the caller.
-    *out_value_actual = value_size;
-    if (value_size > value_capacity) {
-      return ZX_ERR_BUFFER_TOO_SMALL;
-    }
-
-    if (zx_status_t status = value_vmo.read(value, 0, value_size); status != ZX_OK) {
-      return status;
-    }
+    data = {
+        .data = nullptr,
+        .vmo = value_vmo.get(),
+        .len = value_size,
+    };
   }
 
-  return ZX_OK;
+  return callback(context, data);
 #else
   return ZX_ERR_NOT_SUPPORTED;
 #endif
@@ -1335,7 +1333,7 @@ zx_status_t Remote<Protocol>::XattrGet(const uint8_t* name, size_t name_len, uin
 
 template <typename Protocol>
 zx_status_t Remote<Protocol>::XattrSet(const uint8_t* name, size_t name_len, const uint8_t* value,
-                                       size_t value_len) {
+                                       size_t value_len, zxio_xattr_set_mode_t mode) {
 #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
@@ -1358,8 +1356,24 @@ zx_status_t Remote<Protocol>::XattrSet(const uint8_t* name, size_t name_len, con
     attribute_value = fuchsia_io::wire::ExtendedAttributeValue::WithBytes(value_obj);
   }
 
-  const fidl::WireResult result = client()->SetExtendedAttribute(
-      fidl::VectorView<uint8_t>(arena, cpp20::span(name, name_len)), std::move(attribute_value));
+  fio::SetExtendedAttributeMode mode_fidl;
+  switch (mode) {
+    case ZXIO_XATTR_SET:
+      mode_fidl = fio::SetExtendedAttributeMode::kSet;
+      break;
+    case ZXIO_XATTR_CREATE:
+      mode_fidl = fio::SetExtendedAttributeMode::kCreate;
+      break;
+    case ZXIO_XATTR_REPLACE:
+      mode_fidl = fio::SetExtendedAttributeMode::kReplace;
+      break;
+    default:
+      return ZX_ERR_INVALID_ARGS;
+  }
+
+  const fidl::WireResult result =
+      client()->SetExtendedAttribute(fidl::VectorView<uint8_t>(arena, cpp20::span(name, name_len)),
+                                     std::move(attribute_value), mode_fidl);
   if (!result.ok()) {
     return result.status();
   }

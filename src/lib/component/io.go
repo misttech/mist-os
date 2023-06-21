@@ -154,7 +154,7 @@ func (*Service) GetExtendedAttribute(fidl.Context, []uint8) (io.Node2GetExtended
 	return io.Node2GetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*Service) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue) (io.Node2SetExtendedAttributeResult, error) {
+func (*Service) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue, io.SetExtendedAttributeMode) (io.Node2SetExtendedAttributeResult, error) {
 	return io.Node2SetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
@@ -324,7 +324,7 @@ func (*directoryState) GetExtendedAttribute(fidl.Context, []uint8) (io.Node2GetE
 	return io.Node2GetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*directoryState) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue) (io.Node2SetExtendedAttributeResult, error) {
+func (*directoryState) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue, io.SetExtendedAttributeMode) (io.Node2SetExtendedAttributeResult, error) {
 	return io.Node2SetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
@@ -688,7 +688,7 @@ func (*fileState) GetExtendedAttribute(fidl.Context, []uint8) (io.Node2GetExtend
 	return io.Node2GetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*fileState) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue) (io.Node2SetExtendedAttributeResult, error) {
+func (*fileState) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue, io.SetExtendedAttributeMode) (io.Node2SetExtendedAttributeResult, error) {
 	return io.Node2SetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 

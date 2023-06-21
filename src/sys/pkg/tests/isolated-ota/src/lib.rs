@@ -576,8 +576,13 @@ async fn serve_failing_blobfs(
             fio::DirectoryRequest::GetExtendedAttribute { name, responder: _ } => {
                 todo!("https://fxbug.dev/122123: name={:?}", name);
             }
-            fio::DirectoryRequest::SetExtendedAttribute { name, value, responder: _ } => {
-                todo!("https://fxbug.dev/122123: name={:?} value={:?}", name, value);
+            fio::DirectoryRequest::SetExtendedAttribute { name, value, mode, responder: _ } => {
+                todo!(
+                    "https://fxbug.dev/122123: name={:?} value={:?} mode={:?}",
+                    name,
+                    value,
+                    mode
+                );
             }
             fio::DirectoryRequest::RemoveExtendedAttribute { name, responder: _ } => {
                 todo!("https://fxbug.dev/122123: name={:?}", name);

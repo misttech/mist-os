@@ -921,22 +921,23 @@ zx_status_t zxio_xattr_list(zxio_t* io,
   return zio->ops->xattr_list(io, callback, context);
 }
 
-zx_status_t zxio_xattr_get(zxio_t* io, const uint8_t* name, size_t name_len, uint8_t* value,
-                           size_t value_capacity, size_t* out_value_actual) {
+zx_status_t zxio_xattr_get(zxio_t* io, const uint8_t* name, size_t name_len,
+                           zx_status_t (*callback)(void* context, zxio_xattr_data_t data),
+                           void* context) {
   if (!zxio_is_valid(io)) {
     return ZX_ERR_BAD_HANDLE;
   }
   zxio_internal_t* zio = to_internal(io);
-  return zio->ops->xattr_get(io, name, name_len, value, value_capacity, out_value_actual);
+  return zio->ops->xattr_get(io, name, name_len, callback, context);
 }
 
 zx_status_t zxio_xattr_set(zxio_t* io, const uint8_t* name, size_t name_len, const uint8_t* value,
-                           size_t value_len) {
+                           size_t value_len, zxio_xattr_set_mode_t mode) {
   if (!zxio_is_valid(io)) {
     return ZX_ERR_BAD_HANDLE;
   }
   zxio_internal_t* zio = to_internal(io);
-  return zio->ops->xattr_set(io, name, name_len, value, value_len);
+  return zio->ops->xattr_set(io, name, name_len, value, value_len, mode);
 }
 
 zx_status_t zxio_xattr_remove(zxio_t* io, const uint8_t* name, size_t name_len) {

@@ -605,8 +605,9 @@ impl MutableDirectory for FxDirectory {
         &self,
         name: Vec<u8>,
         value: Vec<u8>,
+        mode: fio::SetExtendedAttributeMode,
     ) -> Result<(), zx::Status> {
-        self.directory.set_extended_attribute(name, value).await.map_err(map_to_status)
+        self.directory.set_extended_attribute(name, value, mode.into()).await.map_err(map_to_status)
     }
 
     async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), zx::Status> {
@@ -1699,10 +1700,14 @@ mod tests {
             zx::Status::NOT_FOUND.into_raw(),
         );
 
-        file.set_extended_attribute(name, fio::ExtendedAttributeValue::Bytes(value_vec.clone()))
-            .await
-            .expect("Failed to make FIDL call")
-            .expect("Failed to set extended attribute");
+        file.set_extended_attribute(
+            name,
+            fio::ExtendedAttributeValue::Bytes(value_vec.clone()),
+            fio::SetExtendedAttributeMode::Set,
+        )
+        .await
+        .expect("Failed to make FIDL call")
+        .expect("Failed to set extended attribute");
 
         {
             let (iterator_client, iterator_server) =
@@ -1750,6 +1755,75 @@ mod tests {
         );
 
         close_dir_checked(file).await;
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn extended_attribute_set_modes() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let dir = open_dir_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
+            "foo",
+        )
+        .await;
+
+        let name = b"security.selinux";
+        let value_vec = b"bar".to_vec();
+        let value2_vec = b"new value".to_vec();
+
+        // Can't replace an attribute that doesn't exist yet.
+        assert_eq!(
+            dir.set_extended_attribute(
+                name,
+                fio::ExtendedAttributeValue::Bytes(value_vec.clone()),
+                fio::SetExtendedAttributeMode::Replace
+            )
+            .await
+            .expect("Failed to make FIDL call")
+            .expect_err("Got successful message back from replacing a nonexistent attribute"),
+            zx::Status::NOT_FOUND.into_raw()
+        );
+
+        // Create works when it doesn't exist.
+        dir.set_extended_attribute(
+            name,
+            fio::ExtendedAttributeValue::Bytes(value_vec.clone()),
+            fio::SetExtendedAttributeMode::Create,
+        )
+        .await
+        .expect("Failed to make FIDL call")
+        .expect("Failed to set xattr with create");
+
+        // Create doesn't work once it exists though.
+        assert_eq!(
+            dir.set_extended_attribute(
+                name,
+                fio::ExtendedAttributeValue::Bytes(value2_vec.clone()),
+                fio::SetExtendedAttributeMode::Create
+            )
+            .await
+            .expect("Failed to make FIDL call")
+            .expect_err("Got successful message back from replacing a nonexistent attribute"),
+            zx::Status::ALREADY_EXISTS.into_raw()
+        );
+
+        // But replace does.
+        dir.set_extended_attribute(
+            name,
+            fio::ExtendedAttributeValue::Bytes(value2_vec.clone()),
+            fio::SetExtendedAttributeMode::Replace,
+        )
+        .await
+        .expect("Failed to make FIDL call")
+        .expect("Failed to set xattr with create");
+
+        close_dir_checked(dir).await;
         fixture.close().await;
     }
 

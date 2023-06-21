@@ -372,6 +372,17 @@ impl Default for OpenOptions {
     }
 }
 
+/// Describes the mode of operation when setting an extended attribute.
+#[derive(Copy, Clone, Debug)]
+pub enum XattrSetMode {
+    /// Create the extended attribute if it doesn't exist, replace the value if it does.
+    Set = 1,
+    /// Create the extended attribute if it doesn't exist, failing if it does.
+    Create = 2,
+    /// Replace the value of the extended attribute, failing if it doesn't exist.
+    Replace = 3,
+}
+
 // `ZxioStorage` is marked as `PhantomPinned` in order to prevent unsafe moves
 // of the `zxio_storage_t`, because it may store self-referential types defined
 // in zxio.
@@ -1083,23 +1094,44 @@ impl Zxio {
         Ok(out_names)
     }
 
-    pub fn xattr_get(&self, name: &[u8], value: &mut [u8]) -> Result<usize, zx::Status> {
-        let mut out_value_len = 0;
+    pub fn xattr_get(&self, name: &[u8]) -> Result<Vec<u8>, zx::Status> {
+        unsafe extern "C" fn callback(
+            context: *mut c_void,
+            data: zxio::zxio_xattr_data_t,
+        ) -> zx_status_t {
+            let out_value = &mut *(context as *mut Vec<u8>);
+            if data.data.is_null() {
+                let value_vmo = zx::Unowned::<'_, zx::Vmo>::from_raw_handle(data.vmo);
+                match value_vmo.read_to_vec(0, data.len as u64) {
+                    Ok(vec) => *out_value = vec,
+                    Err(status) => return status.into_raw(),
+                }
+            } else {
+                let value_slice = std::slice::from_raw_parts(data.data as *mut u8, data.len);
+                out_value.extend_from_slice(value_slice);
+            }
+            zx::Status::OK.into_raw()
+        }
+        let mut out_value = Vec::new();
         let status = unsafe {
             zxio::zxio_xattr_get(
                 self.as_ptr(),
                 name.as_ptr(),
                 name.len(),
-                value.as_mut_ptr(),
-                value.len(),
-                &mut out_value_len,
+                Some(callback),
+                &mut out_value as *mut _ as *mut c_void,
             )
         };
         zx::ok(status)?;
-        Ok(out_value_len)
+        Ok(out_value)
     }
 
-    pub fn xattr_set(&self, name: &[u8], value: &[u8]) -> Result<(), zx::Status> {
+    pub fn xattr_set(
+        &self,
+        name: &[u8],
+        value: &[u8],
+        mode: XattrSetMode,
+    ) -> Result<(), zx::Status> {
         let status = unsafe {
             zxio::zxio_xattr_set(
                 self.as_ptr(),
@@ -1107,6 +1139,7 @@ impl Zxio {
                 name.len(),
                 value.as_ptr(),
                 value.len(),
+                mode as u32,
             )
         };
         zx::ok(status)

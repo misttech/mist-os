@@ -383,9 +383,14 @@ impl File for FxFile {
         basic.get_extended_attribute(name).await.map_err(map_to_status)
     }
 
-    async fn set_extended_attribute(&self, name: Vec<u8>, value: Vec<u8>) -> Result<(), Status> {
+    async fn set_extended_attribute(
+        &self,
+        name: Vec<u8>,
+        value: Vec<u8>,
+        mode: fio::SetExtendedAttributeMode,
+    ) -> Result<(), Status> {
         let basic = self.handle.basic_handle();
-        basic.set_extended_attribute(name, value).await.map_err(map_to_status)
+        basic.set_extended_attribute(name, value, mode.into()).await.map_err(map_to_status)
     }
 
     async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
@@ -1521,10 +1526,14 @@ mod tests {
             Status::NOT_FOUND.into_raw(),
         );
 
-        file.set_extended_attribute(name, fio::ExtendedAttributeValue::Bytes(value_vec.clone()))
-            .await
-            .expect("Failed to make FIDL call")
-            .expect("Failed to set extended attribute");
+        file.set_extended_attribute(
+            name,
+            fio::ExtendedAttributeValue::Bytes(value_vec.clone()),
+            fio::SetExtendedAttributeMode::Set,
+        )
+        .await
+        .expect("Failed to make FIDL call")
+        .expect("Failed to set extended attribute");
 
         {
             let (iterator_client, iterator_server) =

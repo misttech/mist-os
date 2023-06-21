@@ -22,7 +22,7 @@ mod tree;
 pub mod volume;
 pub mod writeback_cache;
 
-pub use basic_object_handle::BasicObjectHandle;
+pub use basic_object_handle::{BasicObjectHandle, SetExtendedAttributeMode};
 pub use caching_object_handle::CachingObjectHandle;
 pub use directory::Directory;
 pub use object_record::{ObjectDescriptor, PosixAttributes, Timestamp};

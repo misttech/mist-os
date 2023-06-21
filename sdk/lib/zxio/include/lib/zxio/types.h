@@ -457,6 +457,33 @@ typedef struct zxio_open_options {
   const zxio_node_attributes_t* create_attr;
 } zxio_open_options_t;
 
+// The mode for setting extended attributes.
+typedef uint32_t zxio_xattr_set_mode_t;
+
+// The possible modes for zxio_xattr_set. ZXIO_XATTR_SET is the default, which creates the
+// attribute if it doesn't exist, and replaces the value if it does.
+#define ZXIO_XATTR_SET ((zxio_xattr_set_mode_t)1u)
+// Only create the extended attribute, if it already exists the call will fail.
+#define ZXIO_XATTR_CREATE ((zxio_xattr_set_mode_t)2u)
+// Only replace the extended attribute, if it doesn't already exist the call will fail.
+#define ZXIO_XATTR_REPLACE ((zxio_xattr_set_mode_t)3u)
+
+// Data passed to a callback from xattr_get. Can either be a pointer to some data or a vmo
+// containing the data. In neither case does the callback take ownership of the data; the callback
+// should copy any data it needs out of this and into it's own structure.
+typedef struct zxio_xattr_data {
+  // Possibly contains the extended attribute value data. If it's nullptr, the data is in the vmo.
+  // The callback does _not_ take ownership of the data.
+  void* data;
+
+  // Contains the extended attribute value data, if it's not in the data field. The callback does
+  // _not_ take ownership of the vmo.
+  zx_handle_t vmo;
+
+  // Size of the data. This field is filled in both the void* and vmo cases.
+  size_t len;
+} zxio_xattr_data_t;
+
 __END_CDECLS
 
 #endif  // LIB_ZXIO_TYPES_H_

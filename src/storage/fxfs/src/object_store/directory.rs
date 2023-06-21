@@ -16,7 +16,8 @@ use {
                 PosixAttributes, Timestamp,
             },
             transaction::{LockKey, Mutation, Options, Transaction},
-            BasicObjectHandle, HandleOptions, HandleOwner, ObjectStore, StoreObjectHandle,
+            BasicObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
+            StoreObjectHandle,
         },
         trace_duration,
     },
@@ -549,10 +550,15 @@ impl<S: HandleOwner> Directory<S> {
         handle.get_extended_attribute(name).await
     }
 
-    pub async fn set_extended_attribute(&self, name: Vec<u8>, value: Vec<u8>) -> Result<(), Error> {
+    pub async fn set_extended_attribute(
+        &self,
+        name: Vec<u8>,
+        value: Vec<u8>,
+        mode: SetExtendedAttributeMode,
+    ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let handle = BasicObjectHandle::new(self.owner.clone(), self.object_id);
-        handle.set_extended_attribute(name, value).await
+        handle.set_extended_attribute(name, value, mode).await
     }
 
     pub async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Error> {

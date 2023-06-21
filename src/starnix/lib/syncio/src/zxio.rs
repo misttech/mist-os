@@ -623,6 +623,25 @@ impl Default for zxio_open_options {
     }
 }
 pub type zxio_open_options_t = zxio_open_options;
+pub type zxio_xattr_set_mode_t = u32;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct zxio_xattr_data {
+    pub data: *mut ::std::os::raw::c_void,
+    pub vmo: zx_handle_t,
+    pub __bindgen_padding_0: [u8; 4usize],
+    pub len: usize,
+}
+impl Default for zxio_xattr_data {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+pub type zxio_xattr_data_t = zxio_xattr_data;
 pub type va_list = __builtin_va_list;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -966,9 +985,13 @@ extern "C" {
         io: *mut zxio_t,
         name: *const u8,
         name_len: usize,
-        value: *mut u8,
-        value_capacity: usize,
-        out_value_actual: *mut usize,
+        callback: ::std::option::Option<
+            unsafe extern "C" fn(
+                context: *mut ::std::os::raw::c_void,
+                data: zxio_xattr_data_t,
+            ) -> zx_status_t,
+        >,
+        context: *mut ::std::os::raw::c_void,
     ) -> zx_status_t;
 }
 extern "C" {
@@ -978,6 +1001,7 @@ extern "C" {
         name_len: usize,
         value: *const u8,
         value_len: usize,
+        mode: zxio_xattr_set_mode_t,
     ) -> zx_status_t;
 }
 extern "C" {

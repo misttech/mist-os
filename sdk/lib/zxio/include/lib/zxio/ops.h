@@ -107,10 +107,11 @@ typedef struct zxio_ops {
   zx_status_t (*xattr_list)(zxio_t* io,
                             void (*callback)(void* context, const uint8_t* name, size_t name_len),
                             void* context);
-  zx_status_t (*xattr_get)(zxio_t* io, const uint8_t* name, size_t name_len, uint8_t* value,
-                           size_t value_capacity, size_t* out_value_actual);
+  zx_status_t (*xattr_get)(zxio_t* io, const uint8_t* name, size_t name_len,
+                           zx_status_t (*callback)(void* context, zxio_xattr_data_t data),
+                           void* context);
   zx_status_t (*xattr_set)(zxio_t* io, const uint8_t* name, size_t name_len, const uint8_t* value,
-                           size_t value_len);
+                           size_t value_len, zxio_xattr_set_mode_t mode);
   zx_status_t (*xattr_remove)(zxio_t* io, const uint8_t* name, size_t name_len);
   zx_status_t (*open2)(zxio_t* directory, const char* path, size_t path_len,
                        const zxio_open_options_t* options, zxio_node_attributes_t* inout_attr,

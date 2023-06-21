@@ -135,7 +135,12 @@ pub trait File: Node {
     }
 
     /// Set the value for an extended attribute.
-    async fn set_extended_attribute(&self, _name: Vec<u8>, _value: Vec<u8>) -> Result<(), Status> {
+    async fn set_extended_attribute(
+        &self,
+        _name: Vec<u8>,
+        _value: Vec<u8>,
+        _mode: fio::SetExtendedAttributeMode,
+    ) -> Result<(), Status> {
         Err(Status::NOT_SUPPORTED)
     }
 
