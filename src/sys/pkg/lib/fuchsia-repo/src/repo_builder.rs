@@ -5,7 +5,7 @@
 use {
     crate::{repo_client::RepoClient, repo_keys::RepoKeys, repository::RepoStorageProvider},
     anyhow::{anyhow, Context, Result},
-    async_fs::File,
+    async_fs::{unix::MetadataExt, File},
     camino::{Utf8Path, Utf8PathBuf},
     chrono::{DateTime, Duration, Utc},
     fuchsia_merkle::Hash,
@@ -66,6 +66,13 @@ struct BlobSizeMismatchError {
     path: String,
     manifest_size: u64,
     file_size: u64,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Blobs {hash1} and {hash2} refer to the same hardlinked file")]
+struct MerkleHardLinkMismatchError {
+    hash1: Hash,
+    hash2: Hash,
 }
 
 /// RepoBuilder can create and manipulate package repositories.
@@ -353,6 +360,17 @@ where
             return Ok(true);
         }
 
+        // Determine the set of blobs in the package that are unique.
+        let mut unique_package_blobs = vec![];
+        let package_blobs = package.manifest().blobs();
+        let mut seen_paths = HashSet::new();
+        let mut seen_hashes = HashSet::new();
+        for blob in package_blobs {
+            if seen_paths.insert(&blob.source_path) && seen_hashes.insert(&blob.merkle) {
+                unique_package_blobs.push(blob.to_owned());
+            }
+        }
+
         // Rust doesn't know we've fully processed the stream, so we need to
         // explicitly drop it so it knows we're done borrowing values.
         let blobs = {
@@ -360,7 +378,8 @@ where
 
             // Iterate over the blobs in parallel and check if they exist, ignoring
             // any that we've already staged.
-            let stream = futures::stream::iter(package.manifest().blobs().iter())
+
+            let stream = futures::stream::iter(unique_package_blobs.iter())
                 .filter_map(|blob| async move {
                     if self.staged_blobs.contains_key(&blob.merkle)
                         || to_be_staged_blobs.contains_key(&blob.merkle)
@@ -378,12 +397,27 @@ where
             // Gather up the results. If `ignore_missing_files` is true and any of
             // the files are missing, exit early. Otherwise error out.
             let mut blobs = vec![];
+            let mut seen_links = HashMap::new();
 
             let mut stream = std::pin::pin!(stream);
 
             while let Some((blob, result)) = stream.next().await {
                 match result {
                     Ok(metadata) => {
+                        // Skip over any hardlinks we've already seen.
+                        if let Some(first_merkle) =
+                            seen_links.insert((metadata.dev(), metadata.ino()), blob.merkle)
+                        {
+                            if first_merkle == blob.merkle {
+                                continue;
+                            } else {
+                                return Err(anyhow!(MerkleHardLinkMismatchError {
+                                    hash1: first_merkle,
+                                    hash2: blob.merkle
+                                }));
+                            }
+                        }
+
                         if blob.size != metadata.len() {
                             if self.ignore_missing_packages {
                                 return Ok(false);
@@ -771,6 +805,8 @@ fn check_manifests_are_equivalent(
 
 #[cfg(test)]
 mod tests {
+    use async_fs::unix::PermissionsExt;
+
     use {
         super::*,
         crate::{
@@ -1705,6 +1741,138 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_stage_package_overwrites_corrupted_blob_in_blob_store() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        let repo = FileSystemRepository::new(metadata_repo_path, blob_repo_path.clone());
+        let repo_keys = test_utils::make_repo_keys();
+
+        // Create 2 packages with a shared blob between them
+        let contents = b"shared blob";
+        let hash = fuchsia_merkle::from_slice(contents).root();
+
+        let pkg1_dir = dir.join("package1");
+        let pkg1_meta_far_path = pkg1_dir.join("meta.far");
+        let pkg1_manifest = {
+            let mut builder = PackageBuilder::new("package1");
+            builder.add_contents_as_blob("bin/shared", contents, &pkg1_dir).unwrap();
+            builder.build(&pkg1_dir, &pkg1_meta_far_path).unwrap()
+        };
+        let pkg1_manifest_path = pkg1_dir.join("package1.manifest");
+        serde_json::to_writer(std::fs::File::create(&pkg1_manifest_path).unwrap(), &pkg1_manifest)
+            .unwrap();
+
+        let pkg2_dir = dir.join("package2");
+        let pkg2_meta_far_path = pkg2_dir.join("meta.far");
+        let pkg2_manifest = {
+            let mut builder = PackageBuilder::new("package2");
+            builder.add_contents_as_blob("bin/shared", contents, &pkg2_dir).unwrap();
+            builder.build(&pkg2_dir, &pkg2_meta_far_path).unwrap()
+        };
+        let pkg2_manifest_path = pkg2_dir.join("package2.manifest");
+        serde_json::to_writer(std::fs::File::create(&pkg2_manifest_path).unwrap(), &pkg2_manifest)
+            .unwrap();
+
+        // Create the repo and publish the first package.
+        RepoBuilder::create(&repo, &repo_keys)
+            .add_package(pkg1_manifest_path)
+            .await
+            .unwrap()
+            .commit()
+            .await
+            .unwrap();
+
+        // Corrupt the contents of the blob, and change it's size.
+        let shared_blob_path = blob_repo_path.join(hash.to_string());
+        let mut perms = fs::metadata(&shared_blob_path).unwrap().permissions();
+        perms.set_mode(perms.mode() | 0o664);
+        fs::set_permissions(&shared_blob_path, perms).unwrap();
+        let mut blob = fs::File::options().append(true).open(&shared_blob_path).unwrap();
+        blob.write_all(b", but now corrupted").unwrap();
+        drop(blob);
+
+        // Publish the second package, which should succeed and overwrite the corrupted blob.
+        RepoBuilder::create(&repo, &repo_keys)
+            .add_package(pkg2_manifest_path)
+            .await
+            .unwrap()
+            .commit()
+            .await
+            .unwrap();
+
+        assert_eq!(std::fs::read(&shared_blob_path).unwrap(), contents);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_stage_package_does_not_overwrite_corrupted_blob_in_blob_store_if_lengths_match() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        let repo = FileSystemRepository::new(metadata_repo_path, blob_repo_path.clone());
+        let repo_keys = test_utils::make_repo_keys();
+
+        // Create 2 packages with a shared blob between them
+        let contents = b"shared blob";
+        let contents2 = b"corruptblob";
+        let hash = fuchsia_merkle::from_slice(contents).root();
+
+        let pkg1_dir = dir.join("package1");
+        let pkg1_meta_far_path = pkg1_dir.join("meta.far");
+        let pkg1_manifest = {
+            let mut builder = PackageBuilder::new("package1");
+            builder.add_contents_as_blob("bin/shared", contents, &pkg1_dir).unwrap();
+            builder.build(&pkg1_dir, &pkg1_meta_far_path).unwrap()
+        };
+        let pkg1_manifest_path = pkg1_dir.join("package1.manifest");
+        serde_json::to_writer(std::fs::File::create(&pkg1_manifest_path).unwrap(), &pkg1_manifest)
+            .unwrap();
+
+        let pkg2_dir = dir.join("package2");
+        let pkg2_meta_far_path = pkg2_dir.join("meta.far");
+        let pkg2_manifest = {
+            let mut builder = PackageBuilder::new("package2");
+            builder.add_contents_as_blob("bin/shared", contents, &pkg2_dir).unwrap();
+            builder.build(&pkg2_dir, &pkg2_meta_far_path).unwrap()
+        };
+        let pkg2_manifest_path = pkg2_dir.join("package2.manifest");
+        serde_json::to_writer(std::fs::File::create(&pkg2_manifest_path).unwrap(), &pkg2_manifest)
+            .unwrap();
+
+        // Create the repo and publish the first package.
+        RepoBuilder::create(&repo, &repo_keys)
+            .add_package(pkg1_manifest_path)
+            .await
+            .unwrap()
+            .commit()
+            .await
+            .unwrap();
+
+        // Corrupt the contents of the blob, but keep it's length the same.
+        let shared_blob_path = blob_repo_path.join(hash.to_string());
+        let mut perms = fs::metadata(&shared_blob_path).unwrap().permissions();
+        perms.set_mode(perms.mode() | 0o664);
+        fs::set_permissions(&shared_blob_path, perms).unwrap();
+        fs::write(&shared_blob_path, contents2).unwrap();
+
+        // Publish the second package, which should succeed and overwrite the corrupted blob.
+        RepoBuilder::create(&repo, &repo_keys)
+            .add_package(pkg2_manifest_path)
+            .await
+            .unwrap()
+            .commit()
+            .await
+            .unwrap();
+
+        // The blob still contains the corrupted contents.
+        assert_eq!(std::fs::read(&shared_blob_path).unwrap(), contents2);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
     async fn test_conflicting_package_archives_errors_out() {
         let tmp = tempfile::tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
@@ -1819,5 +1987,40 @@ mod tests {
             .await
             .unwrap_err();
         assert_matches!(err.downcast_ref::<BlobSizeMismatchError>(), Some(_));
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_rejects_distinct_merkles_referring_to_the_same_inode() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        let repo = FileSystemRepository::new(metadata_repo_path, blob_repo_path);
+        let repo_keys = test_utils::make_repo_keys();
+
+        let pkg1_dir = dir.join("package1");
+        let pkg1_meta_far_path = pkg1_dir.join("meta.far");
+        let pkg1_manifest = {
+            let mut builder = PackageBuilder::new("package1");
+            builder.add_contents_as_blob("bin/blob1", b"blob1", &pkg1_dir).unwrap();
+            builder.add_contents_as_blob("bin/blob2", b"blob2", &pkg1_dir).unwrap();
+            builder.build(&pkg1_dir, &pkg1_meta_far_path).unwrap()
+        };
+        let pkg1_manifest_path = pkg1_dir.join("package1.manifest");
+        serde_json::to_writer(std::fs::File::create(&pkg1_manifest_path).unwrap(), &pkg1_manifest)
+            .unwrap();
+
+        // Make blob2 a hardlink of blob1, but the manifest has 2 distinct merkles for it
+        let pkg1_blob1_path = pkg1_dir.join("bin").join("blob1");
+        let pkg1_blob2_path = pkg1_dir.join("bin").join("blob2");
+        fs::remove_file(&pkg1_blob2_path).unwrap();
+        fs::hard_link(&pkg1_blob1_path, &pkg1_blob2_path).unwrap();
+
+        let err = RepoBuilder::create(&repo, &repo_keys)
+            .add_package_manifest(Some(pkg1_dir), pkg1_manifest)
+            .await
+            .unwrap_err();
+        assert_matches!(err.downcast_ref::<MerkleHardLinkMismatchError>(), Some(_));
     }
 }
