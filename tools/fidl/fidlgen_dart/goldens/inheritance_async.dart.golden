@@ -116,8 +116,7 @@ class SubProxy extends $fidl.AsyncProxy<Sub> implements Sub {
           final List<$fidl.MemberType> $types = _kSub_foo_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          final $response = $fidl.decodeMaybeLargeMessage($message,
+          final $response = $fidl.decodeMessage($message,
               _kSub_foo_Type.responseInlineSize($wireFormat), $types[0]);
           $completer.complete($response);
         });
@@ -166,7 +165,7 @@ class SubBinding extends $fidl.AsyncBinding<Sub> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<int> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<$async.Future<int>>(
+              .decodeMessageWithCallback<$async.Future<int>>(
                   $message, _kSub_foo_Type.requestInlineSize($wireFormat),
                   ($fidl.Decoder $decoder, int $offset) {
             return _impl.foo(
@@ -268,8 +267,7 @@ class SuperProxy extends $fidl.AsyncProxy<Super> implements Super {
           final List<$fidl.MemberType> $types = _kSuper_foo_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          final $response = $fidl.decodeMaybeLargeMessage($message,
+          final $response = $fidl.decodeMessage($message,
               _kSuper_foo_Type.responseInlineSize($wireFormat), $types[0]);
           $completer.complete($response);
         });
@@ -318,7 +316,7 @@ class SuperBinding extends $fidl.AsyncBinding<Super> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<int> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<$async.Future<int>>(
+              .decodeMessageWithCallback<$async.Future<int>>(
                   $message, _kSuper_foo_Type.requestInlineSize($wireFormat),
                   ($fidl.Decoder $decoder, int $offset) {
             return _impl.foo(

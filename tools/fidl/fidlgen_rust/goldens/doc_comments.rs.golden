@@ -439,7 +439,7 @@ impl InterfaceSynchronousProxy {
     ///
     /// method comment #3
     pub fn r#method(&self) -> Result<(), fidl::Error> {
-        self.client.send::<fidl::encoding::EmptyPayload, false>(
+        self.client.send::<fidl::encoding::EmptyPayload>(
             (),
             0x45a0257b7cd8f999,
             fidl::encoding::DynamicFlags::empty(),
@@ -493,7 +493,7 @@ impl InterfaceProxy {
 
 impl InterfaceProxyInterface for InterfaceProxy {
     fn r#method(&self) -> Result<(), fidl::Error> {
-        self.client.send::<fidl::encoding::EmptyPayload, false>(
+        self.client.send::<fidl::encoding::EmptyPayload>(
             (),
             0x45a0257b7cd8f999,
             fidl::encoding::DynamicFlags::empty(),
@@ -558,9 +558,6 @@ impl InterfaceEvent {
                 let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.doccomments/InterfaceOnEventEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
-                    return Err(fidl::Error::LargeMessageImpossible);
-                }
                 fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                     &tx_header,
                     _body_bytes,
@@ -654,10 +651,6 @@ impl futures::Stream for InterfaceRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.doccomments/InterfaceMethodRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
@@ -731,7 +724,7 @@ impl fidl::endpoints::ControlHandle for InterfaceControlHandle {
 
 impl InterfaceControlHandle {
     pub fn send_on_event(&self) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::EmptyPayload, false>(
+        self.inner.send::<fidl::encoding::EmptyPayload>(
             (),
             0,
             0x663f6d5971bef0,

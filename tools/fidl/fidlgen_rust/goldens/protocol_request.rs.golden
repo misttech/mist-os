@@ -436,9 +436,8 @@ impl ParentSynchronousProxy {
         &self,
         ___deadline: zx::Time,
     ) -> Result<fidl::endpoints::ClientEnd<ChildMarker>, fidl::Error> {
-        let _response = self
-            .client
-            .send_query::<fidl::encoding::EmptyPayload, ParentGetChildResponse, false, false>(
+        let _response =
+            self.client.send_query::<fidl::encoding::EmptyPayload, ParentGetChildResponse>(
                 (),
                 0xc3cd963aafc873b,
                 fidl::encoding::DynamicFlags::empty(),
@@ -450,22 +449,20 @@ impl ParentSynchronousProxy {
         &self,
         ___deadline: zx::Time,
     ) -> Result<fidl::endpoints::ServerEnd<ChildMarker>, fidl::Error> {
-        let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                ParentGetChildRequestResponse,false,false>(
+        let _response =
+            self.client.send_query::<fidl::encoding::EmptyPayload, ParentGetChildRequestResponse>(
                 (),
                 0xf38d08d64f71c79,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?
-            ;
+            )?;
         Ok(_response.r)
     }
     pub fn r#take_child(
         &self,
         mut c: fidl::endpoints::ClientEnd<ChildMarker>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ParentTakeChildRequest, false>(
+        self.client.send::<ParentTakeChildRequest>(
             (c,),
             0x3e08fd7ca04b2290,
             fidl::encoding::DynamicFlags::empty(),
@@ -475,7 +472,7 @@ impl ParentSynchronousProxy {
         &self,
         mut r: fidl::endpoints::ServerEnd<ChildMarker>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ParentTakeChildRequestRequest, false>(
+        self.client.send::<ParentTakeChildRequestRequest>(
             (r,),
             0x2063f76b1bb45f87,
             fidl::encoding::DynamicFlags::empty(),
@@ -550,14 +547,12 @@ impl ParentProxyInterface for ParentProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<fidl::endpoints::ClientEnd<ChildMarker>, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<ParentGetChildResponse, false>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<ParentGetChildResponse>(_buf?)?;
             Ok(_response.c)
         }
         self.client.send_query_and_decode::<
             fidl::encoding::EmptyPayload,
             fidl::endpoints::ClientEnd<ChildMarker>,
-            false,
         >(
             (),
             0xc3cd963aafc873b,
@@ -571,16 +566,13 @@ impl ParentProxyInterface for ParentProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<fidl::endpoints::ServerEnd<ChildMarker>, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<
-                ParentGetChildRequestResponse,
-                false,
-            >(_buf?)?;
+            let _response =
+                fidl::client::decode_transaction_body::<ParentGetChildRequestResponse>(_buf?)?;
             Ok(_response.r)
         }
         self.client.send_query_and_decode::<
             fidl::encoding::EmptyPayload,
             fidl::endpoints::ServerEnd<ChildMarker>,
-            false,
         >(
             (),
             0xf38d08d64f71c79,
@@ -592,7 +584,7 @@ impl ParentProxyInterface for ParentProxy {
         &self,
         mut c: fidl::endpoints::ClientEnd<ChildMarker>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ParentTakeChildRequest, false>(
+        self.client.send::<ParentTakeChildRequest>(
             (c,),
             0x3e08fd7ca04b2290,
             fidl::encoding::DynamicFlags::empty(),
@@ -602,7 +594,7 @@ impl ParentProxyInterface for ParentProxy {
         &self,
         mut r: fidl::endpoints::ServerEnd<ChildMarker>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ParentTakeChildRequestRequest, false>(
+        self.client.send::<ParentTakeChildRequestRequest>(
             (r,),
             0x2063f76b1bb45f87,
             fidl::encoding::DynamicFlags::empty(),
@@ -736,10 +728,6 @@ impl futures::Stream for ParentRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolrequest/ParentGetChildRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
@@ -761,10 +749,6 @@ impl futures::Stream for ParentRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolrequest/ParentGetChildRequestRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
@@ -786,10 +770,6 @@ impl futures::Stream for ParentRequestStream {
                     let mut req = fidl::new_empty!(ParentTakeChildRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolrequest/ParentTakeChildRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<ParentTakeChildRequest>(
                         &header,
                         _body_bytes,
@@ -805,10 +785,6 @@ impl futures::Stream for ParentRequestStream {
                     let mut req = fidl::new_empty!(ParentTakeChildRequestRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolrequest/ParentTakeChildRequestRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<ParentTakeChildRequestRequest>(
                         &header,
                         _body_bytes,

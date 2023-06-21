@@ -45,56 +45,6 @@ pub enum Error {
     #[error("The FIDL object could not fit within the provided buffer range")]
     OutOfRange,
 
-    /// FIDL types bounded to less than or equal to 65520 bytes cannot be large messages.
-    #[error("FIDL types bounded to less than or equal to 65520 bytes cannot be large messages.")]
-    LargeMessageImpossible,
-
-    // TODO(fxbug.dev/117162): There is a tracking bug keeping tabs on the eventual removal of this
-    // limitation.
-    /// Large FIDL messages must have <=63 handles, rather than the usual limit of 64.
-    #[error("Large FIDL messages must have <=63 handles, rather than the usual limit of 64.")]
-    LargeMessage64Handles,
-
-    /// Large FIDL messages must have at least 1 handle pointing to the overflow VMO.
-    #[error("Large FIDL messages must have at least 1 handle pointing to the overflow VMO.")]
-    LargeMessageMissingHandles,
-
-    /// Large FIDL messages must have properly formed overflow buffer handles.
-    #[error("Large FIDL messages must have properly formed overflow buffer handles.")]
-    LargeMessageInvalidOverflowBufferHandle,
-
-    /// Large FIDL messages must have a well-formed 16-byte info struct
-    #[error("Large FIDL messages must have a well-formed 16-byte info struct.")]
-    LargeMessageInfoMissized {
-        /// Observed size of the `LargeMessageInfo` struct.
-        size: usize,
-    },
-
-    /// Large FIDL messages must have a properly formed info struct.
-    #[error("Large FIDL messages must have a properly formed info struct.")]
-    LargeMessageInfoMalformed,
-
-    /// Large FIDL messages must be greater than 65520 bytes.
-    #[error("Large FIDL messages must be greater than 65520 bytes.")]
-    LargeMessageTooSmall {
-        /// Observed size in the `LargeMessageInfo` struct.
-        size: usize,
-    },
-
-    /// Writing the overflow VMO failed.
-    #[error("Could not write the overflow VMO, due to status: {status}.")]
-    LargeMessageCouldNotWriteVmo {
-        /// Status returned when either when creating the VMO, or writing to it.
-        status: zx_status::Status,
-    },
-
-    /// Reading the overflow VMO failed.
-    #[error("Could not read the overflow VMO, due to status: {status}.")]
-    LargeMessageCouldNotReadVmo {
-        /// Status returned when either getting the VMO size, or reading from it.
-        status: zx_status::Status,
-    },
-
     /// Decoding the FIDL object did not use all of the bytes provided.
     #[error("Decoding the FIDL object did not use all of the bytes provided.")]
     ExtraBytes,

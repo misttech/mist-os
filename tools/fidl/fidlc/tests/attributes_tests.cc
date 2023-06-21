@@ -2066,30 +2066,4 @@ TEST(AttributesTests, BadDiscoverableInvalidNameErrcat) {
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidDiscoverableName);
 }
 
-// TODO(fxbug.dev/100478): Remove once large messages no longer requires flag or attribute.
-TEST(AttributesTests, BadExperimentalAllowOverflowingWithoutExperimentEnabled) {
-  TestLibrary library;
-  // We use the "good" variant for this "bad" test case because the underlying FIDL file does not
-  // change - only the flags we pass to it at invocation time do.
-  library.AddFile("good/fi-0195.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library,
-                                fidl::ErrExperimentalOverflowingAttributeMissingExperimentalFlag);
-}
-
-// TODO(fxbug.dev/100478): Remove once large messages no longer requires flag or attribute.
-TEST(AttributesTests, BadExperimentalAllowOverflowingAllArgumentsFalse) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0196-a.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kAllowOverflowing);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExperimentalOverflowingIncorrectUsage);
-}
-
-// TODO(fxbug.dev/100478): Remove once large messages no longer requires flag or attribute.
-TEST(AttributesTests, BadExperimentalAllowOverflowingNoArguments) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0196-b.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kAllowOverflowing);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributeWithEmptyParens);
-}
-
 }  // namespace

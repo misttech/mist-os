@@ -126,29 +126,6 @@ TEST(Bytes, VectorHeader) {
   ASSERT_EQ(expected, vector_header(3));
 }
 
-TEST(Bytes, LargeMessageInfo) {
-  Bytes expected = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  ASSERT_EQ(expected, large_message_info(32));
-}
-
-TEST(Bytes, AlignedLargeMessageInfo) {
-  // A LargeMessageInfo struct with a size of 32. All values [25,32] should round to this result.
-  Bytes expected = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  ASSERT_EQ(expected, aligned_large_message_info(25));
-  ASSERT_EQ(expected, aligned_large_message_info(26));
-  ASSERT_EQ(expected, aligned_large_message_info(27));
-  ASSERT_EQ(expected, aligned_large_message_info(28));
-  ASSERT_EQ(expected, aligned_large_message_info(29));
-  ASSERT_EQ(expected, aligned_large_message_info(30));
-  ASSERT_EQ(expected, aligned_large_message_info(31));
-  ASSERT_EQ(expected, aligned_large_message_info(32));
-
-  ASSERT_NE(expected, aligned_large_message_info(24));
-  ASSERT_NE(expected, aligned_large_message_info(33));
-}
-
 TEST(Bytes, HandlePresent) {
   Bytes expected = {0xff, 0xff, 0xff, 0xff};
   ASSERT_EQ(expected, handle_present());

@@ -1514,7 +1514,8 @@ impl TestProtocolSynchronousProxy {
     ) -> Result<StrictBoundedUnion, fidl::Error> {
         let _response = self.client.send_query::<
                 fidl::encoding::EmptyPayload,
-                TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,false,false>(
+                TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
+            >(
                 (),
                 0x5bfca9479251b9c3,
                 fidl::encoding::DynamicFlags::empty(),
@@ -1529,7 +1530,8 @@ impl TestProtocolSynchronousProxy {
     ) -> Result<OlderSimpleUnion, fidl::Error> {
         let _response = self.client.send_query::<
                 fidl::encoding::EmptyPayload,
-                TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,false,true>(
+                TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
+            >(
                 (),
                 0x694fede3b8829ce2,
                 fidl::encoding::DynamicFlags::empty(),
@@ -1599,17 +1601,15 @@ impl TestProtocolProxyInterface for TestProtocolProxy {
         ) -> Result<StrictBoundedUnion, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
-                false,
             >(_buf?)?;
             Ok(_response.xu)
         }
-        self.client
-            .send_query_and_decode::<fidl::encoding::EmptyPayload, StrictBoundedUnion, false>(
-                (),
-                0x5bfca9479251b9c3,
-                fidl::encoding::DynamicFlags::empty(),
-                _decode,
-            )
+        self.client.send_query_and_decode::<fidl::encoding::EmptyPayload, StrictBoundedUnion>(
+            (),
+            0x5bfca9479251b9c3,
+            fidl::encoding::DynamicFlags::empty(),
+            _decode,
+        )
     }
     type FlexibleUnionHenceResponseMustBeHeapAllocatedResponseFut =
         fidl::client::QueryResponseFut<OlderSimpleUnion>;
@@ -1621,11 +1621,10 @@ impl TestProtocolProxyInterface for TestProtocolProxy {
         ) -> Result<OlderSimpleUnion, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
-                true,
             >(_buf?)?;
             Ok(_response.xu)
         }
-        self.client.send_query_and_decode::<fidl::encoding::EmptyPayload, OlderSimpleUnion, false>(
+        self.client.send_query_and_decode::<fidl::encoding::EmptyPayload, OlderSimpleUnion>(
             (),
             0x694fede3b8829ce2,
             fidl::encoding::DynamicFlags::empty(),
@@ -1760,10 +1759,6 @@ impl futures::Stream for TestProtocolRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.union/TestProtocolStrictUnionHenceResponseMayBeStackAllocatedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
@@ -1786,10 +1781,6 @@ impl futures::Stream for TestProtocolRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.union/TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,

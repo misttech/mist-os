@@ -186,7 +186,7 @@ impl EmptyProtocolSynchronousProxy {
         EmptyProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
     pub fn r#send_(&self, mut e: &Empty) -> Result<(), fidl::Error> {
-        self.client.send::<EmptyProtocolSendRequest, false>(
+        self.client.send::<EmptyProtocolSendRequest>(
             (e,),
             0x132262fd8b200708,
             fidl::encoding::DynamicFlags::empty(),
@@ -197,15 +197,14 @@ impl EmptyProtocolSynchronousProxy {
         mut e: &Empty,
         ___deadline: zx::Time,
     ) -> Result<Empty, fidl::Error> {
-        let _response = self.client.send_query::<
-                EmptyProtocolSendAndReceiveRequest,
-                EmptyProtocolSendAndReceiveResponse,false,false>(
+        let _response = self
+            .client
+            .send_query::<EmptyProtocolSendAndReceiveRequest, EmptyProtocolSendAndReceiveResponse>(
                 (e,),
                 0x76a931254962cea,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?
-            ;
+            )?;
         Ok(_response.e)
     }
 }
@@ -256,7 +255,7 @@ impl EmptyProtocolProxy {
 
 impl EmptyProtocolProxyInterface for EmptyProtocolProxy {
     fn r#send_(&self, mut e: &Empty) -> Result<(), fidl::Error> {
-        self.client.send::<EmptyProtocolSendRequest, false>(
+        self.client.send::<EmptyProtocolSendRequest>(
             (e,),
             0x132262fd8b200708,
             fidl::encoding::DynamicFlags::empty(),
@@ -269,11 +268,10 @@ impl EmptyProtocolProxyInterface for EmptyProtocolProxy {
         ) -> Result<Empty, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 EmptyProtocolSendAndReceiveResponse,
-                false,
             >(_buf?)?;
             Ok(_response.e)
         }
-        self.client.send_query_and_decode::<EmptyProtocolSendAndReceiveRequest, Empty, false>(
+        self.client.send_query_and_decode::<EmptyProtocolSendAndReceiveRequest, Empty>(
             (e,),
             0x76a931254962cea,
             fidl::encoding::DynamicFlags::empty(),
@@ -339,9 +337,6 @@ impl EmptyProtocolEvent {
                 let mut out = fidl::new_empty!(EmptyProtocolReceiveRequest);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.emptystruct/EmptyProtocolReceiveEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
-                    return Err(fidl::Error::LargeMessageImpossible);
-                }
                 fidl::encoding::Decoder::decode_into::<EmptyProtocolReceiveRequest>(
                     &tx_header,
                     _body_bytes,
@@ -435,10 +430,6 @@ impl futures::Stream for EmptyProtocolRequestStream {
                     let mut req = fidl::new_empty!(EmptyProtocolSendRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.emptystruct/EmptyProtocolSend_Request");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<EmptyProtocolSendRequest>(
                         &header,
                         _body_bytes,
@@ -454,10 +445,6 @@ impl futures::Stream for EmptyProtocolRequestStream {
                     let mut req = fidl::new_empty!(EmptyProtocolSendAndReceiveRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.emptystruct/EmptyProtocolSendAndReceiveRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<EmptyProtocolSendAndReceiveRequest>(
                         &header,
                         _body_bytes,
@@ -544,7 +531,7 @@ impl fidl::endpoints::ControlHandle for EmptyProtocolControlHandle {
 
 impl EmptyProtocolControlHandle {
     pub fn send_receive(&self, mut e: &Empty) -> Result<(), fidl::Error> {
-        self.inner.send::<EmptyProtocolReceiveRequest, false>(
+        self.inner.send::<EmptyProtocolReceiveRequest>(
             (e,),
             0,
             0x1ff0ccf9b710e23f,

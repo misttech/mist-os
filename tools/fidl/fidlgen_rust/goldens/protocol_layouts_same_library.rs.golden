@@ -593,7 +593,7 @@ impl ComposedProtocolSynchronousProxy {
         &self,
         mut payload: &ComposedProtocolOneWayAnonComposedRequest,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ComposedProtocolOneWayAnonComposedRequest, false>(
+        self.client.send::<ComposedProtocolOneWayAnonComposedRequest>(
             payload,
             0x6e7a205bdad7941f,
             fidl::encoding::DynamicFlags::empty(),
@@ -606,7 +606,8 @@ impl ComposedProtocolSynchronousProxy {
     ) -> Result<ComposedProtocolTwoWayAnonComposedResponse, fidl::Error> {
         let _response = self.client.send_query::<
                 ComposedProtocolTwoWayAnonComposedRequest,
-                ComposedProtocolTwoWayAnonComposedResponse,false,true>(
+                ComposedProtocolTwoWayAnonComposedResponse,
+            >(
                 payload,
                 0x7083713dee9435f4,
                 fidl::encoding::DynamicFlags::empty(),
@@ -622,7 +623,8 @@ impl ComposedProtocolSynchronousProxy {
     ) -> Result<ComposedProtocolTwoWayAnonComposedWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
                 ComposedProtocolTwoWayAnonComposedWithErrorRequest,
-                fidl::encoding::ResultType<ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,false,false>(
+                fidl::encoding::ResultType<ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,
+            >(
                 payload,
                 0x4fd32c5e2ffa6828,
                 fidl::encoding::DynamicFlags::empty(),
@@ -632,7 +634,7 @@ impl ComposedProtocolSynchronousProxy {
         Ok(_response.map(|x| x))
     }
     pub fn r#one_way_named_composed(&self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        self.client.send::<TablePayload, false>(
+        self.client.send::<TablePayload>(
             payload,
             0x101636a8fa3e69b8,
             fidl::encoding::DynamicFlags::empty(),
@@ -643,7 +645,7 @@ impl ComposedProtocolSynchronousProxy {
         mut payload: &UnionPayload,
         ___deadline: zx::Time,
     ) -> Result<TablePayload, fidl::Error> {
-        let _response = self.client.send_query::<UnionPayload, TablePayload, false, true>(
+        let _response = self.client.send_query::<UnionPayload, TablePayload>(
             payload,
             0x45b4d3d31b374054,
             fidl::encoding::DynamicFlags::empty(),
@@ -656,15 +658,13 @@ impl ComposedProtocolSynchronousProxy {
         mut payload: &TablePayload,
         ___deadline: zx::Time,
     ) -> Result<ComposedProtocolTwoWayNamedComposedWithErrorResult, fidl::Error> {
-        let _response = self.client.send_query::<
-                TablePayload,
-                fidl::encoding::ResultType<UnionPayload, u32>,false,false>(
+        let _response =
+            self.client.send_query::<TablePayload, fidl::encoding::ResultType<UnionPayload, u32>>(
                 payload,
                 0x450531e2d20c52ef,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?
-            ;
+            )?;
         Ok(_response.map(|x| x))
     }
 }
@@ -745,7 +745,7 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
         &self,
         mut payload: &ComposedProtocolOneWayAnonComposedRequest,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ComposedProtocolOneWayAnonComposedRequest, false>(
+        self.client.send::<ComposedProtocolOneWayAnonComposedRequest>(
             payload,
             0x6e7a205bdad7941f,
             fidl::encoding::DynamicFlags::empty(),
@@ -762,14 +762,12 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
         ) -> Result<ComposedProtocolTwoWayAnonComposedResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ComposedProtocolTwoWayAnonComposedResponse,
-                true,
             >(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<
             ComposedProtocolTwoWayAnonComposedRequest,
             ComposedProtocolTwoWayAnonComposedResponse,
-            false,
         >(
             payload,
             0x7083713dee9435f4,
@@ -791,14 +789,12 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
                     ComposedProtocolTwoWayAnonComposedWithErrorResponse,
                     u32,
                 >,
-                false,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
         self.client.send_query_and_decode::<
             ComposedProtocolTwoWayAnonComposedWithErrorRequest,
             ComposedProtocolTwoWayAnonComposedWithErrorResult,
-            false,
         >(
             payload,
             0x4fd32c5e2ffa6828,
@@ -807,7 +803,7 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
         )
     }
     fn r#one_way_named_composed(&self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        self.client.send::<TablePayload, false>(
+        self.client.send::<TablePayload>(
             payload,
             0x101636a8fa3e69b8,
             fidl::encoding::DynamicFlags::empty(),
@@ -821,10 +817,10 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<TablePayload, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<TablePayload, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<TablePayload>(_buf?)?;
             Ok(_response)
         }
-        self.client.send_query_and_decode::<UnionPayload, TablePayload, false>(
+        self.client.send_query_and_decode::<UnionPayload, TablePayload>(
             payload,
             0x45b4d3d31b374054,
             fidl::encoding::DynamicFlags::empty(),
@@ -842,14 +838,12 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
         ) -> Result<ComposedProtocolTwoWayNamedComposedWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<UnionPayload, u32>,
-                false,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
         self.client.send_query_and_decode::<
             TablePayload,
             ComposedProtocolTwoWayNamedComposedWithErrorResult,
-            false,
         >(
             payload,
             0x450531e2d20c52ef,
@@ -947,9 +941,6 @@ impl ComposedProtocolEvent {
                 let mut out = fidl::new_empty!(ComposedProtocolOnAnonComposedRequest);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
-                    return Err(fidl::Error::LargeMessageImpossible);
-                }
                 fidl::encoding::Decoder::decode_into::<ComposedProtocolOnAnonComposedRequest>(
                     &tx_header,
                     _body_bytes,
@@ -963,7 +954,7 @@ impl ComposedProtocolEvent {
                 let mut out = fidl::new_empty!(fidl::encoding::ResultType<ComposedProtocolOnAnonComposedWithErrorResponse, u32>);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedWithErrorEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<
+                fidl::encoding::Decoder::decode_into::<
                     fidl::encoding::ResultType<
                         ComposedProtocolOnAnonComposedWithErrorResponse,
                         u32,
@@ -976,9 +967,6 @@ impl ComposedProtocolEvent {
                 let mut out = fidl::new_empty!(UnionPayload);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/ComposedProtocolOnNamedComposedEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
-                    return Err(fidl::Error::LargeMessageImpossible);
-                }
                 fidl::encoding::Decoder::decode_into::<UnionPayload>(
                     &tx_header,
                     _body_bytes,
@@ -992,7 +980,7 @@ impl ComposedProtocolEvent {
                 let mut out = fidl::new_empty!(fidl::encoding::ResultType<TablePayload, u32>);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/ComposedProtocolOnNamedComposedWithErrorEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<
+                fidl::encoding::Decoder::decode_into::<
                     fidl::encoding::ResultType<TablePayload, u32>,
                 >(&tx_header, _body_bytes, _handles, &mut out)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
@@ -1083,7 +1071,7 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     let mut req = fidl::new_empty!(ComposedProtocolOneWayAnonComposedRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/ComposedProtocolOneWayAnonComposedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<
+                    fidl::encoding::Decoder::decode_into::<
                         ComposedProtocolOneWayAnonComposedRequest,
                     >(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
@@ -1096,10 +1084,6 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     let mut req = fidl::new_empty!(ComposedProtocolTwoWayAnonComposedRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<
                         ComposedProtocolTwoWayAnonComposedRequest,
                     >(&header, _body_bytes, handles, &mut req)?;
@@ -1121,7 +1105,7 @@ impl futures::Stream for ComposedProtocolRequestStream {
                         fidl::new_empty!(ComposedProtocolTwoWayAnonComposedWithErrorRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<
+                    fidl::encoding::Decoder::decode_into::<
                         ComposedProtocolTwoWayAnonComposedWithErrorRequest,
                     >(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
@@ -1141,7 +1125,7 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     let mut req = fidl::new_empty!(TablePayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/ComposedProtocolOneWayNamedComposedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<TablePayload>(
+                    fidl::encoding::Decoder::decode_into::<TablePayload>(
                         &header,
                         _body_bytes,
                         handles,
@@ -1160,10 +1144,6 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     let mut req = fidl::new_empty!(UnionPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/ComposedProtocolTwoWayNamedComposedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<UnionPayload>(
                         &header,
                         _body_bytes,
@@ -1187,7 +1167,7 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     let mut req = fidl::new_empty!(TablePayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/ComposedProtocolTwoWayNamedComposedWithErrorRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<TablePayload>(
+                    fidl::encoding::Decoder::decode_into::<TablePayload>(
                         &header,
                         _body_bytes,
                         handles,
@@ -1356,7 +1336,7 @@ impl ComposedProtocolControlHandle {
         &self,
         mut payload: &ComposedProtocolOnAnonComposedRequest,
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<ComposedProtocolOnAnonComposedRequest, false>(
+        self.inner.send::<ComposedProtocolOnAnonComposedRequest>(
             payload,
             0,
             0x49a6eee3a0300e28,
@@ -1367,7 +1347,7 @@ impl ComposedProtocolControlHandle {
         &self,
         mut result: Result<&ComposedProtocolOnAnonComposedWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<ComposedProtocolOnAnonComposedWithErrorResponse, u32>, false>(
+        self.inner.send::<fidl::encoding::ResultType<ComposedProtocolOnAnonComposedWithErrorResponse, u32>>(
             result,
             0,
             0x297a909727d08a60,
@@ -1375,7 +1355,7 @@ impl ComposedProtocolControlHandle {
         )
     }
     pub fn send_on_named_composed(&self, mut payload: &UnionPayload) -> Result<(), fidl::Error> {
-        self.inner.send::<UnionPayload, false>(
+        self.inner.send::<UnionPayload>(
             payload,
             0,
             0x17c4edb4a4a36d7b,
@@ -1386,7 +1366,7 @@ impl ComposedProtocolControlHandle {
         &self,
         mut result: Result<&TablePayload, u32>,
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<TablePayload, u32>, false>(
+        self.inner.send::<fidl::encoding::ResultType<TablePayload, u32>>(
             result,
             0,
             0x3ff74c1cafdbabcf,
@@ -1829,7 +1809,7 @@ impl MainProtocolSynchronousProxy {
         &self,
         mut payload: &ComposedProtocolOneWayAnonComposedRequest,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ComposedProtocolOneWayAnonComposedRequest, false>(
+        self.client.send::<ComposedProtocolOneWayAnonComposedRequest>(
             payload,
             0x6e7a205bdad7941f,
             fidl::encoding::DynamicFlags::empty(),
@@ -1842,7 +1822,8 @@ impl MainProtocolSynchronousProxy {
     ) -> Result<ComposedProtocolTwoWayAnonComposedResponse, fidl::Error> {
         let _response = self.client.send_query::<
                 ComposedProtocolTwoWayAnonComposedRequest,
-                ComposedProtocolTwoWayAnonComposedResponse,false,true>(
+                ComposedProtocolTwoWayAnonComposedResponse,
+            >(
                 payload,
                 0x7083713dee9435f4,
                 fidl::encoding::DynamicFlags::empty(),
@@ -1858,7 +1839,8 @@ impl MainProtocolSynchronousProxy {
     ) -> Result<ComposedProtocolTwoWayAnonComposedWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
                 ComposedProtocolTwoWayAnonComposedWithErrorRequest,
-                fidl::encoding::ResultType<ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,false,false>(
+                fidl::encoding::ResultType<ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,
+            >(
                 payload,
                 0x4fd32c5e2ffa6828,
                 fidl::encoding::DynamicFlags::empty(),
@@ -1868,7 +1850,7 @@ impl MainProtocolSynchronousProxy {
         Ok(_response.map(|x| x))
     }
     pub fn r#one_way_named_composed(&self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        self.client.send::<TablePayload, false>(
+        self.client.send::<TablePayload>(
             payload,
             0x101636a8fa3e69b8,
             fidl::encoding::DynamicFlags::empty(),
@@ -1879,7 +1861,7 @@ impl MainProtocolSynchronousProxy {
         mut payload: &UnionPayload,
         ___deadline: zx::Time,
     ) -> Result<TablePayload, fidl::Error> {
-        let _response = self.client.send_query::<UnionPayload, TablePayload, false, true>(
+        let _response = self.client.send_query::<UnionPayload, TablePayload>(
             payload,
             0x45b4d3d31b374054,
             fidl::encoding::DynamicFlags::empty(),
@@ -1892,19 +1874,17 @@ impl MainProtocolSynchronousProxy {
         mut payload: &TablePayload,
         ___deadline: zx::Time,
     ) -> Result<ComposedProtocolTwoWayNamedComposedWithErrorResult, fidl::Error> {
-        let _response = self.client.send_query::<
-                TablePayload,
-                fidl::encoding::ResultType<UnionPayload, u32>,false,false>(
+        let _response =
+            self.client.send_query::<TablePayload, fidl::encoding::ResultType<UnionPayload, u32>>(
                 payload,
                 0x450531e2d20c52ef,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?
-            ;
+            )?;
         Ok(_response.map(|x| x))
     }
     pub fn r#one_way_local(&self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        self.client.send::<TablePayload, false>(
+        self.client.send::<TablePayload>(
             payload,
             0x3954b4c6b80956c1,
             fidl::encoding::DynamicFlags::empty(),
@@ -1915,7 +1895,7 @@ impl MainProtocolSynchronousProxy {
         mut payload: &UnionPayload,
         ___deadline: zx::Time,
     ) -> Result<TablePayload, fidl::Error> {
-        let _response = self.client.send_query::<UnionPayload, TablePayload, false, true>(
+        let _response = self.client.send_query::<UnionPayload, TablePayload>(
             payload,
             0x26998b4c1e8a9a57,
             fidl::encoding::DynamicFlags::empty(),
@@ -1928,22 +1908,20 @@ impl MainProtocolSynchronousProxy {
         mut payload: &TablePayload,
         ___deadline: zx::Time,
     ) -> Result<MainProtocolTwoWayLocalWithErrorResult, fidl::Error> {
-        let _response = self.client.send_query::<
-                TablePayload,
-                fidl::encoding::ResultType<UnionPayload, u32>,false,false>(
+        let _response =
+            self.client.send_query::<TablePayload, fidl::encoding::ResultType<UnionPayload, u32>>(
                 payload,
                 0x4a7bf9ce881afde7,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?
-            ;
+            )?;
         Ok(_response.map(|x| x))
     }
     pub fn r#one_way_anon(
         &self,
         mut payload: &MainProtocolOneWayAnonRequest,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<MainProtocolOneWayAnonRequest, false>(
+        self.client.send::<MainProtocolOneWayAnonRequest>(
             payload,
             0x774bf445f584ce2c,
             fidl::encoding::DynamicFlags::empty(),
@@ -1954,15 +1932,14 @@ impl MainProtocolSynchronousProxy {
         mut payload: &MainProtocolTwoWayAnonRequest,
         ___deadline: zx::Time,
     ) -> Result<MainProtocolTwoWayAnonResponse, fidl::Error> {
-        let _response = self.client.send_query::<
-                MainProtocolTwoWayAnonRequest,
-                MainProtocolTwoWayAnonResponse,false,true>(
+        let _response = self
+            .client
+            .send_query::<MainProtocolTwoWayAnonRequest, MainProtocolTwoWayAnonResponse>(
                 payload,
                 0x3fd7ad8e52b07e2e,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?
-            ;
+            )?;
         Ok(_response)
     }
     pub fn r#two_way_anon_with_error(
@@ -1972,7 +1949,8 @@ impl MainProtocolSynchronousProxy {
     ) -> Result<MainProtocolTwoWayAnonWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
                 MainProtocolTwoWayAnonWithErrorRequest,
-                fidl::encoding::ResultType<MainProtocolTwoWayAnonWithErrorResponse, u32>,false,true>(
+                fidl::encoding::ResultType<MainProtocolTwoWayAnonWithErrorResponse, u32>,
+            >(
                 payload,
                 0x1d33061a424eb245,
                 fidl::encoding::DynamicFlags::empty(),
@@ -2092,7 +2070,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         &self,
         mut payload: &ComposedProtocolOneWayAnonComposedRequest,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ComposedProtocolOneWayAnonComposedRequest, false>(
+        self.client.send::<ComposedProtocolOneWayAnonComposedRequest>(
             payload,
             0x6e7a205bdad7941f,
             fidl::encoding::DynamicFlags::empty(),
@@ -2109,14 +2087,12 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<ComposedProtocolTwoWayAnonComposedResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ComposedProtocolTwoWayAnonComposedResponse,
-                true,
             >(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<
             ComposedProtocolTwoWayAnonComposedRequest,
             ComposedProtocolTwoWayAnonComposedResponse,
-            false,
         >(
             payload,
             0x7083713dee9435f4,
@@ -2138,14 +2114,12 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
                     ComposedProtocolTwoWayAnonComposedWithErrorResponse,
                     u32,
                 >,
-                false,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
         self.client.send_query_and_decode::<
             ComposedProtocolTwoWayAnonComposedWithErrorRequest,
             ComposedProtocolTwoWayAnonComposedWithErrorResult,
-            false,
         >(
             payload,
             0x4fd32c5e2ffa6828,
@@ -2154,7 +2128,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         )
     }
     fn r#one_way_named_composed(&self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        self.client.send::<TablePayload, false>(
+        self.client.send::<TablePayload>(
             payload,
             0x101636a8fa3e69b8,
             fidl::encoding::DynamicFlags::empty(),
@@ -2168,10 +2142,10 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<TablePayload, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<TablePayload, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<TablePayload>(_buf?)?;
             Ok(_response)
         }
-        self.client.send_query_and_decode::<UnionPayload, TablePayload, false>(
+        self.client.send_query_and_decode::<UnionPayload, TablePayload>(
             payload,
             0x45b4d3d31b374054,
             fidl::encoding::DynamicFlags::empty(),
@@ -2189,14 +2163,12 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<ComposedProtocolTwoWayNamedComposedWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<UnionPayload, u32>,
-                false,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
         self.client.send_query_and_decode::<
             TablePayload,
             ComposedProtocolTwoWayNamedComposedWithErrorResult,
-            false,
         >(
             payload,
             0x450531e2d20c52ef,
@@ -2205,7 +2177,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         )
     }
     fn r#one_way_local(&self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        self.client.send::<TablePayload, false>(
+        self.client.send::<TablePayload>(
             payload,
             0x3954b4c6b80956c1,
             fidl::encoding::DynamicFlags::empty(),
@@ -2216,10 +2188,10 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<TablePayload, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<TablePayload, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<TablePayload>(_buf?)?;
             Ok(_response)
         }
-        self.client.send_query_and_decode::<UnionPayload, TablePayload, false>(
+        self.client.send_query_and_decode::<UnionPayload, TablePayload>(
             payload,
             0x26998b4c1e8a9a57,
             fidl::encoding::DynamicFlags::empty(),
@@ -2237,23 +2209,21 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<MainProtocolTwoWayLocalWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<UnionPayload, u32>,
-                false,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
-        self.client
-            .send_query_and_decode::<TablePayload, MainProtocolTwoWayLocalWithErrorResult, false>(
-                payload,
-                0x4a7bf9ce881afde7,
-                fidl::encoding::DynamicFlags::empty(),
-                _decode,
-            )
+        self.client.send_query_and_decode::<TablePayload, MainProtocolTwoWayLocalWithErrorResult>(
+            payload,
+            0x4a7bf9ce881afde7,
+            fidl::encoding::DynamicFlags::empty(),
+            _decode,
+        )
     }
     fn r#one_way_anon(
         &self,
         mut payload: &MainProtocolOneWayAnonRequest,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<MainProtocolOneWayAnonRequest, false>(
+        self.client.send::<MainProtocolOneWayAnonRequest>(
             payload,
             0x774bf445f584ce2c,
             fidl::encoding::DynamicFlags::empty(),
@@ -2267,22 +2237,17 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<MainProtocolTwoWayAnonResponse, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<
-                MainProtocolTwoWayAnonResponse,
-                true,
-            >(_buf?)?;
+            let _response =
+                fidl::client::decode_transaction_body::<MainProtocolTwoWayAnonResponse>(_buf?)?;
             Ok(_response)
         }
-        self.client.send_query_and_decode::<
-            MainProtocolTwoWayAnonRequest,
-            MainProtocolTwoWayAnonResponse,
-            false,
-        >(
-            payload,
-            0x3fd7ad8e52b07e2e,
-            fidl::encoding::DynamicFlags::empty(),
-            _decode,
-        )
+        self.client
+            .send_query_and_decode::<MainProtocolTwoWayAnonRequest, MainProtocolTwoWayAnonResponse>(
+                payload,
+                0x3fd7ad8e52b07e2e,
+                fidl::encoding::DynamicFlags::empty(),
+                _decode,
+            )
     }
     type TwoWayAnonWithErrorResponseFut =
         fidl::client::QueryResponseFut<MainProtocolTwoWayAnonWithErrorResult>;
@@ -2295,14 +2260,12 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<MainProtocolTwoWayAnonWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<MainProtocolTwoWayAnonWithErrorResponse, u32>,
-                true,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
         self.client.send_query_and_decode::<
             MainProtocolTwoWayAnonWithErrorRequest,
             MainProtocolTwoWayAnonWithErrorResult,
-            false,
         >(
             payload,
             0x1d33061a424eb245,
@@ -2436,9 +2399,6 @@ impl MainProtocolEvent {
                 let mut out = fidl::new_empty!(ComposedProtocolOnAnonComposedRequest);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolOnAnonComposedEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
-                    return Err(fidl::Error::LargeMessageImpossible);
-                }
                 fidl::encoding::Decoder::decode_into::<ComposedProtocolOnAnonComposedRequest>(
                     &tx_header,
                     _body_bytes,
@@ -2452,7 +2412,7 @@ impl MainProtocolEvent {
                 let mut out = fidl::new_empty!(fidl::encoding::ResultType<ComposedProtocolOnAnonComposedWithErrorResponse, u32>);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolOnAnonComposedWithErrorEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<
+                fidl::encoding::Decoder::decode_into::<
                     fidl::encoding::ResultType<
                         ComposedProtocolOnAnonComposedWithErrorResponse,
                         u32,
@@ -2465,9 +2425,6 @@ impl MainProtocolEvent {
                 let mut out = fidl::new_empty!(UnionPayload);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolOnNamedComposedEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
-                    return Err(fidl::Error::LargeMessageImpossible);
-                }
                 fidl::encoding::Decoder::decode_into::<UnionPayload>(
                     &tx_header,
                     _body_bytes,
@@ -2481,7 +2438,7 @@ impl MainProtocolEvent {
                 let mut out = fidl::new_empty!(fidl::encoding::ResultType<TablePayload, u32>);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolOnNamedComposedWithErrorEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<
+                fidl::encoding::Decoder::decode_into::<
                     fidl::encoding::ResultType<TablePayload, u32>,
                 >(&tx_header, _body_bytes, _handles, &mut out)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
@@ -2491,9 +2448,6 @@ impl MainProtocolEvent {
                 let mut out = fidl::new_empty!(UnionPayload);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolOnLocalEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
-                    return Err(fidl::Error::LargeMessageImpossible);
-                }
                 fidl::encoding::Decoder::decode_into::<UnionPayload>(
                     &tx_header,
                     _body_bytes,
@@ -2507,7 +2461,7 @@ impl MainProtocolEvent {
                 let mut out = fidl::new_empty!(fidl::encoding::ResultType<TablePayload, u32>);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolOnLocalWithErrorEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<
+                fidl::encoding::Decoder::decode_into::<
                     fidl::encoding::ResultType<TablePayload, u32>,
                 >(&tx_header, _body_bytes, _handles, &mut out)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
@@ -2517,7 +2471,7 @@ impl MainProtocolEvent {
                 let mut out = fidl::new_empty!(MainProtocolOnAnonRequest);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolOnAnonEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<MainProtocolOnAnonRequest>(
+                fidl::encoding::Decoder::decode_into::<MainProtocolOnAnonRequest>(
                     &tx_header,
                     _body_bytes,
                     _handles,
@@ -2530,7 +2484,7 @@ impl MainProtocolEvent {
                 let mut out = fidl::new_empty!(fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolOnAnonWithErrorEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<
+                fidl::encoding::Decoder::decode_into::<
                     fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>,
                 >(&tx_header, _body_bytes, _handles, &mut out)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
@@ -2620,7 +2574,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req = fidl::new_empty!(ComposedProtocolOneWayAnonComposedRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolOneWayAnonComposedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<
+                    fidl::encoding::Decoder::decode_into::<
                         ComposedProtocolOneWayAnonComposedRequest,
                     >(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
@@ -2632,10 +2586,6 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req = fidl::new_empty!(ComposedProtocolTwoWayAnonComposedRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonComposedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<
                         ComposedProtocolTwoWayAnonComposedRequest,
                     >(&header, _body_bytes, handles, &mut req)?;
@@ -2656,7 +2606,7 @@ impl futures::Stream for MainProtocolRequestStream {
                         fidl::new_empty!(ComposedProtocolTwoWayAnonComposedWithErrorRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonComposedWithErrorRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<
+                    fidl::encoding::Decoder::decode_into::<
                         ComposedProtocolTwoWayAnonComposedWithErrorRequest,
                     >(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
@@ -2675,7 +2625,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req = fidl::new_empty!(TablePayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolOneWayNamedComposedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<TablePayload>(
+                    fidl::encoding::Decoder::decode_into::<TablePayload>(
                         &header,
                         _body_bytes,
                         handles,
@@ -2690,10 +2640,6 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req = fidl::new_empty!(UnionPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolTwoWayNamedComposedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<UnionPayload>(
                         &header,
                         _body_bytes,
@@ -2716,7 +2662,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req = fidl::new_empty!(TablePayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolTwoWayNamedComposedWithErrorRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<TablePayload>(
+                    fidl::encoding::Decoder::decode_into::<TablePayload>(
                         &header,
                         _body_bytes,
                         handles,
@@ -2738,7 +2684,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req = fidl::new_empty!(TablePayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolOneWayLocalRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<TablePayload>(
+                    fidl::encoding::Decoder::decode_into::<TablePayload>(
                         &header,
                         _body_bytes,
                         handles,
@@ -2753,10 +2699,6 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req = fidl::new_empty!(UnionPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolTwoWayLocalRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<UnionPayload>(
                         &header,
                         _body_bytes,
@@ -2779,7 +2721,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req = fidl::new_empty!(TablePayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolTwoWayLocalWithErrorRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<TablePayload>(
+                    fidl::encoding::Decoder::decode_into::<TablePayload>(
                         &header,
                         _body_bytes,
                         handles,
@@ -2801,7 +2743,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req = fidl::new_empty!(MainProtocolOneWayAnonRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolOneWayAnonRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<MainProtocolOneWayAnonRequest>(
+                    fidl::encoding::Decoder::decode_into::<MainProtocolOneWayAnonRequest>(
                         &header,
                         _body_bytes,
                         handles,
@@ -2816,7 +2758,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req = fidl::new_empty!(MainProtocolTwoWayAnonRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<MainProtocolTwoWayAnonRequest>(
+                    fidl::encoding::Decoder::decode_into::<MainProtocolTwoWayAnonRequest>(
                         &header,
                         _body_bytes,
                         handles,
@@ -2838,9 +2780,12 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req = fidl::new_empty!(MainProtocolTwoWayAnonWithErrorRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonWithErrorRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<
-                        MainProtocolTwoWayAnonWithErrorRequest,
-                    >(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<MainProtocolTwoWayAnonWithErrorRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
@@ -3086,7 +3031,7 @@ impl MainProtocolControlHandle {
         &self,
         mut payload: &ComposedProtocolOnAnonComposedRequest,
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<ComposedProtocolOnAnonComposedRequest, false>(
+        self.inner.send::<ComposedProtocolOnAnonComposedRequest>(
             payload,
             0,
             0x49a6eee3a0300e28,
@@ -3097,7 +3042,7 @@ impl MainProtocolControlHandle {
         &self,
         mut result: Result<&ComposedProtocolOnAnonComposedWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<ComposedProtocolOnAnonComposedWithErrorResponse, u32>, false>(
+        self.inner.send::<fidl::encoding::ResultType<ComposedProtocolOnAnonComposedWithErrorResponse, u32>>(
             result,
             0,
             0x297a909727d08a60,
@@ -3105,7 +3050,7 @@ impl MainProtocolControlHandle {
         )
     }
     pub fn send_on_named_composed(&self, mut payload: &UnionPayload) -> Result<(), fidl::Error> {
-        self.inner.send::<UnionPayload, false>(
+        self.inner.send::<UnionPayload>(
             payload,
             0,
             0x17c4edb4a4a36d7b,
@@ -3116,7 +3061,7 @@ impl MainProtocolControlHandle {
         &self,
         mut result: Result<&TablePayload, u32>,
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<TablePayload, u32>, false>(
+        self.inner.send::<fidl::encoding::ResultType<TablePayload, u32>>(
             result,
             0,
             0x3ff74c1cafdbabcf,
@@ -3124,7 +3069,7 @@ impl MainProtocolControlHandle {
         )
     }
     pub fn send_on_local(&self, mut payload: &UnionPayload) -> Result<(), fidl::Error> {
-        self.inner.send::<UnionPayload, false>(
+        self.inner.send::<UnionPayload>(
             payload,
             0,
             0x71e90a3d364d2e8d,
@@ -3135,7 +3080,7 @@ impl MainProtocolControlHandle {
         &self,
         mut result: Result<&TablePayload, u32>,
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<TablePayload, u32>, false>(
+        self.inner.send::<fidl::encoding::ResultType<TablePayload, u32>>(
             result,
             0,
             0x2dac7e32bd351bdb,
@@ -3143,7 +3088,7 @@ impl MainProtocolControlHandle {
         )
     }
     pub fn send_on_anon(&self, mut payload: &MainProtocolOnAnonRequest) -> Result<(), fidl::Error> {
-        self.inner.send::<MainProtocolOnAnonRequest, false>(
+        self.inner.send::<MainProtocolOnAnonRequest>(
             payload,
             0,
             0xd8fa6d0f5fabb94,
@@ -3154,13 +3099,12 @@ impl MainProtocolControlHandle {
         &self,
         mut result: Result<&MainProtocolOnAnonWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
-        self.inner
-            .send::<fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>, false>(
-                result,
-                0,
-                0x6658cf43e550fa02,
-                fidl::encoding::DynamicFlags::empty(),
-            )
+        self.inner.send::<fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>>(
+            result,
+            0,
+            0x6658cf43e550fa02,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 #[must_use = "FIDL methods require a response to be sent"]

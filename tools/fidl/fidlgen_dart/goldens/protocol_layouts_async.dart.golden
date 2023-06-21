@@ -1715,12 +1715,6 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
               _kMainProtocol_OnAnonComposed_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_OnAnonComposed_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage(
               $message,
               _kMainProtocol_OnAnonComposed_Type
@@ -1738,11 +1732,6 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
 
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_OnAnonComposedWithError_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final lib$test_protocollayouts_imported
                   .ComposedProtocolOnAnonComposedWithErrorResult $response =
               $fidl.decodeMessage(
@@ -1769,12 +1758,6 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
               _kMainProtocol_OnNamedComposed_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_OnNamedComposed_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage(
               $message,
               _kMainProtocol_OnNamedComposed_Type
@@ -1792,11 +1775,6 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
 
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_OnNamedComposedWithError_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final lib$test_protocollayouts_imported
                   .ComposedProtocolOnNamedComposedWithErrorResult $response =
               $fidl.decodeMessage(
@@ -1823,12 +1801,6 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
               _kMainProtocol_OnImport_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_OnImport_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage(
               $message,
               _kMainProtocol_OnImport_Type.responseInlineSize($wireFormat),
@@ -1845,11 +1817,6 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
 
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_OnImportWithError_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final MainProtocolOnImportWithErrorResult $response =
               $fidl.decodeMessage(
                   $message,
@@ -1873,12 +1840,6 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
               _kMainProtocol_OnLocal_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_OnLocal_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage(
               $message,
               _kMainProtocol_OnLocal_Type.responseInlineSize($wireFormat),
@@ -1895,11 +1856,6 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
 
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_OnLocalWithError_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final MainProtocolOnLocalWithErrorResult $response =
               $fidl.decodeMessage(
                   $message,
@@ -1923,12 +1879,6 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
               _kMainProtocol_OnAnon_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_OnAnon_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage(
               $message,
               _kMainProtocol_OnAnon_Type.responseInlineSize($wireFormat),
@@ -1945,11 +1895,6 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
 
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_OnAnonWithError_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final MainProtocolOnAnonWithErrorResult $response =
               $fidl.decodeMessage(
                   $message,
@@ -1992,12 +1937,6 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
               _kMainProtocol_TwoWayAnonComposed_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_TwoWayAnonComposed_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage(
               $message,
               _kMainProtocol_TwoWayAnonComposed_Type
@@ -2018,7 +1957,7 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           final lib$test_protocollayouts_imported
                   .ComposedProtocolTwoWayAnonComposedWithErrorResult $response =
-              $fidl.decodeMaybeLargeMessage(
+              $fidl.decodeMessage(
                   $message,
                   _kMainProtocol_TwoWayAnonComposedWithError_Type
                       .responseInlineSize($wireFormat),
@@ -2041,12 +1980,6 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
               _kMainProtocol_TwoWayNamedComposed_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_TwoWayNamedComposed_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage(
               $message,
               _kMainProtocol_TwoWayNamedComposed_Type
@@ -2067,7 +2000,7 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           final lib$test_protocollayouts_imported
                   .ComposedProtocolTwoWayNamedComposedWithErrorResult
-              $response = $fidl.decodeMaybeLargeMessage(
+              $response = $fidl.decodeMessage(
                   $message,
                   _kMainProtocol_TwoWayNamedComposedWithError_Type
                       .responseInlineSize($wireFormat),
@@ -2090,12 +2023,6 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
               _kMainProtocol_TwoWayImport_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_TwoWayImport_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage(
               $message,
               _kMainProtocol_TwoWayImport_Type.responseInlineSize($wireFormat),
@@ -2113,7 +2040,7 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
           // ignore: prefer_const_declarations
 
           final MainProtocolTwoWayImportWithErrorResult $response =
-              $fidl.decodeMaybeLargeMessage(
+              $fidl.decodeMessage(
                   $message,
                   _kMainProtocol_TwoWayImportWithError_Type
                       .responseInlineSize($wireFormat),
@@ -2134,8 +2061,7 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
               _kMainProtocol_TwoWayLocal_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          final $response = $fidl.decodeMaybeLargeMessage(
+          final $response = $fidl.decodeMessage(
               $message,
               _kMainProtocol_TwoWayLocal_Type.responseInlineSize($wireFormat),
               $types[0]);
@@ -2152,7 +2078,7 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
           // ignore: prefer_const_declarations
 
           final MainProtocolTwoWayLocalWithErrorResult $response =
-              $fidl.decodeMaybeLargeMessage(
+              $fidl.decodeMessage(
                   $message,
                   _kMainProtocol_TwoWayLocalWithError_Type
                       .responseInlineSize($wireFormat),
@@ -2173,8 +2099,7 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
               _kMainProtocol_TwoWayAnon_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          final $response = $fidl.decodeMaybeLargeMessage(
+          final $response = $fidl.decodeMessage(
               $message,
               _kMainProtocol_TwoWayAnon_Type.responseInlineSize($wireFormat),
               $types[0]);
@@ -2191,7 +2116,7 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
           // ignore: prefer_const_declarations
 
           final MainProtocolTwoWayAnonWithErrorResult $response =
-              $fidl.decodeMaybeLargeMessage(
+              $fidl.decodeMessage(
                   $message,
                   _kMainProtocol_TwoWayAnonWithError_Type
                       .responseInlineSize($wireFormat),
@@ -3051,7 +2976,7 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<void> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<$async.Future<void>>(
+              .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
                   _kMainProtocol_OneWayAnonComposed_Type.requestInlineSize(
                       $wireFormat), ($fidl.Decoder $decoder, int $offset) {
@@ -3068,11 +2993,6 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
               _kMainProtocol_TwoWayAnonComposed_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_TwoWayAnonComposed_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async.Future<
               lib$test_protocollayouts_imported
                   .ComposedProtocolTwoWayAnonComposedResponse> $future = $fidl
@@ -3117,7 +3037,7 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           final _impl = impl!;
           final $async
                   .Future<lib$test_protocollayouts_imported.ComposedProtocolTwoWayAnonComposedWithErrorResponse>
-              $future = $fidl.decodeMaybeLargeMessageWithCallback<
+              $future = $fidl.decodeMessageWithCallback<
                       $async.Future<
                           lib$test_protocollayouts_imported
                               .ComposedProtocolTwoWayAnonComposedWithErrorResponse>>(
@@ -3170,7 +3090,7 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<void> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<$async.Future<void>>(
+              .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
                   _kMainProtocol_OneWayNamedComposed_Type.requestInlineSize(
                       $wireFormat), ($fidl.Decoder $decoder, int $offset) {
@@ -3187,11 +3107,6 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
               _kMainProtocol_TwoWayNamedComposed_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_TwoWayNamedComposed_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async
                   .Future<lib$test_protocollayouts_imported.ImportTablePayload>
               $future = $fidl.decodeMessageWithCallback<
@@ -3236,7 +3151,7 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           final _impl = impl!;
           final $async
                   .Future<lib$test_protocollayouts_imported.ImportUnionPayload>
-              $future = $fidl.decodeMaybeLargeMessageWithCallback<
+              $future = $fidl.decodeMessageWithCallback<
                       $async.Future<
                           lib$test_protocollayouts_imported
                               .ImportUnionPayload>>(
@@ -3289,7 +3204,7 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<void> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<$async.Future<void>>(
+              .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
                   _kMainProtocol_OneWayImport_Type.requestInlineSize(
                       $wireFormat), ($fidl.Decoder $decoder, int $offset) {
@@ -3306,11 +3221,6 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
               _kMainProtocol_TwoWayImport_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kMainProtocol_TwoWayImport_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async
                   .Future<lib$test_protocollayouts_imported.ImportTablePayload>
               $future = $fidl.decodeMessageWithCallback<
@@ -3352,7 +3262,7 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           final _impl = impl!;
           final $async
                   .Future<lib$test_protocollayouts_imported.ImportUnionPayload>
-              $future = $fidl.decodeMaybeLargeMessageWithCallback<
+              $future = $fidl.decodeMessageWithCallback<
                       $async.Future<
                           lib$test_protocollayouts_imported
                               .ImportUnionPayload>>(
@@ -3402,7 +3312,7 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<void> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<$async.Future<void>>(
+              .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
                   _kMainProtocol_OneWayLocal_Type.requestInlineSize(
                       $wireFormat), ($fidl.Decoder $decoder, int $offset) {
@@ -3420,8 +3330,7 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<LocalTablePayload> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<
-                      $async.Future<LocalTablePayload>>(
+              .decodeMessageWithCallback<$async.Future<LocalTablePayload>>(
                   $message,
                   _kMainProtocol_TwoWayLocal_Type.requestInlineSize(
                       $wireFormat), ($fidl.Decoder $decoder, int $offset) {
@@ -3456,8 +3365,7 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<LocalUnionPayload> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<
-                      $async.Future<LocalUnionPayload>>(
+              .decodeMessageWithCallback<$async.Future<LocalUnionPayload>>(
                   $message,
                   _kMainProtocol_TwoWayLocalWithError_Type.requestInlineSize(
                       $wireFormat), ($fidl.Decoder $decoder, int $offset) {
@@ -3504,8 +3412,7 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<void> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<$async.Future<void>>(
-                  $message,
+              .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kMainProtocol_OneWayAnon_Type.requestInlineSize($wireFormat),
                   ($fidl.Decoder $decoder, int $offset) {
             return _impl.oneWayAnon(
@@ -3522,7 +3429,7 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<MainProtocolTwoWayAnonResponse> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<
+              .decodeMessageWithCallback<
                       $async.Future<MainProtocolTwoWayAnonResponse>>($message,
                   _kMainProtocol_TwoWayAnon_Type.requestInlineSize($wireFormat),
                   ($fidl.Decoder $decoder, int $offset) {
@@ -3557,7 +3464,7 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<MainProtocolTwoWayAnonWithErrorResponse> $future =
-              $fidl.decodeMaybeLargeMessageWithCallback<
+              $fidl.decodeMessageWithCallback<
                       $async.Future<MainProtocolTwoWayAnonWithErrorResponse>>(
                   $message,
                   _kMainProtocol_TwoWayAnonWithError_Type.requestInlineSize(

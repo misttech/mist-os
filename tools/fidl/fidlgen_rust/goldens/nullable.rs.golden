@@ -394,9 +394,8 @@ impl SimpleProtocolSynchronousProxy {
         SimpleProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
     pub fn r#add(&self, mut a: i32, mut b: i32, ___deadline: zx::Time) -> Result<i32, fidl::Error> {
-        let _response = self
-            .client
-            .send_query::<SimpleProtocolAddRequest, SimpleProtocolAddResponse, false, false>(
+        let _response =
+            self.client.send_query::<SimpleProtocolAddRequest, SimpleProtocolAddResponse>(
                 (a, b),
                 0x7ee19cf19ae30276,
                 fidl::encoding::DynamicFlags::empty(),
@@ -452,10 +451,10 @@ impl SimpleProtocolProxyInterface for SimpleProtocolProxy {
     fn r#add(&self, mut a: i32, mut b: i32) -> Self::AddResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
             let _response =
-                fidl::client::decode_transaction_body::<SimpleProtocolAddResponse, false>(_buf?)?;
+                fidl::client::decode_transaction_body::<SimpleProtocolAddResponse>(_buf?)?;
             Ok(_response.sum)
         }
-        self.client.send_query_and_decode::<SimpleProtocolAddRequest, i32, false>(
+        self.client.send_query_and_decode::<SimpleProtocolAddRequest, i32>(
             (a, b),
             0x7ee19cf19ae30276,
             fidl::encoding::DynamicFlags::empty(),
@@ -591,10 +590,6 @@ impl futures::Stream for SimpleProtocolRequestStream {
                     let mut req = fidl::new_empty!(SimpleProtocolAddRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.nullable/SimpleProtocolAddRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<SimpleProtocolAddRequest>(
                         &header,
                         _body_bytes,

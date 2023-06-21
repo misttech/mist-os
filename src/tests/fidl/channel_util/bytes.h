@@ -138,25 +138,12 @@ inline Bytes string_header(uint64_t length) {
       pointer_present(),
   };
 }
+
 inline Bytes vector_header(uint64_t length) {
   return {
       vector_length(length),
       pointer_present(),
   };
-}
-inline Bytes large_message_info(uint64_t size) {
-  ZX_ASSERT_MSG(size % FIDL_ALIGNMENT == 0, "bytes must be 8-byte aligned");
-  return {
-      u32(0),     // flags
-      u32(0),     // reserved
-      u64(size),  // msg_byte_count
-  };
-}
-
-// Like |large_message_info|, but takes |size| inputs that are not 8 byte aligned and rounds them up
-// to the nearest alignment boundary.
-inline Bytes aligned_large_message_info(uint64_t size) {
-  return large_message_info(FIDL_ALIGN(size));
 }
 
 inline Bytes out_of_line_envelope(uint32_t num_bytes, uint8_t num_handles) {

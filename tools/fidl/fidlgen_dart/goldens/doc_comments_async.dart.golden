@@ -734,11 +734,6 @@ class InterfaceBinding extends $fidl.AsyncBinding<Interface> {
               _kInterface_Method_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kInterface_Method_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kInterface_Method_Type.requestInlineSize($wireFormat),

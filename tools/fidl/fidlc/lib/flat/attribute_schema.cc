@@ -381,25 +381,6 @@ void AttributeSchema::ResolveArgsWithoutSchema(CompileStep* step, Attribute* att
   }
 }
 
-// TODO(fxbug.dev/100478): Remove once large messages no longer requires flag or attribute.
-static bool ExperimentalOverflowingConstraint(Reporter* reporter, const ExperimentalFlags flags,
-                                              const Attribute* attr, const Element* element) {
-  if (!flags.IsFlagEnabled(ExperimentalFlags::Flag::kAllowOverflowing)) {
-    return reporter->Fail(ErrExperimentalOverflowingAttributeMissingExperimentalFlag, attr->span);
-  }
-
-  bool at_least_one_arg_is_true = false;
-  for (const auto& arg : attr->args) {
-    if (static_cast<const BoolConstantValue*>(&arg->value->Value())->value) {
-      at_least_one_arg_is_true = true;
-    }
-  }
-  if (!at_least_one_arg_is_true) {
-    return reporter->Fail(ErrExperimentalOverflowingIncorrectUsage, attr->span);
-  }
-  return true;
-}
-
 static bool DiscoverableConstraint(Reporter* reporter, const ExperimentalFlags flags,
                                    const Attribute* attr, const Element* element) {
   auto arg = attr->GetArg(AttributeArg::kDefaultAnonymousName);
@@ -479,16 +460,6 @@ AttributeSchemaMap AttributeSchema::OfficialAttributes() {
       .Constrain(DiscoverableConstraint);
   map[std::string(Attribute::kDocCommentName)].AddArg(
       AttributeArgSchema(ConstantValue::Kind::kString));
-  // TODO(fxbug.dev/100478): Remove once large messages no longer requires flag or attribute.
-  map["experimental_overflowing"]
-      .RestrictTo({
-          Element::Kind::kProtocolMethod,
-      })
-      .AddArg("request", AttributeArgSchema(ConstantValue::Kind::kBool,
-                                            AttributeArgSchema::Optionality::kOptional))
-      .AddArg("response", AttributeArgSchema(ConstantValue::Kind::kBool,
-                                             AttributeArgSchema::Optionality::kOptional))
-      .Constrain(ExperimentalOverflowingConstraint);
   map["generated_name"]
       .RestrictToAnonymousLayouts()
       .AddArg(AttributeArgSchema(ConstantValue::Kind::kString))

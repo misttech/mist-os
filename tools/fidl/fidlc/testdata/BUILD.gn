@@ -30,7 +30,6 @@ standalone_libraries = [
   "inheritance_with_recursive_decl.test.fidl",
   "new_type.test.fidl",
   "nullable.test.fidl",
-  "large_messages.test.fidl",
   "overlay.test.fidl",
   "padding.test.fidl",
   "protocol_request.test.fidl",
@@ -66,10 +65,6 @@ foreach(filename, standalone_libraries) {
     experimental_flags = [ "unknown_interactions" ]
     if (filename == "unknown_interactions.test.fidl") {
       experimental_flags += [ "unknown_interactions_new_defaults" ]
-    }
-
-    if (filename == "large_messages.test.fidl") {
-      experimental_flags += [ "allow_overflowing" ]
     }
 
     if (filename == "new_type.test.fidl") {

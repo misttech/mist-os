@@ -15,11 +15,8 @@ use {
         ClosedTargetControllerRequestStream, ClosedTargetRequest, ClosedTargetRequestStream,
         ClosedTargetServerPair, ClosedTargetTwoWayResultRequest,
         ClosedTargetTwoWayTablePayloadResponse, ClosedTargetTwoWayUnionPayloadRequest,
-        ClosedTargetTwoWayUnionPayloadResponse, Empty, EncodingFailureKind,
-        LargeMessageTargetControlHandle, LargeMessageTargetControllerControlHandle,
-        LargeMessageTargetControllerRequestStream, LargeMessageTargetOneWayMethod,
-        LargeMessageTargetRequest, LargeMessageTargetRequestStream, LargeMessageTargetServerPair,
-        OpenTargetControlHandle, OpenTargetControllerControlHandle, OpenTargetControllerRequest,
+        ClosedTargetTwoWayUnionPayloadResponse, Empty, OpenTargetControlHandle,
+        OpenTargetControllerControlHandle, OpenTargetControllerRequest,
         OpenTargetControllerRequestStream, OpenTargetFlexibleTwoWayErrRequest,
         OpenTargetFlexibleTwoWayFieldsErrRequest, OpenTargetRequest, OpenTargetRequestStream,
         OpenTargetServerPair, OpenTargetStrictTwoWayErrRequest,
@@ -65,9 +62,6 @@ fn get_teardown_reason(error: Option<fidl::Error>) -> fidl_fidl_serversuite::Tea
         | fidl::Error::IncompatibleMagicNumber(_)
         | fidl::Error::Invalid
         | fidl::Error::OutOfRange
-        | fidl::Error::LargeMessageMissingHandles
-        | fidl::Error::LargeMessageCouldNotReadVmo { .. }
-        | fidl::Error::LargeMessageInfoMissized { .. }
         | fidl::Error::ExtraBytes
         | fidl::Error::ExtraHandles
         | fidl::Error::NonZeroPadding { .. }
@@ -333,116 +327,6 @@ async fn run_open_target_server(
     Ok(())
 }
 
-async fn run_large_message_target_controller_server(
-    mut stream: LargeMessageTargetControllerRequestStream,
-    _sut_handle: &LargeMessageTargetControlHandle,
-) {
-    println!("Running LargeMessageTargetController");
-    while let Some(request) = stream.try_next().await.unwrap() {
-        println!("Handling LargeMessageTargetController request: {}", method_name(&request));
-        match request {}
-    }
-}
-
-async fn run_large_message_target_server(
-    mut stream: LargeMessageTargetRequestStream,
-    ctl_handle: &LargeMessageTargetControllerControlHandle,
-) -> Result<(), fidl::Error> {
-    println!("Running LargeMessageTarget");
-    while let Some(request) = stream.try_next().await? {
-        println!("Handling LargeMessageTarget request: {}", method_name(&request));
-        match request {
-            LargeMessageTargetRequest::DecodeBoundedKnownToBeSmall { .. } => {
-                ctl_handle
-                    .send_received_one_way(
-                        LargeMessageTargetOneWayMethod::DecodeBoundedKnownToBeSmall,
-                    )
-                    .unwrap();
-            }
-            LargeMessageTargetRequest::DecodeBoundedMaybeLarge { .. } => {
-                ctl_handle
-                    .send_received_one_way(LargeMessageTargetOneWayMethod::DecodeBoundedMaybeLarge)
-                    .unwrap();
-            }
-            LargeMessageTargetRequest::DecodeSemiBoundedBelievedToBeSmall { .. } => {
-                ctl_handle
-                    .send_received_one_way(
-                        LargeMessageTargetOneWayMethod::DecodeSemiBoundedBelievedToBeSmall,
-                    )
-                    .unwrap();
-            }
-            LargeMessageTargetRequest::DecodeSemiBoundedMaybeLarge { .. } => {
-                ctl_handle
-                    .send_received_one_way(
-                        LargeMessageTargetOneWayMethod::DecodeSemiBoundedMaybeLarge,
-                    )
-                    .unwrap();
-            }
-            LargeMessageTargetRequest::DecodeUnboundedMaybeLargeValue { .. } => {
-                ctl_handle
-                    .send_received_one_way(
-                        LargeMessageTargetOneWayMethod::DecodeUnboundedMaybeLargeValue,
-                    )
-                    .unwrap();
-            }
-            LargeMessageTargetRequest::DecodeUnboundedMaybeLargeResource { .. } => {
-                ctl_handle
-                    .send_received_one_way(
-                        LargeMessageTargetOneWayMethod::DecodeUnboundedMaybeLargeResource,
-                    )
-                    .unwrap();
-            }
-            LargeMessageTargetRequest::EncodeBoundedKnownToBeSmall { bytes, responder } => {
-                responder.send(&bytes).unwrap();
-            }
-            LargeMessageTargetRequest::EncodeBoundedMaybeLarge { bytes, responder } => {
-                responder.send(&bytes).unwrap();
-            }
-            LargeMessageTargetRequest::EncodeSemiBoundedBelievedToBeSmall {
-                payload,
-                responder,
-            } => {
-                responder.send(&payload).unwrap();
-            }
-            LargeMessageTargetRequest::EncodeSemiBoundedMaybeLarge { payload, responder } => {
-                responder.send(&payload).unwrap();
-            }
-            LargeMessageTargetRequest::EncodeUnboundedMaybeLargeValue { bytes, responder } => {
-                responder.send(&bytes).unwrap();
-            }
-            LargeMessageTargetRequest::EncodeUnboundedMaybeLargeResource {
-                populate_unset_handles,
-                data,
-                responder,
-            } => {
-                let mut elements = data.elements;
-                if populate_unset_handles {
-                    for element in elements.iter_mut() {
-                        element.handle.get_or_insert_with(|| Event::create().into());
-                    }
-                }
-
-                if let Err(err) = responder.send(elements) {
-                    match err {
-                        fidl::Error::LargeMessage64Handles => ctl_handle
-                            .send_reply_encoding_failed(EncodingFailureKind::LargeMessage64Handles)
-                            .unwrap(),
-                        err => panic!("expected fidl::Error::LargeMessage64Handles, got: {err:?}"),
-                    }
-                }
-            }
-            LargeMessageTargetRequest::_UnknownMethod { ordinal, unknown_method_type, .. } => {
-                let unknown_method_type = match unknown_method_type {
-                    UnknownMethodType::OneWay => DynsuiteUnknownMethodType::OneWay,
-                    UnknownMethodType::TwoWay => DynsuiteUnknownMethodType::TwoWay,
-                };
-                ctl_handle.send_received_unknown_method(ordinal, unknown_method_type).unwrap();
-            }
-        }
-    }
-    Ok(())
-}
-
 async fn handle_runner_request(request: RunnerRequest) {
     match request {
         RunnerRequest::CheckAlive { responder } => {
@@ -494,24 +378,6 @@ async fn handle_runner_request(request: RunnerRequest) {
                     ctl_handle.send_will_teardown(get_teardown_reason(result.err())).unwrap();
                     ctl_handle.shutdown();
                 });
-                responder.send().unwrap();
-                future::join(ctl_fut, sut_fut).await;
-            }
-            AnyTarget::LargeMessageTarget(LargeMessageTargetServerPair {
-                controller: ctl,
-                sut,
-            }) => {
-                let (ctl_stream, ctl_handle) = ctl.into_stream_and_control_handle().unwrap();
-                let (sut_stream, sut_handle) = sut.into_stream_and_control_handle().unwrap();
-                let ctl_fut = run_large_message_target_controller_server(ctl_stream, &sut_handle);
-                let sut_fut =
-                    run_large_message_target_server(sut_stream, &ctl_handle).map(|result| {
-                        if let Err(ref err) = result {
-                            println!("LargeMessageTarget failed: {err:?}");
-                        }
-                        ctl_handle.send_will_teardown(get_teardown_reason(result.err())).unwrap();
-                        ctl_handle.shutdown();
-                    });
                 responder.send().unwrap();
                 future::join(ctl_fut, sut_fut).await;
             }

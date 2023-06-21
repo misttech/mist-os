@@ -175,37 +175,7 @@ func (*runnerImpl) IsTestEnabled(_ fidl.Context, test serversuite.Test) (bool, e
 			serversuite.TestUnknownStrictOneWayClosedProtocol,
 			serversuite.TestUnknownFlexibleOneWayClosedProtocol,
 			serversuite.TestUnknownStrictTwoWayClosedProtocol,
-			serversuite.TestUnknownFlexibleTwoWayClosedProtocol,
-			serversuite.TestBadDecodeByteOverflowFlagSetOnBoundedSmallMessage,
-			serversuite.TestBadDecodeByteOverflowFlagSetOnUnboundedSmallMessage,
-			serversuite.TestBadDecodeByteOverflowFlagUnsetOnUnboundedLargeMessage,
-			serversuite.TestBadDecodeLargeMessageInfoOmitted,
-			serversuite.TestBadDecodeLargeMessageInfoTooSmall,
-			serversuite.TestBadDecodeLargeMessageInfoTooLarge,
-			serversuite.TestBadDecodeLargeMessageInfoTopHalfUnzeroed,
-			serversuite.TestBadDecodeLargeMessageInfoByteCountIsZero,
-			serversuite.TestBadDecodeLargeMessageInfoByteCountBelowMinimum,
-			serversuite.TestBadDecodeLargeMessageNoHandles,
-			serversuite.TestBadDecodeLargeMessageTooFewHandles,
-			serversuite.TestBadDecodeLargeMessage64Handles,
-			serversuite.TestBadDecodeLargeMessageLastHandleNotVmo,
-			serversuite.TestBadDecodeLargeMessageLastHandleInsufficientRights,
-			serversuite.TestBadDecodeLargeMessageLastHandleExcessiveRights,
-			serversuite.TestBadDecodeLargeMessageVmoTooSmall,
-			serversuite.TestBadDecodeLargeMessageInfoByteCountTooSmall,
-			serversuite.TestBadDecodeLargeMessageInfoByteCountTooLarge,
-			serversuite.TestBadEncode64HandleLargeMessage,
-			serversuite.TestGoodDecodeBoundedMaybeLargeMessage,
-			serversuite.TestGoodDecodeSemiBoundedUnknowableLargeMessage,
-			serversuite.TestGoodDecodeSemiBoundedMaybeLargeMessage,
-			serversuite.TestGoodDecodeUnboundedLargeMessage,
-			serversuite.TestGoodDecode63HandleLargeMessage,
-			serversuite.TestGoodDecodeUnknownSmallMessage,
-			serversuite.TestGoodDecodeUnknownLargeMessage,
-			serversuite.TestGoodEncodeBoundedMaybeLargeMessage,
-			serversuite.TestGoodEncodeSemiBoundedMaybeLargeMessage,
-			serversuite.TestGoodEncodeUnboundedLargeMessage,
-			serversuite.TestGoodEncode63HandleLargeMessage:
+			serversuite.TestUnknownFlexibleTwoWayClosedProtocol:
 			return false
 
 		case serversuite.TestV1TwoWayNoPayload, serversuite.TestV1TwoWayStructPayload:
@@ -221,24 +191,6 @@ func (*runnerImpl) IsTestEnabled(_ fidl.Context, test serversuite.Test) (bool, e
 			// hidden from one-way calls.
 			return false
 
-		case serversuite.TestGoodDecodeBoundedKnownSmallMessage,
-			serversuite.TestGoodDecodeBoundedMaybeSmallMessage,
-			serversuite.TestGoodDecodeSemiBoundedUnknowableSmallMessage,
-			serversuite.TestGoodDecodeSemiBoundedMaybeSmallMessage,
-			serversuite.TestGoodDecodeUnboundedSmallMessage,
-			serversuite.TestGoodDecode64HandleSmallMessage,
-			serversuite.TestGoodEncodeBoundedKnownSmallMessage,
-			serversuite.TestGoodEncodeBoundedMaybeSmallMessage,
-			serversuite.TestGoodEncodeSemiBoundedKnownSmallMessage,
-			serversuite.TestGoodEncodeSemiBoundedMaybeSmallMessage,
-			serversuite.TestGoodEncodeUnboundedSmallMessage,
-			serversuite.TestGoodEncode64HandleSmallMessage:
-			// TODO(fxbug.dev/114266): Though the Go bindings don't support large
-			// messages, these messages are all "small", and so should be successfully
-			// handled the these bindings. These cases are especially useful since
-			// they are good limit tests (64 handles, max message size, etc).
-			return false
-
 		default:
 			return true
 		}
@@ -250,15 +202,7 @@ func (*runnerImpl) IsTeardownReasonSupported(_ fidl.Context) (bool, error) {
 	return false, nil
 }
 
-func (*runnerImpl) Start(
-	_ fidl.Context,
-	target serversuite.AnyTarget) error {
-
-	if target.Which() == serversuite.AnyTargetLargeMessageTarget {
-		// TODO(fxbug.dev/114266): Test that go properly reports large messages when
-		// it encounters them.
-		return errors.New("Go does not support large messages")
-	}
+func (*runnerImpl) Start(_ fidl.Context, target serversuite.AnyTarget) error {
 	if target.Which() != serversuite.AnyTargetClosedTarget {
 		return errors.New("Go only supports closed protocols")
 	}

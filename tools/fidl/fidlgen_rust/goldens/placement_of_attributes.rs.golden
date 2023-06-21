@@ -234,7 +234,7 @@ impl ExampleProtocolSynchronousProxy {
         ExampleProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
     pub fn r#method(&self, mut arg: &fidl_test_exampleusing::Empty) -> Result<(), fidl::Error> {
-        self.client.send::<ExampleProtocolMethodRequest, false>(
+        self.client.send::<ExampleProtocolMethodRequest>(
             (arg,),
             0x53978e6fc7476749,
             fidl::encoding::DynamicFlags::empty(),
@@ -285,7 +285,7 @@ impl ExampleProtocolProxy {
 
 impl ExampleProtocolProxyInterface for ExampleProtocolProxy {
     fn r#method(&self, mut arg: &fidl_test_exampleusing::Empty) -> Result<(), fidl::Error> {
-        self.client.send::<ExampleProtocolMethodRequest, false>(
+        self.client.send::<ExampleProtocolMethodRequest>(
             (arg,),
             0x53978e6fc7476749,
             fidl::encoding::DynamicFlags::empty(),
@@ -420,10 +420,6 @@ impl futures::Stream for ExampleProtocolRequestStream {
                     let mut req = fidl::new_empty!(ExampleProtocolMethodRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.placementofattributes/ExampleProtocolMethodRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<ExampleProtocolMethodRequest>(
                         &header,
                         _body_bytes,

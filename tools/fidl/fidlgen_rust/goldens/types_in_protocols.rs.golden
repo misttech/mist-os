@@ -1839,7 +1839,7 @@ impl ProtocolSynchronousProxy {
         mut string: &str,
         mut opt_string: Option<&str>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<Basic, false>(
+        self.client.send::<Basic>(
             (
                 uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64, string,
                 opt_string,
@@ -1865,7 +1865,7 @@ impl ProtocolSynchronousProxy {
         ___deadline: zx::Time,
     ) -> Result<(u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, String, Option<String>), fidl::Error>
     {
-        let _response = self.client.send_query::<Basic, Basic, false, true>(
+        let _response = self.client.send_query::<Basic, Basic>(
             (
                 uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64, string,
                 opt_string,
@@ -1893,15 +1893,14 @@ impl ProtocolSynchronousProxy {
         &self,
         ___deadline: zx::Time,
     ) -> Result<ProtocolErrorBasicResult, fidl::Error> {
-        let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<Basic, u32>,false,true>(
+        let _response = self
+            .client
+            .send_query::<fidl::encoding::EmptyPayload, fidl::encoding::ResultType<Basic, u32>>(
                 (),
                 0x459eaa5d11b9ff93,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?
-            ;
+            )?;
         Ok(_response.map(|x| {
             (
                 x.uint8,
@@ -1929,7 +1928,7 @@ impl ProtocolSynchronousProxy {
         mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&Union>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<Compound, false>(
+        self.client.send::<Compound>(
             (bits, enum_, struct_, table, union, opt_struct, opt_union),
             0x2bc2bc3a9237c6cc,
             fidl::encoding::DynamicFlags::empty(),
@@ -1949,7 +1948,7 @@ impl ProtocolSynchronousProxy {
         (Bits, Enum, Struct, Table, Union, Option<Box<Struct>>, Option<Box<Union>>),
         fidl::Error,
     > {
-        let _response = self.client.send_query::<Compound, Compound, false, true>(
+        let _response = self.client.send_query::<Compound, Compound>(
             (bits, enum_, struct_, table, union, opt_struct, opt_union),
             0x79f279c7201da131,
             fidl::encoding::DynamicFlags::empty(),
@@ -1969,15 +1968,14 @@ impl ProtocolSynchronousProxy {
         &self,
         ___deadline: zx::Time,
     ) -> Result<ProtocolErrorCompoundResult, fidl::Error> {
-        let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<Compound, u32>,false,true>(
+        let _response = self
+            .client
+            .send_query::<fidl::encoding::EmptyPayload, fidl::encoding::ResultType<Compound, u32>>(
                 (),
                 0x29817d89a19ec77d,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?
-            ;
+            )?;
         Ok(_response
             .map(|x| (x.bits, x.enum_, x.struct_, x.table, x.union, x.opt_struct, x.opt_union)))
     }
@@ -1996,7 +1994,7 @@ impl ProtocolSynchronousProxy {
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ArrayBasic, false>(
+        self.client.send::<ArrayBasic>(
             (
                 array_uint8,
                 array_uint16,
@@ -2047,7 +2045,7 @@ impl ProtocolSynchronousProxy {
         ),
         fidl::Error,
     > {
-        let _response = self.client.send_query::<ArrayBasic, ArrayBasic, false, true>(
+        let _response = self.client.send_query::<ArrayBasic, ArrayBasic>(
             (
                 array_uint8,
                 array_uint16,
@@ -2087,7 +2085,8 @@ impl ProtocolSynchronousProxy {
     ) -> Result<ProtocolErrorArrayBasicResult, fidl::Error> {
         let _response = self.client.send_query::<
                 fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<ArrayBasic, u32>,false,true>(
+                fidl::encoding::ResultType<ArrayBasic, u32>,
+            >(
                 (),
                 0xf0dbde9626fff79,
                 fidl::encoding::DynamicFlags::empty(),
@@ -2119,7 +2118,7 @@ impl ProtocolSynchronousProxy {
         mut array_table: &[Table; 5],
         mut array_union: &[Union; 5],
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ArrayCompound, false>(
+        self.client.send::<ArrayCompound>(
             (array_bits, array_enum, array_struct, array_table, array_union),
             0x464948bae1bda09d,
             fidl::encoding::DynamicFlags::empty(),
@@ -2134,7 +2133,7 @@ impl ProtocolSynchronousProxy {
         mut array_union: &[Union; 5],
         ___deadline: zx::Time,
     ) -> Result<([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5]), fidl::Error> {
-        let _response = self.client.send_query::<ArrayCompound, ArrayCompound, false, true>(
+        let _response = self.client.send_query::<ArrayCompound, ArrayCompound>(
             (array_bits, array_enum, array_struct, array_table, array_union),
             0xbcae616f8e1ea7b,
             fidl::encoding::DynamicFlags::empty(),
@@ -2154,7 +2153,8 @@ impl ProtocolSynchronousProxy {
     ) -> Result<ProtocolErrorArrayCompoundResult, fidl::Error> {
         let _response = self.client.send_query::<
                 fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<ArrayCompound, u32>,false,true>(
+                fidl::encoding::ResultType<ArrayCompound, u32>,
+            >(
                 (),
                 0x52257f80e29c1a04,
                 fidl::encoding::DynamicFlags::empty(),
@@ -2179,7 +2179,7 @@ impl ProtocolSynchronousProxy {
         mut vector_string: &[String],
         mut vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error> {
-        self.client.send::<VectorBasic, false>(
+        self.client.send::<VectorBasic>(
             (
                 vector_uint8,
                 vector_uint16,
@@ -2230,7 +2230,7 @@ impl ProtocolSynchronousProxy {
         ),
         fidl::Error,
     > {
-        let _response = self.client.send_query::<VectorBasic, VectorBasic, false, true>(
+        let _response = self.client.send_query::<VectorBasic, VectorBasic>(
             (
                 vector_uint8,
                 vector_uint16,
@@ -2270,7 +2270,8 @@ impl ProtocolSynchronousProxy {
     ) -> Result<ProtocolErrorVectorBasicResult, fidl::Error> {
         let _response = self.client.send_query::<
                 fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<VectorBasic, u32>,false,true>(
+                fidl::encoding::ResultType<VectorBasic, u32>,
+            >(
                 (),
                 0xc27f841d6313f72,
                 fidl::encoding::DynamicFlags::empty(),
@@ -2304,7 +2305,7 @@ impl ProtocolSynchronousProxy {
         mut vector_opt_struct: &[Option<Box<Struct>>],
         mut vector_opt_union: &[Option<Box<Union>>],
     ) -> Result<(), fidl::Error> {
-        self.client.send::<VectorCompound, false>(
+        self.client.send::<VectorCompound>(
             (
                 vector_bits,
                 vector_enum,
@@ -2340,7 +2341,7 @@ impl ProtocolSynchronousProxy {
         ),
         fidl::Error,
     > {
-        let _response = self.client.send_query::<VectorCompound, VectorCompound, false, true>(
+        let _response = self.client.send_query::<VectorCompound, VectorCompound>(
             (
                 vector_bits,
                 vector_enum,
@@ -2370,7 +2371,8 @@ impl ProtocolSynchronousProxy {
     ) -> Result<ProtocolErrorVectorCompoundResult, fidl::Error> {
         let _response = self.client.send_query::<
                 fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<VectorCompound, u32>,false,true>(
+                fidl::encoding::ResultType<VectorCompound, u32>,
+            >(
                 (),
                 0x760e278628f7a985,
                 fidl::encoding::DynamicFlags::empty(),
@@ -2396,7 +2398,7 @@ impl ProtocolSynchronousProxy {
         mut opt_vector_struct: Option<&[Struct]>,
         mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<VectorOptional, false>(
+        self.client.send::<VectorOptional>(
             (opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct),
             0x153c6b333c21c52f,
             fidl::encoding::DynamicFlags::empty(),
@@ -2418,7 +2420,7 @@ impl ProtocolSynchronousProxy {
         ),
         fidl::Error,
     > {
-        let _response = self.client.send_query::<VectorOptional, VectorOptional, false, true>(
+        let _response = self.client.send_query::<VectorOptional, VectorOptional>(
             (opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct),
             0xe4b620aaafd73f3,
             fidl::encoding::DynamicFlags::empty(),
@@ -2437,7 +2439,8 @@ impl ProtocolSynchronousProxy {
     ) -> Result<ProtocolErrorVectorOptionalResult, fidl::Error> {
         let _response = self.client.send_query::<
                 fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<VectorOptional, u32>,false,true>(
+                fidl::encoding::ResultType<VectorOptional, u32>,
+            >(
                 (),
                 0x58e75cf86e2d715e,
                 fidl::encoding::DynamicFlags::empty(),
@@ -2453,7 +2456,7 @@ impl ProtocolSynchronousProxy {
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ArrayVectorNested, false>(
+        self.client.send::<ArrayVectorNested>(
             (vector_array_uint8, vector_vector_uint8),
             0x520dc9cb9b9b5ed7,
             fidl::encoding::DynamicFlags::empty(),
@@ -2465,13 +2468,12 @@ impl ProtocolSynchronousProxy {
         mut vector_vector_uint8: &[Vec<u8>],
         ___deadline: zx::Time,
     ) -> Result<(Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error> {
-        let _response =
-            self.client.send_query::<ArrayVectorNested, ArrayVectorNested, false, true>(
-                (vector_array_uint8, vector_vector_uint8),
-                0x4a438ce0948817dc,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?;
+        let _response = self.client.send_query::<ArrayVectorNested, ArrayVectorNested>(
+            (vector_array_uint8, vector_vector_uint8),
+            0x4a438ce0948817dc,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok((_response.vector_array_uint8, _response.vector_vector_uint8))
     }
     pub fn r#error_array_vector_nested(
@@ -2480,7 +2482,8 @@ impl ProtocolSynchronousProxy {
     ) -> Result<ProtocolErrorArrayVectorNestedResult, fidl::Error> {
         let _response = self.client.send_query::<
                 fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<ArrayVectorNested, u32>,false,true>(
+                fidl::encoding::ResultType<ArrayVectorNested, u32>,
+            >(
                 (),
                 0x7e168d89e1dac8a7,
                 fidl::encoding::DynamicFlags::empty(),
@@ -2519,7 +2522,7 @@ impl ProtocolSynchronousProxy {
         mut vector_table: Vec<ResourceTable>,
         mut vector_union: Vec<ResourceUnion>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<Resource, false>(
+        self.client.send::<Resource>(
             (
                 handle,
                 vmo,
@@ -2615,7 +2618,7 @@ impl ProtocolSynchronousProxy {
         ),
         fidl::Error,
     > {
-        let _response = self.client.send_query::<Resource, Resource, false, true>(
+        let _response = self.client.send_query::<Resource, Resource>(
             (
                 handle,
                 vmo,
@@ -2683,15 +2686,14 @@ impl ProtocolSynchronousProxy {
         &self,
         ___deadline: zx::Time,
     ) -> Result<ProtocolErrorResourceResult, fidl::Error> {
-        let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<Resource, u32>,false,true>(
+        let _response = self
+            .client
+            .send_query::<fidl::encoding::EmptyPayload, fidl::encoding::ResultType<Resource, u32>>(
                 (),
                 0x5b28634d603175b6,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?
-            ;
+            )?;
         Ok(_response.map(|x| {
             (
                 x.handle,
@@ -3350,7 +3352,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut string: &str,
         mut opt_string: Option<&str>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<Basic, false>(
+        self.client.send::<Basic>(
             (
                 uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64, string,
                 opt_string,
@@ -3394,7 +3396,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             (u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, String, Option<String>),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<Basic, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<Basic>(_buf?)?;
             Ok((
                 _response.uint8,
                 _response.uint16,
@@ -3413,7 +3415,6 @@ impl ProtocolProxyInterface for ProtocolProxy {
         self.client.send_query_and_decode::<
             Basic,
             (u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, String, Option<String>),
-            false,
         >(
             (uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64, string, opt_string,),
             0x205b92db5139c88f,
@@ -3428,7 +3429,6 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorBasicResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<Basic, u32>,
-                true,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (
@@ -3447,13 +3447,12 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 )
             }))
         }
-        self.client
-            .send_query_and_decode::<fidl::encoding::EmptyPayload, ProtocolErrorBasicResult, false>(
-                (),
-                0x459eaa5d11b9ff93,
-                fidl::encoding::DynamicFlags::empty(),
-                _decode,
-            )
+        self.client.send_query_and_decode::<fidl::encoding::EmptyPayload, ProtocolErrorBasicResult>(
+            (),
+            0x459eaa5d11b9ff93,
+            fidl::encoding::DynamicFlags::empty(),
+            _decode,
+        )
     }
     fn r#one_way_compound(
         &self,
@@ -3465,7 +3464,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&Union>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<Compound, false>(
+        self.client.send::<Compound>(
             (bits, enum_, struct_, table, union, opt_struct, opt_union),
             0x2bc2bc3a9237c6cc,
             fidl::encoding::DynamicFlags::empty(),
@@ -3496,7 +3495,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             (Bits, Enum, Struct, Table, Union, Option<Box<Struct>>, Option<Box<Union>>),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<Compound, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<Compound>(_buf?)?;
             Ok((
                 _response.bits,
                 _response.enum_,
@@ -3510,7 +3509,6 @@ impl ProtocolProxyInterface for ProtocolProxy {
         self.client.send_query_and_decode::<
             Compound,
             (Bits, Enum, Struct, Table, Union, Option<Box<Struct>>, Option<Box<Union>>),
-            false,
         >(
             (bits, enum_, struct_, table, union, opt_struct, opt_union,),
             0x79f279c7201da131,
@@ -3525,21 +3523,17 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorCompoundResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<Compound, u32>,
-                true,
             >(_buf?)?;
             Ok(_response
                 .map(|x| (x.bits, x.enum_, x.struct_, x.table, x.union, x.opt_struct, x.opt_union)))
         }
-        self.client.send_query_and_decode::<
-            fidl::encoding::EmptyPayload,
-            ProtocolErrorCompoundResult,
-            false,
-        >(
-            (),
-            0x29817d89a19ec77d,
-            fidl::encoding::DynamicFlags::empty(),
-            _decode,
-        )
+        self.client
+            .send_query_and_decode::<fidl::encoding::EmptyPayload, ProtocolErrorCompoundResult>(
+                (),
+                0x29817d89a19ec77d,
+                fidl::encoding::DynamicFlags::empty(),
+                _decode,
+            )
     }
     fn r#one_way_array_basic(
         &self,
@@ -3556,7 +3550,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ArrayBasic, false>(
+        self.client.send::<ArrayBasic>(
             (
                 array_uint8,
                 array_uint16,
@@ -3623,7 +3617,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<ArrayBasic, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<ArrayBasic>(_buf?)?;
             Ok((
                 _response.array_uint8,
                 _response.array_uint16,
@@ -3652,7 +3646,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             [f64; 5],
             [String; 5],
             [Option<String>; 5],
-        ), false>(
+        )>(
             (
                 array_uint8,
                 array_uint16,
@@ -3679,7 +3673,6 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorArrayBasicResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ArrayBasic, u32>,
-                true,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (
@@ -3698,16 +3691,13 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 )
             }))
         }
-        self.client.send_query_and_decode::<
-            fidl::encoding::EmptyPayload,
-            ProtocolErrorArrayBasicResult,
-            false,
-        >(
-            (),
-            0xf0dbde9626fff79,
-            fidl::encoding::DynamicFlags::empty(),
-            _decode,
-        )
+        self.client
+            .send_query_and_decode::<fidl::encoding::EmptyPayload, ProtocolErrorArrayBasicResult>(
+                (),
+                0xf0dbde9626fff79,
+                fidl::encoding::DynamicFlags::empty(),
+                _decode,
+            )
     }
     fn r#one_way_array_compound(
         &self,
@@ -3717,7 +3707,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut array_table: &[Table; 5],
         mut array_union: &[Union; 5],
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ArrayCompound, false>(
+        self.client.send::<ArrayCompound>(
             (array_bits, array_enum, array_struct, array_table, array_union),
             0x464948bae1bda09d,
             fidl::encoding::DynamicFlags::empty(),
@@ -3737,7 +3727,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5]), fidl::Error>
         {
-            let _response = fidl::client::decode_transaction_body::<ArrayCompound, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<ArrayCompound>(_buf?)?;
             Ok((
                 _response.array_bits,
                 _response.array_enum,
@@ -3749,7 +3739,6 @@ impl ProtocolProxyInterface for ProtocolProxy {
         self.client.send_query_and_decode::<
             ArrayCompound,
             ([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5]),
-            false,
         >(
             (array_bits, array_enum, array_struct, array_table, array_union,),
             0xbcae616f8e1ea7b,
@@ -3765,7 +3754,6 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorArrayCompoundResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ArrayCompound, u32>,
-                true,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (x.array_bits, x.array_enum, x.array_struct, x.array_table, x.array_union)
@@ -3774,7 +3762,6 @@ impl ProtocolProxyInterface for ProtocolProxy {
         self.client.send_query_and_decode::<
             fidl::encoding::EmptyPayload,
             ProtocolErrorArrayCompoundResult,
-            false,
         >(
             (),
             0x52257f80e29c1a04,
@@ -3797,7 +3784,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut vector_string: &[String],
         mut vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error> {
-        self.client.send::<VectorBasic, false>(
+        self.client.send::<VectorBasic>(
             (
                 vector_uint8,
                 vector_uint16,
@@ -3864,7 +3851,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<VectorBasic, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<VectorBasic>(_buf?)?;
             Ok((
                 _response.vector_uint8,
                 _response.vector_uint16,
@@ -3893,7 +3880,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             Vec<f64>,
             Vec<String>,
             Vec<Option<String>>,
-        ), false>(
+        )>(
             (
                 vector_uint8,
                 vector_uint16,
@@ -3921,7 +3908,6 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorVectorBasicResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<VectorBasic, u32>,
-                true,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (
@@ -3940,16 +3926,13 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 )
             }))
         }
-        self.client.send_query_and_decode::<
-            fidl::encoding::EmptyPayload,
-            ProtocolErrorVectorBasicResult,
-            false,
-        >(
-            (),
-            0xc27f841d6313f72,
-            fidl::encoding::DynamicFlags::empty(),
-            _decode,
-        )
+        self.client
+            .send_query_and_decode::<fidl::encoding::EmptyPayload, ProtocolErrorVectorBasicResult>(
+                (),
+                0xc27f841d6313f72,
+                fidl::encoding::DynamicFlags::empty(),
+                _decode,
+            )
     }
     fn r#one_way_vector_compound(
         &self,
@@ -3961,7 +3944,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut vector_opt_struct: &[Option<Box<Struct>>],
         mut vector_opt_union: &[Option<Box<Union>>],
     ) -> Result<(), fidl::Error> {
-        self.client.send::<VectorCompound, false>(
+        self.client.send::<VectorCompound>(
             (
                 vector_bits,
                 vector_enum,
@@ -4008,7 +3991,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<VectorCompound, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<VectorCompound>(_buf?)?;
             Ok((
                 _response.vector_bits,
                 _response.vector_enum,
@@ -4027,7 +4010,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             Vec<Union>,
             Vec<Option<Box<Struct>>>,
             Vec<Option<Box<Union>>>,
-        ), false>(
+        )>(
             (
                 vector_bits,
                 vector_enum,
@@ -4050,7 +4033,6 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorVectorCompoundResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<VectorCompound, u32>,
-                true,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (
@@ -4067,7 +4049,6 @@ impl ProtocolProxyInterface for ProtocolProxy {
         self.client.send_query_and_decode::<
             fidl::encoding::EmptyPayload,
             ProtocolErrorVectorCompoundResult,
-            false,
         >(
             (),
             0x760e278628f7a985,
@@ -4082,7 +4063,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut opt_vector_struct: Option<&[Struct]>,
         mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<VectorOptional, false>(
+        self.client.send::<VectorOptional>(
             (opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct),
             0x153c6b333c21c52f,
             fidl::encoding::DynamicFlags::empty(),
@@ -4112,7 +4093,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<VectorOptional, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<VectorOptional>(_buf?)?;
             Ok((
                 _response.opt_vector_uint8,
                 _response.opt_vector_string,
@@ -4125,7 +4106,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             Option<Vec<String>>,
             Option<Vec<Struct>>,
             Option<Vec<Option<Box<Struct>>>>,
-        ), false>(
+        )>(
             (opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct),
             0xe4b620aaafd73f3,
             fidl::encoding::DynamicFlags::empty(),
@@ -4140,7 +4121,6 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorVectorOptionalResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<VectorOptional, u32>,
-                true,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (
@@ -4154,7 +4134,6 @@ impl ProtocolProxyInterface for ProtocolProxy {
         self.client.send_query_and_decode::<
             fidl::encoding::EmptyPayload,
             ProtocolErrorVectorOptionalResult,
-            false,
         >(
             (),
             0x58e75cf86e2d715e,
@@ -4167,7 +4146,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ArrayVectorNested, false>(
+        self.client.send::<ArrayVectorNested>(
             (vector_array_uint8, vector_vector_uint8),
             0x520dc9cb9b9b5ed7,
             fidl::encoding::DynamicFlags::empty(),
@@ -4183,11 +4162,10 @@ impl ProtocolProxyInterface for ProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<(Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<ArrayVectorNested, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<ArrayVectorNested>(_buf?)?;
             Ok((_response.vector_array_uint8, _response.vector_vector_uint8))
         }
-        self.client.send_query_and_decode::<ArrayVectorNested, (Vec<[u8; 5]>, Vec<Vec<u8>>), false>(
+        self.client.send_query_and_decode::<ArrayVectorNested, (Vec<[u8; 5]>, Vec<Vec<u8>>)>(
             (vector_array_uint8, vector_vector_uint8),
             0x4a438ce0948817dc,
             fidl::encoding::DynamicFlags::empty(),
@@ -4202,14 +4180,12 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorArrayVectorNestedResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ArrayVectorNested, u32>,
-                true,
             >(_buf?)?;
             Ok(_response.map(|x| (x.vector_array_uint8, x.vector_vector_uint8)))
         }
         self.client.send_query_and_decode::<
             fidl::encoding::EmptyPayload,
             ProtocolErrorArrayVectorNestedResult,
-            false,
         >(
             (),
             0x7e168d89e1dac8a7,
@@ -4247,7 +4223,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut vector_table: Vec<ResourceTable>,
         mut vector_union: Vec<ResourceUnion>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<Resource, false>(
+        self.client.send::<Resource>(
             (
                 handle,
                 vmo,
@@ -4374,7 +4350,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<Resource, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<Resource>(_buf?)?;
             Ok((
                 _response.handle,
                 _response.vmo,
@@ -4433,7 +4409,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             Vec<ResourceStruct>,
             Vec<ResourceTable>,
             Vec<ResourceUnion>,
-        ), false>(
+        )>(
             (
                 handle,
                 vmo,
@@ -4475,7 +4451,6 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorResourceResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<Resource, u32>,
-                true,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (
@@ -4509,16 +4484,13 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 )
             }))
         }
-        self.client.send_query_and_decode::<
-            fidl::encoding::EmptyPayload,
-            ProtocolErrorResourceResult,
-            false,
-        >(
-            (),
-            0x5b28634d603175b6,
-            fidl::encoding::DynamicFlags::empty(),
-            _decode,
-        )
+        self.client
+            .send_query_and_decode::<fidl::encoding::EmptyPayload, ProtocolErrorResourceResult>(
+                (),
+                0x5b28634d603175b6,
+                fidl::encoding::DynamicFlags::empty(),
+                _decode,
+            )
     }
 }
 
@@ -5000,7 +4972,7 @@ impl ProtocolEvent {
                 let mut out = fidl::new_empty!(Basic);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolEventBasicEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<Basic>(
+                fidl::encoding::Decoder::decode_into::<Basic>(
                     &tx_header,
                     _body_bytes,
                     _handles,
@@ -5026,7 +4998,7 @@ impl ProtocolEvent {
                 let mut out = fidl::new_empty!(Compound);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolEventCompoundEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<Compound>(
+                fidl::encoding::Decoder::decode_into::<Compound>(
                     &tx_header,
                     _body_bytes,
                     _handles,
@@ -5047,7 +5019,7 @@ impl ProtocolEvent {
                 let mut out = fidl::new_empty!(ArrayBasic);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolEventArrayBasicEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<ArrayBasic>(
+                fidl::encoding::Decoder::decode_into::<ArrayBasic>(
                     &tx_header,
                     _body_bytes,
                     _handles,
@@ -5073,7 +5045,7 @@ impl ProtocolEvent {
                 let mut out = fidl::new_empty!(ArrayCompound);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolEventArrayCompoundEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<ArrayCompound>(
+                fidl::encoding::Decoder::decode_into::<ArrayCompound>(
                     &tx_header,
                     _body_bytes,
                     _handles,
@@ -5092,7 +5064,7 @@ impl ProtocolEvent {
                 let mut out = fidl::new_empty!(VectorBasic);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolEventVectorBasicEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<VectorBasic>(
+                fidl::encoding::Decoder::decode_into::<VectorBasic>(
                     &tx_header,
                     _body_bytes,
                     _handles,
@@ -5118,7 +5090,7 @@ impl ProtocolEvent {
                 let mut out = fidl::new_empty!(VectorCompound);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolEventVectorCompoundEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<VectorCompound>(
+                fidl::encoding::Decoder::decode_into::<VectorCompound>(
                     &tx_header,
                     _body_bytes,
                     _handles,
@@ -5139,7 +5111,7 @@ impl ProtocolEvent {
                 let mut out = fidl::new_empty!(VectorOptional);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolEventVectorOptionalEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<VectorOptional>(
+                fidl::encoding::Decoder::decode_into::<VectorOptional>(
                     &tx_header,
                     _body_bytes,
                     _handles,
@@ -5157,7 +5129,7 @@ impl ProtocolEvent {
                 let mut out = fidl::new_empty!(ArrayVectorNested);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolEventArrayVectorNestedEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<ArrayVectorNested>(
+                fidl::encoding::Decoder::decode_into::<ArrayVectorNested>(
                     &tx_header,
                     _body_bytes,
                     _handles,
@@ -5173,7 +5145,7 @@ impl ProtocolEvent {
                 let mut out = fidl::new_empty!(Resource);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolEventResourceEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode::<Resource>(
+                fidl::encoding::Decoder::decode_into::<Resource>(
                     &tx_header,
                     _body_bytes,
                     _handles,
@@ -5294,7 +5266,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(Basic);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolOneWayBasicRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<Basic>(
+                    fidl::encoding::Decoder::decode_into::<Basic>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5324,7 +5296,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(Basic);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolTwoWayBasicRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<Basic>(
+                    fidl::encoding::Decoder::decode_into::<Basic>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5358,10 +5330,6 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolErrorBasicRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
@@ -5383,7 +5351,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(Compound);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolOneWayCompoundRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<Compound>(
+                    fidl::encoding::Decoder::decode_into::<Compound>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5408,7 +5376,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(Compound);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolTwoWayCompoundRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<Compound>(
+                    fidl::encoding::Decoder::decode_into::<Compound>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5437,10 +5405,6 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolErrorCompoundRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
@@ -5462,7 +5426,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(ArrayBasic);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolOneWayArrayBasicRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<ArrayBasic>(
+                    fidl::encoding::Decoder::decode_into::<ArrayBasic>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5492,7 +5456,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(ArrayBasic);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolTwoWayArrayBasicRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<ArrayBasic>(
+                    fidl::encoding::Decoder::decode_into::<ArrayBasic>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5526,10 +5490,6 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolErrorArrayBasicRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
@@ -5551,7 +5511,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(ArrayCompound);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolOneWayArrayCompoundRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<ArrayCompound>(
+                    fidl::encoding::Decoder::decode_into::<ArrayCompound>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5574,7 +5534,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(ArrayCompound);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolTwoWayArrayCompoundRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<ArrayCompound>(
+                    fidl::encoding::Decoder::decode_into::<ArrayCompound>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5601,10 +5561,6 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolErrorArrayCompoundRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
@@ -5626,7 +5582,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(VectorBasic);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolOneWayVectorBasicRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<VectorBasic>(
+                    fidl::encoding::Decoder::decode_into::<VectorBasic>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5656,7 +5612,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(VectorBasic);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolTwoWayVectorBasicRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<VectorBasic>(
+                    fidl::encoding::Decoder::decode_into::<VectorBasic>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5690,10 +5646,6 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolErrorVectorBasicRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
@@ -5715,7 +5667,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(VectorCompound);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolOneWayVectorCompoundRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<VectorCompound>(
+                    fidl::encoding::Decoder::decode_into::<VectorCompound>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5740,7 +5692,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(VectorCompound);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolTwoWayVectorCompoundRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<VectorCompound>(
+                    fidl::encoding::Decoder::decode_into::<VectorCompound>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5769,10 +5721,6 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolErrorVectorCompoundRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
@@ -5794,7 +5742,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(VectorOptional);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolOneWayVectorOptionalRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<VectorOptional>(
+                    fidl::encoding::Decoder::decode_into::<VectorOptional>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5816,7 +5764,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(VectorOptional);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolTwoWayVectorOptionalRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<VectorOptional>(
+                    fidl::encoding::Decoder::decode_into::<VectorOptional>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5842,10 +5790,6 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolErrorVectorOptionalRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
@@ -5867,7 +5811,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(ArrayVectorNested);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolOneWayArrayVectorNestedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<ArrayVectorNested>(
+                    fidl::encoding::Decoder::decode_into::<ArrayVectorNested>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5887,7 +5831,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(ArrayVectorNested);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolTwoWayArrayVectorNestedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<ArrayVectorNested>(
+                    fidl::encoding::Decoder::decode_into::<ArrayVectorNested>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5911,10 +5855,6 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolErrorArrayVectorNestedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
@@ -5936,7 +5876,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(Resource);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolOneWayResourceRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<Resource>(
+                    fidl::encoding::Decoder::decode_into::<Resource>(
                         &header,
                         _body_bytes,
                         handles,
@@ -5981,7 +5921,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(Resource);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolTwoWayResourceRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<Resource>(
+                    fidl::encoding::Decoder::decode_into::<Resource>(
                         &header,
                         _body_bytes,
                         handles,
@@ -6030,10 +5970,6 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.typesinprotocols/ProtocolErrorResourceRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
@@ -7238,7 +7174,7 @@ impl ProtocolControlHandle {
         mut string: &str,
         mut opt_string: Option<&str>,
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<Basic, false>(
+        self.inner.send::<Basic>(
             (
                 uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64, string,
                 opt_string,
@@ -7258,7 +7194,7 @@ impl ProtocolControlHandle {
         mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&Union>,
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<Compound, false>(
+        self.inner.send::<Compound>(
             (bits, enum_, struct_, table, union, opt_struct, opt_union),
             0,
             0x617c5410858734d5,
@@ -7280,7 +7216,7 @@ impl ProtocolControlHandle {
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<ArrayBasic, false>(
+        self.inner.send::<ArrayBasic>(
             (
                 array_uint8,
                 array_uint16,
@@ -7308,7 +7244,7 @@ impl ProtocolControlHandle {
         mut array_table: &[Table; 5],
         mut array_union: &[Union; 5],
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<ArrayCompound, false>(
+        self.inner.send::<ArrayCompound>(
             (array_bits, array_enum, array_struct, array_table, array_union),
             0,
             0x1e63a00079aa7415,
@@ -7330,7 +7266,7 @@ impl ProtocolControlHandle {
         mut vector_string: &[String],
         mut vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<VectorBasic, false>(
+        self.inner.send::<VectorBasic>(
             (
                 vector_uint8,
                 vector_uint16,
@@ -7360,7 +7296,7 @@ impl ProtocolControlHandle {
         mut vector_opt_struct: &[Option<Box<Struct>>],
         mut vector_opt_union: &[Option<Box<Union>>],
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<VectorCompound, false>(
+        self.inner.send::<VectorCompound>(
             (
                 vector_bits,
                 vector_enum,
@@ -7382,7 +7318,7 @@ impl ProtocolControlHandle {
         mut opt_vector_struct: Option<&[Struct]>,
         mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<VectorOptional, false>(
+        self.inner.send::<VectorOptional>(
             (opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct),
             0,
             0x17617b54dfa8d85d,
@@ -7394,7 +7330,7 @@ impl ProtocolControlHandle {
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<ArrayVectorNested, false>(
+        self.inner.send::<ArrayVectorNested>(
             (vector_array_uint8, vector_vector_uint8),
             0,
             0x110b72cfebc4037e,
@@ -7431,7 +7367,7 @@ impl ProtocolControlHandle {
         mut vector_table: Vec<ResourceTable>,
         mut vector_union: Vec<ResourceUnion>,
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<Resource, false>(
+        self.inner.send::<Resource>(
             (
                 handle,
                 vmo,

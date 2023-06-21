@@ -357,130 +357,6 @@ class OpenTargetImpl extends OpenTargetServer {
   }
 }
 
-class LargeMessageTargetControllerImpl extends LargeMessageTargetController {
-  LargeMessageTargetControllerImpl({LargeMessageTargetBinding sutBinding})
-      : _sutBinding = sutBinding {
-    _sutBinding.whenClosed.then((_) {
-      _willTeardown.add(TeardownReason.other);
-    });
-  }
-
-// Binding used to track when teardown happens.
-  LargeMessageTargetBinding _sutBinding;
-
-  StreamController<TeardownReason> _willTeardown = StreamController.broadcast();
-
-  @override
-  Stream<TeardownReason> get willTeardown => _willTeardown.stream;
-
-  void reportReceivedUnknownMethod(
-      int ordinal, serversuite.UnknownMethodType unknownMethodType) {
-    _receivedUnknownMethod.add(
-        LargeMessageTargetController$ReceivedUnknownMethod$Response(
-            ordinal, unknownMethodType));
-  }
-
-  StreamController<LargeMessageTargetController$ReceivedUnknownMethod$Response>
-      _receivedUnknownMethod = StreamController.broadcast();
-  @override
-  Stream<LargeMessageTargetController$ReceivedUnknownMethod$Response>
-      get receivedUnknownMethod => _receivedUnknownMethod.stream;
-
-  void reportReplyEncodingFailed(EncodingFailureKind failureKind) {
-    _replyEncodingFailed.add(failureKind);
-  }
-
-  StreamController<EncodingFailureKind> _replyEncodingFailed =
-      StreamController.broadcast();
-  @override
-  Stream<EncodingFailureKind> get replyEncodingFailed =>
-      _replyEncodingFailed.stream;
-
-  void reportReceivedOneWay(LargeMessageTargetOneWayMethod method) {
-    _receivedOneWay.add(method);
-  }
-
-  StreamController<LargeMessageTargetOneWayMethod> _receivedOneWay =
-      StreamController.broadcast();
-  @override
-  Stream<LargeMessageTargetOneWayMethod> get receivedOneWay =>
-      _receivedOneWay.stream;
-}
-
-class LargeMessageTargetImpl extends LargeMessageTargetServer {
-  LargeMessageTargetImpl({LargeMessageTargetControllerImpl controller})
-      : _controller = controller;
-
-  final LargeMessageTargetControllerImpl _controller;
-
-  Future<void> decodeBoundedKnownToBeSmall(Uint8List bytes) async {
-    await _controller.reportReceivedOneWay(
-        LargeMessageTargetOneWayMethod.decodeBoundedKnownToBeSmall);
-  }
-
-  Future<void> decodeBoundedMaybeLarge(Uint8List bytes) async {
-    await _controller.reportReceivedOneWay(
-        LargeMessageTargetOneWayMethod.decodeBoundedMaybeLarge);
-  }
-
-  Future<void> decodeSemiBoundedBelievedToBeSmall(
-      SemiBoundedBelievedToBeSmall payload) async {
-    await _controller.reportReceivedOneWay(
-        LargeMessageTargetOneWayMethod.decodeSemiBoundedBelievedToBeSmall);
-  }
-
-  Future<void> decodeSemiBoundedMaybeLarge(
-      SemiBoundedMaybeLarge payload) async {
-    await _controller.reportReceivedOneWay(
-        LargeMessageTargetOneWayMethod.decodeSemiBoundedMaybeLarge);
-  }
-
-  Future<void> decodeUnboundedMaybeLargeValue(Uint8List bytes) async {
-    await _controller.reportReceivedOneWay(
-        LargeMessageTargetOneWayMethod.decodeUnboundedMaybeLargeValue);
-  }
-
-  Future<void> decodeUnboundedMaybeLargeResource(
-      List<Elements> elements) async {
-    await _controller.reportReceivedOneWay(
-        LargeMessageTargetOneWayMethod.decodeUnboundedMaybeLargeResource);
-  }
-
-  Future<Uint8List> encodeBoundedKnownToBeSmall(Uint8List bytes) async {
-    return bytes;
-  }
-
-  Future<Uint8List> encodeBoundedMaybeLarge(Uint8List bytes) async {
-    return bytes;
-  }
-
-  Future<SemiBoundedBelievedToBeSmall> encodeSemiBoundedBelievedToBeSmall(
-      SemiBoundedBelievedToBeSmall payload) async {
-    return payload;
-  }
-
-  Future<SemiBoundedMaybeLarge> encodeSemiBoundedMaybeLarge(
-      SemiBoundedMaybeLarge payload) async {
-    return payload;
-  }
-
-  Future<Uint8List> encodeUnboundedMaybeLargeValue(Uint8List bytes) async {
-    return bytes;
-  }
-
-  Future<List<Elements>> encodeUnboundedMaybeLargeResource(
-      bool populateUnsetHandles, UnboundedMaybeLargeResource data) async {
-    // TODO(fxbug.dev/114263): Support populating unset handles. This will probably require using a
-    // zircon object besides an event, since the Dart runtime has no API for creating zircon events.
-    return data.elements;
-  }
-
-  Future<void> $unknownMethod(UnknownMethodMetadata metadata) async {
-    await _controller.reportReceivedUnknownMethod(
-        metadata.ordinal, convertUnknownMethodType(metadata.unknownMethodType));
-  }
-}
-
 class RunnerImpl extends Runner {
   @override
   Future<bool> isTestEnabled(Test test) async {
@@ -512,17 +388,6 @@ class RunnerImpl extends Runner {
       // - Ignores the ZX_ERR_INVALID_ARGS from sending a handle which did not
       //   have the rights specified in the handle dispositions list.
       case Test.serverSendsTooFewRights:
-        return false;
-      // TODO(fxbug.dev/118083): Attempting to read more bytes than are present in the VMO crashes
-      // the Dart runner.
-      case Test.badDecodeLargeMessageVmoTooSmall:
-        return false;
-      case Test.goodEncodeBoundedMaybeLargeMessage:
-      case Test.goodEncodeSemiBoundedMaybeLargeMessage:
-      case Test.goodEncodeUnboundedLargeMessage:
-      case Test.goodEncode63HandleLargeMessage:
-      case Test.badEncode64HandleLargeMessage:
-        // TODO(fxbug.dev/114263): Test encoding large messages.
         return false;
       default:
         return true;
@@ -563,17 +428,6 @@ class RunnerImpl extends Runner {
 
       controllerBinding.bind(controllerServer, target.openTarget.controller);
       sutBinding.bind(sutServer, target.openTarget.sut);
-    } else if (target.largeMessageTarget != null) {
-      var controllerBinding = LargeMessageTargetControllerBinding();
-      var sutBinding = LargeMessageTargetBinding();
-
-      var controllerServer =
-          LargeMessageTargetControllerImpl(sutBinding: sutBinding);
-      var sutServer = LargeMessageTargetImpl(controller: controllerServer);
-
-      controllerBinding.bind(
-          controllerServer, target.largeMessageTarget.controller);
-      sutBinding.bind(sutServer, target.largeMessageTarget.sut);
     } else {
       throw ArgumentError("Unknown AnyTarget variant: ${target.$ordinal}");
     }

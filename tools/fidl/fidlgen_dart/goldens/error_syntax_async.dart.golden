@@ -300,7 +300,7 @@ class ExampleUseOfErrorSyntaxProxy extends $fidl
 
           final lib$test_errorsyntax_parent
                   .ParentUsesErrorSyntaxComposedCallWhichMayFailResult
-              $response = $fidl.decodeMaybeLargeMessage(
+              $response = $fidl.decodeMessage(
                   $message,
                   _kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_Type
                       .responseInlineSize($wireFormat),
@@ -326,7 +326,7 @@ class ExampleUseOfErrorSyntaxProxy extends $fidl
           // ignore: prefer_const_declarations
 
           final ExampleUseOfErrorSyntaxCallWhichMayFailResult $response =
-              $fidl.decodeMaybeLargeMessage(
+              $fidl.decodeMessage(
                   $message,
                   _kExampleUseOfErrorSyntax_CallWhichMayFail_Type
                       .responseInlineSize($wireFormat),
@@ -417,7 +417,7 @@ class ExampleUseOfErrorSyntaxBinding
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<int> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<$async.Future<int>>(
+              .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
                   _kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_Type
                       .requestInlineSize($wireFormat),
@@ -471,7 +471,7 @@ class ExampleUseOfErrorSyntaxBinding
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<int> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<$async.Future<int>>(
+              .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
                   _kExampleUseOfErrorSyntax_CallWhichMayFail_Type
                       .requestInlineSize($wireFormat),

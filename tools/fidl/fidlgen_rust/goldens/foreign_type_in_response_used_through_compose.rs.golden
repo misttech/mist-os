@@ -69,15 +69,14 @@ impl TopSynchronousProxy {
         TopEvent::decode(self.client.wait_for_event(deadline)?)
     }
     pub fn r#get_foo(&self, ___deadline: zx::Time) -> Result<fidl_test_bottom::Foo, fidl::Error> {
-        let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                fidl_test_middle::MiddleGetFooResponse,false,false>(
+        let _response = self
+            .client
+            .send_query::<fidl::encoding::EmptyPayload, fidl_test_middle::MiddleGetFooResponse>(
                 (),
                 0x401a9ffa95a4c333,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?
-            ;
+            )?;
         Ok(_response.foo)
     }
 }
@@ -131,17 +130,15 @@ impl TopProxyInterface for TopProxy {
         ) -> Result<fidl_test_bottom::Foo, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl_test_middle::MiddleGetFooResponse,
-                false,
             >(_buf?)?;
             Ok(_response.foo)
         }
-        self.client
-            .send_query_and_decode::<fidl::encoding::EmptyPayload, fidl_test_bottom::Foo, false>(
-                (),
-                0x401a9ffa95a4c333,
-                fidl::encoding::DynamicFlags::empty(),
-                _decode,
-            )
+        self.client.send_query_and_decode::<fidl::encoding::EmptyPayload, fidl_test_bottom::Foo>(
+            (),
+            0x401a9ffa95a4c333,
+            fidl::encoding::DynamicFlags::empty(),
+            _decode,
+        )
     }
 }
 
@@ -271,10 +268,6 @@ impl futures::Stream for TopRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.foreigntypeinresponseusedthroughcompose/TopGetFooRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,

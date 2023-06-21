@@ -14,8 +14,6 @@ fidl("fuchsia.wlan.device.service") {
 
   sources = [ "service.fidl" ]
 
-  experimental_flags = [ "allow_overflowing" ]
-
   public_deps = [
     "//sdk/fidl/fuchsia.wlan.common",
     "//sdk/fidl/fuchsia.wlan.ieee80211",

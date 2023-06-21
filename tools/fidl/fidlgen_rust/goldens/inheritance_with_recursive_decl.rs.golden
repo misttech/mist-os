@@ -133,7 +133,7 @@ impl ChildSynchronousProxy {
         &self,
         mut request: fidl::endpoints::ServerEnd<ParentMarker>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ParentFirstRequest, false>(
+        self.client.send::<ParentFirstRequest>(
             (request,),
             0x3723835775b3455b,
             fidl::encoding::DynamicFlags::empty(),
@@ -143,7 +143,7 @@ impl ChildSynchronousProxy {
         &self,
         mut request: fidl::endpoints::ServerEnd<ParentMarker>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ChildSecondRequest, false>(
+        self.client.send::<ChildSecondRequest>(
             (request,),
             0x23521821ca109865,
             fidl::encoding::DynamicFlags::empty(),
@@ -206,7 +206,7 @@ impl ChildProxyInterface for ChildProxy {
         &self,
         mut request: fidl::endpoints::ServerEnd<ParentMarker>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ParentFirstRequest, false>(
+        self.client.send::<ParentFirstRequest>(
             (request,),
             0x3723835775b3455b,
             fidl::encoding::DynamicFlags::empty(),
@@ -216,7 +216,7 @@ impl ChildProxyInterface for ChildProxy {
         &self,
         mut request: fidl::endpoints::ServerEnd<ParentMarker>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ChildSecondRequest, false>(
+        self.client.send::<ChildSecondRequest>(
             (request,),
             0x23521821ca109865,
             fidl::encoding::DynamicFlags::empty(),
@@ -350,10 +350,6 @@ impl futures::Stream for ChildRequestStream {
                     let mut req = fidl::new_empty!(ParentFirstRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.inheritancewithrecursivedecl/ChildFirstRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<ParentFirstRequest>(
                         &header,
                         _body_bytes,
@@ -369,10 +365,6 @@ impl futures::Stream for ChildRequestStream {
                     let mut req = fidl::new_empty!(ChildSecondRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.inheritancewithrecursivedecl/ChildSecondRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<ChildSecondRequest>(
                         &header,
                         _body_bytes,
@@ -494,7 +486,7 @@ impl ParentSynchronousProxy {
         &self,
         mut request: fidl::endpoints::ServerEnd<ParentMarker>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ParentFirstRequest, false>(
+        self.client.send::<ParentFirstRequest>(
             (request,),
             0x3723835775b3455b,
             fidl::encoding::DynamicFlags::empty(),
@@ -551,7 +543,7 @@ impl ParentProxyInterface for ParentProxy {
         &self,
         mut request: fidl::endpoints::ServerEnd<ParentMarker>,
     ) -> Result<(), fidl::Error> {
-        self.client.send::<ParentFirstRequest, false>(
+        self.client.send::<ParentFirstRequest>(
             (request,),
             0x3723835775b3455b,
             fidl::encoding::DynamicFlags::empty(),
@@ -685,10 +677,6 @@ impl futures::Stream for ParentRequestStream {
                     let mut req = fidl::new_empty!(ParentFirstRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.inheritancewithrecursivedecl/ParentFirstRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<ParentFirstRequest>(
                         &header,
                         _body_bytes,

@@ -129,15 +129,14 @@ impl ExampleSynchronousProxy {
         mut s: &str,
         ___deadline: zx::Time,
     ) -> Result<ExampleFooResult, fidl::Error> {
-        let _response = self.client.send_query::<
-                ExampleFooRequest,
-                fidl::encoding::ResultType<ExampleFooResponse, u32>,false,false>(
+        let _response = self
+            .client
+            .send_query::<ExampleFooRequest, fidl::encoding::ResultType<ExampleFooResponse, u32>>(
                 (s,),
                 0xf5f1179dc411e44,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?
-            ;
+            )?;
         Ok(_response.map(|x| x.y))
     }
 }
@@ -191,11 +190,10 @@ impl ExampleProxyInterface for ExampleProxy {
         ) -> Result<ExampleFooResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ExampleFooResponse, u32>,
-                false,
             >(_buf?)?;
             Ok(_response.map(|x| x.y))
         }
-        self.client.send_query_and_decode::<ExampleFooRequest, ExampleFooResult, false>(
+        self.client.send_query_and_decode::<ExampleFooRequest, ExampleFooResult>(
             (s,),
             0xf5f1179dc411e44,
             fidl::encoding::DynamicFlags::empty(),
@@ -330,7 +328,7 @@ impl futures::Stream for ExampleRequestStream {
                     let mut req = fidl::new_empty!(ExampleFooRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.error/ExampleFooRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<ExampleFooRequest>(
+                    fidl::encoding::Decoder::decode_into::<ExampleFooRequest>(
                         &header,
                         _body_bytes,
                         handles,

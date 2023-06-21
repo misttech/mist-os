@@ -226,12 +226,6 @@ class ParentProxy extends $fidl.AsyncProxy<Parent> implements Parent {
               _kParent_GetChild_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kParent_GetChild_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage(
               $message,
               _kParent_GetChild_Type.responseInlineSize($wireFormat),
@@ -247,12 +241,6 @@ class ParentProxy extends $fidl.AsyncProxy<Parent> implements Parent {
               _kParent_GetChildRequest_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kParent_GetChildRequest_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage(
               $message,
               _kParent_GetChildRequest_Type.responseInlineSize($wireFormat),
@@ -358,11 +346,6 @@ class ParentBinding extends $fidl.AsyncBinding<Parent> {
           final List<$fidl.MemberType> $types = _kParent_GetChild_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kParent_GetChild_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async.Future<$fidl.InterfaceHandle<Child>> $future = $fidl
               .decodeMessageWithCallback<
                       $async.Future<$fidl.InterfaceHandle<Child>>>($message,
@@ -395,11 +378,6 @@ class ParentBinding extends $fidl.AsyncBinding<Parent> {
               _kParent_GetChildRequest_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kParent_GetChildRequest_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async.Future<$fidl.InterfaceRequest<Child>> $future = $fidl
               .decodeMessageWithCallback<
                       $async.Future<$fidl.InterfaceRequest<Child>>>($message,
@@ -433,11 +411,6 @@ class ParentBinding extends $fidl.AsyncBinding<Parent> {
               _kParent_TakeChild_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kParent_TakeChild_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kParent_TakeChild_Type.requestInlineSize($wireFormat),
@@ -455,11 +428,6 @@ class ParentBinding extends $fidl.AsyncBinding<Parent> {
               _kParent_TakeChildRequest_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kParent_TakeChildRequest_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kParent_TakeChildRequest_Type.requestInlineSize($wireFormat),

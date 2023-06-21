@@ -313,8 +313,7 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
               _kProtocol_RequestStrictResponseFlexible_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          final $response = $fidl.decodeMaybeLargeMessage(
+          final $response = $fidl.decodeMessage(
               $message,
               _kProtocol_RequestStrictResponseFlexible_Type
                   .responseInlineSize($wireFormat),
@@ -330,8 +329,7 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
               _kProtocol_RequestFlexibleResponseStrict_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          final $response = $fidl.decodeMaybeLargeMessage(
+          final $response = $fidl.decodeMessage(
               $message,
               _kProtocol_RequestFlexibleResponseStrict_Type
                   .responseInlineSize($wireFormat),
@@ -415,7 +413,7 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<FlexibleFoo> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<$async.Future<FlexibleFoo>>(
+              .decodeMessageWithCallback<$async.Future<FlexibleFoo>>(
                   $message,
                   _kProtocol_RequestStrictResponseFlexible_Type
                       .requestInlineSize($wireFormat),
@@ -453,7 +451,7 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<StrictFoo> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<$async.Future<StrictFoo>>(
+              .decodeMessageWithCallback<$async.Future<StrictFoo>>(
                   $message,
                   _kProtocol_RequestFlexibleResponseStrict_Type
                       .requestInlineSize($wireFormat),

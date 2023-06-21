@@ -271,7 +271,6 @@ type Method struct {
 	TypeSymbol         string
 	TypeExpr           string
 	Transitional       bool
-	Overflowable       fidlgen.Overflowable
 	Documented
 }
 
@@ -1191,7 +1190,6 @@ func (c *compiler) compileMethod(val fidlgen.Method, protocol Protocol, fidlProt
 		TypeExpr:           c.typeExprForMethod(val, request, response.WireParameters, fmt.Sprintf("%s.%s", protocol.Name, val.Name)),
 		Transitional:       transitional,
 		Documented:         docString(val),
-		Overflowable:       val.GetOverflowable(fidlProtocol, c.experiments),
 	}
 }
 

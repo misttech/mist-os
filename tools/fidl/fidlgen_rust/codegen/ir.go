@@ -160,8 +160,6 @@ type Method struct {
 	// Name of the method converted to CamelCase. Used when generating
 	// rust-types associated with this method, such as responders.
 	CamelName string
-	// Stores overflowing information for this method's payloads.
-	Overflowable fidlgen.Overflowable
 
 	Request  Payload
 	Response Payload
@@ -1343,12 +1341,11 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 
 	for _, v := range val.Methods {
 		r.Methods = append(r.Methods, Method{
-			Method:       v,
-			Name:         compileSnakeIdentifier(v.Name),
-			CamelName:    compileCamelIdentifier(v.Name),
-			Request:      c.compileRequest(v),
-			Response:     c.compileResponse(v),
-			Overflowable: v.GetOverflowable(val, c.experiments),
+			Method:    v,
+			Name:      compileSnakeIdentifier(v.Name),
+			CamelName: compileCamelIdentifier(v.Name),
+			Request:   c.compileRequest(v),
+			Response:  c.compileResponse(v),
 		})
 	}
 

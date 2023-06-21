@@ -47,8 +47,6 @@
   SERVER_TEST(test_name, fidl_serversuite::AnyTarget::Tag::kAjarTarget)
 #define OPEN_SERVER_TEST(test_name) \
   SERVER_TEST(test_name, fidl_serversuite::AnyTarget::Tag::kOpenTarget)
-#define LARGE_MESSAGE_SERVER_TEST(test_name) \
-  SERVER_TEST(test_name, fidl_serversuite::AnyTarget::Tag::kLargeMessageTarget)
 
 namespace server_suite {
 
@@ -166,22 +164,6 @@ class OpenEventReporter
   bool received_flexible_one_way_ = false;
 };
 
-class LargeMessageEventReporter
-    : public virtual fidl::AsyncEventHandler<fidl_serversuite::LargeMessageTargetController>,
-      public TeardownReasonReporterMixin<fidl_serversuite::LargeMessageTargetController>,
-      public UnknownInteractionsReporterMixin<fidl_serversuite::LargeMessageTargetController>,
-      public ReplyEncodingReporterMixin<fidl_serversuite::LargeMessageTargetController> {
- public:
-  void ReceivedOneWay(fidl::Event<fidl_serversuite::LargeMessageTargetController::ReceivedOneWay>&
-                          request) override;
-  std::optional<fidl_serversuite::LargeMessageTargetOneWayMethod> received_one_way() const {
-    return received_one_way_;
-  }
-
- private:
-  std::optional<fidl_serversuite::LargeMessageTargetOneWayMethod> received_one_way_;
-};
-
 template <fidl_serversuite::AnyTarget::Tag TARGET_TYPE>
 struct TargetTypes;
 
@@ -204,13 +186,6 @@ struct TargetTypes<fidl_serversuite::AnyTarget::Tag::kOpenTarget> {
   using Target = fidl_serversuite::OpenTarget;
   using Controller = fidl_serversuite::OpenTargetController;
   using Reporter = OpenEventReporter;
-};
-
-template <>
-struct TargetTypes<fidl_serversuite::AnyTarget::Tag::kLargeMessageTarget> {
-  using Target = fidl_serversuite::LargeMessageTarget;
-  using Controller = fidl_serversuite::LargeMessageTargetController;
-  using Reporter = LargeMessageEventReporter;
 };
 
 template <fidl_serversuite::AnyTarget::Tag TARGET_TYPE>
@@ -273,11 +248,6 @@ class ServerTest : private ::loop_fixture::RealLoop, public ::testing::Test {
       }});
     } else if constexpr (TARGET_TYPE == fidl_serversuite::AnyTarget::Tag::kOpenTarget) {
       target_server = fidl_serversuite::AnyTarget::WithOpenTarget({{
-          .controller = std::move(controller_endpoints->server),
-          .sut = std::move(target_endpoints->server),
-      }});
-    } else if constexpr (TARGET_TYPE == fidl_serversuite::AnyTarget::Tag::kLargeMessageTarget) {
-      target_server = fidl_serversuite::AnyTarget::WithLargeMessageTarget({{
           .controller = std::move(controller_endpoints->server),
           .sut = std::move(target_endpoints->server),
       }});

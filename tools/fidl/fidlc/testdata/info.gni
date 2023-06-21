@@ -300,21 +300,6 @@ fidl_testdata_info = [
     ]
   },
   {
-    name = "large_messages"
-    target = "//tools/fidl/fidlc/testdata:test.largemessages"
-    denylist = [
-      # TODO(fxbug.dev/100478): Re-enable before landing
-      "fidldoc",
-
-      "fidlgen_libfuzzer",
-      "fidlgen_syzkaller",
-
-      # TODO(fxbug.dev/114266): Re-enable when proper runtime error messages have been added.
-      "fidlgen_go",
-      "fidlgen_banjo",
-    ]
-  },
-  {
     name = "padding"
     target = "//tools/fidl/fidlc/testdata:test.padding"
   },

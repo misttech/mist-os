@@ -116,12 +116,6 @@ class TopProxy extends $fidl.AsyncProxy<Top> implements Top {
           final List<$fidl.MemberType> $types = _kTop_GetFoo_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kTop_GetFoo_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage($message,
               _kTop_GetFoo_Type.responseInlineSize($wireFormat), $types[0]);
           $completer.complete($response);
@@ -165,11 +159,6 @@ class TopBinding extends $fidl.AsyncBinding<Top> {
           final List<$fidl.MemberType> $types = _kTop_GetFoo_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kTop_GetFoo_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async.Future<lib$test_bottom.Foo> $future = $fidl
               .decodeMessageWithCallback<$async.Future<lib$test_bottom.Foo>>(
                   $message, _kTop_GetFoo_Type.requestInlineSize($wireFormat),

@@ -437,12 +437,8 @@ constexpr ErrorDef<194, std::string_view> ErrEmptyPayloadStructsWhenResultUnion(
     "method '{}' cannot have an empty struct as a payload, prefer omitting the payload"
     "altogether",
     {.fixable = Fixable::Kind::kEmptyStructResponse});
-constexpr ErrorDef<195> ErrExperimentalOverflowingAttributeMissingExperimentalFlag(
-    "the @experimental_overflowing attribute can only be used if the"
-    "`--experiment allow_overflowing` flag has been enabled for fidlc");
-constexpr ErrorDef<196> ErrExperimentalOverflowingIncorrectUsage(
-    "the @experimental_overflowing attribute must have at least one of the `request` or `response`"
-    "arguments set to true");
+constexpr RetiredDef<195> ErrExperimentalOverflowingAttributeMissingExperimentalFlag;
+constexpr RetiredDef<196> ErrExperimentalOverflowingIncorrectUsage;
 constexpr ErrorDef<197> ErrOverlayMustBeStrict("overlays must be strict", {.documented = false});
 constexpr ErrorDef<198> ErrOverlayMustBeValue("overlays must be value (not resource) types",
                                               {.documented = false});

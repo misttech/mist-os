@@ -258,10 +258,8 @@ class ExampleProxy extends $fidl.AsyncProxy<Example> implements Example {
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
 
-          final ExampleFooResult $response = $fidl.decodeMaybeLargeMessage(
-              $message,
-              _kExample_foo_Type.responseInlineSize($wireFormat),
-              $types[0]);
+          final ExampleFooResult $response = $fidl.decodeMessage($message,
+              _kExample_foo_Type.responseInlineSize($wireFormat), $types[0]);
           if ($response.$tag == ExampleFooResultTag.response) {
             $completer.complete($response.response!.y);
           } else {
@@ -314,7 +312,7 @@ class ExampleBinding extends $fidl.AsyncBinding<Example> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<int> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<$async.Future<int>>(
+              .decodeMessageWithCallback<$async.Future<int>>(
                   $message, _kExample_foo_Type.requestInlineSize($wireFormat),
                   ($fidl.Decoder $decoder, int $offset) {
             return _impl.foo(

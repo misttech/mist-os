@@ -916,12 +916,10 @@ class SomeProtocolProxy extends $fidl.AsyncProxy<SomeProtocol>
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
 
-          final SomeProtocolSomeMethodResult $response =
-              $fidl.decodeMaybeLargeMessage(
-                  $message,
-                  _kSomeProtocol_SomeMethod_Type
-                      .responseInlineSize($wireFormat),
-                  $types[0]);
+          final SomeProtocolSomeMethodResult $response = $fidl.decodeMessage(
+              $message,
+              _kSomeProtocol_SomeMethod_Type.responseInlineSize($wireFormat),
+              $types[0]);
           if ($response.$tag == SomeProtocolSomeMethodResultTag.response) {
             $completer.complete($response.response!.bitsMember);
           } else {
@@ -978,8 +976,7 @@ class SomeProtocolBinding extends $fidl.AsyncBinding<SomeProtocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<BitsMember> $future = $fidl
-              .decodeMaybeLargeMessageWithCallback<$async.Future<BitsMember>>(
-                  $message,
+              .decodeMessageWithCallback<$async.Future<BitsMember>>($message,
                   _kSomeProtocol_SomeMethod_Type.requestInlineSize($wireFormat),
                   ($fidl.Decoder $decoder, int $offset) {
             return _impl.someMethod(

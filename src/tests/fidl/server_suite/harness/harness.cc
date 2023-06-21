@@ -14,9 +14,4 @@ void OpenEventReporter::ReceivedStrictOneWay() { received_strict_one_way_ = true
 
 void OpenEventReporter::ReceivedFlexibleOneWay() { received_flexible_one_way_ = true; }
 
-void LargeMessageEventReporter::ReceivedOneWay(
-    fidl::Event<fidl_serversuite::LargeMessageTargetController::ReceivedOneWay>& request) {
-  received_one_way_ = request.method();
-}
-
 }  // namespace server_suite

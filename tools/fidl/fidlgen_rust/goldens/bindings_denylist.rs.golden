@@ -682,7 +682,8 @@ impl DenyEachBindingSynchronousProxy {
     ) -> Result<DenyEachBindingOnlyDenyCppResult, fidl::Error> {
         let _response = self.client.send_query::<
                 DenyEachBindingOnlyDenyCppRequest,
-                fidl::encoding::ResultType<DenyEachBindingOnlyDenyCppResponse, u32>,false,false>(
+                fidl::encoding::ResultType<DenyEachBindingOnlyDenyCppResponse, u32>,
+            >(
                 (a,),
                 0x290bad96051b1b92,
                 fidl::encoding::DynamicFlags::empty(),
@@ -698,7 +699,8 @@ impl DenyEachBindingSynchronousProxy {
     ) -> Result<DenyEachBindingOnlyDenyDartResult, fidl::Error> {
         let _response = self.client.send_query::<
                 DenyEachBindingOnlyDenyDartRequest,
-                fidl::encoding::ResultType<DenyEachBindingOnlyDenyDartResponse, u32>,false,false>(
+                fidl::encoding::ResultType<DenyEachBindingOnlyDenyDartResponse, u32>,
+            >(
                 (a,),
                 0x75384066a26d87d7,
                 fidl::encoding::DynamicFlags::empty(),
@@ -714,7 +716,8 @@ impl DenyEachBindingSynchronousProxy {
     ) -> Result<DenyEachBindingOnlyDenyGoResult, fidl::Error> {
         let _response = self.client.send_query::<
                 DenyEachBindingOnlyDenyGoRequest,
-                fidl::encoding::ResultType<DenyEachBindingOnlyDenyGoResponse, u32>,false,false>(
+                fidl::encoding::ResultType<DenyEachBindingOnlyDenyGoResponse, u32>,
+            >(
                 (a,),
                 0x657655b981478d99,
                 fidl::encoding::DynamicFlags::empty(),
@@ -730,7 +733,8 @@ impl DenyEachBindingSynchronousProxy {
     ) -> Result<DenyEachBindingOnlyDenyLibfuzzerResult, fidl::Error> {
         let _response = self.client.send_query::<
                 DenyEachBindingOnlyDenyLibfuzzerRequest,
-                fidl::encoding::ResultType<DenyEachBindingOnlyDenyLibfuzzerResponse, u32>,false,false>(
+                fidl::encoding::ResultType<DenyEachBindingOnlyDenyLibfuzzerResponse, u32>,
+            >(
                 (a,),
                 0x1e4f89c329617b1e,
                 fidl::encoding::DynamicFlags::empty(),
@@ -746,7 +750,8 @@ impl DenyEachBindingSynchronousProxy {
     ) -> Result<DenyEachBindingOnlyDenySyzkallerResult, fidl::Error> {
         let _response = self.client.send_query::<
                 DenyEachBindingOnlyDenySyzkallerRequest,
-                fidl::encoding::ResultType<DenyEachBindingOnlyDenySyzkallerResponse, u32>,false,false>(
+                fidl::encoding::ResultType<DenyEachBindingOnlyDenySyzkallerResponse, u32>,
+            >(
                 (a,),
                 0x202ee614a749e98a,
                 fidl::encoding::DynamicFlags::empty(),
@@ -833,14 +838,12 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         ) -> Result<DenyEachBindingOnlyDenyCppResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenyCppResponse, u32>,
-                false,
             >(_buf?)?;
             Ok(_response.map(|x| x.b))
         }
         self.client.send_query_and_decode::<
             DenyEachBindingOnlyDenyCppRequest,
             DenyEachBindingOnlyDenyCppResult,
-            false,
         >(
             (a,),
             0x290bad96051b1b92,
@@ -856,14 +859,12 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         ) -> Result<DenyEachBindingOnlyDenyDartResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenyDartResponse, u32>,
-                false,
             >(_buf?)?;
             Ok(_response.map(|x| x.b))
         }
         self.client.send_query_and_decode::<
             DenyEachBindingOnlyDenyDartRequest,
             DenyEachBindingOnlyDenyDartResult,
-            false,
         >(
             (a,),
             0x75384066a26d87d7,
@@ -878,14 +879,12 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         ) -> Result<DenyEachBindingOnlyDenyGoResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenyGoResponse, u32>,
-                false,
             >(_buf?)?;
             Ok(_response.map(|x| x.b))
         }
         self.client.send_query_and_decode::<
             DenyEachBindingOnlyDenyGoRequest,
             DenyEachBindingOnlyDenyGoResult,
-            false,
         >(
             (a,),
             0x657655b981478d99,
@@ -901,14 +900,12 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         ) -> Result<DenyEachBindingOnlyDenyLibfuzzerResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenyLibfuzzerResponse, u32>,
-                false,
             >(_buf?)?;
             Ok(_response.map(|x| x.b))
         }
         self.client.send_query_and_decode::<
             DenyEachBindingOnlyDenyLibfuzzerRequest,
             DenyEachBindingOnlyDenyLibfuzzerResult,
-            false,
         >(
             (a,),
             0x1e4f89c329617b1e,
@@ -924,14 +921,12 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         ) -> Result<DenyEachBindingOnlyDenySyzkallerResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenySyzkallerResponse, u32>,
-                false,
             >(_buf?)?;
             Ok(_response.map(|x| x.b))
         }
         self.client.send_query_and_decode::<
             DenyEachBindingOnlyDenySyzkallerRequest,
             DenyEachBindingOnlyDenySyzkallerResult,
-            false,
         >(
             (a,),
             0x202ee614a749e98a,
@@ -1068,10 +1063,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                     let mut req = fidl::new_empty!(DenyEachBindingOnlyDenyCppRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.bindingsdenylist/DenyEachBindingOnlyDenyCppRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenyCppRequest>(
                         &header,
                         _body_bytes,
@@ -1095,10 +1086,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                     let mut req = fidl::new_empty!(DenyEachBindingOnlyDenyDartRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.bindingsdenylist/DenyEachBindingOnlyDenyDartRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenyDartRequest>(
                         &header,
                         _body_bytes,
@@ -1122,10 +1109,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                     let mut req = fidl::new_empty!(DenyEachBindingOnlyDenyGoRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.bindingsdenylist/DenyEachBindingOnlyDenyGoRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenyGoRequest>(
                         &header,
                         _body_bytes,
@@ -1149,10 +1132,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                     let mut req = fidl::new_empty!(DenyEachBindingOnlyDenyLibfuzzerRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.bindingsdenylist/DenyEachBindingOnlyDenyLibfuzzerRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenyLibfuzzerRequest>(
                         &header,
                         _body_bytes,
@@ -1176,10 +1155,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                     let mut req = fidl::new_empty!(DenyEachBindingOnlyDenySyzkallerRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.bindingsdenylist/DenyEachBindingOnlyDenySyzkallerRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenySyzkallerRequest>(
                         &header,
                         _body_bytes,
@@ -1736,14 +1711,14 @@ impl ImportsSameNameContextSynchronousProxy {
         ImportsSameNameContextEvent::decode(self.client.wait_for_event(deadline)?)
     }
     pub fn r#unattributed(&self) -> Result<(), fidl::Error> {
-        self.client.send::<fidl::encoding::EmptyPayload, false>(
+        self.client.send::<fidl::encoding::EmptyPayload>(
             (),
             0x698380acfd29e8f,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
     pub fn r#always_appears_in_importing_library(&self) -> Result<(), fidl::Error> {
-        self.client.send::<fidl::encoding::EmptyPayload, false>(
+        self.client.send::<fidl::encoding::EmptyPayload>(
             (),
             0x2874096c521236f8,
             fidl::encoding::DynamicFlags::empty(),
@@ -1798,14 +1773,14 @@ impl ImportsSameNameContextProxy {
 
 impl ImportsSameNameContextProxyInterface for ImportsSameNameContextProxy {
     fn r#unattributed(&self) -> Result<(), fidl::Error> {
-        self.client.send::<fidl::encoding::EmptyPayload, false>(
+        self.client.send::<fidl::encoding::EmptyPayload>(
             (),
             0x698380acfd29e8f,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
     fn r#always_appears_in_importing_library(&self) -> Result<(), fidl::Error> {
-        self.client.send::<fidl::encoding::EmptyPayload, false>(
+        self.client.send::<fidl::encoding::EmptyPayload>(
             (),
             0x2874096c521236f8,
             fidl::encoding::DynamicFlags::empty(),
@@ -1940,9 +1915,6 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.bindingsdenylist/ImportsSameNameContextUnattributedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = ImportsSameNameContextControlHandle {
@@ -1957,9 +1929,6 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.bindingsdenylist/ImportsSameNameContextAlwaysAppearsInImportingLibraryRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = ImportsSameNameContextControlHandle {

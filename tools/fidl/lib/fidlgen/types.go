@@ -81,7 +81,6 @@ type Experiment string
 // the source of truth for this mirror.
 const (
 	ExperimentAllowNewTypes       Experiment = "allow_new_types"
-	ExperimentAllowOverflowing    Experiment = "allow_overflowing"
 	ExperimentNoOptionalStructs   Experiment = "no_optional_structs"
 	ExperimentOutputIndexJSON     Experiment = "output_index_json"
 	ExperimentUnknownInteractions Experiment = "unknown_interactions"
@@ -809,40 +808,6 @@ func (t *Type) MaxDecodeSize() *int {
 	return &mds
 }
 
-// Subtract 16 to account for the header that will need to prefix this type when
-// encoded.
-const largeMessageCutoffForZxChannel = (1 << 16) - 16
-
-// EncodeOverflowableOnTransport determines whether this type could possibly
-// overflow when encoded after being sent on the given transport.
-func (t *Type) EncodeOverflowableOnTransport(transport string) bool {
-	mes := t.MaxEncodeSize()
-	if strings.ToLower(transport) == "channel" {
-		if mes == nil || *mes > largeMessageCutoffForZxChannel {
-			return true
-		}
-		return false
-	}
-
-	// This is a transport that never overflows.
-	return false
-}
-
-// DecodeOverflowableOnTransport determines whether this type could possibly
-// overflow when decoded after being sent on the given transport.
-func (t *Type) DecodeOverflowableOnTransport(transport string) bool {
-	mds := t.MaxDecodeSize()
-	if strings.ToLower(transport) == "channel" {
-		if mds == nil || *mds > largeMessageCutoffForZxChannel {
-			return true
-		}
-		return false
-	}
-
-	// This is a transport that never overflows.
-	return false
-}
-
 type AttributeArg struct {
 	Name  Identifier `json:"name"`
 	Value Constant   `json:"value"`
@@ -1494,66 +1459,6 @@ type Method struct {
 	// If error syntax is used, this is the type of the error variant of the
 	// ResultType union.
 	ErrorType *Type `json:"maybe_response_err_type,omitempty"`
-}
-
-// Overflowable stores information about a method's payloads, indicating whether
-// it is possible for either of them to overflow on either encode or decode.
-type Overflowable struct {
-	// OnRequestEncode indicates whether or not the parent method's request
-	// payload may be so large on encode as to require overflow handling.
-	OnRequestEncode bool
-	// OnRequestDecode indicates whether or not the parent method's request
-	// payload may be so large on decode as to require overflow handling. This
-	// will always be true if OnRequestEncode is true, as the maximum size on
-	// decode is always larger than encode. This is because only the latter may
-	// include unknown, arbitrarily large data.
-	OnRequestDecode bool
-	// OnResponseEncode indicates whether or not the parent method's response
-	// payload may be so large on encode as to require overflow handling.
-	OnResponseEncode bool
-	// OnResponseDecode indicates whether or not the parent method's response
-	// payload may be so large on decode as to require overflow handling. This
-	// will always be true if OnResponseEncode is true, as the maximum size on
-	// decode is always larger than encode. This is because only the latter may
-	// include unknown, arbitrarily large data.
-	OnResponseDecode bool
-}
-
-// GetOverflowable gets boundedness information for the method in question, in
-// both the request and response directions.
-func (m *Method) GetOverflowable(protocol Protocol, experiments Experiments) Overflowable {
-	// TODO(fxbug.dev/100478): Encoding large messages is currently restricted
-	// to allowlisted libraries.
-	var experimentalRequestEncodeOverflowingEnabled, experimentalResponseEncodeOverflowingEnabled bool
-	if experiments.Contains(ExperimentAllowOverflowing) {
-		attr, found := m.Attributes.LookupAttribute("experimental_overflowing")
-		if found {
-			reqArg, hasReq := attr.LookupArg("request")
-			if hasReq && reqArg.ValueString() == "true" {
-				experimentalRequestEncodeOverflowingEnabled = true
-			}
-			resArg, hasRes := attr.LookupArg("response")
-			if hasRes && resArg.ValueString() == "true" {
-				experimentalResponseEncodeOverflowingEnabled = true
-			}
-		}
-	}
-
-	transport := protocol.OverTransport()
-	overflowable := Overflowable{}
-	if m.RequestPayload != nil {
-		overflowable.OnRequestDecode = m.RequestPayload.DecodeOverflowableOnTransport(transport)
-		if experimentalRequestEncodeOverflowingEnabled {
-			overflowable.OnRequestEncode = m.RequestPayload.EncodeOverflowableOnTransport(transport)
-		}
-	}
-	if m.ResponsePayload != nil {
-		overflowable.OnResponseDecode = m.ResponsePayload.DecodeOverflowableOnTransport(transport)
-		if experimentalResponseEncodeOverflowingEnabled {
-			overflowable.OnResponseEncode = m.ResponsePayload.EncodeOverflowableOnTransport(transport)
-		}
-	}
-	return overflowable
 }
 
 // GetRequestPayloadIdentifier retrieves the identifier that points to the

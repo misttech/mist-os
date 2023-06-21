@@ -2527,12 +2527,6 @@ class TestProtocolProxy extends $fidl.AsyncProxy<TestProtocol>
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage(
               $message,
               _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Type
@@ -2552,12 +2546,6 @@ class TestProtocolProxy extends $fidl.AsyncProxy<TestProtocol>
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage(
               $message,
               _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Type
@@ -2630,11 +2618,6 @@ class TestProtocolBinding extends $fidl.AsyncBinding<TestProtocol> {
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async.Future<
               StrictBoundedUnion> $future = $fidl.decodeMessageWithCallback<
                   $async.Future<StrictBoundedUnion>>(
@@ -2676,11 +2659,6 @@ class TestProtocolBinding extends $fidl.AsyncBinding<TestProtocol> {
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async.Future<
               OlderSimpleUnion> $future = $fidl.decodeMessageWithCallback<
                   $async.Future<OlderSimpleUnion>>(

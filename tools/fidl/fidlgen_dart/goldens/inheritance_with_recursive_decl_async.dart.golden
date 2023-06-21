@@ -187,11 +187,6 @@ class ChildBinding extends $fidl.AsyncBinding<Child> {
           final List<$fidl.MemberType> $types = _kChild_First_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kChild_First_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message, _kChild_First_Type.requestInlineSize($wireFormat),
@@ -208,11 +203,6 @@ class ChildBinding extends $fidl.AsyncBinding<Child> {
           final List<$fidl.MemberType> $types = _kChild_Second_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kChild_Second_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message, _kChild_Second_Type.requestInlineSize($wireFormat),
@@ -336,11 +326,6 @@ class ParentBinding extends $fidl.AsyncBinding<Parent> {
           final List<$fidl.MemberType> $types = _kParent_First_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kParent_First_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message, _kParent_First_Type.requestInlineSize($wireFormat),

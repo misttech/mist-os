@@ -32,9 +32,6 @@ class ExperimentalFlags {
     // TODO(fxbug.dev/112767): Remove once soft transition is done.
     kSimpleEmptyResponseSyntax = 1 << 5,
 
-    // TODO(fxbug.dev/100478): Allows backends to implement overflowing experiments.
-    kAllowOverflowing = 1 << 6,
-
     // These experiments control the migration to Unknown Interactions support.
 
     // This flag enables support for Unknown Interactions. By default, unknown

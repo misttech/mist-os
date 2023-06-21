@@ -300,7 +300,8 @@ impl ProtocolSynchronousProxy {
     ) -> Result<FlexibleFoo, fidl::Error> {
         let _response = self.client.send_query::<
                 ProtocolRequestStrictResponseFlexibleRequest,
-                ProtocolRequestStrictResponseFlexibleResponse,false,true>(
+                ProtocolRequestStrictResponseFlexibleResponse,
+            >(
                 (s,),
                 0x9b8c7d3d118df13,
                 fidl::encoding::DynamicFlags::empty(),
@@ -316,7 +317,8 @@ impl ProtocolSynchronousProxy {
     ) -> Result<StrictFoo, fidl::Error> {
         let _response = self.client.send_query::<
                 ProtocolRequestFlexibleResponseStrictRequest,
-                ProtocolRequestFlexibleResponseStrictResponse,false,true>(
+                ProtocolRequestFlexibleResponseStrictResponse,
+            >(
                 (s,),
                 0x480c77690533acb7,
                 fidl::encoding::DynamicFlags::empty(),
@@ -388,20 +390,16 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<FlexibleFoo, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ProtocolRequestStrictResponseFlexibleResponse,
-                true,
             >(_buf?)?;
             Ok(_response.f)
         }
-        self.client.send_query_and_decode::<
-            ProtocolRequestStrictResponseFlexibleRequest,
-            FlexibleFoo,
-            false,
-        >(
-            (s,),
-            0x9b8c7d3d118df13,
-            fidl::encoding::DynamicFlags::empty(),
-            _decode,
-        )
+        self.client
+            .send_query_and_decode::<ProtocolRequestStrictResponseFlexibleRequest, FlexibleFoo>(
+                (s,),
+                0x9b8c7d3d118df13,
+                fidl::encoding::DynamicFlags::empty(),
+                _decode,
+            )
     }
     type RequestFlexibleResponseStrictResponseFut = fidl::client::QueryResponseFut<StrictFoo>;
     fn r#request_flexible_response_strict(
@@ -413,20 +411,16 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<StrictFoo, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ProtocolRequestFlexibleResponseStrictResponse,
-                true,
             >(_buf?)?;
             Ok(_response.f)
         }
-        self.client.send_query_and_decode::<
-            ProtocolRequestFlexibleResponseStrictRequest,
-            StrictFoo,
-            false,
-        >(
-            (s,),
-            0x480c77690533acb7,
-            fidl::encoding::DynamicFlags::empty(),
-            _decode,
-        )
+        self.client
+            .send_query_and_decode::<ProtocolRequestFlexibleResponseStrictRequest, StrictFoo>(
+                (s,),
+                0x480c77690533acb7,
+                fidl::encoding::DynamicFlags::empty(),
+                _decode,
+            )
     }
 }
 
@@ -556,7 +550,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(ProtocolRequestStrictResponseFlexibleRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.requestflexibleenvelope/ProtocolRequestStrictResponseFlexibleRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<
+                    fidl::encoding::Decoder::decode_into::<
                         ProtocolRequestStrictResponseFlexibleRequest,
                     >(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
@@ -576,7 +570,7 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(ProtocolRequestFlexibleResponseStrictRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<
+                    fidl::encoding::Decoder::decode_into::<
                         ProtocolRequestFlexibleResponseStrictRequest,
                     >(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);

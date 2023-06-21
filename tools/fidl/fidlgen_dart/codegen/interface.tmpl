@@ -34,28 +34,12 @@ $async.Future<void>
 */}}
 {{- define "DecodeResponse" -}}
   {{- if .Response.HasError }}
-    {{- if .Overflowable.OnRequestDecode }}
-    final {{ .ResponseMessageType }} $response
-        = $fidl.decodeMaybeLargeMessage($message, {{ .TypeSymbol }}.responseInlineSize($wireFormat), $types[0])
-    {{- else }}
-    if ($message.overflowing == $fidl.CallOverflowing.large) {
-      throw $fidl.FidlError(r'Unexpected byte overflow for {{ .OrdinalName }}', $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-    }
     final {{ .ResponseMessageType }} $response
         = $fidl.decodeMessage($message, {{ .TypeSymbol }}.responseInlineSize($wireFormat), $types[0])
-    {{- end }}
   {{- else }}
     {{- if .AsyncResponseClass -}}
-      {{- if .Overflowable.OnRequestDecode }}
-      final {{ .ResponseMessageType }} $response
-          = $fidl.decodeMaybeLargeMessageWithCallback<{{ .AsyncResponseClass }}>(
-      {{- else }}
-      if ($message.overflowing == $fidl.CallOverflowing.large) {
-        throw $fidl.FidlError(r'Unexpected byte overflow for {{ .OrdinalName }}', $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-      }
       final {{ .ResponseMessageType }} $response =
           $fidl.decodeMessageWithCallback<{{ .AsyncResponseClass }}>(
-      {{- end }}
         $message,
         {{ .TypeSymbol }}.responseInlineSize($wireFormat),
         ($fidl.Decoder $decoder, int $offset) {
@@ -68,16 +52,8 @@ $async.Future<void>
       )
     {{- else -}}
       {{- if .Response.WireParameters -}}
-        {{- if .Overflowable.OnRequestDecode }}
-        final {{ .ResponseMessageType }} $response =
-            $fidl.decodeMaybeLargeMessage($message, {{ .TypeSymbol }}.responseInlineSize($wireFormat), $types[0])
-        {{- else }}
-        if ($message.overflowing == $fidl.CallOverflowing.large) {
-          throw $fidl.FidlError(r'Unexpected byte overflow for {{ .OrdinalName }}', $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-        }
         final {{ .ResponseMessageType }} $response =
             $fidl.decodeMessage($message, {{ .TypeSymbol }}.responseInlineSize($wireFormat), $types[0])
-        {{- end }}
       {{- else -}}
         final {{ .ResponseMessageType }} $response = null
       {{- end -}}
@@ -442,14 +418,7 @@ class {{ .BindingName }} extends $fidl.AsyncBinding<{{ .ServerName }}> {
               final List<$fidl.MemberType> $types = {{ .TypeSymbol }}.request!;
               // ignore: prefer_const_declarations
               final _impl = impl!;
-              {{- if .Overflowable.OnRequestDecode }}
-              final {{ template "AsyncReturn" . }} $future = $fidl.decodeMaybeLargeMessageWithCallback<{{ template "AsyncReturn" . }}>(
-              {{- else }}
-              if ($message.overflowing == $fidl.CallOverflowing.large) {
-                throw $fidl.FidlError(r'Unexpected byte overflow for {{ .OrdinalName }}', $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-              }
               final {{ template "AsyncReturn" . }} $future = $fidl.decodeMessageWithCallback<{{ template "AsyncReturn" . }}>(
-              {{- end }}
                 $message,
                 {{ .TypeSymbol }}.requestInlineSize($wireFormat),
                 ($fidl.Decoder $decoder, int $offset) {

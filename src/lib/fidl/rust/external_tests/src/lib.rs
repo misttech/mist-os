@@ -7,8 +7,6 @@
 mod data_types;
 #[cfg(target_os = "fuchsia")]
 mod handle_rights;
-#[cfg(target_os = "fuchsia")]
-mod large_messages;
 mod persistence;
 #[cfg(target_os = "fuchsia")]
 mod stream_handler_test;

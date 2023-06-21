@@ -147,7 +147,8 @@ impl ExampleUseOfErrorSyntaxSynchronousProxy {
     > {
         let _response = self.client.send_query::<
                 fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest,
-                fidl::encoding::ResultType<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse, u32>,false,false>(
+                fidl::encoding::ResultType<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse, u32>,
+            >(
                 (s,),
                 0x3179cf8f46814221,
                 fidl::encoding::DynamicFlags::empty(),
@@ -163,7 +164,8 @@ impl ExampleUseOfErrorSyntaxSynchronousProxy {
     ) -> Result<ExampleUseOfErrorSyntaxCallWhichMayFailResult, fidl::Error> {
         let _response = self.client.send_query::<
                 ExampleUseOfErrorSyntaxCallWhichMayFailRequest,
-                fidl::encoding::ResultType<ExampleUseOfErrorSyntaxCallWhichMayFailResponse, u32>,false,false>(
+                fidl::encoding::ResultType<ExampleUseOfErrorSyntaxCallWhichMayFailResponse, u32>,
+            >(
                 (s,),
                 0x3424ff83ce3004a2,
                 fidl::encoding::DynamicFlags::empty(),
@@ -241,16 +243,13 @@ impl ExampleUseOfErrorSyntaxProxyInterface for ExampleUseOfErrorSyntaxProxy {
             fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResult,
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<
-                fidl::encoding::ResultType<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse, u32>, false
-            >(_buf?)?
+            let _response = fidl::client::decode_transaction_body::<fidl::encoding::ResultType<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse, u32>>(_buf?)?
             ;
             Ok(_response.map(|x| x.value))
         }
         self.client.send_query_and_decode::<
             fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest,
             fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResult,
-            false,
         >(
             (s,),
             0x3179cf8f46814221,
@@ -266,14 +265,12 @@ impl ExampleUseOfErrorSyntaxProxyInterface for ExampleUseOfErrorSyntaxProxy {
         ) -> Result<ExampleUseOfErrorSyntaxCallWhichMayFailResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ExampleUseOfErrorSyntaxCallWhichMayFailResponse, u32>,
-                false,
             >(_buf?)?;
             Ok(_response.map(|x| x.value))
         }
         self.client.send_query_and_decode::<
             ExampleUseOfErrorSyntaxCallWhichMayFailRequest,
             ExampleUseOfErrorSyntaxCallWhichMayFailResult,
-            false,
         >(
             (s,),
             0x3424ff83ce3004a2,
@@ -410,7 +407,7 @@ impl futures::Stream for ExampleUseOfErrorSyntaxRequestStream {
                     let mut req = fidl::new_empty!(fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.errorsyntax/ExampleUseOfErrorSyntaxComposedCallWhichMayFailRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest>(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest>(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = ExampleUseOfErrorSyntaxControlHandle {
                         inner: this.inner.clone(),
@@ -429,7 +426,7 @@ impl futures::Stream for ExampleUseOfErrorSyntaxRequestStream {
                     let mut req = fidl::new_empty!(ExampleUseOfErrorSyntaxCallWhichMayFailRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.errorsyntax/ExampleUseOfErrorSyntaxCallWhichMayFailRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode::<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = ExampleUseOfErrorSyntaxControlHandle {
                         inner: this.inner.clone(),

@@ -519,7 +519,7 @@ impl ProtocolSynchronousProxy {
         ProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
     pub fn r#foo(&self) -> Result<(), fidl::Error> {
-        self.client.send::<fidl::encoding::EmptyPayload, false>(
+        self.client.send::<fidl::encoding::EmptyPayload>(
             (),
             0x567a8096af6e6139,
             fidl::encoding::DynamicFlags::empty(),
@@ -570,7 +570,7 @@ impl ProtocolProxy {
 
 impl ProtocolProxyInterface for ProtocolProxy {
     fn r#foo(&self) -> Result<(), fidl::Error> {
-        self.client.send::<fidl::encoding::EmptyPayload, false>(
+        self.client.send::<fidl::encoding::EmptyPayload>(
             (),
             0x567a8096af6e6139,
             fidl::encoding::DynamicFlags::empty(),
@@ -704,10 +704,6 @@ impl futures::Stream for ProtocolRequestStream {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.versions/ProtocolFooRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
-                    {
-                        Err(fidl::Error::LargeMessageImpossible)?;
-                    }
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,

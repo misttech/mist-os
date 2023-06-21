@@ -3770,8 +3770,6 @@ bitflags! {
     /// Bitflags type to flags that aid in dynamically identifying features of
     /// the request.
     pub struct DynamicFlags: u8 {
-        /// Indicates that the message's data plane is stored elsewhere out of band.
-        const BYTE_OVERFLOW = 1 << 6;
         /// Indicates that the request is for a flexible method.
         const FLEXIBLE = 1 << 7;
     }
@@ -4169,221 +4167,6 @@ fn decode_wire_metadata(bytes: &[u8]) -> Result<WireMetadata> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Large messages
-////////////////////////////////////////////////////////////////////////////////
-
-/// Special FIDL message body for large messages.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-#[repr(C)]
-pub struct LargeMessageInfo {
-    /// Flags specific to large message.
-    flags: u32,
-    /// A reserved field that may in the future be used to store `msg_handle_count` information.
-    reserved: u32,
-    /// The size of the encoded FIDL message in the VMO. Must be a multiple of FIDL alignment.
-    msg_byte_count: u64,
-}
-
-fidl_struct! {
-    copy: true,
-    name: LargeMessageInfo,
-    members: [
-        flags {
-            ty: u32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-        reserved {
-            ty: u32,
-            index: 1,
-            typevar: T1,
-            offset_v1: 4,
-            offset_v2: 4,
-        },
-        msg_byte_count {
-            ty: u64,
-            index: 2,
-            typevar: T2,
-            offset_v1: 8,
-            offset_v2: 8,
-        },
-    ],
-    padding_v1: [],
-    padding_v2: [],
-    size_v1: 16,
-    size_v2: 16,
-    align_v1: 8,
-    align_v2: 8,
-}
-
-impl LargeMessageInfo {
-    /// Creates a new large message info struct.
-    #[inline]
-    pub fn new(msg_byte_count: u64) -> Self {
-        LargeMessageInfo { flags: 0, reserved: 0, msg_byte_count }
-    }
-
-    /// Returns the `msg_byte_count`.
-    #[inline]
-    pub fn msg_byte_count(&self) -> u64 {
-        self.msg_byte_count
-    }
-}
-
-/// The exact rights an overflow buffer VMO should have.
-#[cfg(target_os = "fuchsia")]
-pub const LARGE_MESSAGE_VMO_RIGHTS: Rights = Rights::from_bits_truncate(
-    Rights::GET_PROPERTY.bits()
-        | Rights::READ.bits()
-        | Rights::TRANSFER.bits()
-        | Rights::WAIT.bits()
-        | Rights::INSPECT.bits(),
-);
-
-/// Assumes a transaction message was just encoded into the given buffers. If
-/// the byte size exceeds the transport limit (64 KiB for channels), this will:
-///
-/// - Create a VMO and write the message body bytes to it (not the header).
-/// - Set `DynamicFlags::BYTE_OVERFLOW` in the header.
-/// - Encode a `LargeMessageInfo` after the header, replacing the body.
-/// - Add the VMO handle to the end of the handle buffer.
-///
-/// Otherwise, it does nothing.
-#[inline]
-pub fn maybe_overflowing_after_encode(
-    _write_bytes: &mut Vec<u8>,
-    _write_handles: &mut Vec<HandleDisposition<'_>>,
-) -> Result<()> {
-    // TODO(fxbug.dev/114350): how do we handle overflow for emulated channels?
-    #[cfg(target_os = "fuchsia")]
-    {
-        if _write_bytes.len() <= fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize {
-            return Ok(());
-        }
-        let header_size = mem::size_of::<TransactionHeader>();
-        let large_msg_info_size = mem::size_of::<LargeMessageInfo>();
-        let control_plane_size = header_size + large_msg_info_size;
-        let body_size = (_write_bytes.len() - header_size) as u64;
-        let data_plane = &_write_bytes[header_size..];
-        if _write_handles.len() == MAX_HANDLES {
-            return Err(Error::LargeMessage64Handles);
-        }
-
-        // Build a VMO, then put all of the data_plane information in the VMO.
-        let vmo = fuchsia_zircon::Vmo::create(body_size)
-            .map_err(|status| Error::LargeMessageCouldNotWriteVmo { status })?;
-        vmo.write(data_plane, 0)
-            .map_err(|status| Error::LargeMessageCouldNotWriteVmo { status })?;
-
-        // Add the handle for the VMO to the handles array.
-        _write_handles.push(HandleDisposition {
-            handle_op: HandleOp::Move(vmo.into_handle()),
-            object_type: ObjectType::VMO,
-            rights: LARGE_MESSAGE_VMO_RIGHTS,
-            result: Status::OK,
-        });
-
-        // Flip the dynamic flag representing `byte_overflow`.
-        let control_plane = &mut _write_bytes[..header_size];
-        let mut dyn_flags = DynamicFlags::from_bits_truncate(control_plane[6]);
-        dyn_flags.insert(DynamicFlags::BYTE_OVERFLOW);
-        control_plane[6] = dyn_flags.bits();
-
-        // Write and encode the `LargeMessageInfo` for this message.
-        let mut large_msg_info_bytes = Vec::<u8>::with_capacity(large_msg_info_size);
-        let large_msg_info = LargeMessageInfo::new(body_size);
-        Encoder::encode::<LargeMessageInfo>(
-            &mut large_msg_info_bytes,
-            &mut Vec::<HandleDisposition>::new(),
-            &large_msg_info,
-        )?;
-
-        // Replace the message body with the LargeMessageInfo.
-        _write_bytes.truncate(control_plane_size);
-        _write_bytes[header_size..].copy_from_slice(&large_msg_info_bytes);
-    }
-    Ok(())
-}
-
-/// Decodes a FIDL value from the given buffers, assuming they came from a
-/// transaction message wrapped by `header`. If the header has the
-/// `DynamicFlags::BYTE_OVERFLOW` flag set, then this will:
-///
-/// - Decode the bytes as a `LargeMessageInfo`.
-/// - Pop the last handle and validate that it is a VMO with expected rights.
-/// - Decode the value from the VMO's bytes and the remaining handles.
-///
-/// Otherwise, it decodes the value directly from the buffers.
-#[inline]
-pub fn maybe_overflowing_decode<T: TypeMarker>(
-    header: &TransactionHeader,
-    body_bytes: &[u8],
-    handles: &mut Vec<HandleInfo>,
-    value: &mut T::Owned,
-) -> Result<()> {
-    // TODO(fxbug.dev/114350): how do we handle overflow for emulated channels?
-    #[cfg(not(target_os = "fuchsia"))]
-    {
-        Decoder::decode_into::<T>(header, body_bytes, handles, value)
-    }
-    #[cfg(target_os = "fuchsia")]
-    {
-        if !header.dynamic_flags().contains(DynamicFlags::BYTE_OVERFLOW) {
-            return Decoder::decode_into::<T>(header, body_bytes, handles, value);
-        }
-        // Pop the tail handle off: this is the overflow VMO. Retain the vector of remaining
-        // handles to pass to the decoder for the actual message.
-        let vmo_handle_info = match handles.pop() {
-            Some(handle_info) => handle_info,
-            None => return Err(Error::LargeMessageMissingHandles),
-        };
-        if vmo_handle_info.object_type != ObjectType::VMO
-            || vmo_handle_info.rights != LARGE_MESSAGE_VMO_RIGHTS
-        {
-            return Err(Error::LargeMessageInvalidOverflowBufferHandle);
-        }
-        if body_bytes.len() != mem::size_of::<LargeMessageInfo>() {
-            return Err(Error::LargeMessageInfoMissized { size: body_bytes.len() });
-        }
-
-        const MAX_MSG_BYTES: usize = fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize;
-        let header_size = mem::size_of::<TransactionHeader>();
-        let mut large_message_info = new_empty!(LargeMessageInfo);
-        let ctx = Context { wire_format_version: WireFormatVersion::V1 };
-        Decoder::decode_with_context::<LargeMessageInfo>(
-            ctx,
-            &body_bytes,
-            &mut [],
-            &mut large_message_info,
-        )?;
-
-        let msg_byte_count = large_message_info.msg_byte_count as usize;
-        if large_message_info.flags != 0 || large_message_info.reserved != 0 {
-            return Err(Error::LargeMessageInfoMalformed);
-        }
-        if msg_byte_count <= MAX_MSG_BYTES - header_size {
-            return Err(Error::LargeMessageTooSmall { size: msg_byte_count });
-        }
-
-        // Make a syscall to get the actual size of the VMO.
-        let vmo = fuchsia_zircon::Vmo::from(vmo_handle_info.handle);
-        let mut overflow_bytes = Vec::new();
-
-        // Safety: The call to `vmo.read` below writes exactly `msg_byte_count` bytes on
-        // success.
-        unsafe {
-            resize_vec_no_zeroing(&mut overflow_bytes, msg_byte_count);
-        }
-
-        vmo.read(&mut overflow_bytes, 0)
-            .map_err(|status| Error::LargeMessageCouldNotReadVmo { status })?;
-        Decoder::decode_into::<T>(header, &overflow_bytes, handles, value)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // TLS buffer
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -4445,15 +4228,12 @@ pub fn with_tls_decode_buf<R>(f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleInfo>)
 ///
 /// This function may not be called recursively.
 #[inline]
-pub fn with_tls_encoded<T: TypeMarker, Out, const OVERFLOWABLE: bool>(
+pub fn with_tls_encoded<T: TypeMarker, Out>(
     val: impl Encode<T>,
     f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleDisposition<'static>>) -> Result<Out>,
 ) -> Result<Out> {
     with_tls_encode_buf(|bytes, handles| {
         Encoder::encode(bytes, handles, val)?;
-        if OVERFLOWABLE {
-            maybe_overflowing_after_encode(bytes, handles)?;
-        }
         f(bytes, handles)
     })
 }
@@ -5137,76 +4917,6 @@ mod test {
             Decoder::decode_with_context::<TransactionHeader>(ctx, bytes, &mut [], &mut out)
                 .expect("Decoding failed");
             assert_eq!(out, header);
-        }
-    }
-
-    #[test]
-    fn direct_encode_transaction_header_byte_overflow() {
-        let bytes = &[
-            0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x01, //
-            0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
-        ];
-        let header = TransactionHeader {
-            tx_id: 4,
-            ordinal: 6,
-            at_rest_flags: [0; 2],
-            dynamic_flags: DynamicFlags::BYTE_OVERFLOW.bits,
-            magic_number: 1,
-        };
-
-        for ctx in CONTEXTS {
-            encode_assert_bytes::<TransactionHeader>(ctx, &header, bytes);
-        }
-    }
-
-    #[test]
-    fn direct_decode_transaction_header_byte_overflow() {
-        let bytes = &[
-            0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x01, //
-            0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
-        ];
-        let header = TransactionHeader {
-            tx_id: 4,
-            ordinal: 6,
-            at_rest_flags: [0; 2],
-            dynamic_flags: DynamicFlags::BYTE_OVERFLOW.bits,
-            magic_number: 1,
-        };
-
-        for ctx in CONTEXTS {
-            let mut out = new_empty!(TransactionHeader);
-            Decoder::decode_with_context::<TransactionHeader>(ctx, bytes, &mut [], &mut out)
-                .expect("Decoding failed");
-            assert_eq!(out, header);
-        }
-    }
-
-    #[test]
-    fn direct_encode_large_message_info() {
-        let bytes = &[
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
-            0x08, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, //
-        ];
-        let large_message_info = LargeMessageInfo { flags: 0, reserved: 0, msg_byte_count: 65544 };
-
-        for ctx in CONTEXTS {
-            encode_assert_bytes::<LargeMessageInfo>(ctx, &large_message_info, bytes);
-        }
-    }
-
-    #[test]
-    fn direct_decode_large_message_info() {
-        let bytes = &[
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
-            0x08, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, //
-        ];
-        let large_message_info = LargeMessageInfo { flags: 0, reserved: 0, msg_byte_count: 65544 };
-
-        for ctx in CONTEXTS {
-            let mut out = new_empty!(LargeMessageInfo);
-            Decoder::decode_with_context::<LargeMessageInfo>(ctx, bytes, &mut [], &mut out)
-                .expect("Decoding failed");
-            assert_eq!(out, large_message_info);
         }
     }
 

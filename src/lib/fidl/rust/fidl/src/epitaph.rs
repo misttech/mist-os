@@ -70,11 +70,10 @@ pub(crate) fn write_epitaph_impl<T: ChannelLike>(
         header: TransactionHeader::new(0, encoding::EPITAPH_ORDINAL, DynamicFlags::empty()),
         body: &EpitaphBody { error: status },
     };
-    encoding::with_tls_encoded::<TransactionMessageType<EpitaphBody>, (), false>(
-        msg,
-        |bytes, handles| match channel.write_etc(bytes, handles) {
+    encoding::with_tls_encoded::<TransactionMessageType<EpitaphBody>, ()>(msg, |bytes, handles| {
+        match channel.write_etc(bytes, handles) {
             Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
             Err(e) => Err(Error::ServerEpitaphWrite(e)),
-        },
-    )
+        }
+    })
 }

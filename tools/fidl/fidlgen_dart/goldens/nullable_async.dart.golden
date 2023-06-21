@@ -680,12 +680,6 @@ class SimpleProtocolProxy extends $fidl.AsyncProxy<SimpleProtocol>
               _kSimpleProtocol_Add_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kSimpleProtocol_Add_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $response = $fidl.decodeMessage(
               $message,
               _kSimpleProtocol_Add_Type.responseInlineSize($wireFormat),
@@ -738,11 +732,6 @@ class SimpleProtocolBinding extends $fidl.AsyncBinding<SimpleProtocol> {
               _kSimpleProtocol_Add_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          if ($message.overflowing == $fidl.CallOverflowing.large) {
-            throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kSimpleProtocol_Add_Ordinal',
-                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
-          }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>($message,
                   _kSimpleProtocol_Add_Type.requestInlineSize($wireFormat),

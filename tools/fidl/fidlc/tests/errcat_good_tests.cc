@@ -1510,30 +1510,6 @@ TEST(ErrcatGoodTests, Good0194b) {
   ASSERT_COMPILED(library);
 }
 
-// TODO(fxbug.dev/100478): Retire once large messages no longer requires flag or attribute.
-TEST(ErrcatGoodTests, Good0195) {
-  TestLibrary library;
-  library.AddFile("good/fi-0195.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kAllowOverflowing);
-  ASSERT_COMPILED(library);
-}
-
-// TODO(fxbug.dev/100478): Retire once large messages no longer requires flag or attribute.
-TEST(ErrcatGoodTests, Good0196a) {
-  TestLibrary library;
-  library.AddFile("good/fi-0196-a.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kAllowOverflowing);
-  ASSERT_COMPILED(library);
-}
-
-// TODO(fxbug.dev/100478): Retire once large messages no longer requires flag or attribute.
-TEST(ErrcatGoodTests, Good0196b) {
-  TestLibrary library;
-  library.AddFile("good/fi-0196-b.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kAllowOverflowing);
-  ASSERT_COMPILED(library);
-}
-
 TEST(ErrcatTests, Good0201) {
   TestLibrary library;
   library.AddFile("good/fi-0201.test.fidl");
