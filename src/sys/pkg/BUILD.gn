@@ -69,32 +69,15 @@ group("system-update-configurator") {
 }
 
 group("system-update-checker") {
-  public_deps = [ "bin/system-update-checker" ]
-  deps = [ "//build/validate:non_production_tag" ]
 }
 
 group("omaha-client") {
-  public_deps = [
-    "bin/omaha-client",
-    "bin/omaha-client:omaha-client-config",
-    "//src/diagnostics/config/triage:omaha-client-detect",
-  ]
 }
 
 group("omaha-client-no-restart") {
-  public_deps = [
-    "bin/omaha-client:omaha-client-config",
-    "bin/omaha-client:omaha-client-no-restart",
-    "//src/diagnostics/config/triage:omaha-client-detect",
-  ]
 }
 
 group("omaha-client-delayed-start") {
-  public_deps = [
-    "bin/omaha-client:omaha-client-config",
-    "bin/omaha-client:omaha-client-delayed-start",
-    "//src/diagnostics/config/triage:omaha-client-detect",
-  ]
 }
 
 group("pkgfs-disable-executability-restrictions") {

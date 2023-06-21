@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/config_data_for_assembly.gni")
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_library.gni")
@@ -9,14 +10,7 @@ import("//src/sys/core/build/core_shard.gni")
 import("//src/sys/pkg/bin/grand-swd-binary/gsb.gni")
 import(
     "//src/sys/pkg/scripts/gen_eager_package_config/eager_package_config.gni")
-
 import("//third_party/cobalt/metrics_registry.gni")
-declare_args() {
-  # Default app id will always return no update.
-  omaha_app_id = "fuchsia-test:no-update"
-}
-omaha_app_id_file = "$root_gen_dir/omaha-app-id.txt"
-write_file(omaha_app_id_file, omaha_app_id)
 
 core_shard("omaha-client-service-core-shard") {
   shard_file = "meta/omaha_client_service.core_shard.cml"
@@ -120,29 +114,16 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
+fuchsia_package("omaha-client-unconfigured") {
+  deps = [ ":component" ]
+  package_name = "omaha-client"
+}
+
 fuchsia_package("omaha-client") {
   deps = [
     ":component",
     ":omaha-client-structured-config",
   ]
-}
-
-# TODO(fxbug.dev/92844): Remove these extra packages when migrating to
-# structured configuration.
-fuchsia_package("omaha-client-no-restart") {
-  deps = [
-    ":component",
-    ":omaha-client-structured-config-no-restart",
-  ]
-  package_name = "omaha-client"
-}
-
-fuchsia_package("omaha-client-delayed-start") {
-  deps = [
-    ":component",
-    ":omaha-client-structured-config-delayed-start",
-  ]
-  package_name = "omaha-client"
 }
 
 fuchsia_component("omaha-client-service-bin-tests-test-driver") {
@@ -180,10 +161,10 @@ metrics_registry("mos_metrics_registry") {
   generate_binarypb = false
 }
 
-config_data("omaha-client-config") {
+config_data_for_assembly("omaha-client-config-no-update") {
   for_pkg = "omaha-client"
   outputs = [ "omaha_app_id" ]
-  sources = [ omaha_app_id_file ]
+  sources = [ "data/omaha-app-id-no-update.txt" ]
 }
 
 resource("omaha-client-test-config") {

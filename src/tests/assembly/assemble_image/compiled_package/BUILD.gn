@@ -11,6 +11,7 @@ if (is_fuchsia) {
   # Create a minimal system image that specifies a compiled package containing
   # a component composed of shards.
   core_realm_definition("core_realm") {
+    # TODO try to remove once assembly fully handles SWD
     deps = []
   }
 }
@@ -20,7 +21,7 @@ if (is_fuchsia) {
 # toolchain
 test_assembly_config("compiled_package") {
   platform = {
-    feature_set_level = "minimal"
+    feature_set_level = "utility"
     build_type = "user"
     example_config = {
       include_example_aib = true

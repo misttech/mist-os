@@ -9,15 +9,10 @@ product_bootfs_labels += [
   "//src/sys/component_manager:component_manager_bootfs_config",
 ]
 
-core_realm_shards += [
-  "//src/intl/intl_services:intl_services_small_shard",
-  "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
-]
+core_realm_shards += [ "//src/intl/intl_services:intl_services_small_shard" ]
 
-legacy_base_package_labels += [
-  "//src/connectivity/network/netcfg:config-default",
-  "//src/sys/pkg:system-update-checker",
-]
+legacy_base_package_labels +=
+    [ "//src/connectivity/network/netcfg:config-default" ]
 
 # Use the product assembly config target to specify the product configuration.
 #
