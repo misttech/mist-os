@@ -21,8 +21,8 @@ uint8_t* Arena::FidlArena::Allocate(size_t size, size_t count,
     // deallocation of the arena).
     available_size_ =
         (block_size > Block::kDefaultBlockSize) ? block_size : Block::kDefaultBlockSize;
-    size_t block_size = available_size_ + FIDL_ALIGN(Block::kBlockHeaderSize);
-    last_block_ = new (new uint8_t[block_size]) Block(last_block_, available_size_);
+    size_t new_block_size = available_size_ + FIDL_ALIGN(Block::kBlockHeaderSize);
+    last_block_ = new (new uint8_t[new_block_size]) Block(last_block_, available_size_);
     next_data_available_ = last_block_->data();
   }
   // At this point we have enough space within the current block (either because there was enough

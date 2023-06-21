@@ -81,21 +81,21 @@ class OutgoingDirectory final {
         std::string("svc") + "/" + std::string(Service::Name) + "/" + std::string(instance);
 
     for (auto& [member_name, member_handler] : handlers) {
-      component::AnyHandler handler = nullptr;
+      component::AnyHandler wrapped_handler = nullptr;
       if constexpr (std::is_same_v<TransportHandler, component::ServiceInstanceHandler>) {
-        handler = [member_handler = std::move(member_handler)](zx::channel server_end) mutable {
+        wrapped_handler = [m_handler = std::move(member_handler)](zx::channel server_end) mutable {
           ZX_ASSERT(server_end.is_valid());
-          member_handler(std::move(server_end));
+          m_handler(std::move(server_end));
           return;
         };
       } else if constexpr (std::is_same_v<TransportHandler, fdf::ServiceInstanceHandler>) {
-        handler = [this,
-                   member_handler = std::move(member_handler)](zx::channel server_end) mutable {
+        wrapped_handler = [this,
+                           m_handler = std::move(member_handler)](zx::channel server_end) mutable {
           ZX_ASSERT(server_end.is_valid());
 
           // The received |server_end| is the token channel handle, which needs to be registered
           // with the runtime.
-          RegisterRuntimeToken(std::move(server_end), member_handler.share());
+          RegisterRuntimeToken(std::move(server_end), m_handler.share());
         };
       } else {
         static_assert(
@@ -103,8 +103,8 @@ class OutgoingDirectory final {
             "TransportHandler must be either fidl::internal::ChannelTransport or fidl::internal::DriverTransport");
       }
 
-      zx::result<> status =
-          component_outgoing_dir_.AddUnmanagedProtocolAt(std::move(handler), basepath, member_name);
+      zx::result<> status = component_outgoing_dir_.AddUnmanagedProtocolAt(
+          std::move(wrapped_handler), basepath, member_name);
       if (status.is_error()) {
         return status;
       }
