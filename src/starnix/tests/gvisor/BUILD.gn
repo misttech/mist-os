@@ -501,6 +501,7 @@ foreach(benchmark_name, gvisor_benchmarks) {
     use_gen_manifest = true
     use_expectations = false
     run_as_root = false
+    test_type = "starnix"
   }
 }
 

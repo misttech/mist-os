@@ -140,6 +140,7 @@ void main(List<String> args) {
         await runTestComponent(
             packageName: starnix_gvisor_benchmarks,
             componentName: '$componentName\_benchmark.cm',
+            realm: "/core/testing:starnix-tests",
             commandArgs: commandArgs,
             expectedMetricNamesFile:
                 'fuchsia.starnix.gvisor_benchmarks.$componentName.txt');
