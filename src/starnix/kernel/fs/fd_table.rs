@@ -68,7 +68,7 @@ impl FdMap {
         fd: FdNumber,
         rlimit: u64,
         entry: FdTableEntry,
-    ) -> Result<(), Errno> {
+    ) -> Result<Option<FdTableEntry>, Errno> {
         let raw_fd = fd.raw();
         if raw_fd < 0 {
             return error!(EBADF);
@@ -79,8 +79,7 @@ impl FdMap {
         if raw_fd == self.next_fd.raw() {
             self.next_fd = self.calculate_lowest_available_fd(&FdNumber::from_raw(raw_fd + 1));
         }
-        self.map.insert(fd, entry);
-        Ok(())
+        Ok(self.map.insert(fd, entry))
     }
 
     fn remove_entry(&mut self, fd: &FdNumber) -> Option<FdTableEntry> {
@@ -168,15 +167,19 @@ impl FdTable {
     }
 
     pub fn unshare(&self) {
-        let mut table = self.table.lock();
-        let unshared_inner = table.unshare();
-        *table = Arc::new(unshared_inner);
+        let doomed_inner;
+        {
+            let mut inner = self.table.lock();
+            doomed_inner = inner.clone();
+            let unshared_inner = inner.unshare();
+            *inner = Arc::new(unshared_inner);
+        }
+        // Drop the doomed inner table after we release the table lock.
+        std::mem::drop(doomed_inner);
     }
 
     pub fn exec(&self) {
-        let inner = self.table.lock();
-        let mut state = inner.map_handle.lock();
-        state.retain(|_fd, entry| !entry.flags.contains(FdFlags::CLOEXEC));
+        self.retain(|_fd, flags| !flags.contains(FdFlags::CLOEXEC));
     }
 
     pub fn insert(&self, task: &Task, fd: FdNumber, file: FileHandle) -> Result<(), Errno> {
@@ -190,11 +193,17 @@ impl FdTable {
         file: FileHandle,
         flags: FdFlags,
     ) -> Result<(), Errno> {
-        let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
-        let id = self.id();
-        let inner = self.table.lock();
-        let mut state = inner.map_handle.lock();
-        state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))
+        let removed_entry;
+        {
+            let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
+            let id = self.id();
+            let inner = self.table.lock();
+            let mut state = inner.map_handle.lock();
+            removed_entry = state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))?;
+        }
+        // Drop the removed entry after we drop the table lock.
+        std::mem::drop(removed_entry);
+        Ok(())
     }
 
     pub fn add_with_flags(
@@ -203,12 +212,18 @@ impl FdTable {
         file: FileHandle,
         flags: FdFlags,
     ) -> Result<FdNumber, Errno> {
-        let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
-        let id = self.id();
-        let inner = self.table.lock();
-        let mut state = inner.map_handle.lock();
-        let fd = state.next_fd;
-        state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))?;
+        let fd;
+        let removed_entry;
+        {
+            let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
+            let id = self.id();
+            let inner = self.table.lock();
+            let mut state = inner.map_handle.lock();
+            fd = state.next_fd;
+            removed_entry = state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))?;
+        }
+        // Drop the removed entry after we drop the table lock.
+        std::mem::drop(removed_entry);
         Ok(fd)
     }
 
@@ -221,9 +236,9 @@ impl FdTable {
         target: TargetFdNumber,
         flags: FdFlags,
     ) -> Result<FdNumber, Errno> {
-        // Drop the file object only after releasing the writer lock in case
+        // Drop the removed entry only after releasing the writer lock in case
         // the close() function on the FileOps calls back into the FdTable.
-        let _removed_file;
+        let _removed_entry;
         let result = {
             let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
             let id = self.id();
@@ -245,13 +260,15 @@ impl FdTable {
                         // when we're past the rlimit.
                         return error!(EBADF);
                     }
-                    _removed_file = state.remove_entry(&fd);
+                    _removed_entry = state.remove_entry(&fd);
                     fd
                 }
                 TargetFdNumber::Minimum(fd) => state.get_lowest_available_fd(fd),
                 TargetFdNumber::Default => state.get_lowest_available_fd(FdNumber::from_raw(0)),
             };
-            state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))?;
+            let existing_entry =
+                state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))?;
+            assert!(existing_entry.is_none());
             Ok(fd)
         };
         result
@@ -324,7 +341,17 @@ impl FdTable {
     where
         F: Fn(FdNumber, &mut FdFlags) -> bool,
     {
-        self.table.lock().map_handle.lock().map.retain(|fd, entry| f(*fd, &mut entry.flags));
+        let mut doomed = vec![];
+        self.table.lock().map_handle.lock().retain(|fd, entry| {
+            if f(*fd, &mut entry.flags) {
+                true
+            } else {
+                doomed.push(entry.file.clone());
+                false
+            }
+        });
+        // Avoid dropping the files until after we drop the table locks.
+        std::mem::drop(doomed);
     }
 
     /// Returns a vector of all current file descriptors in the table.
