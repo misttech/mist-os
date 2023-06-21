@@ -8,7 +8,7 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, NamespaceNode,
     },
-    lock::Mutex,
+    lock::{Mutex, MutexGuard},
     logging::{log_error, log_warn},
     mm::{DesiredAddress, MappedVmo, MappingOptions, MemoryAccessorExt, ProtectionFlags},
     syscalls::*,
@@ -186,7 +186,7 @@ enum TaskRequest {
     /// protocol.
     SetVmo(
         // remote_binder_connection,
-        Arc<RemoteBinderConnection>,
+        #[derivative(Debug = "ignore")] Arc<RemoteBinderConnection>,
         // vmo
         fidl::Vmo,
         // mapped_address
@@ -199,7 +199,7 @@ enum TaskRequest {
     /// protocol.
     Ioctl(
         // remote_binder_connection,
-        Arc<RemoteBinderConnection>,
+        #[derivative(Debug = "ignore")] Arc<RemoteBinderConnection>,
         // request
         u32,
         // parameter
@@ -231,6 +231,7 @@ enum TaskRequest {
 
 /// A `TaskRequest` that is associated with a given thread koid. Each thread koid must be
 /// associated 1 to 1 with a Starnix task and only that task must handle the request.
+#[derive(Debug)]
 struct BoundTaskRequest {
     koid: u64,
     request: TaskRequest,
@@ -254,6 +255,40 @@ struct RemoteBinderHandle<F: RemoteControllerConnector> {
     _phantom: std::marker::PhantomData<F>,
 }
 
+/// The state of the current request for a given task.
+#[derive(Debug)]
+enum PendingRequest {
+    /// No request pending, the task is ready to accept a new one.
+    None,
+    /// A request is currently running. The task should not receive a new request.
+    Running,
+    /// The request the task should run. The task should not receive a new request.
+    Some(BoundTaskRequest),
+}
+
+impl PendingRequest {
+    /// Take the current pending request, if there is one. In this case, the state will move to
+    /// `Running`.
+    fn take(&mut self) -> Option<BoundTaskRequest> {
+        match self {
+            Self::Some(_) => {
+                let value = std::mem::replace(self, PendingRequest::Running);
+                if let Self::Some(v) = value {
+                    Some(v)
+                } else {
+                    panic!();
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Whether a request is currently waiting or running.
+    fn is_pending(this: Option<Self>) -> bool {
+        matches!(this, Some(Self::Running | Self::Some(_)))
+    }
+}
+
 /// Internal state of RemoteBinderHandle.
 ///
 /// This struct keep the state of the local starnix tasks and the remote process and its threads.
@@ -265,6 +300,8 @@ struct RemoteBinderHandle<F: RemoteControllerConnector> {
 /// executed by any task, or requested directed to any unassigned task. Once it received a request
 /// of an unassigned task, it will associate itself with the remote thread and from then on, only
 /// accept request for that thread, or for any task.
+#[derive(Derivative)]
+#[derivative(Debug)]
 struct RemoteBinderHandleState {
     /// The thread_group of the tasks that interact with this remote binder. This is used to
     /// interrupt a random thread in the task group is a taskless request needs to be handled.
@@ -280,7 +317,7 @@ struct RemoteBinderHandleState {
     /// Pending request for each associated task. Once as task is registered and associated with a
     /// remote process, it will have an entry in this map. If the entry is None, it has no work to
     /// do, otherwise, it must executed the given request.
-    pending_requests: HashMap<pid_t, Option<BoundTaskRequest>>,
+    pending_requests: HashMap<pid_t, PendingRequest>,
 
     /// Queue of request that must be executed and for which no assigned task exists. The next time
     /// a unassigned task requires a new request, the first request will be retrieved and the task
@@ -298,18 +335,47 @@ struct RemoteBinderHandleState {
     exit_notifiers: Vec<oneshot::Sender<()>>,
 
     /// Notification queue to wake tasks waiting for requests.
+    #[derivative(Debug = "ignore")]
     waiters: WaitQueue,
 }
 
+impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
+    fn lock(&self) -> MutexGuard<'_, RemoteBinderHandleState> {
+        self.state.lock()
+    }
+}
+
 impl RemoteBinderHandleState {
+    /// Signal all task that they must exit.
+    fn exit(&mut self, result: Result<(), Errno>) {
+        // The task requests in state may refer to async FIDL streams and must be dropped before
+        // dropping the executor.
+        self.koid_to_task.clear();
+        self.unassigned_tasks.clear();
+        self.pending_requests.clear();
+        self.unassigned_requests.clear();
+        self.taskless_requests.clear();
+
+        self.exit = Some(result.map_err(|e| e.code));
+        self.waiters.notify_all();
+        for notifier in std::mem::take(&mut self.exit_notifiers) {
+            let _ = notifier.send(());
+        }
+    }
+
     /// Enqueue a request for the task associated with `koid`.
     fn enqueue_task_request(&mut self, request: BoundTaskRequest) {
+        debug_assert!(self.unassigned_requests.iter().all(|r| r.koid != request.koid));
         if let Some(tid) = self.koid_to_task.get(&request.koid).copied() {
             // Find the task associated with the given koid. If one exist, we enqueue the request
             // for task. The task should never already have a task enqueued, as otherwise, it
             // should be blocked on a syscall, and should not be able to send another one.
-            if matches!(self.pending_requests.insert(tid, Some(request)), Some(Some(_))) {
-                panic!("A single thread received 2 concurrent requests.");
+            if PendingRequest::is_pending(
+                self.pending_requests.insert(tid, PendingRequest::Some(request)),
+            ) {
+                log_error!("A single thread received 2 concurrent requests.");
+                self.exit(error!(EINVAL));
+                return;
             }
             self.waiters.notify_value_event(tid as u64);
         } else if let Some(tid) = self.unassigned_tasks.iter().next().copied() {
@@ -317,13 +383,19 @@ impl RemoteBinderHandleState {
             // Associated the task with the koid, and insert the pending request.
             self.unassigned_tasks.remove(&tid);
             self.koid_to_task.insert(request.koid, tid);
-            self.pending_requests.insert(tid, Some(request));
+            if PendingRequest::is_pending(
+                self.pending_requests.insert(tid, PendingRequest::Some(request)),
+            ) {
+                log_error!("A single thread received 2 concurrent requests.");
+                self.exit(error!(EINVAL));
+                return;
+            }
             self.waiters.notify_value_event(tid as u64);
         } else {
-            // Not unassigned task ready. Request userspace to spawn a new one.
-            self.enqueue_taskless_request(TaskRequest::Return(true));
             // And add the request to the unassigned queue.
             self.unassigned_requests.push_back(request);
+            // Not unassigned task ready. Request userspace to spawn a new one.
+            self.enqueue_taskless_request(TaskRequest::Return(true));
         }
     }
 
@@ -335,12 +407,27 @@ impl RemoteBinderHandleState {
         if let Some(thread_group) = self.thread_group.upgrade() {
             if let Ok(task) = thread_group.read().get_task() {
                 task.interrupt();
-                // One task is ready to handle the request.
-                return;
             }
         }
         // Interrupt a single task to handle the request.
         self.waiters.notify_count(1);
+    }
+
+    /// Called when a task starts waiting.
+    fn register_waiting_task(&mut self, tid: pid_t) {
+        if self.pending_requests.contains_key(&tid) || self.unassigned_tasks.contains(&tid) {
+            // The task is already registered.
+            return;
+        }
+        // This is the first time the task is seen.
+        if let Some(request) = self.unassigned_requests.pop_front() {
+            // There is an unassigned request. Associate it to the task.
+            self.koid_to_task.insert(request.koid, tid);
+            self.pending_requests.insert(tid, PendingRequest::Some(request));
+        } else {
+            // Otherwise, mark the task as unassigned and available.
+            self.unassigned_tasks.insert(tid);
+        }
     }
 }
 
@@ -363,7 +450,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     }
 
     fn close(self: &Arc<Self>) {
-        self.exit(Ok(()));
+        self.lock().exit(Ok(()));
     }
 
     fn ioctl(
@@ -443,7 +530,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         }
                         Ok(())
                     });
-                self.state.lock().enqueue_taskless_request(TaskRequest::SetVmo(
+                self.lock().enqueue_taskless_request(TaskRequest::SetVmo(
                     remote_binder_connection,
                     vmo,
                     mapped_address,
@@ -474,7 +561,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
 
                         responder.send(e)
                     });
-                self.state.lock().enqueue_task_request(BoundTaskRequest {
+                self.lock().enqueue_task_request(BoundTaskRequest {
                     koid: tid,
                     request: TaskRequest::Ioctl(
                         remote_binder_connection,
@@ -500,7 +587,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     ) -> Result<(), Error> {
         // Open the device.
         let (sender, receiver) = oneshot::channel::<Result<Arc<RemoteBinderConnection>, Errno>>();
-        self.state.lock().enqueue_taskless_request(TaskRequest::Open(
+        self.lock().enqueue_taskless_request(TaskRequest::Open(
             path,
             process_accessor,
             process,
@@ -517,7 +604,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         // Register a receiver to be notified of exit
         let (sender, receiver) = oneshot::channel::<()>();
         {
-            let mut state = self.state.lock();
+            let mut state = self.lock();
             if state.exit.is_some() {
                 return Ok(());
             }
@@ -652,7 +739,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     /// Returns the next TaskRequest that `current_task` must handle, waiting if none is available.
     fn get_next_task(&self, current_task: &CurrentTask) -> Result<TaskRequest, Errno> {
         loop {
-            let mut state = self.state.lock();
+            let mut state = self.lock();
             // Exit immediately if requested.
             if let Some(result) = state.exit.as_ref() {
                 return result
@@ -676,7 +763,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 // request.
                 state.unassigned_tasks.remove(&tid);
                 state.koid_to_task.insert(request.koid, tid);
-                state.pending_requests.insert(tid, None);
+                state.pending_requests.insert(tid, PendingRequest::Running);
                 return Ok(request.request);
             }
             // Wait until some request is available.
@@ -705,16 +792,6 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             .ok_or_else(|| errno!(ENOTSUP))?
             .open_remote(current_task, process_accessor, process);
         Ok(connection)
-    }
-
-    /// Signal all task that they must exit.
-    fn exit(&self, result: Result<(), Errno>) {
-        let mut state = self.state.lock();
-        state.exit = Some(result.map_err(|e| e.code));
-        state.waiters.notify_all();
-        for notifier in std::mem::take(&mut state.exit_notifiers) {
-            let _ = notifier.send(());
-        }
     }
 
     /// Implementation of the REMOTE_BINDER_START ioctl.
@@ -770,14 +847,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             if let Err(e) = &result {
                 log_error!("Error when servicing the DevBinder protocol: {e:#}");
             }
-            handle.exit(result.map_err(|_| errno!(ENOENT)));
-
-            // The task requests in state may refer to async FIDL streams and must be dropped before
-            // dropping the executor.
-            let mut state = handle.state.lock();
-            state.pending_requests.clear();
-            state.unassigned_requests.clear();
-            state.taskless_requests.clear();
+            handle.lock().exit(result.map_err(|_| errno!(ENOENT)));
         });
 
         error!(EAGAIN)
@@ -789,14 +859,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         current_task: &CurrentTask,
         wait_command_ref: UserRef<uapi::remote_binder_wait_command>,
     ) -> Result<(), Errno> {
-        {
-            let tid = current_task.get_tid();
-            let mut state = self.state.lock();
-            if !state.pending_requests.contains_key(&tid) && !state.unassigned_tasks.contains(&tid)
-            {
-                state.unassigned_tasks.insert(tid);
-            }
-        }
+        self.lock().register_waiting_task(current_task.get_tid());
         loop {
             let interruption = match self.get_next_task(current_task)? {
                 TaskRequest::Open(path, process_accessor, process, responder) => {
@@ -829,6 +892,11 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     );
                     let result =
                         remote_binder_connection.ioctl(current_task, request, parameter.into());
+                    // Once the potentially blocking calls is made, the task is ready to handle the
+                    // next request.
+                    self.lock()
+                        .pending_requests
+                        .insert(current_task.get_tid(), PendingRequest::None);
                     let interruption = must_interrupt(&result);
                     responder(result).map_err(|_| errno!(EINVAL))?;
                     interruption
