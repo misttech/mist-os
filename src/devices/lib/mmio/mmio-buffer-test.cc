@@ -7,11 +7,15 @@
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/syscalls.h>
 #include <zircon/types.h>
 
+#include <limits>
 #include <optional>
 
 #include <zxtest/zxtest.h>
+
+#include "src/devices/lib/mmio/test-helper.h"
 
 namespace {
 
@@ -120,6 +124,22 @@ TEST(MmioBuffer, AlreadySetVmoCachePolicy) {
   ASSERT_OK(mmio_buffer_init(&mb2, 0, vmo_sz, DuplicateVmo(vmo).get(), ZX_CACHE_POLICY_UNCACHED));
   mmio_buffer_release(&mb1);
   mmio_buffer_release(&mb2);
+}
+
+TEST(MmioBuffer, TestMmioBuffer) {
+  ASSERT_DEATH([]() { fdf_testing::CreateMmioBuffer(0); });
+  ASSERT_DEATH([]() { fdf_testing::CreateMmioBuffer(std::numeric_limits<size_t>::max()); });
+
+  size_t size = zx_system_get_page_size();
+  auto buffer = fdf_testing::CreateMmioBuffer(size);
+  ASSERT_EQ(size, buffer.get_size());
+
+  auto view = buffer.View(0);
+  uint32_t test_val = 0xABCD;
+  zx_off_t offset = 0x60;
+
+  buffer.Write32(test_val, offset);
+  EXPECT_EQ(view.Read32(offset), test_val);
 }
 
 }  // namespace

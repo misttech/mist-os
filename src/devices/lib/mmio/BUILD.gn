@@ -34,10 +34,16 @@ zx_library("mmio") {
   ]
 }
 
+source_set("test_helper") {
+  sources = [ "test-helper.h" ]
+  deps = [ ":mmio" ]
+}
+
 test("mmio-unittest") {
   sources = [ "mmio-buffer-test.cc" ]
   deps = [
     ":mmio",
+    ":test_helper",
     "//zircon/system/ulib/zxtest",
   ]
 }
