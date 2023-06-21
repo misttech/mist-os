@@ -526,14 +526,21 @@ impl FsNodeOps for Arc<FuseNode> {
 
     fn mkdir(
         &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _name: &FsStr,
-        _mode: FileMode,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        mode: FileMode,
         _owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        not_implemented!("FsNodeOps::mkdir");
-        error!(ENOTSUP)
+        let response = self.connection.execute_operation(
+            current_task,
+            self,
+            FuseOperation::Mkdir(
+                uapi::fuse_mkdir_in { mode: mode.bits(), umask: current_task.fs().umask().bits() },
+                name.to_owned(),
+            ),
+        )?;
+        self.fs_node_from_entry(node, response)
     }
 
     fn create_symlink(
@@ -964,6 +971,7 @@ enum FuseOperation {
     Init,
     Interrupt(u64),
     Lookup(FsString),
+    Mkdir(uapi::fuse_mkdir_in, FsString),
     Mknod(uapi::fuse_mknod_in, FsString),
     Open(OpenFlags),
     Poll(uapi::fuse_poll_in),
@@ -1016,6 +1024,11 @@ impl FuseOperation {
                 data.write_all(message.as_bytes())
             }
             Self::Poll(poll_in) => data.write_all(poll_in.as_bytes()),
+            Self::Mkdir(mkdir_in, name) => {
+                let mut len = data.write_all(mkdir_in.as_bytes())?;
+                len += data.write_all(name.as_bytes())?;
+                Ok(len)
+            }
             Self::Mknod(mknod_in, name) => {
                 let mut len = data.write_all(mknod_in.as_bytes())?;
                 len += data.write_all(name.as_bytes())?;
@@ -1047,6 +1060,7 @@ impl FuseOperation {
             Self::Init => uapi::fuse_opcode_FUSE_INIT,
             Self::Interrupt(_) => uapi::fuse_opcode_FUSE_INTERRUPT,
             Self::Lookup(_) => uapi::fuse_opcode_FUSE_LOOKUP,
+            Self::Mkdir(_, _) => uapi::fuse_opcode_FUSE_MKDIR,
             Self::Mknod(_, _) => uapi::fuse_opcode_FUSE_MKNOD,
             Self::Open(_) => uapi::fuse_opcode_FUSE_OPEN,
             Self::Poll(_) => uapi::fuse_opcode_FUSE_POLL,
@@ -1065,6 +1079,9 @@ impl FuseOperation {
             Self::Init => std::mem::size_of::<uapi::fuse_init_in>() as u32,
             Self::Interrupt(_) => std::mem::size_of::<uapi::fuse_interrupt_in>() as u32,
             Self::Lookup(name) => name.as_bytes().len() as u32,
+            Self::Mkdir(_, name) => {
+                (std::mem::size_of::<uapi::fuse_mkdir_in>() + name.as_bytes().len()) as u32
+            }
             Self::Mknod(_, name) => {
                 (std::mem::size_of::<uapi::fuse_mknod_in>() + name.as_bytes().len()) as u32
             }
@@ -1101,7 +1118,7 @@ impl FuseOperation {
                 Ok(FuseResponse::Attr(Self::to_response::<uapi::fuse_attr_out>(&buffer)))
             }
             Self::Init => Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer))),
-            Self::Lookup(_) | Self::Mknod(_, _) => {
+            Self::Lookup(_) | Self::Mkdir(_, _) | Self::Mknod(_, _) => {
                 Ok(FuseResponse::Entry(Self::to_response::<uapi::fuse_entry_out>(&buffer)))
             }
             Self::Open(_) => {

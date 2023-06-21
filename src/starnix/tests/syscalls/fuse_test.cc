@@ -214,4 +214,16 @@ TEST_F(FuseTest, Poll) {
   ASSERT_EQ(poll_struct.revents, POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM);
 }
 
+TEST_F(FuseTest, Mkdir) {
+  ASSERT_TRUE(Mount());
+  std::string dirname = GetMountDir() + "/dir";
+  ASSERT_EQ(open(dirname.c_str(), O_RDONLY), -1);
+  ASSERT_EQ(mkdir(dirname.c_str(), 0777), 0);
+  ScopedFD fd(open(dirname.c_str(), O_RDONLY));
+  ASSERT_TRUE(fd.is_valid());
+  struct stat stats;
+  ASSERT_EQ(fstat(fd.get(), &stats), 0);
+  ASSERT_TRUE(S_ISDIR(stats.st_mode));
+}
+
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
