@@ -37,6 +37,18 @@ driver_bind_rules("nelson-bind") {
   ]
 }
 
+driver_bind_rules("nelson_bt_uart_bind") {
+  rules = "bind/nelson_bt_uart.bind"
+  header_output = "nelson_bt_uart_bind.h"
+  bind_output = "nelson_bt_uart_bind.bc"
+  tests = "bind-tests/nelson_bt_uart-test.json"
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.hardware.pwm",
+    "//src/devices/bind/fuchsia.platform",
+  ]
+}
+
 driver_bind_rules("nelson_buttons_bind") {
   rules = "bind/nelson_buttons.bind"
   header_output = "nelson_buttons_bind.h"
@@ -319,6 +331,7 @@ fuchsia_driver("nelson-module-driver") {
     ":nelson-bind",
     ":nelson_aml_sdio_bind_header",
     ":nelson_aml_video_bind_header",
+    ":nelson_bt_uart_bind_header",
     ":nelson_buttons_bind_header",
     ":nelson_dwc2_bind_header",
     ":nelson_emmc_bind_header",
@@ -419,6 +432,7 @@ group("tests") {
     ":nelson_aml_sdio_bind_test",
     ":nelson_aml_video_bind_test",
     ":nelson_aml_video_bind_test",
+    ":nelson_bt_uart_bind_test",
     ":nelson_dwc2_bind_test",
     ":nelson_ot_radio_bind_test",
     ":nelson_selina_bind_test",

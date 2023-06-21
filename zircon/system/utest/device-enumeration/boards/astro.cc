@@ -16,8 +16,8 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:00:2:2/aml-i2c",
       "sys/platform/05:03:17/aml-gpu-composite/aml-gpu",
       "sys/platform/05:00:18/aml-usb-phy-v2",
-      "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart",
-      "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom",
+      "sys/platform/05:00:3/bt-uart/aml-uart/bt-transport-uart",
+      "sys/platform/05:00:3/bt-uart/aml-uart/bt-transport-uart/bt-hci-broadcom",
 
       // XHCI driver will not be loaded if we are in USB peripheral mode.
       // "xhci/xhci/usb-bus",

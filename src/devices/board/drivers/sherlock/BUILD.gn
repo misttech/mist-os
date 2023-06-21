@@ -69,6 +69,18 @@ driver_bind_rules("sherlock-tee-bind") {
   ]
 }
 
+driver_bind_rules("sherlock-bluetooth-bind") {
+  rules = "bind/sherlock-bluetooth.bind"
+  header_output = "sherlock-bluetooth-bind.h"
+  bind_output = "sherlock-bluetooth-bind.bc"
+  tests = "bind-tests/sherlock-bluetooth-test.json"
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.hardware.pwm",
+    "//src/devices/bind/fuchsia.platform",
+  ]
+}
+
 driver_bind_rules("sherlock-video-bind") {
   rules = "bind/sherlock-video.bind"
   header_output = "sherlock-video-bind.h"
@@ -319,6 +331,7 @@ template("sherlock_driver") {
     deps = [
       ":camera-isp-bind_header",
       ":sherlock-aml-usb-phy-v2-bind_header",
+      ":sherlock-bluetooth-bind_header",
       ":sherlock-buttons-bind_header",
       ":sherlock-dwc2-phy-bind_header",
       ":sherlock-emmc-bind_header",
