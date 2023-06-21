@@ -9,10 +9,10 @@ import("//build/test.gni")
 # makes it easy for a component to implement this service.
 #
 # NOTE: the component's sandbox must contain "dev": "class/display-coordinator".
-source_set("devfs_factory_hlcpp") {
+source_set("devfs_factory") {
   sources = [
-    "devfs-factory-hlcpp.cc",
-    "devfs-factory-hlcpp.h",
+    "devfs-factory.cc",
+    "devfs-factory.h",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",

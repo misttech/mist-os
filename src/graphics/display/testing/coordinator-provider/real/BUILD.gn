@@ -9,7 +9,7 @@ executable("bin") {
 
   deps = [
     "//sdk/lib/component/outgoing/cpp",
-    "//src/graphics/display/testing/coordinator-provider-lib:devfs_factory_hlcpp",
+    "//src/graphics/display/testing/coordinator-provider-lib:devfs_factory",
     "//src/lib/fxl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

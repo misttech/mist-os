@@ -10,7 +10,7 @@
 
 #include <memory>
 
-#include "src/graphics/display/testing/coordinator-provider-lib/devfs-factory-hlcpp.h"
+#include "src/graphics/display/testing/coordinator-provider-lib/devfs-factory.h"
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
