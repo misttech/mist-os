@@ -394,6 +394,41 @@ impl FileOps for FuseFileObject {
         })
     }
 
+    fn wait_async(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _waiter: &Waiter,
+        _events: FdEvents,
+        _handler: EventHandler,
+    ) -> Option<WaitCanceler> {
+        None
+    }
+
+    fn query_events(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        let node = self.get_fuse_node(file)?;
+        let response = self.connection.execute_operation(
+            current_task,
+            node,
+            FuseOperation::Poll(uapi::fuse_poll_in {
+                fh: self.open_out.fh,
+                kh: 0,
+                flags: 0,
+                events: FdEvents::all().bits(),
+            }),
+        )?;
+        let poll_out = if let FuseResponse::Poll(poll_out) = response {
+            poll_out
+        } else {
+            return error!(EINVAL);
+        };
+        FdEvents::from_bits(poll_out.revents).ok_or_else(|| errno!(EINVAL))
+    }
+
     fn readdir(
         &self,
         _file: &FileObject,
@@ -931,6 +966,7 @@ enum FuseOperation {
     Lookup(FsString),
     Mknod(uapi::fuse_mknod_in, FsString),
     Open(OpenFlags),
+    Poll(uapi::fuse_poll_in),
     Read(uapi::fuse_read_in),
     Release(uapi::fuse_open_out),
     Seek(uapi::fuse_lseek_in),
@@ -945,6 +981,7 @@ enum FuseResponse {
     Init(uapi::fuse_init_out),
     Seek(uapi::fuse_lseek_out),
     Open(uapi::fuse_open_out),
+    Poll(uapi::fuse_poll_out),
     Read(Vec<u8>),
     Statfs(uapi::fuse_statfs_out),
     Write(uapi::fuse_write_out),
@@ -978,6 +1015,7 @@ impl FuseOperation {
                 let message = uapi::fuse_open_in { flags: open_flags.bits(), open_flags: 0 };
                 data.write_all(message.as_bytes())
             }
+            Self::Poll(poll_in) => data.write_all(poll_in.as_bytes()),
             Self::Mknod(mknod_in, name) => {
                 let mut len = data.write_all(mknod_in.as_bytes())?;
                 len += data.write_all(name.as_bytes())?;
@@ -1011,6 +1049,7 @@ impl FuseOperation {
             Self::Lookup(_) => uapi::fuse_opcode_FUSE_LOOKUP,
             Self::Mknod(_, _) => uapi::fuse_opcode_FUSE_MKNOD,
             Self::Open(_) => uapi::fuse_opcode_FUSE_OPEN,
+            Self::Poll(_) => uapi::fuse_opcode_FUSE_POLL,
             Self::Read(_) => uapi::fuse_opcode_FUSE_READ,
             Self::Release(_) => uapi::fuse_opcode_FUSE_RELEASE,
             Self::Seek(_) => uapi::fuse_opcode_FUSE_LSEEK,
@@ -1030,6 +1069,7 @@ impl FuseOperation {
                 (std::mem::size_of::<uapi::fuse_mknod_in>() + name.as_bytes().len()) as u32
             }
             Self::Open(_) => std::mem::size_of::<uapi::fuse_open_in>() as u32,
+            Self::Poll(_) => std::mem::size_of::<uapi::fuse_poll_in>() as u32,
             Self::Read(_) => std::mem::size_of::<uapi::fuse_read_in>() as u32,
             Self::Release(_) => std::mem::size_of::<uapi::fuse_release_in>() as u32,
             Self::Seek(_) => std::mem::size_of::<uapi::fuse_lseek_in>() as u32,
@@ -1066,6 +1106,9 @@ impl FuseOperation {
             }
             Self::Open(_) => {
                 Ok(FuseResponse::Open(Self::to_response::<uapi::fuse_open_out>(&buffer)))
+            }
+            Self::Poll(_) => {
+                Ok(FuseResponse::Poll(Self::to_response::<uapi::fuse_poll_out>(&buffer)))
             }
             Self::Read(_) => Ok(FuseResponse::Read(buffer)),
             Self::Release(_) | Self::Flush(_) => Ok(FuseResponse::None),
@@ -1104,12 +1147,20 @@ impl FuseOperation {
     ) -> Result<FuseResponse, Errno> {
         match self {
             Self::Flush(_) if errno == ENOSYS => {
-                state.insert(uapi::fuse_opcode_FUSE_FLUSH, Ok(FuseResponse::None));
+                state.insert(self.opcode(), Ok(FuseResponse::None));
                 Ok(FuseResponse::None)
             }
             Self::Seek(_) if errno == ENOSYS => {
-                state.insert(uapi::fuse_opcode_FUSE_LSEEK, Err(errno.clone()));
+                state.insert(self.opcode(), Err(errno.clone()));
                 Err(errno)
+            }
+            Self::Poll(_) if errno == ENOSYS => {
+                let response = FuseResponse::Poll(uapi::fuse_poll_out {
+                    revents: (FdEvents::POLLIN | FdEvents::POLLOUT).bits(),
+                    padding: 0,
+                });
+                state.insert(self.opcode(), Ok(response.clone()));
+                Ok(response)
             }
             _ => Err(errno),
         }

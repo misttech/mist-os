@@ -6,6 +6,7 @@
 #define SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
 
 #include <fcntl.h>
+#include <poll.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
@@ -200,6 +201,17 @@ TEST_F(FuseTest, Seek) {
   ASSERT_EQ(lseek(fd.get(), 0, SEEK_HOLE), 6);
   ASSERT_EQ(lseek(fd.get(), 7, SEEK_HOLE), -1);
   ASSERT_EQ(errno, ENXIO);
+}
+
+TEST_F(FuseTest, Poll) {
+  ASSERT_TRUE(Mount());
+  ScopedFD fd(open((GetMountDir() + "/witness").c_str(), O_RDONLY));
+  ASSERT_TRUE(fd.is_valid());
+  struct pollfd poll_struct;
+  poll_struct.fd = fd.get();
+  poll_struct.events = -1;
+  ASSERT_EQ(poll(&poll_struct, 1, 0), 1);
+  ASSERT_EQ(poll_struct.revents, POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM);
 }
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
