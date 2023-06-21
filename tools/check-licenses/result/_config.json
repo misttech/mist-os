@@ -21,7 +21,7 @@
     "templates": [
       {
         "paths": [
-          "tools/check-licenses/result/templates"
+          "tools/check-licenses/assets/output_templates"
         ],
         "notes": []
       }
