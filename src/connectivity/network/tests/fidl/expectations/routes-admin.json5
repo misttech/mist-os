@@ -13,10 +13,10 @@
             type: "expect_failure",
             matchers: [
                 // TODO(https://fxbug.dev/129218): Implement fuchsia.net.routes.admin in Netstack2.
-                "add_route_ns2",
+                "*ns2*",
 
                 // TODO(https://fxbug.dev/129219): Implement fuchsia.net.routes.admin in Netstack3.
-                "add_route_ns3",
+                "*ns3*",
             ],
         },
     ],
