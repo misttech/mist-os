@@ -10,7 +10,7 @@ use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_zircon as zx;
 use futures::{AsyncReadExt, AsyncWriteExt, TryStreamExt};
-use std::{ffi::CString, sync::Arc};
+use std::{ffi::CString, rc::Rc, sync::Arc};
 
 use crate::{
     execution::{execute_task, Container},
@@ -26,7 +26,7 @@ use crate::{
 use super::*;
 
 pub fn expose_root(
-    container: &Arc<Container>,
+    container: &Container,
     server_end: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), Error> {
     let system_task = container.kernel.kthreads.system_task();
@@ -37,14 +37,14 @@ pub fn expose_root(
 
 pub async fn serve_component_runner(
     mut request_stream: frunner::ComponentRunnerRequestStream,
-    container: Arc<Container>,
+    container: Rc<Container>,
 ) -> Result<(), Error> {
     while let Some(event) = request_stream.try_next().await? {
         match event {
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
                 let container = container.clone();
                 fasync::Task::local(async move {
-                    if let Err(e) = start_component(start_info, controller, container).await {
+                    if let Err(e) = start_component(start_info, controller, &container).await {
                         log_error!("failed to start component: {:?}", e);
                     }
                 })
@@ -68,12 +68,12 @@ fn to_winsize(window_size: Option<fstarcontainer::ConsoleWindowSize>) -> uapi::w
 
 pub async fn serve_container_controller(
     mut request_stream: fstarcontainer::ControllerRequestStream,
-    container: Arc<Container>,
+    container: &Container,
 ) -> Result<(), Error> {
     while let Some(event) = request_stream.try_next().await? {
         match event {
             fstarcontainer::ControllerRequest::VsockConnect { port, bridge_socket, .. } => {
-                connect_to_vsock(port, bridge_socket, &container).await.unwrap_or_else(|e| {
+                connect_to_vsock(port, bridge_socket, container).await.unwrap_or_else(|e| {
                     log_error!("failed to connect to vsock {:?}", e);
                 });
             }
@@ -108,7 +108,7 @@ pub async fn serve_container_controller(
                                     _ => responder.send(Err(zx::Status::CANCELED.into_raw())),
                                 };
                             });
-                            let _ = forward_to_pty(&container, console, pty).map_err(|e| {
+                            let _ = forward_to_pty(container, console, pty).map_err(|e| {
                                 log_error!("failed to forward to terminal {:?}", e);
                             });
                         }
@@ -129,7 +129,7 @@ pub async fn serve_container_controller(
 async fn connect_to_vsock(
     port: u32,
     bridge_socket: fidl::Socket,
-    container: &Arc<Container>,
+    container: &Container,
 ) -> Result<(), Error> {
     let socket = loop {
         if let Ok(socket) = container.kernel.default_abstract_vsock_namespace.lookup(&port) {
@@ -169,7 +169,7 @@ fn create_task_with_pty(
 }
 
 fn forward_to_pty(
-    container: &Arc<Container>,
+    container: &Container,
     console: fidl::Socket,
     pty: FileHandle,
 ) -> Result<(), Error> {

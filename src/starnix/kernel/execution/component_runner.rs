@@ -48,13 +48,13 @@ use crate::{
 pub async fn start_component(
     mut start_info: ComponentStartInfo,
     controller: ServerEnd<ComponentControllerMarker>,
-    container: Arc<Container>,
+    container: &Container,
 ) -> Result<(), Error> {
     let url = start_info.resolved_url.clone().unwrap_or_else(|| "<unknown>".to_string());
     log_info!("start_component: {}", url);
 
     // TODO(fxbug.dev/125782): We leak the directory created by this function.
-    let component_path = generate_component_path(&container)?;
+    let component_path = generate_component_path(container)?;
 
     let mut mount_record = MountRecord::default();
 
@@ -69,12 +69,12 @@ pub async fn start_component(
                     // Mount custom_artifacts and test_data directory at root of container
                     // We may want to transition to have these directories unique per component
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
-                    mount_record.mount_remote(&container, &dir_proxy, &dir_path)?;
+                    mount_record.mount_remote(container, &dir_proxy, &dir_path)?;
                 }
                 _ => {
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
                     mount_record.mount_remote(
-                        &container,
+                        container,
                         &dir_proxy,
                         &format!("{component_path}/{dir_path}"),
                     )?;

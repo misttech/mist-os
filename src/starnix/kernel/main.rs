@@ -20,7 +20,7 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime as fruntime;
 use futures::{StreamExt, TryStreamExt};
-use std::sync::Arc;
+use std::rc::Rc;
 
 #[cfg(target_arch = "x86_64")]
 use fuchsia_inspect as inspect;
@@ -116,7 +116,7 @@ async fn main() -> Result<(), Error> {
         fuchsia_trace::Scope::Thread
     );
 
-    let container = async_lock::OnceCell::<Arc<Container>>::new();
+    let container = async_lock::OnceCell::<Rc<Container>>::new();
 
     maybe_serve_lifecycle();
 
@@ -157,7 +157,7 @@ async fn main() -> Result<(), Error> {
                     .expect("failed to start component runner");
             }
             KernelServices::ContainerController(stream) => {
-                execution::serve_container_controller(stream, container.wait().await.clone())
+                execution::serve_container_controller(stream, container.wait().await)
                     .await
                     .expect("failed to start container controller");
             }

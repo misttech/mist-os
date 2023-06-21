@@ -21,7 +21,7 @@ use fuchsia_zircon::Task as _;
 use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use starnix_kernel_config::Config;
-use std::{collections::BTreeMap, ffi::CString, sync::Arc};
+use std::{collections::BTreeMap, ffi::CString, rc::Rc, sync::Arc};
 
 use crate::{
     auth::Credentials,
@@ -174,7 +174,7 @@ async fn server_component_controller(
 
 pub async fn create_component_from_stream(
     mut request_stream: frunner::ComponentRunnerRequestStream,
-) -> Result<Arc<Container>, Error> {
+) -> Result<Rc<Container>, Error> {
     if let Some(event) = request_stream.try_next().await? {
         match event {
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
@@ -193,7 +193,7 @@ pub async fn create_component_from_stream(
 async fn create_container(
     mut config: ConfigWrapper,
     task_complete: oneshot::Sender<TaskResult>,
-) -> Result<Arc<Container>, Error> {
+) -> Result<Rc<Container>, Error> {
     trace_duration!(trace_category_starnix!(), trace_name_create_container!());
     const DEFAULT_INIT: &str = "/container/init";
 
@@ -258,7 +258,7 @@ async fn create_container(
         wait_for_init_file(&startup_file_path, system_task).await?;
     };
 
-    let container = Arc::new(Container { kernel, _node: node });
+    let container = Rc::new(Container { kernel, _node: node });
 
     if let Some(outgoing_dir) = config.outgoing_dir.take() {
         // Add `ComponentRunner` to the exposed services of the container, and then serve the
@@ -296,7 +296,7 @@ async fn create_container(
                     }
                     ExposedServices::ContainerController(request_stream) => {
                         fasync::Task::local(async move {
-                            serve_container_controller(request_stream, container_clone.clone())
+                            serve_container_controller(request_stream, &container_clone)
                                 .await
                                 .expect("failed to start container.")
                         })
