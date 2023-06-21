@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 executable("bin") {
-  output_name = "real_hw_display_controller_provider"
+  output_name = "display_coordinator_connector"
 
   sources = [ "main.cc" ]
 

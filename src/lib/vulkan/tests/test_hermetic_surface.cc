@@ -12,7 +12,7 @@
 
 namespace {
 
-// These tests are hemetic because they're run against the fake hardware display controller provider
+// These tests are hemetic because they're run against the fake display coordinator provider
 // and don't need to connect to the real display controller.  They still need sysmem and a Vulkan
 // implementation.
 class TestSurface {

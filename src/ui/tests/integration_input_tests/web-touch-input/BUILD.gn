@@ -100,7 +100,7 @@ group("tests") {
     "//src/chromium:web_context_provider_for_test",
     "//src/cobalt/bin/testing/mock_cobalt",
     "//src/graphics/bin/vulkan_loader",
-    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider",
+    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-connector",
     "//src/testing/fidl/intl_property_manager",
     "//src/ui/bin/text:text_manager",
     "//src/ui/tests/integration_input_tests/web-touch-input/web-touch-input-chromium",

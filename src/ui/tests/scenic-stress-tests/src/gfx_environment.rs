@@ -28,7 +28,14 @@ pub struct GfxEnvironment {
 impl GfxEnvironment {
     pub async fn new(args: Args) -> Self {
         let builder = RealmBuilder::new().await.unwrap();
-        let hdcp = builder.add_child("hdcp", "#meta/hdcp.cm", ChildOptions::new()).await.unwrap();
+        let display_coordinator_connector = builder
+            .add_child(
+                "display-coordinator-connector",
+                "#meta/display-coordinator-connector.cm",
+                ChildOptions::new(),
+            )
+            .await
+            .unwrap();
         let scenic =
             builder.add_child("scenic", "#meta/scenic.cm", ChildOptions::new()).await.unwrap();
 
@@ -39,7 +46,7 @@ impl GfxEnvironment {
                     .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry"))
                     .from(Ref::parent())
                     .to(&scenic)
-                    .to(&hdcp),
+                    .to(&display_coordinator_connector),
             )
             .await
             .unwrap();
@@ -59,7 +66,7 @@ impl GfxEnvironment {
             .add_route(
                 Route::new()
                     .capability(Capability::protocol_by_name("fuchsia.hardware.display.Provider"))
-                    .from(&hdcp)
+                    .from(&display_coordinator_connector)
                     .to(&scenic),
             )
             .await

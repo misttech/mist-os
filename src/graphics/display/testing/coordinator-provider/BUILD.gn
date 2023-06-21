@@ -8,8 +8,8 @@ import("//tools/cmc/build/expect_includes.gni")
 group("coordinator-provider") {
   testonly = true
   public_deps = [
-    ":display-coordinator-provider",
-    ":fake-display-coordinator-provider",
+    ":display-coordinator-connector",
+    ":fake-display-coordinator-connector",
   ]
 }
 
@@ -18,61 +18,61 @@ group("tests") {
   public_deps = [ "fake/tests" ]
 }
 
-fuchsia_component("fake-display-coordinator-provider-component") {
+fuchsia_component("fake-display-coordinator-connector-component") {
   testonly = true
-  manifest = "meta/fake_hdcp.cml"
-  component_name = "hdcp"
+  manifest = "meta/fake_display_coordinator_provider.cml"
+  component_name = "display-coordinator-connector"
   deps = [ "fake:bin" ]
 }
 
-fuchsia_package("fake-display-coordinator-provider") {
+fuchsia_package("fake-display-coordinator-connector") {
   testonly = true
-  package_name = "fake-display-coordinator-provider"
-  deps = [ ":fake-display-coordinator-provider-component" ]
+  package_name = "fake-display-coordinator-connector"
+  deps = [ ":fake-display-coordinator-connector-component" ]
 }
 
-fuchsia_component("display-coordinator-provider-component") {
-  manifest = "meta/real_hdcp.cml"
-  component_name = "hdcp"
+fuchsia_component("display-coordinator-connector-component") {
+  manifest = "meta/display_coordinator_provider.cml"
+  component_name = "display-coordinator-connector"
   deps = [ "real:bin" ]
 }
 
-fuchsia_package("display-coordinator-provider") {
-  package_name = "display-coordinator-provider"
-  deps = [ ":display-coordinator-provider-component" ]
+fuchsia_package("display-coordinator-connector") {
+  package_name = "display-coordinator-connector"
+  deps = [ ":display-coordinator-connector-component" ]
 }
 
-expect_includes("fake-display-coordinator-provider-shard-includes") {
+expect_includes("fake-display-coordinator-connector-shard-includes") {
   includes = [ "meta/fake_display_coordinator_provider.shard.cml" ]
 }
 
-expect_includes("display-coordinator-provider-shard-includes") {
+expect_includes("display-coordinator-connector-shard-includes") {
   includes = [ "meta/display_coordinator_provider.shard.cml" ]
 }
 
-# Includes `fake-display-coordinator-provider-component` as a child component
+# Includes `fake-display-coordinator-connector-component` as a child component
 # and performs "includes" check for the fake display coordinator provider
 # shard in the component manifest.
 #
 # Only supports statically defined components; do not use this on realms built
 # by Realm Builder.
-group("fake-display-coordinator-provider-child-component") {
+group("fake-display-coordinator-connector-child-component") {
   testonly = true
   deps = [
-    ":fake-display-coordinator-provider-component",
-    ":fake-display-coordinator-provider-shard-includes",
+    ":fake-display-coordinator-connector-component",
+    ":fake-display-coordinator-connector-shard-includes",
   ]
 }
 
-# Includes `display-coordinator-provider-component` as a child component
+# Includes `display-coordinator-connector-component` as a child component
 # and performs "includes" check for the real display coordinator provider
 # shard in the component manifest.
 #
 # Only supports statically defined components; do not use this on realms built
 # by Realm Builder.
-group("display-coordinator-provider-child-component") {
+group("display-coordinator-connector-child-component") {
   deps = [
-    ":display-coordinator-provider-component",
-    ":display-coordinator-provider-shard-includes",
+    ":display-coordinator-connector-component",
+    ":display-coordinator-connector-shard-includes",
   ]
 }

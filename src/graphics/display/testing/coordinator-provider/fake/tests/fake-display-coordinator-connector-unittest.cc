@@ -17,10 +17,10 @@ namespace {
 
 constexpr std::chrono::milliseconds kSleepTime(10);
 
-class FakeHardwareDisplayCoordinatorProviderTest : public gtest::TestLoopFixture {
+class FakeDisplayCoordinatorConnectorTest : public gtest::TestLoopFixture {
  public:
-  FakeHardwareDisplayCoordinatorProviderTest() = default;
-  ~FakeHardwareDisplayCoordinatorProviderTest() override = default;
+  FakeDisplayCoordinatorConnectorTest() = default;
+  ~FakeDisplayCoordinatorConnectorTest() override = default;
 
   void SetUp() override {
     TestLoopFixture::SetUp();
@@ -56,7 +56,7 @@ Request NewRequest() { return Request(); }
 
 }  // anonymous namespace
 
-TEST_F(FakeHardwareDisplayCoordinatorProviderTest, NoConflictWithVirtcon) {
+TEST_F(FakeDisplayCoordinatorConnectorTest, NoConflictWithVirtcon) {
   // Count the number of connections that were ever made.
   uint32_t num_connections = 0;
   uint32_t num_virtcon_connections = 0;
@@ -74,7 +74,7 @@ TEST_F(FakeHardwareDisplayCoordinatorProviderTest, NoConflictWithVirtcon) {
   EXPECT_EQ(num_virtcon_connections, 1U);
 }
 
-TEST_F(FakeHardwareDisplayCoordinatorProviderTest, MultipleConnections) {
+TEST_F(FakeDisplayCoordinatorConnectorTest, MultipleConnections) {
   // Count the number of connections that were ever made.
   uint32_t num_connections = 0;
 

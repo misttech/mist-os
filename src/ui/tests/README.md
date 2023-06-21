@@ -240,10 +240,10 @@ capabilities are routed to and from components. This is crucial for testing
 because it allows test authors to have fine-grained control over the test
 environment of their components. Take for example `scenic`. In
 `touch-input-test`, a handle to `fuchsia.hardware.display.Provider` from
-`fake-hardware-display-controller-provider#meta/hdcp.cmx` is routed. By
-providing a fake hardware display provider, we can write integration tests
-without having to use the real display controller. This mapping of source and
-target is explicitly written in the test
+`fake-display-coordinator-connector#meta/display-coordinator-connector.cm`
+is routed. By providing a fake hardware display provider, we can write
+integration tests without having to use the real display controller. This
+mapping of source and target is explicitly written in the test
 [file](/src/ui/tests/integration_input_tests/touch/touch-input-test.cc) during
 Realm construction.
 

@@ -6,16 +6,16 @@ import("//build/components.gni")
 
 group("tests") {
   testonly = true
-  public_deps = [ ":fake_hdcp_tests" ]
+  public_deps = [ ":fake-display-coordinator-connector-unittest" ]
 }
 
-executable("unittests") {
-  output_name = "fake_hdcp_unittests"
+executable("fake-display-coordinator-connector-unittest-bin") {
+  output_name = "fake-display-coordinator-connector-unittest"
   testonly = true
 
   configs += [ "//build/config:all_source" ]
 
-  sources = [ "fake_hdcp_unittest.cc" ]
+  sources = [ "fake-display-coordinator-connector-unittest.cc" ]
 
   deps = [
     "..:lib",
@@ -25,9 +25,9 @@ executable("unittests") {
   ]
 }
 
-fuchsia_unittest_package("fake_hdcp_tests") {
-  manifest = "meta/fake_hdcp_unittests.cml"
-  deps = [ ":unittests" ]
+fuchsia_unittest_package("fake-display-coordinator-connector-unittest") {
+  manifest = "meta/fake-display-coordinator-connector-unittest.cml"
+  deps = [ ":fake-display-coordinator-connector-unittest-bin" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"

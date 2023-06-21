@@ -24,7 +24,7 @@ int main(int argc, const char** argv) {
 
   loop.Run();
 
-  FX_LOGS(INFO) << "Quit HardwareDisplayCoordinatorProvider main loop.";
+  FX_LOGS(INFO) << "Quit Display Coordinator Connector main loop.";
 
   return 0;
 }

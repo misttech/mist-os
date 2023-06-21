@@ -20,12 +20,12 @@ int main(int argc, const char** argv) {
   FX_LOGS(INFO) << "Starting fake fuchsia.hardware.display.Provider service.";
 
   std::shared_ptr<zx_device> mock_root = MockDevice::FakeRootParent();
-  fake_display::ProviderService hdcp_service_impl(std::move(mock_root), app_context.get(),
-                                                  loop.dispatcher());
+  fake_display::ProviderService fake_display_coordinator_connector(
+      std::move(mock_root), app_context.get(), loop.dispatcher());
 
   loop.Run();
 
-  FX_LOGS(INFO) << "Quit fake HardwareDisplayControllerProvider main loop.";
+  FX_LOGS(INFO) << "Quit fake Display Coordinator Connector main loop.";
 
   return 0;
 }

@@ -13,8 +13,8 @@
     ],
     children: [
         {
-            name: "display-coordinator-provider",
-            url: "fuchsia-pkg://fuchsia.com/display-coordinator-provider#meta/hdcp.cm",
+            name: "display-coordinator-connector",
+            url: "fuchsia-pkg://fuchsia.com/display-coordinator-connector#meta/display-coordinator-connector.cm",
         },
     ],
     offer: [
@@ -42,7 +42,7 @@
         },
         {
             protocol: [ "fuchsia.hardware.display.Provider" ],
-            from: "#display-coordinator-provider",
+            from: "#display-coordinator-connector",
             to: [ "#scenic" ],
         },
     ],

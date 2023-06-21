@@ -12,8 +12,8 @@
     ],
     children: [
         {
-            name: "display-coordinator-provider",
-            url: "#meta/hdcp.cm",
+            name: "display-coordinator-connector",
+            url: "#meta/display-coordinator-connector.cm",
         },
         {
             name: "mock_cobalt",
@@ -32,7 +32,7 @@
         },
         {
             protocol: [ "fuchsia.hardware.display.Provider" ],
-            from: "#display-coordinator-provider",
+            from: "#display-coordinator-connector",
             to: [ "#scenic" ],
         },
         {

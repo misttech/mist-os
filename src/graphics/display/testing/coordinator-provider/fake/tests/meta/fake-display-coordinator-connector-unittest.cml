@@ -9,6 +9,6 @@
         "vulkan/client.shard.cml",
     ],
     program: {
-        binary: "bin/fake_hdcp_unittests",
+        binary: "bin/fake-display-coordinator-connector-unittest",
     },
 }

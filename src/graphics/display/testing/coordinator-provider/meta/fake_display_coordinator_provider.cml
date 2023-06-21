@@ -2,22 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "syslog/client.shard.cml" ],
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
     program: {
         runner: "elf",
-        binary: "bin/real_hw_display_controller_provider",
+        binary: "bin/fake_display_coordinator_connector",
     },
     capabilities: [
         { protocol: "fuchsia.hardware.display.Provider" },
     ],
     use: [
         {
-            directory: "dev-display-coordinator",
-            rights: [ "r*" ],
-            path: "/dev/class/display-coordinator",
-        },
-        {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.tracing.provider.Registry",
+            ],
             from: "parent",
         },
     ],

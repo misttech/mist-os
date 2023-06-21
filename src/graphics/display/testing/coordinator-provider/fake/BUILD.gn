@@ -4,7 +4,7 @@
 
 executable("bin") {
   testonly = true
-  output_name = "fake_hw_display_controller_provider"
+  output_name = "fake_display_coordinator_connector"
 
   configs += [ "//build/config:all_source" ]
 
