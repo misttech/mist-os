@@ -72,15 +72,13 @@ fn read_name(current_task: &CurrentTask, name: UserCString, len: u64) -> Result<
     }
 
     // Read a maximum of 65 characters and mark the null terminator.
-    let mut buffer = [0; 65];
-    let name = current_task.mm.read_c_string(name, &mut buffer)?;
+    let mut name = current_task.mm.read_c_string_to_vec(name, 65)?;
 
     // Syscall may have specified an even smaller length, so trim to the requested length.
     if len < name.len() {
-        Ok(name[..len].to_owned())
-    } else {
-        Ok(name.to_owned())
+        name.truncate(len);
     }
+    Ok(name)
 }
 
 pub fn sys_sethostname(

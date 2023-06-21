@@ -801,8 +801,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         service_address_ref: UserRef<UserCString>,
     ) -> Result<(), Errno> {
         let service_address = current_task.mm.read_object(service_address_ref)?;
-        let mut buffer = [0u8; PATH_MAX as usize];
-        let service = current_task.mm.read_c_string(service_address, &mut buffer)?;
+        let service = current_task.mm.read_c_string_to_vec(service_address, PATH_MAX as usize)?;
         let service_name = String::from_utf8(service.to_vec()).map_err(|_| errno!(EINVAL))?;
         let remote_controller_client =
             F::connect_to_remote_controller(current_task, &service_name)?;

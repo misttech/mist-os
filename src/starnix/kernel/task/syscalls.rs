@@ -93,7 +93,7 @@ fn read_c_string_vector(
         if user_string.is_null() {
             break;
         }
-        let string = mm.read_c_string_vec(user_string, elem_limit).map_err(|e| {
+        let string = mm.read_c_string_to_vec(user_string, elem_limit).map_err(|e| {
             if e == errno!(ENAMETOOLONG) {
                 errno!(E2BIG)
             } else {
@@ -159,7 +159,7 @@ pub fn sys_execveat(
         )?
     };
 
-    let path = &current_task.mm.read_c_string_vec(user_path, PATH_MAX as usize)?;
+    let path = &current_task.mm.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
 
     log_trace!(
         "execveat({}, {}, argv={:?}, environ={:?}, flags={})",
@@ -634,9 +634,8 @@ pub fn sys_prctl(
                 None
             } else {
                 let name = UserCString::new(UserAddress::from(arg5));
-                let mut buf = [0u8; 256];
-                // An overly long name produces EINVAL and not ENAMETOOLONG in Linux 5.15.
-                let name = current_task.mm.read_c_string(name, &mut buf).map_err(|e| {
+                let name = current_task.mm.read_c_string_to_vec(name, 256).map_err(|e| {
+                    // An overly long name produces EINVAL and not ENAMETOOLONG in Linux 5.15.
                     if e == errno!(ENAMETOOLONG) {
                         errno!(EINVAL)
                     } else {
@@ -653,7 +652,7 @@ pub fn sys_prctl(
                 }) {
                     return error!(EINVAL);
                 }
-                Some(name.to_vec())
+                Some(name)
             };
             current_task.mm.set_mapping_name(addr, length, name)?;
             Ok(().into())

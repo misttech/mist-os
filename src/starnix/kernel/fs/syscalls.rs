@@ -395,10 +395,9 @@ fn open_file_at(
     flags: u32,
     mode: FileMode,
 ) -> Result<FileHandle, Errno> {
-    let mut buf = [0u8; PATH_MAX as usize];
-    let path = current_task.mm.read_c_string(user_path, &mut buf)?;
-    log_trace!("open_file_at(dir_fd={}, path={:?})", dir_fd, String::from_utf8_lossy(path));
-    current_task.open_file_at(dir_fd, path, OpenFlags::from_bits_truncate(flags), mode)
+    let path = current_task.mm.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    log_trace!("open_file_at(dir_fd={}, path={})", dir_fd, String::from_utf8_lossy(&path));
+    current_task.open_file_at(dir_fd, &path, OpenFlags::from_bits_truncate(flags), mode)
 }
 
 fn lookup_parent_at<T, F>(
@@ -410,14 +409,13 @@ fn lookup_parent_at<T, F>(
 where
     F: Fn(LookupContext, NamespaceNode, &FsStr) -> Result<T, Errno>,
 {
-    let mut buf = [0u8; PATH_MAX as usize];
-    let path = current_task.mm.read_c_string(user_path, &mut buf)?;
-    log_trace!("lookup_parent_at(dir_fd={}, path={:?})", dir_fd, String::from_utf8_lossy(path));
+    let path = current_task.mm.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    log_trace!("lookup_parent_at(dir_fd={}, path={})", dir_fd, String::from_utf8_lossy(&path));
     if path.is_empty() {
         return error!(ENOENT);
     }
     let mut context = LookupContext::default();
-    let (parent, basename) = current_task.lookup_parent_at(&mut context, dir_fd, path)?;
+    let (parent, basename) = current_task.lookup_parent_at(&mut context, dir_fd, &path)?;
     callback(context, parent, basename)
 }
 
@@ -463,19 +461,18 @@ fn lookup_at(
     user_path: UserCString,
     options: LookupFlags,
 ) -> Result<NamespaceNode, Errno> {
-    let mut buf = [0u8; PATH_MAX as usize];
-    let path = current_task.mm.read_c_string(user_path, &mut buf)?;
-    log_trace!("lookup_at(dir_fd={}, path={:?})", dir_fd, String::from_utf8_lossy(path));
+    let path = current_task.mm.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    log_trace!("lookup_at(dir_fd={}, path={})", dir_fd, String::from_utf8_lossy(&path));
     if path.is_empty() {
         if options.allow_empty_path {
-            let (node, _) = current_task.resolve_dir_fd(dir_fd, path)?;
+            let (node, _) = current_task.resolve_dir_fd(dir_fd, &path)?;
             return Ok(node);
         }
         return error!(ENOENT);
     }
 
     let mut parent_context = LookupContext::default();
-    let (parent, basename) = current_task.lookup_parent_at(&mut parent_context, dir_fd, path)?;
+    let (parent, basename) = current_task.lookup_parent_at(&mut parent_context, dir_fd, &path)?;
 
     let mut child_context = if parent_context.must_be_directory {
         // The child must resolve to a directory. This is because a trailing slash
@@ -677,14 +674,13 @@ pub fn sys_mkdirat(
     user_path: UserCString,
     mode: FileMode,
 ) -> Result<(), Errno> {
-    let mut buf = [0u8; PATH_MAX as usize];
-    let path = current_task.mm.read_c_string(user_path, &mut buf)?;
+    let path = current_task.mm.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
 
     if path.is_empty() {
         return error!(ENOENT);
     }
     let (parent, basename) =
-        current_task.lookup_parent_at(&mut LookupContext::default(), dir_fd, path)?;
+        current_task.lookup_parent_at(&mut LookupContext::default(), dir_fd, &path)?;
     parent.create_node(
         current_task,
         basename,
@@ -860,22 +856,15 @@ pub fn sys_fchownat(
     name.entry.node.chown(current_task, maybe_uid(owner), maybe_uid(group))
 }
 
-fn read_xattr_name<'a>(
-    current_task: &CurrentTask,
-    name_addr: UserCString,
-    buf: &'a mut [u8],
-) -> Result<&'a [u8], Errno> {
-    let name = current_task.mm.read_c_string(name_addr, buf).map_err(|e| {
-        if e == ENAMETOOLONG {
-            errno!(ERANGE)
-        } else {
-            e
-        }
-    })?;
+fn read_xattr_name(current_task: &CurrentTask, name_addr: UserCString) -> Result<Vec<u8>, Errno> {
+    let name = current_task
+        .mm
+        .read_c_string_to_vec(name_addr, XATTR_NAME_MAX as usize + 1)
+        .map_err(|e| if e == ENAMETOOLONG { errno!(ERANGE) } else { e })?;
     if name.is_empty() {
         return error!(ERANGE);
     }
-    let dot_index = memchr::memchr(b'.', name).ok_or_else(|| errno!(ENOTSUP))?;
+    let dot_index = memchr::memchr(b'.', &name).ok_or_else(|| errno!(ENOTSUP))?;
     if name[dot_index + 1..].is_empty() {
         return error!(EINVAL);
     }
@@ -893,9 +882,8 @@ fn do_getxattr(
     value_addr: UserAddress,
     size: usize,
 ) -> Result<usize, Errno> {
-    let mut name = vec![0u8; XATTR_NAME_MAX as usize + 1];
-    let name = read_xattr_name(current_task, name_addr, &mut name)?;
-    let value = node.entry.node.get_xattr(current_task, name)?;
+    let name = read_xattr_name(current_task, name_addr)?;
+    let value = node.entry.node.get_xattr(current_task, &name)?;
     if size == 0 {
         return Ok(value.len());
     }
@@ -961,11 +949,9 @@ fn do_setxattr(
         XATTR_REPLACE => XattrOp::Replace,
         _ => return error!(EINVAL),
     };
-    let mut name = vec![0u8; XATTR_NAME_MAX as usize + 1];
-    let name = read_xattr_name(current_task, name_addr, &mut name)?;
-    let mut value = vec![0u8; size];
-    current_task.mm.read_memory(value_addr, &mut value)?;
-    node.entry.node.set_xattr(current_task, name, &value, op)
+    let name = read_xattr_name(current_task, name_addr)?;
+    let value = current_task.mm.read_memory_to_vec(value_addr, size)?;
+    node.entry.node.set_xattr(current_task, &name, &value, op)
 }
 
 pub fn sys_fsetxattr(
@@ -1014,9 +1000,8 @@ fn do_removexattr(
     if mode.is_chr() || mode.is_fifo() {
         return error!(EPERM);
     }
-    let mut name = vec![0u8; XATTR_NAME_MAX as usize + 1];
-    let name = read_xattr_name(current_task, name_addr, &mut name)?;
-    node.entry.node.remove_xattr(current_task, name)
+    let name = read_xattr_name(current_task, name_addr)?;
+    node.entry.node.remove_xattr(current_task, &name)
 }
 
 pub fn sys_removexattr(
@@ -1179,14 +1164,12 @@ pub fn sys_symlinkat(
     new_dir_fd: FdNumber,
     user_path: UserCString,
 ) -> Result<(), Errno> {
-    let mut buf = [0u8; PATH_MAX as usize];
-    let target = current_task.mm.read_c_string(user_target, &mut buf)?;
+    let target = current_task.mm.read_c_string_to_vec(user_target, PATH_MAX as usize)?;
     if target.is_empty() {
         return error!(ENOENT);
     }
 
-    let mut buf = [0u8; PATH_MAX as usize];
-    let path = current_task.mm.read_c_string(user_path, &mut buf)?;
+    let path = current_task.mm.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     // TODO: This check could probably be moved into parent.symlink(..).
     if path.is_empty() {
         return error!(ENOENT);
@@ -1200,7 +1183,7 @@ pub fn sys_symlinkat(
         if context.must_be_directory {
             return error!(ENOENT);
         }
-        parent.create_symlink(current_task, basename, target)
+        parent.create_symlink(current_task, basename, &target)
     });
     res?;
     Ok(())
@@ -1257,12 +1240,10 @@ pub fn sys_memfd_create(
         not_implemented!("memfd_create: flags: {}", flags);
     }
 
-    let mut name = [0u8; MEMFD_NAME_MAX_LEN];
     let name = current_task
         .mm
-        .read_c_string(user_name, &mut name)
-        .map_err(|e| if e == ENAMETOOLONG { errno!(EINVAL) } else { e })?
-        .to_owned();
+        .read_c_string_to_vec(user_name, MEMFD_NAME_MAX_LEN)
+        .map_err(|e| if e == ENAMETOOLONG { errno!(EINVAL) } else { e })?;
 
     let seals = if flags & MFD_ALLOW_SEALING != 0 {
         SealFlags::empty()

@@ -1225,7 +1225,9 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         self.read_objects_to_vec(iovec_addr.into(), iovec_count)
     }
 
-    fn read_c_string_vec(&self, string: UserCString, max_size: usize) -> Result<Vec<u8>, Errno> {
+    /// Read up to `max_size` bytes from `string`, stopping at the first discovered null byte and
+    /// returning the results as a Vec.
+    fn read_c_string_to_vec(&self, string: UserCString, max_size: usize) -> Result<Vec<u8>, Errno> {
         let min_chunk_size = std::cmp::min(*PAGE_SIZE as usize, max_size);
 
         let mut buf = vec![0; min_chunk_size];
@@ -2449,7 +2451,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    async fn test_read_c_string_vec() {
+    async fn test_read_c_string_to_vec() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2465,25 +2467,28 @@ mod tests {
 
         // Expect error if the string is not terminated.
         assert_eq!(
-            mm.read_c_string_vec(UserCString::new(test_addr), max_size),
+            mm.read_c_string_to_vec(UserCString::new(test_addr), max_size),
             error!(ENAMETOOLONG)
         );
 
         // Expect success if the string is terminated.
         mm.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
-        assert_eq!(mm.read_c_string_vec(UserCString::new(test_addr), max_size).unwrap(), b"foo");
+        assert_eq!(mm.read_c_string_to_vec(UserCString::new(test_addr), max_size).unwrap(), b"foo");
 
         // Expect success if the string spans over two mappings.
         assert_eq!(map_memory(&current_task, addr + page_size, page_size), addr + page_size);
         assert_eq!(mm.get_mapping_count(), 2);
         mm.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
-        assert_eq!(mm.read_c_string_vec(UserCString::new(test_addr), max_size).unwrap(), b"foobar");
+        assert_eq!(
+            mm.read_c_string_to_vec(UserCString::new(test_addr), max_size).unwrap(),
+            b"foobar"
+        );
 
         // Expect error if the string exceeds max limit
-        assert_eq!(mm.read_c_string_vec(UserCString::new(test_addr), 2), error!(ENAMETOOLONG));
+        assert_eq!(mm.read_c_string_to_vec(UserCString::new(test_addr), 2), error!(ENAMETOOLONG));
 
         // Expect error if the address is invalid.
-        assert_eq!(mm.read_c_string_vec(UserCString::default(), max_size), error!(EFAULT));
+        assert_eq!(mm.read_c_string_to_vec(UserCString::default(), max_size), error!(EFAULT));
     }
 
     #[::fuchsia::test]

@@ -285,9 +285,8 @@ pub fn sys_bpf(
             let pin_attr: bpf_attr__bindgen_ty_5 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_OBJ_PIN {:?}", pin_attr);
             let object = get_bpf_fd(current_task, pin_attr.bpf_fd)?;
-            let mut pathname = vec![0u8; PATH_MAX as usize];
             let path_addr = UserCString::new(UserAddress::from(pin_attr.pathname));
-            let pathname = current_task.mm.read_c_string(path_addr, &mut pathname)?.to_owned();
+            let pathname = current_task.mm.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
             let (parent, basename) = current_task.lookup_parent_at(
                 &mut LookupContext::default(),
                 FdNumber::AT_FDCWD,
@@ -308,9 +307,8 @@ pub fn sys_bpf(
         bpf_cmd_BPF_OBJ_GET => {
             let path_attr: bpf_attr__bindgen_ty_5 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_OBJ_GET {:?}", path_attr);
-            let mut pathname = vec![0u8; PATH_MAX as usize];
             let path_addr = UserCString::new(UserAddress::from(path_attr.pathname));
-            let pathname = current_task.mm.read_c_string(path_addr, &mut pathname)?.to_owned();
+            let pathname = current_task.mm.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
             let node = current_task.lookup_path_from_root(&pathname)?;
             // TODO(tbodt): This might be the wrong error code, write a test program to find out
             let node =
