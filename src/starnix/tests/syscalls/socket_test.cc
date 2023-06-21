@@ -9,6 +9,8 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <thread>
+
 #include <asm-generic/socket.h>
 #include <gtest/gtest.h>
 
@@ -249,3 +251,23 @@ TEST(UnixSocket, SendMemFd) {
   EXPECT_GT(msg.msg_controllen, 0u);
 }
 #endif  // defined(__NR_memfd_create)
+
+// This test verifies that we can concurrently attempt to create the same type of socket from
+// multiple threads.
+TEST(Socket, ConcurrentCreate) {
+  std::atomic_int barrier{0};
+  std::atomic_int child_ready{0};
+  auto child = std::thread([&] {
+    child_ready.store(1);
+    while (barrier.load() == 0) {
+    }
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    EXPECT_EQ(-1, fd);
+  });
+  while (child_ready.load() == 0) {
+  }
+  barrier.store(1);
+  int fd = socket(AF_INET, SOCK_STREAM, 0);
+  EXPECT_EQ(-1, fd);
+  child.join();
+}

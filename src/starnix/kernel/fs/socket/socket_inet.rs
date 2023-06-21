@@ -18,7 +18,7 @@ use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
 use static_assertions::const_assert_eq;
-use std::{cell::OnceCell, ffi::CStr, sync::Arc};
+use std::{ffi::CStr, sync::Arc, sync::OnceLock};
 use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio};
 
 /// Connects to `fuchsia_posix_socket::Provider` or
@@ -29,11 +29,11 @@ impl ServiceConnector for SocketProviderServiceConnector {
     fn connect(service_name: &str) -> Result<&'static zx::Channel, zx::Status> {
         match service_name {
             fposix_socket::ProviderMarker::PROTOCOL_NAME => {
-                static mut CHANNEL: OnceCell<Result<zx::Channel, zx::Status>> = OnceCell::new();
+                static mut CHANNEL: OnceLock<Result<zx::Channel, zx::Status>> = OnceLock::new();
                 unsafe { &CHANNEL }
             }
             fposix_socket_raw::ProviderMarker::PROTOCOL_NAME => {
-                static mut CHANNEL: OnceCell<Result<zx::Channel, zx::Status>> = OnceCell::new();
+                static mut CHANNEL: OnceLock<Result<zx::Channel, zx::Status>> = OnceLock::new();
                 unsafe { &CHANNEL }
             }
             _ => return Err(zx::Status::INTERNAL),
