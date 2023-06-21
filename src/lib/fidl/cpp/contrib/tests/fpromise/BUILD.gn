@@ -19,6 +19,7 @@ test("fidl_cpp_fpromise_tests_bin") {
     "//sdk/lib/stdcompat",
     "//sdk/testing/fidl/protocols_tests:test.basic.protocol_cpp",
     "//sdk/testing/fidl/protocols_tests:test.error.methods_cpp",
+    "//src/lib/fidl/cpp/contrib/fpromise",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zxtest",
