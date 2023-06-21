@@ -98,7 +98,6 @@ size_checker_input = {
       src = [
         "packages/base/mdns",
         "packages/base/netstack",
-        "packages/base/network-legacy-deprecated",
         "packages/base/network",
       ]
       limit = 8965179  # 8.550 MiB
