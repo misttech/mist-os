@@ -962,7 +962,7 @@ impl MemoryManagerState {
     /// # Parameters
     /// - `addr`: The address to read data from.
     /// - `bytes`: The byte array to read into.
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
         let mut bytes_read = 0;
         for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
             let next_offset = bytes_read + len;
@@ -986,7 +986,11 @@ impl MemoryManagerState {
     /// # Parameters
     /// - `addr`: The address to read data from.
     /// - `bytes`: The byte array to read into.
-    fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno> {
+    fn read_memory_partial_to_slice(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
         let mut bytes_read = 0;
         for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
             let next_offset = bytes_read + len;
@@ -1069,23 +1073,27 @@ fn create_user_vmar(vmar: &zx::Vmar, vmar_info: &zx::VmarInfo) -> Result<zx::Vma
 }
 
 pub trait MemoryAccessor {
-    /// Reads exactly `bytes.len()` bytes of memory from `addr`.
+    /// Reads exactly `bytes.len()` bytes of memory from `addr` into `bytes`.
     ///
-    /// # Parameters
-    /// - `addr`: The address to read data from.
-    /// - `bytes`: The byte array to read into.
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno>;
+    /// In case of success, the number of bytes read will always be `bytes.len()`.
+    ///
+    /// Consider using `MemoryAccessorExt::read_memory_to_*` methods if you do not require control
+    /// over the allocation.
+    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno>;
 
     /// Reads bytes starting at `addr`, continuing until either `bytes.len()` bytes have been read
-    /// or no more bytes can be read.
+    /// or no more bytes can be read from the target.
     ///
     /// This is used, for example, to read null-terminated strings where the exact length is not
     /// known, only the maximum length is.
     ///
-    /// # Parameters
-    /// - `addr`: The address to read data from.
-    /// - `bytes`: The byte array to read into.
-    fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno>;
+    /// Consider using `MemoryAccessorExt::read_memory_partial_to_*` methods if you do not require
+    /// control over the allocation.
+    fn read_memory_partial_to_slice(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno>;
 
     /// Writes the provided bytes to `addr`.
     ///
@@ -1109,7 +1117,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     /// Read exactly `len` bytes of memory, returning them as a a Vec.
     fn read_memory_to_vec(&self, addr: UserAddress, len: usize) -> Result<Vec<u8>, Errno> {
         let mut buffer = vec![0u8; len];
-        self.read_memory(addr, &mut buffer[..])?;
+        self.read_memory_to_slice(addr, &mut buffer[..])?;
         Ok(buffer)
     }
 
@@ -1120,7 +1128,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         max_len: usize,
     ) -> Result<Vec<u8>, Errno> {
         let mut buffer = vec![0u8; max_len];
-        let bytes_read = self.read_memory_partial(addr, &mut buffer[..])?;
+        let bytes_read = self.read_memory_partial_to_slice(addr, &mut buffer[..])?;
         buffer.truncate(bytes_read);
         Ok(buffer)
     }
@@ -1128,7 +1136,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     /// Read exactly `N` bytes from `addr`, returning them as an array.
     fn read_memory_to_array<const N: usize>(&self, addr: UserAddress) -> Result<[u8; N], Errno> {
         let mut buffer = [0u8; N];
-        self.read_memory(addr, &mut buffer[..])?;
+        self.read_memory_to_slice(addr, &mut buffer[..])?;
         Ok(buffer)
     }
 
@@ -1148,7 +1156,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
                 std::mem::size_of::<T>(),
             )
         };
-        self.read_memory(user.addr(), buffer)?;
+        self.read_memory_to_slice(user.addr(), buffer)?;
         Ok(object)
     }
 
@@ -1174,14 +1182,20 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         let mut full_buffer = std::vec::Vec::<u8>::with_capacity(full_size);
         full_buffer.resize(partial_size, 0u8);
 
-        self.read_memory(user.addr(), &mut full_buffer)?;
+        self.read_memory_to_slice(user.addr(), &mut full_buffer)?;
         full_buffer.resize(full_size, 0u8); // Zero pad out to the correct size.
 
         // This should only fail if we provided a mis-sized buffers so panicking is OK.
         Ok(T::read_from(&*full_buffer).unwrap())
     }
 
-    fn read_objects<T: FromBytes>(&self, user: UserRef<T>, objects: &mut [T]) -> Result<(), Errno> {
+    /// Read exactly `objects.len()` objects into `objects` from `user`.
+    fn read_objects_to_slice<T: FromBytes>(
+        &self,
+        user: UserRef<T>,
+        objects: &mut [T],
+    ) -> Result<(), Errno> {
+        // TODO(b/287679867) make this a single read_memory call
         for (index, object) in objects.iter_mut().enumerate() {
             *object = self.read_object(user.at(index))?;
         }
@@ -1195,7 +1209,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         len: usize,
     ) -> Result<Vec<T>, Errno> {
         let mut objects = vec![T::new_zeroed(); len];
-        self.read_objects(user, &mut objects[..])?;
+        self.read_objects_to_slice(user, &mut objects[..])?;
         Ok(objects)
     }
 
@@ -1205,7 +1219,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         user: UserRef<T>,
     ) -> Result<[T; N], Errno> {
         let mut objects = [T::new_zeroed(); N];
-        self.read_objects(user, &mut objects[..])?;
+        self.read_objects_to_slice(user, &mut objects[..])?;
         Ok(objects)
     }
 
@@ -1233,7 +1247,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         let mut buf = vec![0; min_chunk_size];
         let mut index = 0;
         loop {
-            let read = self.read_memory_partial(string.addr(), &mut buf[index..])?;
+            let read = self.read_memory_partial_to_slice(string.addr(), &mut buf[index..])?;
 
             if let Some(nul_index) = memchr::memchr(b'\0', &buf[index..index + read]) {
                 buf.resize(index + nul_index, 0u8);
@@ -1256,12 +1270,16 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         }
     }
 
-    fn read_c_string<'a>(
+    /// Read up to `buffer.len()` bytes from `string`, stopping at the first discovered null byte
+    /// and returning the result as a slice that ends before that null.
+    ///
+    /// Consider using `read_c_string_to_vec` if you do not require control over the allocation.
+    fn read_c_string_to_slice<'a>(
         &self,
         string: UserCString,
         buffer: &'a mut [u8],
     ) -> Result<&'a [u8], Errno> {
-        let actual = self.read_memory_partial(string.addr(), buffer)?;
+        let actual = self.read_memory_partial_to_slice(string.addr(), buffer)?;
         let buffer = &mut buffer[..actual];
         let null_index = memchr::memchr(b'\0', buffer).ok_or_else(|| errno!(ENAMETOOLONG))?;
         Ok(&buffer[..null_index])
@@ -1281,12 +1299,16 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 }
 
 impl MemoryAccessor for MemoryManager {
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        self.state.read().read_memory(addr, bytes)
+    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        self.state.read().read_memory_to_slice(addr, bytes)
     }
 
-    fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno> {
-        self.state.read().read_memory_partial(addr, bytes)
+    fn read_memory_partial_to_slice(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
+        self.state.read().read_memory_partial_to_slice(addr, bytes)
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
@@ -2492,7 +2514,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    async fn test_read_c_string() {
+    async fn test_read_c_string_to_slice() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2507,26 +2529,35 @@ mod tests {
         mm.write_memory(test_addr, test_str).expect("failed to write test string");
 
         // Expect error if the string is not terminated.
-        assert_eq!(mm.read_c_string(UserCString::new(test_addr), &mut buf), error!(ENAMETOOLONG));
+        assert_eq!(
+            mm.read_c_string_to_slice(UserCString::new(test_addr), &mut buf),
+            error!(ENAMETOOLONG)
+        );
 
         // Expect success if the string is terminated.
         mm.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
-        assert_eq!(mm.read_c_string(UserCString::new(test_addr), &mut buf).unwrap(), b"foo");
+        assert_eq!(
+            mm.read_c_string_to_slice(UserCString::new(test_addr), &mut buf).unwrap(),
+            b"foo"
+        );
 
         // Expect success if the string spans over two mappings.
         assert_eq!(map_memory(&current_task, addr + page_size, page_size), addr + page_size);
         assert_eq!(mm.get_mapping_count(), 2);
         mm.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
-        assert_eq!(mm.read_c_string(UserCString::new(test_addr), &mut buf).unwrap(), b"foobar");
+        assert_eq!(
+            mm.read_c_string_to_slice(UserCString::new(test_addr), &mut buf).unwrap(),
+            b"foobar"
+        );
 
         // Expect error if the string does not fit in the provided buffer.
         assert_eq!(
-            mm.read_c_string(UserCString::new(test_addr), &mut [0u8; 2]),
+            mm.read_c_string_to_slice(UserCString::new(test_addr), &mut [0u8; 2]),
             error!(ENAMETOOLONG)
         );
 
         // Expect error if the address is invalid.
-        assert_eq!(mm.read_c_string(UserCString::default(), &mut buf), error!(EFAULT));
+        assert_eq!(mm.read_c_string_to_slice(UserCString::default(), &mut buf), error!(EFAULT));
     }
 
     #[::fuchsia::test]

@@ -129,7 +129,7 @@ fn read_attr<Attr: FromBytes>(
     // SAFETY: attr is FromBytes, meaning it is safe to write any bit pattern to its storage. (The
     // unsafe slice construction is necessary because it's not necessarily safe to read from its
     // storage directly.)
-    current_task.mm.read_memory(attr_addr, unsafe {
+    current_task.mm.read_memory_to_slice(attr_addr, unsafe {
         std::slice::from_raw_parts_mut(&mut attr as *mut Attr as *mut u8, sizeof_attr)
     })?;
 

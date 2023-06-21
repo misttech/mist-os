@@ -543,8 +543,10 @@ impl FileOps for MemFile {
             TaskStateCode::Running | TaskStateCode::Sleeping => {
                 let mut addr = UserAddress::default() + offset;
                 data.write_each(&mut |bytes| {
-                    let actual =
-                        task.mm.read_memory_partial(addr, bytes).map_err(|_| errno!(EIO))?;
+                    let actual = task
+                        .mm
+                        .read_memory_partial_to_slice(addr, bytes)
+                        .map_err(|_| errno!(EIO))?;
                     addr += actual;
                     Ok(actual)
                 })

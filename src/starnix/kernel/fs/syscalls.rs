@@ -1379,15 +1379,15 @@ fn do_mount_create(
     let source = if source_addr.is_null() {
         b""
     } else {
-        current_task.mm.read_c_string(source_addr, &mut buf)?
+        current_task.mm.read_c_string_to_slice(source_addr, &mut buf)?
     };
     let mut buf = [0u8; PATH_MAX as usize];
-    let fs_type = current_task.mm.read_c_string(filesystemtype_addr, &mut buf)?;
+    let fs_type = current_task.mm.read_c_string_to_slice(filesystemtype_addr, &mut buf)?;
     let mut buf = [0u8; PATH_MAX as usize];
     let data = if data_addr.is_null() {
         b""
     } else {
-        current_task.mm.read_c_string(data_addr, &mut buf)?
+        current_task.mm.read_c_string_to_slice(data_addr, &mut buf)?
     };
     log_trace!(
         "mount(source={:?}, target={:?}, type={:?}, data={:?})",

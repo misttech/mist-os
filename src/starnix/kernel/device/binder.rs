@@ -2313,7 +2313,7 @@ impl std::fmt::Debug for RemoteResourceAccessor {
 const MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE: usize = 64 * 1024 * 1024;
 
 impl MemoryAccessor for RemoteResourceAccessor {
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
         let mut index = 0;
         while index < bytes.len() {
             let len = std::cmp::min(bytes.len() - index, MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE);
@@ -2335,7 +2335,11 @@ impl MemoryAccessor for RemoteResourceAccessor {
         Ok(())
     }
 
-    fn read_memory_partial(&self, _addr: UserAddress, _bytes: &mut [u8]) -> Result<usize, Errno> {
+    fn read_memory_partial_to_slice(
+        &self,
+        _addr: UserAddress,
+        _bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
         error!(ENOTSUP)
     }
 
@@ -2430,13 +2434,17 @@ impl ResourceAccessor for CurrentTask {
 }
 
 impl MemoryAccessor for CurrentTask {
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
         log_trace!("Reading {} bytes of memory from {:?}", bytes.len(), addr);
-        self.mm.read_memory(addr, bytes)
+        self.mm.read_memory_to_slice(addr, bytes)
     }
-    fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno> {
+    fn read_memory_partial_to_slice(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
         log_trace!("Reading up to {} bytes of memory from {:?}", bytes.len(), addr);
-        self.mm.read_memory_partial(addr, bytes)
+        self.mm.read_memory_partial_to_slice(addr, bytes)
     }
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         log_trace!("Writing {} bytes to {:?}", bytes.len(), addr);
@@ -2469,13 +2477,17 @@ impl ResourceAccessor for Task {
 }
 
 impl MemoryAccessor for Task {
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
         log_trace!("Reading {} bytes of memory from {:?}", bytes.len(), addr);
-        self.mm.read_memory(addr, bytes)
+        self.mm.read_memory_to_slice(addr, bytes)
     }
-    fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno> {
+    fn read_memory_partial_to_slice(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
         log_trace!("Reading up to {} bytes of memory from {:?}", bytes.len(), addr);
-        self.mm.read_memory_partial(addr, bytes)
+        self.mm.read_memory_partial_to_slice(addr, bytes)
     }
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         log_trace!("Writing {} bytes to {:?}", bytes.len(), addr);
@@ -3204,11 +3216,11 @@ impl BinderDriver {
         let userspace_addrs = unsafe { data.transaction_data.data.ptr };
 
         // Copy the data straight into the target's buffer.
-        source_resource_accessor.read_memory(
+        source_resource_accessor.read_memory_to_slice(
             UserAddress::from(userspace_addrs.buffer),
             allocations.data_buffer.as_mut_bytes(),
         )?;
-        source_resource_accessor.read_objects(
+        source_resource_accessor.read_objects_to_slice(
             UserRef::new(UserAddress::from(userspace_addrs.offsets)),
             allocations.offsets_buffer.as_mut_bytes(),
         )?;
@@ -3330,7 +3342,7 @@ impl BinderDriver {
                     if length > sg_remaining_buffer.length {
                         return error!(EINVAL)?;
                     }
-                    source_resource_accessor.read_memory(
+                    source_resource_accessor.read_memory_to_slice(
                         buffer,
                         &mut sg_buffer.as_mut_bytes()[sg_buffer_offset..sg_buffer_offset + length],
                     )?;
