@@ -205,6 +205,11 @@ void SnapshotCollector::WaitForSnapshot(const SnapshotUuid& uuid, zx::time deadl
 void SnapshotCollector::CompleteWithSnapshot(const SnapshotUuid& uuid,
                                              feedback::Annotations annotations,
                                              fuchsia::feedback::Attachment archive) {
+  // We clear snapshot_requests_ as soon as we receive the shutdown signal.
+  if (shutdown_) {
+    return;
+  }
+
   auto* request = FindSnapshotRequest(uuid);
   FX_CHECK(request);
 

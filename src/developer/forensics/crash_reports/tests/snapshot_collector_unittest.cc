@@ -338,6 +338,35 @@ TEST_F(SnapshotCollectorTest, Check_Shutdown) {
               }));
 }
 
+TEST_F(SnapshotCollectorTest, Check_ShutdownDuringSnapshotCollection) {
+  auto data_provider_owned =
+      std::make_unique<stubs::DataProviderReturnsOnDemand>(kDefaultAnnotations, kDefaultArchiveKey);
+  stubs::DataProviderReturnsOnDemand* data_provider = data_provider_owned.get();
+
+  SetUpDataProviderServer(std::move(data_provider_owned));
+  SetUpDefaultSnapshotManager();
+
+  std::optional<Report> report{std::nullopt};
+  ScheduleGetReportAndThen(zx::duration::infinite(), 0,
+                           ([&report](Report& new_report) { report = std::move(new_report); }));
+
+  // Send shutdown signal while DataProvider is collecting the snapshot.
+  RunLoopFor(kWindow);
+  snapshot_collector_->Shutdown();
+
+  // Finish snapshot collection to ensure the stale callbacks are handled without issue.
+  data_provider->PopSnapshotInternalCallback();
+  RunLoopUntilIdle();
+
+  ASSERT_TRUE(report.has_value());
+  auto snapshot = AsMissing(GetSnapshot(report->SnapshotUuid()));
+  EXPECT_THAT(snapshot.PresenceAnnotations(),
+              IsSupersetOf({
+                  Pair(feedback::kDebugSnapshotErrorKey, "system shutdown"),
+                  Pair(feedback::kDebugSnapshotPresentKey, "false"),
+              }));
+}
+
 TEST_F(SnapshotCollectorTest, Check_SetsPresenceAnnotations) {
   SetUpDefaultDataProviderServer();
   SetUpDefaultSnapshotManager();
