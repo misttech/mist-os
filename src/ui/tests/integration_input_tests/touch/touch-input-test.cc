@@ -765,7 +765,8 @@ class WebEngineTestIp : public TouchInputBase<> {
                     // FATAL errors.
                 },
         },
-        {.capabilities = {Protocol{fuchsia::process::Launcher::Name_}},
+        {.capabilities = {Protocol{fuchsia::kernel::VmexResource::Name_},
+                          Protocol{fuchsia::process::Launcher::Name_}},
          .source = ParentRef(),
          .targets = {target}},
         {.capabilities = {Protocol{fuchsia::ui::test::input::TouchInputListener::Name_}},
@@ -808,7 +809,7 @@ class WebEngineTestIp : public TouchInputBase<> {
          .targets = {ChildRef{kMemoryPressureProvider}}},
         {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_}},
          .source = ParentRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}, ChildRef{kOneChromiumClient}}},
+         .targets = {ChildRef{kMemoryPressureProvider}, target}},
         {.capabilities = {Protocol{fuchsia::kernel::RootJobForInspect::Name_},
                           Protocol{fuchsia::kernel::Stats::Name_},
                           Protocol{fuchsia::scheduler::ProfileProvider::Name_},

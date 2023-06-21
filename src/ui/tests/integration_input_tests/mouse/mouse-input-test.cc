@@ -299,6 +299,7 @@ class ChromiumInputTest : public MouseInputBase {
          .targets = {target}},
         {.capabilities =
              {
+                 Protocol{fuchsia::kernel::VmexResource::Name_},
                  Protocol{fuchsia::process::Launcher::Name_},
                  Protocol{fuchsia::vulkan::loader::Loader::Name_},
              },
@@ -345,7 +346,7 @@ class ChromiumInputTest : public MouseInputBase {
          .targets = {ChildRef{kMemoryPressureProvider}}},
         {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_}},
          .source = ParentRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}, ChildRef{kMouseInputChromium}}},
+         .targets = {ChildRef{kMemoryPressureProvider}, target}},
         {.capabilities = {Protocol{fuchsia::scheduler::ProfileProvider::Name_}},
          .source = ParentRef(),
          .targets = {ChildRef{kMemoryPressureProvider}}},
@@ -374,8 +375,8 @@ class ChromiumInputTest : public MouseInputBase {
   }
 
   // TODO(fxbug.dev/58322): EnsureMouseIsReadyAndGetPosition will send a mouse click
-  // (down and up) and wait for response to ensure the mouse is ready to use. We will retry a mouse
-  // click if we can not get the mouseup response in small timeout. This function returns
+  // (down and up) and wait for response to ensure the mouse is ready to use. We will retry a
+  // mouse click if we can not get the mouseup response in small timeout. This function returns
   // the cursor position in WebEngine coordinate system.
   Position EnsureMouseIsReadyAndGetPosition() {
     for (int retry = 0; retry < kMaxRetry; retry++) {
@@ -441,7 +442,8 @@ class ChromiumInputTest : public MouseInputBase {
   // WebEngine is ready to process events.
   static constexpr auto kFirstEventRetryInterval = zx::sec(1);
 
-  // To avoid retry to timeout, limit 10 retries, if still not ready, fail it with meaningful error.
+  // To avoid retry to timeout, limit 10 retries, if still not ready, fail it with meaningful
+  // error.
   static const int kMaxRetry = 10;
 };
 

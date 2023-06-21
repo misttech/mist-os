@@ -22,10 +22,11 @@
     use: [
         {
             protocol: [
+                // Provided to this Component by the test.
+                "fuchsia.kernel.VmexResource",
+
                 // Used by the test.
                 "fuchsia.ui.test.input.MouseInputListener",
-
-                // Provided to this Component by the test.
                 "fuchsia.web.ContextProvider",
             ],
         },

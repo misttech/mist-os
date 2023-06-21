@@ -69,6 +69,9 @@ class NavListener : public fuchsia::web::NavigationEventListener {
                     << nav_state.is_main_document_loaded();
       is_main_document_loaded_ = nav_state.is_main_document_loaded();
     }
+    if (nav_state.has_page_type()) {
+      FX_CHECK(nav_state.page_type() != fuchsia::web::PageType::ERROR);
+    }
     if (nav_state.has_title()) {
       FX_LOGS(INFO) << "nav_state.title = " << nav_state.title();
       if (nav_state.title().find("about:blank") != std::string::npos) {

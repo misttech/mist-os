@@ -440,6 +440,7 @@ class ChromiumInputTest : public ChromiumInputBase {
         },
         {.capabilities =
              {
+                 Protocol{fuchsia::kernel::VmexResource::Name_},
                  Protocol{fuchsia::process::Launcher::Name_},
                  Protocol{fuchsia::ui::composition::Allocator::Name_},
                  Protocol{fuchsia::ui::composition::Flatland::Name_},
