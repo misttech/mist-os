@@ -46,12 +46,10 @@ static const std::vector<fpbus::Bti> sdio_btis{
 };
 
 static aml_sdmmc_config_t config = {
-    .supports_dma = true,
     .min_freq = 400'000,
     .max_freq = 100'000'000,
     .version_3 = true,
     .prefs = 0,
-    .use_new_tuning = true,
 };
 
 constexpr wifi_config_t wifi_config = {

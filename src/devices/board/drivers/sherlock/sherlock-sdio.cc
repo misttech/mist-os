@@ -77,12 +77,10 @@ static const std::vector<fpbus::Bti> sd_emmc_btis{
 };
 
 constexpr aml_sdmmc_config_t sd_emmc_config = {
-    .supports_dma = true,
     .min_freq = 500'000,      // 500KHz
     .max_freq = 208'000'000,  // 208MHz
     .version_3 = true,
     .prefs = 0,
-    .use_new_tuning = true,
 };
 
 constexpr wifi_config_t wifi_config = {

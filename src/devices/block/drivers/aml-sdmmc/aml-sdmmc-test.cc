@@ -31,7 +31,6 @@ class TestAmlSdmmc : public AmlSdmmc {
       // that are pinned when a request is made.
       : AmlSdmmc(parent, zx::bti(bti.get()), std::move(mmio),
                  aml_sdmmc_config_t{
-                     .supports_dma = true,
                      .min_freq = 400000,
                      .max_freq = 120000000,
                      .version_3 = true,
@@ -148,7 +147,6 @@ class AmlSdmmcTest : public zxtest::Test {
     mock_dev_ = root_->GetLatestChild();
 
     dut_->set_board_config({
-        .supports_dma = true,
         .min_freq = 400000,
         .max_freq = 120000000,
         .version_3 = true,
@@ -248,7 +246,6 @@ TEST_F(AmlSdmmcTest, DdkLifecycle) {
 
 TEST_F(AmlSdmmcTest, InitV3) {
   dut_->set_board_config({
-      .supports_dma = true,
       .min_freq = 400000,
       .max_freq = 120000000,
       .version_3 = true,
@@ -272,7 +269,6 @@ TEST_F(AmlSdmmcTest, InitV3) {
 
 TEST_F(AmlSdmmcTest, InitV2) {
   dut_->set_board_config({
-      .supports_dma = true,
       .min_freq = 400000,
       .max_freq = 120000000,
       .version_3 = false,
@@ -317,7 +313,6 @@ TEST_F(AmlSdmmcTest, TuningV3) {
 
 TEST_F(AmlSdmmcTest, TuningV2) {
   dut_->set_board_config({
-      .supports_dma = true,
       .min_freq = 400000,
       .max_freq = 120000000,
       .version_3 = false,
@@ -346,12 +341,10 @@ TEST_F(AmlSdmmcTest, TuningV2) {
 
 TEST_F(AmlSdmmcTest, DelayLineTuningAllPass) {
   dut_->set_board_config({
-      .supports_dma = true,
       .min_freq = 400000,
       .max_freq = 120000000,
       .version_3 = true,
       .prefs = 0,
-      .use_new_tuning = true,
   });
   ASSERT_OK(dut_->Init({}));
 
@@ -419,12 +412,10 @@ TEST_F(AmlSdmmcTest, DelayLineTuningFailingPoint) {
       "||||||||||||||||||||||||||||||||||||||||------------------------");
 
   dut_->set_board_config({
-      .supports_dma = true,
       .min_freq = 400000,
       .max_freq = 120000000,
       .version_3 = true,
       .prefs = 0,
-      .use_new_tuning = true,
   });
   ASSERT_OK(dut_->Init({}));
 
@@ -492,12 +483,10 @@ TEST_F(AmlSdmmcTest, DelayLineTuningEvenDivider) {
       "||||||||||||||||||||||||||||||-------------------------------|||");
 
   dut_->set_board_config({
-      .supports_dma = true,
       .min_freq = 400000,
       .max_freq = 120000000,
       .version_3 = true,
       .prefs = 0,
-      .use_new_tuning = true,
   });
   ASSERT_OK(dut_->Init({}));
 
@@ -564,12 +553,10 @@ TEST_F(AmlSdmmcTest, DelayLineTuningOddDivider) {
       "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
 
   dut_->set_board_config({
-      .supports_dma = true,
       .min_freq = 400000,
       .max_freq = 120000000,
       .version_3 = true,
       .prefs = 0,
-      .use_new_tuning = true,
   });
   ASSERT_OK(dut_->Init({}));
 
@@ -631,12 +618,10 @@ TEST_F(AmlSdmmcTest, DelayLineTuningCorrectFailingWindowIfLastOne) {
       "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
 
   dut_->set_board_config({
-      .supports_dma = true,
       .min_freq = 400000,
       .max_freq = 120000000,
       .version_3 = true,
       .prefs = 0,
-      .use_new_tuning = true,
   });
   ASSERT_OK(dut_->Init({}));
 

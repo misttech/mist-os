@@ -30,12 +30,10 @@ typedef struct {
 } aml_sdmmc_desc_t;
 
 typedef struct {
-  bool supports_dma;
   uint32_t min_freq;
   uint32_t max_freq;
   bool version_3;
   uint32_t prefs;
-  bool use_new_tuning;
 } aml_sdmmc_config_t;
 
 static const uint8_t aml_sdmmc_tuning_blk_pattern_4bit[64] = {

@@ -42,12 +42,10 @@ static const std::vector<fpbus::Bti> sd_btis{
 };
 
 static aml_sdmmc_config_t config = {
-    .supports_dma = true,
     .min_freq = 400'000,
     .max_freq = 50'000'000,
     .version_3 = true,
     .prefs = 0,
-    .use_new_tuning = true,
 };
 
 static const std::vector<fpbus::Metadata> sd_metadata{

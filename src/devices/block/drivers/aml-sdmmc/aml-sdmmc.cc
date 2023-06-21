@@ -1037,20 +1037,16 @@ zx_status_t AmlSdmmc::Init(const pdev_device_info_t& device_info) {
   }
 
   dev_info_.caps = SDMMC_HOST_CAP_BUS_WIDTH_8 | SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104 |
-                   SDMMC_HOST_CAP_SDR50 | SDMMC_HOST_CAP_DDR50;
-  if (board_config_.supports_dma) {
-    dev_info_.caps |= SDMMC_HOST_CAP_DMA;
-    status = descs_buffer_.Init(bti_.get(), AML_DMA_DESC_MAX_COUNT * sizeof(aml_sdmmc_desc_t),
-                                IO_BUFFER_RW | IO_BUFFER_CONTIG);
-    if (status != ZX_OK) {
-      AML_SDMMC_ERROR("Failed to allocate dma descriptors");
-      return status;
-    }
-    dev_info_.max_transfer_size = AML_DMA_DESC_MAX_COUNT * zx_system_get_page_size();
-  } else {
-    dev_info_.max_transfer_size = AML_SDMMC_MAX_PIO_DATA_SIZE;
+                   SDMMC_HOST_CAP_SDR50 | SDMMC_HOST_CAP_DDR50 | SDMMC_HOST_CAP_DMA;
+
+  status = descs_buffer_.Init(bti_.get(), AML_DMA_DESC_MAX_COUNT * sizeof(aml_sdmmc_desc_t),
+                              IO_BUFFER_RW | IO_BUFFER_CONTIG);
+  if (status != ZX_OK) {
+    AML_SDMMC_ERROR("Failed to allocate dma descriptors");
+    return status;
   }
 
+  dev_info_.max_transfer_size = AML_DMA_DESC_MAX_COUNT * zx_system_get_page_size();
   dev_info_.max_transfer_size_non_dma = AML_SDMMC_MAX_PIO_DATA_SIZE;
   max_freq_ = board_config_.max_freq;
   min_freq_ = board_config_.min_freq;
