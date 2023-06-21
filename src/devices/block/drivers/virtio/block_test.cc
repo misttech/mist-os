@@ -44,6 +44,15 @@ class FakeBackendForBlock : public virtio::FakeBackend {
 
   void set_status(uint8_t status) { status_ = status; }
 
+  uint64_t ReadFeatures() override {
+    uint64_t bitmap = FakeBackend::ReadFeatures();
+
+    // Declare support for VIRTIO_F_VERSION_1.
+    bitmap |= VIRTIO_F_VERSION_1;
+
+    return bitmap;
+  }
+
   void RingKick(uint16_t ring_index) override {
     FakeBackend::RingKick(ring_index);
 
@@ -155,11 +164,6 @@ class FakeBackendForBlock : public virtio::FakeBackend {
     std::scoped_lock lock(mutex_);
     terminate_ = true;
     cond_.notify_all();
-  }
-
- protected:
-  bool ReadSingleFeature(uint32_t bit_offset) override {
-    return (1ul << bit_offset) == VIRTIO_F_VERSION_1;
   }
 
  private:

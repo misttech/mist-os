@@ -62,6 +62,25 @@ class FakeBackendForNetdeviceTest : public FakeBackend {
     tx_ring_started_ = false;
   }
 
+  void SetFeatures(uint64_t bitmap) override { feature_bits_ |= bitmap; }
+
+  uint64_t ReadFeatures() override {
+    uint64_t bitmap = FakeBackend::ReadFeatures();
+
+    if (support_feature_v1_) {
+      bitmap |= VIRTIO_F_VERSION_1;
+    }
+
+    // Declare support for VIRTIO_NET_F_MAC. It is required by the driver implementation.
+    bitmap |= VIRTIO_NET_F_MAC;
+
+    // Declare support for VIRTIO_NET_F_STATUS. If not supported, the spec assumes that the link is
+    // always active. Enable this so we can test link status changes.
+    bitmap |= VIRTIO_NET_F_STATUS;
+
+    return bitmap;
+  }
+
   zx_status_t SetRing(uint16_t index, uint16_t count, zx_paddr_t pa_desc, zx_paddr_t pa_avail,
                       zx_paddr_t pa_used) override {
     switch (index) {
@@ -85,25 +104,6 @@ class FakeBackendForNetdeviceTest : public FakeBackend {
   bool tx_ring_started() const { return tx_ring_started_; }
   uint64_t feature_bits() const { return feature_bits_; }
   void SetSupportFeatureV1(bool v1) { support_feature_v1_ = v1; }
-
- protected:
-  void SetSingleFeature(uint32_t bit_offset) override { feature_bits_ |= (1ul << bit_offset); }
-
-  bool ReadSingleFeature(uint32_t bit_offset) override {
-    switch (1ul << bit_offset) {
-      case VIRTIO_NET_F_MAC:
-        // Required by driver implementation.
-        return true;
-      case VIRTIO_NET_F_STATUS:
-        // If not supported, spec assumes link is always active. Enable this so we can test link
-        // status changes.
-        return true;
-      case VIRTIO_F_VERSION_1:
-        return support_feature_v1_;
-      default:
-        return FakeBackend::ReadSingleFeature(bit_offset);
-    }
-  }
 
  private:
   sync_completion_t completion_;

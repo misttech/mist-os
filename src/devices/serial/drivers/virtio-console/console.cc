@@ -130,7 +130,7 @@ zx_status_t ConsoleDevice::Init() TA_NO_THREAD_SAFETY_ANALYSIS {
   // about the driver and negotiate supported features
   DeviceReset();
   DriverStatusAck();
-  if (!DeviceFeaturesSupported(VIRTIO_F_VERSION_1)) {
+  if (!(DeviceFeaturesSupported() & VIRTIO_F_VERSION_1)) {
     zxlogf(ERROR, "Legacy virtio interface is not supported by this driver");
     return ZX_ERR_NOT_SUPPORTED;
   }

@@ -131,28 +131,30 @@ zx_status_t NetworkDevice::Init() {
 
 zx_status_t NetworkDevice::AckFeatures(bool* is_status_supported, bool* is_multiqueue_supported,
                                        uint16_t* virtio_hdr_len) {
-  if (!DeviceFeaturesSupported(VIRTIO_NET_F_MAC)) {
+  const uint64_t supported_features = DeviceFeaturesSupported();
+
+  if (!(supported_features & VIRTIO_NET_F_MAC)) {
     zxlogf(ERROR, "device does not have a given MAC address.");
     return ZX_ERR_NOT_SUPPORTED;
   }
-  DriverFeaturesAck(VIRTIO_NET_F_MAC);
+  uint64_t enable_features = VIRTIO_NET_F_MAC;
 
-  if (DeviceFeaturesSupported(VIRTIO_NET_F_STATUS)) {
-    DriverFeaturesAck(VIRTIO_NET_F_STATUS);
+  if (supported_features & VIRTIO_NET_F_STATUS) {
+    enable_features |= VIRTIO_NET_F_STATUS;
     *is_status_supported = true;
   } else {
     *is_status_supported = false;
   }
 
-  if (DeviceFeaturesSupported(VIRTIO_NET_F_MQ)) {
-    DriverFeaturesAck(VIRTIO_NET_F_MQ);
+  if (supported_features & VIRTIO_NET_F_MQ) {
+    enable_features |= VIRTIO_NET_F_MQ;
     *is_multiqueue_supported = true;
   } else {
     *is_multiqueue_supported = false;
   }
 
-  if (DeviceFeaturesSupported(VIRTIO_F_VERSION_1)) {
-    DriverFeaturesAck(VIRTIO_F_VERSION_1);
+  if (supported_features & VIRTIO_F_VERSION_1) {
+    enable_features |= VIRTIO_F_VERSION_1;
     *virtio_hdr_len = sizeof(virtio_net_hdr_t);
   } else {
     // 5.1.6.1 Legacy Interface: Device Operation.
@@ -164,6 +166,8 @@ zx_status_t NetworkDevice::AckFeatures(bool* is_status_supported, bool* is_multi
     // https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html#x1-2050006
     *virtio_hdr_len = sizeof(virtio_legacy_net_hdr_t);
   }
+
+  DriverFeaturesAck(enable_features);
   return ZX_OK;
 }
 

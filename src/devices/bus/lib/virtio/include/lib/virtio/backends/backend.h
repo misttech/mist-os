@@ -30,25 +30,10 @@ class Backend {
   virtual zx_status_t Bind() = 0;
   virtual void Unbind() {}
 
-  // Returns true if all of the specified feature bits are set
-  bool ReadFeatures(uint64_t bitmap) {
-    for (uint32_t bit_offset = 0; bit_offset < sizeof(bitmap) * 8; bit_offset++) {
-      if (bitmap & (1ul << bit_offset) && !ReadSingleFeature(bit_offset)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
+  // Returns the bitmap of features supported by the device
+  virtual uint64_t ReadFeatures() = 0;
   // Does a Driver -> Device acknowledgement of all of the feature bits
-  void SetFeatures(uint64_t bitmap) {
-    for (uint32_t bit_offset = 0; bit_offset < sizeof(bitmap) * 8; bit_offset++) {
-      if (bitmap & (1ul << bit_offset)) {
-        SetSingleFeature(bit_offset);
-      }
-    }
-  }
-
+  virtual void SetFeatures(uint64_t bitmap) = 0;
   // Does a FEATURES_OK check
   virtual zx_status_t ConfirmFeatures() = 0;
 
@@ -98,11 +83,6 @@ class Backend {
   DISALLOW_COPY_ASSIGN_AND_MOVE(Backend);
 
  protected:
-  // Returns true if the specified feature bit is set
-  virtual bool ReadSingleFeature(uint32_t bit_offset) = 0;
-  // Does a Driver -> Device acknowledgement of a feature bit
-  virtual void SetSingleFeature(uint32_t bit_offset) = 0;
-
   // For derived backends who want to modify the IRQ mode
   fuchsia_hardware_pci::InterruptMode& irq_mode() { return irq_mode_; }
   std::vector<zx::interrupt>& irq_handles() { return irq_handles_; }

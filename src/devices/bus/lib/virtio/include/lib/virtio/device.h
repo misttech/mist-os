@@ -63,9 +63,7 @@ class Device {
 
  protected:
   // Methods for checking / acknowledging features
-  bool DeviceFeaturesSupported(uint64_t feature_bitmap) {
-    return backend_->ReadFeatures(feature_bitmap);
-  }
+  uint64_t DeviceFeaturesSupported() { return backend_->ReadFeatures(); }
   void DriverFeaturesAck(uint64_t feature_bitmap) { backend_->SetFeatures(feature_bitmap); }
   bool DeviceStatusFeaturesOk() { return backend_->ConfirmFeatures(); }
 

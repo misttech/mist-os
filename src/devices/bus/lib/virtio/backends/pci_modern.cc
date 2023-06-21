@@ -356,29 +356,40 @@ void PciModernBackend::RingKick(uint16_t ring_index) {
   *ptr = ring_index;
 }
 
-bool PciModernBackend::ReadSingleFeature(uint32_t bit_offset) {
-  fbl::AutoLock guard(&lock());
-  uint32_t select = bit_offset / 32;
-  uint32_t bit = bit_offset % 32;
-  uint32_t val;
+uint64_t PciModernBackend::ReadFeatures() {
+  auto read_subset_features = [this](uint32_t select) {
+    uint32_t val;
+    {
+      fbl::AutoLock guard(&lock());
+      MmioWrite(&common_cfg_->device_feature_select, select);
+      MmioRead(&common_cfg_->device_feature, &val);
+    }
+    return val;
+  };
 
-  MmioWrite(&common_cfg_->device_feature_select, select);
-  MmioRead(&common_cfg_->device_feature, &val);
-  bool is_set = (val & (1u << bit)) != 0;
-  zxlogf(DEBUG, "%s: read feature bit at offset %u = %u", tag(), bit_offset, is_set);
-  return is_set;
+  uint64_t bitmap = read_subset_features(1);
+  bitmap = bitmap << 32 | read_subset_features(0);
+  return bitmap;
 }
 
-void PciModernBackend::SetSingleFeature(uint32_t bit_offset) {
-  fbl::AutoLock guard(&lock());
-  uint32_t select = bit_offset / 32;
-  uint32_t bit = bit_offset % 32;
-  uint32_t val;
+void PciModernBackend::SetFeatures(uint64_t bitmap) {
+  auto write_subset_features = [this](uint32_t select, uint32_t sub_bitmap) {
+    fbl::AutoLock guard(&lock());
+    MmioWrite(&common_cfg_->driver_feature_select, select);
+    uint32_t val;
+    MmioRead(&common_cfg_->driver_feature, &val);
+    MmioWrite(&common_cfg_->driver_feature, val | sub_bitmap);
+    zxlogf(DEBUG, "%s: feature bits %08uh now set at offset %u", tag(), sub_bitmap, 32 * select);
+  };
 
-  MmioWrite(&common_cfg_->driver_feature_select, select);
-  MmioRead(&common_cfg_->driver_feature, &val);
-  MmioWrite(&common_cfg_->driver_feature, val | (1u << bit));
-  zxlogf(DEBUG, "%s: feature bit at offset %u now set", tag(), bit_offset);
+  uint32_t sub_bitmap = bitmap & UINT32_MAX;
+  if (sub_bitmap) {
+    write_subset_features(0, sub_bitmap);
+  }
+  sub_bitmap = bitmap >> 32;
+  if (sub_bitmap) {
+    write_subset_features(1, sub_bitmap);
+  }
 }
 
 zx_status_t PciModernBackend::ConfirmFeatures() {

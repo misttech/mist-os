@@ -115,6 +115,8 @@ class PciLegacyBackend : public PciBackend {
   void DeviceReset() final;
   void WaitForDeviceReset() final;
   uint32_t IsrStatus() final;
+  uint64_t ReadFeatures() final;
+  void SetFeatures(uint64_t bitmap) final;
   zx_status_t ConfirmFeatures() final;
 
   // These handle reading and writing a device's device config to allow derived
@@ -138,10 +140,6 @@ class PciLegacyBackend : public PciBackend {
                       zx_paddr_t pa_used) final;
   void RingKick(uint16_t ring_index) final;
 
- protected:
-  bool ReadSingleFeature(uint32_t bit_offset) final;
-  void SetSingleFeature(uint32_t bit_offset) final;
-
  private:
   void SetStatusBits(uint8_t bits);
   uint16_t bar0_base_ __TA_GUARDED(lock());
@@ -164,6 +162,8 @@ class PciModernBackend : public PciBackend {
   void DeviceReset() final;
   void WaitForDeviceReset() final;
   uint32_t IsrStatus() final;
+  uint64_t ReadFeatures() final;
+  void SetFeatures(uint64_t bitmap) final;
   zx_status_t ConfirmFeatures() final;
   zx_status_t ReadVirtioCap(uint8_t offset, virtio_pci_cap* cap);
 
@@ -191,10 +191,6 @@ class PciModernBackend : public PciBackend {
   zx_status_t SetRing(uint16_t index, uint16_t count, zx_paddr_t pa_desc, zx_paddr_t pa_avail,
                       zx_paddr_t pa_used) final;
   void RingKick(uint16_t ring_index) final;
-
- protected:
-  bool ReadSingleFeature(uint32_t bit_offset) final;
-  void SetSingleFeature(uint32_t bit_offset) final;
 
  private:
   zx_status_t MapBar(uint8_t bar);

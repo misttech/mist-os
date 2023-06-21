@@ -106,7 +106,7 @@ zx_status_t BlockDevice::Init() {
 
   DriverStatusAck();
 
-  if (!DeviceFeaturesSupported(VIRTIO_F_VERSION_1)) {
+  if (!(DeviceFeaturesSupported() & VIRTIO_F_VERSION_1)) {
     // Declaring non-support until there is a need in the future.
     zxlogf(ERROR, "Legacy virtio interface is not supported by this driver");
     return ZX_ERR_NOT_SUPPORTED;
