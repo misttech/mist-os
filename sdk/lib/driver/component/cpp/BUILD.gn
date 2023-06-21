@@ -16,25 +16,30 @@ sdk_source_set("cpp") {
 
   include_base = "//sdk"
 
-  public = [
+  sources = [
     "composite_node_spec.h",
+    "driver_base.cc",
     "driver_base.h",
     "driver_export.h",
-    "node_add_args.h",
-    "prepare_stop_completer.h",
-    "start_completer.h",
-  ]
-
-  sources = [
-    "driver_base.cc",
     "internal/basic_factory.h",
     "internal/lifecycle.cc",
     "internal/lifecycle.h",
     "internal/start_args.h",
     "internal/symbols.h",
     "node_add_args.cc",
+    "node_add_args.h",
     "prepare_stop_completer.cc",
+    "prepare_stop_completer.h",
     "start_completer.cc",
+    "start_completer.h",
+  ]
+
+  sdk_headers_for_internal_use = [
+    "internal/basic_factory.h",
+    "internal/lifecycle.cc",
+    "internal/lifecycle.h",
+    "internal/start_args.h",
+    "internal/symbols.h",
   ]
 
   public_deps = [
@@ -46,33 +51,6 @@ sdk_source_set("cpp") {
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/symbols",
     "//sdk/lib/fidl",
-  ]
-}
-
-source_set("cpp_internal") {
-  public = [
-    "internal/basic_factory.h",
-    "internal/lifecycle.h",
-    "internal/start_args.h",
-    "internal/symbols.h",
-  ]
-
-  deps = [ "//sdk/lib/driver/component/cpp" ]
-
-  # Adding additional labels to this visibility list is discouraged. If you are
-  # attempted to access a banjo protocol, please consider migrating your driver to
-  # use FIDL instead. If that is too arduous, then feel free to temporarily add your
-  # driver to this list. If you have other use cases for symbols, please consult the
-  # driver framework team to ensure your use case fits in with future architectural
-  # plans.
-  visibility = [
-    ":cpp_test",
-    "//sdk/lib/driver/testing/cpp",
-    "//src/devices/bin/driver_host2:*",
-    "//src/devices/bin/driver_manager/*",
-    "//src/devices/misc/drivers/compat:*",
-    "//src/devices/tests/v2/v1_lifecycle:*",
-    "//src/ui/input/drivers/hid-input-report:*",
   ]
 }
 
@@ -104,7 +82,6 @@ executable("cpp_test") {
 
   deps = [
     ":cpp",
-    ":cpp_internal",
     ":test_base",
     "tests/fidl:fuchsia.driver.component.test_cpp_driver_wire",
     "tests/fidl:fuchsia.driver.component.test_cpp_wire",

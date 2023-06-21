@@ -206,7 +206,6 @@ source_set("lib") {
   ]
 
   deps = [
-    "//sdk/lib/driver/component/cpp:cpp_internal",
     "//src/lib/fsl",
     "//src/lib/zbitl",
   ]

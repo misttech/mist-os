@@ -33,7 +33,6 @@ source_set("driver_runner") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/component/cpp:cpp_internal",
     "//sdk/lib/zbi-format",
     "//src/bringup/lib/mexec",
     "//src/devices/bin/driver_manager:binding",

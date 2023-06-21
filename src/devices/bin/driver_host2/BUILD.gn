@@ -24,7 +24,6 @@ source_set("driver") {
   ]
 
   deps = [
-    "//sdk/lib/driver/component/cpp:cpp_internal",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//sdk/lib/fit",
     "//src/devices/lib/log",
@@ -84,7 +83,6 @@ fuchsia_driver("test_driver_driver") {
     ":fuchsia.driverhost.test_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/component/cpp:cpp_internal",
     "//src/devices/lib/driver:driver_runtime",
   ]
 }
