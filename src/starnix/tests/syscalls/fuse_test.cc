@@ -226,4 +226,14 @@ TEST_F(FuseTest, Mkdir) {
   ASSERT_TRUE(S_ISDIR(stats.st_mode));
 }
 
+TEST_F(FuseTest, Symlink) {
+  ASSERT_TRUE(Mount());
+  std::string witness = GetMountDir() + "/witness";
+  std::string link = GetMountDir() + "/symlink";
+  ASSERT_EQ(symlink(witness.c_str(), link.c_str()), 0);
+  struct stat stats;
+  ASSERT_EQ(lstat(link.c_str(), &stats), 0);
+  ASSERT_TRUE(S_ISLNK(stats.st_mode));
+}
+
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
