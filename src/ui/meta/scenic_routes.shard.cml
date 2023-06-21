@@ -42,11 +42,6 @@
             subdir: "scenic",
         },
         {
-            directory: "dev-display-coordinator",
-            from: "parent",
-            to: "#scenic",
-        },
-        {
             storage: "tmp",
             from: "parent",
             to: "#scenic",
