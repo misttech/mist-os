@@ -152,7 +152,7 @@ async fn main() -> Result<(), Error> {
                     .expect("failed to start container");
             }
             KernelServices::ComponentRunner(stream) => {
-                execution::serve_component_runner(stream, container.wait().await.clone())
+                execution::serve_component_runner(stream, container.wait().await)
                     .await
                     .expect("failed to start component runner");
             }

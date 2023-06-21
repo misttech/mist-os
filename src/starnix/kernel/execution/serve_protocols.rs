@@ -10,7 +10,7 @@ use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_zircon as zx;
 use futures::{AsyncReadExt, AsyncWriteExt, TryStreamExt};
-use std::{ffi::CString, rc::Rc, sync::Arc};
+use std::{ffi::CString, sync::Arc};
 
 use crate::{
     execution::{execute_task, Container},
@@ -36,23 +36,22 @@ pub fn expose_root(
 }
 
 pub async fn serve_component_runner(
-    mut request_stream: frunner::ComponentRunnerRequestStream,
-    container: Rc<Container>,
+    request_stream: frunner::ComponentRunnerRequestStream,
+    container: &Container,
 ) -> Result<(), Error> {
-    while let Some(event) = request_stream.try_next().await? {
-        match event {
-            frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
-                let container = container.clone();
-                fasync::Task::local(async move {
-                    if let Err(e) = start_component(start_info, controller, &container).await {
+    request_stream
+        .try_for_each_concurrent(None, |event| async {
+            match event {
+                frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
+                    if let Err(e) = start_component(start_info, controller, container).await {
                         log_error!("failed to start component: {:?}", e);
                     }
-                })
-                .detach();
+                }
             }
-        }
-    }
-    Ok(())
+            Ok(())
+        })
+        .await
+        .map_err(Error::from)
 }
 
 fn to_winsize(window_size: Option<fstarcontainer::ConsoleWindowSize>) -> uapi::winsize {
@@ -67,63 +66,68 @@ fn to_winsize(window_size: Option<fstarcontainer::ConsoleWindowSize>) -> uapi::w
 }
 
 pub async fn serve_container_controller(
-    mut request_stream: fstarcontainer::ControllerRequestStream,
+    request_stream: fstarcontainer::ControllerRequestStream,
     container: &Container,
 ) -> Result<(), Error> {
-    while let Some(event) = request_stream.try_next().await? {
-        match event {
-            fstarcontainer::ControllerRequest::VsockConnect { port, bridge_socket, .. } => {
-                connect_to_vsock(port, bridge_socket, container).await.unwrap_or_else(|e| {
-                    log_error!("failed to connect to vsock {:?}", e);
-                });
-            }
-            fstarcontainer::ControllerRequest::SpawnConsole { payload, responder } => {
-                if let (Some(console), Some(binary_path)) = (payload.console, payload.binary_path) {
-                    let binary_path = CString::new(binary_path)?;
-                    let argv = payload
-                        .argv
-                        .unwrap_or(vec![])
-                        .into_iter()
-                        .map(CString::new)
-                        .collect::<Result<Vec<_>, _>>()?;
-                    let environ = payload
-                        .environ
-                        .unwrap_or(vec![])
-                        .into_iter()
-                        .map(CString::new)
-                        .collect::<Result<Vec<_>, _>>()?;
-                    match create_task_with_pty(
-                        &container.kernel,
-                        binary_path,
-                        argv,
-                        environ,
-                        to_winsize(payload.window_size),
-                    ) {
-                        Ok((current_task, pty)) => {
-                            execute_task(current_task, move |result| {
-                                let _ = match result {
-                                    Ok(ExitStatus::Exit(exit_code)) => {
-                                        responder.send(Ok(exit_code))
-                                    }
-                                    _ => responder.send(Err(zx::Status::CANCELED.into_raw())),
-                                };
-                            });
-                            let _ = forward_to_pty(container, console, pty).map_err(|e| {
-                                log_error!("failed to forward to terminal {:?}", e);
-                            });
+    request_stream
+        .map_err(Error::from)
+        .try_for_each_concurrent(None, |event| async {
+            match event {
+                fstarcontainer::ControllerRequest::VsockConnect { port, bridge_socket, .. } => {
+                    connect_to_vsock(port, bridge_socket, container).await.unwrap_or_else(|e| {
+                        log_error!("failed to connect to vsock {:?}", e);
+                    });
+                }
+                fstarcontainer::ControllerRequest::SpawnConsole { payload, responder } => {
+                    if let (Some(console), Some(binary_path)) =
+                        (payload.console, payload.binary_path)
+                    {
+                        let binary_path = CString::new(binary_path)?;
+                        let argv = payload
+                            .argv
+                            .unwrap_or(vec![])
+                            .into_iter()
+                            .map(CString::new)
+                            .collect::<Result<Vec<_>, _>>()?;
+                        let environ = payload
+                            .environ
+                            .unwrap_or(vec![])
+                            .into_iter()
+                            .map(CString::new)
+                            .collect::<Result<Vec<_>, _>>()?;
+                        match create_task_with_pty(
+                            &container.kernel,
+                            binary_path,
+                            argv,
+                            environ,
+                            to_winsize(payload.window_size),
+                        ) {
+                            Ok((current_task, pty)) => {
+                                execute_task(current_task, move |result| {
+                                    let _ = match result {
+                                        Ok(ExitStatus::Exit(exit_code)) => {
+                                            responder.send(Ok(exit_code))
+                                        }
+                                        _ => responder.send(Err(zx::Status::CANCELED.into_raw())),
+                                    };
+                                });
+                                let _ = forward_to_pty(container, console, pty).map_err(|e| {
+                                    log_error!("failed to forward to terminal {:?}", e);
+                                });
+                            }
+                            Err(errno) => {
+                                log_error!("failed to create task with pty {:?}", errno);
+                                responder.send(Err(zx::Status::IO.into_raw()))?;
+                            }
                         }
-                        Err(errno) => {
-                            log_error!("failed to create task with pty {:?}", errno);
-                            responder.send(Err(zx::Status::IO.into_raw()))?;
-                        }
+                    } else {
+                        responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?;
                     }
-                } else {
-                    responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?;
                 }
             }
-        }
-    }
-    Ok(())
+            Ok(())
+        })
+        .await
 }
 
 async fn connect_to_vsock(

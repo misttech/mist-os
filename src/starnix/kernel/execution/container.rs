@@ -182,7 +182,7 @@ pub async fn create_component_from_stream(
                 let config = get_config_from_component_start_info(start_info);
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
                 let container = create_container(config, sender).await?;
-                fasync::Task::spawn(server_component_controller(request_stream, receiver)).detach();
+                fasync::Task::local(server_component_controller(request_stream, receiver)).detach();
                 return Ok(container);
             }
         }
@@ -275,34 +275,27 @@ async fn create_container(
 
         fs.serve_connection(outgoing_dir.into()).map_err(|_| errno!(EINVAL))?;
 
-        let container_clone = container.clone();
-        fasync::Task::local(async move {
-            let container_clone = container_clone.clone();
-            while let Some(request_stream) = fs.next().await {
-                let container_clone = container_clone.clone();
-                match request_stream {
-                    ExposedServices::ComponentRunner(request_stream) => {
-                        fasync::Task::local(async move {
-                            match serve_component_runner(request_stream, container_clone.clone())
-                                .await
-                            {
+        fasync::Task::local({
+            let container = container.clone();
+            async move {
+                fs.for_each_concurrent(None, |request_stream| async {
+                    match request_stream {
+                        ExposedServices::ComponentRunner(request_stream) => {
+                            match serve_component_runner(request_stream, &container).await {
                                 Ok(_) => {}
                                 Err(e) => {
                                     log_error!("Error serving component runner: {:?}", e);
                                 }
                             }
-                        })
-                        .detach();
-                    }
-                    ExposedServices::ContainerController(request_stream) => {
-                        fasync::Task::local(async move {
-                            serve_container_controller(request_stream, &container_clone)
+                        }
+                        ExposedServices::ContainerController(request_stream) => {
+                            serve_container_controller(request_stream, &container)
                                 .await
                                 .expect("failed to start container.")
-                        })
-                        .detach();
+                        }
                     }
-                }
+                })
+                .await;
             }
         })
         .detach();
