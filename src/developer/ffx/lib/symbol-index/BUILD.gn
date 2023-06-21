@@ -113,7 +113,7 @@ if (current_toolchain == default_toolchain) {
 
   sdk_data("symbol-index-sdk") {
     category = "partner"
-    name = "symbol-index"
+    name = "symbol_index"
     file = "$target_gen_dir/symbol-index-sdk.json"
     type = "config"
     non_sdk_deps = [ ":symbol-index-sdk-file" ]

@@ -27,8 +27,9 @@ pub async fn ensure_symbol_index_registered(sdk: &Sdk) -> Result<()> {
         }
         symbol_index_path
     } else {
-        sdk.get_path_prefix().join("data/config/symbol-index*/config.json")
+        sdk.get_path_prefix().join("data/config/symbol_index*/config.json")
     };
+
     let symbol_index_path = pathbuf_to_string(symbol_index_path)?;
 
     let global_symbol_index = global_symbol_index_path()?;

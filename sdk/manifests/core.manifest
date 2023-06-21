@@ -4,7 +4,7 @@ sdk://component_manifest/sys/testing
 sdk://component_manifest/syslog
 sdk://component_manifest/trace
 sdk://component_manifest/vulkan
-sdk://data/symbol-index
+sdk://data/symbol_index
 sdk://docs/low_level
 sdk://docs/metadata_schemas
 sdk://docs/musl_license
