@@ -31,6 +31,24 @@ dependencies:
   standard_message_codec: ^0.0.1
   strings: ^0.2.2
   test: ^1.22.0
+  # The relationship between matcher and test_api inverted in matcher 0.12.15 and test_api 0.6.0;
+  # before these versions, test_api depended on matcher, and after these versions, matcher depends
+  # on test_api.
+  #
+  # This is further complicated by the fact that flutter_tools depends on a precise version of
+  # test_api here:
+  # https://github.com/flutter/flutter/blob/796c8ef/packages/flutter_tools/pubspec.yaml#L56
+  # and that version happens to be < 0.6.0.
+  #
+  # For reasons I don't entirely understand, if we do not pin matcher here, then the version
+  # resolver selects 0.12.15, which depends on test_api, and we get a dependency cycle.
+  #
+  # This problem goes away in later versions of flutter, but these are not accessible to us because
+  # https://flutter-review.googlesource.com/c/recipes/+/43200 disabled uploading of
+  # flutter/sky_engine to CIPD, which is needed for any version of flutter we try to update to. Thus
+  # at the time of this writing the flutter version linked above is the terminal one that will ever
+  # roll into fuchsia.
+  matcher: 0.12.14
   tuple: ^2.0.1
   uuid: ^3.0.7
   webdriver: ^3.0.1
