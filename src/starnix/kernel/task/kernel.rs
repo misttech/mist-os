@@ -6,12 +6,12 @@ use fidl::endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy};
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use netlink::{Netlink, NETLINK_LOG_TAG};
+use netlink::{interfaces::InterfacesHandler, Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashSet},
     iter::FromIterator,
-    sync::Arc,
+    sync::{Arc, Weak},
 };
 
 use crate::{
@@ -136,6 +136,26 @@ pub struct Kernel {
     network_netlink: OnceCell<Netlink<NetlinkSenderReceiverProvider>>,
 }
 
+/// An implementation of [`InterfacesHandler`].
+///
+/// This holds a `Weak<Kernel>` because it is held within a [`Netlink`] which
+/// is itself held within an `Arc<Kernel>`. Holding an `Arc<T>` within an
+/// `Arc<T>` prevents the `Arc`'s ref count from ever reaching 0, causing a
+/// leak.
+struct InterfacesHandlerImpl(Weak<Kernel>);
+
+impl InterfacesHandler for InterfacesHandlerImpl {
+    fn handle_new_link(&mut self, _name: &str) {
+        // TODO(https://fxbug.dev/128995): Create per-device /proc/sys/net
+        // directories.
+    }
+
+    fn handle_deleted_link(&mut self, _name: &str) {
+        // TODO(https://fxbug.dev/128995): Remove per-device /proc/sys/net
+        // directories.
+    }
+}
+
 impl Kernel {
     pub fn new(
         name: &[u8],
@@ -202,9 +222,12 @@ impl Kernel {
     ///
     /// This function follows the lazy initialization pattern, where the first
     /// call will instantiate the Netlink implementation.
-    pub(crate) fn network_netlink(&self) -> &Netlink<NetlinkSenderReceiverProvider> {
+    pub(crate) fn network_netlink<'a>(
+        self: &'a Arc<Self>,
+    ) -> &'a Netlink<NetlinkSenderReceiverProvider> {
         self.network_netlink.get_or_init(|| {
-            let (network_netlink, network_netlink_async_worker) = Netlink::new();
+            let (network_netlink, network_netlink_async_worker) =
+                Netlink::new(InterfacesHandlerImpl(Arc::downgrade(self)));
             self.kthreads.dispatch(move || {
                 fasync::LocalExecutor::new().run_singlethreaded(network_netlink_async_worker);
                 log_error!(tag = NETLINK_LOG_TAG, "Netlink async worker unexpectedly exited");

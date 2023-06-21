@@ -49,6 +49,15 @@ use crate::{
     NETLINK_LOG_TAG,
 };
 
+/// A handler for interface events.
+pub trait InterfacesHandler: Send + Sync + 'static {
+    /// Handle a new link.
+    fn handle_new_link(&mut self, name: &str);
+
+    /// Handle a deleted link.
+    fn handle_deleted_link(&mut self, name: &str);
+}
+
 /// Arguments for an RTM_GETLINK [`Request`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum GetLinkArgs {
@@ -203,7 +212,9 @@ pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessa
 ///
 /// Connects to the interfaces watcher and can respond to RTM_LINK and RTM_ADDR
 /// message requests.
-pub(crate) struct EventLoop<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
+pub(crate) struct EventLoop<H, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
+    /// A handler for interface events.
+    interfaces_handler: H,
     /// An `InterfacesProxy` to get controlling access to interfaces.
     interfaces_proxy: fnet_root::InterfacesProxy,
     /// A `StateProxy` to connect to the interfaces watcher.
@@ -280,10 +291,13 @@ async fn set_link_address(
     }
 }
 
-impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
+impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>
+    EventLoop<H, S>
+{
     /// `new` returns a `Result<EventLoop, EventLoopError>` instance.
     /// This is fallible iff it is not possible to obtain the `StateProxy`.
     pub(crate) fn new(
+        interfaces_handler: H,
         route_clients: ClientTable<NetlinkRoute, S>,
         request_stream: mpsc::Receiver<Request<S>>,
     ) -> Result<Self, EventLoopError<InterfacesFidlError, InterfacesNetstackError>> {
@@ -293,7 +307,13 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
         let state_proxy = connect_to_protocol::<fnet_interfaces::StateMarker>()
             .map_err(|e| EventLoopError::Fidl(InterfacesFidlError::State(e)))?;
 
-        Ok(EventLoop { interfaces_proxy, state_proxy, route_clients, request_stream })
+        Ok(EventLoop {
+            interfaces_handler,
+            interfaces_proxy,
+            state_proxy,
+            route_clients,
+            request_stream,
+        })
     }
 
     /// Run the asynchronous work related to RTM_LINK and RTM_ADDR messages.
@@ -304,7 +324,13 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
     /// event loop task, for example, if the watcher stream ends or if
     /// the FIDL protocol cannot be connected.
     pub(crate) async fn run(self) -> EventLoopError<InterfacesFidlError, InterfacesNetstackError> {
-        let EventLoop { interfaces_proxy, state_proxy, route_clients, request_stream } = self;
+        let EventLoop {
+            mut interfaces_handler,
+            interfaces_proxy,
+            state_proxy,
+            route_clients,
+            request_stream,
+        } = self;
         let if_event_stream = {
             let stream_res = fnet_interfaces_ext::event_stream_from_state(
                 &state_proxy,
@@ -362,6 +388,8 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
                 {
                     *addresses = interface_addresses;
                 }
+
+                interfaces_handler.handle_new_link(&properties.name);
             }
 
             interface_properties
@@ -388,6 +416,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
                     };
 
                     match handle_interface_watcher_event(
+                        &mut interfaces_handler,
                         &interfaces_proxy,
                         &mut interface_properties,
                         &route_clients,
@@ -727,8 +756,10 @@ fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
 /// Returns an `InterfaceEventLoopError` when unexpected events occur, or an
 /// `UpdateError` when updates are not consistent with the current state.
 async fn handle_interface_watcher_event<
+    H: InterfacesHandler,
     S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
 >(
+    interfaces_handler: &mut H,
     interfaces_proxy: &fnet_root::InterfacesProxy,
     interface_properties: &mut BTreeMap<
         u64,
@@ -764,6 +795,8 @@ async fn handle_interface_watcher_event<
             {
                 update_addresses(addresses, updated_addresses, route_clients);
             }
+
+            interfaces_handler.handle_new_link(&properties.name);
 
             debug!(tag = NETLINK_LOG_TAG, "processed add/existing event for id {}", properties.id);
         }
@@ -838,6 +871,8 @@ async fn handle_interface_watcher_event<
                     ModernGroup(RTNLGRP_LINK),
                 )
             }
+
+            interfaces_handler.handle_deleted_link(&properties.name);
 
             debug!(
                 tag = NETLINK_LOG_TAG,
@@ -1167,6 +1202,8 @@ fn interface_properties_to_address_messages(
 pub(crate) mod testutil {
     use super::*;
 
+    use std::sync::{Arc, Mutex};
+
     use fuchsia_zircon as zx;
     use futures::stream::Stream;
     use net_declare::{fidl_subnet, net_addr_subnet};
@@ -1205,11 +1242,58 @@ pub(crate) mod testutil {
         net_addr_subnet!("2001:db8::1/32")
     }
 
+    #[derive(Debug, PartialEq, Eq)]
+    pub(crate) enum HandledLinkKind {
+        New,
+        Del,
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    pub(crate) struct HandledLink {
+        pub name: String,
+        pub kind: HandledLinkKind,
+    }
+
+    pub(crate) struct FakeInterfacesHandlerSink(Arc<Mutex<Vec<HandledLink>>>);
+
+    impl FakeInterfacesHandlerSink {
+        pub(crate) fn take_handled(&mut self) -> Vec<HandledLink> {
+            let Self(rc) = self;
+            core::mem::take(&mut *rc.lock().unwrap())
+        }
+    }
+
+    pub(crate) struct FakeInterfacesHandler(Arc<Mutex<Vec<HandledLink>>>);
+
+    impl FakeInterfacesHandler {
+        pub(crate) fn new() -> (FakeInterfacesHandler, FakeInterfacesHandlerSink) {
+            let inner = Arc::default();
+            (FakeInterfacesHandler(Arc::clone(&inner)), FakeInterfacesHandlerSink(inner))
+        }
+    }
+
+    impl InterfacesHandler for FakeInterfacesHandler {
+        fn handle_new_link(&mut self, name: &str) {
+            let Self(rc) = self;
+            rc.lock()
+                .unwrap()
+                .push(HandledLink { name: name.to_string(), kind: HandledLinkKind::New })
+        }
+
+        fn handle_deleted_link(&mut self, name: &str) {
+            let Self(rc) = self;
+            rc.lock()
+                .unwrap()
+                .push(HandledLink { name: name.to_string(), kind: HandledLinkKind::Del })
+        }
+    }
+
     pub(crate) struct Setup<W> {
-        pub event_loop: EventLoop<FakeSender<RtnlMessage>>,
+        pub event_loop: EventLoop<FakeInterfacesHandler, FakeSender<RtnlMessage>>,
         pub watcher_stream: W,
         pub request_sink: mpsc::Sender<Request<FakeSender<RtnlMessage>>>,
         pub interfaces_request_stream: fnet_root::InterfacesRequestStream,
+        pub interfaces_handler_sink: FakeInterfacesHandlerSink,
     }
 
     pub(crate) fn setup_with_route_clients(
@@ -1220,7 +1304,9 @@ pub(crate) mod testutil {
         let (state_proxy, if_stream) =
             fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>().unwrap();
         let (request_sink, request_stream) = mpsc::channel(1);
-        let event_loop = EventLoop::<FakeSender<_>> {
+        let (interfaces_handler, interfaces_handler_sink) = FakeInterfacesHandler::new();
+        let event_loop = EventLoop::<FakeInterfacesHandler, FakeSender<_>> {
+            interfaces_handler,
             interfaces_proxy,
             state_proxy,
             route_clients,
@@ -1238,7 +1324,13 @@ pub(crate) mod testutil {
             .try_flatten()
             .map(|res| res.expect("watcher stream error"));
 
-        Setup { event_loop, watcher_stream, request_sink, interfaces_request_stream }
+        Setup {
+            event_loop,
+            watcher_stream,
+            request_sink,
+            interfaces_request_stream,
+            interfaces_handler_sink,
+        }
     }
 
     pub(crate) fn setup() -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
@@ -1506,8 +1598,13 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_stream_ended() {
-        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream } =
-            setup();
+        let Setup {
+            event_loop,
+            watcher_stream,
+            request_sink: _,
+            interfaces_request_stream,
+            interfaces_handler_sink: _,
+        } = setup();
         let event_loop_fut = event_loop.run();
         let interfaces = vec![get_fake_interface(1, "lo", LOOPBACK)];
         let watcher_fut =
@@ -1525,8 +1622,13 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_duplicate_events() {
-        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream: _ } =
-            setup();
+        let Setup {
+            event_loop,
+            watcher_stream,
+            request_sink: _,
+            interfaces_request_stream: _,
+            interfaces_handler_sink: _,
+        } = setup();
         let event_loop_fut = event_loop.run();
         let interfaces =
             vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(1, "lo", LOOPBACK)];
@@ -1546,8 +1648,13 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_duplicate_adds() {
-        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream } =
-            setup();
+        let Setup {
+            event_loop,
+            watcher_stream,
+            request_sink: _,
+            interfaces_request_stream,
+            interfaces_handler_sink: _,
+        } = setup();
         let event_loop_fut = event_loop.run();
         let interfaces_existing = vec![get_fake_interface(1, "lo", LOOPBACK)];
         let interfaces_new = vec![get_fake_interface(1, "lo", LOOPBACK)];
@@ -1571,8 +1678,13 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_existing_after_add() {
-        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream } =
-            setup();
+        let Setup {
+            event_loop,
+            watcher_stream,
+            request_sink: _,
+            interfaces_request_stream,
+            interfaces_handler_sink: _,
+        } = setup();
         let event_loop_fut = event_loop.run();
         let interfaces_existing =
             vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(2, "eth001", ETHERNET)];
@@ -1700,16 +1812,21 @@ mod tests {
                 ModernGroup(RTNLGRP_IPV4_IFADDR),
             ],
         );
-        let Setup { event_loop, mut watcher_stream, request_sink: _, interfaces_request_stream } =
-            setup_with_route_clients({
-                let route_clients = ClientTable::default();
-                route_clients.add_client(link_client);
-                route_clients.add_client(addr4_client);
-                route_clients.add_client(addr6_client);
-                route_clients.add_client(all_client);
-                route_clients.add_client(other_client);
-                route_clients
-            });
+        let Setup {
+            event_loop,
+            mut watcher_stream,
+            request_sink: _,
+            interfaces_request_stream,
+            mut interfaces_handler_sink,
+        } = setup_with_route_clients({
+            let route_clients = ClientTable::default();
+            route_clients.add_client(link_client);
+            route_clients.add_client(addr4_client);
+            route_clients.add_client(addr6_client);
+            route_clients.add_client(all_client);
+            route_clients.add_client(other_client);
+            route_clients
+        });
         let event_loop_fut = event_loop.run().fuse();
         futures::pin_mut!(event_loop_fut);
         let root_interfaces_fut =
@@ -1806,6 +1923,17 @@ mod tests {
                 fidl::Error::ClientChannelClosed { .. },
             ))
         );
+        assert_eq!(
+            interfaces_handler_sink.take_handled(),
+            [
+                HandledLink { name: LO_NAME.to_string(), kind: HandledLinkKind::New },
+                HandledLink { name: ETH_NAME.to_string(), kind: HandledLinkKind::New },
+                HandledLink { name: PPP_NAME.to_string(), kind: HandledLinkKind::New },
+                HandledLink { name: WLAN_NAME.to_string(), kind: HandledLinkKind::New },
+                HandledLink { name: ETH_NAME.to_string(), kind: HandledLinkKind::Del },
+            ],
+        );
+
         let wlan_link = SentMessage::multicast(
             create_netlink_link_message(
                 WLAN_INTERFACE_ID,
@@ -1994,13 +2122,18 @@ mod tests {
             crate::client::testutil::CLIENT_ID_2,
             &[],
         );
-        let Setup { event_loop, mut watcher_stream, mut request_sink, interfaces_request_stream } =
-            setup_with_route_clients({
-                let route_clients = ClientTable::default();
-                route_clients.add_client(expected_client.clone());
-                route_clients.add_client(other_client);
-                route_clients
-            });
+        let Setup {
+            event_loop,
+            mut watcher_stream,
+            mut request_sink,
+            interfaces_request_stream,
+            interfaces_handler_sink: _,
+        } = setup_with_route_clients({
+            let route_clients = ClientTable::default();
+            route_clients.add_client(expected_client.clone());
+            route_clients.add_client(other_client);
+            route_clients
+        });
         let event_loop_fut = event_loop.run().fuse();
         futures::pin_mut!(event_loop_fut);
 

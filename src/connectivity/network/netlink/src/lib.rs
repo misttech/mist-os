@@ -13,7 +13,7 @@
 
 mod client;
 mod errors;
-mod interfaces;
+pub mod interfaces;
 pub mod messaging;
 pub mod multicast_groups;
 mod netlink_packet;
@@ -63,11 +63,16 @@ impl<P: SenderReceiverProvider> Netlink<P> {
     /// Callers are responsible for polling the worker [`Future`], which drives
     /// the Netlink implementation's asynchronous work. The worker will never
     /// complete.
-    pub fn new() -> (Self, impl Future<Output = ()> + Send) {
+    pub fn new<H: interfaces::InterfacesHandler>(
+        interfaces_handler: H,
+    ) -> (Self, impl Future<Output = ()> + Send) {
         let (route_client_sender, route_client_receiver) = mpsc::unbounded();
         (
             Netlink { id_generator: ClientIdGenerator::default(), route_client_sender },
-            run_netlink_worker(NetlinkWorkerParams::<P> { route_client_receiver }),
+            run_netlink_worker(NetlinkWorkerParams::<_, P> {
+                interfaces_handler,
+                route_client_receiver,
+            }),
         )
     }
 
@@ -112,7 +117,8 @@ pub enum NewClientError {
 }
 
 /// Parameters used to start the Netlink asynchronous worker.
-struct NetlinkWorkerParams<P: SenderReceiverProvider> {
+struct NetlinkWorkerParams<H, P: SenderReceiverProvider> {
+    interfaces_handler: H,
     /// Receiver of newly created `NETLINK_ROUTE` clients.
     route_client_receiver: UnboundedReceiver<
         ClientWithReceiver<
@@ -126,8 +132,10 @@ struct NetlinkWorkerParams<P: SenderReceiverProvider> {
 /// The worker encompassing all asynchronous Netlink work.
 ///
 /// The worker is never expected to complete.
-async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerParams<P>) {
-    let NetlinkWorkerParams { route_client_receiver } = params;
+async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverProvider>(
+    params: NetlinkWorkerParams<H, P>,
+) {
+    let NetlinkWorkerParams { interfaces_handler, route_client_receiver } = params;
 
     let route_clients = ClientTable::default();
     let (interfaces_request_sink, interfaces_request_stream) = mpsc::channel(1);
@@ -199,18 +207,21 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
         // Interfaces Worker.
         {
             fasync::Task::spawn(async move {
-                let worker =
-                    match interfaces::EventLoop::new(route_clients, interfaces_request_stream) {
-                        Ok(worker) => worker,
-                        Err(EventLoopError::Fidl(e)) => {
-                            panic!("Interfaces event loop creation error: {:?}", e)
-                        }
-                        Err(EventLoopError::Netstack(_)) => {
-                            unreachable!(
-                                "The Netstack variant is not returned when creating a new worker"
-                            );
-                        }
-                    };
+                let worker = match interfaces::EventLoop::new(
+                    interfaces_handler,
+                    route_clients,
+                    interfaces_request_stream,
+                ) {
+                    Ok(worker) => worker,
+                    Err(EventLoopError::Fidl(e)) => {
+                        panic!("Interfaces event loop creation error: {:?}", e)
+                    }
+                    Err(EventLoopError::Netstack(_)) => {
+                        unreachable!(
+                            "The Netstack variant is not returned when creating a new worker"
+                        );
+                    }
+                };
                 panic!("Interfaces event loop error: {:?}", worker.run().await);
             })
         },
