@@ -81,8 +81,8 @@ foreach(funcs,
 
     cflags = []
 
-    # gcc is not correctly honoring -fno-builtin-memmove, but -fno-builtin
-    # correctly suppresses the call to memmove.
+    # TODO(fxbug.dev/129360): gcc is not correctly honoring -fno-builtin-memmove,
+    # but -fno-builtin correctly suppresses the call to memmove.
     if (funcs[0] == "memcpy" && is_gcc) {
       cflags += [ "-fno-builtin" ]
     }
