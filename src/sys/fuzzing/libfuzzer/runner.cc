@@ -30,6 +30,7 @@
 #include "src/lib/files/path.h"
 #include "src/sys/fuzzing/common/dictionary.h"
 #include "src/sys/fuzzing/common/status.h"
+#include "src/sys/fuzzing/libfuzzer/stats.h"
 
 namespace fuzzing {
 namespace {
@@ -42,10 +43,6 @@ const char* kSeedCorpusPath = "/tmp/seed_corpus";
 const char* kTempCorpusPath = "/tmp/temp_corpus";
 const char* kDictionaryPath = "/tmp/dictionary";
 const char* kResultInputPath = "/tmp/result_input";
-
-constexpr zx_duration_t kOneSecond = ZX_SEC(1);
-constexpr size_t kOneKb = 1ULL << 10;
-constexpr size_t kOneMb = 1ULL << 20;
 
 // See libFuzzer's |fuzzer::FuzzingOptions|.
 constexpr int64_t kLibFuzzerNoErrorExitCode = 0;
@@ -769,7 +766,7 @@ ZxPromise<> LibFuzzerRunner::ParseStderr() {
 
           // When running explicit test inputs, libFuzzer doesn't save artifacts. Record the input
           // name to determine which caused the error.
-          re2::StringPiece input(std::move(line));
+          re2::StringPiece input(line);
           if (re2::RE2::Consume(&input, "Running: (\\S+)", &result_input_pathname_)) {
             continue;
           }
@@ -778,60 +775,10 @@ ZxPromise<> LibFuzzerRunner::ParseStderr() {
             continue;
           }
 
-          // These patterns should match libFuzzer's |Fuzzer::PrintStats|.
-          uint32_t runs;
-          if (!re2::RE2::Consume(&input, "#(\\d+)", &runs)) {
-            continue;
+          UpdateReason reason;
+          if (ParseLibFuzzerStats(line, &reason, &status_)) {
+            UpdateMonitors(reason);
           }
-          status_.set_runs(runs);
-
-          // Parse reason.
-          std::string reason_str;
-          if (!re2::RE2::Consume(&input, "\\t(\\S+)", &reason_str)) {
-            continue;
-          }
-          auto reason = UpdateReason::PULSE;  // By default, assume it's just a status update.
-          if (reason_str == "INITED") {
-            reason = UpdateReason::INIT;
-          } else if (reason_str == "NEW") {
-            reason = UpdateReason::NEW;
-          } else if (reason_str == "REDUCE") {
-            reason = UpdateReason::REDUCE;
-          } else if (reason_str == "DONE") {
-            reason = UpdateReason::DONE;
-            status_.set_running(false);
-          }
-
-          // Parse covered PCs.
-          size_t covered_pcs;
-          if (re2::RE2::FindAndConsume(&input, "cov: (\\d+)", &covered_pcs)) {
-            status_.set_covered_pcs(covered_pcs);
-          }
-
-          // Parse covered features.
-          size_t covered_features;
-          if (re2::RE2::FindAndConsume(&input, "ft: (\\d+)", &covered_features)) {
-            status_.set_covered_features(covered_features);
-          }
-
-          // Parse corpus stats.
-          size_t corpus_num_inputs;
-          if (re2::RE2::FindAndConsume(&input, "corp: (\\d+)", &corpus_num_inputs)) {
-            size_t corpus_total_size;
-            status_.set_corpus_num_inputs(corpus_num_inputs);
-            if (re2::RE2::Consume(&input, "/(\\d+)b", &corpus_total_size)) {
-              status_.set_corpus_total_size(corpus_total_size);
-            } else if (re2::RE2::Consume(&input, "/(\\d+)Kb", &corpus_total_size)) {
-              status_.set_corpus_total_size(corpus_total_size * kOneKb);
-            } else if (re2::RE2::Consume(&input, "/(\\d+)Mb", &corpus_total_size)) {
-              status_.set_corpus_total_size(corpus_total_size * kOneMb);
-            }
-          }
-
-          std::vector<ProcessStats> process_stats;
-          status_.set_process_stats(std::move(process_stats));
-
-          UpdateMonitors(reason);
         }
       });
 }

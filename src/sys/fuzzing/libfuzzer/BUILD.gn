@@ -22,6 +22,23 @@ group("tests") {
   ]
 }
 
+# The libFuzzer stats conversions are built separately to allow their use by realmfuzzer et al.
+source_set("stats-lib") {
+  testonly = true
+  sources = [
+    "stats.cc",
+    "stats.h",
+  ]
+  public_deps = [
+    "//src/sys/fuzzing/fidl:fuchsia.fuzzer_hlcpp",
+    "//third_party/re2",
+  ]
+  deps = [
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/files",
+  ]
+}
+
 source_set("engine-lib") {
   visibility = [ ":*" ]
   testonly = true
@@ -37,6 +54,7 @@ source_set("engine-lib") {
     "//third_party/re2",
   ]
   deps = [
+    ":stats-lib",
     "//sdk/lib/syslog/cpp",
     "//src/lib/files",
     "//third_party/boringssl",
@@ -54,12 +72,18 @@ test("unittests-bin") {
   output_name = "libfuzzer_unittests"
   visibility = [ ":*" ]
   testonly = true
-  sources = [ "runner-unittest.cc" ]
+  sources = [
+    "runner-unittest.cc",
+    "stats-unittest.cc",
+  ]
   deps = [
     ":engine-lib",
+    ":stats-lib",
+    "testing:data",
     "testing:test.fuzzer_hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/files",
+    "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//src/sys/fuzzing/common:runner-unittests",
     "//src/sys/fuzzing/common/testing",
