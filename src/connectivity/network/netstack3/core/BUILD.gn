@@ -145,6 +145,12 @@ rustc_library("netstack3-core-instrumented") {
   edition = "2021"
   with_unit_tests = true
 
+  # TODO(https://fxbug.dev/129383): re-enable RBE unconditionally once the cause
+  # for the failure to build in coverage mode is determined.
+  if (is_coverage) {
+    disable_rbe = true
+  }
+
   deps = lib_deps + lib_instrumented_deps
   test_deps = lib_test_deps
 
