@@ -38,6 +38,7 @@ use {
     },
     tracing::{error, warn},
     vfs::{
+        attributes,
         directory::{
             dirents_sink,
             entry::{DirectoryEntry, EntryInfo},
@@ -190,6 +191,27 @@ impl vfs::node::Node for FilteredServiceDirectory {
             creation_time: 0,
             modification_time: 0,
         })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        Ok(attributes!(
+            requested_attributes,
+            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::DIRECTORY,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::CONNECT
+                    | fio::Operations::ENUMERATE
+                    | fio::Operations::TRAVERSE,
+                content_size: 0,
+                storage_size: 0,
+                link_count: 1,
+                id: fio::INO_UNKNOWN,
+            }
+        ))
     }
 }
 

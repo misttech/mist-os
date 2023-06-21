@@ -84,6 +84,7 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     config.set_supports_vmo_file(false);
     config.set_supports_remote_dir(false);
     config.set_supports_get_backing_memory(false);
+    config.set_supports_get_attributes(false);
 
     callback(std::move(config));
   }

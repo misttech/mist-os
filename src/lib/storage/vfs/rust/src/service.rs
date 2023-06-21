@@ -140,4 +140,22 @@ impl Node for Service {
             modification_time: 0,
         })
     }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        Ok(attributes!(
+            requested_attributes,
+            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::CONNECTOR,
+                abilities: fio::Operations::GET_ATTRIBUTES | fio::Operations::CONNECT,
+                content_size: 0,
+                storage_size: 0,
+                link_count: 1,
+                id: fio::INO_UNKNOWN,
+            }
+        ))
+    }
 }

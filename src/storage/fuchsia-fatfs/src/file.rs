@@ -24,6 +24,7 @@ use {
         sync::{Arc, RwLock},
     },
     vfs::{
+        attributes,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
         file::{FidlIoConnection, File as VfsFile, FileIo as VfsFileIo, FileOptions, SyncMode},
@@ -237,6 +238,45 @@ impl vfs::node::Node for FatFile {
             creation_time,
             modification_time,
         })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, Status> {
+        let fs_lock = self.filesystem.lock().unwrap();
+        let file = self.borrow_file(&fs_lock)?;
+        let content_size = file.len() as u64;
+        let creation_time = dos_to_unix_time(file.created());
+        let modification_time = dos_to_unix_time(file.modified());
+
+        // Figure out the storage size by rounding content_size up to the nearest
+        // multiple of cluster_size.
+        let cluster_size = fs_lock.cluster_size() as u64;
+        let storage_size = ((content_size + cluster_size - 1) / cluster_size) * cluster_size;
+
+        Ok(attributes!(
+            requested_attributes,
+            Mutable {
+                creation_time: creation_time,
+                modification_time: modification_time,
+                mode: 0,
+                uid: 0,
+                gid: 0,
+                rdev: 0
+            },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::FILE,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::UPDATE_ATTRIBUTES
+                    | fio::Operations::READ_BYTES
+                    | fio::Operations::WRITE_BYTES,
+                content_size: content_size,
+                storage_size: storage_size,
+                link_count: 1,
+                id: fio::INO_UNKNOWN,
+            }
+        ))
     }
 
     fn close(self: Arc<Self>) {

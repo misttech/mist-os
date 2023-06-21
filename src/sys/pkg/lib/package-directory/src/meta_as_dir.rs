@@ -9,6 +9,7 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::sync::Arc,
     vfs::{
+        attributes,
         common::send_on_open_with_error,
         directory::{
             entry::EntryInfo, immutable::connection::io1::ImmutableConnection,
@@ -119,6 +120,26 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaAsDir<S> {
             creation_time: 0,
             modification_time: 0,
         })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        Ok(attributes!(
+            requested_attributes,
+            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::DIRECTORY,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::ENUMERATE
+                    | fio::Operations::TRAVERSE,
+                content_size: usize_to_u64_safe(self.root_dir.meta_files.len()),
+                storage_size: usize_to_u64_safe(self.root_dir.meta_files.len()),
+                link_count: 1,
+                id: 1,
+            }
+        ))
     }
 }
 
@@ -377,6 +398,36 @@ mod tests {
                 creation_time: 0,
                 modification_time: 0,
             }
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_get_attributes() {
+        let (_env, meta_as_dir) = TestEnv::new().await;
+
+        assert_eq!(
+            meta_as_dir.get_attributes(fio::NodeAttributesQuery::all()).await.unwrap(),
+            attributes!(
+                fio::NodeAttributesQuery::all(),
+                Mutable {
+                    creation_time: 0,
+                    modification_time: 0,
+                    mode: 0,
+                    uid: 0,
+                    gid: 0,
+                    rdev: 0
+                },
+                Immutable {
+                    protocols: fio::NodeProtocolKinds::DIRECTORY,
+                    abilities: fio::Operations::GET_ATTRIBUTES
+                        | fio::Operations::ENUMERATE
+                        | fio::Operations::TRAVERSE,
+                    content_size: 4,
+                    storage_size: 4,
+                    link_count: 1,
+                    id: 1,
+                }
+            )
         );
     }
 }

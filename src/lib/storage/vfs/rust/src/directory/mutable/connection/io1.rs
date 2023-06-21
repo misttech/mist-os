@@ -394,6 +394,13 @@ mod tests {
             panic!("Not implemented");
         }
 
+        async fn get_attributes(
+            &self,
+            _query: fio::NodeAttributesQuery,
+        ) -> Result<fio::NodeAttributes2, zx::Status> {
+            panic!("Not implemented");
+        }
+
         fn close(self: Arc<Self>) {
             let _ = self.fs.handle_event(MutableDirectoryAction::Close);
         }

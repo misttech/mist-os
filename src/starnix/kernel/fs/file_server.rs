@@ -21,7 +21,7 @@ use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
-use vfs::{directory, execution_scope, file, path, ToObjectRequest};
+use vfs::{attributes, directory, execution_scope, file, path, ToObjectRequest};
 
 /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
 pub fn serve_file(
@@ -280,6 +280,56 @@ impl StarnixNodeConnection {
         }
     }
 
+    fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> fio::NodeAttributes2 {
+        let info = self.file.node().info();
+
+        // This cast is necessary depending on the architecture.
+        #[allow(clippy::unnecessary_cast)]
+        let link_count = info.link_count as u64;
+
+        let (protocols, abilities) = if info.mode.contains(FileMode::IFDIR) {
+            (
+                fio::NodeProtocolKinds::DIRECTORY,
+                fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::UPDATE_ATTRIBUTES
+                    | fio::Operations::ENUMERATE
+                    | fio::Operations::TRAVERSE
+                    | fio::Operations::MODIFY_DIRECTORY,
+            )
+        } else {
+            (
+                fio::NodeProtocolKinds::FILE,
+                fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::UPDATE_ATTRIBUTES
+                    | fio::Operations::READ_BYTES
+                    | fio::Operations::WRITE_BYTES,
+            )
+        };
+
+        attributes!(
+            requested_attributes,
+            Mutable {
+                creation_time: info.time_status_change.into_nanos() as u64,
+                modification_time: info.time_modify.into_nanos() as u64,
+                mode: info.mode.bits(),
+                uid: info.uid,
+                gid: info.gid,
+                rdev: info.rdev.bits(),
+            },
+            Immutable {
+                protocols: protocols,
+                abilities: abilities,
+                content_size: info.size as u64,
+                storage_size: info.storage_size() as u64,
+                link_count: link_count,
+                id: self.file.fs.dev_id.bits(),
+            }
+        )
+    }
+
     /// Implementation of `vfs::directory::entry_container::MutableDirectory::set_attrs` and
     /// `vfs::File::set_attrs`.
     fn set_attrs(
@@ -303,6 +353,13 @@ impl StarnixNodeConnection {
 impl vfs::node::Node for StarnixNodeConnection {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         Ok(StarnixNodeConnection::get_attrs(self))
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        Ok(StarnixNodeConnection::get_attributes(self, requested_attributes))
     }
 }
 

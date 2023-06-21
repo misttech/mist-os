@@ -277,6 +277,28 @@ impl Node for VmoFile {
             modification_time: 0,
         })
     }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, Status> {
+        let content_size = self.get_size().await?;
+        Ok(attributes!(
+            requested_attributes,
+            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::FILE,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::UPDATE_ATTRIBUTES
+                    | fio::Operations::READ_BYTES
+                    | fio::Operations::WRITE_BYTES,
+                content_size: content_size,
+                storage_size: content_size,
+                link_count: 1,
+                id: self.inode,
+            }
+        ))
+    }
 }
 
 #[async_trait]

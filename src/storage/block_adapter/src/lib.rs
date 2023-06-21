@@ -17,6 +17,7 @@ use {
     remote_block_device::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient},
     std::sync::Arc,
     vfs::{
+        attributes,
         common::rights_to_posix_mode_bits,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
@@ -78,6 +79,30 @@ impl Node for BlockFile {
             creation_time: 0,
             modification_time: 0,
         })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        let block_size = self.block_client.block_size();
+        let block_count = self.block_client.block_count();
+        let device_size = block_count.checked_mul(block_size.into()).unwrap();
+        Ok(attributes!(
+            requested_attributes,
+            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::FILE,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::UPDATE_ATTRIBUTES
+                    | fio::Operations::READ_BYTES
+                    | fio::Operations::WRITE_BYTES,
+                content_size: device_size,
+                storage_size: device_size,
+                link_count: 1,
+                id: 0,
+            }
+        ))
     }
 }
 

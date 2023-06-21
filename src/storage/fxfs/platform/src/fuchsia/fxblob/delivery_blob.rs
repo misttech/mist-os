@@ -18,7 +18,8 @@ use {
     delivery_blob::{DeliveryBlobError, Type1Blob},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io::{
-        self as fio, FilesystemInfo, NodeAttributeFlags, NodeAttributes, NodeMarker,
+        self as fio, FilesystemInfo, NodeAttributeFlags, NodeAttributes, NodeAttributes2,
+        NodeAttributesQuery, NodeMarker,
     },
     fuchsia_hash::Hash,
     fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
@@ -307,6 +308,13 @@ impl FxNode for FxDeliveryBlob {
 #[async_trait]
 impl Node for FxDeliveryBlob {
     async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
+        Err(Status::BAD_STATE)
+    }
+
+    async fn get_attributes(
+        &self,
+        _requested_attributes: NodeAttributesQuery,
+    ) -> Result<NodeAttributes2, Status> {
         Err(Status::BAD_STATE)
     }
 }

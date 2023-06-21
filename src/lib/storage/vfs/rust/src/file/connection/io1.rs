@@ -517,10 +517,21 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 let status = self.handle_set_attr(flags, attributes).await;
                 responder.send(status.into_raw())?;
             }
-            fio::FileRequest::GetAttributes { query: _, responder } => {
+            fio::FileRequest::GetAttributes { query, responder } => {
                 fuchsia_trace::duration!("storage", "File::GetAttributes");
-                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                let result = self.handle_get_attributes(query).await;
+                responder.send(
+                    result
+                        .as_ref()
+                        .map(|a| {
+                            let fio::NodeAttributes2 {
+                                mutable_attributes: m,
+                                immutable_attributes: i,
+                            } = a;
+                            (m, i)
+                        })
+                        .map_err(|status| zx::Status::into_raw(*status)),
+                )?;
             }
             fio::FileRequest::UpdateAttributes { payload: _, responder } => {
                 fuchsia_trace::duration!("storage", "File::UpdateAttributes");
@@ -652,6 +663,13 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
         };
         (zx::Status::OK, attributes)
+    }
+
+    async fn handle_get_attributes(
+        &mut self,
+        query: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        self.file.get_attributes(query).await
     }
 
     async fn handle_read(&mut self, count: u64) -> Result<Vec<u8>, zx::Status> {
@@ -834,6 +852,7 @@ mod tests {
         GetBackingMemory { flags: fio::VmoFlags },
         GetSize,
         GetAttrs,
+        GetAttributes { query: fio::NodeAttributesQuery },
         SetAttrs { flags: fio::NodeAttributeFlags, attrs: fio::NodeAttributes },
         Close,
         Sync,
@@ -894,6 +913,35 @@ mod tests {
                 creation_time: MOCK_FILE_CREATION_TIME,
                 modification_time: MOCK_FILE_MODIFICATION_TIME,
             })
+        }
+
+        async fn get_attributes(
+            &self,
+            query: fio::NodeAttributesQuery,
+        ) -> Result<fio::NodeAttributes2, zx::Status> {
+            self.handle_operation(FileOperation::GetAttributes { query })?;
+            Ok(attributes!(
+                query,
+                Mutable {
+                    creation_time: MOCK_FILE_CREATION_TIME,
+                    modification_time: MOCK_FILE_MODIFICATION_TIME,
+                    mode: 0,
+                    uid: 0,
+                    gid: 0,
+                    rdev: 0
+                },
+                Immutable {
+                    protocols: fio::NodeProtocolKinds::FILE,
+                    abilities: fio::Operations::GET_ATTRIBUTES
+                        | fio::Operations::UPDATE_ATTRIBUTES
+                        | fio::Operations::READ_BYTES
+                        | fio::Operations::WRITE_BYTES,
+                    content_size: self.file_size,
+                    storage_size: 2 * self.file_size,
+                    link_count: MOCK_FILE_LINKS,
+                    id: MOCK_FILE_ID,
+                }
+            ))
         }
 
         fn close(self: Arc<Self>) {
@@ -1185,6 +1233,56 @@ mod tests {
                     }
                 },
                 FileOperation::GetAttrs
+            ]
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_get_attributes() {
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::empty());
+        let (mutable_attributes, immutable_attributes) = env
+            .proxy
+            .get_attributes(fio::NodeAttributesQuery::all())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        let expected = attributes!(
+            fio::NodeAttributesQuery::all(),
+            Mutable {
+                creation_time: MOCK_FILE_CREATION_TIME,
+                modification_time: MOCK_FILE_MODIFICATION_TIME,
+                mode: 0,
+                uid: 0,
+                gid: 0,
+                rdev: 0,
+            },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::FILE,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::UPDATE_ATTRIBUTES
+                    | fio::Operations::READ_BYTES
+                    | fio::Operations::WRITE_BYTES,
+                content_size: MOCK_FILE_SIZE,
+                storage_size: 2 * MOCK_FILE_SIZE,
+                link_count: MOCK_FILE_LINKS,
+                id: MOCK_FILE_ID,
+            }
+        );
+        assert_eq!(mutable_attributes, expected.mutable_attributes);
+        assert_eq!(immutable_attributes, expected.immutable_attributes);
+
+        let events = env.file.operations.lock().unwrap();
+        assert_eq!(
+            *events,
+            vec![
+                FileOperation::Init {
+                    options: FileOptions {
+                        rights: fio::Operations::GET_ATTRIBUTES,
+                        is_append: false
+                    }
+                },
+                FileOperation::GetAttributes { query: fio::NodeAttributesQuery::all() }
             ]
         );
     }

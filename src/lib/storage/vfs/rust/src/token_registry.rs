@@ -307,6 +307,13 @@ mod tests {
             async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
                 panic!("Not implemented!")
             }
+
+            async fn get_attributes(
+                &self,
+                _query: fio::NodeAttributesQuery,
+            ) -> Result<fio::NodeAttributes2, Status> {
+                panic!("Not implemented");
+            }
         }
 
         #[async_trait]

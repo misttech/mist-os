@@ -45,6 +45,7 @@ use {
     },
     storage_device::buffer,
     vfs::{
+        attributes,
         common::rights_to_posix_mode_bits,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
@@ -278,6 +279,34 @@ impl vfs::node::Node for FxBlob {
             creation_time: props.creation_time.as_nanos(),
             modification_time: props.modification_time.as_nanos(),
         })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, Status> {
+        let props = self.handle.get_properties().await.map_err(map_to_status)?;
+        Ok(attributes!(
+            requested_attributes,
+            Mutable {
+                creation_time: props.creation_time.as_nanos(),
+                modification_time: props.modification_time.as_nanos(),
+                mode: props.posix_attributes.map(|a| a.mode).unwrap_or(0),
+                uid: props.posix_attributes.map(|a| a.uid).unwrap_or(0),
+                gid: props.posix_attributes.map(|a| a.gid).unwrap_or(0),
+                rdev: props.posix_attributes.map(|a| a.rdev).unwrap_or(0),
+            },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::FILE,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::READ_BYTES
+                    | fio::Operations::EXECUTE,
+                content_size: self.uncompressed_size,
+                storage_size: props.allocated_size,
+                link_count: props.refs,
+                id: self.handle.object_id(),
+            }
+        ))
     }
 
     fn close(self: Arc<Self>) {

@@ -8,7 +8,7 @@ use super::endpoint;
 
 // Macros are exported into the root of the crate.
 use crate::{
-    assert_close, assert_event, assert_get_attr, clone_get_proxy_assert,
+    assert_close, assert_event, assert_get_attr, assert_get_attributes, clone_get_proxy_assert,
     clone_get_service_proxy_assert_ok,
 };
 
@@ -57,6 +57,40 @@ fn get_attr() {
                     creation_time: 0,
                     modification_time: 0,
                 }
+            );
+            assert_close!(proxy);
+        },
+    );
+}
+
+#[test]
+fn get_attributes() {
+    run_server_client(
+        fio::OpenFlags::NODE_REFERENCE,
+        endpoint(|_scope, _channel| ()),
+        |proxy| async move {
+            assert_get_attributes!(
+                proxy,
+                fio::NodeAttributesQuery::all(),
+                attributes!(
+                    fio::NodeAttributesQuery::all(),
+                    Mutable {
+                        creation_time: 0,
+                        modification_time: 0,
+                        mode: 0,
+                        uid: 0,
+                        gid: 0,
+                        rdev: 0
+                    },
+                    Immutable {
+                        protocols: fio::NodeProtocolKinds::CONNECTOR,
+                        abilities: fio::Operations::GET_ATTRIBUTES | fio::Operations::CONNECT,
+                        content_size: 0,
+                        storage_size: 0,
+                        link_count: 1,
+                        id: fio::INO_UNKNOWN,
+                    }
+                )
             );
             assert_close!(proxy);
         },
@@ -197,14 +231,11 @@ fn clone_same_rights() {
 }
 
 #[test]
-fn attributes_not_supported() {
+fn update_attributes_not_supported() {
     run_server_client(
         fio::OpenFlags::NODE_REFERENCE,
         endpoint(|_scope, _channel| ()),
         |node_proxy| async move {
-            let response =
-                node_proxy.get_attributes(fio::NodeAttributesQuery::ABILITIES).await.unwrap();
-            assert_eq!(response, Err(Status::NOT_SUPPORTED.into_raw()));
             let response =
                 node_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap();
             assert_eq!(response, Err(Status::NOT_SUPPORTED.into_raw()));

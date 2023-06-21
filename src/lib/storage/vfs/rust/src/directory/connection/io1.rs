@@ -200,10 +200,21 @@ where
                 };
                 responder.send(status, &attrs)?;
             }
-            fio::DirectoryRequest::GetAttributes { query: _, responder } => {
+            fio::DirectoryRequest::GetAttributes { query, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetAttributes");
-                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                let result = self.directory.get_attributes(query).await;
+                responder.send(
+                    result
+                        .as_ref()
+                        .map(|a| {
+                            let fio::NodeAttributes2 {
+                                mutable_attributes: m,
+                                immutable_attributes: i,
+                            } = a;
+                            (m, i)
+                        })
+                        .map_err(|status| zx::Status::into_raw(*status)),
+                )?;
             }
             fio::DirectoryRequest::UpdateAttributes { payload: _, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::UpdateAttributes");

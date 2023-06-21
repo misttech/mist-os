@@ -23,6 +23,7 @@ use {
     std::{collections::HashMap, sync::Arc},
     tracing::error,
     vfs::{
+        attributes,
         common::send_on_open_with_error,
         directory::{
             entry::EntryInfo, immutable::connection::io1::ImmutableConnection,
@@ -340,6 +341,26 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for RootDir<S> {
             modification_time: 0,
         })
     }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        Ok(attributes!(
+            requested_attributes,
+            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::DIRECTORY,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::ENUMERATE
+                    | fio::Operations::TRAVERSE,
+                content_size: 0,
+                storage_size: 0,
+                link_count: 1,
+                id: 1,
+            }
+        ))
+    }
 }
 
 #[async_trait]
@@ -624,6 +645,36 @@ mod tests {
                 creation_time: 0,
                 modification_time: 0,
             }
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_get_attributes() {
+        let (_env, root_dir) = TestEnv::new().await;
+
+        assert_eq!(
+            root_dir.get_attributes(fio::NodeAttributesQuery::all()).await.unwrap(),
+            attributes!(
+                fio::NodeAttributesQuery::all(),
+                Mutable {
+                    creation_time: 0,
+                    modification_time: 0,
+                    mode: 0,
+                    uid: 0,
+                    gid: 0,
+                    rdev: 0
+                },
+                Immutable {
+                    protocols: fio::NodeProtocolKinds::DIRECTORY,
+                    abilities: fio::Operations::GET_ATTRIBUTES
+                        | fio::Operations::ENUMERATE
+                        | fio::Operations::TRAVERSE,
+                    content_size: 0,
+                    storage_size: 0,
+                    link_count: 1,
+                    id: 1,
+                }
+            )
         );
     }
 

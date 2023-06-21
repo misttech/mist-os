@@ -94,6 +94,7 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
                     conformant_path_handling: Some(true),
                     supports_unlink: Some(true),
                     supports_open2: Some(true),
+                    supports_get_attributes: Some(true),
                     ..Default::default()
                 })?;
             }

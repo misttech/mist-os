@@ -908,3 +908,21 @@ macro_rules! assert_link_err {
         assert_eq!(Status::from_raw(status), $expected_status);
     }};
 }
+
+// See comment at the top of the file for why this is a macro.
+#[macro_export]
+macro_rules! assert_get_attributes {
+    ($proxy:expr, $requested_attributes:expr, $expected:expr) => {{
+        use $crate::test_utils::assertions::reexport::Status;
+
+        let (mutable_attributes, immutable_attributes) = $proxy
+            .get_attributes($requested_attributes)
+            .await
+            .expect("get_attributes failed")
+            .map_err(Status::from_raw)
+            .expect("get_attributes error");
+
+        assert_eq!(mutable_attributes, $expected.mutable_attributes);
+        assert_eq!(immutable_attributes, $expected.immutable_attributes);
+    }};
+}

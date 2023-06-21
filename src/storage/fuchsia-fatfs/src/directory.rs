@@ -27,6 +27,7 @@ use {
         sync::{Arc, RwLock},
     },
     vfs::{
+        attributes,
         directory::{
             dirents_sink::{self, AppendResult, Sink},
             entry::{DirectoryEntry, EntryInfo},
@@ -800,6 +801,41 @@ impl vfs::node::Node for FatDirectory {
             creation_time,
             modification_time,
         })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, Status> {
+        let fs_lock = self.filesystem.lock().unwrap();
+        let dir = self.borrow_dir(&fs_lock)?;
+
+        let creation_time = dos_to_unix_time(dir.created());
+        let modification_time = dos_to_unix_time(dir.modified());
+
+        Ok(attributes!(
+            requested_attributes,
+            Mutable {
+                creation_time: creation_time,
+                modification_time: modification_time,
+                mode: 0,
+                uid: 0,
+                gid: 0,
+                rdev: 0
+            },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::DIRECTORY,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::UPDATE_ATTRIBUTES
+                    | fio::Operations::ENUMERATE
+                    | fio::Operations::TRAVERSE
+                    | fio::Operations::MODIFY_DIRECTORY,
+                content_size: 0,
+                storage_size: 0,
+                link_count: 1,
+                id: fio::INO_UNKNOWN,
+            }
+        ))
     }
 
     fn close(self: Arc<Self>) {

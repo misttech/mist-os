@@ -1404,6 +1404,13 @@ mod tests {
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
             Err(zx::Status::INTERNAL)
         }
+
+        async fn get_attributes(
+            &self,
+            _requested_attributes: fio::NodeAttributesQuery,
+        ) -> Result<fio::NodeAttributes2, zx::Status> {
+            Err(zx::Status::INTERNAL)
+        }
     }
 
     #[async_trait]

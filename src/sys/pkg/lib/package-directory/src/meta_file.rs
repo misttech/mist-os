@@ -12,8 +12,8 @@ use {
     std::sync::Arc,
     tracing::error,
     vfs::{
-        directory::entry::EntryInfo, execution_scope::ExecutionScope, file::FidlIoConnection,
-        path::Path as VfsPath, ToObjectRequest,
+        attributes, directory::entry::EntryInfo, execution_scope::ExecutionScope,
+        file::FidlIoConnection, path::Path as VfsPath, ToObjectRequest,
     },
 };
 
@@ -110,6 +110,24 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaFile<S> {
             creation_time: 0,
             modification_time: 0,
         })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        Ok(attributes!(
+            requested_attributes,
+            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::FILE,
+                abilities: fio::Operations::GET_ATTRIBUTES,
+                content_size: self.location.length,
+                storage_size: self.location.length,
+                link_count: 1,
+                id: 1,
+            }
+        ))
     }
 }
 
@@ -567,6 +585,34 @@ mod tests {
         assert_eq!(
             File::sync(&meta_file, Default::default()).await,
             Err(zx::Status::NOT_SUPPORTED)
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn file_get_attributes() {
+        let (_env, meta_file) = TestEnv::new().await;
+
+        assert_eq!(
+            meta_file.get_attributes(fio::NodeAttributesQuery::all()).await.unwrap(),
+            attributes!(
+                fio::NodeAttributesQuery::all(),
+                Mutable {
+                    creation_time: 0,
+                    modification_time: 0,
+                    mode: 0,
+                    uid: 0,
+                    gid: 0,
+                    rdev: 0
+                },
+                Immutable {
+                    protocols: fio::NodeProtocolKinds::FILE,
+                    abilities: fio::Operations::GET_ATTRIBUTES,
+                    content_size: meta_file.location.length,
+                    storage_size: meta_file.location.length,
+                    link_count: 1,
+                    id: 1,
+                }
+            )
         );
     }
 }

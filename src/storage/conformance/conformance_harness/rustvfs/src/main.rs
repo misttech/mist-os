@@ -120,6 +120,7 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     supports_get_token: Some(true),
                     conformant_path_handling: Some(true),
                     supports_unlink: Some(true),
+                    supports_get_attributes: Some(true),
 
                     // Unsupported options:
                     supports_link: Some(false), // Link is not supported using a pseudo filesystem.

@@ -471,6 +471,13 @@ impl vfs::node::Node for BlobDirectory {
     async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
         self.directory.get_attrs().await
     }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, Status> {
+        self.directory.get_attributes(requested_attributes).await
+    }
 }
 
 /// Implements VFS entry container trait for directories, allowing manipulation of their contents.

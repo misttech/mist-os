@@ -274,6 +274,13 @@ impl vfs::node::Node for XattrFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         unimplemented!()
     }
+
+    async fn get_attributes(
+        &self,
+        _query: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, Status> {
+        unimplemented!()
+    }
 }
 
 #[async_trait]

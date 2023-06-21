@@ -37,10 +37,8 @@ pub trait Node: DirectoryEntry {
     /// Returns node attributes (io2).
     async fn get_attributes(
         &self,
-        _requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
-    }
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status>;
 
     /// Get this node's attributes.
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status>;
@@ -163,9 +161,20 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::SetAttr { flags: _, attributes: _, responder } => {
                 responder.send(ZX_ERR_BAD_HANDLE)?;
             }
-            fio::NodeRequest::GetAttributes { query: _, responder } => {
-                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
+            fio::NodeRequest::GetAttributes { query, responder } => {
+                let result = self.node.get_attributes(query).await;
+                responder.send(
+                    result
+                        .as_ref()
+                        .map(|a| {
+                            let fio::NodeAttributes2 {
+                                mutable_attributes: m,
+                                immutable_attributes: i,
+                            } = a;
+                            (m, i)
+                        })
+                        .map_err(|status| zx::Status::into_raw(*status)),
+                )?;
             }
             fio::NodeRequest::UpdateAttributes { payload: _, responder } => {
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
