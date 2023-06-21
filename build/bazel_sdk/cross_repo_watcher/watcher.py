@@ -32,7 +32,12 @@ class PubSub:
             if dest_path == None:
                 dest_path = path
             if dest_path != path:
-                shutil.copy(path, os.path.join(repo, dest_path))
+                dest_abs_path = os.path.join(repo, dest_path)
+                try:
+                    shutil.copy(path, dest_abs_path)
+                except:
+                    subprocess.run(['sudo', 'mkdir', '-p', os.path.dirname(dest_abs_path)])
+                    subprocess.run(['sudo', 'cp', path, dest_abs_path])
 
             execute_commands_in_repo(repo, cmds, dest_path)
             # Publish downstream messages
@@ -64,10 +69,10 @@ class PubSubHandler(BaseHTTPRequestHandler):
 
 
 def execute_commands_in_repo(repo: str, commands: List[str], dest_path: str):
-    print(f'Run in repo: {repo}')
+    print(f'\033[94mRun in repo: {repo}\033[0m')
     for command in commands:
         cmd = command.format(dest_path=dest_path).split()
-        print(f'Execute cmd: {cmd}')
+        print(f'\033[93mExecute cmd: {cmd}\033[0m')
         result = subprocess.run(cmd, cwd=repo)
 
 
