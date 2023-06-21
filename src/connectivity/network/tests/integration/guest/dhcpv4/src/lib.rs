@@ -51,9 +51,13 @@ async fn acquires_address(name: &str) {
     interfaces::wait_for_addresses(&interface_state, iface.id(), |addresses| {
         addresses
             .iter()
-            .any(|&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
-                addr == WANT_ADDR
-            })
+            .any(
+                |&fidl_fuchsia_net_interfaces_ext::Address {
+                     addr,
+                     valid_until: _,
+                     assignment_state: _,
+                 }| { addr == WANT_ADDR },
+            )
             .then_some(())
     })
     .await
