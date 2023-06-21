@@ -16,7 +16,6 @@
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
 #include "src/ui/lib/display/get_hardware_display_controller.h"
-#include "src/ui/lib/display/hardware_display_controller_provider_impl.h"
 #include "src/ui/scenic/bin/app.h"
 #include "src/ui/scenic/lib/scenic/util/scheduler_profile.h"
 
@@ -34,12 +33,7 @@ int main(int argc, const char** argv) {
   // Set up an inspect::Node to inject into the App.
   sys::ComponentInspector inspector(app_context.get());
 
-  // Obtain the default display coordinator via the fuchsia.hardware.display.Provider service that
-  // we find in our environment. Scenic provides its own default implementation through
-  // |hdcp_service_impl|, which can be overridden by the environment (e.g. by a test's
-  // "injected-services" facet).
-  ui_display::HardwareDisplayCoordinatorProviderImpl hdcp_service_impl(app_context.get());
-  auto display_coordinator_promise = ui_display::GetHardwareDisplayCoordinator(&hdcp_service_impl);
+  auto display_coordinator_promise = ui_display::GetHardwareDisplayCoordinator();
 
   // Instantiate Scenic app.
   scenic_impl::App app(std::move(app_context), inspector.root().CreateChild("scenic"),

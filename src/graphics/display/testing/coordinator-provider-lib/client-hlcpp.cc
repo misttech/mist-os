@@ -12,12 +12,13 @@
 
 #include <memory>
 
-#include "src/graphics/display/testing/coordinator-provider-lib/devfs-factory-hlcpp.h"
 #include "src/lib/files/directory.h"
 
 namespace display {
 
-fpromise::promise<CoordinatorHandlesHlcpp> GetCoordinatorHlcpp(
+namespace {
+
+fpromise::promise<CoordinatorHandlesHlcpp> GetCoordinatorFromProviderHlcpp(
     std::shared_ptr<fuchsia::hardware::display::ProviderPtr> provider) {
   zx::channel ctrl_server, ctrl_client;
   zx_status_t status = zx::channel::create(0, &ctrl_server, &ctrl_client);
@@ -50,23 +51,23 @@ fpromise::promise<CoordinatorHandlesHlcpp> GetCoordinatorHlcpp(
   return dc_handles_bridge.consumer.promise();
 }
 
-fpromise::promise<CoordinatorHandlesHlcpp> GetCoordinatorHlcpp(
-    DevFsCoordinatorFactoryHlcpp* devfs_provider_opener) {
+}  // namespace
+
+fpromise::promise<CoordinatorHandlesHlcpp> GetCoordinatorHlcpp() {
   TRACE_DURATION("gfx", "GetCoordinatorHlcpp");
 
-  // We check the environment to see if there is any fake display is provided through
-  // fuchsia.hardware.display.Provider protocol. We connect to fake display if given. Otherwise, we
-  // fall back to |hdcp_service_impl|.
-  // TODO(fxbug.dev/73816): Change fake display injection after moving to CFv2.
+  // The display coordinator should always come from the fuchsia.hardware.
+  // display.Provider protocol from the services (/svc) directory the current
+  // component is offered.
   std::vector<std::string> contents;
   files::ReadDirContents("/svc", &contents);
-  const bool fake_display_is_injected =
+  const bool has_display_provider_service =
       std::find(contents.begin(), contents.end(), "fuchsia.hardware.display.Provider") !=
       contents.end();
 
-  auto provider = std::make_shared<fuchsia::hardware::display::ProviderPtr>();
-  if (fake_display_is_injected) {
+  if (has_display_provider_service) {
     const char* kSvcPath = "/svc/fuchsia.hardware.display.Provider";
+    auto provider = std::make_shared<fuchsia::hardware::display::ProviderPtr>();
     zx_status_t status =
         fdio_service_connect(kSvcPath, provider->NewRequest().TakeChannel().release());
     if (status != ZX_OK) {
@@ -75,13 +76,11 @@ fpromise::promise<CoordinatorHandlesHlcpp> GetCoordinatorHlcpp(
                      << ". Something went wrong in fake-display injection routing.";
       return fpromise::make_result_promise<CoordinatorHandlesHlcpp>(fpromise::error());
     }
-  } else if (devfs_provider_opener) {
-    devfs_provider_opener->BindDisplayProvider(provider->NewRequest());
-  } else {
-    FX_LOGS(ERROR) << "No display provider given.";
-    return fpromise::make_result_promise<CoordinatorHandlesHlcpp>(fpromise::error());
+    return GetCoordinatorFromProviderHlcpp(std::move(provider));
   }
-  return GetCoordinatorHlcpp(std::move(provider));
+
+  FX_LOGS(ERROR) << "No display provider given.";
+  return fpromise::make_result_promise<CoordinatorHandlesHlcpp>(fpromise::error());
 }
 
 }  // namespace display

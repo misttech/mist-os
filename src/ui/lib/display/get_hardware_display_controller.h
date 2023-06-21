@@ -9,22 +9,13 @@
 #define SRC_UI_LIB_DISPLAY_GET_HARDWARE_DISPLAY_CONTROLLER_H_
 
 #include "src/graphics/display/testing/coordinator-provider-lib/client-hlcpp.h"
-#include "src/graphics/display/testing/coordinator-provider-lib/devfs-factory-hlcpp.h"
 
 namespace ui_display {
 
 using DisplayCoordinatorHandles = display::CoordinatorHandlesHlcpp;
 
-using HardwareDisplayCoordinatorProviderImpl = display::DevFsCoordinatorFactoryHlcpp;
-
-inline fpromise::promise<DisplayCoordinatorHandles> GetHardwareDisplayCoordinator(
-    std::shared_ptr<fuchsia::hardware::display::ProviderPtr> provider) {
-  return display::GetCoordinatorHlcpp(std::move(provider));
-}
-
-inline fpromise::promise<DisplayCoordinatorHandles> GetHardwareDisplayCoordinator(
-    HardwareDisplayCoordinatorProviderImpl* hdcp_service_impl = nullptr) {
-  return display::GetCoordinatorHlcpp(hdcp_service_impl);
+inline fpromise::promise<DisplayCoordinatorHandles> GetHardwareDisplayCoordinator() {
+  return display::GetCoordinatorHlcpp();
 }
 
 }  // namespace ui_display

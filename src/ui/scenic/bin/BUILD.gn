@@ -18,7 +18,6 @@ executable("bin") {
     "//sdk/lib/sys/inspect/cpp",
     "//src/lib/async-watchdog",
     "//src/ui/lib/display:hdcp_client",
-    "//src/ui/lib/display:hdcp_service",
     "//src/ui/scenic:scenic_structured_config",
     "//src/ui/scenic/lib/annotation:annotation_registry",
     "//src/ui/scenic/lib/display",

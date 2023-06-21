@@ -25,7 +25,6 @@ source_set("devfs_factory_hlcpp") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_wire",
     "//sdk/lib/sys/cpp",
-    "//src/lib/files",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",
   ]
@@ -43,9 +42,9 @@ source_set("client_hlcpp") {
     "//sdk/lib/fit-promise",
   ]
   deps = [
-    ":devfs_factory_hlcpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
+    "//src/lib/files",
     "//zircon/system/ulib/trace",
   ]
 }
@@ -57,7 +56,6 @@ test("get_hardware_display_controller_test_bin") {
 
   deps = [
     ":client_hlcpp",
-    ":devfs_factory_hlcpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl/test:gtest_main",
@@ -81,7 +79,6 @@ test("get_hardware_display_controller_inject_services_test_bin") {
 
   deps = [
     ":client_hlcpp",
-    ":devfs_factory_hlcpp",
     "//sdk/lib/fit-promise",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",

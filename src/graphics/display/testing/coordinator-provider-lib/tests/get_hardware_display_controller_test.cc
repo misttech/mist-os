@@ -9,7 +9,6 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/testing/coordinator-provider-lib/client-hlcpp.h"
-#include "src/graphics/display/testing/coordinator-provider-lib/devfs-factory-hlcpp.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
 namespace display {
@@ -21,20 +20,12 @@ struct fake_context : fpromise::context {
   fpromise::suspended_task suspend_task() override { return fpromise::suspended_task(); }
 };
 
-class GetHardwareDisplayCoordinatorTest : public gtest::RealLoopFixture {};
+class GetHardwareDisplayCoordinatorWithoutProviderServiceTest : public gtest::RealLoopFixture {};
 
-TEST_F(GetHardwareDisplayCoordinatorTest, ErrorCase) {
+TEST_F(GetHardwareDisplayCoordinatorWithoutProviderServiceTest, FailedOnNoProviderService) {
   auto promise = GetCoordinatorHlcpp();
   fake_context context;
   EXPECT_TRUE(promise(context).is_error());
-}
-
-TEST_F(GetHardwareDisplayCoordinatorTest, WithDevFsCoordinatorFactoryHlcpp) {
-  std::unique_ptr<sys::ComponentContext> app_context = sys::ComponentContext::Create();
-  DevFsCoordinatorFactoryHlcpp hdcp_service_impl(app_context.get());
-  auto promise = GetCoordinatorHlcpp(&hdcp_service_impl);
-  fake_context context;
-  EXPECT_FALSE(promise(context).is_error());
 }
 
 }  // namespace
