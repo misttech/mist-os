@@ -14,8 +14,10 @@ use crate::{
     types::*,
 };
 use bitflags::bitflags;
-use std::collections::btree_map::{BTreeMap, Entry};
-use std::sync::Arc;
+use std::{
+    collections::btree_map::{BTreeMap, Entry},
+    sync::Arc,
+};
 
 // See LOOP_SET_BLOCK_SIZE in <https://man7.org/linux/man-pages/man4/loop.4.html>.
 const MIN_BLOCK_SIZE: u32 = 512;
@@ -333,7 +335,7 @@ impl FileOps for LoopDeviceFile {
                 current_task.mm.write_object(user_info, &info)?;
                 Ok(SUCCESS)
             }
-            _ => default_ioctl(request),
+            _ => default_ioctl(file, current_task, request, arg),
         }
     }
 }
@@ -418,8 +420,8 @@ impl FileOps for LoopControlDevice {
 
     fn ioctl(
         &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
+        file: &FileObject,
+        current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
@@ -435,7 +437,7 @@ impl FileOps for LoopControlDevice {
                 self.registry.remove(minor)?;
                 Ok(minor.into())
             }
-            _ => default_ioctl(request),
+            _ => default_ioctl(file, current_task, request, arg),
         }
     }
 }

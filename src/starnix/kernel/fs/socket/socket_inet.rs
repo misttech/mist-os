@@ -283,6 +283,7 @@ impl SocketOps for InetSocket {
     fn ioctl(
         &self,
         _socket: &Socket,
+        file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
@@ -327,7 +328,7 @@ impl SocketOps for InetSocket {
                 current_task.mm.write_object(UserRef::new(user_addr), &out_ifreq)?;
                 Ok(SUCCESS)
             }
-            _ => default_ioctl(request),
+            _ => default_ioctl(file, current_task, request, arg),
         }
     }
 }

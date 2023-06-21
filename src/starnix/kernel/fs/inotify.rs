@@ -173,7 +173,7 @@ impl FileOps for InotifyFileObject {
 
     fn ioctl(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
@@ -185,7 +185,7 @@ impl FileOps for InotifyFileObject {
                 let size = i32::try_from(self.available()).unwrap_or(i32::MAX);
                 current_task.mm.write_object(addr, &size).map(|_| SUCCESS)
             }
-            _ => default_ioctl(request),
+            _ => default_ioctl(file, current_task, request, arg),
         }
     }
 

@@ -159,11 +159,12 @@ pub trait SocketOps: Send + Sync + AsAny {
     fn ioctl(
         &self,
         _socket: &Socket,
-        _current_task: &CurrentTask,
+        file: &FileObject,
+        current_task: &CurrentTask,
         request: u32,
-        _arg: SyscallArg,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        default_ioctl(request)
+        default_ioctl(file, current_task, request, arg)
     }
 }
 
@@ -344,11 +345,12 @@ impl Socket {
 
     pub fn ioctl(
         &self,
+        file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        self.ops.ioctl(self, current_task, request, arg)
+        self.ops.ioctl(self, file, current_task, request, arg)
     }
 
     pub fn bind(

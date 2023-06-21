@@ -741,6 +741,7 @@ impl SocketOps for UnixSocket {
     fn ioctl(
         &self,
         socket: &Socket,
+        file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
@@ -753,7 +754,7 @@ impl SocketOps for UnixSocket {
                 current_task.mm.write_object(UserRef::<i32>::new(user_addr), &length)?;
                 Ok(SUCCESS)
             }
-            _ => default_ioctl(request),
+            _ => default_ioctl(file, current_task, request, arg),
         }
     }
 }

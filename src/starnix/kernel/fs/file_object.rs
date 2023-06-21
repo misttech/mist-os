@@ -245,12 +245,12 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
 
     fn ioctl(
         &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
+        file: &FileObject,
+        current_task: &CurrentTask,
         request: u32,
-        _arg: SyscallArg,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        default_ioctl(request)
+        default_ioctl(file, current_task, request, arg)
     }
 
     fn fcntl(
@@ -496,9 +496,43 @@ pub(crate) use fileops_impl_nonseekable;
 pub(crate) use fileops_impl_seekable;
 pub(crate) use fileops_impl_seekless;
 
-pub fn default_ioctl(request: u32) -> Result<SyscallResult, Errno> {
+pub fn default_ioctl(
+    file: &FileObject,
+    current_task: &CurrentTask,
+    request: u32,
+    arg: SyscallArg,
+) -> Result<SyscallResult, Errno> {
     match request {
         TCGETS => error!(ENOTTY),
+        FIONBIO => {
+            file.update_file_flags(OpenFlags::NONBLOCK, OpenFlags::NONBLOCK);
+            Ok(SUCCESS)
+        }
+
+        FS_IOC_FSGETXATTR => {
+            not_implemented!("FS_IOC_FSGETXATTR");
+            let arg = UserAddress::from(arg).into();
+            current_task.mm.write_object(arg, &fsxattr::default())?;
+            Ok(SUCCESS)
+        }
+        FS_IOC_FSSETXATTR => {
+            not_implemented!("FS_IOC_FSSETXATTR");
+            let arg = UserAddress::from(arg).into();
+            let _: fsxattr = current_task.mm.read_object(arg)?;
+            Ok(SUCCESS)
+        }
+        FS_IOC_GETFLAGS => {
+            not_implemented!("FS_IOC_GETFLAGS");
+            let arg = UserAddress::from(arg).into();
+            current_task.mm.write_object(arg, &u32::default())?;
+            Ok(SUCCESS)
+        }
+        FS_IOC_SETFLAGS => {
+            not_implemented!("FS_IOC_SETFLAGS");
+            let arg = UserAddress::from(arg).into();
+            let _: u32 = current_task.mm.read_object(arg)?;
+            Ok(SUCCESS)
+        }
         _ => {
             not_implemented!("ioctl: request=0x{:x}", request);
             error!(ENOTTY)
@@ -1096,39 +1130,7 @@ impl FileObject {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        match request {
-            FIONBIO => {
-                self.update_file_flags(OpenFlags::NONBLOCK, OpenFlags::NONBLOCK);
-                Ok(SUCCESS)
-            }
-
-            FS_IOC_FSGETXATTR => {
-                not_implemented!("FS_IOC_FSGETXATTR");
-                let arg = UserAddress::from(arg).into();
-                current_task.mm.write_object(arg, &fsxattr::default())?;
-                Ok(SUCCESS)
-            }
-            FS_IOC_FSSETXATTR => {
-                not_implemented!("FS_IOC_FSSETXATTR");
-                let arg = UserAddress::from(arg).into();
-                let _: fsxattr = current_task.mm.read_object(arg)?;
-                Ok(SUCCESS)
-            }
-            FS_IOC_GETFLAGS => {
-                not_implemented!("FS_IOC_GETFLAGS");
-                let arg = UserAddress::from(arg).into();
-                current_task.mm.write_object(arg, &u32::default())?;
-                Ok(SUCCESS)
-            }
-            FS_IOC_SETFLAGS => {
-                not_implemented!("FS_IOC_SETFLAGS");
-                let arg = UserAddress::from(arg).into();
-                let _: u32 = current_task.mm.read_object(arg)?;
-                Ok(SUCCESS)
-            }
-
-            _ => self.ops().ioctl(self, current_task, request, arg),
-        }
+        self.ops().ioctl(self, current_task, request, arg)
     }
 
     pub fn fcntl(

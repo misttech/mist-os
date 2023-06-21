@@ -67,12 +67,12 @@ impl FileOps for SocketFile {
 
     fn ioctl(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        self.socket.ioctl(current_task, request, arg)
+        self.socket.ioctl(file, current_task, request, arg)
     }
 
     fn close(&self, _file: &FileObject) {

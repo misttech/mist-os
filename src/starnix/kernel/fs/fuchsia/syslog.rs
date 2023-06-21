@@ -51,11 +51,11 @@ impl FileOps for SyslogFile {
 
     fn ioctl(
         &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
+        file: &FileObject,
+        current_task: &CurrentTask,
         request: u32,
-        _arg: SyscallArg,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        default_ioctl(request)
+        default_ioctl(file, current_task, request, arg)
     }
 }

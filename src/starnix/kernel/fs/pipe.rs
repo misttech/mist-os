@@ -206,7 +206,7 @@ impl Pipe {
 
     fn ioctl(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
@@ -219,7 +219,7 @@ impl Pipe {
                 current_task.mm.write_object(addr, &value)?;
                 Ok(SUCCESS)
             }
-            _ => default_ioctl(request),
+            _ => default_ioctl(file, current_task, request, arg),
         }
     }
 
