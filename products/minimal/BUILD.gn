@@ -11,7 +11,7 @@ assert(
 # LINT.IfChange
 product_assembly_configuration("minimal") {
   platform = {
-    build_type = "user"
+    build_type = "eng"
     fonts = {
       # minimal is headless, so ostensibly does not need fonts.
       enabled = false

@@ -34,7 +34,7 @@ fuchsia_product_configuration(
     name = "minimal",
     json_config = {
         "platform": {
-            "build_type": BUILD_TYPES.USER,
+            "build_type": BUILD_TYPES.ENG,
             "fonts": {
                 "enabled": False,
             },
