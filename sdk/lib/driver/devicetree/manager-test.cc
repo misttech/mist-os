@@ -20,7 +20,9 @@
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <gtest/gtest.h>
 
+#include "sdk/lib/driver/devicetree/test-data/basic-properties.h"
 #include "sdk/lib/driver/devicetree/visitor.h"
+#include "sdk/lib/driver/devicetree/visitors/default.h"
 
 namespace fdf_devicetree {
 namespace {
@@ -219,7 +221,14 @@ class ManagerTest : public gtest::DriverTestLoopFixture {
 
 TEST_F(ManagerTest, TestFindsNodes) {
   Manager manager(LoadTestBlob("/pkg/test-data/simple.dtb"));
-  ASSERT_EQ(ZX_OK, manager.Discover().status_value());
+  class EmptyVisitor : public Visitor {
+   public:
+    zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override {
+      return zx::ok();
+    }
+  };
+  EmptyVisitor visitor;
+  ASSERT_EQ(ZX_OK, manager.Walk(visitor).status_value());
   ASSERT_EQ(3lu, manager.nodes().size());
 
   // Root node is always first, and has no name.
@@ -239,8 +248,7 @@ TEST_F(ManagerTest, TestPropertyCallback) {
   Manager manager(LoadTestBlob("/pkg/test-data/simple.dtb"));
   class TestVisitor : public Visitor {
    public:
-    explicit TestVisitor() : Visitor() {}
-    zx::result<> Visit(Node& node) override {
+    zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override {
       for (auto& [name, _] : node.properties()) {
         if (node.name() == "example-device") {
           auto iter = expected.find(std::string(name));
@@ -259,8 +267,6 @@ TEST_F(ManagerTest, TestPropertyCallback) {
     };
   };
 
-  ASSERT_EQ(ZX_OK, manager.Discover().status_value());
-
   TestVisitor visitor;
   ASSERT_EQ(ZX_OK, manager.Walk(visitor).status_value());
   EXPECT_EQ(0lu, visitor.expected.size());
@@ -268,9 +274,7 @@ TEST_F(ManagerTest, TestPropertyCallback) {
 
 TEST_F(ManagerTest, TestPublishesSimpleNode) {
   Manager manager(LoadTestBlob("/pkg/test-data/simple.dtb"));
-  ASSERT_EQ(ZX_OK, manager.Discover().status_value());
-
-  manager.DefaultVisit();
+  ASSERT_EQ(ZX_OK, manager.Walk(manager.default_visitor()).status_value());
 
   DoPublish(manager);
   ASSERT_EQ(2lu, pbus_.nodes().size());
@@ -298,6 +302,29 @@ TEST_F(ManagerTest, TestPublishesSimpleNode) {
                bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
        }}},
       pbus_node);
+}
+
+TEST_F(ManagerTest, TestMmioProperties) {
+  Manager manager(LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
+  ASSERT_EQ(ZX_OK, manager.Walk(manager.default_visitor()).status_value());
+
+  DoPublish(manager);
+
+  ASSERT_EQ(2lu, pbus_.nodes().size());
+  // First node is devicetree root. Second one is the sample-device. Check MMIO of sample-device.
+  auto mmio = pbus_.nodes()[1].mmio();
+
+  // Test MMIO properties.
+  ASSERT_TRUE(mmio);
+  ASSERT_EQ(3lu, mmio->size());
+  ASSERT_EQ(TEST_REG_A_BASE, *(*mmio)[0].base());
+  ASSERT_EQ(static_cast<uint64_t>(TEST_REG_A_LENGTH), *(*mmio)[0].length());
+  ASSERT_EQ((uint64_t)TEST_REG_B_BASE_WORD0 << 32 | TEST_REG_B_BASE_WORD1, *(*mmio)[1].base());
+  ASSERT_EQ((uint64_t)TEST_REG_B_LENGTH_WORD0 << 32 | TEST_REG_B_LENGTH_WORD1,
+            *(*mmio)[1].length());
+  ASSERT_EQ((uint64_t)TEST_REG_C_BASE_WORD0 << 32 | TEST_REG_C_BASE_WORD1, *(*mmio)[2].base());
+  ASSERT_EQ((uint64_t)TEST_REG_C_LENGTH_WORD0 << 32 | TEST_REG_C_LENGTH_WORD1,
+            *(*mmio)[2].length());
 }
 
 }  // namespace

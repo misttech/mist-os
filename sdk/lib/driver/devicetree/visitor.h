@@ -5,6 +5,7 @@
 #ifndef LIB_DRIVER_DEVICETREE_VISITOR_H_
 #define LIB_DRIVER_DEVICETREE_VISITOR_H_
 
+#include <lib/devicetree/devicetree.h>
 #include <lib/zx/result.h>
 
 namespace fdf_devicetree {
@@ -16,7 +17,7 @@ class Visitor {
  public:
   explicit Visitor() = default;
   virtual ~Visitor() = default;
-  virtual zx::result<> Visit(Node& node) = 0;
+  virtual zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) = 0;
 };
 
 }  // namespace fdf_devicetree

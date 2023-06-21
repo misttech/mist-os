@@ -10,9 +10,6 @@
 #include <lib/zbi-format/zbi.h>
 #include <lib/zx/result.h>
 
-#include "sdk/lib/driver/devicetree/node.h"
-#include "sdk/lib/driver/devicetree/visitors/default.h"
-
 namespace fdf {
 using namespace fuchsia_driver_framework;
 }
@@ -59,7 +56,8 @@ zx::result<Manager> Manager::CreateFromNamespace(fdf::Namespace& ns) {
   return zx::ok(Manager(std::move(data)));
 }
 
-zx::result<> Manager::Discover() {
+zx::result<> Manager::Walk(Visitor& visitor) {
+  zx::result<> visit_status = zx::ok();
   tree_.Walk(
       [&, this](const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
         FDF_LOG(DEBUG, "Found node - %s", path.back().data());
@@ -81,24 +79,17 @@ zx::result<> Manager::Discover() {
                    KV("prop_len", phandle_prop->second.AsBytes().size()));
         }
 
+        visit_status = visitor.Visit(*ptr, decoder);
+        if (visit_status.is_error()) {
+          FDF_SLOG(ERROR, "Node visit failed.", KV("node_name", node->name()),
+                   KV("status_str", visit_status.status_string()));
+          return false;
+        }
+
         return true;
       });
-  return zx::ok();
-}
 
-zx::result<> Manager::Walk(Visitor& visitor) {
-  for (auto& node : nodes_publish_order_) {
-    auto status = visitor.Visit(*node.get());
-    if (status.is_error()) {
-      return status.take_error();
-    }
-  }
-  return zx::ok();
-}
-
-void Manager::DefaultVisit() {
-  DefaultVisitor visitor;
-  [[maybe_unused]] auto unused = Walk(visitor);
+  return visit_status;
 }
 
 zx::result<> Manager::PublishDevices(

@@ -1,0 +1,22 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file
+
+/dts-v1/;
+
+#include "sdk/lib/driver/devicetree/test-data/basic-properties.h"
+
+/ {
+    compatible = "fuchsia,sample-dt";
+    #address-cells = <2>;
+    #size-cells = <2>;
+
+    sample-device@0 {
+        compatible = "fuchsia,sample-device";
+        reg = <0 TEST_REG_A_BASE 0 TEST_REG_A_LENGTH
+               TEST_REG_B_BASE_WORD0 TEST_REG_B_BASE_WORD1
+               TEST_REG_B_LENGTH_WORD0 TEST_REG_B_LENGTH_WORD1
+               TEST_REG_C_BASE_WORD0 TEST_REG_C_BASE_WORD1
+               TEST_REG_C_LENGTH_WORD0 TEST_REG_C_LENGTH_WORD1>;
+    };
+};

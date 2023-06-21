@@ -32,6 +32,7 @@ source_set("devicetree") {
     "manager.cc",
     "node.cc",
     "visitors/bind-property.cc",
+    "visitors/mmio.cc",
   ]
 }
 
@@ -66,9 +67,22 @@ resource("simple-dtb") {
   deps = [ ":simple" ]
 }
 
+devicetree("basic-properties") {
+  sources = [ "test-data/basic-properties.dts" ]
+  golden = "test-data/basic-properties.golden.dts"
+  outputs = [ "$target_out_dir/basic-properties.dtb" ]
+}
+
+resource("basic-properties-dtb") {
+  sources = [ "$target_out_dir/basic-properties.dtb" ]
+  outputs = [ "test-data/{{source_file_part}}" ]
+  deps = [ ":basic-properties" ]
+}
+
 fuchsia_unittest_component("devicetree-manager-test-component") {
   component_name = "devicetree-manager-test"
   deps = [
+    ":basic-properties-dtb",
     ":devicetree-manager-test",
     ":simple-dtb",
   ]

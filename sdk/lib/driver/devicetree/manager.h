@@ -17,6 +17,7 @@
 
 #include "sdk/lib/driver/devicetree/node.h"
 #include "sdk/lib/driver/devicetree/visitor.h"
+#include "sdk/lib/driver/devicetree/visitors/default.h"
 
 namespace fdf_devicetree {
 
@@ -29,18 +30,19 @@ class Manager {
       : fdt_blob_(std::move(fdt_blob)),
         tree_(devicetree::ByteView{fdt_blob_.data(), fdt_blob_.size()}) {}
 
-  // Do the initial walk of the tree.
-  zx::result<> Discover();
-
-  // Call |visitor.Visit()| for each node in the tree.
-  // If |visitor.Visit()| returns something that's not `zx::ok()`, then this
-  // will stop walking and return the error code.
-  zx::result<> Walk(Visitor& visitor);
-
-  // Call |BindPropertyVisitor.Visit()| for each node in the tree.
-  // This will collect the node bind properties and append it to the node.
+  // This method does the following things -
+  //   * Does the initial walk of the tree and discovers devices/nodes.
+  //   * Calls |visitor.Visit()| for each node in the tree.
+  //     If |visitor.Visit()| returns something that's not `zx::ok()`, then this
+  //     will stop walking and return the error code.
+  //
+  // This method can be called with the |DefaultVisitor| or with a collection
+  // of visitors of user's choice.
+  // Example:
+  //   auto result = manager.Walk(manager.default_visitor())
+  //
   // This needs to be called before |PublishDevices|.
-  void DefaultVisit();
+  zx::result<> Walk(Visitor& visitor);
 
   // Publish the discovered devices.
   // |pbus| should be the platform bus.
@@ -52,6 +54,11 @@ class Manager {
 
   const std::vector<std::unique_ptr<Node>>& nodes() { return nodes_publish_order_; }
 
+  // Set of visitors to parse basic devicetree properties like bind property,
+  // MMIO register properties etc., of each node and publish the properties to
+  // |fdf_devicetree::Node|.
+  DefaultVisitor& default_visitor() { return default_visitor_; }
+
  private:
   std::vector<uint8_t> fdt_blob_;
   devicetree::Devicetree tree_;
@@ -61,6 +68,7 @@ class Manager {
   // Nodes by phandle. Note that not every node in the tree has a phandle.
   std::unordered_map<uint32_t, Node*> nodes_by_phandle_;
   uint32_t node_id_ = 0;
+  DefaultVisitor default_visitor_;
 };
 
 }  // namespace fdf_devicetree

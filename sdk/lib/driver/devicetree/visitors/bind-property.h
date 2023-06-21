@@ -18,7 +18,7 @@ class BindPropertyVisitor : public Visitor {
  public:
   explicit BindPropertyVisitor() : Visitor() {}
   ~BindPropertyVisitor() override = default;
-  zx::result<> Visit(Node& node) override;
+  zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override;
 };
 
 }  // namespace fdf_devicetree

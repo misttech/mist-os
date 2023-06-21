@@ -11,6 +11,7 @@
 #include "sdk/lib/driver/devicetree/node.h"
 #include "sdk/lib/driver/devicetree/visitor.h"
 #include "sdk/lib/driver/devicetree/visitors/bind-property.h"
+#include "sdk/lib/driver/devicetree/visitors/mmio.h"
 
 namespace fdf_devicetree {
 
@@ -21,6 +22,10 @@ class MultiVisitor : public Visitor {
  public:
   explicit MultiVisitor() : Visitor() { Init<0, Visitors...>(); }
   ~MultiVisitor() override = default;
+
+  // Allow move construction and assignment.
+  MultiVisitor(MultiVisitor&& other) = default;
+  MultiVisitor& operator=(MultiVisitor&& other) = default;
 
   template <int I, typename T, typename... Other>
   constexpr void Init() {
@@ -33,9 +38,9 @@ class MultiVisitor : public Visitor {
     }
   }
 
-  zx::result<> Visit(Node& node) override {
+  zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override {
     for (size_t i = 0; i < visitors_.size(); i++) {
-      [[maybe_unused]] auto status = visitors_[i]->Visit(node);
+      [[maybe_unused]] auto status = visitors_[i]->Visit(node, decoder);
     }
     return zx::ok();
   }
@@ -44,7 +49,7 @@ class MultiVisitor : public Visitor {
   std::array<std::unique_ptr<Visitor>, sizeof...(Visitors)> visitors_;
 };
 
-using DefaultVisitor = MultiVisitor<BindPropertyVisitor>;
+using DefaultVisitor = MultiVisitor<BindPropertyVisitor, MmioVisitor>;
 
 }  // namespace fdf_devicetree
 
