@@ -46,6 +46,7 @@ bitflags = "1.3"
 bit-set = "0.5.0"
 bit-vec = "0.5.0"
 blocking = "1.0.2"
+bstr = { version = "1.5.0", default-features = false, features = [ "std" ] }
 byteorder = { version = "1.4.3", features = ["i128"] }
 bytes = "1.0.1"
 camino = { version = "1.1.1", features = ["proptest1", "serde1"] }
@@ -802,3 +803,14 @@ env_vars = [ "CARGO_PKG_VERSION=0.2.63" ]
 rustflags = ["--cfg=limb_width_64"]
 [gn.package.syn."1.0.98"]
 [gn.package.wasm-bindgen."0.2.63"]
+
+# Feature review config.
+# These crates have a list of reviewed features, and only reviewed features are
+# allowed. This prevents features from being unexpectedly turned on implicitly.
+
+[gn]
+require_feature_reviews = [ "bstr" ]
+
+# The unicode feature is excluded so we don't need to spend time auditing it.
+[gn.package.bstr."1.5.0"]
+reviewed_features = [ "std", "alloc" ]
