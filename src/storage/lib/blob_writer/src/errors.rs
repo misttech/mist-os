@@ -11,10 +11,10 @@ pub enum CreateError {
     #[error(transparent)]
     Fidl(#[from] fidl::Error),
     /// There was a problem getting the shared vmo for the blob.
-    #[error("failed to get vmo: {0}")]
+    #[error("failed to get vmo")]
     GetVmo(#[from] Status),
     /// An error occurred while getting the size of the vmo.
-    #[error("failed to get size of vmo: {0}")]
+    #[error("failed to get size of vmo")]
     GetSize(#[source] Status),
 }
 
@@ -25,16 +25,16 @@ pub enum WriteError {
     #[error(transparent)]
     Fidl(#[from] fidl::Error),
     /// There was a problem getting the size of the vmo.
-    #[error("failed to get the size of the vmo: {0}")]
-    GetSize(#[from] Status),
+    #[error("failed to get the size of the vmo")]
+    GetSize(#[source] Status),
     /// The outstanding writes queue ended prematurely.
     #[error("outstanding writes queue ended prematurely")]
     QueueEnded,
     /// An error occurred while making a BytesReady request to the BlobWriter server.
-    #[error("failed to complete a BytesReady request: {0}")]
+    #[error("failed to complete a BytesReady request")]
     BytesReady(#[source] Status),
     /// An error occurred while writing to the vmo.
-    #[error("failed to write to the vmo: {0}")]
+    #[error("failed to write to the vmo")]
     VmoWrite(#[source] Status),
     /// Client tried to write past the expected end of the blob.
     #[error("client tried to write past the expected end of the blob")]
