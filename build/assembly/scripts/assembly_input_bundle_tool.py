@@ -53,10 +53,18 @@ def create_bundle(args: argparse.Namespace) -> None:
                 add_config_data_entries_from_file(
                     aib_creator, config_data_entry)
 
+    excluded_files = set()
+    if args.excluded_files:
+        excluded_files_list = _read_json_file(args.excluded_files)
+        for entry in excluded_files_list:
+            if 'source' in entry:
+                excluded_files.add(entry['source'])
+
     if args.bootfs_files_list:
         for bootfs_files_entry_file in args.bootfs_files_list:
             with open(bootfs_files_entry_file) as bootfs_files_entry:
-                add_bootfs_files_from_list(aib_creator, bootfs_files_entry)
+                add_bootfs_files_from_list(
+                    aib_creator, bootfs_files_entry, excluded_files)
 
     if args.kernel_cmdline:
         add_kernel_cmdline_from_file(aib_creator, args.kernel_cmdline)
@@ -206,7 +214,8 @@ def add_compiled_packages_from_file(aib_creator: AIBCreator, compiled_packages):
             aib_creator.compiled_packages.append(main_def)
 
 
-def add_bootfs_files_from_list(aib_creator: AIBCreator, bootfs_files):
+def add_bootfs_files_from_list(
+        aib_creator: AIBCreator, bootfs_files, excluded_files):
     """
     bootfs_files schema:
     [
@@ -221,8 +230,10 @@ def add_bootfs_files_from_list(aib_creator: AIBCreator, bootfs_files):
         # Not all distribution manifests have the source and destination pairs.
         # For an example see: dart_kernel.gni
         if 'source' in entry and 'destination' in entry:
-            aib_creator.bootfs_files.add(
-                FileEntry(entry['source'], entry['destination']))
+            source = entry['source']
+            if source not in excluded_files:
+                aib_creator.bootfs_files.add(
+                    FileEntry(source, entry['destination']))
 
 
 def _read_json_file(pkg_list_file):
@@ -466,6 +477,10 @@ def main():
         "--compiled-packages",
         type=argparse.FileType('r'),
         help="Path to a json file of compiled package configuration")
+    bundle_creation_parser.add_argument(
+        "--excluded-files",
+        type=argparse.FileType('r'),
+        help="Path to a distribution manifest listing files to exclude")
 
     bundle_creation_parser.set_defaults(handler=create_bundle)
 

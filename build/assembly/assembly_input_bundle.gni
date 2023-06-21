@@ -5,6 +5,7 @@
 import("//build/assembly/assembly_input_bundle_archive.gni")
 import("//build/assembly/assembly_input_bundle_package.gni")
 import("//build/bazel/bazel_inputs.gni")
+import("//build/dist/distribution_manifest.gni")
 import("//build/group_with_inputs.gni")
 import("//build/python/python_action.gni")
 
@@ -241,6 +242,7 @@ template("assembly_input_bundle") {
     kernel_cmdline = "${target_name}.kernel_cmdline"
     shell_commands_list = "${target_name}.shell_commands.list"
     compiled_packages = "${target_name}.compiled_packages"
+    excluded_files = "${target_name}.excluded_files"
   }
 
   files = {
@@ -269,6 +271,10 @@ template("assembly_input_bundle") {
 
     _gen_files = "${target_gen_dir}/${target_name}"
     shell_commands_list = "${_gen_files}/shell_commands.list"
+
+    # The distribution manifest listing files to excluded from all platform
+    # AIBs.
+    excluded_files = "${_gen_files}/excluded_files.list"
 
     # The output path for the generated file which collects bootfs_files from
     # the invoking scope
@@ -659,6 +665,17 @@ template("assembly_input_bundle") {
     creation_deps += [ ":${labels.compiled_packages}" ]
   }
 
+  distribution_manifest(labels.excluded_files) {
+    deps = [ "//src/devices/misc/drivers/compat:driver" ]
+    outputs = [ files.excluded_files ]
+  }
+  creation_args += [
+    "--excluded-files",
+    rebase_path(files.excluded_files, root_build_dir),
+  ]
+  creation_inputs += [ files.excluded_files ]
+  creation_deps += [ ":${labels.excluded_files}" ]
+
   # Create the out-of-tree-usable Assembly Input Bundle
   python_action(labels.assembly_input_bundle) {
     forward_variables_from(invoker,
@@ -719,6 +736,7 @@ template("assembly_input_bundle") {
       config_package_barrier = []
       distribution_entries_barrier = []
       driver_package_component_files_barrier = []
+      driver_component_barrier = []
       system_image_package_barrier = []
       shell_commands_barrier = []
     }
