@@ -3,12 +3,19 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/graphics/display/testing/coordinator-provider/meta/display_coordinator_provider.shard.cml",
         "//src/ui/meta/a11y_routes.shard.cml",
         "//src/ui/meta/scene_manager_routes.shard.cml",
         "//src/ui/meta/scenic_routes.shard.cml",
         "//src/ui/meta/text_manager_routes.shard.cml",
         "//src/ui/meta/virtual_keyboard_manager_routes.shard.cml",
         "syslog/client.shard.cml",
+    ],
+    children: [
+        {
+            name: "display-coordinator-provider",
+            url: "fuchsia-pkg://fuchsia.com/display-coordinator-provider#meta/hdcp.cm",
+        },
     ],
     offer: [
         {
@@ -33,6 +40,11 @@
             protocol: [ "fuchsia.ui.accessibility.view.Registry" ],
             from: "#scene_manager",
             to: [ "#a11y_manager" ],
+        },
+        {
+            protocol: [ "fuchsia.hardware.display.Provider" ],
+            from: "#display-coordinator-provider",
+            to: [ "#scenic" ],
         },
     ],
 }

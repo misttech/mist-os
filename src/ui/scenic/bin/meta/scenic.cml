@@ -5,9 +5,7 @@
     include: [ "//src/ui/scenic/bin/meta/scenic.shard.cml" ],
     use: [
         {
-            directory: "dev-display-coordinator",
-            rights: [ "r*" ],
-            path: "/dev/class/display-coordinator",
+            protocol: [ "fuchsia.hardware.display.Provider" ],
         },
     ],
 }
