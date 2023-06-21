@@ -6,7 +6,7 @@
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/sys/cpp/component_context.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
@@ -18,74 +18,85 @@ namespace display {
 
 static const std::string kDisplayDir = "/dev/class/display-coordinator";
 
-DevFsCoordinatorFactoryHlcpp::DevFsCoordinatorFactoryHlcpp(sys::ComponentContext* app_context) {
-  app_context->outgoing()->AddPublicService(bindings_.GetHandler(this));
+zx::result<> DevFsCoordinatorFactory::CreateAndPublishService(
+    component::OutgoingDirectory& outgoing, async_dispatcher_t* dispatcher) {
+  return outgoing.AddProtocol<fuchsia_hardware_display::Provider>(
+      std::make_unique<DevFsCoordinatorFactory>(dispatcher));
 }
 
-// |fuchsia::hardware::display::Provider|.
-void DevFsCoordinatorFactoryHlcpp::OpenCoordinatorForPrimary(
-    ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> request,
-    OpenCoordinatorForPrimaryCallback callback) {
+DevFsCoordinatorFactory::DevFsCoordinatorFactory(async_dispatcher_t* dispatcher)
+    : dispatcher_(dispatcher) {}
+
+void DevFsCoordinatorFactory::OpenCoordinatorForVirtcon(
+    OpenCoordinatorForVirtconRequest& request,
+    OpenCoordinatorForVirtconCompleter::Sync& completer) {
+  completer.Reply({{
+      .s = ZX_ERR_NOT_SUPPORTED,
+  }});
+}
+
+zx_status_t DevFsCoordinatorFactory::OpenCoordinatorForPrimaryOnDevice(
+    const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename,
+    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server) {
+  zx::result client = component::ConnectAt<fuchsia_hardware_display::Provider>(dir, filename);
+  if (client.is_error()) {
+    FX_PLOGS(ERROR, client.error_value())
+        << "Failed to open display_controller at path: " << kDisplayDir << '/' << filename;
+
+    // We could try to match the value of the C "errno" macro to the closest ZX error, but
+    // this would give rise to many corner cases.  We never expect this to fail anyway, since
+    // |filename| is given to us by the device watcher.
+    return ZX_ERR_INTERNAL;
+  }
+
+  // TODO(fxbug.dev/57269): Pass an async completer asynchronously into
+  // OpenCoordinator(), rather than blocking on a synchronous call.
+  fidl::WireResult result =
+      fidl::WireCall(client.value())->OpenCoordinatorForPrimary(std::move(coordinator_server));
+  if (!result.ok()) {
+    FX_PLOGS(ERROR, result.status()) << "Failed to call service handle";
+
+    // There's not a clearly-better value to return here.  Returning the FIDL error would be
+    // somewhat unexpected, since the caller wouldn't receive it as a FIDL status, rather as
+    // the return value of a "successful" method invocation.
+    return ZX_ERR_INTERNAL;
+  }
+  if (result->s != ZX_OK) {
+    FX_PLOGS(ERROR, result->s) << "Failed to open display coordinator";
+    return result->s;
+  }
+
+  return ZX_OK;
+}
+
+void DevFsCoordinatorFactory::OpenCoordinatorForPrimary(
+    OpenCoordinatorForPrimaryRequest& request,
+    OpenCoordinatorForPrimaryCompleter::Sync& completer) {
   // Watcher's lifetime needs to be at most as long as the lifetime of |this|,
   // and otherwise as long as the lifetime of |callback|.  |this| will own
   // the references to outstanding watchers, and each watcher will notify |this|
   // when it is done, so that |this| can remove a reference to it.
-  static uint64_t last_id = 0;
-  const uint64_t id = ++last_id;
+  const int64_t id = next_display_client_id_++;
 
   std::unique_ptr<fsl::DeviceWatcher> watcher = fsl::DeviceWatcher::Create(
       kDisplayDir,
-      [id, holders = &holders_, request = std::move(request), callback = std::move(callback)](
+      [this, id, request = std::move(request), async_completer = completer.ToAsync()](
           const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) mutable {
         FX_LOGS(INFO) << "Found display controller at path: " << kDisplayDir << '/' << filename
                       << '.';
-
-        zx::result client = component::ConnectAt<fuchsia_hardware_display::Provider>(dir, filename);
-        if (client.is_error()) {
-          FX_PLOGS(ERROR, client.error_value())
-              << "Failed to open display_controller at path: " << kDisplayDir << '/' << filename;
-
-          // We could try to match the value of the C "errno" macro to the closest ZX error, but
-          // this would give rise to many corner cases.  We never expect this to fail anyway, since
-          // |filename| is given to us by the device watcher.
-          callback(ZX_ERR_INTERNAL);
+        zx_status_t open_coordinator_status =
+            OpenCoordinatorForPrimaryOnDevice(dir, filename, std::move(request.coordinator()));
+        if (open_coordinator_status != ZX_OK) {
+          async_completer.Reply({{.s = open_coordinator_status}});
           return;
         }
-
-        // TODO(fxbug.dev/57269): it would be nice to simply pass |callback| asynchronously into
-        // OpenCoordinator(), rather than blocking on a synchronous call.  However, it is
-        // non-trivial to do so, so for now we use a blocking call to proxy the request.
-        fidl::WireResult result =
-            fidl::WireCall(client.value())
-                ->OpenCoordinatorForPrimary(
-                    fidl::ServerEnd<fuchsia_hardware_display::Coordinator>(request.TakeChannel()));
-        if (!result.ok()) {
-          FX_PLOGS(ERROR, result.status()) << "Failed to call service handle";
-
-          // There's not a clearly-better value to return here.  Returning the FIDL error would be
-          // somewhat unexpected, since the caller wouldn't receive it as a FIDL status, rather as
-          // the return value of a "successful" method invocation.
-          callback(ZX_ERR_INTERNAL);
-          return;
-        }
-        if (result->s != ZX_OK) {
-          FX_PLOGS(ERROR, result->s) << "Failed to open display coordinator";
-          callback(result->s);
-          return;
-        }
-
-        callback(ZX_OK);
-
+        async_completer.Reply({{.s = ZX_OK}});
         // We no longer need |this| to store this closure, remove it. Do not do
         // any work after this point.
-        holders->erase(id);
-      });
-  holders_[id] = std::move(watcher);
-}
-
-void DevFsCoordinatorFactoryHlcpp::BindDisplayProvider(
-    fidl::InterfaceRequest<fuchsia::hardware::display::Provider> request) {
-  bindings_.AddBinding(this, std::move(request));
+        pending_device_watchers_.erase(id);
+      },
+      dispatcher_);
+  pending_device_watchers_[id] = std::move(watcher);
 }
 
 }  // namespace display
