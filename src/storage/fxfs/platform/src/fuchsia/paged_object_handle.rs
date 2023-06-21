@@ -715,13 +715,11 @@ impl PagedObjectHandle {
         let keys = [LockKey::truncate(store.store_object_id(), self.handle.object_id())];
         let _truncate_guard = debug_assert_not_too_long!(fs.write_lock(&keys));
 
-        // Changing the size of the vmo will cause `was_file_modified_since_last_call` to return
-        // true which will update the mtime during the next flush.
         self.buffer.resize(new_size).await;
 
         let previous_content_size = self.handle.get_size();
+        let mut inner = self.inner.lock().unwrap();
         if new_size < previous_content_size {
-            let mut inner = self.inner.lock().unwrap();
             inner.pending_shrink = match inner.pending_shrink {
                 PendingShrink::None => PendingShrink::ShrinkTo(new_size),
                 PendingShrink::ShrinkTo(size) => {
@@ -730,6 +728,11 @@ impl PagedObjectHandle {
                 PendingShrink::NeedsTrim => PendingShrink::ShrinkTo(new_size),
             }
         }
+
+        // Not all paths through the resize method above cause the modification time in the kernel
+        // to be set (e.g. if only the content size is changed), so force an mtime update here.
+        let _ = self.was_file_modified_since_last_call()?;
+        inner.dirty_mtime = DirtyTimestamp::Some(Timestamp::now());
 
         // There may be reservations for dirty pages that are no longer relevant but the locations
         // of the pages is not tracked so they are assumed to still be dirty. This will get
