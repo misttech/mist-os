@@ -221,7 +221,6 @@
 //tools/fidl/fidlc:fidlc_sdk
 //tools/fidl/fidlgen_cpp:fidlgen_cpp_sdk
 //tools/fidl/fidlgen_hlcpp:fidlgen_hlcpp_sdk
-//tools/fidl/fidlgen_hlcpp:fidlgen_sdk
 //tools/fidl/fidlgen_rust:fidlgen_rust_sdk
 //tools/fidlcat:fidlcat_sdk
 //tools/fvdl:fvdl_sdk

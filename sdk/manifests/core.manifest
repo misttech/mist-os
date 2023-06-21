@@ -230,7 +230,6 @@ sdk://tools/arm64/ffx_tools/ffx-scrutiny
 sdk://tools/arm64/fidl-format
 sdk://tools/arm64/fidlc
 sdk://tools/arm64/fidlcat
-sdk://tools/arm64/fidlgen
 sdk://tools/arm64/fidlgen_cpp
 sdk://tools/arm64/fidlgen_hlcpp
 sdk://tools/arm64/fidlgen_rust
@@ -263,7 +262,6 @@ sdk://tools/x64/ffx_tools/ffx-scrutiny
 sdk://tools/x64/fidl-format
 sdk://tools/x64/fidlc
 sdk://tools/x64/fidlcat
-sdk://tools/x64/fidlgen
 sdk://tools/x64/fidlgen_cpp
 sdk://tools/x64/fidlgen_hlcpp
 sdk://tools/x64/fidlgen_rust

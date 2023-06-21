@@ -47,13 +47,6 @@ if (is_host) {
     sdk_category = "partner"
   }
 
-  # TODO(fxbug.dev/45483): Remove once all SDK customers are using HLCPP backend
-  # directly.
-  go_binary("fidlgen") {
-    library = ":main"
-    sdk_category = "partner"
-  }
-
   golden_files("fidlgen_hlcpp_golden_tests") {
     testonly = true
 

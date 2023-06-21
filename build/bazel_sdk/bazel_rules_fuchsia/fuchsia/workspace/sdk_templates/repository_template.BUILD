@@ -71,7 +71,7 @@ fuchsia_toolchain_info(
     ffx_scrutiny_manifest = "//tools:x64/ffx_tools/ffx-scrutiny-meta.json",
     fidlc = "//tools:x64/fidlc",
     fidlgen_cpp = "//tools:x64/fidlgen_cpp",
-    fidlgen_hlcpp = "//tools:x64/fidlgen",  # (TODO: rename to fidlgen_hlcpp once the Core SDK renames it)
+    fidlgen_hlcpp = "//tools:x64/fidlgen_hlcpp",
     fssh = "//tools:x64/fssh",
     fvm = "//tools:x64/fvm",
     fvm_manifest = "//tools:x64/fvm-meta.json",

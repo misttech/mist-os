@@ -1415,8 +1415,8 @@ tools/arm64/fidlc
 tools/arm64/fidlc-meta.json
 tools/arm64/fidlcat
 tools/arm64/fidlcat-meta.json
-tools/arm64/fidlgen
-tools/arm64/fidlgen-meta.json
+tools/arm64/fidlgen_hlcpp
+tools/arm64/fidlgen_hlcpp-meta.json
 tools/arm64/fpublish
 tools/arm64/fpublish-meta.json
 tools/arm64/fserve
@@ -1463,8 +1463,8 @@ tools/x64/fidlc
 tools/x64/fidlc-meta.json
 tools/x64/fidlcat
 tools/x64/fidlcat-meta.json
-tools/x64/fidlgen
-tools/x64/fidlgen-meta.json
+tools/x64/fidlgen_hlcpp
+tools/x64/fidlgen_hlcpp-meta.json
 tools/x64/fpublish
 tools/x64/fpublish-meta.json
 tools/x64/fserve
