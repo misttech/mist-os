@@ -47,6 +47,7 @@ if (is_fuchsia) {
 
     bootfs_labels = [
       "//build/input:recovery_bootfs",
+      "//bundles:bootstrap",
       "//bundles:debugging",
       "//bundles/bringup:manual_testing",
       "//bundles/drivers:bootstrap",
@@ -289,6 +290,7 @@ if (is_fuchsia) {
     bootfs_labels = []
     bootfs_labels = [
       "//build/input:recovery_bootfs",
+      "//bundles:bootstrap",
       "//bundles/drivers:bootstrap",
       "//bundles/drivers:usb-host-stack",
       "//bundles/drivers:usb-peripheral-stack",
@@ -354,6 +356,7 @@ if (is_fuchsia) {
 
     bootfs_labels = [
       "//build/input:recovery_bootfs",
+      "//bundles:bootstrap",
       "//bundles/drivers:bootstrap",
       "//bundles/drivers:usb-host-stack",
       "//bundles/drivers:usb-peripheral-stack",

@@ -26,6 +26,7 @@ assembled_system("overnet") {
     "//src/sys/pkg/bin/system-update-committer",
   ]
   bootfs_labels = [
+    "//bundles:bootstrap",
     "//bundles:debugging",
     "//bundles/bringup:manual_testing",
     "//bundles/drivers:bootstrap",

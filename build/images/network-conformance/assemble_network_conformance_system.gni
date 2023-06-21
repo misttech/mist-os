@@ -61,6 +61,7 @@ template("assemble_network_conformance_system") {
 
     bootfs_labels = [
       "//build/input:recovery_bootfs",
+      "//bundles:bootstrap",
       "//bundles/drivers:bootstrap",
       "//src/sys/bin/psutils",
       "//src/sys/component_manager:component_manager_bootfs_config",

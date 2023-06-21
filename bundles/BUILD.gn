@@ -5,10 +5,6 @@
 import("//build/drivers/check_included_drivers.gni")
 import("//build/drivers/create_all_drivers_doc.gni")
 
-# TODO(fxbug.dev/122864) Remove transitional labels
-group("bootstrap") {
-}
-
 # WARNING: Known to infrastructure
 #
 # This provides metadata in the //:boot_tests schema.
@@ -44,6 +40,16 @@ group("amlogic_hw_dependent_tests") {
     # Verify communication with amlogic optee.
     "//src/security/bin/tee_manager:optee_smoke_test",
   ]
+}
+
+# Binaries that form the base of every single product.
+group("bootstrap") {
+  deps = [ ":bootstrap-zedboot" ]
+}
+
+# Binaries that form the base of every single zedboot image.
+group("bootstrap-zedboot") {
+  deps = [ "//src/storage/bundles:bootstrap" ]
 }
 
 # Debugging tools installed on the boot image.
