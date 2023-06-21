@@ -189,14 +189,14 @@ config_data("omaha-client-config") {
 resource("omaha-client-test-config") {
   testonly = true
   outputs = [ "test-config-data/omaha-client-service-bin-tests/omaha_app_id" ]
-  sources = [ rebase_path("test_data/omaha_test_app_id") ]
+  sources = [ "test_data/omaha_test_app_id" ]
 }
 
 resource("omaha-client-channels-test-config") {
   testonly = true
   outputs =
       [ "test-config-data/omaha-client-service-bin-tests/channel_config.json" ]
-  sources = [ rebase_path("test_data/test_channel_config.json") ]
+  sources = [ "test_data/test_channel_config.json" ]
 }
 
 group("tests") {
