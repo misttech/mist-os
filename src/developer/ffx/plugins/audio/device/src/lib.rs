@@ -34,23 +34,43 @@ fho::embedded_plugin!(DeviceTool);
 impl FfxMain for DeviceTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        match self.cmd.subcommand {
+        match &self.cmd.subcommand {
             SubCommand::Info(_) => {
                 device_info(self.audio_proxy, self.cmd).await.map_err(Into::into)
             }
-            SubCommand::Play(_) => {
+
+            SubCommand::Play(play_command) => {
                 let (play_remote, play_local) = fidl::Socket::create_datagram();
-                device_play(
-                    self.audio_proxy,
-                    self.cmd,
-                    play_local,
-                    play_remote,
-                    std::io::stdin(),
-                    &ffx_audio_common::STDOUT,
-                    &ffx_audio_common::STDERR,
-                )
-                .await
-                .map_err(Into::into)
+                match &play_command.file {
+                    Some(input_file_path) => {
+                        let file_reader = std::fs::File::open(&input_file_path).map_err(|e| {
+                            anyhow::anyhow!("Error trying to open file \"{input_file_path}\": {e}")
+                        })?;
+
+                        device_play(
+                            self.audio_proxy,
+                            self.cmd,
+                            play_local,
+                            play_remote,
+                            file_reader,
+                            &ffx_audio_common::STDOUT,
+                            &ffx_audio_common::STDERR,
+                        )
+                        .await
+                        .map_err(Into::into)
+                    }
+                    None => device_play(
+                        self.audio_proxy,
+                        self.cmd,
+                        play_local,
+                        play_remote,
+                        std::io::stdin(),
+                        &ffx_audio_common::STDOUT,
+                        &ffx_audio_common::STDERR,
+                    )
+                    .await
+                    .map_err(Into::into),
+                }
             }
             SubCommand::Record(_) => {
                 device_record(self.audio_proxy, self.cmd).await.map_err(Into::into)
@@ -530,6 +550,7 @@ where
                 is_input: Some(false),
                 id: Some(device_id),
                 device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
+
                 ..Default::default()
             },
         )),
@@ -652,6 +673,10 @@ mod tests {
     use ffx_audio_device_args::{DeviceCommand, DeviceDirection};
     use ffx_core::macro_deps::futures::AsyncWriteExt;
     use fidl::HandleBased;
+    use std::fs;
+    use std::io::Write;
+    use std::os::unix::fs::PermissionsExt;
+    use tempfile::TempDir;
     use zerocopy::AsBytes;
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -659,9 +684,9 @@ mod tests {
         let audio_daemon = ffx_audio_common::tests::fake_audio_daemon();
 
         let command = DeviceCommand {
-            subcommand: ffx_audio_device_args::SubCommand::Play(DevicePlayCommand {}),
+            subcommand: ffx_audio_device_args::SubCommand::Play(DevicePlayCommand { file: None }),
             id: Some("abc123".to_string()),
-            device_direction: Some(DeviceDirection::Input),
+            device_direction: Some(DeviceDirection::Output),
         };
 
         let (play_remote, play_local) = fidl::Socket::create_datagram();
@@ -673,7 +698,7 @@ mod tests {
         async_play_local.write_all(ffx_audio_common::tests::WAV_HEADER_EXT).await.unwrap();
 
         let result = device_play(
-            audio_daemon,
+            audio_daemon.clone(),
             command,
             play_local,
             play_remote,
@@ -683,6 +708,54 @@ mod tests {
         )
         .await;
 
+        result.unwrap();
+        let expected_output = "Successfully processed all audio data.".as_bytes();
+
+        {
+            let mut lock = ffx_audio_common::tests::MOCK_STDOUT.lock().unwrap();
+            let output: &[u8] = lock.as_bytes();
+            assert_eq!(output, expected_output);
+            lock.clear();
+        }
+
+        // Test reading from a file.
+        let test_dir = TempDir::new().unwrap();
+        let test_dir_path = test_dir.path().to_path_buf();
+        let test_wav_path = test_dir_path.join("sine.wav");
+        let wav_path = test_wav_path
+            .clone()
+            .into_os_string()
+            .into_string()
+            .map_err(|_e| anyhow::anyhow!("Error turning path into string"))?;
+
+        // Create valid WAV file.
+        fs::File::create(&test_wav_path)
+            .unwrap()
+            .write_all(ffx_audio_common::tests::SINE_WAV)
+            .unwrap();
+        fs::set_permissions(&test_wav_path, fs::Permissions::from_mode(0o770)).unwrap();
+
+        let file_reader = std::fs::File::open(&test_wav_path)
+            .map_err(|e| anyhow::anyhow!("Error trying to open file \"{}\": {e}", wav_path))?;
+
+        let file_command = DeviceCommand {
+            subcommand: ffx_audio_device_args::SubCommand::Play(DevicePlayCommand {
+                file: Some(wav_path),
+            }),
+            id: Some("abc123".to_string()),
+            device_direction: Some(DeviceDirection::Input),
+        };
+        let (play_remote, play_local) = fidl::Socket::create_datagram();
+        let result = device_play(
+            audio_daemon.clone(),
+            file_command,
+            play_local,
+            play_remote,
+            file_reader,
+            &ffx_audio_common::tests::MOCK_STDOUT,
+            &ffx_audio_common::tests::MOCK_STDERR,
+        )
+        .await;
         result.unwrap();
         let expected_output = "Successfully processed all audio data.".as_bytes();
         let lock = ffx_audio_common::tests::MOCK_STDOUT.lock().unwrap();

@@ -31,17 +31,35 @@ impl FfxMain for PlayTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         let (play_remote, play_local) = fidl::Socket::create_datagram();
-        play_impl(
-            self.audio_proxy,
-            play_local,
-            play_remote,
-            self.cmd,
-            std::io::stdin(),
-            &ffx_audio_common::STDOUT,
-            &ffx_audio_common::STDERR,
-        )
-        .await
-        .map_err(Into::into)
+        match &self.cmd.file {
+            Some(input_file_path) => {
+                let file_reader = std::fs::File::open(&input_file_path).map_err(|e| {
+                    anyhow::anyhow!("Error trying to open file \"{input_file_path}\": {e}")
+                })?;
+                play_impl(
+                    self.audio_proxy,
+                    play_local,
+                    play_remote,
+                    self.cmd,
+                    file_reader,
+                    &ffx_audio_common::STDOUT,
+                    &ffx_audio_common::STDERR,
+                )
+                .await
+                .map_err(Into::into)
+            }
+            None => play_impl(
+                self.audio_proxy,
+                play_local,
+                play_remote,
+                self.cmd,
+                std::io::stdin(),
+                &ffx_audio_common::STDOUT,
+                &ffx_audio_common::STDERR,
+            )
+            .await
+            .map_err(Into::into),
+        }
     }
 }
 
@@ -115,16 +133,21 @@ mod tests {
     use ffx_core::macro_deps::futures::AsyncWriteExt;
     use ffx_writer as _;
     use fidl_fuchsia_media::AudioRenderUsage;
+    use std::fs;
+    use std::io::Write;
+    use std::os::unix::fs::PermissionsExt;
+    use tempfile::TempDir;
     use zerocopy::AsBytes;
 
     #[fuchsia_async::run_singlethreaded(test)]
     pub async fn test_play() -> Result<(), fho::Error> {
         let audio_daemon = ffx_audio_common::tests::fake_audio_daemon();
 
-        let command = PlayCommand {
+        let stdin_command = PlayCommand {
             usage: AudioRenderUsageExtended::Media(AudioRenderUsage::Media),
             buffer_size: Some(48000),
             packet_count: None,
+            file: None,
             gain: 0.0,
             mute: false,
             clock: fidl_fuchsia_audio_ffxdaemon::ClockType::Flexible(
@@ -140,10 +163,10 @@ mod tests {
 
         async_play_local.write_all(ffx_audio_common::tests::WAV_HEADER_EXT).await.unwrap();
         let result = play_impl(
-            audio_daemon,
+            audio_daemon.clone(),
             play_local,
             play_remote,
-            command,
+            stdin_command,
             &ffx_audio_common::tests::WAV_HEADER_EXT[..],
             &ffx_audio_common::tests::MOCK_STDOUT,
             &ffx_audio_common::tests::MOCK_STDERR,
@@ -152,10 +175,63 @@ mod tests {
 
         result.unwrap();
         let expected_output = "Successfully processed all audio data.".as_bytes();
+
+        {
+            let mut lock = ffx_audio_common::tests::MOCK_STDOUT.lock().unwrap();
+            let output: &[u8] = lock.as_bytes();
+            assert_eq!(output, expected_output);
+            lock.clear();
+        }
+
+        // Test reading from a file.
+        let test_dir = TempDir::new().unwrap();
+        let test_dir_path = test_dir.path().to_path_buf();
+        let test_wav_path = test_dir_path.join("sine.wav");
+        let wav_path = test_wav_path
+            .clone()
+            .into_os_string()
+            .into_string()
+            .map_err(|_e| anyhow::anyhow!("Error turning path into string"))?;
+
+        // Create valid WAV file.
+        fs::File::create(&test_wav_path)
+            .unwrap()
+            .write_all(ffx_audio_common::tests::SINE_WAV)
+            .unwrap();
+        fs::set_permissions(&test_wav_path, fs::Permissions::from_mode(0o770)).unwrap();
+
+        let file_reader = std::fs::File::open(&test_wav_path)
+            .map_err(|e| anyhow::anyhow!("Error trying to open file \"{}\": {e}", wav_path))?;
+
+        let file_command = PlayCommand {
+            usage: AudioRenderUsageExtended::Media(AudioRenderUsage::Media),
+            buffer_size: Some(48000),
+            packet_count: None,
+            file: Some(wav_path),
+            gain: 0.0,
+            mute: false,
+            clock: fidl_fuchsia_audio_ffxdaemon::ClockType::Flexible(
+                fidl_fuchsia_audio_ffxdaemon::Flexible,
+            ),
+        };
+        let (play_remote, play_local) = fidl::Socket::create_datagram();
+        let result = play_impl(
+            audio_daemon,
+            play_local,
+            play_remote,
+            file_command,
+            file_reader,
+            &ffx_audio_common::tests::MOCK_STDOUT,
+            &ffx_audio_common::tests::MOCK_STDERR,
+        )
+        .await;
+        result.unwrap();
+        let expected_output = "Successfully processed all audio data.".as_bytes();
         let lock = ffx_audio_common::tests::MOCK_STDOUT.lock().unwrap();
         let output: &[u8] = lock.as_bytes();
 
         assert_eq!(output, expected_output);
+
         Ok(())
     }
 }

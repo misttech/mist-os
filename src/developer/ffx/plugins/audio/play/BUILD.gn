@@ -32,6 +32,7 @@ ffx_plugin("ffx_audio_play") {
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:zerocopy",
   ]
 

@@ -15,6 +15,8 @@ ultrasound renderer and capturer by specifying usage to ultrasound.
 
 `ffx audio play`
 
+`ffx audio play --file ~/path/to/file.wav`
+
 `ffx audio record`
 
 `ffx audio play --usage ultrasound`
@@ -37,6 +39,8 @@ must not be present)
 `ffx audio device --id {} record`
 
 `ffx audio device --id {} play`
+
+`ffx audio device --id {} play --file ~/path/to/file.wav`
 
 ### Other Tips
 * One can check the input/output of the signal by running a play and record command at the same

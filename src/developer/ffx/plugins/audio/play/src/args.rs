@@ -10,7 +10,8 @@ use {anyhow::Result, argh::FromArgs, ffx_core::ffx_command, fidl_fuchsia_media::
     subcommand,
     name = "play",
     description = "Reads a WAV file from stdin and sends the audio data to audio_core AudioRenderer API.",
-    example = "$ ffx audio gen sine --duration 1s --frequency 440 --amplitude 0.5 --format 48000,int16,2ch | ffx audio play"
+    example = "$ ffx audio gen sine --duration 1s --frequency 440 --amplitude 0.5 --format 48000,int16,2ch | ffx audio play \n\
+            $ ffx audio play --file ~/path/to/sine.wav"
 )]
 pub struct PlayCommand {
     #[argh(
@@ -59,6 +60,13 @@ pub struct PlayCommand {
         default = "fidl_fuchsia_audio_ffxdaemon::ClockType::Flexible(fidl_fuchsia_audio_ffxdaemon::Flexible)"
     )]
     pub clock: fidl_fuchsia_audio_ffxdaemon::ClockType,
+
+    #[argh(
+        option,
+        description = "file in WAV format containing audio signal. If not specified,\
+        ffx command will read from stdin."
+    )]
+    pub file: Option<String>,
 }
 
 #[derive(Debug, PartialEq)]

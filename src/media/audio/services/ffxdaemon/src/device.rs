@@ -227,7 +227,7 @@ impl Device {
         ring_buffer_wrapper.stop().await?;
 
         let output_message = format!(
-            "Succesfully processed all audio data. \n Woke up late {} times.\n ",
+            "Successfully processed all audio data. \n Woke up late {} times.\n ",
             late_wakeups
         );
 

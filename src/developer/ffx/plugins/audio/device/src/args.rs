@@ -14,17 +14,18 @@ use {
     description = "Interact directly with device hardware.",
     example = "\
     To print information about a specific device: \n\
-    \t$ ffx audio device --id 000 --direction input info \n\n\
+    \t$ ffx audio device --id 3d99d780 --direction input info \n\n\
     Play a wav file directly to device hardware: \n\
-    \t$ cat ~/sine.wav | ffx audio device --id 000 play \n\n
+    \t$ cat ~/sine.wav | ffx audio device --id  a70075f2 play \n\n
+    \t$ ffx audio device --id  a70075f2 play --file ~/sine.wav \n\n
     Record a wav file directly from device hardware: \n\
-    \t$ ffx audio device --id 000 record --format 48000,uint8,1ch --duration 1s \n\n
+    \t$ ffx audio device --id 3d99d780 record --format 48000,uint8,1ch --duration 1s \n\n
     Mute the stream of the output device: \n
-    \t$ ffx audio device --id 000 --direction output mute \n\n
+    \t$ ffx audio device --id a70075f2 --direction output mute \n\n
     Set the gain of the output device to -20 dB: \n
-    \t$ ffx audio device --id 000 --direction output gain -20 \n\n
+    \t$ ffx audio device --id a70075f2 --direction output gain -20 \n\n
     Turn agc on for the input device: \n
-    \t$ ffx audio device --id 000 --direction input agc on"
+    \t$ ffx audio device --id 3d99d780 --direction input agc on"
 )]
 pub struct DeviceCommand {
     #[argh(subcommand)]
@@ -64,7 +65,8 @@ pub enum SubCommand {
 pub struct InfoCommand {
     #[argh(
         option,
-        description = "output format: accepted options are 'text' for readable text, or 'json' for a JSON dictionary. Default: text",
+        description = "output format: accepted options are 'text' for readable text, or 'json' \
+        for a JSON dictionary. Default: text",
         default = "InfoOutputFormat::Text"
     )]
     pub output: InfoOutputFormat,
@@ -72,7 +74,14 @@ pub struct InfoCommand {
 
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "play", description = "Send audio data directly to device ring buffer.")]
-pub struct DevicePlayCommand {}
+pub struct DevicePlayCommand {
+    #[argh(
+        option,
+        description = "file in WAV format containing audio signal. If not specified, \
+        ffx command will read from stdin."
+    )]
+    pub file: Option<String>,
+}
 
 #[derive(Debug, PartialEq)]
 pub enum InfoOutputFormat {
@@ -85,7 +94,7 @@ pub enum InfoOutputFormat {
 pub struct DeviceRecordCommand {
     #[argh(
         option,
-        description = "duration of output signal. Examples: 5ms or 3s. If not specified,\
+        description = "duration of output signal. Examples: 5ms or 3s. If not specified, \
         press ENTER to stop recording.",
         from_str_fn(parse_duration)
     )]
