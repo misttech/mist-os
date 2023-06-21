@@ -33,6 +33,7 @@ rustc_library("fidl-fuchsia-pkg-ext") {
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hex",
     "//third_party/rust_crates:http",
@@ -54,6 +55,7 @@ rustc_library("fidl-fuchsia-pkg-ext") {
   sources = [
     "src/base_package_index.rs",
     "src/cache.rs",
+    "src/cache/storage.rs",
     "src/errors.rs",
     "src/fidl_iterator_to_stream.rs",
     "src/lib.rs",

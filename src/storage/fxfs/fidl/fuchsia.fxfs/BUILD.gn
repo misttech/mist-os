@@ -10,4 +10,6 @@ fidl("fuchsia.fxfs") {
     "//sdk/fidl/fuchsia.io",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

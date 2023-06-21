@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.pkg;
 
+using fuchsia.fxfs;
 using fuchsia.io;
 using zx;
 
@@ -121,21 +122,15 @@ closed protocol NeededBlobs {
     ///
     /// + request `blob_type` the type of the blob to be written. Will be
     ///   removed once the transition to offline compression is complete.
-    /// - response `file` is the handle used to write the blob
-    ///     If `file` is absent, the blob is already cached and so does not
-    ///     need to be written.
-    ///     If `file` is present, the blob is still needed and should be
-    ///     written by the client. `file` must be truncated to the correct size
-    ///     (if it is an uncompressed blob) and then written from start to finish
-    ///     (seeks are not supported). A corrupt blob is indicated by a `Write()`
-    ///     (usually the final write) failing with `ZX_ERR_IO_DATA_INTEGRITY`.
+    /// - response `writer` is used to write the blob. If `writer` is absent,
+    ///   the blob is already cached and so does not need to be written.
     /// * error an OpenBlobError indicating failure. Clients may retry this
     ///   request, though the server end may abort this cache operation on
     ///   errors it considers to be fatal.
     strict OpenMetaBlob(struct {
         blob_type BlobType;
     }) -> (resource struct {
-        file client_end:<fuchsia.io.File, optional>;
+        writer BlobWriter:optional;
     }) error OpenBlobError;
 
     /// Returns an iterator of blobs that are not present on the system that
@@ -164,14 +159,8 @@ closed protocol NeededBlobs {
     /// + request `blob_id` the blob id describing this blob.
     /// + request `blob_type` the type of the blob to be written. Will be
     ///   removed once the transition to offline compression is complete.
-    /// - response `file` is the handle used to write the blob
-    ///     If `file` is absent, the blob is already cached and so does not
-    ///     need to be written.
-    ///     If `file` is present, the blob is still needed and should be
-    ///     written by the client. `file` must be truncated to the correct size
-    ///     (if it is an uncompressed blob) and then written from start to finish
-    ///     (seeks are not supported). A corrupt blob is indicated by a `Write()`
-    ///     (usually the final write) failing with `ZX_ERR_IO_DATA_INTEGRITY`.
+    /// - response `writer` is used to write the blob. If `writer` is absent,
+    ///   the blob is already cached and so does not need to be written.
     /// * error an OpenBlobError indicating failure. Clients may retry this
     ///   request, though the server end may abort this cache operation on
     ///   errors it considers to be fatal.
@@ -179,14 +168,14 @@ closed protocol NeededBlobs {
         blob_id BlobId;
         blob_type BlobType;
     }) -> (resource struct {
-        file client_end:<fuchsia.io.File, optional>;
+        writer BlobWriter:optional;
     }) error OpenBlobError;
 
     /// Indicates that a blob opened by `Open[Meta]Blob` has been successfully
     /// written.
     ///
-    /// A client should call this once the last `Write` call to the `file`
-    /// returned by `Open[Meta]Blob` has completed successfully.
+    /// A client should call this once the blob has been fully written using
+    /// the `writer` returned by `Open[Meta]Blob`.
     ///
     /// + request `blob_id` the blob id describing this blob.
     /// * error a BlobWrittenError indicating failure. Clients may retry the
@@ -216,6 +205,21 @@ type BlobType = strict enum {
 
     /// Delivery blob.
     DELIVERY = 2;
+};
+
+/// Used to write a blob to the underlying storage.
+type BlobWriter = strict resource union {
+    /// To write a blob with `file`:
+    ///   1. If the blob is uncompressed, use `fuchsia.io/File.Resize` to set
+    ///      the blob's uncompressed size.
+    ///   2. Use `fuchsia.io/File.Write` to write the blob's contents from
+    ///      start to finish (seeks are not supported).
+    /// A corrupt blob is indicated by a `Write()` (usually the final write),
+    /// failing with `ZX_ERR_IO_DATA_INTEGRITY`.
+    1: file client_end:fuchsia.io.File;
+    /// To write a blob with `writer`, follow the instructions on the
+    /// `fuchsia.fxfs.BlobWriter` protocol.
+    2: writer client_end:fuchsia.fxfs.BlobWriter;
 };
 
 /// A chunked iterator of [`BlobInfo`], allowing transfer of more [`BlobInfo`]s

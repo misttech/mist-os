@@ -62,16 +62,10 @@ async fn get_single_package_with_no_content_blobs() {
 
     let (meta_far, _) = pkg.contents();
 
-    let meta_blob = needed_blobs
-        .open_meta_blob(fpkg::BlobType::Uncompressed)
-        .await
-        .unwrap()
-        .unwrap()
-        .unwrap()
-        .into_proxy()
-        .unwrap();
+    let meta_blob =
+        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap().unwrap().unwrap();
 
-    let () = write_blob(&meta_far.contents, meta_blob).await.unwrap();
+    let () = write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     assert_eq!(get_missing_blobs(&needed_blobs).await, vec![]);
@@ -189,7 +183,6 @@ async fn unavailable_when_client_drops_needed_blobs_channel() {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn handles_partially_written_pkg() {
     let env = TestEnv::builder().build().await;
-    let blobfs = blobfs::Client::new(env.blobfs.root_dir_proxy().unwrap());
 
     let pkg = PackageBuilder::new("partially-written")
         .add_resource_at("written-1", &b"some contents"[..])
@@ -209,27 +202,12 @@ async fn handles_partially_written_pkg() {
 
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(meta_far_hash).into(), length: 0 };
 
-    // Write the meta far to blobfs.
-    let () = crate::write_blob(
-        &meta_far_data,
-        blobfs
-            .open_blob_proxy_for_write(&meta_far_hash, fpkg::BlobType::Uncompressed)
-            .await
-            .unwrap(),
-    )
-    .await
-    .unwrap();
-
-    // Write a content blob to blobfs.
+    // Write the meta far to blobfs and one of the two content blobs to blobfs.
+    let () = env.write_to_blobfs(&meta_far_hash, &meta_far_data).await;
     {
         let data = &b"some contents"[..];
         let hash = MerkleTree::from_reader(data).unwrap().root();
-        let () = crate::write_blob(
-            data,
-            blobfs.open_blob_proxy_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap(),
-        )
-        .await
-        .unwrap();
+        let () = env.write_to_blobfs(&hash, data).await;
     }
 
     // Perform a Get(), expecting to only write the 1 remaining content blob.

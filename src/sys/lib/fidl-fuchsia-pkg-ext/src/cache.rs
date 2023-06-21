@@ -8,7 +8,7 @@
 
 use {
     crate::types::{BlobId, BlobInfo},
-    fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
+    fidl_fuchsia_pkg as fpkg,
     fuchsia_pkg::PackageDirectory,
     fuchsia_zircon_status::Status,
     futures::prelude::*,
@@ -17,6 +17,8 @@ use {
         Arc,
     },
 };
+
+mod storage;
 
 /// An open connection to a provider of the `fuchsia.pkg.PackageCache`.
 #[derive(Debug, Clone)]
@@ -158,15 +160,15 @@ async fn open_blob(
         }
         res => {
             if let Some(blob) = res?? {
-                let proxy = blob.into_proxy()?;
+                let (writer, closer) = self::storage::into_blob_writer_and_closer(*blob)?;
                 Ok(Some(NeededBlob {
                     blob: Blob {
-                        proxy: Clone::clone(&proxy),
+                        writer,
                         needed_blobs: needed_blobs.clone(),
                         blob_id,
                         state: NeedsTruncate,
                     },
-                    closer: BlobCloser { proxy, closed: false },
+                    closer: BlobCloser { closer, closed: false },
                 }))
             } else {
                 Ok(None)
@@ -350,14 +352,14 @@ pub struct NeededBlob {
 #[derive(Debug)]
 #[must_use = "Subsequent opens of this blob may race with closing this one"]
 pub struct BlobCloser {
-    proxy: fio::FileProxy,
+    closer: Box<dyn self::storage::Closer>,
     closed: bool,
 }
 
 impl BlobCloser {
     /// Close the blob, silently ignoring errors.
     pub async fn close(mut self) {
-        let _ = self.proxy.close().await;
+        let () = self.closer.close().await;
         self.closed = true;
     }
 }
@@ -365,9 +367,7 @@ impl BlobCloser {
 impl Drop for BlobCloser {
     fn drop(&mut self) {
         if !self.closed {
-            // Dropped without waiting on close. We can at least send the close request here, but
-            // there could be a race with another attempt to open the blob.
-            let _ = self.proxy.close();
+            let () = self.closer.best_effort_close();
         }
     }
 }
@@ -414,7 +414,7 @@ pub struct NeedsBlobWritten;
 #[derive(Debug)]
 #[must_use]
 pub struct Blob<S> {
-    proxy: fio::FileProxy,
+    writer: Box<dyn self::storage::Writer>,
     needed_blobs: fpkg::NeededBlobsProxy,
     blob_id: BlobId,
     state: S,
@@ -422,27 +422,21 @@ pub struct Blob<S> {
 
 impl Blob<NeedsTruncate> {
     /// Truncates the blob to the given size. On success, the blob enters the writable state.
-    pub async fn truncate(self, size: u64) -> Result<TruncateBlobSuccess, TruncateBlobError> {
-        let () =
-            self.proxy.resize(size).await?.map_err(Status::from_raw).map_err(
-                |status| match status {
-                    Status::NO_SPACE => TruncateBlobError::NoSpace,
-                    status => TruncateBlobError::UnexpectedResponse(status),
-                },
-            )?;
+    pub async fn truncate(mut self, size: u64) -> Result<TruncateBlobSuccess, TruncateBlobError> {
+        let () = self.writer.truncate(size).await?;
 
-        let Self { proxy, needed_blobs, blob_id, state: _ } = self;
+        let Self { writer, needed_blobs, blob_id, state: _ } = self;
 
         Ok(if size == 0 {
             TruncateBlobSuccess::AllWritten(Blob {
-                proxy,
+                writer,
                 needed_blobs,
                 blob_id,
                 state: NeedsBlobWritten,
             })
         } else {
             TruncateBlobSuccess::NeedsData(Blob {
-                proxy,
+                writer,
                 needed_blobs,
                 blob_id,
                 state: NeedsData { size, written: 0 },
@@ -461,36 +455,35 @@ impl Blob<NeedsData> {
         self,
         buf: &[u8],
     ) -> impl Future<Output = Result<BlobWriteSuccess, WriteBlobError>> + '_ {
-        self.write_with_trace_callbacks(buf, |_| {}, || {})
+        self.write_with_trace_callbacks(buf, &|_| {}, &|| {})
     }
 
     /// Writes all of the given buffer to the blob.
-    /// Calls `after_write` after each fuchsia.io/File.Write message is sent with the number of
-    /// bytes sent.
-    /// Calls `after_write_ack` after each fuchsia.io/File.Write message is acknowledged.
+    ///
+    /// `after_write` and `after_write_ack` are called before and after, respectively, waiting for
+    /// the server to acknowledge writes.
+    /// They may be called multiple times if the write of `buf` is chunked.
+    /// `after_write` is given the size of each write in bytes.
+    /// Useful for creating trace spans.
     ///
     /// # Panics
     ///
     /// Panics if a write is attempted with a buf larger than the remaining blob size.
     pub async fn write_with_trace_callbacks(
         mut self,
-        mut buf: &[u8],
-        after_write: impl Fn(u64),
-        after_write_ack: impl Fn(),
+        buf: &[u8],
+        after_write: &(dyn Fn(u64) + Send + Sync),
+        after_write_ack: &(dyn Fn() + Send + Sync),
     ) -> Result<BlobWriteSuccess, WriteBlobError> {
         assert!(self.state.written + buf.len() as u64 <= self.state.size);
 
-        while !buf.is_empty() {
-            // Don't try to write more than MAX_BUF bytes at a time.
-            let limit = buf.len().min(fio::MAX_BUF as usize);
-            let written = self.write_some(&buf[..limit], &after_write, &after_write_ack).await?;
-            buf = &buf[written..];
-        }
+        let () = self.writer.write(buf, after_write, after_write_ack).await?;
+        self.state.written += buf.len() as u64;
 
         if self.state.written == self.state.size {
-            let Self { proxy, needed_blobs, blob_id, state: _ } = self;
+            let Self { writer, needed_blobs, blob_id, state: _ } = self;
             Ok(BlobWriteSuccess::AllWritten(Blob {
-                proxy,
+                writer,
                 needed_blobs,
                 blob_id,
                 state: NeedsBlobWritten,
@@ -498,45 +491,6 @@ impl Blob<NeedsData> {
         } else {
             Ok(BlobWriteSuccess::NeedsData(self))
         }
-    }
-
-    /// Writes some of the given buffer to the blob.
-    ///
-    /// Returns the number of bytes written (which may be less than the buffer's size) or the error
-    /// encountered during the write.
-    async fn write_some(
-        &mut self,
-        buf: &[u8],
-        after_write: &impl Fn(u64),
-        after_write_ack: &impl Fn(),
-    ) -> Result<usize, WriteBlobError> {
-        let result_fut = self.proxy.write(buf);
-        after_write(buf.len() as u64);
-
-        let result = result_fut.await;
-        after_write_ack();
-
-        let result = result?.map_err(Status::from_raw);
-
-        let actual = match result {
-            Ok(actual) => actual,
-            Err(Status::IO_DATA_INTEGRITY) => {
-                return Err(WriteBlobError::Corrupt);
-            }
-            Err(Status::NO_SPACE) => {
-                return Err(WriteBlobError::NoSpace);
-            }
-            Err(status) => {
-                return Err(WriteBlobError::UnexpectedResponse(status));
-            }
-        };
-
-        if actual > buf.len() as u64 {
-            return Err(WriteBlobError::Overwrite);
-        }
-
-        self.state.written += actual;
-        Ok(actual as usize)
     }
 }
 
@@ -675,6 +629,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::{ClientEnd, ControlHandle as _, RequestStream as _};
+    use fidl_fuchsia_io as fio;
     use fidl_fuchsia_pkg::{
         BlobInfoIteratorRequest, NeededBlobsRequest, NeededBlobsRequestStream,
         PackageCacheGetResponder, PackageCacheMarker, PackageCacheRequest,
@@ -756,7 +711,7 @@ mod tests {
             match self.stream.next().await {
                 Some(Ok(NeededBlobsRequest::OpenMetaBlob { blob_type, responder })) => {
                     assert_eq!(blob_type, fpkg::BlobType::Uncompressed);
-                    responder.send(res).unwrap();
+                    responder.send(res.map(|o| o.map(fpkg::BlobWriter::File))).unwrap();
                 }
                 r => panic!("Unexpected request: {:?}", r),
             }
@@ -772,7 +727,7 @@ mod tests {
                 Some(Ok(NeededBlobsRequest::OpenBlob { blob_id, blob_type, responder })) => {
                     assert_eq!(BlobId::from(blob_id), expected_blob_id);
                     assert_eq!(blob_type, fpkg::BlobType::Uncompressed);
-                    responder.send(res).unwrap();
+                    responder.send(res.map(|o| o.map(fpkg::BlobWriter::File))).unwrap();
                 }
                 r => panic!("Unexpected request: {:?}", r),
             }
@@ -1176,12 +1131,12 @@ mod tests {
             (
                 NeededBlob {
                     blob: Blob {
-                        proxy: Clone::clone(&blob_proxy),
+                        writer: Box::new(Clone::clone(&blob_proxy)),
                         needed_blobs: needed_blobs_proxy,
                         blob_id: Self::mock_hash(),
                         state: NeedsTruncate,
                     },
-                    closer: BlobCloser { proxy: blob_proxy, closed: false },
+                    closer: BlobCloser { closer: Box::new(blob_proxy), closed: false },
                 },
                 Self { blob, needed_blobs },
             )

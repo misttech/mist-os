@@ -928,7 +928,7 @@ async fn download_blob(
                 dest = match dest
                     .write_with_trace_callbacks(
                         &chunk,
-                        |size: u64| {
+                        &|size: u64| {
                             ftrace::async_begin(
                                 trace_id,
                                 ftrace::cstr!("app"),
@@ -936,7 +936,7 @@ async fn download_blob(
                                 &[ftrace::ArgValue::of("size", size)],
                             )
                         },
-                        || {
+                        &|| {
                             ftrace::async_end(
                                 trace_id,
                                 ftrace::cstr!("app"),

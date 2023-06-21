@@ -613,12 +613,12 @@ trait OpenBlobResponder {
 }
 impl OpenBlobResponder for fpkg::NeededBlobsOpenBlobResponder {
     fn send(self, res: OpenBlobResponse) -> Result<(), fidl::Error> {
-        self.send(res)
+        self.send(res.map(|o| o.map(fpkg::BlobWriter::File)))
     }
 }
 impl OpenBlobResponder for fpkg::NeededBlobsOpenMetaBlobResponder {
     fn send(self, res: OpenBlobResponse) -> Result<(), fidl::Error> {
-        self.send(res)
+        self.send(res.map(|o| o.map(fpkg::BlobWriter::File)))
     }
 }
 
@@ -793,6 +793,19 @@ mod serve_needed_blobs_tests {
         }
     }
 
+    trait BlobWriterExt {
+        fn unwrap_file(self) -> fio::FileProxy;
+    }
+
+    impl BlobWriterExt for Box<fpkg::BlobWriter> {
+        fn unwrap_file(self) -> fio::FileProxy {
+            match *self {
+                fpkg::BlobWriter::File(file) => file.into_proxy().unwrap(),
+                fpkg::BlobWriter::Writer(_) => panic!("should be file"),
+            }
+        }
+    }
+
     #[fuchsia_async::run_singlethreaded(test)]
     async fn open_blob_handles_io_open_error() {
         // Provide open_write_blob a closed blobfs and file stream to trigger a PEER_CLOSED IO
@@ -876,8 +889,7 @@ mod serve_needed_blobs_tests {
                     .expect("open_meta_blob failed")
                     .expect("open_meta_blob error")
                     .expect("meta blob not cached")
-                    .into_proxy()
-                    .unwrap();
+                    .unwrap_file();
 
                 let () = blob
                     .resize(4)
@@ -943,8 +955,7 @@ mod serve_needed_blobs_tests {
                     .expect("open_meta_blob failed")
                     .expect("open_meta_blob error")
                     .expect("meta blob not cached")
-                    .into_proxy()
-                    .unwrap();
+                    .unwrap_file();
 
                 let () = blob
                     .resize(4)
@@ -1006,7 +1017,7 @@ mod serve_needed_blobs_tests {
                 blobfs.expect_readable_missing_checks(&[], &[[0; 32].into()]).await;
             },
             async {
-                let _: fidl::endpoints::ClientEnd<fio::FileMarker> = proxy
+                let _: Box<fpkg::BlobWriter> = proxy
                     .open_meta_blob(fpkg::BlobType::Uncompressed)
                     .await
                     .expect("open_meta_blob failed")
@@ -1124,8 +1135,7 @@ mod serve_needed_blobs_tests {
                     .expect("open_meta_blob failed")
                     .expect("open_meta_blob error")
                     .expect("blob already cached")
-                    .into_proxy()
-                    .unwrap();
+                    .unwrap_file();
 
                 let () = blob
                     .resize(1)
@@ -1156,8 +1166,7 @@ mod serve_needed_blobs_tests {
                     .expect("open_meta_blob failed")
                     .expect("open_meta_blob error")
                     .expect("blob already cached")
-                    .into_proxy()
-                    .unwrap();
+                    .unwrap_file();
 
                 let () = blob
                     .close()
@@ -1188,8 +1197,7 @@ mod serve_needed_blobs_tests {
                     .unwrap()
                     .unwrap()
                     .unwrap()
-                    .into_proxy()
-                    .unwrap();
+                    .unwrap_file();
 
                 let () = blob
                     .resize(1)
@@ -1566,8 +1574,7 @@ mod serve_needed_blobs_tests {
                     .expect("open_blob failed")
                     .expect("open_blob error")
                     .expect("blob not cached")
-                    .into_proxy()
-                    .unwrap();
+                    .unwrap_file();
 
                 let () = blob
                     .resize(payload.len() as u64)
@@ -1635,7 +1642,7 @@ mod serve_needed_blobs_tests {
                     .await;
             },
             async {
-                let _: fidl::endpoints::ClientEnd<fio::FileMarker> = proxy
+                let _: Box<fpkg::BlobWriter> = proxy
                     .open_blob(&BlobId::from([2; 32]).into(), fpkg::BlobType::Uncompressed)
                     .await
                     .expect("open_blob failed")
@@ -1704,8 +1711,7 @@ mod serve_needed_blobs_tests {
                         let proxy = &proxy;
 
                         async move {
-                            let blob =
-                                open_fut.await.unwrap().unwrap().unwrap().into_proxy().unwrap();
+                            let blob = open_fut.await.unwrap().unwrap().unwrap().unwrap_file();
 
                             let payload = payload(hash);
                             let () = blob
@@ -1815,7 +1821,7 @@ mod serve_needed_blobs_tests {
                 blobfs.expect_readable_missing_checks(&[], &[[2; 32].into()]).await;
             },
             async {
-                let _: fidl::endpoints::ClientEnd<fio::FileMarker> = proxy
+                let _: Box<fpkg::BlobWriter> = proxy
                     .open_blob(&BlobId::from([2; 32]).into(), fpkg::BlobType::Uncompressed)
                     .await
                     .expect("open_blob failed")
@@ -1925,8 +1931,7 @@ mod serve_needed_blobs_tests {
                     .expect("open_blob failed")
                     .expect("open_blob error")
                     .expect("blob not cached")
-                    .into_proxy()
-                    .unwrap();
+                    .unwrap_file();
 
                 let () = blob
                     .resize(1)
@@ -1957,8 +1962,7 @@ mod serve_needed_blobs_tests {
                     .unwrap()
                     .unwrap()
                     .unwrap()
-                    .into_proxy()
-                    .unwrap();
+                    .unwrap_file();
 
                 let () = blob
                     .close()
@@ -1983,8 +1987,7 @@ mod serve_needed_blobs_tests {
                     .unwrap()
                     .unwrap()
                     .unwrap()
-                    .into_proxy()
-                    .unwrap();
+                    .unwrap_file();
 
                 let () = blob
                     .resize(1)

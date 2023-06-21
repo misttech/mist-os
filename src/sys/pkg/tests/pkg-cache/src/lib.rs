@@ -42,16 +42,26 @@ mod retained_packages;
 mod space;
 mod sync;
 
-async fn write_blob(contents: &[u8], file: fio::FileProxy) -> Result<(), zx::Status> {
-    let () =
-        file.resize(contents.len() as u64).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+async fn write_blob(contents: &[u8], blob: fpkg::BlobWriter) -> Result<(), zx::Status> {
+    match blob {
+        fpkg::BlobWriter::File(file) => {
+            let file = file.into_proxy().unwrap();
+            let () = file
+                .resize(contents.len() as u64)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap();
+            fuchsia_fs::file::write(&file, contents).await.map_err(|e| match e {
+                fuchsia_fs::file::WriteError::WriteError(s) => s,
+                _ => zx::Status::INTERNAL,
+            })?;
+            let () = file.close().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        }
+        // TODO(fxbug.dev/129281) Support fxblob write api in pkg-cache.
+        fpkg::BlobWriter::Writer(_writer) => panic!("fxblob write api not supported"),
+    }
 
-    fuchsia_fs::file::write(&file, contents).await.map_err(|e| match e {
-        fuchsia_fs::file::WriteError::WriteError(s) => s,
-        _ => zx::Status::INTERNAL,
-    })?;
-
-    let () = file.close().await.unwrap().map_err(zx::Status::from_raw).unwrap();
     Ok(())
 }
 
@@ -109,7 +119,7 @@ async fn get_and_verify_package(
 pub async fn write_meta_far(needed_blobs: &fpkg::NeededBlobsProxy, meta_far: BlobContents) {
     let meta_blob =
         needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap().unwrap().unwrap();
-    let () = write_blob(&meta_far.contents, meta_blob.into_proxy().unwrap()).await.unwrap();
+    let () = write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(needed_blobs, meta_far.merkle).await;
 }
 
@@ -137,15 +147,13 @@ pub async fn write_needed_blobs(
                 .await
                 .unwrap()
                 .unwrap()
-                .unwrap()
-                .into_proxy()
                 .unwrap();
             let () = write_blob(
                 available_blobs
                     .remove(&fpkg_ext::BlobId::from(blob_info.blob_id).into())
                     .unwrap()
                     .as_slice(),
-                blob_proxy,
+                *blob_proxy,
             )
             .await
             .unwrap();
@@ -659,9 +667,7 @@ impl TestEnv<BlobfsRamdisk> {
         drop(self.apps);
         self.blobfs.stop().await.unwrap();
     }
-}
 
-impl TestEnv<BlobfsRamdisk> {
     fn builder() -> TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
         TestEnvBuilder::new()
     }
@@ -735,5 +741,17 @@ impl<B: Blobfs> TestEnv<B> {
         )
         .await
         .expect("open system")
+    }
+
+    async fn write_to_blobfs(&self, hash: &Hash, contents: &[u8]) {
+        let blobfs = blobfs::Client::new(self.blobfs.root_proxy());
+        let () = write_blob(
+            contents,
+            fpkg::BlobWriter::File(
+                blobfs.open_blob_for_write(hash, fpkg::BlobType::Uncompressed).await.unwrap(),
+            ),
+        )
+        .await
+        .unwrap();
     }
 }
