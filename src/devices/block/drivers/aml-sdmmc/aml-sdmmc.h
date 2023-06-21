@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
 #include <lib/ddk/phys-iter.h>
-#include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
@@ -83,17 +82,8 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
 
   struct TuneResults {
     uint64_t results = 0;
-    uint32_t param_max = 0;
 
-    bool all_passed() const {
-      if (results == std::numeric_limits<decltype(results)>::max()) {
-        return true;
-      }
-
-      return results == ((1ULL << param_max) - 1);
-    }
-
-    std::string ToString() const {
+    std::string ToString(const uint32_t param_max) const {
       char string[param_max + 2];
       for (uint32_t i = 0; i <= param_max; i++) {
         string[i] = (results & (1ULL << i)) ? '|' : '-';
@@ -106,7 +96,6 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
   struct TuneWindow {
     uint32_t start = 0;
     uint32_t size = 0;
-    TuneResults results;
 
     uint32_t middle() const { return start + (size / 2); }
   };
@@ -136,7 +125,6 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
     inspect::UintProperty longest_window_size;
     inspect::UintProperty longest_window_adj_delay;
     inspect::UintProperty distance_to_failing_point;
-    inspect::StringProperty tuning_method;
 
     void Init(const pdev_device_info_t& device_info);
   };
@@ -145,22 +133,14 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
 
   uint32_t DistanceToFailingPoint(TuneSettings point,
                                   cpp20::span<const TuneResults> adj_delay_results);
-  zx::result<TuneSettings> PerformNewTuning(cpp20::span<const TuneResults> adj_delay_results);
-  zx::result<TuneSettings> PerformOldTuning(cpp20::span<const TuneResults> adj_delay_results);
+  zx::result<TuneSettings> PerformTuning(cpp20::span<const TuneResults> adj_delay_results);
   zx_status_t TuningDoTransfer(zx::unowned_vmo received_block, size_t blk_pattern_size,
                                uint32_t tuning_cmd_idx);
   bool TuningTestSettings(cpp20::span<const uint8_t> tuning_blk, uint32_t tuning_cmd_idx,
                           zx::unowned_vmo received_block);
-  // Sweeps from zero to param_max and creates a TuneWindow representing the largest span of values
-  // for which check_param returned true.
-  static TuneWindow ProcessTuningResults(uint32_t param_max,
-                                         fit::function<bool(uint32_t)> check_param);
-  // Like above, but considers param_max to be adjacent to zero when creating the TuneWindow.
-  static TuneWindow ProcessTuningResultsWithWrapping(uint32_t param_max,
-                                                     fit::function<bool(uint32_t)> check_param);
-  static TuneWindow ProcessTuningResultsInternal(uint32_t param_max,
-                                                 fit::function<bool(uint32_t)> check_param,
-                                                 bool wrap);
+  // Sweeps from zero to the max delay and creates a TuneWindow representing the largest span of
+  // delay values that failed.
+  TuneWindow GetFailingWindow(TuneResults results);
   TuneResults TuneDelayLines(cpp20::span<const uint8_t> tuning_blk, uint32_t tuning_cmd_idx,
                              zx::unowned_vmo received_block);
 
