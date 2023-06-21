@@ -498,7 +498,6 @@ def protocol_type(ir, root_ir, recurse_guard=None) -> type:
     )
 
 
-@classmethod
 def init_with_handle(self, hdl):
     self.handle = hdl
 

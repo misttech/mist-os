@@ -40,7 +40,8 @@ void Context_dealloc(Context *self) {
   Py_TYPE(self)->tp_free(reinterpret_cast<PyObject *>(self));
 }
 
-std::pair<std::unique_ptr<ffx_config_t[]>, Py_ssize_t> build_config(PyObject *config) {
+std::pair<std::unique_ptr<ffx_config_t[]>, Py_ssize_t> build_config(PyObject *config,
+                                                                    const char *target) {
   static const char TYPE_ERROR[] = "`config` must be a dictionary of string key/value pairs";
   if (!PyDict_Check(config)) {
     PyErr_SetString(PyExc_TypeError, TYPE_ERROR);
@@ -51,9 +52,11 @@ std::pair<std::unique_ptr<ffx_config_t[]>, Py_ssize_t> build_config(PyObject *co
     return std::make_pair(nullptr, 0);
   }
   std::unique_ptr<ffx_config_t[]> ffx_config;
-  if (config_len > 0) {
-    ffx_config = std::make_unique<ffx_config_t[]>(config_len);
+  if (target) {
+    config_len++;
   }
+  ffx_config = std::make_unique<ffx_config_t[]>(config_len);
+
   PyObject *py_key = nullptr;
   PyObject *py_value = nullptr;
   Py_ssize_t pos = 0;
@@ -81,20 +84,29 @@ std::pair<std::unique_ptr<ffx_config_t[]>, Py_ssize_t> build_config(PyObject *co
         .value = value,
     };
   }
+  if (target) {
+    ffx_config[config_len - 1] = {
+        .key = "target.default",
+        .value = target,
+    };
+  }
   return std::make_pair(std::move(ffx_config), config_len);
 }
 
 int Context_init(Context *self, PyObject *args, PyObject *kwds) {
-  static const char *kwlist[] = {"config", "isolate_dir", nullptr};
+  static const char *kwlist[] = {"config", "isolate_dir", "target", nullptr};
   PyObject *config = nullptr;
   PyObject *isolate = nullptr;
-  if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OO", const_cast<char **>(kwlist), &config,
-                                   &isolate)) {
+  const char *target = nullptr;
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OOz", const_cast<char **>(kwlist), &config,
+                                   &isolate, &target)) {
     return -1;
   }
   if (isolate &&
       !PyObject_IsInstance(isolate, reinterpret_cast<PyObject *>(&isolate::IsolateDirType))) {
     PyErr_SetString(PyExc_TypeError, "isolate must be a fuchsia_controller_py.IsolateDir type");
+    Py_XDECREF(config);
+    Py_XDECREF(isolate);
     return -1;
   }
   // This temp incref/decref stuff is just derived from the tutorial:
@@ -106,14 +118,18 @@ int Context_init(Context *self, PyObject *args, PyObject *kwds) {
 
   std::unique_ptr<ffx_config_t[]> ffx_config;
   Py_ssize_t config_len = 0;
-  if (config) {
-    auto pair = build_config(config);
-    if (pair.first == nullptr) {
-      return -1;
-    }
-    ffx_config = std::move(pair.first);
-    config_len = pair.second;
+  if (!config || config == Py_None) {
+    Py_XDECREF(config);
+    config = PyDict_New();
   }
+  auto pair = build_config(config, target);
+  if (pair.first == nullptr) {
+    Py_XDECREF(config);
+    Py_XDECREF(isolate);
+    return -1;
+  }
+  ffx_config = std::move(pair.first);
+  config_len = pair.second;
   const char *isolate_dir = nullptr;
   if (isolate) {
     isolate_dir = reinterpret_cast<isolate::IsolateDir *>(isolate)->dir.c_str();
@@ -121,6 +137,8 @@ int Context_init(Context *self, PyObject *args, PyObject *kwds) {
   if (create_ffx_env_context(&self->env_context, mod::get_module_state()->ctx, ffx_config.get(),
                              config_len, isolate_dir) != ZX_OK) {
     mod::dump_python_err();
+    Py_XDECREF(config);
+    Py_XDECREF(isolate);
     return -1;
   }
   return 0;

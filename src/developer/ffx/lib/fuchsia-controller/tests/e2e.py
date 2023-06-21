@@ -33,3 +33,21 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
         expected = "this is an echo test"
         result = await echo_proxy.echo_string(value=expected)
         self.assertEqual(result.response, expected)
+
+    def test_context_creation_no_config_but_target(self):
+        """This test simply ensures passing a target does not cause an error."""
+        _ctx = Context(target="foo")
+
+    def test_context_creation_no_args(self):
+        _ctx = Context()
+
+    def test_setting_fidl_clients(self):
+        """Previously a classmethod was setting the handle.
+
+        This ensures these aren't being set globally."""
+        ctx = self._make_ctx()
+        e1 = ffx_fidl.Echo.Client(
+            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER))
+        e2 = ffx_fidl.Echo.Client(
+            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER))
+        self.assertNotEqual(e1.handle.as_int(), e2.handle.as_int())

@@ -17,18 +17,23 @@ async def echo():
     print(f"Echo Result: {result}")
 
 
-async def target_info_isolated():
+async def target_info_multi_target_isolated():
     isolate = IsolateDir("/tmp/foo/bar")
-    ctx = Context({"sdk.root": "."}, isolate_dir=isolate)
-    ch = ctx.connect_target_proxy()
-    proxy = fd_ffx.Target.Client(ch)
-    result = await proxy.identity()
-    print(f"Target Info Received: {result}")
+    ctx = Context(
+        config={"sdk.root": "."}, isolate_dir=isolate, target="emu-one")
+    ctx2 = Context(
+        config={"sdk.root": "."}, isolate_dir=isolate, target="emu-two")
+    proxy = fd_ffx.Target.Client(ctx.connect_target_proxy())
+    proxy2 = fd_ffx.Target.Client(ctx2.connect_target_proxy())
+    result2 = proxy2.identity()
+    result1 = proxy.identity()
+    results = await asyncio.gather(*[result1, result2])
+    print(f"Target Info Received: {results}")
 
 
 async def async_main():
     await echo()
-    await target_info_isolated()
+    await target_info_multi_target_isolated()
 
 
 def main():
@@ -38,7 +43,7 @@ def main():
         print()
         print(f"Testing synchronous calls, iteration {x}.")
         asyncio.run(echo())
-        asyncio.run(target_info_isolated())
+        asyncio.run(target_info_multi_target_isolated())
 
 
 if __name__ == "__main__":
