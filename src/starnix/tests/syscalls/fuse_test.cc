@@ -242,4 +242,17 @@ TEST_F(FuseTest, Symlink) {
   ASSERT_EQ(memcmp(&buffer[0], &witness[0], witness.size()), 0);
 }
 
+TEST_F(FuseTest, Link) {
+  ASSERT_TRUE(Mount());
+  std::string witness = GetMountDir() + "/witness";
+  std::string linkname = GetMountDir() + "/link";
+  ASSERT_EQ(link(witness.c_str(), linkname.c_str()), 0);
+  struct stat stats;
+  ASSERT_EQ(lstat(linkname.c_str(), &stats), 0);
+  ASSERT_TRUE(S_ISREG(stats.st_mode));
+  ino_t ino = stats.st_ino;
+  ASSERT_EQ(lstat(witness.c_str(), &stats), 0);
+  ASSERT_EQ(ino, stats.st_ino);
+}
+
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_

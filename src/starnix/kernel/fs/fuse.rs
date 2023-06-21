@@ -573,12 +573,21 @@ impl FsNodeOps for Arc<FuseNode> {
     fn link(
         &self,
         _node: &FsNode,
-        _current_task: &CurrentTask,
-        _name: &FsStr,
-        _child: &FsNodeHandle,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        child: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        not_implemented!("FsNodeOps::link");
-        error!(ENOTSUP)
+        let child_node = FuseNode::from_node(child)?;
+        self.connection
+            .execute_operation(
+                current_task,
+                self,
+                FuseOperation::Link(
+                    uapi::fuse_link_in { oldnodeid: child_node.nodeid },
+                    name.to_owned(),
+                ),
+            )
+            .map(|_| ())
     }
 
     fn unlink(
@@ -982,6 +991,7 @@ enum FuseOperation {
     Lookup(FsString),
     Mkdir(uapi::fuse_mkdir_in, FsString),
     Mknod(uapi::fuse_mknod_in, FsString),
+    Link(uapi::fuse_link_in, FsString),
     Open(OpenFlags),
     Poll(uapi::fuse_poll_in),
     Read(uapi::fuse_read_in),
@@ -1057,6 +1067,11 @@ impl FuseOperation {
                 len += Self::write_null_terminated(data, name)?;
                 Ok(len)
             }
+            Self::Link(link_in, name) => {
+                let mut len = data.write_all(link_in.as_bytes())?;
+                len += Self::write_null_terminated(data, name)?;
+                Ok(len)
+            }
             Self::Read(read_in) => data.write_all(read_in.as_bytes()),
             Self::Release(open_in) => {
                 let message = uapi::fuse_release_in {
@@ -1099,6 +1114,7 @@ impl FuseOperation {
             Self::Lookup(_) => uapi::fuse_opcode_FUSE_LOOKUP,
             Self::Mkdir(_, _) => uapi::fuse_opcode_FUSE_MKDIR,
             Self::Mknod(_, _) => uapi::fuse_opcode_FUSE_MKNOD,
+            Self::Link(_, _) => uapi::fuse_opcode_FUSE_LINK,
             Self::Open(_) => uapi::fuse_opcode_FUSE_OPEN,
             Self::Poll(_) => uapi::fuse_opcode_FUSE_POLL,
             Self::Read(_) => uapi::fuse_opcode_FUSE_READ,
@@ -1123,6 +1139,9 @@ impl FuseOperation {
             }
             Self::Mknod(_, name) => {
                 (std::mem::size_of::<uapi::fuse_mknod_in>() + name.as_bytes().len() + 1) as u32
+            }
+            Self::Link(_, name) => {
+                (std::mem::size_of::<uapi::fuse_link_in>() + name.as_bytes().len() + 1) as u32
             }
             Self::Open(_) => std::mem::size_of::<uapi::fuse_open_in>() as u32,
             Self::Poll(_) => std::mem::size_of::<uapi::fuse_poll_in>() as u32,
@@ -1160,7 +1179,11 @@ impl FuseOperation {
                 Ok(FuseResponse::Attr(Self::to_response::<uapi::fuse_attr_out>(&buffer)))
             }
             Self::Init => Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer))),
-            Self::Lookup(_) | Self::Mkdir(_, _) | Self::Mknod(_, _) | Self::Symlink(_, _) => {
+            Self::Lookup(_)
+            | Self::Mkdir(_, _)
+            | Self::Mknod(_, _)
+            | Self::Link(_, _)
+            | Self::Symlink(_, _) => {
                 Ok(FuseResponse::Entry(Self::to_response::<uapi::fuse_entry_out>(&buffer)))
             }
             Self::Open(_) => {
