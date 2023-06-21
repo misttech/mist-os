@@ -21,6 +21,7 @@ where
 {
     create_file_ops: F,
 }
+
 impl<F, O> SimpleFileNode<F, O>
 where
     F: Fn() -> Result<O, Errno> + Send + Sync,
@@ -30,6 +31,7 @@ where
         SimpleFileNode { create_file_ops }
     }
 }
+
 impl<F, O> FsNodeOps for SimpleFileNode<F, O>
 where
     F: Fn() -> Result<O, Errno> + Send + Sync + 'static,
@@ -55,13 +57,41 @@ where
     }
 }
 
+pub fn parse_u32_file(buf: &[u8]) -> Result<u32, Errno> {
+    let i = buf.iter().position(|c| !char::from(*c).is_ascii_digit()).unwrap_or(buf.len());
+    std::str::from_utf8(&buf[..i]).unwrap().parse::<u32>().map_err(|_| errno!(EINVAL))
+}
+
+pub fn serialize_u32_file(value: u32) -> Vec<u8> {
+    let string = format!("{}\n", value);
+    string.as_bytes().to_vec()
+}
+
+pub fn parse_i32_file(buf: &[u8]) -> Result<i32, Errno> {
+    let i = buf
+        .iter()
+        .position(|c| {
+            let ch = char::from(*c);
+            !(ch.is_ascii_digit() || ch == '-')
+        })
+        .unwrap_or(buf.len());
+    std::str::from_utf8(&buf[..i]).unwrap().parse::<i32>().map_err(|_| errno!(EINVAL))
+}
+
+pub fn serialize_i32_file(value: i32) -> Vec<u8> {
+    let string = format!("{}\n", value);
+    string.as_bytes().to_vec()
+}
+
 pub struct BytesFile<Ops: BytesFileOps>(Arc<Ops>);
+
 impl<Ops: BytesFileOps> BytesFile<Ops> {
     pub fn new_node(data: Ops) -> impl FsNodeOps {
         let data = Arc::new(data);
         SimpleFileNode::new(move || Ok(BytesFile(Arc::clone(&data))))
     }
 }
+
 impl<Ops: BytesFileOps> FileOps for BytesFile<Ops> {
     fileops_impl_seekable!();
 
@@ -83,6 +113,8 @@ impl<Ops: BytesFileOps> FileOps for BytesFile<Ops> {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         if offset != 0 {
+            // TODO: Validate whether this error condition is correct.
+            // It doesn't appear to be correct for /proc/<pid>/oom_*
             return error!(EINVAL);
         }
         let data = data.read_all()?;

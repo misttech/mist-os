@@ -250,6 +250,9 @@ pub struct TaskMutableState {
     /// for this field ensure this property.
     no_new_privs: bool,
 
+    /// Userspace hint about how to adjust the OOM score for this process.
+    pub oom_score_adj: i32,
+
     /// List of currently installed seccomp_filters
     pub seccomp_filters: SeccompFilterContainer,
 
@@ -470,6 +473,7 @@ impl Task {
                 scheduler_policy: Default::default(),
                 uts_ns,
                 no_new_privs,
+                oom_score_adj: Default::default(),
                 seccomp_filters,
                 robust_list_head: UserAddress::NULL,
             }),

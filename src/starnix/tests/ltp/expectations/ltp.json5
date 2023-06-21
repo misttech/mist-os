@@ -1336,6 +1336,9 @@
                 // Times out because getrusage is not implemented yet.
                 "getrusage04",
 
+                // Nothing stops us from creating lots and lots of processes.
+                "fork12",
+
                 // Flaky test.
                 "cve-2017-17052",
                 "fs_inod",
