@@ -4,7 +4,9 @@
 
 #include "fake-paver.h"
 
+#include <fidl/fuchsia.paver/cpp/common_types.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <zircon/errors.h>
 
 namespace paver_test {
 
@@ -60,21 +62,67 @@ void FakePaver::FindSysconfig(FindSysconfigRequestView request,
 void FakePaver::QueryActiveConfiguration(QueryActiveConfigurationCompleter::Sync& completer) {
   fbl::AutoLock al(&lock_);
   AppendCommand(Command::kQueryActiveConfiguration);
-  completer.ReplySuccess(fuchsia_paver::wire::Configuration::kA);
+
+  // This is not quite the same logic as the paver uses, but for testing
+  // purposes it is simpler and should be equivalent.
+  // See:
+  // https://cs.opensource.google/fuchsia/fuchsia/+/refs/heads/main:src/firmware/lib/abr/flow.c;l=80;drc=d0e362718c30f2e490c2e84607b6a37579058a17
+  bool slot_a_active = abr_data_.slot_a.active && !abr_data_.slot_a.unbootable;
+  bool slot_b_active = abr_data_.slot_b.active && !abr_data_.slot_b.unbootable;
+
+  if (slot_a_active) {
+    completer.ReplySuccess(fuchsia_paver::Configuration::kA);
+    return;
+  }
+
+  if (slot_b_active) {
+    completer.ReplySuccess(fuchsia_paver::Configuration::kB);
+    return;
+  }
+
+  completer.ReplySuccess(fuchsia_paver::Configuration::kRecovery);
 }
 
 void FakePaver::QueryConfigurationLastSetActive(
     QueryConfigurationLastSetActiveCompleter::Sync& completer) {
   fbl::AutoLock al(&lock_);
   AppendCommand(Command::kQueryConfigurationLastSetActive);
-  completer.ReplySuccess(fuchsia_paver::wire::Configuration::kA);
+  if (abr_data_.last_set_active.has_value()) {
+    completer.ReplySuccess(abr_data_.last_set_active.value());
+  } else {
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
+  }
 }
 
 void FakePaver::QueryConfigurationStatus(QueryConfigurationStatusRequestView request,
                                          QueryConfigurationStatusCompleter::Sync& completer) {
   fbl::AutoLock al(&lock_);
   AppendCommand(Command::kQueryConfigurationStatus);
-  completer.ReplySuccess(fuchsia_paver::wire::ConfigurationStatus::kHealthy);
+  AbrSlotData slot_data;
+  zx_status_t status;
+  switch (request->configuration) {
+    case fuchsia_paver::wire::Configuration::kA:
+      slot_data = abr_data_.slot_a;
+      break;
+
+    case fuchsia_paver::wire::Configuration::kB:
+      slot_data = abr_data_.slot_b;
+      status = ZX_OK;
+      break;
+
+    case fuchsia_paver::wire::Configuration::kRecovery:
+      status = ZX_ERR_INVALID_ARGS;
+      completer.ReplyError(status);
+      return;
+  }
+
+  if (slot_data.unbootable) {
+    completer.ReplySuccess(fuchsia_paver::wire::ConfigurationStatus::kUnbootable);
+  } else if (!slot_data.healthy) {
+    completer.ReplySuccess(fuchsia_paver::wire::ConfigurationStatus::kPending);
+  } else {
+    completer.ReplySuccess(fuchsia_paver::wire::ConfigurationStatus::kHealthy);
+  }
 }
 
 void FakePaver::SetConfigurationActive(SetConfigurationActiveRequestView request,
@@ -85,13 +133,21 @@ void FakePaver::SetConfigurationActive(SetConfigurationActiveRequestView request
   switch (request->configuration) {
     case fuchsia_paver::wire::Configuration::kA:
       abr_data_.slot_a.active = true;
+      abr_data_.slot_b.active = false;
+
       abr_data_.slot_a.unbootable = false;
+      abr_data_.slot_a.healthy = false;
+      abr_data_.last_set_active = fuchsia_paver::Configuration::kA;
       status = ZX_OK;
       break;
 
     case fuchsia_paver::wire::Configuration::kB:
       abr_data_.slot_b.active = true;
+      abr_data_.slot_a.active = false;
+
       abr_data_.slot_b.unbootable = false;
+      abr_data_.slot_b.healthy = false;
+      abr_data_.last_set_active = fuchsia_paver::Configuration::kB;
       status = ZX_OK;
       break;
 
@@ -110,11 +166,13 @@ void FakePaver::SetConfigurationUnbootable(SetConfigurationUnbootableRequestView
   switch (request->configuration) {
     case fuchsia_paver::wire::Configuration::kA:
       abr_data_.slot_a.unbootable = true;
+      abr_data_.slot_a.healthy = false;
       status = ZX_OK;
       break;
 
     case fuchsia_paver::wire::Configuration::kB:
       abr_data_.slot_b.unbootable = true;
+      abr_data_.slot_b.healthy = false;
       status = ZX_OK;
       break;
 
@@ -129,7 +187,25 @@ void FakePaver::SetConfigurationHealthy(SetConfigurationHealthyRequestView reque
                                         SetConfigurationHealthyCompleter::Sync& completer) {
   fbl::AutoLock al(&lock_);
   AppendCommand(Command::kSetConfigurationHealthy);
-  completer.Reply(ZX_OK);
+  zx_status_t status;
+  switch (request->configuration) {
+    case fuchsia_paver::wire::Configuration::kA:
+      abr_data_.slot_a.unbootable = false;
+      abr_data_.slot_a.healthy = true;
+      status = ZX_OK;
+      break;
+
+    case fuchsia_paver::wire::Configuration::kB:
+      abr_data_.slot_b.unbootable = false;
+      abr_data_.slot_b.healthy = true;
+      status = ZX_OK;
+      break;
+
+    case fuchsia_paver::wire::Configuration::kRecovery:
+      status = ZX_ERR_INVALID_ARGS;
+      break;
+  }
+  completer.Reply(status);
 }
 
 void FakePaver::SetOneShotRecovery(SetOneShotRecoveryCompleter::Sync& completer) {

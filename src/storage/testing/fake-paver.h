@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <fbl/auto_lock.h>
@@ -50,11 +51,13 @@ enum class Command {
 struct AbrSlotData {
   bool unbootable;
   bool active;
+  bool healthy;
 };
 
 struct AbrData {
   AbrSlotData slot_a;
   AbrSlotData slot_b;
+  std::optional<fuchsia_paver::Configuration> last_set_active;
 };
 
 constexpr AbrData kInitAbrData = {
@@ -62,12 +65,15 @@ constexpr AbrData kInitAbrData = {
         {
             .unbootable = false,
             .active = false,
+            .healthy = false,
         },
     .slot_b =
         {
             .unbootable = false,
             .active = false,
+            .healthy = false,
         },
+    .last_set_active = std::nullopt,
 };
 
 class FakePaver : public fidl::WireServer<fuchsia_paver::Paver>,
