@@ -5,12 +5,13 @@
 #ifndef LIB_SYS_CPP_TESTS_ECHO_SERVER_H_
 #define LIB_SYS_CPP_TESTS_ECHO_SERVER_H_
 
+#include <fidl/test.placeholders/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fidl/cpp/interface_request.h>
 
 #include <test/placeholders/cpp/fidl.h>
 
-namespace {
+namespace echo_server {
 
 class EchoImpl : public test::placeholders::Echo {
  public:
@@ -31,6 +32,20 @@ class EchoImpl : public test::placeholders::Echo {
   fidl::BindingSet<test::placeholders::Echo> bindings_;
 };
 
-}  // namespace
+class NewEchoImpl : public fidl::Server<test_placeholders::Echo> {
+ public:
+  void EchoString(EchoStringRequest& request, EchoStringCompleter::Sync& completer) override {
+    completer.Reply(std::move(request.value()));
+  }
+
+  fidl::ProtocolHandler<test_placeholders::Echo> GetHandler(async_dispatcher_t* dispatcher) {
+    return bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure);
+  }
+
+ private:
+  fidl::ServerBindingGroup<test_placeholders::Echo> bindings_;
+};
+
+}  // namespace echo_server
 
 #endif  // LIB_SYS_CPP_TESTS_ECHO_SERVER_H_

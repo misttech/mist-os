@@ -18,6 +18,8 @@
 
 namespace {
 
+using echo_server::EchoImpl;
+
 class ServiceDirectoryProviderTests : public gtest::RealLoopFixture {
  protected:
   void ConnectToService(const std::shared_ptr<sys::ServiceDirectory>& svc,

@@ -40,10 +40,12 @@ sdk://pkg/fidl_base
 sdk://pkg/fidl_cpp
 sdk://pkg/fidl_cpp_base
 sdk://pkg/fidl_cpp_sync
+sdk://pkg/fidl_cpp_wire
 sdk://pkg/fit
 sdk://pkg/fit-promise
 sdk://pkg/scenic_cpp_testing
 sdk://pkg/stdcompat
+sdk://pkg/sync
 sdk://pkg/sys_component_cpp_testing
 sdk://pkg/sys_cpp
 sdk://pkg/sys_cpp_testing

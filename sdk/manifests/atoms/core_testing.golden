@@ -26,6 +26,7 @@
 //sdk/fidl/fuchsia.url:fuchsia.url_sdk
 //sdk/lib/async-loop-testing/cpp:cpp_sdk
 //sdk/lib/fdio:fdio_sdk_manifest
+//sdk/lib/fidl/cpp/wire:wire_sdk
 //sdk/lib/fidl/cpp:cpp_base_sdk
 //sdk/lib/fidl/cpp:cpp_sdk
 //sdk/lib/fidl/cpp:cpp_sync_sdk
@@ -49,6 +50,7 @@
 //zircon/system/ulib/async-testing:async-testing_sdk
 //zircon/system/ulib/async:async-cpp_sdk
 //zircon/system/ulib/async:async_sdk
+//zircon/system/ulib/sync:sync_sdk_manifest
 //zircon/system/ulib/syslog:syslog_sdk_manifest
 //zircon/system/ulib/trace-engine:trace-engine_sdk_manifest
 //zircon/system/ulib/zx:zx_sdk

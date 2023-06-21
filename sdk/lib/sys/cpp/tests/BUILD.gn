@@ -27,6 +27,7 @@ test("component_cpp_unittests_bin") {
     "//sdk/lib/vfs/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/testing/fidl:placeholders_cpp",
     "//src/testing/fidl:placeholders_hlcpp",
   ]
 
@@ -58,6 +59,7 @@ test("component_cpp_testing_unittests_bin") {
     "//sdk/lib/vfs/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/testing/fidl:placeholders_cpp",
     "//src/testing/fidl:placeholders_hlcpp",
   ]
 }

@@ -16,6 +16,8 @@
 
 namespace {
 
+using echo_server::EchoImpl;
+using echo_server::NewEchoImpl;
 using OutgoingDirectorySetupTest = gtest::RealLoopFixture;
 
 class OutgoingDirectoryTest : public gtest::RealLoopFixture {
@@ -45,6 +47,7 @@ class OutgoingDirectoryTest : public gtest::RealLoopFixture {
   }
 
   EchoImpl echo_impl_;
+  NewEchoImpl new_echo_impl_;
   fidl::InterfaceHandle<fuchsia::io::Directory> svc_client_;
   sys::OutgoingDirectory outgoing_;
 };
@@ -59,7 +62,7 @@ TEST_F(OutgoingDirectoryTest, Control) {
   TestCanAccessEchoService("svc/test.placeholders.Echo", false);
 }
 
-TEST_F(OutgoingDirectoryTest, AddAndRemove) {
+TEST_F(OutgoingDirectoryTest, AddAndRemoveHlcpp) {
   ASSERT_EQ(ZX_ERR_NOT_FOUND, outgoing_.RemovePublicService<test::placeholders::Echo>());
 
   ASSERT_EQ(ZX_OK, outgoing_.AddPublicService(echo_impl_.GetHandler(dispatcher())));
@@ -70,6 +73,23 @@ TEST_F(OutgoingDirectoryTest, AddAndRemove) {
 
   ASSERT_EQ(ZX_OK, outgoing_.RemovePublicService<test::placeholders::Echo>());
   ASSERT_EQ(ZX_ERR_NOT_FOUND, outgoing_.RemovePublicService<test::placeholders::Echo>());
+
+  TestCanAccessEchoService("svc/test.placeholders.Echo", false);
+}
+
+TEST_F(OutgoingDirectoryTest, AddAndRemoveNewCpp) {
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, outgoing_.RemovePublicService<test::placeholders::Echo>());
+
+  ASSERT_EQ(ZX_OK, outgoing_.AddProtocol<test_placeholders::Echo>(
+                       new_echo_impl_.GetHandler(dispatcher())));
+
+  ASSERT_EQ(ZX_ERR_ALREADY_EXISTS, outgoing_.AddProtocol<test_placeholders::Echo>(
+                                       new_echo_impl_.GetHandler(dispatcher())));
+
+  TestCanAccessEchoService("svc/test.placeholders.Echo");
+
+  ASSERT_EQ(ZX_OK, outgoing_.RemoveProtocol<test_placeholders::Echo>());
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, outgoing_.RemoveProtocol<test_placeholders::Echo>());
 
   TestCanAccessEchoService("svc/test.placeholders.Echo", false);
 }

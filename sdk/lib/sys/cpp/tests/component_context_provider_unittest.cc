@@ -11,6 +11,8 @@
 
 namespace {
 
+using echo_server::EchoImpl;
+
 class ComponentContextProviderTests : public gtest::RealLoopFixture {
  protected:
   void PublishOutgoingService() {

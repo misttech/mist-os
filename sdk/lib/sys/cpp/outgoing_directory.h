@@ -6,6 +6,8 @@
 #define LIB_SYS_CPP_OUTGOING_DIRECTORY_H_
 
 #include <lib/async/dispatcher.h>
+#include <lib/fidl/cpp/wire/connect_service.h>
+#include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fit/function.h>
 #include <lib/sys/service/cpp/service.h>
 #include <lib/sys/service/cpp/service_handler.h>
@@ -157,6 +159,50 @@ class OutgoingDirectory final {
   // ```
   template <typename Interface>
   zx_status_t RemovePublicService(const std::string& name = Interface::Name_) const {
+    return RemovePublicService(name);
+  }
+
+  // Publishes the specified protocol to the set of outgoing capabilities.
+  //
+  // Adds a protocol with the given |name|, using the given |handler|.
+  // |handler| should remain valid for the lifetime of this object.
+  //
+  // # Errors
+  //
+  // ZX_ERR_ALREADY_EXISTS: The outgoing directory already contains an entry for
+  // this protocol.
+  //
+  // # Example
+  //
+  // ```
+  // fidl::ServerBindingGroup<fuchsia_foo::Controller> bindings;
+  // outgoing.AddPublicProtocol(bindings.CreateHandler(this, dispatcher, on_closed));
+  // ```
+  template <typename Protocol>
+  zx_status_t AddProtocol(fidl::ProtocolHandler<Protocol> handler,
+                          std::string name = fidl::DiscoverableProtocolName<Protocol>) const {
+    return AddPublicService(
+        [handler = std::move(handler)](zx::channel channel, async_dispatcher_t* dispatcher) {
+          handler(fidl::ServerEnd<Protocol>{std::move(channel)});
+        },
+        std::move(name));
+  }
+
+  // Removes the specified protocol from the set of outgoing capabilities.
+  //
+  // # Errors
+  //
+  // ZX_ERR_NOT_FOUND: The outgoing directory does not contain an entry for this
+  // protocol.
+  //
+  // # Example
+  //
+  // ```
+  // outgoing.RemoveProtocol<fuchsia_foo::Controller>();
+  // ```
+  template <typename Protocol>
+  zx_status_t RemoveProtocol(
+      const std::string& name = fidl::DiscoverableProtocolName<Protocol>) const {
     return RemovePublicService(name);
   }
 

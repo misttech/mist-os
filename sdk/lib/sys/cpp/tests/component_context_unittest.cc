@@ -13,6 +13,10 @@
 #include "echo_server.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
+namespace {
+
+using echo_server::EchoImpl;
+
 class ComponentContextTest : public gtest::RealLoopFixture {
  protected:
   void QueryEcho() {
@@ -36,7 +40,7 @@ class ComponentContextTest : public gtest::RealLoopFixture {
 
 TEST_F(ComponentContextTest, ServeInConstructor) {
   fidl::InterfaceRequest request = outgoing_client_.NewRequest();
-  
+
   // Try connecting to a service and call it before it's published.
   QueryEcho();
 
@@ -57,7 +61,7 @@ TEST_F(ComponentContextTest, ServeInConstructor) {
 
 TEST_F(ComponentContextTest, DelayedServe) {
   fidl::InterfaceRequest request = outgoing_client_.NewRequest();
-  
+
   // Doesn't start serving outgoing directory.
   context_ = std::make_unique<sys::ComponentContext>(sys::ServiceDirectory::CreateFromNamespace());
 
@@ -179,3 +183,5 @@ TEST_F(ComponentContextStaticConstructorTest, Create_ServeOutDelayed) {
   EXPECT_EQ(0, RunHelperProc({"--serve_out_delay_50ms"}, std::move(out_dir_req)));
   EXPECT_TRUE(got_echo_result);
 }
+
+}  // namespace
