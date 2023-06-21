@@ -46,10 +46,10 @@ namespace devicetree {
 //   // prefer the latter.
 //   ScanState OnSubtree(const NodePath& path);
 //
-//   // When multiple tree scans are performed, |Matcher::OnWalk| is called
-//   // at the end of each walk, meaning all nodes of the tree have at least all
-//   // nodes that this matcher has showed interest on have been visited.
-//   ScanState OnWalk();
+//   // When multiple tree scans are performed, |Matcher::OnScam| is called
+//   // at the end of each scan, meaning all nodes of the tree where a matcher has shown interes
+//   // have been visited.
+//   ScanState OnScan();
 //
 //   // Called whenever an error happens.
 //   void OnError(std::string_view error);
@@ -75,7 +75,7 @@ namespace devicetree {
 //      }
 //   }
 //
-//   ScanState OnWalk() {
+//   ScanState OnScan() {
 //     return ScanState::kDone;
 //   }
 //
@@ -165,13 +165,13 @@ constexpr bool Match(const devicetree::Devicetree& devicetree, Matchers&&... mat
         matchers..., alias_matcher);
   };
 
-  // Call OnWalk on ever matcher
-  auto on_walk = [](auto& visit_state, auto&... matchers) {
+  // Call OnScan on ever matcher
+  auto on_scan = [](auto& visit_state, auto&... matchers) {
     ForEachMatcher(
         [&visit_state](auto& matcher, size_t index) {
           if (visit_state[index].state() != ScanState::kDone &&
               visit_state[index].state() != ScanState::kNeedsPathResolution) {
-            visit_state[index].set_state(matcher.OnWalk());
+            visit_state[index].set_state(matcher.OnScan());
           }
         },
         matchers...);
@@ -218,7 +218,7 @@ constexpr bool Match(const devicetree::Devicetree& devicetree, Matchers&&... mat
 
   for (size_t i = 0; i < kMaxScanForMatchers; ++i) {
     devicetree.Walk(visit_and_prune, unprune);
-    on_walk(visit_state, matchers..., alias_matcher);
+    on_scan(visit_state, matchers..., alias_matcher);
 
     // If result == 1 then no errors found, but not all matchers are done.
     if (auto res = all_matchers_done(i, matchers...); res != ScanResult::kMatchersPending) {

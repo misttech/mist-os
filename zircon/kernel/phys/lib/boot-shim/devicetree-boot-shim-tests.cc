@@ -68,7 +68,7 @@ class FakeMatcher : public boot_shim::DevicetreeItemBase<FakeMatcher, 2> {
     return devicetree::ScanState::kActive;
   }
 
-  devicetree::ScanState OnWalk() {
+  devicetree::ScanState OnScan() {
     return value_.empty() ? devicetree::ScanState::kActive : devicetree::ScanState::kDone;
   }
 

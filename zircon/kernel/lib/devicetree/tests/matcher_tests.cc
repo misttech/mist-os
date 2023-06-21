@@ -28,15 +28,15 @@ struct InvalidMatcher {};
 using devicetree::internal::HasMaxScansMember;
 using devicetree::internal::HasOnError_v;
 using devicetree::internal::HasOnNode_v;
-using devicetree::internal::HasOnWalk_v;
+using devicetree::internal::HasOnScan_v;
 using devicetree::internal::OnErrorSignature_v;
 using devicetree::internal::OnNodeSignature_v;
-using devicetree::internal::OnWalkSignature_v;
+using devicetree::internal::OnScanSignature_v;
 
 static_assert(!HasOnError_v<InvalidMatcher>);
 static_assert(!OnErrorSignature_v<InvalidMatcher>);
-static_assert(!HasOnWalk_v<InvalidMatcher>);
-static_assert(!OnWalkSignature_v<InvalidMatcher>);
+static_assert(!HasOnScan_v<InvalidMatcher>);
+static_assert(!OnScanSignature_v<InvalidMatcher>);
 static_assert(!HasOnNode_v<InvalidMatcher>);
 static_assert(!OnNodeSignature_v<InvalidMatcher>);
 static_assert(!HasMaxScansMember<InvalidMatcher>::value);
@@ -46,13 +46,13 @@ struct ValidMatcher {
   devicetree::ScanState OnNode(const devicetree::NodePath&,
                                const devicetree::PropertyDecoder& decoder);
   void OnError(std::string_view v);
-  devicetree::ScanState OnWalk();
+  devicetree::ScanState OnScan();
 };
 
 static_assert(HasOnError_v<ValidMatcher>);
 static_assert(OnErrorSignature_v<ValidMatcher>);
-static_assert(HasOnWalk_v<ValidMatcher>);
-static_assert(OnWalkSignature_v<ValidMatcher>);
+static_assert(HasOnScan_v<ValidMatcher>);
+static_assert(OnScanSignature_v<ValidMatcher>);
 static_assert(HasOnNode_v<ValidMatcher>);
 static_assert(OnNodeSignature_v<ValidMatcher>);
 static_assert(HasMaxScansMember<ValidMatcher>::value);
@@ -105,7 +105,7 @@ struct SingleNodeMatcher {
     return on_subtree(path);
   }
 
-  devicetree::ScanState OnWalk() {
+  devicetree::ScanState OnScan() {
     walk_count++;
     walk();
     return walk_result;
@@ -240,7 +240,7 @@ TEST_F(MatchTest, MultipleWalksForCompletion) {
   EXPECT_EQ(seen, 2);
 }
 
-TEST_F(MatchTest, OnWalkCompetion) {
+TEST_F(MatchTest, OnScanCompetion) {
   size_t seen = 0;
   SingleNodeMatcher<2> matcher("/A/C/D", [&](auto name, const auto& decoder) {
     seen++;
@@ -319,7 +319,7 @@ TEST_F(MatchTest, MultipleMatchersEarlyCompletion) {
   EXPECT_EQ(seen_2, 1);
 }
 
-TEST_F(MatchTest, MultipleMatchersOnWalkCompletion) {
+TEST_F(MatchTest, MultipleMatchersOnScanCompletion) {
   size_t seen_1 = 0;
   SingleNodeMatcher<2> matcher_1("/A/C/D", [&](auto name, const auto& decoder) {
     seen_1++;

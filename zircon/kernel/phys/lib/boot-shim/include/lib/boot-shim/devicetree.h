@@ -42,7 +42,7 @@ class DevicetreeItemBase {
     return devicetree::ScanState::kActive;
   }
 
-  devicetree::ScanState OnWalk() { return devicetree::ScanState::kActive; }
+  devicetree::ScanState OnScan() { return devicetree::ScanState::kActive; }
 
   void OnError(std::string_view error) {
     Log("Error on %s, %*s\n", fbl::TypeInfo<T>::Name(), static_cast<int>(error.length()),
@@ -150,7 +150,7 @@ class ArmDevicetreeGicItem
                                const devicetree::PropertyDecoder& decoder);
   devicetree::ScanState OnSubtree(const devicetree::NodePath& path);
 
-  devicetree::ScanState OnWalk() {
+  devicetree::ScanState OnScan() {
     return matched_ ? devicetree::ScanState::kDone : devicetree::ScanState::kActive;
   }
 
@@ -306,7 +306,7 @@ class DevicetreeMemoryItem : public DevicetreeItemBase<DevicetreeMemoryItem, 1>,
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
   devicetree::ScanState OnSubtree(const devicetree::NodePath& path);
-  devicetree::ScanState OnWalk() { return devicetree::ScanState::kDone; }
+  devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
 
   // Boot shim item API.
   size_t size_bytes() const { return ItemSize(ranges_count_ * sizeof(zbi_mem_range_t)); }
