@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/component/component_id_index.gni")
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/images/fvm.gni")
@@ -198,10 +197,9 @@ group("core_component_id_index") {
   deps = [ "//src/sys/core:core_component_id_index" ]
 }
 
-# If this target is included in the build, all components are allowed to use
-# isolated-persistent-storage, even if they are not in the component ID index.
-component_id_index("component_id_index_no_restrict_storage") {
-  source = "config/component_id_index_no_restrict_storage.json5"
+# Transitional.
+group("component_id_index_no_restrict_storage") {
+  deps = [ "//src/sys/core:component_id_index_no_restrict_storage" ]
 }
 
 executable("test_component_using_storage_bin") {

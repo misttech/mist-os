@@ -3,6 +3,7 @@
 // the index.
 {
     appmgr_restrict_isolated_persistent_storage: false,
+
     // The `instances` field is require, but please leave it empty here.
-    instances: []
+    instances: [],
 }

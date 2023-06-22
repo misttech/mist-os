@@ -87,7 +87,7 @@ if (labels.images == "//build/images/bringup") {
     base_packages = [
       "//src/performance/trace",
       "//src/sys/appmgr:appmgr_scheme_config",
-      "//src/sys/appmgr:component_id_index_no_restrict_storage",
+      "//src/sys/core:component_id_index_no_restrict_storage",
       "//src/sys/appmgr:core_component_id_index",
       "//src/sys/appmgr",
       "//src/sys/pkg/bin/system-update-checker",

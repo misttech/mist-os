@@ -20,6 +20,12 @@ component_id_index("core_component_id_index") {
   source = "core_component_id_index.json5"
 }
 
+# If this target is included in the build, all components are allowed to use
+# isolated-persistent-storage, even if they are not in the component ID index.
+component_id_index("component_id_index_no_restrict_storage") {
+  source = "component_id_index_no_restrict_storage.json5"
+}
+
 executable("core_proxy") {
   sources = [ "src/main.cc" ]
 

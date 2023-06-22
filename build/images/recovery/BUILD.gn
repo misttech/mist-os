@@ -164,7 +164,7 @@ if (is_fuchsia) {
                         "//src/recovery/system:system_recovery",
                         "//src/sys/appmgr",
                         "//src/sys/appmgr:appmgr_scheme_config",
-                        "//src/sys/appmgr:component_id_index_no_restrict_storage",
+                        "//src/sys/core:component_id_index_no_restrict_storage",
                         "//src/ui/bin/brightness_manager:auto-brightness",
 
                         # Flattened from //src/sys/pkg:recovery
@@ -280,7 +280,7 @@ if (is_fuchsia) {
                       "//src/connectivity/network/netcfg:config-default",
                       "//src/sys/appmgr",
                       "//src/sys/appmgr:appmgr_scheme_config",
-                      "//src/sys/appmgr:component_id_index_no_restrict_storage",
+                      "//src/sys/core:component_id_index_no_restrict_storage",
                       "//src/sys/sysmgr",
                       "//src/firmware/fastboot-tcp",
                       "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",

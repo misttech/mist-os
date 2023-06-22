@@ -12,7 +12,7 @@ declare_args() {
 
     # All v1 components are allowed to use isolated-persistent-storage, even if
     # they're not listed in the component ID index.
-    "//src/sys/appmgr:component_id_index_no_restrict_storage",
+    "//src/sys/core:component_id_index_no_restrict_storage",
   ]
 
   appmgr_with_sysmgr_base_packages = [
@@ -23,6 +23,6 @@ declare_args() {
 
     # All v1 components are allowed to use isolated-persistent-storage, even if
     # they're not listed in the component ID index.
-    "//src/sys/appmgr:component_id_index_no_restrict_storage",
+    "//src/sys/core:component_id_index_no_restrict_storage",
   ]
 }
