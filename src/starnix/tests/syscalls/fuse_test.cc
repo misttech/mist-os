@@ -10,6 +10,7 @@
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
+#include <unistd.h>
 
 #include <gtest/gtest.h>
 #include <linux/magic.h>
@@ -261,6 +262,19 @@ TEST_F(FuseTest, Unlink) {
   ASSERT_TRUE(ScopedFD(open(witness.c_str(), O_RDONLY)).is_valid());
   ASSERT_EQ(unlink(witness.c_str()), 0);
   ASSERT_FALSE(ScopedFD(open(witness.c_str(), O_RDONLY)).is_valid());
+}
+
+TEST_F(FuseTest, Truncate) {
+  ASSERT_TRUE(Mount());
+  std::string file = GetMountDir() + "/file";
+  ScopedFD fd(open(file.c_str(), O_WRONLY | O_CREAT));
+  ASSERT_TRUE(fd.is_valid());
+  ASSERT_EQ(write(fd.get(), "hello", 5), 5);
+  fd.reset();
+  ASSERT_EQ(truncate(file.c_str(), 2), 0);
+  fd = ScopedFD(open(file.c_str(), O_RDONLY));
+  char buffer[10];
+  ASSERT_EQ(read(fd.get(), buffer, 10), 2);
 }
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_

@@ -604,12 +604,31 @@ impl FsNodeOps for Arc<FuseNode> {
 
     fn truncate(
         &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _length: u64,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        length: u64,
     ) -> Result<(), Errno> {
-        not_implemented!("FsNodeOps::truncate");
-        error!(ENOTSUP)
+        node.update_info(|info| {
+            // Truncate is implemented by updating the attributes of the file.
+            let attributes = uapi::fuse_setattr_in {
+                size: length,
+                valid: uapi::FATTR_SIZE,
+                ..Default::default()
+            };
+
+            let response = self.connection.execute_operation(
+                current_task,
+                self,
+                FuseOperation::SetAttr(attributes),
+            )?;
+            let attr = if let FuseResponse::Attr(attr) = response {
+                attr
+            } else {
+                return error!(EINVAL);
+            };
+            FuseNode::update_node_info(info, attr.attr)?;
+            Ok(())
+        })
     }
 
     fn allocate(&self, _node: &FsNode, _offset: u64, _length: u64) -> Result<(), Errno> {
@@ -999,6 +1018,7 @@ enum FuseOperation {
     Readlink,
     Release(uapi::fuse_open_out),
     Seek(uapi::fuse_lseek_in),
+    SetAttr(uapi::fuse_setattr_in),
     Statfs,
     Symlink(
         // Target of the link
@@ -1088,6 +1108,7 @@ impl FuseOperation {
                 data.write_all(message.as_bytes())
             }
             Self::Seek(seek_in) => data.write_all(seek_in.as_bytes()),
+            Self::SetAttr(setattr_in) => data.write_all(setattr_in.as_bytes()),
             Self::Symlink(target, name) => {
                 let mut len = Self::write_null_terminated(data, name)?;
                 len += Self::write_null_terminated(data, target)?;
@@ -1127,6 +1148,7 @@ impl FuseOperation {
             Self::Readlink => uapi::fuse_opcode_FUSE_READLINK,
             Self::Release(_) => uapi::fuse_opcode_FUSE_RELEASE,
             Self::Seek(_) => uapi::fuse_opcode_FUSE_LSEEK,
+            Self::SetAttr(_) => uapi::fuse_opcode_FUSE_SETATTR,
             Self::Statfs => uapi::fuse_opcode_FUSE_STATFS,
             Self::Symlink(_, _) => uapi::fuse_opcode_FUSE_SYMLINK,
             Self::Unlink(_) => uapi::fuse_opcode_FUSE_UNLINK,
@@ -1155,6 +1177,7 @@ impl FuseOperation {
             Self::Read(_) => std::mem::size_of::<uapi::fuse_read_in>() as u32,
             Self::Release(_) => std::mem::size_of::<uapi::fuse_release_in>() as u32,
             Self::Seek(_) => std::mem::size_of::<uapi::fuse_lseek_in>() as u32,
+            Self::SetAttr(_) => std::mem::size_of::<uapi::fuse_setattr_in>() as u32,
             Self::Symlink(target, name) => {
                 (target.as_bytes().len() + name.as_bytes().len() + 2) as u32
             }
@@ -1183,7 +1206,7 @@ impl FuseOperation {
     fn parse_response(&self, buffer: Vec<u8>) -> Result<FuseResponse, Errno> {
         debug_assert!(self.has_response());
         match self {
-            Self::GetAttr => {
+            Self::GetAttr | Self::SetAttr(_) => {
                 Ok(FuseResponse::Attr(Self::to_response::<uapi::fuse_attr_out>(&buffer)))
             }
             Self::Init => Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer))),
