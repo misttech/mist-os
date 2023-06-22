@@ -57,6 +57,7 @@ sdk_source_set("cpp_library") {
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_hlcpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/cpp/wire",
     "//sdk/lib/sys/cpp",
   ]
 

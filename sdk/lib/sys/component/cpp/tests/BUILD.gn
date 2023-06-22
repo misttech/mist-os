@@ -80,6 +80,7 @@ executable("realm_builder_test_bin") {
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/testing/fidl:placeholders_cpp",
     "//src/testing/fidl:placeholders_hlcpp",
   ]
 }

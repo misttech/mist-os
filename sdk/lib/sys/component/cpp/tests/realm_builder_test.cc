@@ -4,6 +4,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <fidl/test.placeholders/cpp/fidl.h>
 #include <fuchsia/component/cpp/fidl.h>
 #include <fuchsia/component/decl/cpp/fidl.h>
 #include <fuchsia/data/cpp/fidl.h>
@@ -300,21 +301,24 @@ TEST_F(RealmBuilderTest, RoutesProtocolFromLocalComponentRawPointer) {
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   realm_builder.AddLocalChild(kEchoServer, &local_echo_server);
 #pragma clang diagnostic pop
-  realm_builder.AddRoute(Route{.capabilities = {Protocol{test::placeholders::Echo::Name_}},
-                               .source = ChildRef{kEchoServer},
-                               .targets = {ParentRef()}});
+  realm_builder.AddRoute(
+      Route{.capabilities = {Protocol{fidl::DiscoverableProtocolName<test_placeholders::Echo>}},
+            .source = ChildRef{kEchoServer},
+            .targets = {ParentRef()}});
   auto realm = realm_builder.Build(dispatcher());
   auto cleanup = fit::defer([&]() {
     bool complete = false;
     realm.Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
     RunLoopUntil([&]() { return complete; });
   });
-  test::placeholders::EchoPtr echo;
-  ASSERT_EQ(realm.component().Connect(echo.NewRequest()), ZX_OK);
+  auto echo_client = realm.component().Connect<test_placeholders::Echo>();
+  ASSERT_TRUE(echo_client.is_ok());
+  fidl::Client echo(std::move(*echo_client), dispatcher());
   bool was_called = false;
-  echo->EchoString("hello", [&](const fidl::StringPtr& response) {
+  echo->EchoString({"hello"}).Then([&](fidl::Result<test_placeholders::Echo::EchoString>& result) {
     was_called = true;
-    ASSERT_EQ(response, "hello");
+    ASSERT_TRUE(result.is_ok());
+    ASSERT_EQ(result->response(), "hello");
   });
   RunLoopUntil([&]() { return was_called; });
 }

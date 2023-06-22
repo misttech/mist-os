@@ -11,9 +11,11 @@
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/fidl/cpp/interface_request.h>
+#include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fit/result.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sys/cpp/service_directory.h>
+#include <lib/zx/result.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
@@ -112,6 +114,22 @@ class ScopedChild final {
   // Connect to an interface in the exposed directory using the supplied
   // channel.
   zx_status_t Connect(const std::string& interface_name, zx::channel request) const;
+
+  // ClientEnd variant of |Connect|. See |Connect| for more details.
+  template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
+  zx::result<fidl::ClientEnd<Protocol>> Connect(
+      std::string path = fidl::DiscoverableProtocolName<Protocol>) {
+    auto endpoints = fidl::CreateEndpoints<Protocol>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
+    }
+
+    if (auto result = Connect(path, endpoints->server.TakeChannel()); result != ZX_OK) {
+      return zx::error(result);
+    }
+
+    return zx::ok(std::move(endpoints->client));
+  }
 
   // Get the child name of this instance.
   std::string GetChildName() const;
