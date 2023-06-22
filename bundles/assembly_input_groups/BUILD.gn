@@ -58,12 +58,9 @@ assembly_input_groups("network") {
     "//src/connectivity/network:for_transition",
     "//src/connectivity/network/mdns/bundles:services",
     "//src/sys/pkg:tools",
-    "//src/sys/pkg:system-update-checker",
   ]
-  core_realm_shards = [
-    "//src/sys/pkg/bin/system-updater:system-updater-core-shard",
-    "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
-  ]
+  core_realm_shards =
+      [ "//src/sys/pkg/bin/system-updater:system-updater-core-shard" ]
 }
 
 assembly_input_groups("ssh") {

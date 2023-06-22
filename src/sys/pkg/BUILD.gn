@@ -68,18 +68,6 @@ group("system-update-configurator") {
   ]
 }
 
-group("system-update-checker") {
-}
-
-group("omaha-client") {
-}
-
-group("omaha-client-no-restart") {
-}
-
-group("omaha-client-delayed-start") {
-}
-
 group("pkgfs-disable-executability-restrictions") {
   public_deps = [ "bin/pkg-cache:disable-executability-restrictions" ]
   deps = [ "//build/validate:non_production_tag" ]

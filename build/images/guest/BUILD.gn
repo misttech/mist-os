@@ -57,10 +57,7 @@ if (labels.images == "//build/images/bringup") {
   # Guest's specific core realm (not based on core_realm_shards).
   core_realm_definition("core") {
     testonly = true
-    deps = [
-      "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
-      "//src/sys/pkg/bin/system-updater:system-updater-core-shard",
-    ]
+    deps = [ "//src/sys/pkg/bin/system-updater:system-updater-core-shard" ]
   }
 
   # Guest's specific product assembly.  It's based on the minimal feature set

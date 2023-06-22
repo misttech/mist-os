@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_binary("bin") {
   name = "system_update_checker"
@@ -70,10 +69,6 @@ rustc_binary("bin") {
     "src/update_monitor.rs",
     "src/update_service.rs",
   ]
-}
-
-core_shard("system-update-checker-core-shard") {
-  shard_file = "meta/system_update_checker.core_shard.cml"
 }
 
 fuchsia_component("component") {

@@ -18,14 +18,7 @@ product_bootfs_labels += [
   "//src/sys/component_manager:component_manager_bootfs_config",
 ]
 
-core_realm_shards += [
-  "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
-]
-
 legacy_base_package_labels += [
-  # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
-  "//src/sys/pkg:system-update-checker",
-
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/connectivity/network/netcfg:config-default",
 ]

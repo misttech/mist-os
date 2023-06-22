@@ -8,10 +8,7 @@ import("//src/sys/core/build/core.gni")
 
 core_realm_definition("core") {
   testonly = true
-  deps = [
-    "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
-    "//src/sys/pkg/bin/system-updater:system-updater-core-shard",
-  ]
+  deps = [ "//src/sys/pkg/bin/system-updater:system-updater-core-shard" ]
 }
 
 assembled_system("overnet") {
