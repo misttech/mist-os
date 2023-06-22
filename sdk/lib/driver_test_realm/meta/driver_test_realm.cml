@@ -55,6 +55,15 @@
             path: "/boot",
         },
     ],
+    use: [
+        // Provided by the parent when it wants to override the DTR
+        // implementation. Config |tunnel_boot_items| needs to be set.
+        {
+            protocol: [ "fuchsia.boot.Items" ],
+            from: "parent",
+            availability: "optional",
+        },
+    ],
     offer: [
         {
             protocol: [ "fuchsia.boot.RootResource" ],
@@ -102,4 +111,10 @@
             from: "self",
         },
     ],
+    config: {
+        tunnel_boot_items: {
+            type: "bool",
+            mutability: [ "parent" ],
+        },
+    },
 }

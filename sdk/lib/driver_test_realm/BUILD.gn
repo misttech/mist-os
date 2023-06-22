@@ -56,6 +56,7 @@ executable("bin") {
   testonly = true
   sources = [ "driver_test_realm.cc" ]
   deps = [
+    ":driver_test_realm_config",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
     "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp_wire",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp_wire",
@@ -80,11 +81,29 @@ executable("bin") {
       [ "USE_DRIVER_FRAMEWORK_V2_DEFAULT=$use_driver_framework_v2_default" ]
 }
 
-fuchsia_component("driver_test_realm_component") {
+fuchsia_component_manifest("manifest") {
   component_name = "driver_test_realm"
-  testonly = true
   manifest = "meta/driver_test_realm.cml"
-  deps = [ ":bin" ]
+}
+
+fuchsia_structured_config_cpp_elf_lib("driver_test_realm_config") {
+  cm_label = ":manifest"
+}
+
+fuchsia_structured_config_values("driver_test_realm_config_default") {
+  cm_label = ":manifest"
+  values = {
+    tunnel_boot_items = false
+  }
+}
+
+fuchsia_component("driver_test_realm_component") {
+  testonly = true
+  cm_label = ":manifest"
+  deps = [
+    ":bin",
+    ":driver_test_realm_config_default",
+  ]
 }
 
 executable("fake_boot_resolver_bin") {

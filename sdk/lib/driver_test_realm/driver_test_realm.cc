@@ -38,6 +38,7 @@
 #include <fbl/string_printf.h>
 #include <mock-boot-arguments/server.h>
 
+#include "sdk/lib/driver_test_realm/driver_test_realm_config.h"
 #include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
 #include "src/lib/storage/vfs/cpp/pseudo_file.h"
@@ -284,8 +285,9 @@ std::map<std::string, std::string> CreateBootArgs(const fuchsia_driver_test::Rea
 
 class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
  public:
-  DriverTestRealm(component::OutgoingDirectory* outgoing, async_dispatcher_t* dispatcher)
-      : outgoing_(outgoing), dispatcher_(dispatcher), vfs_(dispatcher_) {}
+  DriverTestRealm(component::OutgoingDirectory* outgoing, async_dispatcher_t* dispatcher,
+                  driver_test_realm_config::Config config)
+      : outgoing_(outgoing), dispatcher_(dispatcher), vfs_(dispatcher_), config_(config) {}
 
   zx::result<> Init() {
     // We must connect capabilities up early as not all users wait for Start to complete before
@@ -382,14 +384,30 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       return;
     }
 
-    auto boot_items = std::make_unique<FakeBootItems>();
-    if (request.args().board_name().has_value()) {
-      boot_items->board_name_ = *request.args().board_name();
-    }
-    result = outgoing_->AddProtocol<fuchsia_boot::Items>(std::move(boot_items));
-    if (result.is_error()) {
-      completer.Reply(result.take_error());
-      return;
+    // Tunnel fuchsia_boot::Items from parent to realm builder if |tunnel_boot_items| configuration
+    // is set. If not, provide fuchsia_boot::Items from local.
+    if (config_.tunnel_boot_items()) {
+      result = outgoing_->AddUnmanagedProtocol<fuchsia_boot::Items>(
+          [](fidl::ServerEnd<fuchsia_boot::Items> server_end) {
+            if (const zx::result status = component::Connect<fuchsia_boot::Items>(
+                    std::move(server_end),
+                    fidl::DiscoverableProtocolDefaultPath<fuchsia_boot::Items>);
+                status.is_error()) {
+              FX_LOGS(ERROR) << "Failed to connect to fuchsia_boot::Items"
+                             << status.status_string();
+            }
+          });
+    } else {
+      auto boot_items = std::make_unique<FakeBootItems>();
+      if (request.args().board_name().has_value()) {
+        boot_items->board_name_ = *request.args().board_name();
+      }
+
+      result = outgoing_->AddProtocol<fuchsia_boot::Items>(std::move(boot_items));
+      if (result.is_error()) {
+        completer.Reply(result.take_error());
+        return;
+      }
     }
 
     result = outgoing_->AddProtocol<fuchsia_device_manager::SystemStateTransition>(
@@ -567,6 +585,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
   fidl::ClientEnd<fuchsia_io::Directory> exposed_dir_;
   // Queue of connection requests that need to be ran once exposed_dir_ is valid.
   std::vector<fit::closure> cb_queue_;
+  driver_test_realm_config::Config config_;
 };
 
 }  // namespace
@@ -575,7 +594,9 @@ int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   component::OutgoingDirectory outgoing(loop.dispatcher());
 
-  DriverTestRealm dtr(&outgoing, loop.dispatcher());
+  auto config = driver_test_realm_config::Config::TakeFromStartupHandle();
+
+  DriverTestRealm dtr(&outgoing, loop.dispatcher(), config);
   {
     zx::result result = dtr.Init();
     ZX_ASSERT(result.is_ok());
