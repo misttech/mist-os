@@ -75,6 +75,9 @@ product_assembly_configuration("core_with_netstack3") {
         force_netstack3 = true
       }
     }
+    fonts = {
+      enabled = true
+    }
   }
   product = {
   }

@@ -73,6 +73,7 @@ user_platform_aib_names =
 
       # Fonts
       "fonts",
+      "fonts_hermetic",
 
       # SWD (Software Delivery)
       "omaha_client",

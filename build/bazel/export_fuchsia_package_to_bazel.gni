@@ -1,0 +1,72 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_inputs.gni")
+import("//build/components/fuchsia_package_archive.gni")
+import("//build/packages/prebuilt_package.gni")
+
+# Exports a fuchsia package built via GN to be used within
+# the Bazel build graph as bazel_input_resource with a .far resource.
+#
+# Usage:
+#
+# 1. Wrap an existing GN fuchsia_package rule with:
+# ```
+# fuchsia_package("foo") {
+#   ...
+# }
+#
+# export_fuchsia_package_to_bazel("foo_for_bazel") {
+#   package = ":foo"
+# }
+# ```
+# 2. On the Bazel side, the .far file should be loaded using:
+#    ```
+#    fuchsia_prebuilt_package(
+#      name = "foo",
+#      archive = "@legacy_ninja_build_outputs//path/to:foo.far"
+#    )
+#    ```
+#
+# Parameters
+#
+#   package (required)
+#     A 'fuchsia_package' target.
+#
+#   deps (optional)
+#   testonly (optional)
+#   visibility (optional)
+#     Usual GN meanings.
+#
+template("export_fuchsia_package_to_bazel") {
+  assert(defined(invoker.package), "Must specify package.")
+
+  labels = {
+    package_name = get_label_info(invoker.package, "name")
+    archive_label = "${target_name}.archive"
+    bazel_output = "${package_name}.far"
+  }
+
+  fuchsia_package_archive(labels.archive_label) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                             "visibility",
+                           ])
+    package = invoker.package
+  }
+
+  bazel_input_resource(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                             "visibility",
+                           ])
+    deps = [ ":${labels.archive_label}" ]
+    sources = get_target_outputs(":${labels.archive_label}")
+    outputs = [ labels.bazel_output ]
+  }
+}

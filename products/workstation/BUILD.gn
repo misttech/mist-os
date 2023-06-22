@@ -10,6 +10,7 @@ assert(
     is_fuchsia,
     "Product definitions and assemblies should only be defined in the fuchsia toolchain")
 
+# LINT.IfChange
 workstation_platform_config = {
   build_type = "eng"
   battery = {
@@ -36,7 +37,17 @@ workstation_platform_config = {
   virtualization = {
     enabled = true
   }
+  fonts = {
+    enabled = true
+    font_collection = "open-fonts-collection"
+  }
 }
+
+# LINT.ThenChange(//build/bazel/assembly/product_configurations/BUILD.bazel)
+
+_workstation_font_asset_provider_packages = [
+  "//src/fonts/asset_providers:open-fonts-collection.asset-provider.package",
+]
 
 workstation_product_config = {
   session_url = "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm"
@@ -45,6 +56,7 @@ workstation_product_config = {
 product_assembly_configuration("workstation") {
   platform = workstation_platform_config
   product = workstation_product_config
+  font_asset_provider_packages = _workstation_font_asset_provider_packages
 }
 
 # TODO(https://fxbug.dev/107089) remove this product once workstation_eng can start paused
@@ -56,6 +68,7 @@ product_assembly_configuration("workstation_paused") {
 
     session_url = ""
   }
+  font_asset_provider_packages = _workstation_font_asset_provider_packages
 }
 
 group("bootfs") {

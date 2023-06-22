@@ -43,6 +43,7 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "core_realm_user_and_userdebug",
     "fan",
     "fonts",
+    "fonts_hermetic",
     "fshost_common",
     "fshost_f2fs",
     "fshost_fxfs",

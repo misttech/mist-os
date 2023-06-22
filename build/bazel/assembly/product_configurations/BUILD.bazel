@@ -56,6 +56,9 @@ fuchsia_product_configuration(
 # LINT.IfChange
 fuchsia_product_configuration(
     name = "core",
+    base_packages = [
+        ":small-open-fonts-collection",
+    ],
     json_config = {
         "platform": {
             "build_type": BUILD_TYPES.ENG,

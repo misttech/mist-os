@@ -4,6 +4,7 @@
 
 # See README.md for details.
 
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
 import("//src/fonts/build/font_asset_provider.gni")
 import("//src/fonts/build/fonts.gni")
@@ -72,13 +73,32 @@ fuchsia_package("provider.package") {
   deps = [ ":provider.component" ]
 }
 
+# Generate bazel inputs for the font asset provider packages above.
+group("bazel_inputs") {
+  public_deps = [
+    ":open-fonts-collection-bazel",
+    ":small-open-fonts-collection-bazel",
+  ]
+}
+
 # Font asset provider definitions.
-#
 # Expect to have one for each font collection in //src/fonts/collections.
 font_asset_provider("open-fonts-collection") {
   deps = [ "//src/fonts/collections:open-fonts-collection" ]
 }
 
+# Makes "@legacy_ninja_build_outputs//:open-fonts-collection.asset-provider.package.far"
+# available to the Bazel build, pointing to the correct far package.
+export_fuchsia_package_to_bazel("open-fonts-collection-bazel") {
+  package = ":open-fonts-collection.asset-provider.package"
+}
+
 font_asset_provider("small-open-fonts-collection") {
   deps = [ "//src/fonts/collections:small-open-fonts-collection" ]
+}
+
+# Makes "@legacy_ninja_build_outputs//:small-open-fonts-collection.asset-provider.package.far"
+# available to the Bazel build, pointing to the correct far package.
+export_fuchsia_package_to_bazel("small-open-fonts-collection-bazel") {
+  package = ":small-open-fonts-collection.asset-provider.package"
 }

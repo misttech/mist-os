@@ -22,14 +22,16 @@ impl DefineSubsystemConfiguration<FontsConfig> for FontsSubsystem {
         // Adding the platform bundle conditionally allows us to soft-migrate
         // products that use the packages from the `fonts` bundle.
         if *context.feature_set_level == FeatureSupportLevel::Minimal {
-            // If a named font collection is specified, set the generated font manifest
-            // name, so that the fonts server would use it.
             if let Some(ref font_collection_name) = fonts_config.font_collection {
                 ensure!(
                     fonts_config.enabled,
                     "fonts.enabled must be `true` if `fonts.font_collection` is set"
                 );
-                builder.platform_bundle("fonts.hermetic");
+                ensure!(
+                    !font_collection_name.is_empty(),
+                    "fonts.font_collection must not be empty",
+                );
+                builder.platform_bundle("fonts_hermetic");
                 let mut component = builder
                     .package(FONT_SERVER_PACKAGE_NAME)
                     .component(FONT_SERVER_COMPONENT_LOCAL_URL)
@@ -42,17 +44,10 @@ impl DefineSubsystemConfiguration<FontsConfig> for FontsSubsystem {
                         matches!(context.build_type, BuildType::Eng | BuildType::UserDebug),
                     )
                     .context("while setting verbose_logging")?;
-                let font_manifest = if font_collection_name.is_empty() {
-                    // Empty means default behavior (use config-data).
-                    String::from("")
-                } else {
-                    // Nonempty means read from the specified file.
-                    // The file must be routed in.
-                    format!(
-                        "/fonts/data/assets/{}_all.hermetic_assets.font_manifest.json",
-                        font_collection_name
-                    )
-                };
+                let font_manifest = format!(
+                    "/fonts/data/assets/{}_all.hermetic_assets.font_manifest.json",
+                    font_collection_name
+                );
                 component
                     .field("font_manifest", font_manifest)
                     .context("while setting font_manifest")?;
@@ -70,7 +65,7 @@ impl DefineSubsystemConfiguration<FontsConfig> for FontsSubsystem {
                         matches!(context.build_type, BuildType::Eng | BuildType::UserDebug),
                     )
                     .context("while setting verbose_logging")?;
-                // Fallback to using fonts from `config-data` if a font collection is not
+                // Fallback to using fonts from `config-data` since a font collection was not
                 // specified. Signified by an empty value in `font_manifest`.
                 component
                     .field("font_manifest", String::from(""))

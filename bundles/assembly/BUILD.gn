@@ -1546,11 +1546,15 @@ icu_assembly_input_bundle("intl_services") {
   icu_base_packages = [ "//src/intl/intl_services:pkg" ]
 }
 
+# Legacy fonts setup: fonts sourced from config-data.
 assembly_input_bundle("fonts") {
   base_packages = [ "//src/fonts:pkg" ]
 }
 
-assembly_input_bundle("fonts.hermetic") {
-  # TODO(fxbug.dev/12285): Needs more base_packages.
-  base_packages = [ "//src/fonts/asset_providers:provider.package" ]
+# Hermetic fonts setup: fonts sourced from a component.
+assembly_input_bundle("fonts_hermetic") {
+  base_packages = [
+    "//src/fonts/asset_providers:server.package",
+    "//src/fonts/asset_providers:provider.package",
+  ]
 }

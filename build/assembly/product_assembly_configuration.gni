@@ -55,6 +55,11 @@ import("//build/group_with_inputs.gni")
 #     product-provided package to place into the cache set. The scope must have a
 #     'package_target' field pointing to the GN target of the fuchsia_package.
 #
+#   font_asset_provider_packages [optional]
+#     [list, GN labels] A list of GN labels pointing at product-provided
+#     packages containing font assets.  These fonts end up as base packages,
+#     since that is the only font distribution method we support at the moment.
+#
 #   platform [optional]
 #   [scope] This is the platform configuration scope
 #
@@ -119,6 +124,14 @@ template("product_assembly_configuration") {
             }
           }
         }
+      }
+    }
+
+    # Font packages to be included in base_packages.  These contain no
+    # config data.
+    if (defined(invoker.font_asset_provider_packages)) {
+      foreach(font_package, invoker.font_asset_provider_packages) {
+        base_package_labels += [ font_package ]
       }
     }
 
@@ -207,6 +220,26 @@ template("product_assembly_configuration") {
             if (defined(package.config_data)) {
               config_data = _config_data
             }
+          },
+        ]
+      }
+    }
+
+    # Similar to above, except for font packages, and a bit simpler since
+    # invoker.font_asset_provider_packages is a list of labels, not a list
+    # of scopes.
+    if (defined(invoker.font_asset_provider_packages)) {
+      foreach(package, invoker.font_asset_provider_packages) {
+        _package_out_dir = get_label_info(package, "target_out_dir")
+        _package_name = get_label_info(package, "name")
+        _manifest_path =
+            "${_package_out_dir}/${_package_name}/package_manifest.json"
+        _manifest_path_rebased = rebase_path(_manifest_path, root_build_dir)
+
+        base_package_manifests += [ _manifest_path ]
+        base_packages += [
+          {
+            manifest = _manifest_path_rebased
           },
         ]
       }

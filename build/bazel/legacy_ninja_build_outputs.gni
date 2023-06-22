@@ -40,6 +40,7 @@ gn_labels_for_bazel_inputs =
       "//build/bazel:build_args_bazel_inputs",
       "//build/images/flash:esp.bazel_input",
       "//build/info:build_info_version",
+      "//src/fonts/asset_providers:bazel_inputs",
       "//sdk:core",
     ] + eng_platform_aib_labels
 

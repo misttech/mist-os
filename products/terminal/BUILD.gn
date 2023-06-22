@@ -21,6 +21,11 @@ product_assembly_configuration("terminal") {
       enabled = true
       legacy = true
     }
+    fonts = {
+      enabled = true
+      # TODO(fxbug.dev/122855): Add `fonts_collection` once OOT is ready to
+      # use the updated fonts provisioning methods.
+    }
   }
   product = {
   }

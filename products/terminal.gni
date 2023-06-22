@@ -18,19 +18,13 @@ legacy_base_package_labels += [
   "//src/sys/pkg:system-update-checker",
 ]
 
-legacy_base_package_labels += [
-  "//src/fonts",
-  "//src/intl/intl_services:pkg",
-]
+legacy_base_package_labels += [ "//src/intl/intl_services:pkg" ]
 
 # Remove intl_services default shards that were added in core.gni.
 core_realm_shards += [ "//src/intl/intl_services:intl_services_shard" ]
 
 # Add build type config data
-legacy_base_package_labels += [
-  "//src/cobalt/bin/app:build_type_eng",
-  "//src/fonts:build_type_eng",
-]
+legacy_base_package_labels += [ "//src/cobalt/bin/app:build_type_eng" ]
 
 # Add UI packages on terminal.
 legacy_cache_package_labels += [
