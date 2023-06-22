@@ -9,8 +9,23 @@ use fidl_fuchsia_tracing::BufferingMode;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
-/// Interact with the tracing subsystem.
-#[argh(subcommand, name = "trace")]
+#[argh(
+    subcommand,
+    name = "trace",
+    description = "Tracing is a tool that allows you to collect, aggregate, and visualize diagnostic
+tracing information from both userspace processes and the Zircon kernel on a Fuchsia device.",
+    example = "
+
+[Quick Start]:
+
+    $ ffx trace start [--duration <SECONDS> ]
+
+This will record a trace using the default categories, which are suitable for getting a high
+level overview.
+
+This will produce a file `trace.fxt` which can be uploaded to ui.perfetto.dev to be viewed.",
+    note = "For a full tutorial, visit https://fuchsia.dev/fuchsia-src/development/sdk/ffx/record-traces"
+)]
 pub struct TraceCommand {
     #[argh(subcommand)]
     pub sub_cmd: TraceSubCommand,
@@ -66,31 +81,83 @@ pub struct Stop {
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Record a trace.
-#[argh(subcommand, name = "start")]
+#[argh(
+    subcommand,
+    name = "start",
+    example = "
+[Quick Start]:
+
+    $ ffx trace start [--duration <SECONDS> ]
+
+This will record a trace using the default categories, which are suitable for getting a high
+level overview.
+
+This will produce a file `trace.fxt` which can be uploaded to ui.perfetto.dev to be viewed.
+
+[Trace Various Categories]:
+
+    $ ffx trace start --categories '#default,flatland:*,temp'
+
+This will record a trace with all the default categories enabled, 'temp' events enabled, and any
+event that starts with 'flatland:'
+
+
+[Capturing a Sporadic Occurrence]
+
+    $ ffx trace start --buffer-size 64 --buffering-mode circular
+
+This will run the trace with the largest available buffer size, overwriting the old events with new
+ones. When the event occurs press <enter> to stop the trace.
+
+
+[Automatically Capturing a Sporadic Occurrence with a Trigger]
+
+This approach allows you to automatically stop the trace when the event happens, but the traced
+code must already be set up to write a trigger event.
+
+    $ ffx trace start --buffer-size 64 --buffering-mode circular --trigger '<alert_name>:terminate'
+",
+    note = "For a full tutorial, visit https://fuchsia.dev/fuchsia-src/development/sdk/ffx/record-traces"
+)]
+
 pub struct Start {
-    /// the buffering to use on the trace. Defaults to "oneshot".
-    /// Accepted values are "oneshot," "circular," and "streaming."
     #[argh(option, default = "BufferingMode::Oneshot", from_str_fn(buffering_mode_from_str))]
+    /// the buffering scheme to trace with. Defaults to "oneshot"
+    ///
+    /// oneshot:   Writes to the tracing buffer until it is full, then ignores all additional trace events.
+    ///
+    /// circular:  Writes to the tracing buffer until its is full, then new events will replace old events.
+    ///
+    /// streaming: Forwards tracing events to the trace manager as they arrive. Provides additional
+    ///            buffer space with the trade off of some overhead due to occasional ipcs to send the
+    ///            events to the trace manager during the trace.
     pub buffering_mode: BufferingMode,
 
     /// size of per-provider trace buffer in MB.  Defaults to 4.
     #[argh(option, default = "4")]
     pub buffer_size: u32,
 
-    /// comma-separated list of categories to enable.  Defaults
-    /// to #default. Run `ffx config get trace.category_groups.default`
-    /// to see what categories are included in #default.
+    /// comma-separated list of categories to enable.  Defaults to "#default". Run `ffx config get
+    /// trace.category_groups.default` to see what categories are included in #default.
     ///
-    /// A trailing * may be used to indicate a prefix match. For example,
-    /// kernel* would match any category that starts with kernel.
+    /// A trailing "*" may be used to indicate a prefix match. For example, "kernel*" includes any
+    /// category that starts with kernel.
     ///
-    /// A name prefixed with # indicates a category group that will be expanded
-    /// from ffx config within the plugin *before* being sent to trace manager.
-    /// A category group can either be added to global config by editing
-    /// data/config.json in the ffx trace plugin, or by using ffx config set to
-    /// add/edit a user configured category group. Available category groups
-    /// can be discovered by running
-    /// `ffx config get -s all trace.category_groups`
+    /// A name prefixed with # indicates a category group that will be expanded from ffx config
+    /// within the plugin *before* being sent to trace manager. A category group can either be
+    /// added to global config by editing data/config.json in the ffx trace plugin, or by using ffx
+    /// config set to add/edit a user configured category group. Available category groups can be
+    /// discovered by running `ffx config get -s all trace.category_groups`
+    ///
+    /// A category may be limited to a specific trace provider using a '/'. For example
+    /// --categories "scenic.cm/FrameDropped" will only enable the "FrameDropped" category for the
+    /// scenic.cm trace provider and no other providers.
+    ///
+    /// Categories and category groups may be mixed, for example,
+    ///
+    ///     ffx trace start --categories #default,my_category
+    ///
+    /// Enables all the default categories as well as "my_category".
     #[argh(option, default = "vec![String::from(\"#default\")]", from_str_fn(parse_categories))]
     pub categories: TraceCategories,
 
