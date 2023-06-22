@@ -29,8 +29,6 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
-
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Handles {
     pub plain_handle: fidl::Handle,

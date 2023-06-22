@@ -29,8 +29,6 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
-
 #[derive(Debug, Clone)]
 pub enum LocalUnionPayload {
     B(bool),
@@ -1319,114 +1317,84 @@ impl MainProtocolEvent {
                 let mut out = fidl::new_empty!(
                     fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest
                 );
-                fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOnAnonComposedEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
                 fidl::encoding::Decoder::decode_into::<
                     fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest,
                 >(&tx_header, _body_bytes, _handles, &mut out)?;
-                fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((MainProtocolEvent::OnAnonComposed { payload: out }))
             }
             0x9e24af9a2790a3b => {
                 let mut out = fidl::new_empty!(fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorResponse, u32>);
-                fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOnAnonComposedWithErrorEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
                 fidl::encoding::Decoder::decode_into::<fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorResponse, u32>>(&tx_header, _body_bytes, _handles, &mut out)?;
-                fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((MainProtocolEvent::OnAnonComposedWithError { result: out.map(|x| x) }))
             }
             0x5e68f92a5b28cdea => {
                 let mut out =
                     fidl::new_empty!(fidl_test_protocollayouts_imported::ImportUnionPayload);
-                fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOnNamedComposedEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
                 fidl::encoding::Decoder::decode_into::<
                     fidl_test_protocollayouts_imported::ImportUnionPayload,
                 >(&tx_header, _body_bytes, _handles, &mut out)?;
-                fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((MainProtocolEvent::OnNamedComposed { payload: out }))
             }
             0x67eb74dad2a05c0b => {
                 let mut out = fidl::new_empty!(fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ImportTablePayload, u32>);
-                fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOnNamedComposedWithErrorEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
                 fidl::encoding::Decoder::decode_into::<
                     fidl::encoding::ResultType<
                         fidl_test_protocollayouts_imported::ImportTablePayload,
                         u32,
                     >,
                 >(&tx_header, _body_bytes, _handles, &mut out)?;
-                fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((MainProtocolEvent::OnNamedComposedWithError { result: out.map(|x| x) }))
             }
             0x5b61e3156b09acd0 => {
                 let mut out =
                     fidl::new_empty!(fidl_test_protocollayouts_imported::ImportUnionPayload);
-                fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOnImportEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
                 fidl::encoding::Decoder::decode_into::<
                     fidl_test_protocollayouts_imported::ImportUnionPayload,
                 >(&tx_header, _body_bytes, _handles, &mut out)?;
-                fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((MainProtocolEvent::OnImport { payload: out }))
             }
             0xf988d72f8ee4fd7 => {
                 let mut out = fidl::new_empty!(fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ImportTablePayload, u32>);
-                fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOnImportWithErrorEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
                 fidl::encoding::Decoder::decode_into::<
                     fidl::encoding::ResultType<
                         fidl_test_protocollayouts_imported::ImportTablePayload,
                         u32,
                     >,
                 >(&tx_header, _body_bytes, _handles, &mut out)?;
-                fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((MainProtocolEvent::OnImportWithError { result: out.map(|x| x) }))
             }
             0x3a46c48153f0437c => {
                 let mut out = fidl::new_empty!(LocalUnionPayload);
-                fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOnLocalEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
                 fidl::encoding::Decoder::decode_into::<LocalUnionPayload>(
                     &tx_header,
                     _body_bytes,
                     _handles,
                     &mut out,
                 )?;
-                fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((MainProtocolEvent::OnLocal { payload: out }))
             }
             0x79ac5bbdc7114e24 => {
                 let mut out = fidl::new_empty!(fidl::encoding::ResultType<LocalTablePayload, u32>);
-                fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOnLocalWithErrorEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
                 fidl::encoding::Decoder::decode_into::<
                     fidl::encoding::ResultType<LocalTablePayload, u32>,
                 >(&tx_header, _body_bytes, _handles, &mut out)?;
-                fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((MainProtocolEvent::OnLocalWithError { result: out.map(|x| x) }))
             }
             0x64f7b1ec1ba0810b => {
                 let mut out = fidl::new_empty!(MainProtocolOnAnonRequest);
-                fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOnAnonEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
                 fidl::encoding::Decoder::decode_into::<MainProtocolOnAnonRequest>(
                     &tx_header,
                     _body_bytes,
                     _handles,
                     &mut out,
                 )?;
-                fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((MainProtocolEvent::OnAnon { payload: out }))
             }
             0x32f63a6e25a83699 => {
                 let mut out = fidl::new_empty!(fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>);
-                fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOnAnonWithErrorEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
                 fidl::encoding::Decoder::decode_into::<
                     fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>,
                 >(&tx_header, _body_bytes, _handles, &mut out)?;
-                fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((MainProtocolEvent::OnAnonWithError { result: out.map(|x| x) }))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
@@ -1511,20 +1479,14 @@ impl futures::Stream for MainProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x67da05e1ae3f5e1 => {
                     let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedProtocolOneWayAnonComposedRequest);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOneWayAnonComposedRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedProtocolOneWayAnonComposedRequest>(&header, _body_bytes, handles, &mut req)?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::OneWayAnonComposed { payload: req, control_handle })
                 }
                 0x16afa17ea70d3370 => {
                     let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayAnonComposedRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest>(&header, _body_bytes, handles, &mut req)?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::TwoWayAnonComposed {
@@ -1538,10 +1500,7 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x2ed33746b7bb119d => {
                     let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayAnonComposedWithErrorRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest>(&header, _body_bytes, handles, &mut req)?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::TwoWayAnonComposedWithError {
@@ -1556,12 +1515,9 @@ impl futures::Stream for MainProtocolRequestStream {
                 0x5d78ce13958eee58 => {
                     let mut req =
                         fidl::new_empty!(fidl_test_protocollayouts_imported::ImportTablePayload);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOneWayNamedComposedRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocollayouts_imported::ImportTablePayload,
                     >(&header, _body_bytes, handles, &mut req)?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::OneWayNamedComposed { payload: req, control_handle })
@@ -1569,12 +1525,9 @@ impl futures::Stream for MainProtocolRequestStream {
                 0xf67f27cae663810 => {
                     let mut req =
                         fidl::new_empty!(fidl_test_protocollayouts_imported::ImportUnionPayload);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayNamedComposedRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocollayouts_imported::ImportUnionPayload,
                     >(&header, _body_bytes, handles, &mut req)?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::TwoWayNamedComposed {
@@ -1589,12 +1542,9 @@ impl futures::Stream for MainProtocolRequestStream {
                 0x30dac4182813ef7f => {
                     let mut req =
                         fidl::new_empty!(fidl_test_protocollayouts_imported::ImportTablePayload);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayNamedComposedWithErrorRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocollayouts_imported::ImportTablePayload,
                     >(&header, _body_bytes, handles, &mut req)?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::TwoWayNamedComposedWithError {
@@ -1609,12 +1559,9 @@ impl futures::Stream for MainProtocolRequestStream {
                 0x530db65f2691d3b => {
                     let mut req =
                         fidl::new_empty!(fidl_test_protocollayouts_imported::ImportTablePayload);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOneWayImportRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocollayouts_imported::ImportTablePayload,
                     >(&header, _body_bytes, handles, &mut req)?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::OneWayImport { payload: req, control_handle })
@@ -1622,12 +1569,9 @@ impl futures::Stream for MainProtocolRequestStream {
                 0x2bf680c8f0d40604 => {
                     let mut req =
                         fidl::new_empty!(fidl_test_protocollayouts_imported::ImportUnionPayload);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayImportRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocollayouts_imported::ImportUnionPayload,
                     >(&header, _body_bytes, handles, &mut req)?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::TwoWayImport {
@@ -1642,12 +1586,9 @@ impl futures::Stream for MainProtocolRequestStream {
                 0x432093586084ff0a => {
                     let mut req =
                         fidl::new_empty!(fidl_test_protocollayouts_imported::ImportTablePayload);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayImportWithErrorRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocollayouts_imported::ImportTablePayload,
                     >(&header, _body_bytes, handles, &mut req)?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::TwoWayImportWithError {
@@ -1661,30 +1602,24 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x54759b55efd60f43 => {
                     let mut req = fidl::new_empty!(LocalTablePayload);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOneWayLocalRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<LocalTablePayload>(
                         &header,
                         _body_bytes,
                         handles,
                         &mut req,
                     )?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::OneWayLocal { payload: req, control_handle })
                 }
                 0x6bbeeb18f39c539b => {
                     let mut req = fidl::new_empty!(LocalUnionPayload);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayLocalRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<LocalUnionPayload>(
                         &header,
                         _body_bytes,
                         handles,
                         &mut req,
                     )?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::TwoWayLocal {
@@ -1698,15 +1633,12 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x4dd8e7287c4c9b57 => {
                     let mut req = fidl::new_empty!(LocalTablePayload);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayLocalWithErrorRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<LocalTablePayload>(
                         &header,
                         _body_bytes,
                         handles,
                         &mut req,
                     )?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::TwoWayLocalWithError {
@@ -1720,30 +1652,24 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x3a552f30c77c76ec => {
                     let mut req = fidl::new_empty!(MainProtocolOneWayAnonRequest);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolOneWayAnonRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<MainProtocolOneWayAnonRequest>(
                         &header,
                         _body_bytes,
                         handles,
                         &mut req,
                     )?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::OneWayAnon { payload: req, control_handle })
                 }
                 0x672eb5e71efdabcf => {
                     let mut req = fidl::new_empty!(MainProtocolTwoWayAnonRequest);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayAnonRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<MainProtocolTwoWayAnonRequest>(
                         &header,
                         _body_bytes,
                         handles,
                         &mut req,
                     )?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::TwoWayAnon {
@@ -1757,15 +1683,12 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x6bd5fcf6f7b46df1 => {
                     let mut req = fidl::new_empty!(MainProtocolTwoWayAnonWithErrorRequest);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayAnonWithErrorRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<MainProtocolTwoWayAnonWithErrorRequest>(
                         &header,
                         _body_bytes,
                         handles,
                         &mut req,
                     )?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(MainProtocolRequest::TwoWayAnonWithError {
@@ -2253,15 +2176,11 @@ impl MainProtocolTwoWayAnonComposedResponder {
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayAnonComposedResponse");
             fidl::encoding::Encoder::encode::<
                 fidl::encoding::TransactionMessageType<
                     fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse,
                 >,
             >(bytes, handles, msg)?;
-            fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
-            fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
-
             self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
@@ -2341,13 +2260,9 @@ impl MainProtocolTwoWayAnonComposedWithErrorResponder {
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayAnonComposedWithErrorResponse");
             fidl::encoding::Encoder::encode::<
                 fidl::encoding::TransactionMessageType<fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>>
             >(bytes, handles, msg)?;
-            fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
-            fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
-
             self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
@@ -2427,15 +2342,11 @@ impl MainProtocolTwoWayNamedComposedResponder {
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayNamedComposedResponse");
             fidl::encoding::Encoder::encode::<
                 fidl::encoding::TransactionMessageType<
                     fidl_test_protocollayouts_imported::ImportTablePayload,
                 >,
             >(bytes, handles, msg)?;
-            fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
-            fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
-
             self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
@@ -2515,7 +2426,6 @@ impl MainProtocolTwoWayNamedComposedWithErrorResponder {
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayNamedComposedWithErrorResponse");
             fidl::encoding::Encoder::encode::<
                 fidl::encoding::TransactionMessageType<
                     fidl::encoding::ResultType<
@@ -2524,9 +2434,6 @@ impl MainProtocolTwoWayNamedComposedWithErrorResponder {
                     >,
                 >,
             >(bytes, handles, msg)?;
-            fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
-            fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
-
             self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
@@ -2606,15 +2513,11 @@ impl MainProtocolTwoWayImportResponder {
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayImportResponse");
             fidl::encoding::Encoder::encode::<
                 fidl::encoding::TransactionMessageType<
                     fidl_test_protocollayouts_imported::ImportTablePayload,
                 >,
             >(bytes, handles, msg)?;
-            fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
-            fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
-
             self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
@@ -2694,7 +2597,6 @@ impl MainProtocolTwoWayImportWithErrorResponder {
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayImportWithErrorResponse");
             fidl::encoding::Encoder::encode::<
                 fidl::encoding::TransactionMessageType<
                     fidl::encoding::ResultType<
@@ -2703,9 +2605,6 @@ impl MainProtocolTwoWayImportWithErrorResponder {
                     >,
                 >,
             >(bytes, handles, msg)?;
-            fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
-            fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
-
             self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
@@ -2779,13 +2678,9 @@ impl MainProtocolTwoWayLocalResponder {
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayLocalResponse");
             fidl::encoding::Encoder::encode::<
                 fidl::encoding::TransactionMessageType<LocalTablePayload>,
             >(bytes, handles, msg)?;
-            fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
-            fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
-
             self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
@@ -2859,15 +2754,11 @@ impl MainProtocolTwoWayLocalWithErrorResponder {
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayLocalWithErrorResponse");
             fidl::encoding::Encoder::encode::<
                 fidl::encoding::TransactionMessageType<
                     fidl::encoding::ResultType<LocalUnionPayload, u32>,
                 >,
             >(bytes, handles, msg)?;
-            fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
-            fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
-
             self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
@@ -2941,13 +2832,9 @@ impl MainProtocolTwoWayAnonResponder {
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayAnonResponse");
             fidl::encoding::Encoder::encode::<
                 fidl::encoding::TransactionMessageType<MainProtocolTwoWayAnonResponse>,
             >(bytes, handles, msg)?;
-            fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
-            fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
-
             self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
@@ -3027,15 +2914,11 @@ impl MainProtocolTwoWayAnonWithErrorResponder {
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocollayouts/MainProtocolTwoWayAnonWithErrorResponse");
             fidl::encoding::Encoder::encode::<
                 fidl::encoding::TransactionMessageType<
                     fidl::encoding::ResultType<MainProtocolTwoWayAnonWithErrorResponse, u32>,
                 >,
             >(bytes, handles, msg)?;
-            fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
-            fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
-
             self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }

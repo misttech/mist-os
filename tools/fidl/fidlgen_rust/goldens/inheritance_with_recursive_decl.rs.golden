@@ -29,8 +29,6 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
-
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ChildSecondRequest {
     pub request: fidl::endpoints::ServerEnd<ParentMarker>,
@@ -348,30 +346,24 @@ impl futures::Stream for ChildRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x3723835775b3455b => {
                     let mut req = fidl::new_empty!(ParentFirstRequest);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.inheritancewithrecursivedecl/ChildFirstRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<ParentFirstRequest>(
                         &header,
                         _body_bytes,
                         handles,
                         &mut req,
                     )?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = ChildControlHandle { inner: this.inner.clone() };
 
                     Ok(ChildRequest::First { request: req.request, control_handle })
                 }
                 0x23521821ca109865 => {
                     let mut req = fidl::new_empty!(ChildSecondRequest);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.inheritancewithrecursivedecl/ChildSecondRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<ChildSecondRequest>(
                         &header,
                         _body_bytes,
                         handles,
                         &mut req,
                     )?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = ChildControlHandle { inner: this.inner.clone() };
 
                     Ok(ChildRequest::Second { request: req.request, control_handle })
@@ -675,15 +667,12 @@ impl futures::Stream for ParentRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x3723835775b3455b => {
                     let mut req = fidl::new_empty!(ParentFirstRequest);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.inheritancewithrecursivedecl/ParentFirstRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<ParentFirstRequest>(
                         &header,
                         _body_bytes,
                         handles,
                         &mut req,
                     )?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = ParentControlHandle { inner: this.inner.clone() };
 
                     Ok(ParentRequest::First { request: req.request, control_handle })

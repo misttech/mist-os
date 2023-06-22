@@ -29,8 +29,6 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
-
 #[derive(Debug, Clone)]
 pub enum EmptyFlexibleUnion {
     #[deprecated = "Use `EmptyFlexibleUnion::unknown()` to construct and `EmptyFlexibleUnionUnknown!()` to exhaustively match."]
@@ -1757,15 +1755,12 @@ impl futures::Stream for TestProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x5bfca9479251b9c3 => {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.union/TestProtocolStrictUnionHenceResponseMayBeStackAllocatedRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
                         handles,
                         &mut req,
                     )?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = TestProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(TestProtocolRequest::StrictUnionHenceResponseMayBeStackAllocated {
@@ -1779,15 +1774,12 @@ impl futures::Stream for TestProtocolRequestStream {
                 }
                 0x694fede3b8829ce2 => {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.union/TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
                         handles,
                         &mut req,
                     )?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = TestProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(TestProtocolRequest::FlexibleUnionHenceResponseMustBeHeapAllocated {
@@ -1948,15 +1940,11 @@ impl TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponder {
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.union/TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse");
             fidl::encoding::Encoder::encode::<
                 fidl::encoding::TransactionMessageType<
                     TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
                 >,
             >(bytes, handles, msg)?;
-            fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
-            fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
-
             self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
@@ -2029,15 +2017,11 @@ impl TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponder {
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.union/TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse");
             fidl::encoding::Encoder::encode::<
                 fidl::encoding::TransactionMessageType<
                     TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
                 >,
             >(bytes, handles, msg)?;
-            fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
-            fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
-
             self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }

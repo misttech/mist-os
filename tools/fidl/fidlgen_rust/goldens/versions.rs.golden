@@ -29,7 +29,6 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 bitflags! {
     #[derive(Default)]
     pub struct Bits: u32 {
@@ -702,15 +701,12 @@ impl futures::Stream for ProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x567a8096af6e6139 => {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.versions/ProtocolFooRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
                         _body_bytes,
                         handles,
                         &mut req,
                     )?;
-                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(ProtocolRequest::Foo { control_handle })

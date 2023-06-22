@@ -6,7 +6,6 @@
 
 use {
     crate::{
-        create_trace_provider,
         encoding::{
             DynamicFlags, Encode, TransactionHeader, TransactionMessage, TransactionMessageType,
             TypeMarker,
@@ -31,9 +30,6 @@ pub struct ServeInner {
 impl ServeInner {
     /// Create a new set of server innards.
     pub fn new(channel: AsyncChannel) -> Self {
-        // Initialize tracing. This is a no-op if FIDL userspace tracing is
-        // disabled or if the function was already called.
-        create_trace_provider();
         let waker = AtomicWaker::new();
         let shutdown = AtomicBool::new(false);
         ServeInner { waker, shutdown, channel }

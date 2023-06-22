@@ -27,39 +27,3 @@ pub use encoding::{
     persist, standalone_decode_resource, standalone_decode_value, standalone_encode_resource,
     standalone_encode_value, unpersist, Persistable, Standalone,
 };
-
-#[cfg(feature = "fidl_trace")]
-pub use {
-    fuchsia_trace::blob as trace_blob, fuchsia_trace::duration_begin, fuchsia_trace::duration_end,
-};
-
-#[cfg(not(feature = "fidl_trace"))]
-#[macro_export]
-/// No-op implementation of duration_begin, when FIDL tracing is disabled.
-macro_rules! duration_begin {
-    ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {};
-}
-
-#[cfg(not(feature = "fidl_trace"))]
-#[macro_export]
-/// No-op implementation of duration_end, when FIDL tracing is disabled.
-macro_rules! duration_end {
-    ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {};
-}
-
-#[cfg(not(feature = "fidl_trace"))]
-#[macro_export]
-/// No-op implementation of trace_blob, when FIDL tracing is disabled.
-macro_rules! trace_blob {
-    ($category:expr, $name:expr, $bytes:expr $(, $key:expr => $val:expr)*) => {};
-}
-
-/// Calling this function more than once is idempotent.
-#[cfg(feature = "fidl_trace")]
-fn create_trace_provider() {
-    fuchsia_trace_provider::trace_provider_create_with_fdio();
-}
-
-/// Calling this function more than once is idempotent.
-#[cfg(not(feature = "fidl_trace"))]
-fn create_trace_provider() {}
