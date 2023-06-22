@@ -5,7 +5,6 @@
 import("//build/assembly/compare_json_list.gni")
 import("//build/assembly/generated_image_assembly_config.gni")
 import("//build/assembly/generated_images_config.gni")
-import("//build/assembly/generated_images_config_old.gni")
 import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
 import("//build/assembly/legacy_assembly_input_bundle.gni")
 import("//build/bazel/assembly/bazel_assembly_images_config_inputs.gni")
@@ -362,7 +361,6 @@ template("assembled_system") {
     generated_config_for_legacy_bundle =
         "${namespace}.legacy_image_assembly_config"
     image_assembly_inputs = "${namespace}.image_assembly_inputs"
-    images_config_old = "${namespace}.images_config_old"
     images_config = "${namespace}.images_config"
     images_config_matches = "${namespace}.images_config_matches"
     product_assembler = "${namespace}.product_assembler"
@@ -415,7 +413,6 @@ template("assembled_system") {
 
     image_assembly_inputs = "$target_out_dir/${namespace}.image_assembly_inputs"
 
-    images_config_old = "$target_out_dir/${namespace}.images_config_old.json"
     images_config = "$target_out_dir/${namespace}.images_config.json"
 
     outdir = "$target_out_dir/$namespace"
@@ -673,36 +670,6 @@ template("assembled_system") {
     }
     if (defined(invoker.cmdline)) {
       cmdline = invoker.cmdline
-    }
-  }
-
-  generated_images_config_old(labels.images_config_old) {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                             "zbi_signing_script",
-                             "zbi_signing_args",
-                             "blobfs_maximum_bytes",
-                             "blobfs_minimum_data_bytes",
-                             "blobfs_maximum_contents_size",
-                             "blobfs_minimum_inodes",
-                             "fvm_truncate_to_length",
-                           ])
-
-    output_path = files.images_config_old
-    zbi_name = "${image_name}"
-    fvm_reserved_slices = fvm_reserved_slices
-    generate_fvm = generate_fvm
-
-    fvm_slice_size = 1048576
-    if (defined(invoker.assembly_fvm_slice_size)) {
-      fvm_slice_size = invoker.assembly_fvm_slice_size
-    }
-
-    blob_layout_format = "compact"
-    if (defined(invoker.assembly_blob_layout_format)) {
-      blob_layout_format = invoker.assembly_blob_layout_format
     }
   }
 
