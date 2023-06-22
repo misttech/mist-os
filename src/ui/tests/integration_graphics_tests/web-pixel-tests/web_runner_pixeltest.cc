@@ -191,6 +191,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
             {
                 .capabilities =
                     {
+                        Protocol{fuchsia::kernel::VmexResource::Name_},
                         Protocol{fuchsia::process::Launcher::Name_},
                         Protocol{fuchsia::vulkan::loader::Loader::Name_},
                     },

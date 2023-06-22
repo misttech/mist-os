@@ -18,6 +18,7 @@
             // Keep it minimal, describe only what's actually needed.
             // TODO(fxbug.dev/81446): Remove this list.
             protocol: [
+                "fuchsia.kernel.VmexResource",
                 "fuchsia.process.Launcher",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sysmem.Allocator",

@@ -24,6 +24,7 @@
             protocol: [
                 // Used by the test.
                 "fuchsia.input.virtualkeyboard.Manager",
+                "fuchsia.kernel.VmexResource",
                 "test.virtualkeyboard.InputPositionListener",
             ],
         },

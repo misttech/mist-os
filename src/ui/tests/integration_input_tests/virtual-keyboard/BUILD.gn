@@ -25,6 +25,7 @@ executable("virtual-keyboard-test-bin") {
     "//sdk/fidl/fuchsia.input.virtualkeyboard:fuchsia.input.virtualkeyboard_hlcpp",
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_hlcpp",
     "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_hlcpp",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_hlcpp",

@@ -20,6 +20,7 @@
             protocol: [
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
+                "fuchsia.kernel.VmexResource",
                 "fuchsia.media.ProfileProvider",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.process.Launcher",

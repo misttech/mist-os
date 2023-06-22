@@ -9,6 +9,7 @@
 #include <fuchsia/input/virtualkeyboard/cpp/fidl.h>
 #include <fuchsia/intl/cpp/fidl.h>
 #include <fuchsia/io/cpp/fidl.h>
+#include <fuchsia/kernel/cpp/fidl.h>
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/memorypressure/cpp/fidl.h>
 #include <fuchsia/metrics/cpp/fidl.h>
@@ -431,7 +432,10 @@ class WebEngineTest : public VirtualKeyboardBase {
                                     .path = "/config/data"}},
          .source = ParentRef(),
          .targets = {ChildRef{kFontsProvider}}},
-        {.capabilities = {Protocol{fuchsia::process::Launcher::Name_},
+        {.capabilities = {Protocol{fuchsia::input::virtualkeyboard::Manager::Name_},
+                          Protocol{fuchsia::input::virtualkeyboard::ControllerCreator::Name_},
+                          Protocol{fuchsia::kernel::VmexResource::Name_},
+                          Protocol{fuchsia::process::Launcher::Name_},
                           Protocol{fuchsia::ui::input3::Keyboard::Name_},
                           Protocol{fuchsia::ui::input::ImeService::Name_}},
          .source = ParentRef(),
@@ -439,10 +443,6 @@ class WebEngineTest : public VirtualKeyboardBase {
         {.capabilities = {Protocol{fuchsia::intl::PropertyProvider::Name_}},
          .source = ChildRef{kIntl},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::input::virtualkeyboard::Manager::Name_},
-                          Protocol{fuchsia::input::virtualkeyboard::ControllerCreator::Name_}},
-         .source = ParentRef(),
-         .targets = {ChildRef{kWebVirtualKeyboardClient}}},
         {.capabilities = {Protocol{fuchsia::memorypressure::Provider::Name_}},
          .source = ChildRef{kMemoryPressureProvider},
          .targets = {target}},
@@ -461,7 +461,7 @@ class WebEngineTest : public VirtualKeyboardBase {
          .targets = {ChildRef{kMemoryPressureProvider}}},
         {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_}},
          .source = ParentRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}, ChildRef{kWebVirtualKeyboardClient}}},
+         .targets = {ChildRef{kMemoryPressureProvider}, target}},
         {.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_},
                           Protocol{fuchsia::scheduler::ProfileProvider::Name_}},
          .source = ParentRef(),
