@@ -75,7 +75,6 @@
                 "chown02_16",
                 "chown03_16",
                 "chown05_16",
-                "chroot04",
                 "clock_adjtime01",
                 "clock_adjtime02",
                 "clock_getres01",

@@ -87,7 +87,11 @@ impl FsContext {
 
     /// Change the root.
     pub fn chroot(&self, current_task: &CurrentTask, name: NamespaceNode) -> Result<(), Errno> {
-        name.entry.node.check_access(current_task, Access::EXEC)?;
+        name.entry.node.check_access(current_task, Access::EXEC).map_err(|_| errno!(EACCES))?;
+        if !current_task.creds().has_capability(CAP_SYS_CHROOT) {
+            return error!(EPERM);
+        }
+
         let mut state = self.state.write();
         state.root = name;
         Ok(())

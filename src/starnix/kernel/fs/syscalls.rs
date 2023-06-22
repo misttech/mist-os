@@ -537,10 +537,6 @@ pub fn sys_getdents64(
 }
 
 pub fn sys_chroot(current_task: &CurrentTask, user_path: UserCString) -> Result<(), Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_CHROOT) {
-        return error!(EPERM);
-    }
-
     let name = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
     if !name.entry.node.is_dir() {
         return error!(ENOTDIR);
