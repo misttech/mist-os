@@ -5,7 +5,7 @@
 use crate::{
     auth::FsCred,
     fs::{
-        buffers::{InputBuffer, OutputBuffer},
+        buffers::{InputBuffer, OutputBuffer, OutputBufferCallback},
         default_eof_offset, default_seek, fileops_impl_nonseekable, fs_args, CacheMode, DirentSink,
         FdEvents, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
         FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
@@ -821,7 +821,7 @@ impl FuseMutableState {
         }
         let operation = Arc::new(operation);
         self.last_unique_id += 1;
-        let message = FuseKernelMessage::new(self.last_unique_id, task, node, operation);
+        let message = FuseKernelMessage::new(self.last_unique_id, task, node, operation)?;
         if let Some(waiter) = waiter {
             self.waiters.wait_async_value(waiter, self.last_unique_id);
         }
@@ -967,11 +967,12 @@ impl FuseKernelMessage {
         task: &CurrentTask,
         node: &FuseNode,
         operation: Arc<FuseOperation>,
-    ) -> Self {
+    ) -> Result<Self, Errno> {
         let creds = task.creds();
-        Self {
+        Ok(Self {
             header: uapi::fuse_in_header {
-                len: std::mem::size_of::<uapi::fuse_in_header>() as u32 + operation.len(),
+                len: u32::try_from(std::mem::size_of::<uapi::fuse_in_header>() + operation.len())
+                    .map_err(|_| errno!(EINVAL))?,
                 opcode: operation.opcode(),
                 unique,
                 nodeid: node.nodeid,
@@ -981,7 +982,7 @@ impl FuseKernelMessage {
                 padding: 0,
             },
             operation,
-        }
+        })
     }
 
     fn serialize(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
@@ -1156,36 +1157,34 @@ impl FuseOperation {
         }
     }
 
-    fn len(&self) -> u32 {
-        match self {
-            Self::Flush(_) => std::mem::size_of::<uapi::fuse_flush_in>() as u32,
-            Self::GetAttr | Self::Readlink | Self::Statfs => 0,
-            Self::Init => std::mem::size_of::<uapi::fuse_init_in>() as u32,
-            Self::Interrupt(_) => std::mem::size_of::<uapi::fuse_interrupt_in>() as u32,
-            Self::Lookup(name) => (name.as_bytes().len() + 1) as u32,
-            Self::Mkdir(_, name) => {
-                (std::mem::size_of::<uapi::fuse_mkdir_in>() + name.as_bytes().len() + 1) as u32
+    fn len(&self) -> usize {
+        #[derive(Debug, Default)]
+        struct CountingOutputBuffer {
+            written: usize,
+        }
+
+        impl OutputBuffer for CountingOutputBuffer {
+            fn available(&self) -> usize {
+                usize::MAX
             }
-            Self::Mknod(_, name) => {
-                (std::mem::size_of::<uapi::fuse_mknod_in>() + name.as_bytes().len() + 1) as u32
+            fn bytes_written(&self) -> usize {
+                self.written
             }
-            Self::Link(_, name) => {
-                (std::mem::size_of::<uapi::fuse_link_in>() + name.as_bytes().len() + 1) as u32
+            fn write_each(
+                &mut self,
+                _callback: &mut OutputBufferCallback<'_>,
+            ) -> Result<usize, Errno> {
+                panic!("Should not be called.");
             }
-            Self::Open(_) => std::mem::size_of::<uapi::fuse_open_in>() as u32,
-            Self::Poll(_) => std::mem::size_of::<uapi::fuse_poll_in>() as u32,
-            Self::Read(_) => std::mem::size_of::<uapi::fuse_read_in>() as u32,
-            Self::Release(_) => std::mem::size_of::<uapi::fuse_release_in>() as u32,
-            Self::Seek(_) => std::mem::size_of::<uapi::fuse_lseek_in>() as u32,
-            Self::SetAttr(_) => std::mem::size_of::<uapi::fuse_setattr_in>() as u32,
-            Self::Symlink(target, name) => {
-                (target.as_bytes().len() + name.as_bytes().len() + 2) as u32
-            }
-            Self::Unlink(name) => (name.as_bytes().len() + 1) as u32,
-            Self::Write(_, content) => {
-                (std::mem::size_of::<uapi::fuse_write_in>() + content.len()) as u32
+            fn write_all(&mut self, buffer: &[u8]) -> Result<usize, Errno> {
+                self.written += buffer.len();
+                Ok(buffer.len())
             }
         }
+
+        let mut counting_output_buffer = CountingOutputBuffer::default();
+        self.serialize(&mut counting_output_buffer).expect("Serialization should not fail");
+        counting_output_buffer.written
     }
 
     fn has_response(&self) -> bool {
