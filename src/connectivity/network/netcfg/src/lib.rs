@@ -17,7 +17,6 @@ use ::dhcpv4::protocol::FromFidlExt as _;
 use std::{
     boxed::Box,
     collections::{hash_map::Entry, HashMap, HashSet},
-    fmt::Debug,
     fs, io,
     num::NonZeroU64,
     path,
@@ -973,18 +972,6 @@ impl<'a> NetCfg<'a> {
             Masquerade(fnet_masquerade::FactoryRequestStream),
         }
 
-        impl Debug for RequestStream {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.debug_tuple(match self {
-                    Self::Virtualization(_) => "Virtualization",
-                    Self::Dhcpv6PrefixProvider(_) => "Dhcpv6PrefixProvider",
-                    Self::Masquerade(_) => "Masquerade",
-                })
-                .field(&"_")
-                .finish()
-            }
-        }
-
         // Serve fuchsia.net.virtualization/Control.
         let mut fs = ServiceFs::new_local();
         let _: &mut ServiceFsDir<'_, _> =
@@ -1022,7 +1009,6 @@ impl<'a> NetCfg<'a> {
 
         debug!("starting eventloop...");
 
-        #[derive(Debug)]
         enum Event {
             NetworkDeviceResult(Result<Option<devices::NetworkDeviceInstance>, anyhow::Error>),
             InterfaceWatcherResult(Result<Option<fidl_fuchsia_net_interfaces::Event>, fidl::Error>),
@@ -1089,7 +1075,6 @@ impl<'a> NetCfg<'a> {
                 }
                 complete => return Err(anyhow::anyhow!("eventloop ended unexpectedly")),
             };
-            tracing::trace!("handling event {:?}", event);
             match event {
                 Event::NetworkDeviceResult(netdev_res) => {
                     let instance =
