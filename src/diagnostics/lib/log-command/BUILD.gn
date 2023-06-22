@@ -34,6 +34,7 @@ rustc_library("log-command") {
   ]
 
   sources = [
+    "src/filter.rs",
     "src/lib.rs",
     "src/log_formatter.rs",
     "src/log_socket_stream.rs",

@@ -8,6 +8,7 @@ use chrono_english::{parse_date_string, Dialect};
 use diagnostics_data::Severity;
 use fidl_fuchsia_diagnostics::LogInterestSelector;
 use std::{ops::Deref, time::Duration};
+pub mod filter;
 pub mod log_formatter;
 pub mod log_socket_stream;
 
@@ -299,6 +300,38 @@ pub struct LogCommand {
     /// filters by tid
     #[argh(option)]
     pub tid: Option<u64>,
+}
+
+impl Default for LogCommand {
+    fn default() -> Self {
+        LogCommand {
+            filter: vec![],
+            moniker: vec![],
+            exclude: vec![],
+            tags: vec![],
+            exclude_tags: vec![],
+            hide_tags: false,
+            hide_file: false,
+            clock: TimeFormat::Monotonic,
+            no_color: false,
+            kernel: false,
+            severity: Severity::Info,
+            show_metadata: false,
+            raw: false,
+            since: None,
+            since_monotonic: None,
+            until: None,
+            until_monotonic: None,
+            sub_command: None,
+            select: vec![],
+            show_full_moniker: false,
+            spam_list_path: None,
+            disable_spam_filter: false,
+            enable_spam_highlight: false,
+            pid: None,
+            tid: None,
+        }
+    }
 }
 
 impl TopLevelCommand for LogCommand {}
