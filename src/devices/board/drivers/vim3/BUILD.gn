@@ -5,17 +5,6 @@
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
-driver_bind_rules("vim3-bluetooth-bind") {
-  rules = "vim3-bluetooth.bind"
-  header_output = "vim3-bluetooth-bind.h"
-  bind_output = "vim3-bluetooth.bindbc"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.hardware.pwm",
-    "//src/devices/bind/fuchsia.platform",
-  ]
-}
-
 driver_bind_rules("vim3-video-bind") {
   rules = "vim3-video.bind"
   header_output = "vim3-video-bind.h"
@@ -138,7 +127,6 @@ fuchsia_driver("vim3-driver") {
   ]
   deps = [
     ":vim3-bind",
-    ":vim3-bluetooth-bind_header",
     ":vim3-cpu-bind_header",
     ":vim3-emmc-bind_header",
     ":vim3-pwm-bind_header",
