@@ -31,8 +31,7 @@ namespace accessibility_test {
 using fuchsia::accessibility::semantics::Node;
 
 using component_testing::ChildRef;
-using component_testing::LocalComponent;
-using component_testing::LocalComponentHandles;
+using component_testing::LocalComponentImpl;
 using component_testing::Realm;
 
 using RealmBuilder = component_testing::RealmBuilder;
@@ -40,14 +39,14 @@ using RealmBuilder = component_testing::RealmBuilder;
 // Mock component that will proxy SemanticsManager and SemanticTree requests to the ViewManager
 // owned by the test fixture.
 class SemanticsManagerProxy : public fuchsia::accessibility::semantics::SemanticsManager,
-                              public LocalComponent {
+                              public LocalComponentImpl {
  public:
   SemanticsManagerProxy(fuchsia::accessibility::semantics::SemanticsManager* semantics_manager,
                         async_dispatcher_t* dispatcher)
       : dispatcher_(dispatcher), semantics_manager_(semantics_manager) {}
   ~SemanticsManagerProxy() override = default;
 
-  void Start(std::unique_ptr<LocalComponentHandles> mock_handles) override;
+  void OnStart() override;
 
   // |fuchsia::accessibility::semantics::SemanticsManager|
   void RegisterViewForSemantics(
@@ -58,7 +57,6 @@ class SemanticsManagerProxy : public fuchsia::accessibility::semantics::Semantic
 
  private:
   async_dispatcher_t* dispatcher_ = nullptr;
-  std::vector<std::unique_ptr<LocalComponentHandles>> mock_handles_{};
   fidl::BindingSet<fuchsia::accessibility::semantics::SemanticsManager> bindings_;
   fuchsia::accessibility::semantics::SemanticsManager* semantics_manager_ = nullptr;
 };
@@ -89,7 +87,6 @@ class SemanticsIntegrationTestV2
  protected:
   sys::ComponentContext* context() { return context_.get(); }
   a11y::ViewManager* view_manager() { return view_manager_.get(); }
-  SemanticsManagerProxy* semantics_manager_proxy() { return semantics_manager_proxy_.get(); }
   std::optional<Realm>& realm() { return realm_; }
   sys::ServiceDirectory* svc() { return realm_exposed_services_.get(); }
   zx_koid_t view_ref_koid() const { return view_ref_koid_; }
@@ -134,7 +131,6 @@ class SemanticsIntegrationTestV2
   std::optional<Realm> realm_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
   std::unique_ptr<a11y::ViewManager> view_manager_;
-  std::unique_ptr<SemanticsManagerProxy> semantics_manager_proxy_;
   std::optional<ui_testing::UITestManager> ui_test_manager_;
 };
 

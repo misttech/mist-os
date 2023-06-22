@@ -57,13 +57,12 @@ bool CompareFloat(float f0, float f1, float epsilon = 0.01f) {
 
 }  // namespace
 
-void SemanticsManagerProxy::Start(std::unique_ptr<LocalComponentHandles> mock_handles) {
-  FX_CHECK(mock_handles->outgoing()->AddPublicService(
+void SemanticsManagerProxy::OnStart() {
+  FX_CHECK(outgoing()->AddPublicService(
                fidl::InterfaceRequestHandler<fuchsia::accessibility::semantics::SemanticsManager>(
                    [this](auto request) {
                      bindings_.AddBinding(this, std::move(request), dispatcher_);
                    })) == ZX_OK);
-  mock_handles_.emplace_back(std::move(mock_handles));
 }
 
 void SemanticsManagerProxy::RegisterViewForSemantics(
@@ -144,9 +143,9 @@ void SemanticsIntegrationTestV2::BuildRealm() {
       std::make_unique<a11y::A11ySemanticsEventManager>(),
       std::make_shared<MockAccessibilityView>(), context_.get());
 
-  semantics_manager_proxy_ =
-      std::make_unique<SemanticsManagerProxy>(view_manager_.get(), dispatcher());
-  realm_->AddLocalChild(SemanticsIntegrationTestV2::kSemanticsManager, semantics_manager_proxy());
+  realm_->AddLocalChild(SemanticsIntegrationTestV2::kSemanticsManager, [&] {
+    return std::make_unique<SemanticsManagerProxy>(view_manager_.get(), dispatcher());
+  });
 
   // Let subclass configure Realm beyond this base setup.
   ConfigureRealm();
