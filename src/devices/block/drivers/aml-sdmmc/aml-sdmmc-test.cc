@@ -36,7 +36,7 @@ class TestAmlSdmmc : public AmlSdmmc {
                      .version_3 = true,
                      .prefs = 0,
                  },
-                 zx::interrupt(ZX_HANDLE_INVALID), ddk::GpioProtocolClient()),
+                 zx::interrupt(ZX_HANDLE_INVALID), {}),
         bti_(bti.release()) {}
 
   using AmlSdmmc::Bind;

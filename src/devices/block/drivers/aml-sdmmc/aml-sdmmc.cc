@@ -5,7 +5,6 @@
 #include "aml-sdmmc.h"
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
-#include <fuchsia/hardware/gpio/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/sdmmc/c/banjo.h>
 #include <inttypes.h>
@@ -68,15 +67,17 @@ namespace sdmmc {
 
 AmlSdmmc::AmlSdmmc(zx_device_t* parent, zx::bti bti, fdf::MmioBuffer mmio,
                    aml_sdmmc_config_t config, zx::interrupt irq,
-                   const ddk::GpioProtocolClient& gpio)
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio)
     : AmlSdmmcType(parent),
       mmio_(std::move(mmio)),
       bti_(std::move(bti)),
-      reset_gpio_(gpio),
       irq_(std::move(irq)),
       board_config_(config),
       dead_(false),
       pending_txn_(false) {
+  if (reset_gpio.is_valid()) {
+    reset_gpio_.Bind(std::move(reset_gpio));
+  }
   for (auto& store : registered_vmos_) {
     store.emplace(vmo_store::Options{});
   }
@@ -323,14 +324,36 @@ void AmlSdmmc::ConfigureDefaultRegs() {
   }
 }
 
-void AmlSdmmc::SdmmcHwReset() {
+zx_status_t AmlSdmmc::SdmmcHwReset() {
   if (reset_gpio_.is_valid()) {
-    reset_gpio_.ConfigOut(0);
+    fidl::WireResult result1 = reset_gpio_->ConfigOut(0);
+    if (!result1.ok()) {
+      AML_SDMMC_ERROR("Failed to send ConfigOut request to reset gpio: %s",
+                      result1.status_string());
+      return result1.status();
+    }
+    if (result1->is_error()) {
+      AML_SDMMC_ERROR("Failed to configure reset gpio to output low: %s",
+                      zx_status_get_string(result1->error_value()));
+      return result1->error_value();
+    }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
-    reset_gpio_.ConfigOut(1);
+    fidl::WireResult result2 = reset_gpio_->ConfigOut(1);
+    if (!result2.ok()) {
+      AML_SDMMC_ERROR("Failed to send ConfigOut request to reset gpio: %s",
+                      result2.status_string());
+      return result2.status();
+    }
+    if (result2->is_error()) {
+      AML_SDMMC_ERROR("Failed to configure reset gpio to output high: %s",
+                      zx_status_get_string(result2->error_value()));
+      return result2->error_value();
+    }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
   }
   ConfigureDefaultRegs();
+
+  return ZX_OK;
 }
 
 zx_status_t AmlSdmmc::SdmmcSetTiming(sdmmc_timing_t timing) {
@@ -1175,14 +1198,24 @@ zx_status_t AmlSdmmc::Create(void* ctx, zx_device_t* parent) {
   }
 
   // Optional protocol.
-  ddk::GpioProtocolClient reset_gpio(parent, "gpio-wifi-power-on");
-  if (!reset_gpio.is_valid()) {
-    // Alternative name.
-    reset_gpio = ddk::GpioProtocolClient(parent, "gpio");
+  fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio;
+  const char* kGpioWifiFragmentNames[2] = {"gpio-wifi-power-on", "gpio"};
+  for (const char* fragment : kGpioWifiFragmentNames) {
+    zx::result reset_gpio_result =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(parent, fragment);
+    if (reset_gpio_result.is_ok()) {
+      reset_gpio = std::move(reset_gpio_result.value());
+      break;
+    }
+    if (reset_gpio_result.status_value() != ZX_ERR_NOT_FOUND) {
+      AML_SDMMC_ERROR("Failed to get gpio protocol from fragment %s: %s", fragment,
+                      reset_gpio_result.status_string());
+      return reset_gpio_result.status_value();
+    }
   }
 
   auto dev = std::make_unique<AmlSdmmc>(parent, std::move(bti), *std::move(mmio), config,
-                                        std::move(irq), reset_gpio);
+                                        std::move(irq), std::move(reset_gpio));
 
   if ((status = dev->Init(dev_info)) != ZX_OK) {
     return status;

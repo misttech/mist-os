@@ -874,7 +874,7 @@ zx_status_t Imx8mSdmmc::SdmmcSetTiming(sdmmc_timing_t timing) {
   return SdmmcSetBusFreq(bus_freq_);
 }
 
-void Imx8mSdmmc::SdmmcHwReset() {}
+zx_status_t Imx8mSdmmc::SdmmcHwReset() { return ZX_OK; }
 
 void Imx8mSdmmc::AutoTuningModeSelect(uint32_t buswidth) {
   auto vendor_spec2_reg = VendorSpecificRegister2::Get().ReadFrom(&mmio_);

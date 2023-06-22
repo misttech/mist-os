@@ -156,7 +156,9 @@ closed protocol Sdmmc {
         s zx.Status;
     });
     /// Issue a hw reset.
-    strict HwReset() -> ();
+    strict HwReset() -> (struct {
+        s zx.Status;
+    });
     /// Perform tuning.
     strict PerformTuning(struct {
         cmd_idx uint32;

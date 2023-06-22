@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_AML_SDMMC_AML_SDMMC_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_AML_SDMMC_AML_SDMMC_H_
 
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
 #include <lib/ddk/phys-iter.h>
@@ -36,7 +36,7 @@ using AmlSdmmcType = ddk::Device<AmlSdmmc, ddk::Suspendable>;
 class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::base_protocol> {
  public:
   AmlSdmmc(zx_device_t* parent, zx::bti bti, fdf::MmioBuffer mmio, aml_sdmmc_config_t config,
-           zx::interrupt irq, const ddk::GpioProtocolClient& gpio);
+           zx::interrupt irq, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio);
 
   virtual ~AmlSdmmc() = default;
   static zx_status_t Create(void* ctx, zx_device_t* parent);
@@ -51,7 +51,7 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
   zx_status_t SdmmcSetBusWidth(sdmmc_bus_width_t bus_width);
   zx_status_t SdmmcSetBusFreq(uint32_t bus_freq);
   zx_status_t SdmmcSetTiming(sdmmc_timing_t timing);
-  void SdmmcHwReset();
+  zx_status_t SdmmcHwReset();
   zx_status_t SdmmcPerformTuning(uint32_t cmd_idx);
   zx_status_t SdmmcRegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb);
   void SdmmcAckInBandInterrupt() {}
@@ -172,7 +172,7 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
 
   zx::bti bti_;
 
-  const ddk::GpioProtocolClient reset_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> reset_gpio_;
   zx::interrupt irq_;
   aml_sdmmc_config_t board_config_;
 

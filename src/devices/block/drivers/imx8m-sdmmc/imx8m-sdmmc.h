@@ -81,7 +81,7 @@ class Imx8mSdmmc : public DeviceType, public ddk::SdmmcProtocol<Imx8mSdmmc, ddk:
   zx_status_t SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) TA_EXCL(mtx_);
   zx_status_t SdmmcSetBusFreq(uint32_t bus_freq) TA_EXCL(mtx_);
   zx_status_t SdmmcSetTiming(sdmmc_timing_t timing) TA_EXCL(mtx_);
-  void SdmmcHwReset() TA_EXCL(mtx_);
+  zx_status_t SdmmcHwReset() TA_EXCL(mtx_);
   zx_status_t SdmmcPerformTuning(uint32_t cmd_idx) TA_EXCL(mtx_);
   zx_status_t SdmmcRequest(sdmmc_req_t* req) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t SdmmcRegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb)

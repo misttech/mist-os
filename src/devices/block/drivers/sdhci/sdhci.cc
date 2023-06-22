@@ -776,9 +776,10 @@ zx_status_t Sdhci::SdmmcSetTiming(sdmmc_timing_t timing) {
   return ZX_OK;
 }
 
-void Sdhci::SdmmcHwReset() {
+zx_status_t Sdhci::SdmmcHwReset() {
   fbl::AutoLock lock(&mtx_);
   sdhci_.HwReset();
+  return ZX_OK;
 }
 
 zx_status_t Sdhci::SdmmcPerformTuning(uint32_t cmd_idx) {

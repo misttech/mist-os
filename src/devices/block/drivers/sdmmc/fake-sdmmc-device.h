@@ -89,7 +89,7 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice> {
     timing_ = timing;
     return set_timing_status_;
   }
-  void SdmmcHwReset() {}
+  zx_status_t SdmmcHwReset() { return ZX_OK; }
   zx_status_t SdmmcPerformTuning(uint32_t cmd_idx) { return perform_tuning_status_; }
 
   zx_status_t SdmmcRegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb);
