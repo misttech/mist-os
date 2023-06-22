@@ -7,32 +7,13 @@
         runner: "elf",
         binary: "bin/capability_requested_child_v2",
     },
-    capabilities: [
-        { protocol: "fuchsia.test.Protocol0" },
-        { protocol: "fuchsia.test.Protocol1" },
-    ],
     use: [
         {
-            protocol: "fuchsia.test.Protocol0",
+            protocol: [
+                "fuchsia.test.Protocol0",
+                "fuchsia.test.Protocol1",
+            ],
             from: "parent",
-        },
-        {
-            protocol: "fuchsia.test.Protocol1",
-            from: "parent",
-        },
-    ],
-    expose: [
-        {
-            protocol: "fuchsia.component.Binder",
-            from: "framework",
-        },
-        {
-            protocol: "fuchsia.test.Protocol0",
-            from: "self",
-        },
-        {
-            protocol: "fuchsia.test.Protocol1",
-            from: "self",
         },
     ],
 }

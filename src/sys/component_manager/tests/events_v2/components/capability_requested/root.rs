@@ -6,7 +6,7 @@ use {component_events::events::EventStream, fidl_fidl_test_components as ftest};
 
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component::EventPayload;
-use futures_util::StreamExt;
+use futures_util::{future, StreamExt};
 
 /// This component sends CapabilityRequested events, and verifies
 /// they get routed to the correct protocol.
@@ -16,35 +16,41 @@ async fn main() {
         EventStream::open_at_path("/events/capability_requested_0").await.unwrap();
     let mut event_stream_2 =
         EventStream::open_at_path("/events/capability_requested_1").await.unwrap();
-    let event = event_stream.next().await.unwrap();
-    if let Some(EventPayload::CapabilityRequested(payload)) = event.payload {
-        let mut trigger_server =
-            ServerEnd::<ftest::TriggerMarker>::new(payload.capability.unwrap())
-                .into_stream()
-                .unwrap();
-        let request = trigger_server.next().await.unwrap().unwrap();
-        match request {
-            ftest::TriggerRequest::Run { responder } => {
-                responder.send("0").unwrap();
+    let protocol0 = async move {
+        let event = event_stream.next().await.unwrap();
+        if let Some(EventPayload::CapabilityRequested(payload)) = event.payload {
+            let mut trigger_server =
+                ServerEnd::<ftest::TriggerMarker>::new(payload.capability.unwrap())
+                    .into_stream()
+                    .unwrap();
+            let request = trigger_server.next().await.unwrap().unwrap();
+            match request {
+                ftest::TriggerRequest::Run { responder } => {
+                    responder.send("0").unwrap();
+                }
             }
+        } else {
+            panic!("Invalid request");
         }
-    } else {
-        panic!("Invalid request");
-    }
+    };
 
-    let event = event_stream_2.next().await.unwrap();
-    if let Some(EventPayload::CapabilityRequested(payload)) = event.payload {
-        let mut trigger_server =
-            ServerEnd::<ftest::TriggerMarker>::new(payload.capability.unwrap())
-                .into_stream()
-                .unwrap();
-        let request = trigger_server.next().await.unwrap().unwrap();
-        match request {
-            ftest::TriggerRequest::Run { responder } => {
-                responder.send("1").unwrap();
+    let protocol1 = async move {
+        let event = event_stream_2.next().await.unwrap();
+        if let Some(EventPayload::CapabilityRequested(payload)) = event.payload {
+            let mut trigger_server =
+                ServerEnd::<ftest::TriggerMarker>::new(payload.capability.unwrap())
+                    .into_stream()
+                    .unwrap();
+            let request = trigger_server.next().await.unwrap().unwrap();
+            match request {
+                ftest::TriggerRequest::Run { responder } => {
+                    responder.send("1").unwrap();
+                }
             }
+        } else {
+            panic!("Invalid request");
         }
-    } else {
-        panic!("Invalid request");
-    }
+    };
+
+    future::join(protocol0, protocol1).await;
 }
