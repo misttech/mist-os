@@ -20,7 +20,10 @@ use crate::{
         DeviceMode, DeviceRegistry,
     },
     fs::{
-        socket::{NetlinkSenderReceiverProvider, SocketAddress},
+        socket::{
+            GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
+            SocketAddress,
+        },
         FileOps, FileSystemHandle, FsNode,
     },
     lock::RwLock,
@@ -132,6 +135,9 @@ pub struct Kernel {
     /// A struct containing a VMO with a vDSO implementation, if implemented for a given architecture, and possibly an offset for a sigreturn function.
     pub vdso: Vdso,
 
+    /// The implementation of generic Netlink protocol families.
+    generic_netlink: OnceCell<GenericNetlink<NetlinkToClientSender<GenericMessage>>>,
+
     /// The implementation of networking-related Netlink protocol families.
     network_netlink: OnceCell<Netlink<NetlinkSenderReceiverProvider>>,
 }
@@ -201,6 +207,8 @@ impl Kernel {
             shared_futexes: Default::default(),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
             vdso: Vdso::new(),
+
+            generic_netlink: OnceCell::new(),
             network_netlink: OnceCell::new(),
         }))
     }
@@ -216,6 +224,21 @@ impl Kernel {
     ) -> Result<Box<dyn FileOps>, Errno> {
         let registry = self.device_registry.read();
         registry.open_device(current_task, node, flags, dev, mode)
+    }
+
+    /// Return a reference to the GenericNetlink implementation.
+    ///
+    /// This function follows the lazy initialization pattern, where the first
+    /// call will instantiate the Generic Netlink server in a separate kthread.
+    pub(crate) fn generic_netlink(&self) -> &GenericNetlink<NetlinkToClientSender<GenericMessage>> {
+        self.generic_netlink.get_or_init(|| {
+            let (generic_netlink, generic_netlink_fut) = GenericNetlink::new();
+            self.kthreads.pool.dispatch(move || {
+                fasync::LocalExecutor::new().run_singlethreaded(generic_netlink_fut);
+                log_error!("Generic Netlink future unexpectedly exited");
+            });
+            generic_netlink
+        })
     }
 
     /// Return a reference to the [`netlink::Netlink`] implementation.

@@ -19,6 +19,7 @@ use netlink::{
 use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
 use netlink_packet_route::rtnl::RtnlMessage;
 use netlink_packet_utils::Emitable as _;
+
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
@@ -36,6 +37,9 @@ pub const SOCKET_MIN_SIZE: usize = 4 << 10;
 pub const SOCKET_DEFAULT_SIZE: usize = 16 * 1024;
 pub const SOCKET_MAX_SIZE: usize = 4 << 20;
 
+// From linux/socket.go in gVisor.
+const SOL_NETLINK: u32 = 270;
+
 pub fn new_netlink_socket(
     kernel: &Arc<Kernel>,
     socket_type: SocketType,
@@ -49,6 +53,7 @@ pub fn new_netlink_socket(
     let ops: Box<dyn SocketOps> = match family {
         NetlinkFamily::KobjectUevent => Box::new(UEventNetlinkSocket::new(kernel)),
         NetlinkFamily::Route => Box::new(RouteNetlinkSocket::new(kernel)?),
+        NetlinkFamily::Generic => Box::new(GenericNetlinkSocket::new(kernel)?),
         _ => Box::new(BaseNetlinkSocket::new(family)),
     };
     Ok(ops)
@@ -972,6 +977,179 @@ impl SocketOps for RouteNetlinkSocket {
         // TODO(https://issuetracker.google.com/283827094): Support add/del
         // multicast group membership.
         self.inner.lock().setsockopt(task, level, optname, user_opt)
+    }
+}
+
+/// Socket implementation for the NETLINK_GENERIC family of netlink sockets.
+struct GenericNetlinkSocket {
+    inner: Arc<Mutex<NetlinkSocketInner>>,
+    message_sender: mpsc::UnboundedSender<NetlinkMessage<GenericMessage>>,
+}
+
+impl GenericNetlinkSocket {
+    pub fn new(kernel: &Arc<Kernel>) -> Result<Self, Errno> {
+        let inner = Arc::new(Mutex::new(NetlinkSocketInner {
+            family: NetlinkFamily::Generic,
+            messages: MessageQueue::new(SOCKET_DEFAULT_SIZE),
+            waiters: WaitQueue::default(),
+            address: None,
+            passcred: false,
+            timestamp: false,
+        }));
+        let (message_sender, message_receiver) = mpsc::unbounded();
+        match kernel
+            .generic_netlink()
+            .new_generic_client(NetlinkToClientSender::new(inner.clone()), message_receiver)
+        {
+            Ok(()) => Ok(Self { inner, message_sender }),
+            Err(e) => {
+                log_warn!(
+                    tag = NETLINK_LOG_TAG,
+                    "Failed to connect to generic netlink server. Errno: {:?}",
+                    e
+                );
+                error!(EPIPE)
+            }
+        }
+    }
+
+    /// Locks and returns the inner state of the Socket.
+    fn lock(&self) -> crate::lock::MutexGuard<'_, NetlinkSocketInner> {
+        self.inner.lock()
+    }
+}
+
+impl SocketOps for GenericNetlinkSocket {
+    fn connect(
+        &self,
+        _socket: &SocketHandle,
+        current_task: &CurrentTask,
+        peer: SocketPeer,
+    ) -> Result<(), Errno> {
+        let mut state = self.lock();
+        state.connect(current_task, peer)
+    }
+
+    fn listen(&self, _socket: &Socket, _backlog: i32, _credentials: ucred) -> Result<(), Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn accept(&self, _socket: &Socket) -> Result<SocketHandle, Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn bind(
+        &self,
+        _socket: &Socket,
+        current_task: &CurrentTask,
+        socket_address: SocketAddress,
+    ) -> Result<(), Errno> {
+        let mut state = self.lock();
+        state.bind(current_task, socket_address)
+    }
+
+    fn read(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        data: &mut dyn OutputBuffer,
+        _flags: SocketMessageFlags,
+    ) -> Result<MessageReadInfo, Errno> {
+        self.lock().read_datagram(data)
+    }
+
+    fn write(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        data: &mut dyn InputBuffer,
+        _dest_address: &mut Option<SocketAddress>,
+        _ancillary_data: &mut Vec<AncillaryData>,
+    ) -> Result<usize, Errno> {
+        let data = data.read_all()?;
+        match NetlinkMessage::<GenericMessage>::deserialize(&data) {
+            Err(e) => {
+                log_warn!("Failed to process write; data could not be deserialized: {:?}", e);
+                error!(EINVAL)
+            }
+            Ok(msg) => {
+                let msg_len = msg.buffer_len();
+                match self.message_sender.unbounded_send(msg) {
+                    Ok(()) => Ok(msg_len),
+                    Err(e) => {
+                        log_warn!("Netlink receiver unexpectedly disconnected for socket: {:?}", e);
+                        error!(EPIPE)
+                    }
+                }
+            }
+        }
+    }
+
+    fn wait_async(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> WaitCanceler {
+        self.lock().wait_async(waiter, events, handler)
+    }
+
+    fn query_events(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(self.lock().query_events() & FdEvents::POLLIN)
+    }
+
+    fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
+        not_implemented!("BaseNetlinkSocket::shutdown is stubbed");
+        Ok(())
+    }
+
+    fn close(&self, _socket: &Socket) {}
+
+    fn getsockname(&self, _socket: &Socket) -> Vec<u8> {
+        self.lock().getsockname()
+    }
+
+    fn getpeername(&self, _socket: &Socket) -> Result<Vec<u8>, Errno> {
+        self.lock().getpeername()
+    }
+
+    fn getsockopt(
+        &self,
+        _socket: &Socket,
+        level: u32,
+        optname: u32,
+        _optlen: u32,
+    ) -> Result<Vec<u8>, Errno> {
+        self.lock().getsockopt(level, optname)
+    }
+
+    fn setsockopt(
+        &self,
+        _socket: &Socket,
+        task: &Task,
+        level: u32,
+        optname: u32,
+        user_opt: UserBuffer,
+    ) -> Result<(), Errno> {
+        match level {
+            SOL_NETLINK => {
+                match optname {
+                    // We currently send all multicast messages to all generic
+                    // netlink clients. We'll likely need to support actual
+                    // correct multicast behavior at some point.
+                    // TODO(fxbug.dev/128857): Actually handle memberships.
+                    NETLINK_ADD_MEMBERSHIP => Ok(()),
+                    _ => self.lock().setsockopt(task, level, optname, user_opt),
+                }
+            }
+            _ => self.lock().setsockopt(task, level, optname, user_opt),
+        }
     }
 }
 
