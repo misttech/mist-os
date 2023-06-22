@@ -45,6 +45,20 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             "UI is only supported in the default feature set level"
         );
 
+        // We should only configure scenic here when it has been added to assembly.
+        let mut scenic_config = builder.package("scenic").component("meta/scenic.cm")?;
+        scenic_config
+            .field(
+                "frame_scheduler_min_predicted_frame_duration_in_us",
+                ui_config.frame_scheduler_min_predicted_frame_duration_in_us,
+            )?
+            .field("i_can_haz_flatland", true)?
+            .field("enable_allocator_for_flatland", true)?
+            .field("pointer_auto_focus", ui_config.pointer_auto_focus)?
+            .field("flatland_enable_display_composition", false)?
+            .field("i_can_haz_display_id", -1i64)?
+            .field("i_can_haz_display_mode", -1i64)?;
+
         let config_dir = builder.add_domain_config("sensor-config").directory("sensor-config");
         if let Some(sensor_config_path) = &ui_config.sensor_config {
             config_dir.entry(FileEntry {

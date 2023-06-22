@@ -346,10 +346,7 @@ fuchsia_structured_config_values("scenic_config") {
 
 fuchsia_package("scenic_pkg") {
   package_name = "scenic"
-  deps = [
-    ":component_v2",
-    ":scenic_config",
-  ]
+  deps = [ ":component_v2" ]
 }
 
 group("scenic_with_default_config") {
