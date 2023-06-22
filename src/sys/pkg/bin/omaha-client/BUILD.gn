@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/config_data_for_assembly.gni")
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_library.gni")
@@ -144,7 +143,6 @@ fuchsia_unittest_package("omaha-client-service-bin-tests") {
     ":omaha-client-channels-test-config",
     ":omaha-client-service-bin-tests-test-driver",
     ":omaha-client-structured-config",
-    ":omaha-client-test-config",
     "//src/connectivity/network/dns:component",
     "//src/connectivity/network/netstack:component",
     "//src/power/shutdown-shim/tests:shutdown_shim_component",
@@ -161,18 +159,6 @@ metrics_registry("mos_metrics_registry") {
   generate_binarypb = false
 }
 
-config_data_for_assembly("omaha-client-config-no-update") {
-  for_pkg = "omaha-client"
-  outputs = [ "omaha_app_id" ]
-  sources = [ "data/omaha-app-id-no-update.txt" ]
-}
-
-resource("omaha-client-test-config") {
-  testonly = true
-  outputs = [ "test-config-data/omaha-client-service-bin-tests/omaha_app_id" ]
-  sources = [ "test_data/omaha_test_app_id" ]
-}
-
 resource("omaha-client-channels-test-config") {
   testonly = true
   outputs =
@@ -185,7 +171,6 @@ group("tests") {
   public_deps = [
     ":omaha-client-channels-test-config",
     ":omaha-client-service-bin-tests",
-    ":omaha-client-test-config",
   ]
 }
 

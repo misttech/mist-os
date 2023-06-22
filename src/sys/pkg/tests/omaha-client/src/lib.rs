@@ -9,7 +9,8 @@ use {
     anyhow::anyhow,
     assert_matches::assert_matches,
     diagnostics_reader::{ArchiveReader, Inspect},
-    fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_paver as fpaver,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics,
+    fidl_fuchsia_paver as fpaver,
     fidl_fuchsia_pkg::{self as fpkg, PackageCacheRequestStream, PackageResolverRequestStream},
     fidl_fuchsia_update::{
         AttemptsMonitorMarker, AttemptsMonitorRequest, AttemptsMonitorRequestStream,
@@ -37,6 +38,7 @@ use {
         channel::{mpsc, oneshot},
         prelude::*,
     },
+    mock_boot_arguments::MockBootArgumentsService,
     mock_crash_reporter::{CrashReport, MockCrashReporterService, ThrottleHook},
     mock_installer::MockUpdateInstallerService,
     mock_omaha_server::{
@@ -66,6 +68,7 @@ const OMAHA_CLIENT_CML: &str = "#meta/omaha-client-service.cm";
 const SYSTEM_UPDATER_CML: &str = "#meta/system-updater.cm";
 const SYSTEM_UPDATE_COMMITTER_CML: &str = "#meta/system-update-committer.cm";
 const STASH_CML: &str = "#meta/stash2.cm";
+const APP_ID: &str = "integration-test-appid";
 
 struct Mounts {
     _test_dir: TempDir,
@@ -89,11 +92,6 @@ impl Mounts {
         fs::write(url_path, url).expect("write omaha_url");
     }
 
-    fn write_appid(&self, appid: impl AsRef<[u8]>) {
-        let appid_path = self.config_data.join("omaha_app_id");
-        fs::write(appid_path, appid).expect("write omaha_app_id");
-    }
-
     fn write_version(&self, version: impl AsRef<[u8]>) {
         let version_path = self.build_info.join("version");
         fs::write(version_path, version).expect("write version");
@@ -105,13 +103,11 @@ impl Mounts {
     }
 }
 struct Proxies {
-    _cache: Arc<MockCache>,
     config_optout: Arc<fuchsia_update_config_optout::Mock>,
     resolver: Arc<MockResolverService>,
     update_manager: ManagerProxy,
     channel_control: ChannelControlProxy,
     commit_status_provider: CommitStatusProviderProxy,
-    _verifier: Arc<MockVerifierService>,
 }
 
 // A builder lambda which accepts as input the full service URL of the mock
@@ -136,10 +132,7 @@ struct TestEnvBuilder {
 impl TestEnvBuilder {
     fn new() -> Self {
         Self {
-            responses_by_appid: vec![(
-                "integration-test-appid".to_string(),
-                ResponseAndMetadata::default(),
-            )],
+            responses_by_appid: vec![(APP_ID.to_string(), ResponseAndMetadata::default())],
             version: "0.1.2.3".to_string(),
             installer: None,
             paver: None,
@@ -156,7 +149,7 @@ impl TestEnvBuilder {
     fn default_with_response(self, response: OmahaResponse) -> Self {
         Self {
             responses_by_appid: vec![(
-                "integration-test-appid".to_string(),
+                APP_ID.to_string(),
                 ResponseAndMetadata { response, ..Default::default() },
             )],
             ..self
@@ -255,7 +248,6 @@ impl TestEnvBuilder {
         }));
         let url = OmahaServer::start(server.clone()).expect("start server");
         mounts.write_url(&url);
-        mounts.write_appid("integration-test-appid");
         mounts.write_version(self.version);
         if let Some(eager_package_config_builder) = self.eager_package_config_builder {
             let json = eager_package_config_builder(&url);
@@ -288,12 +280,9 @@ impl TestEnvBuilder {
         }
 
         let cache = Arc::new(MockCache::new());
-        {
-            let cache = cache.clone();
-            svc.add_fidl_service(move |stream: PackageCacheRequestStream| {
-                fasync::Task::spawn(Arc::clone(&cache).run_cache_service(stream)).detach()
-            });
-        }
+        svc.add_fidl_service(move |stream: PackageCacheRequestStream| {
+            fasync::Task::spawn(Arc::clone(&cache).run_cache_service(stream)).detach()
+        });
 
         let config_optout = Arc::new(fuchsia_update_config_optout::Mock::new());
         svc.add_fidl_service({
@@ -332,26 +321,28 @@ impl TestEnvBuilder {
                     .detach()
             });
         }
-
-        {
-            let verifier = Arc::clone(&verifier);
-            svc.add_fidl_service(move |stream| {
-                fasync::Task::spawn(Arc::clone(&verifier).run_netstack_verifier_service(stream))
-                    .detach()
-            });
-        }
+        svc.add_fidl_service(move |stream| {
+            fasync::Task::spawn(Arc::clone(&verifier).run_netstack_verifier_service(stream))
+                .detach()
+        });
 
         // Set up crash reporter service.
         let crash_reporter = Arc::new(
             self.crash_reporter.unwrap_or_else(|| MockCrashReporterService::new(|_| Ok(()))),
         );
-        {
-            let crash_reporter = Arc::clone(&crash_reporter);
-            svc.add_fidl_service(move |stream| {
-                fasync::Task::spawn(Arc::clone(&crash_reporter).run_crash_reporter_service(stream))
-                    .detach()
-            });
-        }
+        svc.add_fidl_service(move |stream| {
+            fasync::Task::spawn(Arc::clone(&crash_reporter).run_crash_reporter_service(stream))
+                .detach()
+        });
+
+        let boot_arguments_service = Arc::new(MockBootArgumentsService::new(HashMap::from([(
+            "omaha_app_id".into(),
+            Some(APP_ID.into()),
+        )])));
+        svc.add_fidl_service(move |stream| {
+            fasync::Task::spawn(Arc::clone(&boot_arguments_service).handle_request_stream(stream))
+                .detach()
+        });
 
         let mut use_real_system_updater = true;
         if let Some(installer) = self.installer {
@@ -449,6 +440,7 @@ impl TestEnvBuilder {
                     >())
                     .capability(Capability::protocol::<fpkg::CupMarker>())
                     .capability(Capability::protocol::<fidl_fuchsia_update_config::OptOutMarker>())
+                    .capability(Capability::protocol::<fboot::ArgumentsMarker>())
                     .from(&fake_capabilities)
                     .to(&omaha_client_service),
             )
@@ -601,13 +593,11 @@ impl TestEnvBuilder {
             realm_instance,
             _mounts: mounts,
             proxies: Proxies {
-                _cache: cache,
                 config_optout,
                 resolver,
                 update_manager,
                 channel_control,
                 commit_status_provider,
-                _verifier: verifier,
             },
             server,
             reboot_called,
@@ -925,7 +915,7 @@ async fn test_omaha_client_update_multi_app() {
     let env = TestEnvBuilder::new()
         .responses_and_metadata(vec![
             (
-                "integration-test-appid".to_string(),
+                APP_ID.to_string(),
                 ResponseAndMetadata { response: OmahaResponse::Update, ..Default::default() },
             ),
             (
@@ -1030,7 +1020,7 @@ async fn test_omaha_client_update_eager_package() {
     let env = TestEnvBuilder::new()
         .responses_and_metadata(vec![
             (
-                "integration-test-appid".to_string(),
+                APP_ID.to_string(),
                 ResponseAndMetadata { response: OmahaResponse::NoUpdate, ..Default::default() },
             ),
             (
@@ -1143,7 +1133,7 @@ async fn test_omaha_client_update_cup_force_historical_key() {
     // the latest.
     let env = TestEnvBuilder::new()
         .responses_and_metadata(vec![(
-            "integration-test-appid".to_string(),
+            APP_ID.to_string(),
             ResponseAndMetadata { response: OmahaResponse::Update, ..Default::default() },
         )])
         .private_keys(PrivateKeys {
@@ -1207,7 +1197,7 @@ async fn test_omaha_client_update_cup_key_mismatch() {
     // handshake and no response.
     let env = TestEnvBuilder::new()
         .responses_and_metadata(vec![(
-            "integration-test-appid".to_string(),
+            APP_ID.to_string(),
             ResponseAndMetadata { response: OmahaResponse::Update, ..Default::default() },
         )])
         .private_keys(PrivateKeys {
@@ -1247,7 +1237,7 @@ async fn test_omaha_client_update_cup_bad_etag() {
     // What if the server returns an empty etag?
     let env = TestEnvBuilder::new()
         .responses_and_metadata(vec![(
-            "integration-test-appid".to_string(),
+            APP_ID.to_string(),
             ResponseAndMetadata { response: OmahaResponse::Update, ..Default::default() },
         )])
         .etag_override("a1b2c3d4e5")
@@ -1281,7 +1271,7 @@ async fn test_omaha_client_update_cup_empty_etag() {
     // What if the server returns an empty etag?
     let env = TestEnvBuilder::new()
         .responses_and_metadata(vec![(
-            "integration-test-appid".to_string(),
+            APP_ID.to_string(),
             ResponseAndMetadata { response: OmahaResponse::Update, ..Default::default() },
         )])
         .etag_override("")

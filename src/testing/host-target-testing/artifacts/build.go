@@ -686,7 +686,8 @@ func (b *OmahaBuild) GetPaver(ctx context.Context) (paver.Paver, error) {
 	// Create a ZBI with the omaha_url argument.
 	destZbiPath := path.Join(tempDir, "omaha_argument.zbi")
 	imageArguments := map[string]string{
-		"omaha_url": b.omahatool.URL(),
+		"omaha_url":    b.omahatool.URL(),
+		"omaha_app_id": b.omahatool.Args.AppId,
 	}
 
 	if err := b.zbitool.MakeImageArgsZbi(ctx, destZbiPath, imageArguments); err != nil {
@@ -734,7 +735,8 @@ func (b *OmahaBuild) GetFlasher(ctx context.Context) (flasher.Flasher, error) {
 	// Create a ZBI with the omaha_url argument.
 	destZbiPath := path.Join(tempDir, "omaha_argument.zbi")
 	imageArguments := map[string]string{
-		"omaha_url": b.omahatool.URL(),
+		"omaha_url":    b.omahatool.URL(),
+		"omaha_app_id": b.omahatool.Args.AppId,
 	}
 
 	if err := b.zbitool.MakeImageArgsZbi(ctx, destZbiPath, imageArguments); err != nil {

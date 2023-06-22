@@ -1107,8 +1107,6 @@ assembly_input_bundle("omaha_client") {
       ]
     },
   ]
-  config_data_labels =
-      [ "//src/sys/pkg/bin/omaha-client:omaha-client-config-no-update" ]
 }
 
 # AIB to enable virtualization support.

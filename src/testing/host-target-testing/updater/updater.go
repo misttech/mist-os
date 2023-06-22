@@ -347,7 +347,8 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 	defer os.Remove(destZbi.Name())
 
 	imageArguments := map[string]string{
-		"omaha_url": u.omahaTool.URL(),
+		"omaha_url":    u.omahaTool.URL(),
+		"omaha_app_id": u.omahaTool.Args.AppId,
 	}
 
 	if err := u.zbiTool.MakeImageArgsZbi(ctx, destZbi.Name(), imageArguments); err != nil {

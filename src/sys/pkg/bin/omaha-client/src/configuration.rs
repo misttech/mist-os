@@ -64,14 +64,7 @@ fn get_appid(
         }
     }
 
-    // If no appid in the channel configs, then attempt to read from config data.
-    match fs::read_to_string("/config/data/omaha_app_id") {
-        Ok(id) => (id, AppIdSource::ConfigData),
-        Err(e) => {
-            error!("Unable to read omaha app id from config/data: {:?}", e);
-            (String::new(), AppIdSource::DefaultEmpty)
-        }
-    }
+    (String::new(), AppIdSource::DefaultEmpty)
 }
 
 impl ClientConfiguration {
@@ -419,9 +412,13 @@ mod tests {
         let config =
             ClientConfiguration::initialize_from("1.2.3.4", None, VbMetaData::default()).await;
         assert_eq!(config.channel_data.source, ChannelSource::MinFS);
+        assert_eq!(
+            config.app_set.get_system_app_metadata().appid_source,
+            AppIdSource::DefaultEmpty
+        );
         let apps = config.app_set.get_apps();
         assert_eq!(apps.len(), 1);
-        assert_eq!(apps[0].id, "fuchsia:test-app-id");
+        assert_eq!(apps[0].id, "");
         assert_eq!(apps[0].version, Version::from([1, 2, 3, 4]));
         assert_eq!(apps[0].cohort.name, None);
         assert_eq!(apps[0].cohort.hint, None);
@@ -441,9 +438,13 @@ mod tests {
         )
         .await;
         assert_eq!(config.channel_data.source, ChannelSource::Default);
+        assert_eq!(
+            config.app_set.get_system_app_metadata().appid_source,
+            AppIdSource::DefaultEmpty
+        );
         let apps = config.app_set.get_apps();
         assert_eq!(apps.len(), 1);
-        assert_eq!(apps[0].id, "fuchsia:test-app-id");
+        assert_eq!(apps[0].id, "");
         assert_eq!(apps[0].version, Version::from([1, 2, 3, 4]));
         assert_eq!(apps[0].cohort.name, Some("default-channel".to_string()));
         assert_eq!(apps[0].cohort.hint, Some("default-channel".to_string()));

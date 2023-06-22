@@ -10,6 +10,7 @@ rustc_test("driver") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -38,6 +39,7 @@ rustc_test("driver") {
     "//src/sys/pkg/lib/fidl-fuchsia-update-installer-ext",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/lib/omaha-client",
+    "//src/sys/pkg/testing/mock-boot-arguments:lib",
     "//src/sys/pkg/testing/mock-crash-reporter:lib",
     "//src/sys/pkg/testing/mock-installer",
     "//src/sys/pkg/testing/mock-omaha-server",

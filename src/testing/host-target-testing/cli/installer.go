@@ -135,7 +135,7 @@ func (c *InstallerConfig) OmahaTool(ctx context.Context, device *device.Client) 
 		ToolPath:       c.omahaToolPath,
 		PrivateKeyId:   c.privateKeyId,
 		PrivateKeyPath: c.privateKeyPath,
-		AppId:          "fuchsia-test:no-update",
+		AppId:          "e2e-ota-test-app-id",
 		LocalHostname:  localHostname,
 		RequireCup:     c.omahaRequireCup,
 	}, /*stdout=*/ nil /*stderr=*/, nil)

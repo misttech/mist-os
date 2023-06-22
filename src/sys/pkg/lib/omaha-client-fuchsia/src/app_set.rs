@@ -11,7 +11,6 @@ use {
 pub enum AppIdSource {
     VbMetadata,
     ChannelConfig,
-    ConfigData,
     DefaultEmpty,
 }
 
