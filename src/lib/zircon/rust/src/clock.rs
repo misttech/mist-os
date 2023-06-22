@@ -351,6 +351,25 @@ mod tests {
     }
 
     #[test]
+    fn clock_trivial_transformation() {
+        let t_0 = Time::ZERO;
+        // Identity clock transformation
+        let xform = ClockTransformation {
+            reference_offset: 3,
+            synthetic_offset: 2,
+            rate: sys::zx_clock_rate_t { synthetic_ticks: 6, reference_ticks: 2 },
+        };
+
+        let utc_time = xform.apply(t_0);
+        let monotonic_time = xform.apply_inverse(utc_time);
+        // Verify that the math is correct.
+        assert_eq!(3 * (t_0.into_nanos() - 3) + 2, utc_time.into_nanos());
+
+        // Transformation roundtrip should be equivalent.
+        assert_eq!(t_0, monotonic_time);
+    }
+
+    #[test]
     fn clock_transformation_roundtrip() {
         let t_0 = Time::ZERO;
         // Arbitrary clock transformation
