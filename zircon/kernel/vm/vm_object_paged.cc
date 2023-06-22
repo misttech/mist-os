@@ -407,7 +407,10 @@ zx_status_t VmObjectPaged::CreateFromWiredPages(const void* data, size_t size, b
       // created anonymous VMO with no committed pages has all its content implicitly zero.
       status = vmo->cow_pages_locked()->AddNewPageLocked(
           count * PAGE_SIZE, page, VmCowPages::CanOverwriteContent::Zero, nullptr, false, false);
-      ASSERT(status == ZX_OK);
+      ASSERT_MSG(status == ZX_OK,
+                 "AddNewPageLocked failed on page %zu of %zu at %#" PRIx64 " from [%#" PRIx64
+                 ", %#" PRIx64 ")",
+                 count, size / PAGE_SIZE, pa, start_paddr, start_paddr + size);
       DEBUG_ASSERT(!page->is_loaned());
     }
 
