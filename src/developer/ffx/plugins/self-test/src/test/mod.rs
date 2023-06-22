@@ -4,11 +4,14 @@
 
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use errors::ffx_bail;
-use ffx_config::global_env_context;
+use ffx_config::{
+    global_env_context,
+    logging::{change_log_file, reset_log_file},
+};
 use ffx_daemon::{DaemonConfig, SocketDetails};
 use fuchsia_async::TimeoutExt;
 use serde_json::Value;
-use std::{future::Future, io::Write, pin::Pin, time::Duration};
+use std::{future::Future, io::Write, path::PathBuf, pin::Pin, time::Duration};
 use termion::is_tty;
 
 pub mod asserts;
@@ -44,6 +47,12 @@ async fn set_value_in_isolate(
         .await
 }
 
+fn subtest_log_file(isolate: &ffx_isolate::Isolate) -> PathBuf {
+    let mut dir = isolate.log_dir().to_path_buf();
+    dir.push("self_test.log");
+    dir
+}
+
 /// Create a new ffx isolate. This method relies on the environment provided by
 /// the ffx binary and should only be called within ffx.
 pub async fn new_isolate(name: &str) -> Result<ffx_isolate::Isolate> {
@@ -52,6 +61,9 @@ pub async fn new_isolate(name: &str) -> Result<ffx_isolate::Isolate> {
     let isolate = ffx_isolate::Isolate::new_with_sdk(name, ssh_key, &context).await?;
     set_in_isolate(&context, &isolate, "overnet.cso").await?;
     set_value_in_isolate(&isolate, "watchdogs.host_pipe.enabled", true.into()).await?;
+    // Globally change the log file to one appropriate to the isolate.  We'll reset it after
+    // the test completes
+    change_log_file(&subtest_log_file(&isolate))?;
     Ok(isolate)
 }
 
@@ -157,6 +169,7 @@ pub async fn run(tests: Vec<TestCase>, timeout: Duration, case_timeout: Duration
                     num_errs = num_errs + 1;
                 }
             }
+            reset_log_file()?;
         }
 
         if num_errs != 0 {
