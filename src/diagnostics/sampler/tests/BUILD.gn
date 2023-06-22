@@ -32,35 +32,41 @@ rustc_test("integration-bin") {
   testonly = true
   name = "sampler_integration_test"
   deps = [
+    "../testing/fidl:test.sampler_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.metrics.test:fuchsia.metrics.test_rust",
     "//src/diagnostics/sampler/tests/fidl:fuchsia.mockrebootcontroller_rust",
     "//src/diagnostics/sampler/tests/fidl:fuchsia.samplertestcontroller_rust",
     "//src/lib/diagnostics/reader/rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-component-test",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:futures",
   ]
 
   source_root = "lib.rs"
 
   sources = [
     "lib.rs",
-    "mocks.rs",
     "test_topology.rs",
     "utils.rs",
   ]
 }
 
-fuchsia_unittest_component("sampler-integration-test") {
+fuchsia_component("sampler-test-suite-component") {
+  testonly = true
+  component_name = "sampler-test-suite"
   manifest = "meta/integration-test.cml"
   deps = [ ":integration-bin" ]
+}
+
+fuchsia_package("sampler-test-suite") {
+  testonly = true
+  deps = [ ":sampler-test-suite-component" ]
 }
 
 fuchsia_structured_config_values("sampler-test-config") {
@@ -90,20 +96,19 @@ resource("validation-fire-projects") {
   outputs = [ "data/config/fire/any_name/projects/{{source_file_part}}" ]
 }
 
+fuchsia_component("sampler-test-root") {
+  testonly = true
+  manifest = "meta/test-root.cml"
+}
+
 fuchsia_test_package("sampler-integration-tests") {
   test_components = [
     ":config-validation-test",
-    ":sampler-integration-test",
+    ":sampler-test-root",
   ]
-  deps = [
-    ":sampler-test-config",
-    ":validation-fire-components",
-    ":validation-fire-projects",
-    ":validation-sampler-resources",
-    "//src/cobalt/bin/testing/mock_cobalt:component_v2",
-    "//src/diagnostics/archivist:archivist-for-embedding-v2",
-    "//src/diagnostics/sampler:sampler-component",
-    "//src/diagnostics/sampler/tests/test_component:single_counter_test_component",
+  subpackages = [
+    "../testing/realm-factory",
+    ":sampler-test-suite",
   ]
 }
 

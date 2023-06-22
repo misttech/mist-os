@@ -10,7 +10,6 @@ use fidl_fuchsia_samplertestcontroller::SamplerTestControllerMarker;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 
-mod mocks;
 mod test_topology;
 mod utils;
 
@@ -20,18 +19,16 @@ mod utils;
 /// cobalt as expected.
 #[fuchsia::test]
 async fn event_count_sampler_test() {
-    let instance = test_topology::create().await.expect("initialized topology");
+    let realm = test_topology::create_realm().await.expect("initialized topology");
     let test_app_controller =
-        instance.root.connect_to_protocol_at_exposed_dir::<SamplerTestControllerMarker>().unwrap();
+        realm.connect_to_protocol::<SamplerTestControllerMarker>().await.unwrap();
     let reboot_controller =
-        instance.root.connect_to_protocol_at_exposed_dir::<MockRebootControllerMarker>().unwrap();
-    let logger_querier = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<MetricEventLoggerQuerierMarker>()
-        .unwrap();
-    let _sampler_binder = instance
-        .root
-        .connect_to_named_protocol_at_exposed_dir::<BinderMarker>("fuchsia.component.SamplerBinder")
+        realm.connect_to_protocol::<MockRebootControllerMarker>().await.unwrap();
+    let logger_querier =
+        realm.connect_to_protocol::<MetricEventLoggerQuerierMarker>().await.unwrap();
+    let _sampler_binder = realm
+        .connect_to_named_protocol::<BinderMarker>("fuchsia.component.SamplerBinder")
+        .await
         .unwrap();
 
     test_app_controller.increment_int(1).await.unwrap();
@@ -118,18 +115,16 @@ async fn event_count_sampler_test() {
 /// the reboot server goes down, sampler continues to run as expected.
 #[fuchsia::test]
 async fn reboot_server_crashed_test() {
-    let instance = test_topology::create().await.expect("initialized topology");
+    let realm = test_topology::create_realm().await.expect("initialized topology");
     let test_app_controller =
-        instance.root.connect_to_protocol_at_exposed_dir::<SamplerTestControllerMarker>().unwrap();
+        realm.connect_to_protocol::<SamplerTestControllerMarker>().await.unwrap();
     let reboot_controller =
-        instance.root.connect_to_protocol_at_exposed_dir::<MockRebootControllerMarker>().unwrap();
-    let logger_querier = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<MetricEventLoggerQuerierMarker>()
-        .unwrap();
-    let _sampler_binder = instance
-        .root
-        .connect_to_named_protocol_at_exposed_dir::<BinderMarker>("fuchsia.component.SamplerBinder")
+        realm.connect_to_protocol::<MockRebootControllerMarker>().await.unwrap();
+    let logger_querier =
+        realm.connect_to_protocol::<MetricEventLoggerQuerierMarker>().await.unwrap();
+    let _sampler_binder = realm
+        .connect_to_named_protocol::<BinderMarker>("fuchsia.component.SamplerBinder")
+        .await
         .unwrap();
 
     // Crash the reboot server to verify that sampler continues to sample.
@@ -178,18 +173,20 @@ async fn reboot_server_crashed_test() {
 /// the reboot server goes down, sampler continues to run as expected.
 #[fuchsia::test]
 async fn sampler_inspect_test() {
-    let instance = test_topology::create().await.expect("initialized topology");
-    let _sampler_binder = instance
-        .root
-        .connect_to_named_protocol_at_exposed_dir::<BinderMarker>("fuchsia.component.SamplerBinder")
+    let realm_name = "sampler_inspect_test_case";
+    let realm =
+        test_topology::create_realm_with_name(realm_name).await.expect("initialized topology");
+    let _sampler_binder = realm
+        .connect_to_named_protocol::<BinderMarker>("fuchsia.component.SamplerBinder")
+        .await
         .unwrap();
 
     let hierarchy = loop {
         // Observe verification shows up in inspect.
         let mut data = ArchiveReader::new()
             .add_selector(format!(
-                "realm_builder\\:{}/wrapper/sampler:root",
-                instance.root.child_name()
+                "test_realm_factory/realm_builder\\:{}/wrapper/sampler:root",
+                realm_name
             ))
             .snapshot::<Inspect>()
             .await

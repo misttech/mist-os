@@ -12,7 +12,10 @@
     },
     use: [
         {
-            protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
+            protocol: [
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "test.sampler.RealmFactory",
+            ],
         },
     ],
 }
