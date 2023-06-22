@@ -30,7 +30,6 @@
 #   approvers, and then wait at least one business day for discussion and
 #   approval.
 
-aaronwood@google.com
 abarth@google.com
 abdulla@google.com
 digit@google.com
@@ -52,6 +51,9 @@ tmandry@google.com
 # Build system files in the source root
 per-file .gn,BUILD.gn = file:/build/OWNERS
 
+# Build system files throughout the tree
+per-file **.gn,**.gni,**.bazel,**.bzl = file:/build/OWNERS
+
 # Go-language support files
 per-file go.mod,go.sum = file:/build/go/OWNERS
 
@@ -66,5 +68,8 @@ per-file .gitmodules = file:/third_party/OWNERS
 
 # Add owners to source related files
 per-file .gitignore,.gitmodules = file:/infra/OWNERS
+
+# All  in-tree README.md for correcting usage comments during LSCs
+per-file **/README.md = aaronwood@google.com
 
 per-file .ignore = *
