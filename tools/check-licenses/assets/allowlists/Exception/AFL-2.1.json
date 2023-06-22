@@ -2,27 +2,13 @@
   "result": {
     "allowlists": [
       {
-        "name": "Unicode-TOU",
+        "name": "AFL-2.1",
         "matchType": "Exception",
         "entries": [
           {
             "projects": [
-              "prebuilt/third_party/flutter"
-            ],
-            "bug": "",
-            "notes": []
-          },
-          {
-            "projects": [
               "prebuilt/third_party/dart/linux-x64",
               "prebuilt/third_party/dart_paused/linux-x64"
-            ],
-            "bug": "",
-            "notes": []
-          },
-          {
-            "projects": [
-              "prebuilt/third_party/sky_engine"
             ],
             "bug": "",
             "notes": []
@@ -32,4 +18,3 @@
     ]
   }
 }
-

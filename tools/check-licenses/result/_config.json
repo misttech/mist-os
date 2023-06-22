@@ -193,17 +193,6 @@
       {
         "name": "AllLicensePatternUsagesMustBeApproved",
         "allowlist": {
-          "prebuilt/third_party/vulkansdk/linux/source/DirectXShaderCompiler/external/SPIRV-Headers/LICENSE": true,
-          "prebuilt/third_party/vulkansdk/linux/source/SPIRV-Headers/LICENSE": true,
-          "third_party/dart-pkg/pub/dds/tool/dap/external_dap_spec/debugAdapterProtocol.license.txt": true,
-          "third_party/shaderc/third_party/LICENSE.glslang": true,
-          "prebuilt/test_data/media/third_party/chromium_media_test_data/COPYING": true,
-          "prebuilt/third_party/edk2/License.txt": true,
-          "prebuilt/third_party/dart/linux-x64/bin/resources/devtools/assets/NOTICES": true,
-          "prebuilt/third_party/dart_paused/linux-x64/bin/resources/devtools/assets/NOTICES": true,
-          "third_party/rust_crates/vendor/regex-syntax-0.6.26/src/unicode_tables/LICENSE-UNICODE": true,
-          "tools/debug/covargs/api/third_party/codecoverage": true,
-          "third_party/dart-pkg/pub/characters/third_party/Unicode_Consortium/UNICODE_LICENSE.txt": true
         }
       },
       {

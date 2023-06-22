@@ -14,6 +14,15 @@
           },
           {
             "projects": [
+              "prebuilt/third_party/dart/linux-x64",
+              "prebuilt/third_party/dart_paused/linux-x64",
+              "third_party/dart-pkg/pub/characters"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
               "third_party/icu/default",
               "third_party/icu/latest",
               "third_party/icu/stable"
@@ -30,14 +39,9 @@
           },
           {
             "projects": [
+              "prebuilt/third_party/rust/linux-x64",
+              "third_party/rust_crates/vendor/regex-syntax-0.6.26",
               "third_party/rust_crates/vendor/bstr-1.5.0"
-            ],
-            "bug": "",
-            "notes": []
-          },
-          {
-            "projects": [
-              "prebuilt/third_party/rust/linux-x64"
             ],
             "bug": "",
             "notes": []

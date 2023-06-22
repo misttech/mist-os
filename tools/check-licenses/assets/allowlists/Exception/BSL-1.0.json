@@ -7,12 +7,50 @@
         "entries": [
           {
             "projects": [
-              "prebuilt/third_party/sky_engine",
-              "third_party/rust_crates/vendor/ryu-1.0.3",
-              "third_party/mesa",
-              "third_party/zlib",
-              "prebuilt/third_party/vulkansdk/linux",
+              "prebuilt/third_party/dart/linux-x64",
+              "prebuilt/third_party/dart_paused/linux-x64"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "prebuilt/third_party/sky_engine"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "prebuilt/third_party/vulkansdk/linux"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
               "prebuilt/third_party/flutter"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "third_party/rust_crates/vendor/ryu-1.0.3"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "third_party/mesa"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "third_party/zlib"
             ],
             "bug": "",
             "notes": []
