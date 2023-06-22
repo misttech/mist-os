@@ -62,7 +62,7 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for enabling developer support.
     #[serde(default)]
-    pub development_support: Option<development_support_config::DevelopmentSupportConfig>,
+    pub development_support: development_support_config::DevelopmentSupportConfig,
 
     /// Platform configuration options for the diagnostics area.
     #[serde(default)]

@@ -3,33 +3,49 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
+use anyhow::Context;
 use assembly_config_schema::platform_config::development_support_config::DevelopmentSupportConfig;
 
 pub(crate) struct DevelopmentConfig;
-impl DefineSubsystemConfiguration<Option<DevelopmentSupportConfig>> for DevelopmentConfig {
+impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfig {
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        config: &Option<DevelopmentSupportConfig>,
+        config: &DevelopmentSupportConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         // Select the correct AIB based on the user-provided setting if present
         // and fall-back to the default by build-type.
-        let aib_name = match (config, context.build_type) {
-            (Some(DevelopmentSupportConfig { enabled: true }), BuildType::User) => {
-                anyhow::bail!("Development support is not allowed on user builds");
+        builder.platform_bundle(match (context.build_type, config.enabled) {
+            (BuildType::User, Some(_)) => {
+                anyhow::bail!("Development support cannot be enabled on user builds");
             }
 
             // User-provided development setting for non-user builds.
-            (Some(DevelopmentSupportConfig { enabled: true }), _) => "kernel_args_eng",
-            (Some(DevelopmentSupportConfig { enabled: false }), _) => "kernel_args_user",
+            (_, Some(true)) => "kernel_args_eng",
+            (_, Some(false)) => "kernel_args_user",
 
             // Default development setting by build-type.
-            (None, BuildType::Eng) => "kernel_args_eng",
-            (None, BuildType::UserDebug) => "kernel_args_userdebug",
-            (None, BuildType::User) => "kernel_args_user",
-        };
+            (BuildType::Eng, None) => "kernel_args_eng",
+            (BuildType::UserDebug, None) => "kernel_args_userdebug",
+            (BuildType::User, None) => "kernel_args_user",
+        });
 
-        builder.platform_bundle(aib_name);
+        match (context.build_type, &config.authorized_ssh_keys_path) {
+            (BuildType::User, Some(_)) => {
+                anyhow::bail!("authorized_ssh_keys cannot be provided on user builds")
+            }
+            (_, Some(authorized_ssh_keys_path)) => {
+                builder
+                    .package("sshd-host")
+                    .config_data(assembly_config_schema::FileEntry {
+                        source: authorized_ssh_keys_path.clone(),
+                        destination: "authorized_keys".into(),
+                    })
+                    .context("Setting authorized_keys")?;
+            }
+            _ => {}
+        }
+
         Ok(())
     }
 }
