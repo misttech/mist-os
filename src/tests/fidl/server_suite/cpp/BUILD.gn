@@ -17,26 +17,13 @@ executable("bin") {
   ]
 }
 
-fuchsia_component("cpp_server") {
-  testonly = true
-  component_name = "server"
+fuchsia_test_component("server") {
   manifest = "meta/server.cml"
   deps = [ ":bin" ]
 }
 
-fuchsia_component("harness_cpp") {
+fuchsia_package("cpp") {
   testonly = true
-  component_name = "harness"
-  manifest = "meta/harness_cpp.cml"
-  deps = [ "//src/tests/fidl/server_suite/harness:bin" ]
-}
-
-fuchsia_test_package("fidl-server-suite-cpp-test") {
-  test_components = [ ":harness_cpp" ]
-  deps = [ ":cpp_server" ]
-}
-
-group("cpp") {
-  testonly = true
-  deps = [ ":fidl-server-suite-cpp-test" ]
+  package_name = "fidl_server_suite_cpp_server"
+  deps = [ ":server" ]
 }

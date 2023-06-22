@@ -21,25 +21,13 @@ go_library("lib") {
   sources = [ "main.go" ]
 }
 
-fuchsia_component("go_server") {
-  component_name = "server"
+fuchsia_test_component("server") {
   manifest = "meta/server.cml"
   deps = [ ":bin" ]
 }
 
-fuchsia_component("harness_go") {
+fuchsia_package("go") {
   testonly = true
-  component_name = "harness"
-  manifest = "meta/harness_go.cml"
-  deps = [ "//src/tests/fidl/server_suite/harness:bin" ]
-}
-
-fuchsia_test_package("fidl-server-suite-go-test") {
-  test_components = [ ":harness_go" ]
-  deps = [ ":go_server" ]
-}
-
-group("go") {
-  testonly = true
-  deps = [ ":fidl-server-suite-go-test" ]
+  package_name = "fidl_server_suite_go_server"
+  deps = [ ":server" ]
 }

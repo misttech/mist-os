@@ -2,14 +2,40 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
+
+suites = [
+  "dart",
+  "cpp",
+  "go",
+  "hlcpp",
+  "llcpp",
+  "rust",
+]
+
+fuchsia_test_component("test_component") {
+  component_name = "test"
+  manifest = "meta/test.cml"
+}
+
+foreach(suite, suites) {
+  fuchsia_test_package("fidl_server_suite_${suite}_test") {
+    subpackages = [ "//src/tests/fidl/server_suite/harness" ]
+    renameable_subpackages = [
+      {
+        name = "server"
+        package = "//src/tests/fidl/server_suite/${suite}"
+      },
+    ]
+    test_components = [ ":test_component" ]
+  }
+}
+
 group("server_suite") {
   testonly = true
-  deps = [
-    "cpp",
-    "dart",
-    "go",
-    "hlcpp",
-    "llcpp",
-    "rust",
-  ]
+
+  deps = []
+  foreach(suite, suites) {
+    deps += [ ":fidl_server_suite_${suite}_test" ]
+  }
 }

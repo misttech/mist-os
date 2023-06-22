@@ -19,25 +19,13 @@ rustc_binary("bin") {
   ]
 }
 
-fuchsia_component("rust_server") {
-  component_name = "server"
+fuchsia_test_component("server") {
   manifest = "meta/server.cml"
   deps = [ ":bin" ]
 }
 
-fuchsia_component("harness_rust") {
+fuchsia_package("rust") {
   testonly = true
-  component_name = "harness"
-  manifest = "meta/harness_rust.cml"
-  deps = [ "//src/tests/fidl/server_suite/harness:bin" ]
-}
-
-fuchsia_test_package("fidl-server-suite-rust-test") {
-  test_components = [ ":harness_rust" ]
-  deps = [ ":rust_server" ]
-}
-
-group("rust") {
-  testonly = true
-  deps = [ ":fidl-server-suite-rust-test" ]
+  package_name = "fidl_server_suite_rust_server"
+  deps = [ ":server" ]
 }
