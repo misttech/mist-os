@@ -33,6 +33,12 @@
             to: "#starnix_runner",
         },
         {
+            protocol: [ "fuchsia.posix.socket.packet.Provider_OnlyForStarnix" ],
+            from: "#network",
+            as: "fuchsia.posix.socket.packet.Provider",
+            to: "#starnix_runner",
+        },
+        {
             protocol: [ "fuchsia.power.battery.BatteryManager" ],
             from: "#battery_manager",
             to: "#starnix_runner",

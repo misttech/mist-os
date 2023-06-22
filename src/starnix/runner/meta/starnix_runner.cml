@@ -43,6 +43,7 @@
                 "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
+                "fuchsia.posix.socket.packet.Provider",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",
                 "fuchsia.sysmem.Allocator",

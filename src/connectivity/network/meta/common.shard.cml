@@ -247,6 +247,11 @@
             as: "fuchsia.net.root.Interfaces_OnlyForStarnix",
         },
         {
+            protocol: [ "fuchsia.posix.socket.packet.Provider" ],
+            from: "#netstack",
+            as: "fuchsia.posix.socket.packet.Provider_OnlyForStarnix",
+        },
+        {
             protocol: [ "fuchsia.net.name.Lookup" ],
             from: "#dns-resolver",
         },
