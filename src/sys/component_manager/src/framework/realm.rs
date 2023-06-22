@@ -256,7 +256,7 @@ impl RealmCapabilityHost {
         let child_moniker = ChildMoniker::try_new(&child.name, child.collection.as_ref())
             .map_err(|_| fcomponent::Error::InvalidArguments)?;
         component.remove_dynamic_child(&child_moniker).await.map_err(|error| {
-            warn!(%error, ?child, "remove_dynamic_child() failed");
+            debug!(%error, ?child, "remove_dynamic_child() failed");
             error.into()
         })?;
         Ok(())
