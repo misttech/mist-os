@@ -1219,6 +1219,7 @@ group("rbe_config.metadata") {
 build_api_module("clippy_target_mapping") {
   testonly = true
   data_keys = [ "rust_source_map" ]
+  walk_keys = [ "clippy_barrier" ]
   deps = [ "//:default" ]
 }
 

@@ -58,18 +58,23 @@ if (is_host) {
   }
 
   gen_dir = "gen/build/rust/tests"
-  host = "host_$host_cpu"
+  host = "host_${host_cpu}"
 
   python_host_test("clippy_test") {
     main_source = "test.py"
     extra_args = [ host ]
     deps = [
       ":copy_clippy",
+      ":copy_clippy_target_mapping",
       ":copy_default_toolchain",
       ":copy_other_toolchain",
       ":copy_script",
-      ":copy_workaround",
     ]
+    metadata = {
+      # Exclude the test universe crates from the global
+      # clippy_target_mapping.json since they have intentional errors.
+      clippy_barrier = []
+    }
   }
 
   host_test_data("copy_clippy") {
@@ -125,28 +130,24 @@ if (is_host) {
     outputs = [ "$target_gen_dir/out/default/{{source_file_part}}" ]
   }
 
-  # The `host_test_data` can copy over all of the clippy related targets, but
-  # unfortunately due to generated_file targets only following dep edges, we can't
-  # actually depend on clippy_target_mapping.json because it collects metadata
-  # from //:default. To avoid this we use an additional action to copy it over
-  # without making it an explicit dep in GN. Note that this requires allowlisting
-  # the script from our hermeticity checker.
-  _mapping = "clippy_target_mapping.json"
-  _temp = "$target_gen_dir/$_mapping.tmp"
-  host_test_data("copy_workaround") {
-    sources = [ _temp ]
-    deps = [ ":copy_crimes" ]
-    outputs = [ "$target_gen_dir/out/default/$_mapping" ]
+  _clippy_target_mapping = "$target_gen_dir/clippy_target_mapping.json"
+  host_test_data("copy_clippy_target_mapping") {
+    sources = [ _clippy_target_mapping ]
+    deps = [ ":gen_clippy_target_mapping" ]
+    outputs = [ "$target_gen_dir/out/default/{{source_file_part}}" ]
   }
-  action("copy_crimes") {
-    _depfile = "$target_gen_dir/copy_crimes.d"
-    script = "//build/rust/tests/copy_crimes.sh"
-    args = [
-      _mapping,
-      rebase_path(_temp, root_build_dir),
-      rebase_path(_depfile, root_build_dir),
+
+  # Create a version of //${build_dir}/clippy_target_mapping.json which has
+  # this test's "universe", which consists of only the crates defined here.
+  generated_file("gen_clippy_target_mapping") {
+    outputs = [ _clippy_target_mapping ]
+    output_conversion = "json"
+    testonly = true
+    data_keys = [ "rust_source_map" ]
+    walk_keys = [ "clippy_barrier" ]
+    deps = [
+      ":copy_clippy",
+      ":copy_other_toolchain",
     ]
-    depfile = _depfile
-    outputs = [ _temp ]
   }
 }
