@@ -34,7 +34,7 @@ use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::{
     link::nlas::Nla as LinkNla, AddressHeader, AddressMessage, LinkHeader, LinkMessage,
     RtnlMessage, AF_INET, AF_INET6, AF_UNSPEC, ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP,
-    ARPHRD_VOID, IFA_F_PERMANENT, IFF_LOOPBACK, IFF_LOWER_UP, IFF_RUNNING, IFF_UP,
+    ARPHRD_VOID, IFA_F_PERMANENT, IFA_F_TENTATIVE, IFF_LOOPBACK, IFF_LOWER_UP, IFF_RUNNING, IFF_UP,
     RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV6_IFADDR, RTNLGRP_LINK,
 };
 use tracing::{debug, error, warn};
@@ -334,7 +334,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         let if_event_stream = {
             let stream_res = fnet_interfaces_ext::event_stream_from_state(
                 &state_proxy,
-                fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+                fnet_interfaces_ext::IncludedAddresses::All,
             );
 
             match stream_res {
@@ -1144,8 +1144,6 @@ fn interface_properties_to_address_messages(
                  valid_until: _,
                  assignment_state,
              }| {
-                assert_eq!(*assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
-
                 let mut addr_header = AddressHeader::default();
 
                 let (family, addr_bytes) = match addr {
@@ -1157,14 +1155,26 @@ fn interface_properties_to_address_messages(
                 // be safely casted to a u8.
                 addr_header.family = family.try_into().expect("should fit into u8");
                 addr_header.prefix_len = *prefix_len;
+
+                // TODO(https://issuetracker.google.com/284980862): Determine proper mapping from
+                // Netstack properties to address flags.
+                let flags = IFA_F_PERMANENT
+                    | match assignment_state {
+                        fnet_interfaces::AddressAssignmentState::Assigned => 0,
+                        fnet_interfaces::AddressAssignmentState::Tentative
+                        | fnet_interfaces::AddressAssignmentState::Unavailable => {
+                            // There is no equivalent `IFA_F_` flag for
+                            // `Unavailable` so we treat it as tentative to
+                            // signal that the address is installed but not
+                            // considered assigned.
+                            IFA_F_TENTATIVE
+                        }
+                    };
                 // In the header, flags are stored as u8, and in the NLAs, flags are stored as u32,
                 // requiring casting. There are several possible flags, such as
                 // IFA_F_NOPREFIXROUTE that do not fit into a u8, and are expected to be lost in
                 // the header. This NLA is present in netlink_packet_route but is not shown on the
                 // rtnetlink man page.
-                // TODO(https://issuetracker.google.com/284980862): Determine proper mapping from
-                // Netstack properties to address flags.
-                let flags = IFA_F_PERMANENT;
                 addr_header.flags = flags as u8;
                 addr_header.index = id;
 
@@ -1420,13 +1430,20 @@ pub(crate) mod testutil {
         NetlinkAddressMessage(addr_message)
     }
 
-    pub(crate) fn test_addr(addr: fnet::Subnet) -> fnet_interfaces::Address {
+    pub(crate) fn test_addr_with_assignment_state(
+        addr: fnet::Subnet,
+        assignment_state: fnet_interfaces::AddressAssignmentState,
+    ) -> fnet_interfaces::Address {
         fnet_interfaces::Address {
             addr: Some(addr),
             valid_until: Some(zx::sys::ZX_TIME_INFINITE),
-            assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
+            assignment_state: Some(assignment_state),
             ..Default::default()
         }
+    }
+
+    pub(crate) fn test_addr(addr: fnet::Subnet) -> fnet_interfaces::Address {
+        test_addr_with_assignment_state(addr, fnet_interfaces::AddressAssignmentState::Assigned)
     }
 }
 
@@ -1842,7 +1859,10 @@ mod tests {
                     name: Some(LO_NAME.to_string()),
                     device_class: Some(LOOPBACK),
                     online: Some(false),
-                    addresses: Some(vec![test_addr(TEST_V4_ADDR)]),
+                    addresses: Some(vec![test_addr_with_assignment_state(
+                        TEST_V4_ADDR,
+                        fnet_interfaces::AddressAssignmentState::Assigned,
+                    )]),
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
                     ..Default::default()
@@ -1852,7 +1872,16 @@ mod tests {
                     name: Some(ETH_NAME.to_string()),
                     device_class: Some(ETHERNET),
                     online: Some(false),
-                    addresses: Some(vec![test_addr(TEST_V6_ADDR), test_addr(TEST_V4_ADDR)]),
+                    addresses: Some(vec![
+                        test_addr_with_assignment_state(
+                            TEST_V6_ADDR,
+                            fnet_interfaces::AddressAssignmentState::Unavailable,
+                        ),
+                        test_addr_with_assignment_state(
+                            TEST_V4_ADDR,
+                            fnet_interfaces::AddressAssignmentState::Unavailable,
+                        ),
+                    ]),
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
                     ..Default::default()
@@ -1862,7 +1891,16 @@ mod tests {
                     name: Some(PPP_NAME.to_string()),
                     device_class: Some(PPP),
                     online: Some(false),
-                    addresses: Some(vec![test_addr(TEST_V4_ADDR), test_addr(TEST_V6_ADDR)]),
+                    addresses: Some(vec![
+                        test_addr_with_assignment_state(
+                            TEST_V4_ADDR,
+                            fnet_interfaces::AddressAssignmentState::Assigned,
+                        ),
+                        test_addr_with_assignment_state(
+                            TEST_V6_ADDR,
+                            fnet_interfaces::AddressAssignmentState::Assigned,
+                        ),
+                    ]),
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
                     ..Default::default()
@@ -1896,7 +1934,16 @@ mod tests {
                     name: Some(WLAN_NAME.to_string()),
                     device_class: Some(WLAN),
                     online: Some(false),
-                    addresses: Some(vec![test_addr(TEST_V4_ADDR), test_addr(TEST_V6_ADDR)]),
+                    addresses: Some(vec![
+                        test_addr_with_assignment_state(
+                            TEST_V4_ADDR,
+                            fnet_interfaces::AddressAssignmentState::Tentative,
+                        ),
+                        test_addr_with_assignment_state(
+                            TEST_V6_ADDR,
+                            fnet_interfaces::AddressAssignmentState::Tentative,
+                        ),
+                    ]),
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
                     ..Default::default()
@@ -1904,7 +1951,16 @@ mod tests {
                 fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
                     id: Some(LO_INTERFACE_ID),
                     online: Some(true),
-                    addresses: Some(vec![test_addr(TEST_V4_ADDR), test_addr(TEST_V6_ADDR)]),
+                    addresses: Some(vec![
+                        test_addr_with_assignment_state(
+                            TEST_V4_ADDR,
+                            fnet_interfaces::AddressAssignmentState::Assigned,
+                        ),
+                        test_addr_with_assignment_state(
+                            TEST_V6_ADDR,
+                            fnet_interfaces::AddressAssignmentState::Assigned,
+                        ),
+                    ]),
                     ..Default::default()
                 }),
                 fnet_interfaces::Event::Removed(ETH_INTERFACE_ID),
@@ -1974,7 +2030,7 @@ mod tests {
                 WLAN_INTERFACE_ID.try_into().unwrap(),
                 TEST_V4_ADDR,
                 WLAN_NAME.to_string(),
-                IFA_F_PERMANENT,
+                IFA_F_PERMANENT | IFA_F_TENTATIVE,
             )
             .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false),
             ModernGroup(RTNLGRP_IPV4_IFADDR),
@@ -1984,7 +2040,7 @@ mod tests {
                 ETH_INTERFACE_ID.try_into().unwrap(),
                 TEST_V4_ADDR,
                 ETH_NAME.to_string(),
-                IFA_F_PERMANENT,
+                IFA_F_PERMANENT | IFA_F_TENTATIVE,
             )
             .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER),
             ModernGroup(RTNLGRP_IPV4_IFADDR),
@@ -2009,7 +2065,7 @@ mod tests {
                 WLAN_INTERFACE_ID.try_into().unwrap(),
                 TEST_V6_ADDR,
                 WLAN_NAME.to_string(),
-                IFA_F_PERMANENT,
+                IFA_F_PERMANENT | IFA_F_TENTATIVE,
             )
             .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false),
             ModernGroup(RTNLGRP_IPV6_IFADDR),
@@ -2029,7 +2085,7 @@ mod tests {
                 ETH_INTERFACE_ID.try_into().unwrap(),
                 TEST_V6_ADDR,
                 ETH_NAME.to_string(),
-                IFA_F_PERMANENT,
+                IFA_F_PERMANENT | IFA_F_TENTATIVE,
             )
             .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER),
             ModernGroup(RTNLGRP_IPV6_IFADDR),
