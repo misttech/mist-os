@@ -633,9 +633,9 @@ zx::result<> Fastboot::OemAddStagedBootloaderFile(const std::string& command,
   return SendResponse(ResponseType::kOkay, "", transport);
 }
 
-bool Fastboot::FindGptDevices(paver::GptDevicePartitioner::GptFds& gpt_devices) {
+zx::result<std::vector<paver::GptDevicePartitioner::GptClients>> Fastboot::FindGptDevices() {
   auto fd = fbl::unique_fd(open("/dev", O_RDONLY));
-  return paver::GptDevicePartitioner::FindGptFds(fd, &gpt_devices);
+  return paver::GptDevicePartitioner::FindGptDevices(fd);
 }
 
 zx::result<fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>> Fastboot::ConnectToDynamicDataSink(
@@ -647,20 +647,22 @@ zx::result<fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>> Fastboot::Conne
                          .status_value());
   }
 
-  paver::GptDevicePartitioner::GptFds gpt_devices;
-  if (!FindGptDevices(gpt_devices)) {
+  zx::result device_result = FindGptDevices();
+  if (device_result.is_error()) {
     return zx::error(SendResponse(ResponseType::kFail, "Failed to find gpt devices", transport,
                                   zx::error(ZX_ERR_INTERNAL))
                          .status_value());
   }
+  std::vector<paver::GptDevicePartitioner::GptClients> gpt_devices =
+      std::move(device_result.value());
 
   // Filter out ramdisk block devices.
-  paver::GptDevicePartitioner::GptFds non_ramdisk_devices;
-  for (auto& [path, fd] : gpt_devices) {
-    if (path.find(kRamDiskString) != std::string::npos) {
+  std::vector<paver::GptDevicePartitioner::GptClients> non_ramdisk_devices;
+  for (paver::GptDevicePartitioner::GptClients& client : gpt_devices) {
+    if (client.topological_path.find(kRamDiskString) != std::string::npos) {
       continue;
     }
-    non_ramdisk_devices.push_back((std::make_pair(path, std::move(fd))));
+    non_ramdisk_devices.push_back(std::move(client));
   }
 
   if (non_ramdisk_devices.empty()) {
@@ -680,24 +682,11 @@ zx::result<fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>> Fastboot::Conne
                          .status_value());
   }
   auto [data_sink_local, data_sink_remote] = std::move(*data_sink);
-
-  fdio_cpp::FdioCaller caller(std::move(non_ramdisk_devices[0].second));
-  auto channel = caller.take_channel();
-  if (channel.is_error()) {
-    return zx::error(SendResponse(ResponseType::kFail, "Failed to take channel", transport,
-                                  zx::error(channel.status_value()))
-                         .status_value());
-  }
-  fidl::ClientEnd<fuchsia_hardware_block::Block> block_device(std::move(*channel));
-
-  // TODO(fxbug.dev/127870): Plumb the controller through.
-  zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-  if (controller_endpoints.is_error()) {
-    return controller_endpoints.take_error();
-  }
+  fidl::ClientEnd block_device = std::move(non_ramdisk_devices[0].block);
+  fidl::ClientEnd controller = std::move(non_ramdisk_devices[0].controller);
 
   auto res = paver_client_res.value()->UseBlockDevice(
-      std::move(block_device), std::move(controller_endpoints->client),
+      std::move(block_device), std::move(controller),
       fidl::ServerEnd<fuchsia_paver::DynamicDataSink>(data_sink_remote.TakeChannel()));
 
   if (!res.ok()) {

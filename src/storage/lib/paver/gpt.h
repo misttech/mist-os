@@ -89,12 +89,6 @@ class GptDevicePartitioner {
 
   fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root() { return svc_root_; }
 
-  using GptFds = std::vector<std::pair<std::string, fbl::unique_fd>>;
-
-  // Find all block devices which could contain a GPT.
-  // TODO(fxbug.dev/127870): Replace usages of this with FindGptDevices.
-  static bool FindGptFds(const fbl::unique_fd& devfs_root, GptFds* out);
-
   // FIDL clients for a block device that could contain a GPT.
   struct GptClients {
     std::string topological_path;
@@ -106,6 +100,11 @@ class GptDevicePartitioner {
   static zx::result<std::vector<GptClients>> FindGptDevices(const fbl::unique_fd& devfs_root);
 
  private:
+  using GptFds = std::vector<std::pair<std::string, fbl::unique_fd>>;
+  // Find all block devices which could contain a GPT.
+  // TODO(fxbug.dev/127870): Replace usages of this with FindGptDevices.
+  static bool FindGptFds(const fbl::unique_fd& devfs_root, GptFds* out);
+
   // Initializes GPT for a device which was explicitly provided. If |gpt_device| doesn't have a
   // valid GPT, it will initialize it with a valid one.
   static zx::result<std::unique_ptr<GptDevicePartitioner>> InitializeProvidedGptDevice(

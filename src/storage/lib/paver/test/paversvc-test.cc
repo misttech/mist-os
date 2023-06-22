@@ -2168,10 +2168,11 @@ TEST_F(PaverServiceLuisTest, FindGPTDevicesIgnoreFvmPartitions) {
   ASSERT_TRUE(status.is_ok());
 
   // Check that FVM created sub-partitions are not considered as candidates.
-  paver::GptDevicePartitioner::GptFds gpt_devices;
-  paver::GptDevicePartitioner::FindGptFds(devmgr_.devfs_root(), &gpt_devices);
-  ASSERT_EQ(gpt_devices.size(), 1);
-  ASSERT_EQ(gpt_devices[0].first, std::string("/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block"));
+  zx::result gpt_devices = paver::GptDevicePartitioner::FindGptDevices(devmgr_.devfs_root());
+  ASSERT_OK(gpt_devices);
+  ASSERT_EQ(gpt_devices.value().size(), 1);
+  ASSERT_EQ(gpt_devices.value()[0].topological_path,
+            std::string("/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block"));
 }
 
 TEST_F(PaverServiceLuisTest, WriteOpaqueVolume) {

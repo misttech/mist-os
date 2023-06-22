@@ -886,13 +886,21 @@ class FastbootFakeGptDevices : public Fastboot {
       : Fastboot(max_download_size, std::move(svc_root)),
         block_topology_paths_(std::move(block_topology_paths)) {}
 
-  bool FindGptDevices(paver::GptDevicePartitioner::GptFds& gpt_devices) override {
+  zx::result<std::vector<paver::GptDevicePartitioner::GptClients>> FindGptDevices() override {
+    std::vector<paver::GptDevicePartitioner::GptClients> devices;
     for (auto& ele : block_topology_paths_) {
-      // fd doesn't matter, test won't be using it. We just give a valid one.
-      gpt_devices.emplace_back(ele, fbl::unique_fd(open("/svc", O_RDONLY)));
+      // We need to have valid channels for the devices, but it doesn't matter what they are.
+      zx::channel block, controller;
+      if (zx_status_t status = zx::channel::create(0, &block, &controller); status != ZX_OK) {
+        return zx::error(status);
+      }
+      devices.push_back({
+          .topological_path = ele,
+          .block = fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(block)),
+          .controller = fidl::ClientEnd<fuchsia_device::Controller>(std::move(controller)),
+      });
     }
-
-    return true;
+    return zx::ok(std::move(devices));
   }
 
  private:

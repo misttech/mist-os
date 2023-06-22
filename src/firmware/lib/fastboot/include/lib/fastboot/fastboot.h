@@ -97,7 +97,7 @@ class __EXPORT Fastboot : public FastbootBase {
   // For test injection. Fastboot unittest doesn't have a realistic physical block device
   // environment. Specifically, our goal is to filter out ram disk. But in test we can only create
   // ramdisk block devices. Thus test will override this method to return fake topology path and fd.
-  virtual bool FindGptDevices(paver::GptDevicePartitioner::GptFds &gpt_devices);
+  virtual zx::result<std::vector<paver::GptDevicePartitioner::GptClients>> FindGptDevices();
 };
 
 }  // namespace fastboot
