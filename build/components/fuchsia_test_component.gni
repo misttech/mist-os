@@ -27,12 +27,15 @@ template("fuchsia_test_component") {
     forward_variables_from(invoker,
                            "*",
                            [
+                             "manifest",
                              "testonly",
                              "metadata",
+
+                             # don't override target name from invoker as it is
+                             # used below and in `fuchsia_component` template
+                             "target_name",
                            ])
-    if (defined(invoker.manifest) && !defined(manifest)) {
-      manifest = invoker.manifest
-    }
+    forward_variables_from(invoker, [ "manifest" ])
     testonly = true
     metadata = {
       if (defined(invoker.metadata)) {
