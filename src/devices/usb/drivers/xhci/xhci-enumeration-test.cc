@@ -20,9 +20,12 @@
 
 #include "src/devices/usb/drivers/xhci/xhci-enumeration.h"
 
+#include <fuchsia/hardware/usb/descriptor/c/banjo.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
 #include <lib/mmio-ptr/fake.h>
+#include <lib/mmio/mmio-buffer.h>
+#include <zircon/syscalls.h>
 
 #include <atomic>
 #include <thread>
@@ -30,7 +33,7 @@
 #include <fake-dma-buffer/fake-dma-buffer.h>
 #include <zxtest/zxtest.h>
 
-#include "fuchsia/hardware/usb/descriptor/c/banjo.h"
+#include "src/devices/lib/mmio/test-helper.h"
 #include "src/devices/usb/drivers/xhci/usb-xhci.h"
 #include "src/devices/usb/drivers/xhci/xhci-event-ring.h"
 
@@ -328,19 +331,14 @@ void UsbXhci::UsbHciRequestQueue(usb_request_t* usb_request,
 
 uint16_t UsbXhci::InterrupterMapping() { return 0; }
 
+// Interrupter takes a View which needs to refer back to a MmioBuffer that
+// hasn't gone out of scope, so since there's no other scaffolding here we're
+// going to just hold it here.
+fdf::MmioBuffer kInterruptorMmio = fdf_testing::CreateMmioBuffer(zx_system_get_page_size());
 int UsbXhci::InitThread() {
   interrupters_ = fbl::MakeArray<Interrupter>(1);
   interrupters_[0].Init(0, 0, nullptr, {}, 0, {}, this, {}, nullptr);
-  mmio_buffer_t invalid_mmio = {
-      // Add a dummy vaddr to pass the check in the MmioBuffer constructor.
-      .vaddr = FakeMmioPtr(this),
-      .offset = 0,
-      .size = 0,
-      .vmo = ZX_HANDLE_INVALID,
-  };
-  invalid_mmio.size = 4;
-  interrupters_[0].Start(RuntimeRegisterOffset::Get().FromValue(0),
-                         fdf::MmioView(invalid_mmio, 0, 1));
+  interrupters_[0].Start(RuntimeRegisterOffset::Get().FromValue(0), kInterruptorMmio.View(0));
   device_state_ = fbl::MakeArray<fbl::RefPtr<DeviceState>>(32);
   return 0;
 }
