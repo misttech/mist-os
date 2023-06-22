@@ -20,8 +20,8 @@ use fidl_fuchsia_developer_ffx::{RepositoryIteratorMarker, RepositoryRegistryPro
 use fidl_fuchsia_developer_ffx_ext::{RepositoryConfig, RepositoryError, RepositorySpec};
 use fuchsia_url::RepositoryUrl;
 use pbms::{
-    get_images_dir, get_product_data, is_locally_built, is_pb_ready, product_bundle_urls,
-    select_auth, select_product_bundle, update_metadata_all, ListingMode,
+    is_locally_built, is_pb_ready, pbv1_get, product_bundle_urls, select_auth,
+    select_product_bundle, update_metadata_all, ListingMode,
 };
 use std::{
     collections::BTreeSet,
@@ -400,7 +400,25 @@ where
         }
     };
 
-    match download_product_bundle(&sdk, ui, cmd, &product_url, repos).await {
+    if pbv1_get::bundled_exists_locally(&sdk, &product_url).await? {
+        if cmd.force {
+            if let Err(e) = pb_remove_all(&sdk, ui, vec![product_url.clone()], true, repos).await {
+                let mut note = TableRows::builder();
+                let message =
+                    format!("Unexpected error removing the existing product bundle: {:?}", e);
+                note.title(message);
+                ui.present(&Presentation::Table(note)).expect("Problem presenting the note.");
+                return Ok(());
+            }
+        } else {
+            let mut note = TableRows::builder();
+            note.title("This product bundle is already downloaded. Use --force to replace it.");
+            ui.present(&Presentation::Table(note)).expect("Problem presenting the note.");
+            return Ok(());
+        }
+    }
+
+    match pbv1_get::download_product_bundle(&sdk, ui, cmd.oob_auth, &cmd.auth, &product_url).await {
         Ok(true) => tracing::debug!("Product Bundle downloaded successfully."),
         Ok(false) => tracing::debug!("Product Bundle download skipped."),
         Err(e) => {
@@ -492,49 +510,6 @@ async fn get_repository_name(
         }
     }
     Ok(repo_name)
-}
-
-/// Downloads the selected product bundle contents to the local storage directory.
-/// Returns:
-///   - Err(_) if the download fails unexpectedly.
-///   - Ok(false) if the download is skipped because the product bundle is already
-///     available in local storage.
-///   - Ok(true) if the files are successfully downloaded.
-async fn download_product_bundle<I>(
-    sdk: &ffx_config::Sdk,
-    ui: &mut I,
-    cmd: &GetCommand,
-    product_url: &Url,
-    repos: &RepositoryRegistryProxy,
-) -> Result<bool>
-where
-    I: structured_ui::Interface + Sync,
-{
-    let output_dir = pbms::get_product_dir(&product_url).await?;
-
-    // Go ahead and download the product images.
-    let path = get_images_dir(&product_url, sdk.get_path_prefix()).await;
-    if path.is_ok() && path.unwrap().exists() {
-        if cmd.force {
-            if let Err(e) = pb_remove_all(sdk, ui, vec![product_url.clone()], true, repos).await {
-                let mut note = TableRows::builder();
-                let message =
-                    format!("Unexpected error removing the existing product bundle: {:?}", e);
-                note.title(message);
-                ui.present(&Presentation::Table(note)).expect("Problem presenting the note.");
-                return Ok(false);
-            }
-        } else {
-            let mut note = TableRows::builder();
-            note.title("This product bundle is already downloaded. Use --force to replace it.");
-            ui.present(&Presentation::Table(note)).expect("Problem presenting the note.");
-            return Ok(false);
-        }
-    }
-
-    let client = Client::initial()?;
-    get_product_data(&product_url, &output_dir, select_auth(cmd.oob_auth, &cmd.auth), ui, &client)
-        .await
 }
 
 /// Sets up a package server repository for the product bundle being downloaded. This is
