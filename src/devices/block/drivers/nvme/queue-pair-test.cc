@@ -15,6 +15,7 @@
 
 #include "src/devices/block/drivers/nvme/commands.h"
 #include "src/devices/block/drivers/nvme/registers.h"
+#include "src/devices/lib/mmio/test-helper.h"
 
 namespace nvme {
 
@@ -26,14 +27,12 @@ class QueuePairTest : public zxtest::Test {
   TransactionData& txn(QueuePair* pair, size_t id) __TA_NO_THREAD_SAFETY_ANALYSIS {
     return pair->txns_[id];
   }
+
   zx::bti fake_bti_;
   // We only use the capability register for the doorbell stride, so 0 is fine.
   CapabilityReg caps_ = CapabilityReg::Get().FromValue(0);
-  fdf::MmioBuffer mmio_{mmio_buffer_t{.vaddr = FakeMmioPtr(this),
-                                      .offset = 0,
-                                      .size = NVME_REG_DOORBELL_BASE + 0x100,
-                                      .vmo = ZX_HANDLE_INVALID},
-                        &kMmioOps, this};
+  fdf::MmioBuffer mmio_ = fdf_testing::CreateMmioBuffer(
+      NVME_REG_DOORBELL_BASE * 0x100, ZX_CACHE_POLICY_UNCACHED_DEVICE, &kMmioOps, this);
 
   // void doorbell_ring(bool is_completion, size_t queue_id, uint16_t value)
   std::function<void(bool, size_t, uint16_t)> doorbell_ring_;

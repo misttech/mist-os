@@ -91,6 +91,7 @@ test("nvme-queue-pair-tests-bin") {
     ":nvme_bind",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
+    "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/fake-bti",
     "//src/lib/ddk",
     "//zircon/system/ulib/hwreg",
