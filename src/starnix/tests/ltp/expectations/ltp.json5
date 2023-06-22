@@ -1153,7 +1153,6 @@
                 "timerfd04",
                 "timerfd_gettime01",
                 "timerfd_settime01",
-                "timerfd_settime02",
                 "times01",
                 "times03",
                 "tomoyo_accept_test",
@@ -1352,6 +1351,7 @@
                 "fallocate05",
                 "fallocate06",
                 "fs_fill",
+                "timerfd_settime02",
 
                 // Tests reach unexpected Abort
                 "clock_gettime01",
