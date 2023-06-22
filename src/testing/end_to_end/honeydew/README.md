@@ -73,6 +73,15 @@ To fully uninstall HoneyDew, delete the virtual environment that was crated
 ## Usage
 
 ### Device object creation
+First compile fuchsia with `fx build` before running these commands.
+
+From your Fuchsia directory, change to your build directory:
+```shell
+~/fuchsia$ cd $(cat .fx-build-dir)
+```
+
+Now you can use the `fuchsia-vendored-python` interpreter and play around with
+HoneyDew:
 ```python
 # Update `sys.path` to include HoneyDew's path before importing it
 # Do this step only if you have not pip installed HoneyDew
@@ -81,6 +90,15 @@ To fully uninstall HoneyDew, delete the virtual environment that was crated
 >>> FUCHSIA_ROOT = os.environ.get("FUCHSIA_DIR")
 >>> HONEYDEW_ROOT = f"{FUCHSIA_ROOT}/src/testing/end_to_end/honeydew"
 >>> sys.path.append(HONEYDEW_ROOT)
+
+# Update `sys.path` to include Fuchsia Controller and FIDL IR paths before
+# importing Honeydew.
+>>> import subprocess
+>>> OUT_DIR = subprocess.check_output( \
+  "echo $(cat \"$FUCHSIA_DIR\"/.fx-build-dir)", \
+  shell=True).strip().decode('utf-8')
+>>> sys.path.append(f"{FUCHSIA_ROOT}/src/developer/ffx/lib/fuchsia-controller/python")
+>>> sys.path.append(f"{FUCHSIA_ROOT}/{OUT_DIR}/host_x64")
 
 # Enable Info logging
 >>> import logging
@@ -264,6 +282,10 @@ follow the below instructions every time HoneyDew code is changed.
 
 
 ### Code Coverage
+**Running** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/coverage.sh`
+**will automatically perform the below mentioned coverage steps. Use this to**
+**ensure code you have touched has unit test coverage.**
+
 It is a hard requirement that HoneyDew code is well tested using a combination
 of unit and functional tests.
 
@@ -291,14 +313,24 @@ follow the below instructions every time HoneyDew code is changed:
   `pip show parameterized`
 * Run the below commands and ensure code you have touched has unit test coverage
 ```shell
+# Set up environment for running coverage tool
+(fuchsia_python_venv)~/fuchsia$ BUILD_DIR=$(cat "$FUCHSIA_DIR"/.fx-build-dir)
+(fuchsia_python_venv)~/fuchsia$ OLD_PYTHONPATH=$PYTHONPATH
+(fuchsia_python_venv)~/fuchsia$ PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$PYTHONPATH
+(fuchsia_python_venv)~/fuchsia$ pushd $FUCHSIA_DIR/$BUILD_DIR
+
 # Run unit tests using coverage tool
-(fuchsia_python_venv)~/fuchsia$ coverage run -m unittest discover --top-level-directory ~/fuchsia/src/testing/end_to_end/honeydew --start-directory ~/fuchsia/src/testing/end_to_end/honeydew/tests/unit_tests --pattern "*_test.py"
+(fuchsia_python_venv)~/fuchsia$ coverage run -m unittest discover --top-level-directory $FUCHSIA_DIR/src/testing/end_to_end/honeydew --start-directory $FUCHSIA_DIR/src/testing/end_to_end/honeydew/tests/unit_tests --pattern "*_test.py"
 
 # Run below command to generate code coverage stats
 (fuchsia_python_venv)~/fuchsia$ coverage report -m
 
 # Delete the .coverage file
 (fuchsia_python_venv)~/fuchsia$ rm -rf .coverage
+
+# Restore environment
+(fuchsia_python_venv)~/fuchsia$ PYTHONPATH=$OLD_PYTHONPATH
+(fuchsia_python_venv)~/fuchsia$ popd
 ```
 
 ### Cleanup
