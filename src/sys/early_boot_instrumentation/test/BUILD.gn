@@ -31,3 +31,12 @@ fuchsia_component("early-boot-instrumentation-provider") {
   manifest = "meta/provider.cml"
   deps = [ ":provider" ]
 }
+
+test("early-boot-collector-stub") {
+  sources = [ "collector-test.cc" ]
+  deps = [
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+  ]
+}

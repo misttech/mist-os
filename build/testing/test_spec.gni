@@ -149,10 +149,11 @@ foreach(dt, allowed_device_types) {
 #
 #   image_overrides (optional)
 #     [scope] Images to use instead of the defaults in images.json. This should
-#     only be used by boot_test() defined in //build/testing/zbi_test.gni
-#     which requires different images to boot the target with.
+#     only be used by boot_test() defined in //build/testing/boot_test.gni or
+#     cuckoo_kernel_zbi_test() defined in //build/testing/kernel_zbi_test.gni
+#     which require different images to boot the target with.
 #
-#     zbi, vbmeta, qemu_kernel, efi_disk (optional)
+#     zbi, vbmeta, qemu_kernel, efi_disk, fvm (optional)
 #       [label_with_toolchain] Specifies an override via label. One of
 #       these values must be set.
 #

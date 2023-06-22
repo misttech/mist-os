@@ -94,5 +94,6 @@ assembly_input_groups("test") {
     "//src/media/audio/audio_core:core_shard",
     "//src/settings/service:setui_service_core_shard",
     "//src/media/sounds/soundplayer:core_shard",
+    "//src/sys/test_manager:test_manager_core_shard",
   ]
 }

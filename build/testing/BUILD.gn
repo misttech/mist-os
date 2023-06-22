@@ -14,6 +14,9 @@ core_realm_definition("cuckoo-core-realm") {
     input_group_label = "//bundles/assembly_input_groups:${input_group}"
     deps += [ "${input_group_label}.core_realm_shards" ]
   }
+
+  # This shard is needed for snapshot.
+  deps += [ "//src/intl/intl_services:intl_services_shard" ]
 }
 
 product_assembly_configuration("cuckoo-product-configuration") {
