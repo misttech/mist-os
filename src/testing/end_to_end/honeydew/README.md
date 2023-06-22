@@ -36,6 +36,10 @@ as all of the in-tree code is developed using `fuchsia-vendored-python`
 # cd to Fuchsia root directory
 ~$ cd $FUCHSIA_DIR
 
+# Configure PYTHONPATH
+~/fuchsia$ BUILD_DIR=$(cat "$FUCHSIA_DIR"/.fx-build-dir)
+~/fuchsia$ PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$PYTHONPATH
+
 # create a virtual environment using `fuchsia-vendored-python`
 ~/fuchsia$ mkdir -p $FUCHSIA_DIR/src/testing/end_to_end/.venvs/
 ~/fuchsia$ fuchsia-vendored-python -m venv $FUCHSIA_DIR/src/testing/end_to_end/.venvs/fuchsia_python_venv
@@ -51,9 +55,9 @@ as all of the in-tree code is developed using `fuchsia-vendored-python`
 (fuchsia_python_venv)~/fuchsia/src/testing/end_to_end/honeydew$ python -m pip install --editable ".[test,guidelines]"
 
 # verify you are able to import honeydew from a python terminal running inside this virtual environment
-(fuchsia_python_venv)~/fuchsia/src/testing/end_to_end/honeydew$ cd $FUCHSIA_DIR
-(fuchsia_python_venv)~/fuchsia$
-(fuchsia_python_venv)~/fuchsia$ python
+(fuchsia_python_venv)~/fuchsia/src/testing/end_to_end/honeydew$ cd $FUCHSIA_DIR/$BUILD_DIR
+(fuchsia_python_venv)~/fuchsia/out/default$
+(fuchsia_python_venv)~/fuchsia.out/default$ python
 Python 3.8.8+chromium.12 (tags/v3.8.8-dirty:024d8058b0, Feb 19 2021, 16:18:16)
 [GCC 4.8.2 20140120 (Red Hat 4.8.2-15)] on linux
 Type "help", "copyright", "credits" or "license" for more information.

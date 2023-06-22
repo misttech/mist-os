@@ -7,6 +7,7 @@
 
 LACEWING_SRC="$FUCHSIA_DIR/src/testing/end_to_end"
 HONEYDEW_SRC="$LACEWING_SRC/honeydew"
+BUILD_DIR=$(cat "$FUCHSIA_DIR"/.fx-build-dir)
 
 VENV_ROOT_PATH="$LACEWING_SRC/.venvs"
 VENV_NAME="fuchsia_python_venv"
@@ -44,6 +45,11 @@ echo "Installing 'honeydew' module..."
 cd $HONEYDEW_SRC
 python -m pip install --editable ".[test,guidelines]"
 
+echo "Configuring environment for honeydew..."
+pushd $FUCHSIA_DIR/$BUILD_DIR > /dev/null
+OLD_PYTHONPATH=$PYTHONPATH
+PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$PYTHONPATH
+
 python -c "import honeydew"
 if [ $? -eq 0 ]; then
     echo "Successfully installed honeydew"
@@ -51,6 +57,9 @@ else
     echo "honeydew installation failed. Please try again by following instructions manually"
 fi
 
+echo "Restoring environment..."
+PYTHONPATH=$OLD_PYTHONPATH
+popd > /dev/null
 cd $STARTING_DIR
 
 echo "Installation is now completed..."
