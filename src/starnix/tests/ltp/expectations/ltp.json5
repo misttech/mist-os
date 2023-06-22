@@ -1333,9 +1333,6 @@
                 // TODO(fxbug.dev/128583) Re-enable once flake is resolved.
                 "sigwait01",
 
-                // Times out because getrusage is not implemented yet.
-                "getrusage04",
-
                 // Nothing stops us from creating lots and lots of processes.
                 "fork12",
 

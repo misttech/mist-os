@@ -867,17 +867,19 @@ pub fn sys_getrusage(
     const RUSAGE_SELF: i32 = crate::types::uapi::RUSAGE_SELF as i32;
     const RUSAGE_THREAD: i32 = crate::types::uapi::RUSAGE_THREAD as i32;
     // TODO(fxb/76811): Implement proper rusage.
-    match who {
-        RUSAGE_CHILDREN => (),
-        RUSAGE_SELF => (),
-        RUSAGE_THREAD => (),
+    let time_stats = match who {
+        RUSAGE_CHILDREN => current_task.task.thread_group.read().children_time_stats,
+        RUSAGE_SELF => current_task.task.thread_group.time_stats(),
+        RUSAGE_THREAD => current_task.task.time_stats(),
         _ => return error!(EINVAL),
     };
 
-    if !user_usage.is_null() {
-        let usage = rusage::default();
-        current_task.mm.write_object(user_usage, &usage)?;
-    }
+    let usage = rusage {
+        ru_utime: timeval_from_duration(time_stats.user_time),
+        ru_stime: timeval_from_duration(time_stats.system_time),
+        ..rusage::default()
+    };
+    current_task.mm.write_object(user_usage, &usage)?;
 
     Ok(())
 }
