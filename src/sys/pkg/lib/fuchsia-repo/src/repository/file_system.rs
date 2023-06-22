@@ -412,11 +412,29 @@ impl RepoStorage for FileSystemRepository {
                     } else {
                         false
                     };
+
                     if is_hardlink {
-                        // No work to do if src and dest are already hardlinks,
-                        // but only if we want it to be a hardlink.
-                    } else if async_fs::hard_link(&src, &dst).await.is_err() && dst_dirty {
-                        copy_blob(&src, &dst).await?
+                        // No work to do if src and dest are already hardlinks.
+                    } else {
+                        match async_fs::hard_link(&src, &dst).await {
+                            Ok(()) => {
+                                // FIXME(b/271694204): Workaround an unknown issue where hardlinks
+                                // aren't readable immediately after creation in some environments.
+                                if async_fs::metadata(&dst).await.is_err() {
+                                    warn!("Hardlink at {dst:?} not yet readable");
+                                    fuchsia_async::Timer::new(std::time::Duration::from_secs(1)).await;
+                                    if async_fs::metadata(&dst).await.is_err() {
+                                        warn!("Hardlink at {dst:?} still not readable, falling back to copy");
+                                        copy_blob(&src, &dst).await?
+                                    }
+                                }
+                            }
+                            Err(_) if dst_dirty => copy_blob(&src, &dst).await?,
+                            Err(_) => {
+                                // The dest file exists and has the right size,
+                                // but we failed to make it a hardlink.
+                            }
+                        }
                     }
                 }
             }
