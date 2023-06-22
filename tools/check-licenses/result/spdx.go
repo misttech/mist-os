@@ -52,7 +52,7 @@ func generateSPDXDoc(name string, projects []*project.Project, root *project.Pro
 		OtherLicenses:     make([]*spdx.OtherLicense, 0),
 		CreationInfo: &spdx.CreationInfo{
 			Creators: []spdx_common.Creator{
-				spdx_common.Creator{
+				{
 					Creator:     "fuchsia.googlesource.com/fuchsia/+/refs/head/main/tools/check-licenses",
 					CreatorType: "Tool",
 				},
@@ -64,7 +64,8 @@ func generateSPDXDoc(name string, projects []*project.Project, root *project.Pro
 	r := &spdx.Relationship{
 		RefA:         spdx_common.DocElementID{ElementRefID: doc.SPDXIdentifier},
 		RefB:         spdx_common.DocElementID{ElementRefID: rootPackage.PackageSPDXIdentifier},
-		Relationship: "DESCRIBES"}
+		Relationship: "DESCRIBES",
+	}
 	doc.Relationships = append(doc.Relationships, r)
 
 	for _, p := range projects {
@@ -78,7 +79,8 @@ func generateSPDXDoc(name string, projects []*project.Project, root *project.Pro
 			r := &spdx.Relationship{
 				RefA:         spdx_common.DocElementID{ElementRefID: rootPackage.PackageSPDXIdentifier},
 				RefB:         spdx_common.DocElementID{ElementRefID: pPackage.PackageSPDXIdentifier},
-				Relationship: "CONTAINS"}
+				Relationship: "CONTAINS",
+			}
 			doc.Relationships = append(doc.Relationships, r)
 		}
 
