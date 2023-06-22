@@ -313,8 +313,9 @@ static void gic_init_percpu() {
   auto status =
       system_topology::Graph::GetSystemTopology().ProcessorByLogicalId(logical_num, &node);
   if (status == ZX_OK) {
-    DEBUG_ASSERT(node->entity_type == ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR &&
-                 node->entity.processor.architecture == ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64);
+    DEBUG_ASSERT(node->entity.discriminant == ZBI_TOPOLOGY_ENTITY_PROCESSOR &&
+                 node->entity.processor.architecture_info.discriminant ==
+                     ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
     mask_translator.SetGicIdForLogicalId(logical_num,
                                          node->entity.processor.architecture_info.arm64.gic_id);
   } else {

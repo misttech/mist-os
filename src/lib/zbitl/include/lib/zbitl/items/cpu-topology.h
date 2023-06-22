@@ -17,9 +17,10 @@
 namespace zbitl {
 
 // CpuTopologyTable encodes the ZBI description of a CPU topology (per
-// ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2). Its main utility lies in provided backwards
+// ZBI_TYPE_CPU_TOPOLOGY). Its main utility lies in provided backwards
 // compatibility with arm bootloaders that pass the deprecated
-// ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1 type.
+// ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1 or ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2
+// types.
 class CpuTopologyTable {
  public:
   class iterator;
@@ -45,29 +46,33 @@ class CpuTopologyTable {
   iterator end() const;
 
  private:
-  class ConvertingIterator;
+  class V1ConvertingIterator;
+  class V2ConvertingIterator;
   struct Dispatch;
 
-  std::variant<cpp20::span<const zbi_topology_node_v2_t>, const zbi_cpu_config_t*> table_;
+  std::variant<cpp20::span<const zbi_topology_node_t>,     //
+               cpp20::span<const zbi_topology_node_v2_t>,  //
+               const zbi_cpu_config_t*>
+      table_;
 };
 
-class CpuTopologyTable::ConvertingIterator {
+class CpuTopologyTable::V1ConvertingIterator {
  public:
-  bool operator==(const ConvertingIterator& other) const {
+  bool operator==(const V1ConvertingIterator& other) const {
     return logical_id_ == other.logical_id_;
   }
 
-  bool operator!=(const ConvertingIterator& other) const { return !(*this == other); }
+  bool operator!=(const V1ConvertingIterator& other) const { return !(*this == other); }
 
-  ConvertingIterator& operator++();  // prefix
+  V1ConvertingIterator& operator++();  // prefix
 
-  ConvertingIterator operator++(int) {  // postfix
-    ConvertingIterator old = *this;
+  V1ConvertingIterator operator++(int) {  // postfix
+    V1ConvertingIterator old = *this;
     ++*this;
     return old;
   }
 
-  zbi_topology_node_v2_t operator*() const;
+  zbi_topology_node_t operator*() const;
 
  private:
   friend Dispatch;
@@ -80,12 +85,40 @@ class CpuTopologyTable::ConvertingIterator {
   std::optional<uint8_t> logical_id_;
 };
 
+class CpuTopologyTable::V2ConvertingIterator {
+ public:
+  bool operator==(const V2ConvertingIterator& other) const { return idx_ == other.idx_; }
+
+  bool operator!=(const V2ConvertingIterator& other) const { return !(*this == other); }
+
+  V2ConvertingIterator& operator++() {  // prefix
+    ZX_ASSERT_MSG(idx_, "cannot increment default-constructed iterator");
+    ZX_ASSERT_MSG(*idx_ < v2_nodes_.size(), "cannot increment end iterator");
+    ++*idx_;
+    return *this;
+  }
+
+  V2ConvertingIterator operator++(int) {  // postfix
+    V2ConvertingIterator old = *this;
+    ++*this;
+    return old;
+  }
+
+  zbi_topology_node_t operator*() const;
+
+ private:
+  friend Dispatch;
+
+  cpp20::span<const zbi_topology_node_v2_t> v2_nodes_;
+  std::optional<size_t> idx_;
+};
+
 class CpuTopologyTable::iterator {
  public:
   using iterator_category = std::input_iterator_tag;
-  using value_type = zbi_topology_node_v2_t;
-  using reference = zbi_topology_node_v2_t&;
-  using pointer = zbi_topology_node_v2_t*;
+  using value_type = zbi_topology_node_t;
+  using reference = zbi_topology_node_t&;
+  using pointer = zbi_topology_node_t*;
   using difference_type = ptrdiff_t;
 
   bool operator==(const iterator& other) const { return it_ == other.it_; }
@@ -102,14 +135,16 @@ class CpuTopologyTable::iterator {
     return old;
   }
 
-  zbi_topology_node_v2_t operator*() const {
+  zbi_topology_node_t operator*() const {
     return std::visit([](const auto& it) { return *it; }, it_);
   }
 
  private:
   friend Dispatch;
 
-  std::variant<cpp20::span<const zbi_topology_node_v2_t>::iterator, ConvertingIterator> it_;
+  std::variant<cpp20::span<const zbi_topology_node_t>::iterator, V1ConvertingIterator,
+               V2ConvertingIterator>
+      it_;
 };
 
 }  // namespace zbitl

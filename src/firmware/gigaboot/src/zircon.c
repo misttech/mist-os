@@ -6,7 +6,6 @@
 #include <inttypes.h>
 #include <lib/zbi-format/board.h>
 #include <lib/zbi-format/driver-config.h>
-#include <lib/zbi-format/internal/deprecated-cpu.h>
 #include <lib/zbi-format/internal/efi.h>
 #include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/memory.h>

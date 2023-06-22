@@ -151,8 +151,9 @@ static void topology_cpu_init() {
   lk_init_secondary_cpus(arch_max_num_cpus() - 1);
 
   for (auto* node : system_topology::GetSystemTopology().processors()) {
-    if (node->entity_type != ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR ||
-        node->entity.processor.architecture != ZBI_TOPOLOGY_ARCHITECTURE_V2_RISCV64) {
+    if (node->entity.discriminant != ZBI_TOPOLOGY_ENTITY_PROCESSOR ||
+        node->entity.processor.architecture_info.discriminant !=
+            ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64) {
       panic("Invalid processor node.");
     }
 
@@ -171,26 +172,26 @@ static void topology_cpu_init() {
 }
 
 // clang-format off
-static constexpr zbi_topology_node_v2_t fallback_topology = {
-  .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
-  .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+static constexpr zbi_topology_node_t kFallbackTopology = {
   .entity = {
+    .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
     .processor = {
-      .logical_ids = {0},
-      .logical_id_count = 1,
-      .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
-      .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_RISCV64,
       .architecture_info = {
+        .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
         .riscv64 = {
           .hart_id = 0,
         }
-      }
+      },
+      .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+      .logical_ids = {0},
+      .logical_id_count = 1,
     }
-  }
+  },
+  .parent_index = ZBI_TOPOLOGY_NO_PARENT,
 };
 // clang-format on
 
-static zx::result<fbl::Array<zbi_topology_node_v2_t>> sbi_detect_topology(size_t max_cpus) {
+static zx::result<fbl::Array<zbi_topology_node_t>> sbi_detect_topology(size_t max_cpus) {
   DEBUG_ASSERT(max_cpus > 0 && max_cpus <= SMP_MAX_CPUS);
 
   arch::HartId detected_harts[SMP_MAX_CPUS]{};
@@ -233,28 +234,28 @@ static zx::result<fbl::Array<zbi_topology_node_v2_t>> sbi_detect_topology(size_t
 
   // Construct a flat topology tree based on what was found
   fbl::AllocChecker ac;
-  auto nodes = fbl::MakeArray<zbi_topology_node_v2_t>(&ac, detected_hart_count);
+  auto nodes = fbl::MakeArray<zbi_topology_node_t>(&ac, detected_hart_count);
   if (!ac.check()) {
     return zx::error_result(ZX_ERR_NO_MEMORY);
   }
   for (size_t i = 0; i < detected_hart_count; i++) {
     // clang-format off
     nodes[i] = {
-      .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
-      .parent_index = ZBI_TOPOLOGY_NO_PARENT,
       .entity = {
-        .processor = {
-          .logical_ids = { static_cast<uint16_t>(i) },
-          .logical_id_count = 1,
-          .flags = static_cast<uint16_t>((i == 0) ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY : 0),
-          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_RISCV64,
+        .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+        .processor = {          
           .architecture_info = {
+            .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
             .riscv64 = {
               .hart_id = detected_harts[i],
-            }
-          }
+            },
+          },
+          .flags = (i == 0) ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY : zbi_topology_processor_flags_t{0},
+          .logical_ids = { static_cast<uint16_t>(i) },
+          .logical_id_count = 1,
         }
-      }
+      },
+      .parent_index = ZBI_TOPOLOGY_NO_PARENT,
     };
     // clang-format on
   }
@@ -289,7 +290,7 @@ static void init_topology(uint level) {
           "SMP: Failed to initialize system topolgy from handoff data, probing for secondary cpus via SBI\n");
 
       // Use SBI to try to detect secondary cpus.
-      zx::result<fbl::Array<zbi_topology_node_v2_t>> topo = sbi_detect_topology(max_cpus);
+      zx::result<fbl::Array<zbi_topology_node_t>> topo = sbi_detect_topology(max_cpus);
       if (topo.is_ok()) {
         // Assume the synthesized topology tree only contains processor nodes and thus
         // the size of the array is the total detected cpu count.
@@ -311,7 +312,7 @@ static void init_topology(uint level) {
            result);
 
     // Try to fallback to a topology of just this processor.
-    result = system_topology::Graph::InitializeSystemTopology(&fallback_topology, 1);
+    result = system_topology::Graph::InitializeSystemTopology(&kFallbackTopology, 1);
     ASSERT(result == ZX_OK);
   }
 

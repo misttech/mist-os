@@ -8,8 +8,8 @@
 
 #include <lib/ddk/platform-defs.h>
 #include <lib/zbi-format/board.h>
+#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
-#include <lib/zbi-format/internal/deprecated-cpu.h>
 #include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi/zbi.h>

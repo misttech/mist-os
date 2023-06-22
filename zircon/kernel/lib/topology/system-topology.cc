@@ -7,11 +7,13 @@
 
 #include <assert.h>
 #include <debug.h>
-#include <lib/zbi-format/internal/deprecated-cpu.h>
+#include <inttypes.h>
+#include <lib/zbi-format/cpu.h>
 #include <trace.h>
 #include <zircon/errors.h>
 
 #include <ktl/move.h>
+#include <ktl/optional.h>
 #include <ktl/unique_ptr.h>
 
 #include <ktl/enforce.h>
@@ -41,23 +43,19 @@ zx_status_t GrowVector(size_t new_size, fbl::Vector<T>* vector, fbl::AllocChecke
   return ZX_OK;
 }
 
-const char* ZbiTopologyTypeToString(zbi_topology_entity_type_v2_t type) {
+const char* ZbiTopologyTypeToString(uint64_t type) {
   switch (type) {
-    case ZBI_TOPOLOGY_ENTITY_V2_UNDEFINED:
-      return "undefined";
-    case ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR:
+    case ZBI_TOPOLOGY_ENTITY_PROCESSOR:
       return "processor";
-    case ZBI_TOPOLOGY_ENTITY_V2_CLUSTER:
+    case ZBI_TOPOLOGY_ENTITY_CLUSTER:
       return "cluster";
-    case ZBI_TOPOLOGY_ENTITY_V2_CACHE:
+    case ZBI_TOPOLOGY_ENTITY_CACHE:
       return "cache";
-    case ZBI_TOPOLOGY_ENTITY_V2_DIE:
+    case ZBI_TOPOLOGY_ENTITY_DIE:
       return "die";
-    case ZBI_TOPOLOGY_ENTITY_V2_SOCKET:
+    case ZBI_TOPOLOGY_ENTITY_SOCKET:
       return "socket";
-    case ZBI_TOPOLOGY_ENTITY_V2_POWER_PLANE:
-      return "power_plane";
-    case ZBI_TOPOLOGY_ENTITY_V2_NUMA_REGION:
+    case ZBI_TOPOLOGY_ENTITY_NUMA_REGION:
       return "numa_region";
   }
 
@@ -66,8 +64,7 @@ const char* ZbiTopologyTypeToString(zbi_topology_entity_type_v2_t type) {
 
 }  // namespace
 
-zx_status_t Graph::Initialize(Graph* graph, const zbi_topology_node_v2_t* flat_nodes,
-                              size_t count) {
+zx_status_t Graph::Initialize(Graph* graph, const zbi_topology_node_t* flat_nodes, size_t count) {
   DEBUG_ASSERT(flat_nodes != nullptr);
   DEBUG_ASSERT(count > 0);
 
@@ -89,18 +86,18 @@ zx_status_t Graph::Initialize(Graph* graph, const zbi_topology_node_v2_t* flat_n
   size_t logical_processor_count = 0;
 
   Node* node = nullptr;
-  const zbi_topology_node_v2_t* flat_node = nullptr;
+  const zbi_topology_node_t* flat_node = nullptr;
   for (size_t flat_node_index = 0; flat_node_index < count; ++flat_node_index) {
     flat_node = &flat_nodes[flat_node_index];
     node = &nodes[flat_node_index];
 
-    node->entity_type = flat_node->entity_type;
-    LTRACEF("index %zu type %d (%s)\n", flat_node_index, node->entity_type,
-            ZbiTopologyTypeToString((zbi_topology_entity_type_v2_t)node->entity_type));
+    node->entity.discriminant = flat_node->entity.discriminant;
+    LTRACEF("index %zu type %" PRIu64 " (%s)\n", flat_node_index, node->entity.discriminant,
+            ZbiTopologyTypeToString(node->entity.discriminant));
 
     // Copy info.
-    switch (node->entity_type) {
-      case ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR:
+    switch (node->entity.discriminant) {
+      case ZBI_TOPOLOGY_ENTITY_PROCESSOR:
         node->entity.processor = flat_node->entity.processor;
 
         processors.push_back(node, &checker);
@@ -118,13 +115,13 @@ zx_status_t Graph::Initialize(Graph* graph, const zbi_topology_node_v2_t* flat_n
           }
         }
         break;
-      case ZBI_TOPOLOGY_ENTITY_V2_CLUSTER:
+      case ZBI_TOPOLOGY_ENTITY_CLUSTER:
         node->entity.cluster = flat_node->entity.cluster;
         break;
-      case ZBI_TOPOLOGY_ENTITY_V2_NUMA_REGION:
+      case ZBI_TOPOLOGY_ENTITY_NUMA_REGION:
         node->entity.numa_region = flat_node->entity.numa_region;
         break;
-      case ZBI_TOPOLOGY_ENTITY_V2_CACHE:
+      case ZBI_TOPOLOGY_ENTITY_CACHE:
         node->entity.cache = flat_node->entity.cache;
         break;
       default:
@@ -153,7 +150,7 @@ zx_status_t Graph::Initialize(Graph* graph, const zbi_topology_node_v2_t* flat_n
   return ZX_OK;
 }
 
-zx_status_t Graph::InitializeSystemTopology(const zbi_topology_node_v2_t* nodes, size_t count) {
+zx_status_t Graph::InitializeSystemTopology(const zbi_topology_node_t* nodes, size_t count) {
   if (count == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -169,7 +166,7 @@ zx_status_t Graph::InitializeSystemTopology(const zbi_topology_node_v2_t* nodes,
   return ZX_OK;
 }
 
-bool Graph::Validate(const zbi_topology_node_v2_t* nodes, size_t count) {
+bool Graph::Validate(const zbi_topology_node_t* nodes, size_t count) {
   DEBUG_ASSERT(nodes != nullptr);
   DEBUG_ASSERT(count > 0);
 
@@ -178,21 +175,19 @@ bool Graph::Validate(const zbi_topology_node_v2_t* nodes, size_t count) {
     parents[i] = ZBI_TOPOLOGY_NO_PARENT;
   }
 
-  uint8_t current_type = ZBI_TOPOLOGY_ENTITY_V2_UNDEFINED;
+  ktl::optional<uint64_t> current_type;
   int current_depth = 0;
 
-  const zbi_topology_node_v2_t* node;
+  const zbi_topology_node_t* node;
   for (size_t index = 0; index < count; index++) {
     // Traverse the nodes in reverse order.
     const size_t current_index = count - index - 1;
 
     node = &nodes[current_index];
 
-    if (current_type == ZBI_TOPOLOGY_ENTITY_V2_UNDEFINED) {
-      current_type = node->entity_type;
-    }
-
-    if (current_type != node->entity_type) {
+    if (!current_type) {
+      current_type = node->entity.discriminant;
+    } else if (current_type != node->entity.discriminant) {
       if (current_index == parents[current_depth]) {
         // If the type changes then it should be the parent of the
         // previous level.
@@ -202,7 +197,7 @@ bool Graph::Validate(const zbi_topology_node_v2_t* nodes, size_t count) {
           ValidationError(current_index, "Structure is too deep, we only support 20 levels.");
           return false;
         }
-      } else if (node->entity_type == ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR) {
+      } else if (node->entity.discriminant == ZBI_TOPOLOGY_ENTITY_PROCESSOR) {
         // If it isn't the parent of the previous level, but it is a process than we have
         // encountered a new branch and should start walking from the bottom again.
 
@@ -219,7 +214,7 @@ bool Graph::Validate(const zbi_topology_node_v2_t* nodes, size_t count) {
                         "parents");
         return false;
       }
-      current_type = node->entity_type;
+      current_type = node->entity.discriminant;
     }
 
     if (parents[current_depth] == ZBI_TOPOLOGY_NO_PARENT) {
@@ -230,13 +225,13 @@ bool Graph::Validate(const zbi_topology_node_v2_t* nodes, size_t count) {
     }
 
     // Ensure that all leaf nodes are processors.
-    if (current_depth == 0 && node->entity_type != ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR) {
+    if (current_depth == 0 && node->entity.discriminant != ZBI_TOPOLOGY_ENTITY_PROCESSOR) {
       ValidationError(current_index, "Encountered a leaf node that isn't a processor.");
       return false;
     }
 
     // Ensure that all processors are leaf nodes.
-    if (current_depth != 0 && node->entity_type == ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR) {
+    if (current_depth != 0 && node->entity.discriminant == ZBI_TOPOLOGY_ENTITY_PROCESSOR) {
       ValidationError(current_index, "Encountered a processor that isn't a leaf node.");
       return false;
     }
@@ -270,11 +265,10 @@ void Graph::Dump() {
   for (size_t i = 0; i < count; i++) {
     const auto* cpu = processors_[i];
 
-    DEBUG_ASSERT(cpu->entity_type == ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR);
+    DEBUG_ASSERT(cpu->entity.discriminant == ZBI_TOPOLOGY_ENTITY_PROCESSOR);
     printf("processor %u", cpu->entity.processor.logical_ids[0]);
     for (const auto* node = cpu->parent; node; node = node->parent) {
-      printf(" -> %s (id %zu) ",
-             ZbiTopologyTypeToString((zbi_topology_entity_type_v2_t)node->entity_type),
+      printf(" -> %s (id %zu) ", ZbiTopologyTypeToString(node->entity.discriminant),
              node_to_id(node));
     }
     printf("\n");
@@ -290,7 +284,7 @@ uint8_t GetPerformanceClass(cpu_num_t cpu_id) {
   DEBUG_ASSERT(cpu_node != nullptr);
 
   for (Node* node = cpu_node->parent; node != nullptr; node = node->parent) {
-    if (node->entity_type == ZBI_TOPOLOGY_ENTITY_V2_CLUSTER) {
+    if (node->entity.discriminant == ZBI_TOPOLOGY_ENTITY_CLUSTER) {
       return node->entity.cluster.performance_class;
     }
   }

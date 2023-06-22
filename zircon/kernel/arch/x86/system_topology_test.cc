@@ -20,7 +20,7 @@ bool test_cpus_z840() {
   BEGIN_TEST;
 
   arch::testing::FakeCpuidIo io(arch::testing::X86Microprocessor::kIntelXeonE5_2690_V4);
-  fbl::Vector<zbi_topology_node_v2_t> flat_topology;
+  fbl::Vector<zbi_topology_node_t> flat_topology;
   auto status = x86::GenerateFlatTopology(io, acpi_lite::testing::Z840AcpiParser(), &flat_topology);
   ASSERT_EQ(ZX_OK, status);
 
@@ -34,22 +34,22 @@ bool test_cpus_z840() {
   int last_cache = -1;
   for (int i = 0; i < (int)flat_topology.size(); i++) {
     const auto& node = flat_topology[i];
-    switch (node.entity_type) {
-      case ZBI_TOPOLOGY_ENTITY_V2_NUMA_REGION:
+    switch (node.entity.discriminant) {
+      case ZBI_TOPOLOGY_ENTITY_NUMA_REGION:
         last_numa = i;
         numa_count++;
         break;
-      case ZBI_TOPOLOGY_ENTITY_V2_DIE:
+      case ZBI_TOPOLOGY_ENTITY_DIE:
         EXPECT_EQ(last_numa, node.parent_index);
         last_die = i;
         die_count++;
         break;
-      case ZBI_TOPOLOGY_ENTITY_V2_CACHE:
+      case ZBI_TOPOLOGY_ENTITY_CACHE:
         EXPECT_EQ(last_die, node.parent_index);
         last_cache = i;
         cache_count++;
         break;
-      case ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR:
+      case ZBI_TOPOLOGY_ENTITY_PROCESSOR:
         EXPECT_EQ(last_cache, node.parent_index);
         core_count++;
         thread_count += node.entity.processor.logical_id_count;
@@ -77,7 +77,7 @@ bool test_cpus_2970wx_x399() {
   BEGIN_TEST;
 
   arch::testing::FakeCpuidIo io(arch::testing::X86Microprocessor::kAmdRyzenThreadripper2970wx);
-  fbl::Vector<zbi_topology_node_v2_t> flat_topology;
+  fbl::Vector<zbi_topology_node_t> flat_topology;
   auto status =
       x86::GenerateFlatTopology(io, acpi_lite::testing::Sys2970wxAcpiParser(), &flat_topology);
   ASSERT_EQ(ZX_OK, status);
@@ -92,22 +92,22 @@ bool test_cpus_2970wx_x399() {
   int last_cache = -1;
   for (int i = 0; i < (int)flat_topology.size(); i++) {
     const auto& node = flat_topology[i];
-    switch (node.entity_type) {
-      case ZBI_TOPOLOGY_ENTITY_V2_NUMA_REGION:
+    switch (node.entity.discriminant) {
+      case ZBI_TOPOLOGY_ENTITY_NUMA_REGION:
         last_numa = i;
         numa_count++;
         break;
-      case ZBI_TOPOLOGY_ENTITY_V2_DIE:
+      case ZBI_TOPOLOGY_ENTITY_DIE:
         EXPECT_EQ(last_numa, node.parent_index);
         last_die = i;
         die_count++;
         break;
-      case ZBI_TOPOLOGY_ENTITY_V2_CACHE:
+      case ZBI_TOPOLOGY_ENTITY_CACHE:
         EXPECT_EQ(last_die, node.parent_index);
         last_cache = i;
         cache_count++;
         break;
-      case ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR:
+      case ZBI_TOPOLOGY_ENTITY_PROCESSOR:
         EXPECT_EQ(last_cache, node.parent_index);
         core_count++;
         thread_count += node.entity.processor.logical_id_count;
@@ -137,7 +137,7 @@ bool test_cpus_fallback() {
   // thread to one core to one package, multiplied by the number of processors
   // enumerated by ACPI.
   arch::testing::FakeCpuidIo io;
-  fbl::Vector<zbi_topology_node_v2_t> flat_topology;
+  fbl::Vector<zbi_topology_node_t> flat_topology;
   auto status =
       x86::GenerateFlatTopology(io, acpi_lite::testing::PixelbookEveAcpiParser(), &flat_topology);
   ASSERT_EQ(ZX_OK, status);
@@ -149,17 +149,17 @@ bool test_cpus_fallback() {
   int thread_count = 0;
   for (int i = 0; i < (int)flat_topology.size(); i++) {
     const auto& node = flat_topology[i];
-    switch (node.entity_type) {
-      case ZBI_TOPOLOGY_ENTITY_V2_NUMA_REGION:
+    switch (node.entity.discriminant) {
+      case ZBI_TOPOLOGY_ENTITY_NUMA_REGION:
         numa_count++;
         break;
-      case ZBI_TOPOLOGY_ENTITY_V2_DIE:
+      case ZBI_TOPOLOGY_ENTITY_DIE:
         die_count++;
         break;
-      case ZBI_TOPOLOGY_ENTITY_V2_CACHE:
+      case ZBI_TOPOLOGY_ENTITY_CACHE:
         cache_count++;
         break;
-      case ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR:
+      case ZBI_TOPOLOGY_ENTITY_PROCESSOR:
         core_count++;
         thread_count += node.entity.processor.logical_id_count;
         break;

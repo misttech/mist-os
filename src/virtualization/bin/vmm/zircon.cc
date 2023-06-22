@@ -9,8 +9,8 @@
 #include <lib/fdio/fd.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/board.h>
+#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
-#include <lib/zbi-format/internal/deprecated-cpu.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/error-string.h>

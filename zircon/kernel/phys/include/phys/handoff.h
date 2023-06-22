@@ -11,7 +11,7 @@
 #include <lib/crypto/entropy_pool.h>
 #include <lib/uart/all.h>
 #include <lib/zbi-format/board.h>
-#include <lib/zbi-format/internal/deprecated-cpu.h>
+#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/reboot.h>
 #include <lib/zbi-format/zbi.h>
@@ -117,8 +117,8 @@ struct PhysHandoff {
   // ZBI_TYPE_MEM_CONFIG payload.
   PhysHandoffTemporarySpan<const zbi_mem_range_t> mem_config;
 
-  // ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2 payload (or translated legacy equivalent).
-  PhysHandoffTemporarySpan<const zbi_topology_node_v2_t> cpu_topology;
+  // ZBI_TYPE_CPU_TOPOLOGY payload (or translated legacy equivalents).
+  PhysHandoffTemporarySpan<const zbi_topology_node_t> cpu_topology;
 
   // ZBI_TYPE_CRASHLOG payload.
   PhysHandoffTemporaryString crashlog;

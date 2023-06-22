@@ -51,36 +51,37 @@ static const zbi_platform_id_t platform_id = {
 
 static void add_cpu_topology(zbi_header_t* zbi) {
 #define TOPOLOGY_CPU_COUNT 4
-  zbi_topology_node_v2_t nodes[TOPOLOGY_CPU_COUNT];
+  zbi_topology_node_t nodes[TOPOLOGY_CPU_COUNT];
 
   for (uint8_t index = 0; index < TOPOLOGY_CPU_COUNT; index++) {
-    nodes[index] = (zbi_topology_node_v2_t){
-        .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
-        .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+    nodes[index] = (zbi_topology_node_t){
         .entity =
             {
+                .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
                 .processor =
                     {
-                        .logical_ids = {index},
-                        .logical_id_count = 1,
-                        .flags = index == 0 ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY
-                                            : (zbi_topology_processor_flags_t)0,
-                        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
+
                         .architecture_info =
                             {
+                                .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
                                 .arm64 =
                                     {
                                         .cpu_id = index,
                                         .gic_id = index,
                                     },
                             },
+                        .flags = index == 0 ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY
+                                            : (zbi_topology_processor_flags_t)0,
+                        .logical_ids = {index},
+                        .logical_id_count = 1,
                     },
             },
+        .parent_index = ZBI_TOPOLOGY_NO_PARENT,
     };
   }
 
-  append_boot_item(zbi, ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2, sizeof(zbi_topology_node_v2_t), &nodes,
-                   sizeof(zbi_topology_node_v2_t) * TOPOLOGY_CPU_COUNT);
+  append_boot_item(zbi, ZBI_TYPE_CPU_TOPOLOGY, sizeof(zbi_topology_node_t), &nodes,
+                   sizeof(zbi_topology_node_t) * TOPOLOGY_CPU_COUNT);
 }
 
 static void append_board_boot_item(zbi_header_t* bootdata) {
