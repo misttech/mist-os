@@ -155,7 +155,9 @@ pub struct Kernel {
 struct InterfacesHandlerImpl(Weak<Kernel>);
 
 impl InterfacesHandlerImpl {
-    fn with_netstack_devices<F: FnOnce(&Arc<NetstackDevices>, Option<&FileSystemHandle>)>(
+    fn with_netstack_devices<
+        F: FnOnce(&Arc<NetstackDevices>, Option<&FileSystemHandle>, Option<&FileSystemHandle>),
+    >(
         &mut self,
         f: F,
     ) {
@@ -164,17 +166,17 @@ impl InterfacesHandlerImpl {
             // The kernel may be getting torn-down.
             return
         };
-        f(&rc.netstack_devices, rc.proc_fs.get())
+        f(&rc.netstack_devices, rc.proc_fs.get(), rc.sys_fs.get())
     }
 }
 
 impl InterfacesHandler for InterfacesHandlerImpl {
     fn handle_new_link(&mut self, name: &str) {
-        self.with_netstack_devices(|devs, proc_fs| devs.add_dev(name, proc_fs))
+        self.with_netstack_devices(|devs, proc_fs, sys_fs| devs.add_dev(name, proc_fs, sys_fs))
     }
 
     fn handle_deleted_link(&mut self, name: &str) {
-        self.with_netstack_devices(|devs, _proc_fs| devs.remove_dev(name))
+        self.with_netstack_devices(|devs, _proc_fs, _sys_fs| devs.remove_dev(name))
     }
 }
 

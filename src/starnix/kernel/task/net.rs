@@ -7,7 +7,9 @@ use std::{collections::HashMap, sync::Arc};
 
 struct NetstackDevice {
     /// The device-specific directories that are found under `/proc/sys/net`.
-    proc_sys_net: ProcSysNetDev,
+    proc_sys_net: Option<ProcSysNetDev>,
+    /// The device-specific node found under `/sys/class.net`.
+    sys_class_net: Option<Arc<FsNode>>,
 }
 
 /// Keeps track of network devices and their [`NetstackDevice`].
@@ -17,13 +19,27 @@ pub struct NetstackDevices {
 }
 
 impl NetstackDevices {
-    pub fn add_dev(&self, name: &str, proc_fs: Option<&FileSystemHandle>) {
-        // procfs may not be mounted.
-        if let Some(proc_fs) = proc_fs {
-            let mut entries = self.entries.lock();
-            entries
-                .insert(name.into(), NetstackDevice { proc_sys_net: ProcSysNetDev::new(proc_fs) });
-        }
+    pub fn add_dev(
+        &self,
+        name: &str,
+        proc_fs: Option<&FileSystemHandle>,
+        sys_fs: Option<&FileSystemHandle>,
+    ) {
+        // procfs or sysfs may not be mounted.
+        let proc_sys_net = proc_fs.map(ProcSysNetDev::new);
+        let sys_class_net = sys_fs.map(|sys_fs| {
+            // nodes in `/sys/class/net` are normally symlinks into
+            // `/sys/devices`. However, currently known use-cases only enumerate
+            // the nodes in `/sys/class/net` so we enable that use-case with the
+            // workaround here where we create empty directories.
+            //
+            // TODO(https://fxbug.dev/128794): Support `/sys/class/net`
+            // properly.
+            StaticDirectoryBuilder::new(sys_fs).build()
+        });
+
+        let mut entries = self.entries.lock();
+        entries.insert(name.into(), NetstackDevice { proc_sys_net, sys_class_net });
     }
 
     pub fn remove_dev(&self, name: &str) {
@@ -34,26 +50,33 @@ impl NetstackDevices {
 }
 
 /// An implementation of a directory holding netstack interface-specific
-/// directories such as those found under `/proc/sys/net`.
+/// directories such as those found under `/proc/sys/net` and `/sys/class/net`.
 pub struct NetstackDevicesDirectory {
     inner: Arc<NetstackDevices>,
-    dir_fn: fn(&NetstackDevice) -> &Arc<FsNode>,
+    dir_fn: fn(&NetstackDevice) -> Option<&Arc<FsNode>>,
 }
 
 impl NetstackDevicesDirectory {
     pub fn new_proc_sys_net_ipv4_neigh(inner: Arc<NetstackDevices>) -> Arc<Self> {
-        Self::new(inner, |d| ProcSysNetDev::get_ipv4_neigh(&d.proc_sys_net))
+        Self::new(inner, |d| d.proc_sys_net.as_ref().map(ProcSysNetDev::get_ipv4_neigh))
     }
 
     pub fn new_proc_sys_net_ipv6_conf(inner: Arc<NetstackDevices>) -> Arc<Self> {
-        Self::new(inner, |d| ProcSysNetDev::get_ipv6_conf(&d.proc_sys_net))
+        Self::new(inner, |d| d.proc_sys_net.as_ref().map(ProcSysNetDev::get_ipv6_conf))
     }
 
     pub fn new_proc_sys_net_ipv6_neigh(inner: Arc<NetstackDevices>) -> Arc<Self> {
-        Self::new(inner, |d| ProcSysNetDev::get_ipv6_neigh(&d.proc_sys_net))
+        Self::new(inner, |d| d.proc_sys_net.as_ref().map(ProcSysNetDev::get_ipv6_neigh))
     }
 
-    fn new(inner: Arc<NetstackDevices>, dir_fn: fn(&NetstackDevice) -> &Arc<FsNode>) -> Arc<Self> {
+    pub fn new_sys_class_net(inner: Arc<NetstackDevices>) -> Arc<Self> {
+        Self::new(inner, |d| d.sys_class_net.as_ref())
+    }
+
+    fn new(
+        inner: Arc<NetstackDevices>,
+        dir_fn: fn(&NetstackDevice) -> Option<&Arc<FsNode>>,
+    ) -> Arc<Self> {
         Arc::new(Self { inner, dir_fn })
     }
 }
@@ -77,7 +100,7 @@ impl FsNodeOps for Arc<NetstackDevicesDirectory> {
         name: &FsStr,
     ) -> Result<Arc<FsNode>, Errno> {
         let entries = self.inner.entries.lock();
-        entries.get(name).map(self.dir_fn).map(Arc::clone).ok_or_else(|| {
+        entries.get(name).and_then(self.dir_fn).map(Arc::clone).ok_or_else(|| {
             errno!(
                 ENOENT,
                 format!(
@@ -118,7 +141,7 @@ impl FileOps for Arc<NetstackDevicesDirectory> {
         // Subtract 2 from the offset to account for `.` and `..`.
         let entries = self.inner.entries.lock();
         for (name, node) in entries.iter().skip(sink.offset() as usize - 2) {
-            let node = (self.dir_fn)(node);
+            let Some(node) = (self.dir_fn)(node) else { continue };
             sink.add(
                 node.node_id,
                 sink.offset() + 1,

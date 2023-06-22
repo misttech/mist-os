@@ -29,6 +29,7 @@ impl SysFs {
     pub fn new_fs(kernel: &Kernel, options: FileSystemOptions) -> FileSystemHandle {
         let fs = FileSystem::new(kernel, CacheMode::Cached, SysFs, options);
         let mut dir = StaticDirectoryBuilder::new(&fs);
+        let dir_mode = mode!(IFDIR, 0o755);
         dir.subdir(b"fs", 0o755, |dir| {
             dir.subdir(b"selinux", 0o755, |_| ());
             dir.subdir(b"bpf", 0o755, |_| ());
@@ -48,8 +49,17 @@ impl SysFs {
         dir.entry(
             b"devices",
             SysFsDirectory::new(Arc::downgrade(&kernel.device_registry.read().root_kobject())),
-            mode!(IFDIR, 0o755),
+            dir_mode,
         );
+
+        dir.subdir(b"class", 0o755, |dir| {
+            dir.entry(
+                b"net",
+                NetstackDevicesDirectory::new_sys_class_net(kernel.netstack_devices.clone()),
+                dir_mode,
+            );
+        });
+
         // TODO(fxbug.dev/121327): Temporary fix of flakeness in tcp_socket_test.
         // Remove after registry.rs refactor is in place.
         kernel

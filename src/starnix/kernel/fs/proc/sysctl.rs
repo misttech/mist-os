@@ -156,8 +156,10 @@ fn sysctl_net_diretory(fs: &FileSystemHandle, kernel: &Arc<Kernel>) -> FsNodeHan
     //
     //   conf/all/*:
     //	   Change all the interface-specific settings.
-    devs.add_dev("all", Some(fs));
-    devs.add_dev("default", Some(fs));
+    //
+    // Note that the all/default directories don't exist in `/sys/class/net`.
+    devs.add_dev("all", Some(fs), None /* sys_fs */);
+    devs.add_dev("default", Some(fs), None /* sys_fs */);
 
     dir.subdir(b"core", 0o555, |dir| {
         dir.entry(b"bpf_jit_enable", StubSysctl::new_node(), file_mode);
