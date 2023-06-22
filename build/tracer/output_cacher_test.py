@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import time
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import output_cacher
@@ -38,35 +39,45 @@ class TempFileTransformTests(unittest.TestCase):
 
     def test_transform_suffix_only(self):
         self.assertEqual(
-            output_cacher.TempFileTransform(
-                suffix=".tmp").transform("foo/bar.o"), "foo/bar.o.tmp")
+            output_cacher.TempFileTransform(suffix=".tmp").transform(
+                Path("foo/bar.o")),
+            Path("foo/bar.o.tmp"),
+        )
 
     def test_transform_temp_dir_only(self):
         self.assertEqual(
-            output_cacher.TempFileTransform(
-                temp_dir="t/m/p").transform("foo/bar.o"), "t/m/p/foo/bar.o")
+            output_cacher.TempFileTransform(temp_dir=Path("t/m/p")).transform(
+                Path("foo/bar.o")),
+            Path("t/m/p/foo/bar.o"),
+        )
 
     def test_transform_suffix_and_temp_dir(self):
         self.assertEqual(
             output_cacher.TempFileTransform(
-                temp_dir="/t/m/p", suffix=".foo").transform("foo/bar.o"),
-            "/t/m/p/foo/bar.o.foo")
+                temp_dir=Path("/t/m/p"),
+                suffix=".foo").transform(Path("foo/bar.o")),
+            Path("/t/m/p/foo/bar.o.foo"),
+        )
 
     def test_transform_basename_prefix_only(self):
         self.assertEqual(
-            output_cacher.TempFileTransform(
-                basename_prefix="fake.").transform("bar.o"), "fake.bar.o")
+            output_cacher.TempFileTransform(basename_prefix="fake.").transform(
+                Path("bar.o")),
+            Path("fake.bar.o"),
+        )
         self.assertEqual(
-            output_cacher.TempFileTransform(
-                basename_prefix="fake.").transform("foo/bar.o"),
-            "foo/fake.bar.o")
+            output_cacher.TempFileTransform(basename_prefix="fake.").transform(
+                Path("foo/bar.o")),
+            Path("foo/fake.bar.o"),
+        )
 
     def test_transform_basename_prefix_and_temp_dir(self):
         self.assertEqual(
             output_cacher.TempFileTransform(
                 temp_dir="/t/m/p",
-                basename_prefix="xyz-").transform("foo/bar.o"),
-            "/t/m/p/foo/xyz-bar.o")
+                basename_prefix="xyz-").transform(Path("foo/bar.o")),
+            Path("/t/m/p/foo/xyz-bar.o"),
+        )
 
 
 class SplitTransformJoinTest(unittest.TestCase):
@@ -152,25 +163,25 @@ class LexicallyRewriteTokenTest(unittest.TestCase):
 class EnsureFileExists(unittest.TestCase):
 
     def test_file_exists(self):
-        with mock.patch.object(os.path, "exists",
+        with mock.patch.object(Path, "exists",
                                return_value=True) as mock_exists:
-            output_cacher.ensure_file_exists("some/file.txt")
+            output_cacher.ensure_file_exists(Path("some/file.txt"))
         mock_exists.assert_called()
         # just make sure no exception raised
 
     def test_file_not_exists(self):
-        with mock.patch.object(os.path, "exists",
+        with mock.patch.object(Path, "exists",
                                return_value=False) as mock_exists:
             with mock.patch.object(time, "sleep") as mock_sleep:
                 with self.assertRaises(FileNotFoundError):
-                    output_cacher.ensure_file_exists("not/a/file.txt")
+                    output_cacher.ensure_file_exists(Path("not/a/file.txt"))
         mock_exists.assert_called()
 
     def test_file_exists_later(self):
-        with mock.patch.object(os.path, "exists",
+        with mock.patch.object(Path, "exists",
                                side_effect=[False, True]) as mock_exists:
             with mock.patch.object(time, "sleep") as mock_sleep:
-                output_cacher.ensure_file_exists("late/file.txt")
+                output_cacher.ensure_file_exists(Path("late/file.txt"))
         mock_exists.assert_called()
         mock_sleep.assert_called()
         # just make sure no exception raised
@@ -179,71 +190,68 @@ class EnsureFileExists(unittest.TestCase):
 class MoveIfDifferentTests(unittest.TestCase):
 
     def test_nonexistent_source(self):
-        with mock.patch.object(os.path, "exists",
+        with mock.patch.object(Path, "exists",
                                return_value=False) as mock_exists:
-            with mock.patch.object(shutil, "move") as mock_move:
-                with mock.patch.object(os, "remove") as mock_remove:
+            with mock.patch.object(Path, "rename") as mock_move:
+                with mock.patch.object(Path, "unlink") as mock_remove:
                     with mock.patch.object(time, "sleep") as mock_sleep:
                         with self.assertRaises(FileNotFoundError):
                             output_cacher.move_if_different(
-                                "source.txt", "dest.txt")
-        mock_exists.assert_called()
+                                Path("source.txt"), Path("dest.txt"))
+        mock_exists.assert_called_with()
         mock_move.assert_not_called()
         mock_remove.assert_not_called()
 
     def test_new_output(self):
 
-        def fake_exists(path):
-            if path == "source.txt":
-                return True
-            elif path == "dest.txt":
-                return False
-
-        with mock.patch.object(os.path, "exists",
-                               wraps=fake_exists) as mock_exists:
+        with mock.patch.object(
+                Path,
+                "exists",
+                side_effect=[True, False],  # source.txt, dest.txt
+        ) as mock_exists:
             with mock.patch.object(output_cacher, "files_match") as mock_diff:
-                with mock.patch.object(shutil, "move") as mock_move:
-                    with mock.patch.object(os, "remove") as mock_remove:
+                with mock.patch.object(Path, "rename") as mock_move:
+                    with mock.patch.object(Path, "unlink") as mock_remove:
                         moved = output_cacher.move_if_different(
-                            "source.txt", "dest.txt")
+                            Path("source.txt"), Path("dest.txt"))
         self.assertTrue(moved)
-        mock_exists.assert_called()
+        mock_exists.assert_called_with()
         mock_diff.assert_not_called()
-        mock_move.assert_called_with("source.txt", "dest.txt")
+        mock_move.assert_called_with(Path("dest.txt"))
         mock_remove.assert_not_called()
 
     def test_updating_output(self):
-        with mock.patch.object(os.path, "exists",
+        with mock.patch.object(Path, "exists",
                                return_value=True) as mock_exists:
             with mock.patch.object(output_cacher, "files_match",
                                    return_value=False) as mock_diff:
-                with mock.patch.object(shutil, "move") as mock_move:
-                    with mock.patch.object(os, "remove") as mock_remove:
+                with mock.patch.object(Path, "rename") as mock_move:
+                    with mock.patch.object(Path, "unlink") as mock_remove:
                         moved = output_cacher.move_if_different(
-                            "source.txt", "dest.txt")
+                            Path("source.txt"), Path("dest.txt"))
         self.assertTrue(moved)
-        mock_exists.assert_called()
-        mock_diff.assert_called()
-        mock_move.assert_called_with("source.txt", "dest.txt")
+        mock_exists.assert_called_with()
+        mock_diff.assert_called_with(Path("dest.txt"), Path("source.txt"))
+        mock_move.assert_called_with(Path("dest.txt"))
         mock_remove.assert_not_called()
 
     def test_cached_output(self):
-        with mock.patch.object(os.path, "exists",
+        with mock.patch.object(Path, "exists",
                                return_value=True) as mock_exists:
             with mock.patch.object(output_cacher, "files_match",
                                    return_value=True) as mock_diff:
-                with mock.patch.object(shutil, "move") as mock_move:
-                    with mock.patch.object(os, "remove") as mock_remove:
+                with mock.patch.object(Path, "rename") as mock_move:
+                    with mock.patch.object(Path, "unlink") as mock_remove:
                         with mock.patch.object(
                                 output_cacher,
                                 "ensure_file_exists") as mock_exists:
                             moved = output_cacher.move_if_different(
-                                "source.txt", "dest.txt")
+                                Path("source.txt"), Path("dest.txt"))
         self.assertFalse(moved)
         mock_exists.assert_called()
         mock_diff.assert_called()
         mock_move.assert_not_called()
-        mock_remove.assert_called_with("source.txt")
+        mock_remove.assert_called_with()
 
 
 class SubstituteCommandTest(unittest.TestCase):
@@ -261,7 +269,7 @@ class SubstituteCommandTest(unittest.TestCase):
             command=["run.sh", "out.txt"], substitutions={"out.txt": ""})
         repl, renamed = action.substitute_command(transform)
         self.assertEqual(repl, ["run.sh", "out.txt.tmp"])
-        self.assertEqual(renamed, {"out.txt": "out.txt.tmp"})
+        self.assertEqual(renamed, {Path("out.txt"): Path("out.txt.tmp")})
 
     def test_require_flag_match_missing_flag(self):
         transform = output_cacher.TempFileTransform(suffix=".tmp")
@@ -287,7 +295,7 @@ class SubstituteCommandTest(unittest.TestCase):
             substitutions={"out.txt": "-f"})
         repl, renamed = action.substitute_command(transform)
         self.assertEqual(repl, ["run.sh", "-f", "out.txt.tmp"])
-        self.assertEqual(renamed, {"out.txt": "out.txt.tmp"})
+        self.assertEqual(renamed, {Path("out.txt"): Path("out.txt.tmp")})
 
     def test_match_only_one_flag(self):
         transform = output_cacher.TempFileTransform(basename_prefix="tmp-")
@@ -296,7 +304,7 @@ class SubstituteCommandTest(unittest.TestCase):
             substitutions={"out.txt": "-f"})
         repl, renamed = action.substitute_command(transform)
         self.assertEqual(repl, ["run.sh", "-x", "out.txt", "-f", "tmp-out.txt"])
-        self.assertEqual(renamed, {"out.txt": "tmp-out.txt"})
+        self.assertEqual(renamed, {Path("out.txt"): Path("tmp-out.txt")})
 
     def test_match_only_one_flag_first_occurrence(self):
         transform = output_cacher.TempFileTransform(basename_prefix="tmp-")
@@ -306,7 +314,7 @@ class SubstituteCommandTest(unittest.TestCase):
         repl, renamed = action.substitute_command(transform)
         self.assertEqual(
             repl, ["run.sh", "out.txt", "-f", "tmp-out.txt", "out.txt"])
-        self.assertEqual(renamed, {"out.txt": "tmp-out.txt"})
+        self.assertEqual(renamed, {Path("out.txt"): Path("tmp-out.txt")})
 
 
 class ReplaceOutputArgsTest(unittest.TestCase):
@@ -340,7 +348,7 @@ class ReplaceOutputArgsTest(unittest.TestCase):
                 self.assertEqual(action.run_cached(transform), 0)
         mock_call.assert_called_with(["run.sh", "in.put", "out.put.tmp"])
         mock_update.assert_called_with(
-            src="out.put.tmp", dest="out.put", verbose=False)
+            src=Path("out.put.tmp"), dest=Path("out.put"), verbose=False)
 
     def test_command_passed_using_relative_temp_dir(self):
         transform = output_cacher.TempFileTransform(temp_dir="temp/temp")
@@ -351,13 +359,15 @@ class ReplaceOutputArgsTest(unittest.TestCase):
             # This test doesn't care if move happened.
             with mock.patch.object(output_cacher, "move_if_different",
                                    return_value=False) as mock_update:
-                with mock.patch.object(os, "makedirs") as mock_mkdir:
+                with mock.patch.object(Path, "mkdir") as mock_mkdir:
                     self.assertEqual(action.run_cached(transform), 0)
-        mock_mkdir.assert_called_with("temp/temp/foo", exist_ok=True)
+        mock_mkdir.assert_called_with(parents=True, exist_ok=True)
         mock_call.assert_called_with(
             ["run.sh", "in.put", "temp/temp/foo/out.put"])
         mock_update.assert_called_with(
-            src="temp/temp/foo/out.put", dest="foo/out.put", verbose=False)
+            src=Path("temp/temp/foo/out.put"),
+            dest=Path("foo/out.put"),
+            verbose=False)
 
 
 class RunTwiceCompareTests(unittest.TestCase):
@@ -389,10 +399,10 @@ class RunTwiceCompareTests(unittest.TestCase):
         with mock.patch.object(subprocess, "call", return_value=0) as mock_call:
             with mock.patch.object(output_cacher, "files_match",
                                    return_value=True) as mock_match:
-                with mock.patch.object(os.path, "isfile",
+                with mock.patch.object(Path, "is_file",
                                        return_value=True) as mock_isfile:
-                    with mock.patch.object(os, "remove") as mock_remove:
-                        with mock.patch.object(os, "makedirs") as mock_mkdir:
+                    with mock.patch.object(Path, "unlink") as mock_remove:
+                        with mock.patch.object(Path, "mkdir") as mock_mkdir:
                             with mock.patch.object(shutil,
                                                    "copy2") as mock_copy:
                                 with mock.patch.object(time,
@@ -406,12 +416,12 @@ class RunTwiceCompareTests(unittest.TestCase):
                 mock.call(["run.sh", "in.put", "out.put"]),
             ],
             any_order=True)
-        mock_match.assert_called_with("out.put", "out.put.tmp")
-        mock_remove.assert_called_with("out.put.tmp")
+        mock_match.assert_called_with(Path("out.put"), Path("out.put.tmp"))
+        mock_remove.assert_called_with()
         mock_isfile.assert_called()
         mock_mkdir.assert_not_called()  # using suffix, not temp_dir
         mock_copy.assert_called_once_with(
-            "out.put", "out.put.tmp", follow_symlinks=False)
+            Path("out.put"), Path("out.put.tmp"), follow_symlinks=False)
 
     def test_command_passed_and_rerun_differs(self):
         transform = output_cacher.TempFileTransform(suffix=".tmp")
@@ -421,10 +431,10 @@ class RunTwiceCompareTests(unittest.TestCase):
         with mock.patch.object(subprocess, "call", return_value=0) as mock_call:
             with mock.patch.object(output_cacher, "files_match",
                                    return_value=False) as mock_match:
-                with mock.patch.object(os.path, "isfile",
+                with mock.patch.object(Path, "is_file",
                                        return_value=True) as mock_isfile:
-                    with mock.patch.object(os, "remove") as mock_remove:
-                        with mock.patch.object(os, "makedirs") as mock_mkdir:
+                    with mock.patch.object(Path, "unlink") as mock_remove:
+                        with mock.patch.object(Path, "mkdir") as mock_mkdir:
                             with mock.patch.object(shutil,
                                                    "copy2") as mock_copy:
                                 with mock.patch.object(time,
@@ -438,19 +448,19 @@ class RunTwiceCompareTests(unittest.TestCase):
                 mock.call(["run.sh", "in.put", "out.put"]),
             ],
             any_order=True)
-        mock_match.assert_called_with("out.put", "out.put.tmp")
+        mock_match.assert_called_with(Path("out.put"), Path("out.put.tmp"))
         mock_remove.assert_not_called()
         mock_isfile.assert_called()
         mock_mkdir.assert_not_called()  # using suffix, not temp_dir
         mock_copy.assert_called_once_with(
-            "out.put", "out.put.tmp", follow_symlinks=False)
+            Path("out.put"), Path("out.put.tmp"), follow_symlinks=False)
 
     def test_command_passed_and_some_outputs_differ(self):
 
-        def fake_match(file1: str, file2: str) -> bool:
-            if file1 == "out.put":
+        def fake_match(file1: Path, file2: Path) -> bool:
+            if file1 == Path("out.put"):
                 return True
-            elif file1 == "out2.put":
+            elif file1 == Path("out2.put"):
                 return False
             raise ValueError(f"Unhandled file name: {file1}")
 
@@ -464,10 +474,10 @@ class RunTwiceCompareTests(unittest.TestCase):
         with mock.patch.object(subprocess, "call", return_value=0) as mock_call:
             with mock.patch.object(output_cacher, "files_match",
                                    wraps=fake_match) as mock_match:
-                with mock.patch.object(os.path, "isfile",
+                with mock.patch.object(Path, "is_file",
                                        return_value=True) as mock_isfile:
-                    with mock.patch.object(os, "remove") as mock_remove:
-                        with mock.patch.object(os, "makedirs") as mock_mkdir:
+                    with mock.patch.object(Path, "unlink") as mock_remove:
+                        with mock.patch.object(Path, "mkdir") as mock_mkdir:
                             with mock.patch.object(shutil,
                                                    "copy2") as mock_copy:
                                 with mock.patch.object(time,
@@ -483,17 +493,22 @@ class RunTwiceCompareTests(unittest.TestCase):
             any_order=True)
         mock_match.assert_has_calls(
             [
-                mock.call("out.put", "out.put.tmp"),
-                mock.call("out2.put", "out2.put.tmp"),
+                mock.call(Path("out.put"), Path("out.put.tmp")),
+                mock.call(Path("out2.put"), Path("out2.put.tmp")),
             ],
             any_order=True)
-        mock_remove.assert_has_calls([mock.call("out.put.tmp")])
+        mock_remove.assert_has_calls([mock.call()])
         mock_isfile.assert_called()
         mock_mkdir.assert_not_called()  # using suffix, not temp_dir
         mock_copy.assert_has_calls(
             [
-                mock.call("out.put", "out.put.tmp", follow_symlinks=False),
-                mock.call("out2.put", "out2.put.tmp", follow_symlinks=False),
+                mock.call(
+                    Path("out.put"), Path("out.put.tmp"),
+                    follow_symlinks=False),
+                mock.call(
+                    Path("out2.put"),
+                    Path("out2.put.tmp"),
+                    follow_symlinks=False),
             ],
             any_order=True)
 
@@ -519,7 +534,7 @@ class RunTwiceWithSubstitutionCompareTests(unittest.TestCase):
         with mock.patch.object(subprocess, "call", return_value=0) as mock_call:
             with mock.patch.object(output_cacher, "files_match",
                                    return_value=True) as mock_match:
-                with mock.patch.object(os, "remove") as mock_remove:
+                with mock.patch.object(Path, "unlink") as mock_remove:
                     self.assertEqual(
                         action.run_twice_with_substitution_and_compare_outputs(
                             transform), 0)
@@ -529,8 +544,8 @@ class RunTwiceWithSubstitutionCompareTests(unittest.TestCase):
                 mock.call(["run.sh", "in.put", "out.put.tmp"]),
             ],
             any_order=True)
-        mock_match.assert_called_with("out.put", "out.put.tmp")
-        mock_remove.assert_called_with("out.put.tmp")
+        mock_match.assert_called_with(Path("out.put"), Path("out.put.tmp"))
+        mock_remove.assert_called_with()
 
     def test_command_passed_and_rerun_differs(self):
         transform = output_cacher.TempFileTransform(suffix=".tmp")
@@ -550,15 +565,15 @@ class RunTwiceWithSubstitutionCompareTests(unittest.TestCase):
                 mock.call(["run.sh", "in.put", "out.put.tmp"]),
             ],
             any_order=True)
-        mock_match.assert_called_with("out.put", "out.put.tmp")
+        mock_match.assert_called_with(Path("out.put"), Path("out.put.tmp"))
         mock_remove.assert_not_called()
 
     def test_command_passed_and_some_outptus_differ(self):
 
-        def fake_match(file1: str, file2: str) -> bool:
-            if file1 == "out.put":
+        def fake_match(file1: Path, file2: Path) -> bool:
+            if file1 == Path("out.put"):
                 return True
-            elif file1 == "out2.put":
+            elif file1 == Path("out2.put"):
                 return False
             raise ValueError(f"Unhandled file name: {file1}")
 
@@ -572,7 +587,7 @@ class RunTwiceWithSubstitutionCompareTests(unittest.TestCase):
         with mock.patch.object(subprocess, "call", return_value=0) as mock_call:
             with mock.patch.object(output_cacher, "files_match",
                                    wraps=fake_match) as mock_match:
-                with mock.patch.object(os, "remove") as mock_remove:
+                with mock.patch.object(Path, "unlink") as mock_remove:
                     self.assertEqual(
                         action.run_twice_with_substitution_and_compare_outputs(
                             transform), 1)
@@ -584,11 +599,11 @@ class RunTwiceWithSubstitutionCompareTests(unittest.TestCase):
             any_order=True)
         mock_match.assert_has_calls(
             [
-                mock.call("out.put", "out.put.tmp"),
-                mock.call("out2.put", "out2.put.tmp"),
+                mock.call(Path("out.put"), Path("out.put.tmp")),
+                mock.call(Path("out2.put"), Path("out2.put.tmp")),
             ],
             any_order=True)
-        mock_remove.assert_has_calls([mock.call("out.put.tmp")])
+        mock_remove.assert_has_calls([mock.call()])
 
 
 if __name__ == '__main__':

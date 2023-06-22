@@ -37,14 +37,16 @@ import shutil
 import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import Any, Callable, Collection, Dict, Iterable, Sequence, Tuple
 import dataclasses
-# TODO: migrate to pathlib.Path
 
-_SCRIPT_BASENAME = os.path.basename(__file__)
-_SCRIPT_DIR = os.path.dirname(__file__)
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(_SCRIPT_DIR))
-_DETAIL_DIFF_SCRIPT = 'build/rbe/detail-diff.sh'
+_SCRIPT_BASENAME = Path(__file__).name
+_SCRIPT_DIR = Path(__file__).parent
+_PROJECT_ROOT = _SCRIPT_DIR.resolve().parent.parent
+_PROJECT_ROOT_REL = os.path.relpath(
+    _PROJECT_ROOT, start=Path(os.curdir).absolute())
+_DETAIL_DIFF_SCRIPT = Path('build/rbe/detail-diff.sh')
 
 
 def _partition(
@@ -62,13 +64,13 @@ def _partition(
     return trues, falses
 
 
-def files_match(file1: str, file2: str):
+def files_match(file1: Path, file2: Path):
     """Compares two files, returns True if they both exist and match."""
     # filecmp.cmp does not invoke any subprocesses.
     return filecmp.cmp(file1, file2, shallow=False)
 
 
-def ensure_file_exists(path):
+def ensure_file_exists(path: Path):
     """Assert that a file exists, or wait for it to appear.
 
     It has been shown that some fault tolerance is needed
@@ -81,7 +83,7 @@ def ensure_file_exists(path):
       FileNotFoundError if path does not exist, even after waiting.
     """
     for delay in (3, 6, 15):
-        if os.path.exists(path):
+        if Path.exists():
             return
 
         # This branch should be highly unlikely, so it is allowed to be slow.
@@ -98,13 +100,13 @@ def ensure_file_exists(path):
         f"[{_SCRIPT_BASENAME}] *** Expected output file not found: {path}")
 
 
-def detail_diff(left: str, right: str):
+def detail_diff(left: Path, right: Path):
     """Richer difference analysis."""
     subprocess.call(
         [
-            os.path.join(_PROJECT_ROOT, _DETAIL_DIFF_SCRIPT),
-            left,
-            right,
+            _PROJECT_ROOT_REL / _DETAIL_DIFF_SCRIPT,
+            str(left),
+            str(right),
         ])
 
 
@@ -122,7 +124,7 @@ def retry_file_op_once_with_delay(
         # If this fails again, exception will be raised.
 
 
-def move_if_different(src: str, dest: str, verbose: bool = False) -> bool:
+def move_if_different(src: Path, dest: Path, verbose: bool = False) -> bool:
     """Moves src -> dest if their contents differ.
 
     Args:
@@ -135,15 +137,15 @@ def move_if_different(src: str, dest: str, verbose: bool = False) -> bool:
       False if the destination already matches source.
     """
     ensure_file_exists(src)
-    if not os.path.exists(dest) or not files_match(dest, src):
+    if not dest.exists() or not files_match(dest, src):
         if verbose:
             print(f"  === Updated: {dest}")
-        shutil.move(src, dest)
+        src.rename(dest)
         return True
     else:
         if verbose:
             print(f"  === Cached: {dest}")
-        os.remove(src)
+        src.unlink()
         return False
 
 
@@ -161,7 +163,7 @@ class TempFileTransform(object):
       is sensitive to the output file extension.
       Example: "foo/bar.txt", with prefix="tmp-" -> foo/tmp-bar.txt
     """
-    temp_dir: str = ""
+    temp_dir: Path = None
     suffix: str = ""
     basename_prefix: str = ""
 
@@ -169,10 +171,9 @@ class TempFileTransform(object):
     def valid(self):
         return self.temp_dir or self.suffix or self.basename_prefix
 
-    def transform(self, path: str) -> str:
-        return os.path.join(
-            self.temp_dir, os.path.dirname(path),
-            self.basename_prefix + os.path.basename(path) + self.suffix)
+    def transform(self, path: Path) -> Path:
+        subpath = path.parent / (self.basename_prefix + path.name + self.suffix)
+        return self.temp_dir / subpath if self.temp_dir else subpath
 
 
 def split_transform_join(
@@ -222,12 +223,20 @@ class OutputSubstitution(object):
                 raise ValueError(
                     f'Expecting a substitution specification FILENAME or ' +
                     f'substitute_after:OPTION:FILENAME, but got {spec}.')
-            self.match_previous_option = tokens[1]
-            self.output_name = tokens[2]
+            self._match_previous_option = tokens[1]
+            self._output_name = tokens[2]
         else:
             # if blank, this will not be used for matching
-            self.match_previous_option = ''
-            self.output_name = spec
+            self._match_previous_option = ''
+            self._output_name = spec
+
+    @property
+    def match_previous_option(self) -> str:
+        return self._match_previous_option
+
+    @property
+    def output_name(self) -> str:
+        return self._output_name
 
 
 @dataclasses.dataclass
@@ -240,22 +249,23 @@ class Action(object):
 
     def substitute_command(
         self, tempfile_transform: TempFileTransform
-    ) -> Tuple[Sequence[str], Dict[str, str]]:
+    ) -> Tuple[Sequence[str], Dict[Path, Path]]:
         # renamed_outputs: keys: original file names, values: transformed temporary file names
-        renamed_outputs = {}
+        renamed_outputs: Dict[Path, Path] = {}
 
-        def replace_output_filename(arg: str, prev_opt: str) -> str:
+        def replace_output_filename(arg: str, prev_opt: str) -> Path:
+            arg_path = Path(arg)
             if arg in self.substitutions:
                 match_previous = self.substitutions[arg]
                 # Some output filenames requires the previous option to match.
                 if match_previous != '' and prev_opt != match_previous:
-                    return arg
-                new_arg = tempfile_transform.transform(arg)
-                if arg != new_arg:
-                    renamed_outputs[arg] = new_arg
+                    return arg_path
+                new_arg = tempfile_transform.transform(arg_path)
+                if arg_path != new_arg:
+                    renamed_outputs[arg_path] = new_arg
                 return new_arg
             else:
-                return arg
+                return arg_path
 
         substituted_command = []
         # Subprocess calls do not work for commands that start with VAR=VALUE
@@ -265,7 +275,7 @@ class Action(object):
 
         substituted_command += [
             lexically_rewrite_token(
-                tok, lambda x: replace_output_filename(x, prev_opt))
+                tok, lambda x: str(replace_output_filename(x, prev_opt)))
             for prev_opt, tok in zip([''] + self.command[:-1], self.command)
         ]
 
@@ -300,7 +310,7 @@ class Action(object):
         # mkdir when needed.
         if tempfile_transform.temp_dir:
             for new_arg in renamed_outputs.values():
-                os.makedirs(os.path.dirname(new_arg), exist_ok=True)
+                new_arg.parent.mkdir(parents=True, exist_ok=True)
 
         # Run the modified command.
         retval = subprocess.call(substituted_command)
@@ -368,18 +378,20 @@ class Action(object):
             return retval
 
         # Backup a copy of all declared outputs.
-        renamed_outputs = {}
+        renamed_outputs: Dict[Path, Path] = {}
         for out in self.substitutions:
             # TODO(fangism): what do we do about symlinks?
             # TODO(fangism): An output *directory* is unexpected, coming from GN,
             # but has been observed.  For now skip it.
-            if os.path.isfile(out):
-                renamed_outputs[out] = tempfile_transform.transform(out)
+            out_path = Path(out)
+            if out_path.is_file():
+                renamed_outputs[out_path] = tempfile_transform.transform(
+                    out_path)
             # A nonexistent output would be caught by action_tracer.py.
 
         for out, backup in renamed_outputs.items():
             if tempfile_transform.temp_dir:
-                os.makedirs(os.path.dirname(backup), exist_ok=True)
+                backup.parent.mkdir(parents=True, exist_ok=True)
             # preserve metadata such as timestamp
             shutil.copy2(out, backup, follow_symlinks=False)
 
@@ -425,7 +437,7 @@ class Action(object):
         # mkdir when needed.
         if tempfile_transform.temp_dir:
             for new_arg in renamed_outputs.values():
-                os.makedirs(os.path.dirname(new_arg), exist_ok=True)
+                new_arg.parent.mkdir(parents=True, exist_ok=True)
 
         # Run the original command.
         retval = subprocess.call(self.command)
@@ -447,7 +459,7 @@ class Action(object):
 
 
 def verify_files_match(
-        fileset: Dict[str, str], label: str, renamed: bool) -> int:
+        fileset: Dict[Path, Path], label: str, renamed: bool) -> int:
     """Compare outputs and report differences.
 
     Remove matching copies.
@@ -468,7 +480,7 @@ def verify_files_match(
 
     # Remove any files that matched to save space.
     for _, temp_out in matching_files:
-        os.remove(temp_out)
+        temp_out.unlink()
 
     if different_files:
         label_text = ""
@@ -497,7 +509,7 @@ def verify_files_match(
     return 0
 
 
-def main_arg_parser() -> argparse.ArgumentParser:
+def _main_arg_parser() -> argparse.ArgumentParser:
     """Construct the argument parser, called by main()."""
     parser = argparse.ArgumentParser(
         description="Wraps a GN action to preserve unchanged outputs",
@@ -538,8 +550,8 @@ def main_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--temp-dir",
-        type=str,
-        default="",
+        type=Path,
+        default=None,
         help=
         "Temporary directory for writing, can be relative to working directory or absolute.",
     )
@@ -582,9 +594,11 @@ def main_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+_MAIN_ARG_PARSER = _main_arg_parser()
+
+
 def main():
-    parser = main_arg_parser()
-    args = parser.parse_args()
+    args = _MAIN_ARG_PARSER.parse_args()
 
     tempfile_transform = TempFileTransform(
         temp_dir=args.temp_dir,
@@ -603,8 +617,8 @@ def main():
         "cp",  # TODO: Could conditionally copy if different.
         "rsync",
     }
-    script = args.command[0]
-    if os.path.basename(script) in ignored_scripts:
+    script = Path(args.command[0])
+    if script.name in ignored_scripts:
         wrap = False
 
     # If disabled, run the original command as-is.
