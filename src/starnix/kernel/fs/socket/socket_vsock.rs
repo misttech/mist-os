@@ -251,7 +251,7 @@ impl VsockSocket {
                     return error!(EAGAIN);
                 }
                 let remote_socket = Socket::new(
-                    current_task.kernel(),
+                    current_task,
                     SocketDomain::Vsock,
                     SocketType::Stream,
                     SocketProtocol::default(),
@@ -302,12 +302,12 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_vsock_socket() {
-        let (kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task) = create_kernel_and_task();
         let (fs1, fs2) = fidl::Socket::create_stream();
         const VSOCK_PORT: u32 = 5555;
 
         let listen_socket = Socket::new(
-            &kernel,
+            &current_task,
             SocketDomain::Vsock,
             SocketType::Stream,
             SocketProtocol::default(),
@@ -360,7 +360,7 @@ mod tests {
         let (kernel, current_task) = create_kernel_and_task();
         let (fs1, fs2) = fidl::Socket::create_stream();
         let socket = Socket::new(
-            &kernel,
+            &current_task,
             SocketDomain::Vsock,
             SocketType::Stream,
             SocketProtocol::default(),
@@ -394,14 +394,14 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_vsock_poll() {
-        let (kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task) = create_kernel_and_task();
 
         let (client, server) = zx::Socket::create_stream();
         let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)
             .expect("create_fuchsia_pipe");
         let server_zxio = Zxio::create(server.into_handle()).expect("Zxio::create");
         let socket_object = Socket::new(
-            &kernel,
+            &current_task,
             SocketDomain::Vsock,
             SocketType::Stream,
             SocketProtocol::default(),

@@ -366,27 +366,11 @@
                 "AllInetTests/CookedPacketTest.ReceiveOutbound/*",
 
                 // packet_socket_raw_test
-                "AllInetTests/RawPacketTest.SetAndGetSocketLinger/*",
-                "AllInetTests/RawPacketTest.SetSocketRecvBufBelowMin/*",
-                "AllInetTests/RawPacketTest.Send/*",
-                "AllInetTests/RawPacketTest.SetSocketRecvBufAboveMax/*",
-                "AllInetTests/RawPacketTest.SetSocketSendBufBelowMin/*",
-                "AllInetTests/RawPacketTest.SetSocketSendBufAboveMax/*",
-                "AllInetTests/RawPacketTest.SetSocketSendBuf/*",
-                "AllInetTests/RawPacketTest.GetSocketError/*",
-                "AllInetTests/RawPacketTest.GetSocketErrorBind/*",
-                "AllInetTests/RawPacketTest.SetSocketRecvBuf/*",
                 "AllInetTests/RawPacketTest.SetSocketDetachFilterNoInstalledFilter/*",
-                "AllInetTests/RawPacketTest.GetSocketDetachFilter/*",
-                "AllInetTests/RawPacketTest.GetSocketAcceptConn/*",
-                "AllInetTests/RawPacketTest.Receive/*",
-                "AllInetTests/RawPacketTest.SendFromLoopback/*",
-                "AllInetTests/RawPacketTest.SendFromUnspec/*",
                 "AllRawPacketMsgSizeTest/RawPacketMsgSizeTest.SendTooLong/*",
                 "AllRawPacketMsgSizeTest/RawPacketMsgSizeTest.SpliceTooLong/*",
 
                 // packet_socket_test
-                "AllPacketSocketTests/PacketSocketCreationTest.Create/*",
                 "AllPacketSocketTests/PacketSocketTest.GetSockName/*",
                 "AllPacketSocketTests/PacketSocketTest.RebindProtocol/*",
                 "AllPacketSocketTests/PacketSocketTest.ReceiveSentBoundToProtocolAll/*",
@@ -1041,6 +1025,14 @@
 
                 // TODO(fxbug.dev/128870): Investigate failure on arm.
                 "SigstopTest.RestartSyscall",
+
+                // packet_socket_raw_test
+                // These tests cause the test runner to crash when looking up
+                // the ID of the loopback interface.
+                "AllInetTests/RawPacketTest.Receive/*",
+                "AllInetTests/RawPacketTest.SendFromLoopback/*",
+                "AllInetTests/RawPacketTest.SendFromUnspec/*",
+                "AllInetTests/RawPacketTest.GetSocketErrorBind/*",
             ],
         },
     ],

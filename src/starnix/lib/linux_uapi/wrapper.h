@@ -30,6 +30,7 @@
 #include <linux/fs.h>
 #include <linux/fuse.h>
 #include <linux/futex.h>
+#include <linux/if_packet.h>
 #include <linux/inotify.h>
 #include <linux/input.h>
 #include <linux/ip.h>

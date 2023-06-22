@@ -14,6 +14,7 @@ use crate::{
 
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use fidl_fuchsia_posix_socket as fposix_socket;
+use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
@@ -21,14 +22,17 @@ use static_assertions::const_assert_eq;
 use std::{ffi::CStr, sync::Arc, sync::OnceLock};
 use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio};
 
-/// Connects to `fuchsia_posix_socket::Provider` or
-/// `fuchsia_posix_socket_raw::Provider`.
+/// Connects to the appropriate `fuchsia_posix_socket_*::Provider` protocol.
 struct SocketProviderServiceConnector;
 
 impl ServiceConnector for SocketProviderServiceConnector {
     fn connect(service_name: &str) -> Result<&'static zx::Channel, zx::Status> {
         match service_name {
             fposix_socket::ProviderMarker::PROTOCOL_NAME => {
+                static mut CHANNEL: OnceLock<Result<zx::Channel, zx::Status>> = OnceLock::new();
+                unsafe { &CHANNEL }
+            }
+            fposix_socket_packet::ProviderMarker::PROTOCOL_NAME => {
                 static mut CHANNEL: OnceLock<Result<zx::Channel, zx::Status>> = OnceLock::new();
                 unsafe { &CHANNEL }
             }
@@ -49,17 +53,18 @@ impl ServiceConnector for SocketProviderServiceConnector {
     }
 }
 
-pub struct InetSocket {
+/// A socket backed by an underlying Zircon I/O object.
+pub struct ZxioBackedSocket {
     /// The underlying Zircon I/O object.
     zxio: Arc<syncio::Zxio>,
 }
 
-impl InetSocket {
+impl ZxioBackedSocket {
     pub fn new(
         domain: SocketDomain,
         socket_type: SocketType,
         protocol: SocketProtocol,
-    ) -> Result<InetSocket, Errno> {
+    ) -> Result<ZxioBackedSocket, Errno> {
         let zxio = Zxio::new_socket::<SocketProviderServiceConnector>(
             domain.as_raw() as c_int,
             socket_type.as_raw() as c_int,
@@ -68,7 +73,7 @@ impl InetSocket {
         .map_err(|status| from_status_like_fdio!(status))?
         .map_err(|out_code| errno_from_zxio_code!(out_code))?;
 
-        Ok(InetSocket { zxio: Arc::new(zxio) })
+        Ok(ZxioBackedSocket { zxio: Arc::new(zxio) })
     }
 
     pub fn sendmsg(
@@ -80,7 +85,9 @@ impl InetSocket {
     ) -> Result<usize, Errno> {
         let addr = match addr {
             Some(sockaddr) => match sockaddr {
-                SocketAddress::Inet(sockaddr) | SocketAddress::Inet6(sockaddr) => sockaddr.clone(),
+                SocketAddress::Inet(sockaddr)
+                | SocketAddress::Inet6(sockaddr)
+                | SocketAddress::Packet(sockaddr) => sockaddr.clone(),
                 _ => return error!(EINVAL),
             },
             None => vec![],
@@ -108,7 +115,7 @@ impl InetSocket {
     }
 }
 
-impl SocketOps for InetSocket {
+impl SocketOps for ZxioBackedSocket {
     fn connect(
         &self,
         _socket: &SocketHandle,
@@ -117,7 +124,8 @@ impl SocketOps for InetSocket {
     ) -> Result<(), Errno> {
         match peer {
             SocketPeer::Address(SocketAddress::Inet(addr))
-            | SocketPeer::Address(SocketAddress::Inet6(addr)) => self
+            | SocketPeer::Address(SocketAddress::Inet6(addr))
+            | SocketPeer::Address(SocketAddress::Packet(addr)) => self
                 .zxio
                 .connect(&addr)
                 .map_err(|status| from_status_like_fdio!(status))?
@@ -144,7 +152,7 @@ impl SocketOps for InetSocket {
             socket.domain,
             socket.socket_type,
             socket.protocol,
-            Box::new(InetSocket { zxio: Arc::new(zxio) }),
+            Box::new(ZxioBackedSocket { zxio: Arc::new(zxio) }),
         ))
     }
 
@@ -155,7 +163,9 @@ impl SocketOps for InetSocket {
         socket_address: SocketAddress,
     ) -> Result<(), Errno> {
         match socket_address {
-            SocketAddress::Inet(addr) | SocketAddress::Inet6(addr) => self
+            SocketAddress::Inet(addr)
+            | SocketAddress::Inet6(addr)
+            | SocketAddress::Packet(addr) => self
                 .zxio
                 .bind(&addr)
                 .map_err(|status| from_status_like_fdio!(status))?
@@ -339,6 +349,7 @@ const_assert_eq!(syncio::zxio::AF_UNIX, uapi::AF_UNIX as u32);
 const_assert_eq!(syncio::zxio::AF_INET, uapi::AF_INET as u32);
 const_assert_eq!(syncio::zxio::AF_INET6, uapi::AF_INET6 as u32);
 const_assert_eq!(syncio::zxio::AF_NETLINK, uapi::AF_NETLINK as u32);
+const_assert_eq!(syncio::zxio::AF_PACKET, uapi::AF_PACKET as u32);
 const_assert_eq!(syncio::zxio::AF_VSOCK, uapi::AF_VSOCK as u32);
 
 const_assert_eq!(syncio::zxio::SO_DEBUG, uapi::SO_DEBUG);

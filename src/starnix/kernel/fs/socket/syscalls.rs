@@ -27,7 +27,7 @@ pub fn sys_socket(
     let open_flags = socket_flags_to_open_flags(flags);
     let socket_file = Socket::new_file(
         current_task,
-        Socket::new(current_task.kernel(), domain, socket_type, protocol)?,
+        Socket::new(current_task, domain, socket_type, protocol)?,
         open_flags,
     );
 
@@ -125,7 +125,8 @@ pub fn sys_bind(
             SocketDomain::Unix
             | SocketDomain::Vsock
             | SocketDomain::Inet6
-            | SocketDomain::Netlink => error!(EINVAL),
+            | SocketDomain::Netlink
+            | SocketDomain::Packet => error!(EINVAL),
             SocketDomain::Inet => error!(EAFNOSUPPORT),
         };
     }
@@ -167,9 +168,10 @@ pub fn sys_bind(
         SocketAddress::Vsock(port) => {
             current_task.abstract_vsock_namespace.bind(current_task, port, socket)?;
         }
-        SocketAddress::Inet(_) | SocketAddress::Inet6(_) | SocketAddress::Netlink(_) => {
-            socket.bind(current_task, address)?
-        }
+        SocketAddress::Inet(_)
+        | SocketAddress::Inet6(_)
+        | SocketAddress::Netlink(_)
+        | SocketAddress::Packet(_) => socket.bind(current_task, address)?,
     }
 
     Ok(())
@@ -259,6 +261,10 @@ pub fn sys_connect(
             SocketPeer::Address(address)
         }
         SocketAddress::Netlink(_) => SocketPeer::Address(address),
+        SocketAddress::Packet(ref addr) => {
+            log_trace!("connect to packet socket named {:?}", addr);
+            SocketPeer::Address(address)
+        }
     };
 
     let result = client_socket.connect(current_task, peer.clone());

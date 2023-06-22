@@ -205,7 +205,7 @@ pub enum SocketPeer {
 }
 
 fn create_socket_ops(
-    kernel: &Arc<Kernel>,
+    current_task: &CurrentTask,
     domain: SocketDomain,
     socket_type: SocketType,
     protocol: SocketProtocol,
@@ -214,11 +214,20 @@ fn create_socket_ops(
         SocketDomain::Unix => Ok(Box::new(UnixSocket::new(socket_type))),
         SocketDomain::Vsock => Ok(Box::new(VsockSocket::new(socket_type))),
         SocketDomain::Inet | SocketDomain::Inet6 => {
-            Ok(Box::new(InetSocket::new(domain, socket_type, protocol)?))
+            Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
         }
         SocketDomain::Netlink => {
             let netlink_family = NetlinkFamily::from_raw(protocol.as_raw());
-            new_netlink_socket(kernel, socket_type, netlink_family)
+            new_netlink_socket(current_task.kernel(), socket_type, netlink_family)
+        }
+        SocketDomain::Packet => {
+            // Follow Linux, and require CAP_NET_RAW to create packet sockets.
+            // See https://man7.org/linux/man-pages/man7/packet.7.html.
+            if current_task.creds().has_capability(CAP_NET_RAW) {
+                Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
+            } else {
+                error!(EPERM)
+            }
         }
     }
 }
@@ -229,12 +238,12 @@ impl Socket {
     /// # Parameters
     /// - `domain`: The domain of the socket (e.g., `AF_UNIX`).
     pub fn new(
-        kernel: &Arc<Kernel>,
+        current_task: &CurrentTask,
         domain: SocketDomain,
         socket_type: SocketType,
         protocol: SocketProtocol,
     ) -> Result<SocketHandle, Errno> {
-        let ops = create_socket_ops(kernel, domain, socket_type, protocol)?;
+        let ops = create_socket_ops(current_task, domain, socket_type, protocol)?;
         Ok(Arc::new(Socket { ops, domain, socket_type, protocol, state: Mutex::default() }))
     }
 
@@ -445,10 +454,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_dgram_socket() {
-        let (kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task) = create_kernel_and_task();
         let bind_address = SocketAddress::Unix(b"dgram_test".to_vec());
         let rec_dgram = Socket::new(
-            &kernel,
+            &current_task,
             SocketDomain::Unix,
             SocketType::Datagram,
             SocketProtocol::default(),
@@ -468,7 +477,7 @@ mod tests {
         let xfer_bytes = xfer_value.to_ne_bytes();
 
         let send = Socket::new(
-            &kernel,
+            &current_task,
             SocketDomain::Unix,
             SocketType::Datagram,
             SocketProtocol::default(),

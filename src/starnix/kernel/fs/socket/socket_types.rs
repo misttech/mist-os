@@ -52,6 +52,9 @@ pub enum SocketDomain {
 
     /// An IF_NETLINK socket (currently stubbed out).
     Netlink,
+
+    /// An AF_PACKET socket.
+    Packet,
 }
 
 impl SocketDomain {
@@ -62,6 +65,7 @@ impl SocketDomain {
             AF_INET => Some(Self::Inet),
             AF_INET6 => Some(Self::Inet6),
             AF_NETLINK => Some(Self::Netlink),
+            AF_PACKET => Some(Self::Packet),
             _ => None,
         }
     }
@@ -73,6 +77,7 @@ impl SocketDomain {
             Self::Inet => AF_INET,
             Self::Inet6 => AF_INET6,
             Self::Netlink => AF_NETLINK,
+            Self::Packet => AF_PACKET,
         }
     }
 
@@ -152,6 +157,9 @@ pub enum SocketAddress {
 
     /// AF_NETLINK addresses contain a unicast pid and multicast groups.
     Netlink(NetlinkAddress),
+
+    /// AF_PACKET socket addresses are passed through as a sockaddr* to zxio.
+    Packet(Vec<u8>),
 }
 
 pub const SA_FAMILY_SIZE: usize = std::mem::size_of::<uapi::__kernel_sa_family_t>();
@@ -168,6 +176,9 @@ impl SocketAddress {
                 SocketAddress::Inet6(uapi::sockaddr_in6::default().as_bytes().to_vec())
             }
             SocketDomain::Netlink => SocketAddress::Netlink(NetlinkAddress::default()),
+            SocketDomain::Packet => {
+                SocketAddress::Packet(uapi::sockaddr_ll::default().as_bytes().to_vec())
+            }
         }
     }
 
@@ -223,6 +234,11 @@ impl SocketAddress {
                 }
                 None => return error!(EINVAL),
             },
+            AF_PACKET => {
+                let sockaddr_len = std::mem::size_of::<sockaddr_ll>();
+                let addrlen = std::cmp::min(address.len(), sockaddr_len);
+                SocketAddress::Packet(address[..addrlen].to_vec())
+            }
             _ => SocketAddress::Unspecified,
         };
         Ok(address)
@@ -236,6 +252,7 @@ impl SocketAddress {
             SocketAddress::Inet(_) => domain == SocketDomain::Inet,
             SocketAddress::Inet6(_) => domain == SocketDomain::Inet6,
             SocketAddress::Netlink(_) => domain == SocketDomain::Netlink,
+            SocketAddress::Packet(_) => domain == SocketDomain::Packet,
         }
     }
 
@@ -262,7 +279,9 @@ impl SocketAddress {
                 vm_addr.write_to(&mut bytes[..]);
                 bytes
             }
-            SocketAddress::Inet(addr) | SocketAddress::Inet6(addr) => addr.to_vec(),
+            SocketAddress::Inet(addr)
+            | SocketAddress::Inet6(addr)
+            | SocketAddress::Packet(addr) => addr.to_vec(),
             SocketAddress::Netlink(addr) => addr.to_bytes(),
         }
     }

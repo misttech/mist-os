@@ -847,6 +847,7 @@ impl SocketOps for RouteNetlinkSocket {
             SocketAddress::Unspecified
             | SocketAddress::Inet(_)
             | SocketAddress::Inet6(_)
+            | SocketAddress::Packet(_)
             | SocketAddress::Unix(_)
             | SocketAddress::Vsock(_) => return error!(EINVAL),
             SocketAddress::Netlink(NetlinkAddress { pid: _, groups }) => groups,
