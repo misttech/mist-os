@@ -156,7 +156,7 @@ pub mod route {
         req: &RtnlMessage,
         // `true` for new address requests; `false` for delete address requests.
         is_new: bool,
-    ) -> Option<ExtractedAddressRequest> {
+    ) -> Result<ExtractedAddressRequest, NackErrorCode> {
         let kind = if is_new { "new" } else { "del" };
 
         let interface_id = match NonZeroU32::new(message.header.index) {
@@ -166,14 +166,16 @@ pub mod route {
                     "unspecified interface ID in address {} request from {}: {:?}",
                     kind, client, req,
                 );
-                return None;
+                return Err(NackErrorCode::INVALID);
             }
         };
 
         let mut address_bytes = None;
+        let mut local_bytes = None;
         let mut addr_flags = None;
         message.nlas.iter().for_each(|nla| match nla {
-            AddressNla::Local(bytes) => address_bytes = Some(bytes),
+            AddressNla::Address(bytes) => address_bytes = Some(bytes),
+            AddressNla::Local(bytes) => local_bytes = Some(bytes),
             AddressNla::Flags(flags) => addr_flags = Some(*flags),
             nla => {
                 warn!(
@@ -182,14 +184,63 @@ pub mod route {
                 );
             }
         });
-        let address_bytes = match address_bytes {
-            Some(address_bytes) => address_bytes,
-            None => {
-                debug!(
-                    "missing `Local` NLA in address {} request from {}: {:?}",
+
+        // Linux supports the notion of a "peer" address which is used for
+        // pointtopoint interfaces. Fuchsia does not support this so we do not
+        // allow different-valued `IFA_LOCAL` and `IFA_ADDRESS` values.
+        //
+        // Per https://www.man7.org/linux/man-pages/man8/ip-address.8.html,
+        //
+        //   ip address add - add new protocol address.
+        //       dev IFNAME
+        //            the name of the device to add the address to.
+        //
+        //       local ADDRESS (default)
+        //            the address of the interface. The format of the address
+        //            depends on the protocol. It is a dotted quad for IP and a
+        //            sequence of hexadecimal halfwords separated by colons for
+        //            IPv6. The ADDRESS may be followed by a slash and a decimal
+        //            number which encodes the network prefix length.
+        //
+        //       peer ADDRESS
+        //            the address of the remote endpoint for pointopoint
+        //            interfaces. Again, the ADDRESS may be followed by a slash
+        //            and a decimal number, encoding the network prefix length.
+        //            If a peer address is specified, the local address cannot
+        //            have a prefix length. The network prefix is associated
+        //            with the peer rather than with the local address.
+        //
+        //   ...
+        //
+        //   ip address delete - delete protocol address
+        //       Arguments: coincide with the arguments of ip addr add. The
+        //       device name is a required argument. The rest are optional. If
+        //       no arguments are given, the first address is deleted.
+        //
+        // Note that when only one of `IFA_LOCAL` or `IFA_ADDRESS` is included
+        // in a message, it is treated as the "local" address on the interface
+        // to be added/removed. When both are included, `IFA_LOCAL` is treated
+        // as the "local" address and `IFA_ADDRESS` is treated as the "peer".
+        // TODO(https://fxbug.dev/129502): Support peer addresses.
+        let address_bytes = match (local_bytes, address_bytes) {
+            (Some(local), Some(address)) => {
+                if local == address {
+                    address
+                } else {
+                    debug!(
+                    "got different `IFA_ADDRESS` and `IFA_LOCAL` values for {} address request from {}: {:?}",
                     kind, client, req,
                 );
-                return None;
+                    return Err(NackErrorCode::NOT_SUPPORTED);
+                }
+            }
+            (Some(bytes), None) | (None, Some(bytes)) => bytes,
+            (None, None) => {
+                debug!(
+                    "missing `IFA_ADDRESS` and `IFA_LOCAL` in address {} request from {}: {:?}",
+                    kind, client, req,
+                );
+                return Err(NackErrorCode::INVALID);
             }
         };
 
@@ -197,7 +248,7 @@ pub mod route {
             AF_INET => {
                 const BYTES: usize = Ipv4Addr::BYTES as usize;
                 if address_bytes.len() < BYTES {
-                    return None;
+                    return Err(NackErrorCode::INVALID);
                 }
 
                 let mut bytes = [0; BYTES as usize];
@@ -207,7 +258,7 @@ pub mod route {
             AF_INET6 => {
                 const BYTES: usize = Ipv6Addr::BYTES as usize;
                 if address_bytes.len() < BYTES {
-                    return None;
+                    return Err(NackErrorCode::INVALID);
                 }
 
                 let mut bytes = [0; BYTES];
@@ -219,7 +270,7 @@ pub mod route {
                     "invalid address family ({}) in address {} request from {}: {:?}",
                     family, kind, client, req,
                 );
-                return None;
+                return Err(NackErrorCode::INVALID);
             }
         };
 
@@ -231,11 +282,11 @@ pub mod route {
                 | AddrSubnetError::InvalidWitness,
             ) => {
                 debug!("invalid address in address {} request from {}: {:?}", kind, client, req);
-                return None;
+                return Err(NackErrorCode::INVALID);
             }
         };
 
-        Some(ExtractedAddressRequest {
+        Ok(ExtractedAddressRequest {
             address_and_interface_id: interfaces::AddressAndInterfaceArgs { address, interface_id },
             addr_flags: addr_flags.unwrap_or_else(|| message.header.flags.into()),
         })
@@ -332,9 +383,9 @@ pub mod route {
                         &req,
                         true,
                     ) {
-                        Some(s) => s,
-                        None => {
-                            return client.send_unicast(new_ack(NackErrorCode::INVALID, req_header));
+                        Ok(o) => o,
+                        Err(e) => {
+                            return client.send_unicast(new_ack(e, req_header));
                         }
                     };
 
@@ -370,9 +421,9 @@ pub mod route {
                         &req,
                         false,
                     ) {
-                        Some(s) => s,
-                        None => {
-                            return client.send_unicast(new_ack(NackErrorCode::INVALID, req_header));
+                        Ok(o) => o,
+                        Err(e) => {
+                            return client.send_unicast(new_ack(e, req_header));
                         }
                     };
 
@@ -1095,10 +1146,11 @@ mod test {
         ack: bool,
         addr: AddrSubnetEither,
         interface_id: u64,
+        expected_response: NackErrorCode,
     ) -> TestAddrCase {
         TestAddrCase {
             expected_request_args: None,
-            expected_response: Some(Err(NackErrorCode::INVALID)),
+            expected_response: Some(Err(expected_response)),
             ..valid_new_addr_request(ack, addr, interface_id, Ok(()))
         }
     }
@@ -1116,10 +1168,11 @@ mod test {
         ack: bool,
         addr: AddrSubnetEither,
         interface_id: u64,
+        expected_response: NackErrorCode,
     ) -> TestAddrCase {
         TestAddrCase {
             expected_request_args: None,
-            expected_response: Some(Err(NackErrorCode::INVALID)),
+            expected_response: Some(Err(expected_response)),
             ..valid_del_addr_request(ack, addr, interface_id, Ok(()))
         }
     }
@@ -1150,6 +1203,69 @@ mod test {
             interfaces::testutil::test_addr_subnet_v6(),
             interfaces::testutil::ETH_INTERFACE_ID,
             Ok(())); "new_v6_ok_no_ack")]
+    #[test_case(
+        TestAddrCase {
+            nlas: vec![
+                AddressNla::Local(bytes_from_addr(interfaces::testutil::test_addr_subnet_v4())),
+            ],
+            ..valid_new_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::ETH_INTERFACE_ID,
+                Ok(()),
+            )
+        }; "new_v4_local_nla_ok_no_ack")]
+    #[test_case(
+        TestAddrCase {
+            nlas: vec![
+                AddressNla::Address(bytes_from_addr(interfaces::testutil::test_addr_subnet_v6())),
+            ],
+            ..valid_new_addr_request(
+                true,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::PPP_INTERFACE_ID,
+                Ok(()),
+            )
+        }; "new_v6_address_nla_ok_ack")]
+    #[test_case(
+        TestAddrCase {
+            nlas: vec![
+                AddressNla::Address(bytes_from_addr(interfaces::testutil::test_addr_subnet_v6())),
+                AddressNla::Local(bytes_from_addr(interfaces::testutil::test_addr_subnet_v6())),
+            ],
+            ..valid_new_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::PPP_INTERFACE_ID,
+                Ok(()),
+            )
+        }; "new_v6_same_local_and_address_nla_ok_no_ack")]
+    #[test_case(
+        TestAddrCase {
+            nlas: vec![
+                AddressNla::Local(bytes_from_addr(interfaces::testutil::test_addr_subnet_v6())),
+                AddressNla::Address(Vec::new()),
+            ],
+            ..invalid_new_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::NOT_SUPPORTED,
+            )
+        }; "new_v6_valid_local_and_empty_address_nlas_no_ack")]
+    #[test_case(
+        TestAddrCase {
+            nlas: vec![
+                AddressNla::Local(Vec::new()),
+                AddressNla::Address(bytes_from_addr(interfaces::testutil::test_addr_subnet_v4())),
+            ],
+            ..invalid_new_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::ETH_INTERFACE_ID,
+                NackErrorCode::NOT_SUPPORTED,
+            )
+        }; "new_v4_empty_local_and_valid_address_nlas_no_ack")]
     #[test_case(
         TestAddrCase {
             kind: AddressRequestKind::New { add_subnet_route: true },
@@ -1219,6 +1335,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::LO_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "new_zero_interface_id_ack")]
     #[test_case(
@@ -1228,6 +1345,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "new_zero_interface_id_no_ack")]
     #[test_case(
@@ -1237,6 +1355,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "new_no_nlas_ack")]
     #[test_case(
@@ -1246,6 +1365,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "new_no_nlas_no_ack")]
     #[test_case(
@@ -1255,8 +1375,9 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
-        }; "new_missing_local_nla_ack")]
+        }; "new_missing_address_and_local_nla_ack")]
     #[test_case(
         TestAddrCase {
             nlas: vec![AddressNla::Flags(0)],
@@ -1264,8 +1385,9 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
-        }; "new_missing_local_nla_no_ack")]
+        }; "new_missing_address_and_local_nla_no_ack")]
     #[test_case(
         TestAddrCase {
             nlas: vec![AddressNla::Local(Vec::new())],
@@ -1273,6 +1395,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "new_invalid_local_nla_ack")]
     #[test_case(
@@ -1282,8 +1405,29 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "new_invalid_local_nla_no_ack")]
+    #[test_case(
+        TestAddrCase {
+            nlas: vec![AddressNla::Address(Vec::new())],
+            ..invalid_new_addr_request(
+                true,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
+            )
+        }; "new_invalid_address_nla_ack")]
+    #[test_case(
+        TestAddrCase {
+            nlas: vec![AddressNla::Address(Vec::new())],
+            ..invalid_new_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
+            )
+        }; "new_invalid_address_nla_no_ack")]
     #[test_case(
         TestAddrCase {
             prefix_len: 0,
@@ -1311,6 +1455,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "new_invalid_prefix_len_ack")]
     #[test_case(
@@ -1320,6 +1465,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "new_invalid_prefix_len_no_ack")]
     #[test_case(
@@ -1329,6 +1475,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::LO_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "new_invalid_family_ack")]
     #[test_case(
@@ -1338,6 +1485,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::PPP_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "new_invalid_family_no_ack")]
     // Delete address tests cases.
@@ -1377,6 +1525,69 @@ mod test {
         }; "del_v4_invalid_response_ack")]
     #[test_case(
         TestAddrCase {
+            nlas: vec![
+                AddressNla::Local(bytes_from_addr(interfaces::testutil::test_addr_subnet_v4())),
+            ],
+            ..valid_del_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::ETH_INTERFACE_ID,
+                Ok(()),
+            )
+        }; "del_v4_local_nla_ok_no_ack")]
+    #[test_case(
+        TestAddrCase {
+            nlas: vec![
+                AddressNla::Address(bytes_from_addr(interfaces::testutil::test_addr_subnet_v6())),
+            ],
+            ..valid_del_addr_request(
+                true,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::PPP_INTERFACE_ID,
+                Ok(()),
+            )
+        }; "del_v6_address_nla_ok_ack")]
+    #[test_case(
+        TestAddrCase {
+            nlas: vec![
+                AddressNla::Address(bytes_from_addr(interfaces::testutil::test_addr_subnet_v4())),
+                AddressNla::Local(bytes_from_addr(interfaces::testutil::test_addr_subnet_v4())),
+            ],
+            ..valid_del_addr_request(
+                true,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::ETH_INTERFACE_ID,
+                Ok(()),
+            )
+        }; "del_v4_same_local_and_address_nla_ok_ack")]
+    #[test_case(
+        TestAddrCase {
+            nlas: vec![
+                AddressNla::Local(bytes_from_addr(interfaces::testutil::test_addr_subnet_v6())),
+                AddressNla::Address(Vec::new()),
+            ],
+            ..invalid_del_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::NOT_SUPPORTED,
+            )
+        }; "del_v6_valid_local_and_empty_address_nlas_no_ack")]
+    #[test_case(
+        TestAddrCase {
+            nlas: vec![
+                AddressNla::Local(Vec::new()),
+                AddressNla::Address(bytes_from_addr(interfaces::testutil::test_addr_subnet_v4())),
+            ],
+            ..invalid_del_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::ETH_INTERFACE_ID,
+                NackErrorCode::NOT_SUPPORTED,
+            )
+        }; "del_v4_empty_local_and_valid_address_nlas_no_ack")]
+    #[test_case(
+        TestAddrCase {
             expected_response: Some(Err(NackErrorCode::new(libc::EEXIST).unwrap())),
             ..valid_del_addr_request(
                 false,
@@ -1412,6 +1623,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::LO_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "del_zero_interface_id_ack")]
     #[test_case(
@@ -1421,6 +1633,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "del_zero_interface_id_no_ack")]
     #[test_case(
@@ -1430,6 +1643,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "del_no_nlas_ack")]
     #[test_case(
@@ -1439,6 +1653,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "del_no_nlas_no_ack")]
     #[test_case(
@@ -1448,8 +1663,9 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
-        }; "del_missing_local_nla_ack")]
+        }; "del_missing_address_and_local_nla_ack")]
     #[test_case(
         TestAddrCase {
             nlas: vec![AddressNla::Flags(0)],
@@ -1457,8 +1673,9 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
-        }; "del_missing_local_nla_no_ack")]
+        }; "del_missing_address_and_local_nla_no_ack")]
     #[test_case(
         TestAddrCase {
             nlas: vec![AddressNla::Local(Vec::new())],
@@ -1466,6 +1683,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "del_invalid_local_nla_ack")]
     #[test_case(
@@ -1475,8 +1693,29 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "del_invalid_local_nla_no_ack")]
+    #[test_case(
+        TestAddrCase {
+            nlas: vec![AddressNla::Address(Vec::new())],
+            ..invalid_del_addr_request(
+                true,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
+            )
+        }; "del_invalid_address_nla_ack")]
+    #[test_case(
+        TestAddrCase {
+            nlas: vec![AddressNla::Address(Vec::new())],
+            ..invalid_del_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
+            )
+        }; "del_invalid_address_nla_no_ack")]
     #[test_case(
         TestAddrCase {
             prefix_len: 0,
@@ -1504,6 +1743,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "del_invalid_prefix_len_ack")]
     #[test_case(
@@ -1513,6 +1753,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "del_invalid_prefix_len_no_ack")]
     #[test_case(
@@ -1522,6 +1763,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::LO_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "del_invalid_family_ack")]
     #[test_case(
@@ -1531,6 +1773,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::PPP_INTERFACE_ID,
+                NackErrorCode::INVALID,
             )
         }; "del_invalid_family_no_ack")]
     #[fuchsia::test]
