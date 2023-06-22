@@ -77,7 +77,8 @@ __EXPORT void inspector_print_backtrace_markup(FILE* f, zx_handle_t process, zx_
     if (frame.fatal_error) {
       source += "\nunwinding aborted: " + frame.error.msg();
     }
-    fprintf(f, "{{{bt:%u:%#" PRIxPTR ":%s}}} %s\n", n, pc, n ? "ra" : "pc", source.c_str());
+    fprintf(f, "{{{bt:%u:%#" PRIxPTR ":%s}}} %s\n", n, pc, frame.pc_is_return_address ? "ra" : "pc",
+            source.c_str());
     n++;
   }
 

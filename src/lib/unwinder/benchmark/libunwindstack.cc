@@ -225,7 +225,7 @@ std::vector<unwinder::Frame> UnwindFromLibunwindstack(
       dest.SetPC(src.pc + regs->GetPcAdjustment(src.pc, nullptr));
     }
     dest.SetSP(src.sp);
-    res.emplace_back(std::move(dest), unwinder::Frame::Trust::kCFI);
+    res.emplace_back(std::move(dest), i > 0, unwinder::Frame::Trust::kCFI);
   }
   return res;
 }

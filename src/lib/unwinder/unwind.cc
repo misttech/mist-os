@@ -23,6 +23,29 @@
 
 namespace unwinder {
 
+namespace {
+
+bool PcIsReturnAddress(const Registers& regs) {
+  // If |regs| is recovered from a regular function call, rax/lr/ra will be scratched.
+  // Otherwise, they will be available.
+  RegisterID reg_id;
+  switch (regs.arch()) {
+    case Registers::Arch::kX64:
+      reg_id = RegisterID::kX64_rax;
+      break;
+    case Registers::Arch::kArm64:
+      reg_id = RegisterID::kArm64_lr;
+      break;
+    case Registers::Arch::kRiscv64:
+      reg_id = RegisterID::kRiscv64_ra;
+      break;
+  }
+  uint64_t val;
+  return regs.Get(reg_id, val).has_err();
+}
+
+}  // namespace
+
 std::string Frame::Describe() const {
   std::string res = "registers={" + regs.Describe() + "}  trust=";
   switch (trust) {
@@ -45,6 +68,9 @@ std::string Frame::Describe() const {
       res += "Context";
       break;
   }
+  if (pc_is_return_address) {
+    res += "  pc_is_return_address";
+  }
   if (error.has_err()) {
     res += "  error=\"" + error.msg() + "\"";
   }
@@ -59,12 +85,12 @@ std::vector<Frame> Unwinder::Unwind(Memory* stack, const Registers& registers, s
     stack = &unavailable_memory;
   }
 
-  std::vector<Frame> res = {{registers, Frame::Trust::kContext}};
+  std::vector<Frame> res = {{registers, false, Frame::Trust::kContext}};
 
   while (--max_depth) {
     Frame& current = res.back();
 
-    Frame next(Registers(current.regs.arch()), /*placeholder*/ Frame::Trust::kCFI);
+    Frame next(Registers(current.regs.arch()), /*placeholders*/ true, Frame::Trust::kCFI);
 
     Step(stack, current, next);
 
@@ -89,20 +115,21 @@ void Unwinder::Step(Memory* stack, Frame& current, Frame& next) {
   bool success = false;
   std::string err_msg;
 
-  bool is_first_frame = current.trust == Frame::Trust::kContext;
-
   // Try CFI first because it's the most accurate one.
-  if (auto err = cfi_unwinder_.Step(stack, current.regs, next.regs, !is_first_frame); err.ok()) {
+  if (auto err = cfi_unwinder_.Step(stack, current.regs, next.regs, current.pc_is_return_address);
+      err.ok()) {
     next.trust = Frame::Trust::kCFI;
+    next.pc_is_return_address = PcIsReturnAddress(next.regs);
     success = true;
   } else {
     err_msg = "CFI: " + err.msg();
   }
 
-  if (!success && is_first_frame) {
+  if (!success && !current.pc_is_return_address) {
     // PLT unwinder only works for the first frame.
     if (auto err = plt_unwinder.Step(stack, current.regs, next.regs); err.ok()) {
       next.trust = Frame::Trust::kPLT;
+      next.pc_is_return_address = true;
       success = true;
     } else {
       err_msg += "; PLT: " + err.msg();
@@ -113,6 +140,7 @@ void Unwinder::Step(Memory* stack, Frame& current, Frame& next) {
   if (!success) {
     if (auto err = fp_unwinder.Step(stack, current.regs, next.regs); err.ok()) {
       next.trust = Frame::Trust::kFP;
+      next.pc_is_return_address = true;
       success = true;
     } else {
       err_msg += "; FP: " + err.msg();
@@ -123,6 +151,7 @@ void Unwinder::Step(Memory* stack, Frame& current, Frame& next) {
   if (!success) {
     if (auto err = scs_unwinder.Step(stack, current.regs, next.regs); err.ok()) {
       next.trust = Frame::Trust::kSCS;
+      next.pc_is_return_address = true;
       success = true;
     } else {
       err_msg += "; SCS: " + err.msg();
