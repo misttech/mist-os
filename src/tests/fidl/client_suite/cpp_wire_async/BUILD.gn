@@ -18,26 +18,13 @@ executable("bin") {
   ]
 }
 
-fuchsia_component("cpp_wire_async_client") {
-  testonly = true
-  component_name = "client"
+fuchsia_test_component("client") {
   manifest = "meta/client.cml"
   deps = [ ":bin" ]
 }
 
-fuchsia_component("harness_cpp_wire_async") {
+fuchsia_package("cpp_wire_async") {
   testonly = true
-  component_name = "harness"
-  manifest = "meta/harness_cpp_wire_async.cml"
-  deps = [ "//src/tests/fidl/client_suite/harness:bin" ]
-}
-
-fuchsia_test_package("fidl-client-suite-cpp-wire-async-test") {
-  test_components = [ ":harness_cpp_wire_async" ]
-  deps = [ ":cpp_wire_async_client" ]
-}
-
-group("cpp_wire_async") {
-  testonly = true
-  deps = [ ":fidl-client-suite-cpp-wire-async-test" ]
+  package_name = "fidl_client_suite_cpp_wire_async_client"
+  deps = [ ":client" ]
 }

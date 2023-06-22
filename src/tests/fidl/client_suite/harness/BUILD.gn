@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
+
 executable("bin") {
   testonly = true
   output_name = "client_suite_harness"
@@ -29,4 +31,17 @@ executable("bin") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
+}
+
+fuchsia_component("component") {
+  testonly = true
+  component_name = "harness"
+  manifest = "meta/harness.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("harness") {
+  package_name = "fidl_client_suite_test_harness"
+  testonly = true
+  deps = [ ":component" ]
 }

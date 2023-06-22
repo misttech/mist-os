@@ -21,26 +21,13 @@ rustc_binary("bin") {
   ]
 }
 
-fuchsia_component("rust_sync_client") {
-  testonly = true
-  component_name = "client"
+fuchsia_test_component("client") {
   manifest = "meta/client.cml"
   deps = [ ":bin" ]
 }
 
-fuchsia_component("harness_rust_sync") {
+fuchsia_package("rust_sync") {
   testonly = true
-  component_name = "harness"
-  manifest = "meta/harness_rust_sync.cml"
-  deps = [ "//src/tests/fidl/client_suite/harness:bin" ]
-}
-
-fuchsia_test_package("fidl-client-suite-rust-sync-test") {
-  test_components = [ ":harness_rust_sync" ]
-  deps = [ ":rust_sync_client" ]
-}
-
-group("rust_sync") {
-  testonly = true
-  deps = [ ":fidl-client-suite-rust-sync-test" ]
+  package_name = "fidl_client_suite_rust_sync_client"
+  deps = [ ":client" ]
 }

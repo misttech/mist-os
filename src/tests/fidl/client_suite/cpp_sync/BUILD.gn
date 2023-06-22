@@ -17,26 +17,13 @@ executable("bin") {
   ]
 }
 
-fuchsia_component("cpp_sync_client") {
-  testonly = true
-  component_name = "client"
+fuchsia_test_component("client") {
   manifest = "meta/client.cml"
   deps = [ ":bin" ]
 }
 
-fuchsia_component("harness_cpp_sync") {
+fuchsia_package("cpp_sync") {
   testonly = true
-  component_name = "harness"
-  manifest = "meta/harness_cpp_sync.cml"
-  deps = [ "//src/tests/fidl/client_suite/harness:bin" ]
-}
-
-fuchsia_test_package("fidl-client-suite-cpp-sync-test") {
-  test_components = [ ":harness_cpp_sync" ]
-  deps = [ ":cpp_sync_client" ]
-}
-
-group("cpp_sync") {
-  testonly = true
-  deps = [ ":fidl-client-suite-cpp-sync-test" ]
+  package_name = "fidl_client_suite_cpp_sync_client"
+  deps = [ ":client" ]
 }

@@ -17,25 +17,13 @@ executable("bin") {
   ]
 }
 
-fuchsia_component("hlcpp_async_client") {
-  component_name = "client"
+fuchsia_test_component("client") {
   manifest = "meta/client.cml"
   deps = [ ":bin" ]
 }
 
-fuchsia_component("harness_hlcpp_async") {
+fuchsia_package("hlcpp_async") {
   testonly = true
-  component_name = "harness"
-  manifest = "meta/harness_hlcpp_async.cml"
-  deps = [ "//src/tests/fidl/client_suite/harness:bin" ]
-}
-
-fuchsia_test_package("fidl-client-suite-hlcpp-async-test") {
-  test_components = [ ":harness_hlcpp_async" ]
-  deps = [ ":hlcpp_async_client" ]
-}
-
-group("hlcpp_async") {
-  testonly = true
-  deps = [ ":fidl-client-suite-hlcpp-async-test" ]
+  package_name = "fidl_client_suite_hlcpp_async_client"
+  deps = [ ":client" ]
 }

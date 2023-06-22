@@ -21,26 +21,15 @@ dart_library("bin") {
   ]
 }
 
-dart_component("dart_client") {
-  component_name = "client"
+dart_component("client") {
+  testonly = true
   manifest = "meta/client.cml"
   main_package = "client"
   deps = [ ":bin" ]
 }
 
-fuchsia_component("harness_dart") {
+fuchsia_package("dart") {
   testonly = true
-  component_name = "harness"
-  manifest = "meta/harness_dart.cml"
-  deps = [ "//src/tests/fidl/client_suite/harness:bin" ]
-}
-
-fuchsia_test_package("fidl-client-suite-dart-test") {
-  test_components = [ ":harness_dart" ]
-  deps = [ ":dart_client" ]
-}
-
-group("dart") {
-  testonly = true
-  deps = [ ":fidl-client-suite-dart-test" ]
+  package_name = "fidl_client_suite_dart_client"
+  deps = [ ":client" ]
 }

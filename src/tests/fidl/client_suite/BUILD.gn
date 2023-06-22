@@ -2,18 +2,44 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
+
+suites = [
+  "cpp_async",
+  "cpp_sync",
+  "cpp_wire_async",
+  "cpp_wire_sync",
+  "dart",
+  "go",
+  "hlcpp_async",
+  "hlcpp_sync",
+  "rust_async",
+  "rust_sync",
+]
+
+fuchsia_test_component("test_component") {
+  component_name = "test"
+  manifest = "meta/test.cml"
+}
+
+foreach(suite, suites) {
+  fuchsia_test_package("fidl_client_suite_${suite}_test") {
+    subpackages = [ "//src/tests/fidl/client_suite/harness" ]
+    renameable_subpackages = [
+      {
+        name = "client"
+        package = "//src/tests/fidl/client_suite/${suite}"
+      },
+    ]
+    test_components = [ ":test_component" ]
+  }
+}
+
 group("client_suite") {
   testonly = true
-  deps = [
-    "cpp_async",
-    "cpp_sync",
-    "cpp_wire_async",
-    "cpp_wire_sync",
-    "dart",
-    "go",
-    "hlcpp_async",
-    "hlcpp_sync",
-    "rust_async",
-    "rust_sync",
-  ]
+
+  deps = []
+  foreach(suite, suites) {
+    deps += [ ":fidl_client_suite_${suite}_test" ]
+  }
 }
