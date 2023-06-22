@@ -104,7 +104,7 @@ before removing it, and you should [preserve the ABI](#preserving)
 when removing an API whenever possible.
 
 The recommended way to remove an API is to use its @available attribute. This is the
-method we generally recommend. For example, if an API was added at level 11, it
+method we generally recommend. For example, if an API was added at level 10, it
 can be removed at level 12 like this:
 
 ```
