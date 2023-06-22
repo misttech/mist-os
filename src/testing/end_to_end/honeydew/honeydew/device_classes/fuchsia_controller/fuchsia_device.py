@@ -146,6 +146,23 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         # connection.
         self._context_destroy()
 
+    def on_device_boot(self) -> None:
+        """Take actions after the device is rebooted.
+
+        Raises:
+            errors.FuchsiaControllerError: On FIDL communication failure.
+        """
+        # Create a new Fuchsia controller context for new device connection.
+        self._context_create()
+
+        # Ensure device is healthy
+        self.health_check()
+
+        # If applicable, initialize bluetooth stack
+        # TODO(b/285993492): Implement fuchsia-controller bluetooth affordance
+        # if "qemu" not in self.device_type:
+        #     self.bluetooth.sys_init()
+
     # List all private properties in alphabetical order
     @property
     def _build_info(self) -> Dict[str, Any]:
@@ -229,20 +246,6 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         """
         self._ctx = None
         self._rcs_proxy = None
-
-    def _on_device_boot(self) -> None:
-        """Take actions after the device is rebooted.
-
-        Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure.
-        """
-        # Create a new Fuchsia controller context for new device connection.
-        self._context_create()
-
-        # If applicable, initialize bluetooth stack
-        # TODO(b/285993492): Implement fuchsia-controller bluetooth affordance
-        # if "qemu" not in self.device_type:
-        #     self.bluetooth.sys_init()
 
     def _send_log_command(
             self, tag: str, message: str, level: custom_types.LEVEL) -> None:

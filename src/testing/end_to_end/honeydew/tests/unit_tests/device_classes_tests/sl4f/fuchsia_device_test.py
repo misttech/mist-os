@@ -102,6 +102,11 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         self.assertIsInstance(
             self.fd_obj, affordances_capable.ComponentCapableDevice)
 
+    def test_fuchsia_device_is_reboot_capable(self) -> None:
+        """Test case to make sure fuchsia device is reboot capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.RebootCapableDevice)
+
     def test_fuchsia_device_is_tracing_capable(self) -> None:
         """Test case to make sure fuchsia device is tracing capable"""
         self.assertIsInstance(
@@ -165,14 +170,17 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         "sys_init",
         autospec=True)
     @mock.patch.object(
+        fuchsia_device.FuchsiaDevice, "health_check", autospec=True)
+    @mock.patch.object(
         fuchsia_device.sl4f_transport.SL4F, "start_server", autospec=True)
     def test_on_device_boot(
-            self, mock_sl4f_start_server, mock_bluetooth_sys_init,
-            mock_device_type) -> None:
-        """Testcase for FuchsiaDevice._on_device_boot()"""
+            self, mock_sl4f_start_server, mock_health_check,
+            mock_bluetooth_sys_init, mock_device_type) -> None:
+        """Testcase for FuchsiaDevice.on_device_boot()"""
         # pylint: disable=protected-access
-        self.fd_obj._on_device_boot()
+        self.fd_obj.on_device_boot()
 
+        mock_health_check.assert_called()
         mock_sl4f_start_server.assert_called()
         mock_device_type.assert_called()
         mock_bluetooth_sys_init.assert_called()

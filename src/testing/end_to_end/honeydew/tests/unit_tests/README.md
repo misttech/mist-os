@@ -30,11 +30,15 @@
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/device_classes_tests/fuchsia_controller:fuchsia_device_fc_test --host --output
 
+    fx test //src/testing/end_to_end/honeydew/tests/unit_tests/transports_tests:fastboot_test --host --output
+
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/transports_tests:ffx_test --host --output
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/transports_tests:ssh_test --host --output
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/transports_tests:sl4f_test --host --output
+
+    fx test //src/testing/end_to_end/honeydew/tests/unit_tests/utils_tests:common_utils_test --host --output
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/utils_tests:http_utils_test --host --output
     ```

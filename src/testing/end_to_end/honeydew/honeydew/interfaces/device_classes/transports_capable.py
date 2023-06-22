@@ -6,10 +6,25 @@
 
 import abc
 
+from honeydew.transports import fastboot as fastboot_transport
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.transports import ssh as ssh_transport
 from honeydew.utils import properties
+
+
+class FastbootCapableDevice(abc.ABC):
+    """Abstract base class to be implemented by a device which supports the
+    Fastboot transport."""
+
+    @properties.Transport
+    @abc.abstractmethod
+    def fastboot(self) -> fastboot_transport.Fastboot:
+        """Returns a fastboot transport object.
+
+        Returns:
+            fastboot_transport.Fastboot object
+        """
 
 
 class FFXCapableDevice(abc.ABC):

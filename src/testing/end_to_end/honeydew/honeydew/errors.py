@@ -28,6 +28,10 @@ class HoneyDewError(Exception):
         _LOGGER.debug(repr(self), exc_info=True)
 
 
+class HoneyDewTimeoutError(HoneyDewError):
+    """Exception for timeout based raised by HoneyDew."""
+
+
 class FfxCommandError(HoneyDewError):
     """Exception for errors raised by ffx commands running on host machine."""
 
@@ -54,3 +58,7 @@ class FuchsiaStateError(HoneyDewError):
 
 class FuchsiaDeviceError(HoneyDewError):
     """Base exception for errors raised by fuchsia device."""
+
+
+class FastbootCommandError(HoneyDewError):
+    """Exception for errors raised by Fastboot commands."""

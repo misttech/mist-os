@@ -9,6 +9,7 @@ import abc
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
+from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.utils import properties
 
 
@@ -37,6 +38,37 @@ class ComponentCapableDevice(abc.ABC):
 
         Returns:
             component.Component object
+        """
+
+
+class RebootCapableDevice(abc.ABC):
+    """Abstract base class to be implemented by a device which supports the
+    reboot operation."""
+
+    @abc.abstractmethod
+    def reboot(self) -> None:
+        """Soft reboot the device."""
+
+    @abc.abstractmethod
+    def on_device_boot(self) -> None:
+        """Take actions after the device is rebooted."""
+
+    @abc.abstractmethod
+    def wait_for_offline(
+            self, timeout: float = fuchsia_device.TIMEOUTS["OFFLINE"]) -> None:
+        """Wait for Fuchsia device to go offline.
+
+        Args:
+            timeout: How long in sec to wait for device to go offline.
+        """
+
+    @abc.abstractmethod
+    def wait_for_online(
+            self, timeout: float = fuchsia_device.TIMEOUTS["ONLINE"]) -> None:
+        """Wait for Fuchsia device to go online.
+
+        Args:
+            timeout: How long in sec to wait for device to go offline.
         """
 
 

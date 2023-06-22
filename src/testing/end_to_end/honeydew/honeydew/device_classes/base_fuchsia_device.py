@@ -15,15 +15,15 @@ from honeydew import custom_types
 from honeydew import errors
 from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
+from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.interfaces.device_classes import transports_capable
+from honeydew.transports import fastboot as fastboot_transport
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import ssh as ssh_transport
 from honeydew.utils import properties
 
 _TIMEOUTS: Dict[str, float] = {
-    "OFFLINE": 60,
-    "ONLINE": 60,
     "SLEEP": .5,
 }
 
@@ -31,6 +31,8 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
+                        affordances_capable.RebootCapableDevice,
+                        transports_capable.FastbootCapableDevice,
                         transports_capable.FFXCapableDevice,
                         transports_capable.SSHCapableDevice):
     """Common implementation for Fuchsia devices using different transports.
@@ -128,6 +130,17 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
 
     # List all transports in alphabetical order
     @properties.Transport
+    def fastboot(self) -> fastboot_transport.Fastboot:
+        """Returns the Fastboot transport object.
+
+        Returns:
+            Fastboot object.
+        """
+        fastboot_obj: fastboot_transport.Fastboot = fastboot_transport.Fastboot(
+            device_name=self.device_name, reboot_affordance=self)
+        return fastboot_obj
+
+    @properties.Transport
     def ffx(self) -> ffx_transport.FFX:
         """Returns the FFX transport object.
 
@@ -182,6 +195,15 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
         message = f"[Host Time: {timestamp}] - {message}"
         self._send_log_command(tag="lacewing", message=message, level=level)
 
+    @abc.abstractmethod
+    def on_device_boot(self) -> None:
+        """Take actions after the device is rebooted.
+
+        Raises:
+            errors.FuchsiaControllerError: On communications failure.
+            errors.Sl4FError: On communications failure.
+        """
+
     def power_cycle(
             self,
             power_switch: power_switch_interface.PowerSwitch,
@@ -210,10 +232,7 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
         power_switch.power_on(outlet)
         self.wait_for_online()
 
-        # Once the device is online make sure all transports are initialized and
-        # healthy.
-        self._on_device_boot()
-        self.health_check()
+        self.on_device_boot()
 
         self.log_message_to_device(
             message=f"Successfully power cycled {self.device_name}...",
@@ -235,11 +254,7 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
 
         self.wait_for_offline()
         self.wait_for_online()
-
-        # Once the device is online make sure all transports are initialized and
-        # healthy.
-        self._on_device_boot()
-        self.health_check()
+        self.on_device_boot()
 
         self.log_message_to_device(
             message=f"Successfully rebooted {self.device_name}...",
@@ -287,7 +302,8 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
         _LOGGER.info("Snapshot file has been saved @ '%s'", snapshot_file_path)
         return snapshot_file_path
 
-    def wait_for_offline(self, timeout: float = _TIMEOUTS["OFFLINE"]) -> None:
+    def wait_for_offline(
+            self, timeout: float = fuchsia_device.TIMEOUTS["OFFLINE"]) -> None:
         """Wait for Fuchsia device to go offline.
 
         Args:
@@ -308,7 +324,8 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
             raise errors.FuchsiaDeviceError(
                 f"'{self.device_name}' failed to go offline in {timeout}sec.")
 
-    def wait_for_online(self, timeout: float = _TIMEOUTS["ONLINE"]) -> None:
+    def wait_for_online(
+            self, timeout: float = fuchsia_device.TIMEOUTS["ONLINE"]) -> None:
         """Wait for Fuchsia device to go online.
 
         Args:
@@ -372,15 +389,6 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
         """
 
     # List all private methods, in alphabetical order
-    @abc.abstractmethod
-    def _on_device_boot(self) -> None:
-        """Take actions after the device is rebooted.
-
-        Raises:
-            errors.FuchsiaControllerError: On communications failure.
-            errors.Sl4FError: On communications failure.
-        """
-
     @abc.abstractmethod
     def _send_log_command(
             self, tag: str, message: str, level: custom_types.LEVEL) -> None:

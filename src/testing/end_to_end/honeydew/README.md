@@ -76,13 +76,13 @@ To fully uninstall HoneyDew, delete the virtual environment that was crated
 ```python
 # Update `sys.path` to include HoneyDew's path before importing it
 # Do this step only if you have not pip installed HoneyDew
+>>> import os
 >>> import sys
 >>> FUCHSIA_ROOT = os.environ.get("FUCHSIA_DIR")
 >>> HONEYDEW_ROOT = f"{FUCHSIA_ROOT}/src/testing/end_to_end/honeydew"
 >>> sys.path.append(HONEYDEW_ROOT)
 
 # Enable Info logging
->>> import os
 >>> import logging
 >>> logging.basicConfig(level=logging.INFO)
 
@@ -182,6 +182,9 @@ INFO:honeydew.device_classes.fuchsia_device_base:Snapshot file has been saved @ 
 * [Component affordance](markdowns/component.md)
 * [Bluetooth affordance](markdowns/bluetooth.md)
 * [Tracing affordance](markdowns/tracing.md)
+
+### Access the transports
+* [Fastboot transport](markdowns/fastboot.md)
 
 ### Device object destruction
 ```python

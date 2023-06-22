@@ -100,6 +100,11 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         self.assertIsInstance(
             self.fd_obj, affordances_capable.ComponentCapableDevice)
 
+    def test_fuchsia_device_is_reboot_capable(self) -> None:
+        """Test case to make sure fuchsia device is reboot capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.RebootCapableDevice)
+
     def test_fuchsia_device_is_tracing_capable(self) -> None:
         """Test case to make sure fuchsia device is tracing capable"""
         self.assertIsInstance(
@@ -153,12 +158,15 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             self.fd_obj._product_info, _MOCK_DEVICE_PROPERTIES["product_info"])
         mock_hwinfo_product.assert_called()
 
+    @mock.patch.object(
+        fuchsia_device.FuchsiaDevice, "health_check", autospec=True)
     @mock.patch("fuchsia_controller_py.Context", autospec=True)
-    def test_on_device_boot(self, mock_fc_context) -> None:
+    def test_on_device_boot(self, mock_fc_context, mock_health_check) -> None:
         """Testcase for FuchsiaDevice._on_device_boot()"""
         # pylint: disable=protected-access
-        self.fd_obj._on_device_boot()
+        self.fd_obj.on_device_boot()
         mock_fc_context.assert_called_once_with({})
+        mock_health_check.assert_called()
 
     @parameterized.expand(
         [

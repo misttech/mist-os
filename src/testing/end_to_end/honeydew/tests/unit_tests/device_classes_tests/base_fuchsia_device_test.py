@@ -209,15 +209,20 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         self.assertEqual(self.fd_obj.firmware_version, "1.2.3")
 
     # # List all the tests related to transports in alphabetical order
-    def test_fuchsia_device_is_ssh_capable(self) -> None:
-        """Test case to make sure fuchsia device is SSH capable"""
-        self.assertIsInstance(self.fd_obj, transports_capable.SSHCapableDevice)
+    def test_fuchsia_device_is_fastboot_capable(self) -> None:
+        """Test case to make sure fuchsia device is Fastboot capable"""
+        self.assertIsInstance(
+            self.fd_obj, transports_capable.FastbootCapableDevice)
 
     def test_fuchsia_device_is_ffx_capable(self) -> None:
         """Test case to make sure fuchsia device is FFX capable"""
         self.assertIsInstance(self.fd_obj, transports_capable.FFXCapableDevice)
 
-    # # List all the tests related to public methods in alphabetical order
+    def test_fuchsia_device_is_ssh_capable(self) -> None:
+        """Test case to make sure fuchsia device is SSH capable"""
+        self.assertIsInstance(self.fd_obj, transports_capable.SSHCapableDevice)
+
+    # List all the tests related to public methods in alphabetical order
     def test_close(self) -> None:
         """Testcase for BaseFuchsiaDevice.close()"""
         self.fd_obj.close()
@@ -267,22 +272,13 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         side_effect=[False, True],
         autospec=True)
     @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX,
-        "check_connection",
-        autospec=True)
-    @mock.patch.object(
-        base_fuchsia_device.ssh_transport.SSH,
-        "check_connection",
-        autospec=True)
-    @mock.patch.object(
-        base_fuchsia_device.BaseFuchsiaDevice, "_on_device_boot", autospec=True)
+        base_fuchsia_device.BaseFuchsiaDevice, "on_device_boot", autospec=True)
     @mock.patch.object(
         base_fuchsia_device.BaseFuchsiaDevice,
         "_send_log_command",
         autospec=True)
     def test_power_cycle(
             self, mock_send_log_command, mock_on_device_boot,
-            mock_ssh_check_connection, mock_ffx_check_connection,
             mock_is_target_connected) -> None:
         """Testcase for BaseFuchsiaDevice.power_cycle()"""
         power_switch = mock.MagicMock(
@@ -294,8 +290,6 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         power_switch.power_off.assert_called()
         power_switch.power_on.assert_called()
         mock_on_device_boot.assert_called()
-        mock_ssh_check_connection.assert_called()
-        mock_ffx_check_connection.assert_called()
 
     @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX,
@@ -303,15 +297,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         side_effect=[False, True],
         autospec=True)
     @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX,
-        "check_connection",
-        autospec=True)
-    @mock.patch.object(
-        base_fuchsia_device.ssh_transport.SSH,
-        "check_connection",
-        autospec=True)
-    @mock.patch.object(
-        base_fuchsia_device.BaseFuchsiaDevice, "_on_device_boot", autospec=True)
+        base_fuchsia_device.BaseFuchsiaDevice, "on_device_boot", autospec=True)
     @mock.patch.object(
         base_fuchsia_device.BaseFuchsiaDevice,
         "_send_log_command",
@@ -322,8 +308,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         autospec=True)
     def test_reboot(
             self, mock_send_reboot_command, mock_send_log_command,
-            mock_on_device_boot, mock_ssh_check_connection,
-            mock_ffx_check_connection, mock_is_target_connected) -> None:
+            mock_on_device_boot, mock_is_target_connected) -> None:
         """Testcase for BaseFuchsiaDevice.reboot()"""
         self.fd_obj.reboot()
 
@@ -331,8 +316,6 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         self.assertEqual(mock_is_target_connected.call_count, 2)
         mock_send_reboot_command.assert_called()
         mock_on_device_boot.assert_called()
-        mock_ssh_check_connection.assert_called()
-        mock_ffx_check_connection.assert_called()
 
     @parameterized.expand(
         [

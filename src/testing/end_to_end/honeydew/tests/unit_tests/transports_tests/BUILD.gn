@@ -5,6 +5,17 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
+  python_host_test("fastboot_test") {
+    main_source = "fastboot_test.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
+  }
+
   python_host_test("ffx_test") {
     main_source = "ffx_test.py"
     libraries = [
@@ -39,6 +50,7 @@ if (is_host) {
 group("tests") {
   testonly = true
   public_deps = [
+    ":fastboot_test($host_toolchain)",
     ":ffx_test($host_toolchain)",
     ":sl4f_test($host_toolchain)",
     ":ssh_test($host_toolchain)",

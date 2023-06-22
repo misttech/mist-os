@@ -9,7 +9,7 @@ import logging
 from shutil import rmtree
 import subprocess
 import tempfile
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Type
 
 from honeydew import custom_types
 from honeydew import errors
@@ -359,12 +359,18 @@ class FFX:
                 return True
         return False
 
-    def run(self, cmd: List[str], timeout: float = _TIMEOUTS["FFX_CLI"]) -> str:
+    def run(
+            self,
+            cmd: List[str],
+            timeout: float = _TIMEOUTS["FFX_CLI"],
+            exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None
+    ) -> str:
         """Executes and returns the output of `ffx -t {target} {cmd}`.
 
         Args:
             cmd: FFX command to run.
             timeout: Timeout to wait for the ffx command to return.
+            exceptions_to_skip: Any non fatal exceptions to be ignored.
 
         Returns:
             Output of `ffx -t {target} {cmd}`.
@@ -373,20 +379,26 @@ class FFX:
             subprocess.TimeoutExpired: In case of timeout
             errors.FfxCommandError: In case of failure.
         """
+        exceptions_to_skip = tuple(exceptions_to_skip or [])
+
         ffx_cmd: List[str] = FFX._generate_ffx_cmd(cmd=cmd, target=self._target)
         try:
             _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
             output: str = subprocess.check_output(
                 ffx_cmd, stderr=subprocess.STDOUT, timeout=timeout).decode()
 
-            _LOGGER.debug("`%s` returned: %s", " ".join(cmd), output)
+            _LOGGER.debug("`%s` returned: %s", " ".join(ffx_cmd), output)
 
             return output
-        except subprocess.TimeoutExpired as err:
-            _LOGGER.debug(err, exc_info=True)
-            raise
         except Exception as err:  # pylint: disable=broad-except
-            raise errors.FfxCommandError(f"`{cmd}` command failed") from err
+            if isinstance(err, exceptions_to_skip):
+                return ""
+
+            if isinstance(err, subprocess.TimeoutExpired):
+                _LOGGER.debug(err, exc_info=True)
+                raise
+
+            raise errors.FfxCommandError(f"`{ffx_cmd}` command failed") from err
 
     # List all private methods in alphabetical order
     @staticmethod

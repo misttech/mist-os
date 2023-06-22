@@ -100,7 +100,7 @@ _FFX_TARGET_LIST_OUTPUT: str = \
     '"target_type":"workstation_eng.qemu-x64","target_state":"Product",' \
     '"addresses":["fe80::6a47:a931:1e84:5077%qemu"],"is_default":true}]\n'
 
-_FFS_TARGET_LIST_JSON: List[Dict[str, Any]] = [
+_FFX_TARGET_LIST_JSON: List[Dict[str, Any]] = [
     {
         "nodename": "fuchsia-emulator",
         "rcs_state": "Y",
@@ -127,13 +127,13 @@ _MOCK_ARGS: Dict[str, Any] = {
     "ffx_target_list_output":
         _FFX_TARGET_LIST_OUTPUT,
     "ffx_target_list_json":
-        _FFS_TARGET_LIST_JSON,
+        _FFX_TARGET_LIST_JSON,
 }
 
 _EXPECTED_VALUES: Dict[str, Any] = {
     "ffx_target_show_output": _FFX_TARGET_SHOW_OUTPUT.decode(),
     "ffx_target_show_json": _FFX_TARGET_SHOW_JSON,
-    "ffx_target_list_json": _FFS_TARGET_LIST_JSON,
+    "ffx_target_list_json": _FFX_TARGET_LIST_JSON,
 }
 
 
@@ -403,6 +403,21 @@ class FfxCliTests(unittest.TestCase):
         """Test case for ffx.run() raises errors.FfxCommandError"""
         with self.assertRaises(errors.FfxCommandError):
             self.ffx_obj.run(cmd=_INPUT_ARGS["run_cmd"])
+
+        mock_subprocess_check_output.assert_called()
+
+    @mock.patch.object(
+        ffx.subprocess,
+        "check_output",
+        side_effect=RuntimeError("error"),
+        autospec=True)
+    def test_ffx_run_with_exceptions_to_skip(
+            self, mock_subprocess_check_output) -> None:
+        """Test case for ffx.run() when called with exceptions_to_skip."""
+        self.assertEqual(
+            self.ffx_obj.run(
+                cmd=_INPUT_ARGS["run_cmd"], exceptions_to_skip=[RuntimeError]),
+            "")
 
         mock_subprocess_check_output.assert_called()
 

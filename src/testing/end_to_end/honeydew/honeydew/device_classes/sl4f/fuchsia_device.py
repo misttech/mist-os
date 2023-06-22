@@ -133,6 +133,22 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         super().health_check()
         self.sl4f.check_connection()
 
+    def on_device_boot(self) -> None:
+        """Take actions after the device is rebooted.
+
+        Raises:
+            errors.Sl4fError: On SL4F communication failure.
+        """
+        # Restart SL4F server on the device
+        self.sl4f.start_server()
+
+        # Ensure device is healthy
+        self.health_check()
+
+        # If applicable, initialize bluetooth stack
+        if "qemu" not in self.device_type:
+            self.bluetooth_gap.sys_init()
+
     # List all private properties in alphabetical order
     @property
     def _build_info(self) -> Dict[str, Any]:
@@ -177,19 +193,6 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         return get_product_info_resp["result"]
 
     # List all private methods in alphabetical order
-    def _on_device_boot(self) -> None:
-        """Take actions after the device is rebooted.
-
-        Raises:
-            errors.Sl4fError: On SL4F communication failure.
-        """
-        # Restart SL4F server on the device
-        self.sl4f.start_server()
-
-        # If applicable, initialize bluetooth stack
-        if "qemu" not in self.device_type:
-            self.bluetooth_gap.sys_init()
-
     def _send_log_command(
             self, tag: str, message: str, level: custom_types.LEVEL) -> None:
         """Send a device command to write to the syslog.

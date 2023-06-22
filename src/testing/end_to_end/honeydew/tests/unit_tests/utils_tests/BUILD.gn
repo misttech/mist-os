@@ -5,6 +5,16 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
+  python_host_test("common_utils_test") {
+    main_source = "common_utils_test.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
+
   python_host_test("http_utils_test") {
     main_source = "http_utils_test.py"
     libraries = [
@@ -19,5 +29,8 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":http_utils_test($host_toolchain)" ]
+  public_deps = [
+    ":common_utils_test($host_toolchain)",
+    ":http_utils_test($host_toolchain)",
+  ]
 }

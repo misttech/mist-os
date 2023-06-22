@@ -5,7 +5,7 @@
 """Abstract base class for Fuchsia device."""
 
 import abc
-from typing import Optional
+from typing import Dict, Optional
 
 from honeydew import custom_types
 from honeydew.interfaces.affordances import component
@@ -14,6 +14,11 @@ from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
 from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
 from honeydew.utils import properties
+
+TIMEOUTS: Dict[str, float] = {
+    "OFFLINE": 60,
+    "ONLINE": 60,
+}
 
 
 class FuchsiaDevice(abc.ABC):
@@ -136,6 +141,10 @@ class FuchsiaDevice(abc.ABC):
         """
 
     @abc.abstractmethod
+    def on_device_boot(self) -> None:
+        """Take actions after the device is rebooted."""
+
+    @abc.abstractmethod
     def power_cycle(
             self,
             power_switch: power_switch_interface.PowerSwitch,
@@ -167,4 +176,20 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             Absolute path of the snapshot file.
+        """
+
+    @abc.abstractmethod
+    def wait_for_offline(self, timeout: float = TIMEOUTS["OFFLINE"]) -> None:
+        """Wait for Fuchsia device to go offline.
+
+        Args:
+            timeout: How long in sec to wait for device to go offline.
+        """
+
+    @abc.abstractmethod
+    def wait_for_online(self, timeout: float = TIMEOUTS["ONLINE"]) -> None:
+        """Wait for Fuchsia device to go online.
+
+        Args:
+            timeout: How long in sec to wait for device to go offline.
         """

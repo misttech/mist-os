@@ -42,10 +42,12 @@ python_library("honeydew") {
     "interfaces/device_classes/fuchsia_device.py",
     "interfaces/device_classes/transports_capable.py",
     "transports/__init__.py",
+    "transports/fastboot.py",
     "transports/ffx.py",
     "transports/sl4f.py",
     "transports/ssh.py",
     "utils/__init__.py",
+    "utils/common.py",
     "utils/http_utils.py",
     "utils/properties.py",
   ]
