@@ -24,9 +24,6 @@ pub trait CapabilityProvider: Send + Sync {
     /// Binds a server end of a zx::Channel to the provided capability.  If the capability is a
     /// directory, then `flags`, and `relative_path` will be propagated along to open
     /// the appropriate directory.
-    ///
-    /// May return a `fuchsia_async::Task` to serve this capability. The caller should ensure that
-    /// it stays live for an appropriate scope associated with the capability.
     async fn open(
         self: Box<Self>,
         task_scope: TaskScope,
