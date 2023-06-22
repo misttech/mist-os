@@ -28,11 +28,12 @@ class BlockDevice : public storage::VmoidRegistry {
   // FIFO protocol. This is the normal way to read from and write to the block device.
   virtual zx_status_t FifoTransaction(block_fifo_request_t* requests, size_t count) = 0;
 
-  // Queries the device path using the fuchsia.device.Controller interface.
-  virtual zx::result<std::string> GetDevicePath() const = 0;
+  // Returns the full topological path of the device.
+  virtual zx::result<std::string> GetTopologicalPath() const = 0;
 
-  // Accesses the Controller proxy for the device.
-  virtual fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const = 0;
+  // Attempts to rebind a given driver to the device. If `url_suffix` is empty, then the device
+  // will be bound based on its bind rules.
+  virtual zx::result<> Rebind(std::string_view url_suffix) const = 0;
 
   // fuchsia.device.block interface:
   virtual zx_status_t BlockGetInfo(fuchsia_hardware_block::wire::BlockInfo* out_info) const = 0;

@@ -18,7 +18,7 @@ zx_status_t RemoteBlockDevice::FifoTransaction(block_fifo_request_t* requests, s
   return fifo_client_.Transaction(requests, count);
 }
 
-zx::result<std::string> RemoteBlockDevice::GetDevicePath() const {
+zx::result<std::string> RemoteBlockDevice::GetTopologicalPath() const {
   // TODO(https://fxbug.dev/112484): this relies on multiplexing.
   const fidl::WireResult result =
       fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(device_.channel().borrow()))
@@ -33,9 +33,19 @@ zx::result<std::string> RemoteBlockDevice::GetDevicePath() const {
   return zx::ok(response->path.get());
 }
 
-fidl::UnownedClientEnd<fuchsia_device::Controller> RemoteBlockDevice::Controller() const {
+zx::result<> RemoteBlockDevice::Rebind(std::string_view url_suffix) const {
   // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  return fidl::UnownedClientEnd<fuchsia_device::Controller>(device_.borrow().channel());
+  const fidl::WireResult result =
+      fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(device_.channel().borrow()))
+          ->Rebind(fidl::StringView::FromExternal(url_suffix));
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  fit::result response = result.value();
+  if (response.is_error()) {
+    return response.take_error();
+  }
+  return zx::ok();
 }
 
 zx_status_t RemoteBlockDevice::BlockGetInfo(

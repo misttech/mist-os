@@ -651,7 +651,7 @@ void VnodeMinfs::Recreate(Minfs* fs, ino_t ino, fbl::RefPtr<VnodeMinfs>* out) {
 #ifdef __Fuchsia__
 
 zx::result<std::string> VnodeMinfs::GetDevicePath() const {
-  return fs_->bc_->device()->GetDevicePath();
+  return fs_->bc_->device()->GetTopologicalPath();
 }
 
 #endif

@@ -269,19 +269,12 @@ zx_status_t Commit(GptDevice* gpt, const char* dev) {
     return status;
   }
 
-  fidl::UnownedClientEnd<fuchsia_device::Controller> controller = gpt->device().Controller();
-  const fidl::WireResult result = fidl::WireCall(controller)->Rebind({});
-  if (!result.ok()) {
+  if (zx::result result = gpt->device().Rebind({}); result.is_error()) {
     fprintf(stderr, "gpt: gpt updated but device %s could not be rebound: %s. Please reboot.\n",
-            dev, result.FormatDescription().c_str());
-    return result.status();
+            dev, result.status_string());
+    return result.error_value();
   }
-  const fit::result response = result.value();
-  if (response.is_error()) {
-    fprintf(stderr, "gpt: gpt updated but device %s could not be rebound: %s. Please reboot.\n",
-            dev, zx_status_get_string(response.error_value()));
-    return response.error_value();
-  }
+
   printf("GPT changes complete.\n");
   return ZX_OK;
 }

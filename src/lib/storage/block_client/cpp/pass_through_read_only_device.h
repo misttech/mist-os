@@ -21,11 +21,13 @@ class PassThroughReadOnlyBlockDevice : public BlockDevice {
     return device_.FifoTransaction(requests, count);
   }
 
-  fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const override {
-    ZX_ASSERT(false);
+  zx::result<std::string> GetTopologicalPath() const override {
+    return device_.GetTopologicalPath();
   }
 
-  zx::result<std::string> GetDevicePath() const override { return device_.GetDevicePath(); }
+  zx::result<> Rebind(std::string_view url_suffix) const override {
+    return device_.Rebind(url_suffix);
+  }
 
   zx_status_t BlockGetInfo(fuchsia_hardware_block::wire::BlockInfo* out_info) const override {
     return device_.BlockGetInfo(out_info);

@@ -72,10 +72,10 @@ class FakeBlockDevice : public block_client::BlockDevice {
   FakeBlockDevice() = default;
 
   zx_status_t FifoTransaction(block_fifo_request_t* requests, size_t count) final { return ZX_OK; }
-  fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const override {
-    ZX_ASSERT(false);
+  zx::result<std::string> GetTopologicalPath() const final { return zx::ok(std::string()); }
+  zx::result<> Rebind(std::string_view url_suffix) const override {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
-  zx::result<std::string> GetDevicePath() const final { return zx::ok(std::string()); }
   zx_status_t BlockGetInfo(fuchsia_hardware_block::wire::BlockInfo* out_info) const final {
     return ZX_OK;
   }

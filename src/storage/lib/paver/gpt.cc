@@ -33,6 +33,15 @@ constexpr size_t ReservedHeaderBlocks(size_t blk_size) {
   return (kReservedEntryBlocks + 2 * blk_size) / blk_size;
 }
 
+zx::result<> RebindGptDriver(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+                             block_client::BlockDevice& device) {
+  zx::result pauser = BlockWatcherPauser::Create(svc_root);
+  if (pauser.is_error()) {
+    return pauser.take_error();
+  }
+  return device.Rebind("gpt.cm");
+}
+
 }  // namespace
 
 zx::result<Uuid> GptPartitionType(Partition type, PartitionScheme s) {
@@ -100,17 +109,6 @@ bool FilterByName(const gpt_partition_t& part, std::string_view name) {
 
 bool FilterByTypeAndName(const gpt_partition_t& part, const Uuid& type, std::string_view name) {
   return type == Uuid(part.type) && FilterByName(part, name);
-}
-
-zx::result<> RebindGptDriver(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-                             fidl::UnownedClientEnd<fuchsia_device::Controller> controller) {
-  auto pauser = BlockWatcherPauser::Create(svc_root);
-  if (pauser.is_error()) {
-    return pauser.take_error();
-  }
-  auto result = fidl::WireCall(controller)->Rebind(fidl::StringView("gpt.cm"));
-  return zx::make_result(result.ok() ? (result->is_error() ? result->error_value() : ZX_OK)
-                                     : result.status());
 }
 
 bool GptDevicePartitioner::FindGptFds(const fbl::unique_fd& devfs_root, GptFds* out) {
@@ -280,8 +278,7 @@ zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::Initiali
       ERROR("Failed to sync empty GPT\n");
       return zx::error(ZX_ERR_BAD_STATE);
     }
-    if (auto status = RebindGptDriver(svc_root, caller.borrow_as<fuchsia_device::Controller>());
-        status.is_error()) {
+    if (zx::result status = RebindGptDriver(svc_root, gpt->device()); status.is_error()) {
       ERROR("Failed to re-read GPT\n");
       return status.take_error();
     }
@@ -472,7 +469,7 @@ zx::result<Uuid> GptDevicePartitioner::CreateGptPartition(const char* name, cons
     ERROR("Failed to clear first block of new partition\n");
     return status.take_error();
   }
-  if (auto status = RebindGptDriver(svc_root_, gpt_->device().Controller()); status.is_error()) {
+  if (zx::result status = RebindGptDriver(svc_root_, gpt_->device()); status.is_error()) {
     ERROR("Failed to rebind GPT\n");
     return status.take_error();
   }
@@ -572,8 +569,7 @@ zx::result<> GptDevicePartitioner::WipePartitions(FilterCallback filter) const {
     gpt_->Sync();
     LOG("Immediate reboot strongly recommended\n");
   }
-
-  static_cast<void>(RebindGptDriver(svc_root_, gpt_->device().Controller()));
+  static_cast<void>(RebindGptDriver(svc_root_, gpt_->device()));
   return zx::ok();
 }
 

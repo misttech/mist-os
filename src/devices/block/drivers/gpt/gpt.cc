@@ -210,11 +210,12 @@ class BlockClient : public block_client::BlockDevice {
     ZX_ASSERT(block_op_size_ > 0);
   }
 
-  // BlockDevice interface
-  zx::result<std::string> GetDevicePath() const override { return zx::error(ZX_ERR_NOT_SUPPORTED); }
+  zx::result<std::string> GetTopologicalPath() const override {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
 
-  fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const override {
-    ZX_ASSERT(false);
+  zx::result<> Rebind(std::string_view url_suffix) const override {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   zx_status_t VolumeGetInfo(

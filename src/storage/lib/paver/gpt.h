@@ -133,9 +133,6 @@ class GptDevicePartitioner {
 zx::result<uuid::Uuid> GptPartitionType(Partition type,
                                         PartitionScheme scheme = PartitionScheme::kLegacy);
 
-zx::result<> RebindGptDriver(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-                             fidl::UnownedClientEnd<fuchsia_device::Controller> controller);
-
 // TODO(69527): Remove this and migrate usages to |utf16_to_utf8|
 inline void utf16_to_cstring(char* dst, const uint8_t* src, size_t charcount) {
   while (charcount > 0) {

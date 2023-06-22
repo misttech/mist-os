@@ -136,7 +136,7 @@ zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<
 }
 
 zx::result<std::string> Directory::GetDevicePath() const {
-  return blobfs_->Device()->GetDevicePath();
+  return blobfs_->Device()->GetTopologicalPath();
 }
 
 zx_status_t Directory::Unlink(std::string_view name, bool must_be_dir) {
