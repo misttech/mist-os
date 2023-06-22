@@ -298,17 +298,24 @@ def _merge_sdk_manifests(manifest_one: SdkManifest,
         return None
     manifest['arch']['host'] = list(host_archs)[0]
 
+    def compare_then_copy(name: str) -> bool:
+        """Copy the value of a manifest field after checking for correctness."""
+        value1 = manifest_one[name]
+        value2 = manifest_two[name]
+        if value1 != value2:
+            print(f'Error: mismatching {name}: \'{value1}\' vs \'{value2}\'')
+            return False
+
+        manifest[name] = value1
+        return True
+
     # Id.
-    if manifest_one['id'] != manifest_two['id']:
-        print('Error: mismatching id')
+    if not compare_then_copy('id'):
         return None
-    manifest['id'] = manifest_one['id']
 
     # Root.
-    if manifest_one['root'] != manifest_two['root']:
-        print('Error: mismatching root')
+    if not compare_then_copy('root'):
         return None
-    manifest['root'] = manifest_one['root']
 
     # Target architectures.
     manifest['arch']['target'] = sorted(
