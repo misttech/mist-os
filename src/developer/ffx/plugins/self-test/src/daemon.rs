@@ -4,7 +4,13 @@
 
 use crate::{assert_eq, test::new_isolate};
 use anyhow::*;
+use ffx_daemon::SocketDetails;
 use fuchsia_async::Duration;
+use std::{
+    io::{BufRead, BufReader, Write},
+    thread::sleep,
+    time::Duration as StdDuration,
+};
 
 pub(crate) async fn test_echo() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("daemon-echo").await?;
@@ -12,6 +18,43 @@ pub(crate) async fn test_echo() -> Result<Option<ffx_isolate::Isolate>> {
 
     let want = "SUCCESS: received \"Ffx\"\n";
     assert_eq!(out.stdout, want);
+
+    Ok(Some(isolate))
+}
+
+pub(crate) async fn test_isolate_cleanup() -> Result<Option<ffx_isolate::Isolate>> {
+    let isolate = new_isolate("isolate-cleanup").await?;
+    isolate
+        .env_context()
+        .query("selftest.drop-isolate")
+        .level(Some(ffx_config::ConfigLevel::User))
+        .set(true.into())
+        .await
+        .unwrap();
+    let mut child = isolate
+        .ffx_cmd(&["self-test", "drop-isolate"])
+        .await?
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut child_stdin = child.stdin.take().unwrap();
+    let mut stdout_lines = BufReader::new(child.stdout.take().unwrap()).lines();
+
+    let daemon_socket_output = stdout_lines.next().unwrap().unwrap();
+    let socket_details: SocketDetails = serde_json::from_str(&daemon_socket_output).unwrap();
+
+    assert!(socket_details.is_currently_running());
+
+    writeln!(&mut child_stdin, "drop isolate please").unwrap();
+    child.wait().unwrap();
+
+    loop {
+        if !socket_details.is_currently_running() {
+            break;
+        }
+        sleep(StdDuration::from_secs(1));
+    }
 
     Ok(Some(isolate))
 }
