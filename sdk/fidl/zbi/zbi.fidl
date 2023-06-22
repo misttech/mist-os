@@ -133,6 +133,11 @@ type Type = flexible enum : uint32 {
     /// mBSI
     DRV_BOARD_INFO = 0x49534200 | TYPE_DRIVER_METADATA_PREFIX;
 
+    /// CPU configuration. See zbi_topology_node_t for a description of the payload.
+    //
+    // 'CPU3'
+    CPU_TOPOLOGY = 0x43505533;
+
     /// Device memory configuration. See zbi_mem_range_t for a description of the
     /// payload.
     ///

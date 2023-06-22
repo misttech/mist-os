@@ -41,6 +41,8 @@ std::string_view TypeName(uint32_t type) {
       return "NVRAM"sv;
     case ZBI_TYPE_PLATFORM_ID:
       return "PLATFORM_ID"sv;
+    case ZBI_TYPE_CPU_TOPOLOGY:
+      return "CPU_TOPOLOGY"sv;
     case ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1:
       return "DEPRECATED_CPU_TOPOLOGY_V1"sv;
     case ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2:

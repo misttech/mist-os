@@ -1,21 +1,29 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+// DO NOT EDIT. Generated from FIDL library
+//   zbi (//sdk/fidl/zbi/cpu.fidl)
+// by zither, a Fuchsia platform tool.
 
 #ifndef LIB_ZBI_FORMAT_CPU_H_
 #define LIB_ZBI_FORMAT_CPU_H_
 
 #include <stdint.h>
 
-#define ZBI_MAX_SMT 4
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+#define ZBI_MAX_SMT ((uint64_t)(4u))
 
 typedef uint16_t zbi_topology_processor_flags_t;
 
-// This is the processor that boots the system and the last to be shutdown.
+// The associated processor boots the system and is the last to be shutdown.
 #define ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY ((zbi_topology_processor_flags_t)(1u << 0))
 
-// This is the processor that handles all interrupts, some architectures will
-// not have one.
+// The associated processor handles all interrupts. Some architectures
+// will not have such a processor.
 #define ZBI_TOPOLOGY_PROCESSOR_FLAGS_INTERRUPT ((zbi_topology_processor_flags_t)(1u << 1))
 
 typedef struct {
@@ -35,15 +43,34 @@ typedef struct {
 } zbi_topology_arm64_info_t;
 
 typedef struct {
-  // Indexes here correspond to the logical_ids index for the thread.
-  uint32_t apic_ids[ZBI_MAX_SMT];
+  uint32_t apic_ids[4];
   uint32_t apic_id_count;
 } zbi_topology_x64_info_t;
 
 typedef struct {
-  // ID that represents this CPU in SBI.
+  // ID that represents this logical CPU (i.e., hart) in SBI.
   uint64_t hart_id;
 } zbi_topology_riscv64_info_t;
+
+#define ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64 ((uint64_t)(1u))
+#define ZBI_TOPOLOGY_ARCHITECTURE_INFO_X64 ((uint64_t)(2u))
+#define ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64 ((uint64_t)(3u))
+
+typedef struct {
+  uint64_t discriminant;
+  union {
+    zbi_topology_arm64_info_t arm64;
+    zbi_topology_x64_info_t x64;
+    zbi_topology_riscv64_info_t riscv64;
+  };
+} zbi_topology_architecture_info_t;
+
+typedef struct {
+  zbi_topology_architecture_info_t architecture_info;
+  zbi_topology_processor_flags_t flags;
+  uint16_t logical_ids[4];
+  uint8_t logical_id_count;
+} zbi_topology_processor_t;
 
 typedef struct {
   // Relative performance level of this processor in the system. The value is
@@ -72,6 +99,53 @@ typedef struct {
   uint32_t cache_id;
 } zbi_topology_cache_t;
 
+typedef struct {
+  uint64_t reserved;
+} zbi_topology_die_t;
+
+typedef struct {
+  uint64_t reserved;
+} zbi_topology_socket_t;
+
+typedef struct {
+  // Starting memory addresses of the numa region.
+  uint64_t start;
+
+  // Size in bytes of the numa region.
+  uint64_t size;
+} zbi_topology_numa_region_t;
+
+#define ZBI_TOPOLOGY_ENTITY_PROCESSOR ((uint64_t)(1u))
+#define ZBI_TOPOLOGY_ENTITY_CLUSTER ((uint64_t)(2u))
+#define ZBI_TOPOLOGY_ENTITY_CACHE ((uint64_t)(3u))
+#define ZBI_TOPOLOGY_ENTITY_DIE ((uint64_t)(4u))
+#define ZBI_TOPOLOGY_ENTITY_SOCKET ((uint64_t)(5u))
+#define ZBI_TOPOLOGY_ENTITY_NUMA_REGION ((uint64_t)(6u))
+
+typedef struct {
+  uint64_t discriminant;
+  union {
+    zbi_topology_processor_t processor;
+    zbi_topology_cluster_t cluster;
+    zbi_topology_cache_t cache;
+    zbi_topology_die_t die;
+    zbi_topology_socket_t socket;
+    zbi_topology_numa_region_t numa_region;
+  };
+} zbi_topology_entity_t;
+
 #define ZBI_TOPOLOGY_NO_PARENT ((uint16_t)(0xffffu))
+
+// The ZBI_TYPE_CPU_TOPOLOGY payload consists of an array of
+// zbi_topology_node_t, giving a flattened tree-like description of the CPU
+// configuration according to the entity hierarchy.
+typedef struct {
+  zbi_topology_entity_t entity;
+  uint16_t parent_index;
+} zbi_topology_node_t;
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif  // LIB_ZBI_FORMAT_CPU_H_

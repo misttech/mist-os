@@ -7,6 +7,7 @@ import("//zircon/tools/zither/zither_golden_files.gni")
 
 zbi_sources = [
   "board.fidl",
+  "cpu.fidl",
   "driver-config.fidl",
   "graphics.fidl",
   "kernel.fidl",
@@ -23,7 +24,7 @@ fidl("zbi") {
   sources = zbi_sources
   enable_zither = true
 
-  # TODO(fxbug.dev/110021): For string_array<N>.
+  # TODO(fxbug.dev/110021): For string_array<N> and overlay.
   experimental_flags = [ "zx_c_types" ]
 
   zither = {
