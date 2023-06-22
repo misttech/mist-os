@@ -199,7 +199,10 @@ void plic_init_percpu() {
 
 void plic_shutdown() { PANIC_UNIMPLEMENTED; }
 
-void plic_shutdown_cpu() { PANIC_UNIMPLEMENTED; }
+void plic_shutdown_cpu() {
+  // Nothing to be done here on the secondary cpus.
+  ASSERT(arch_curr_cpu_num() != BOOT_CPU_ID);
+}
 
 bool plic_msi_is_supported() { return false; }
 
