@@ -113,36 +113,61 @@ zx::result<> RebindGptDriver(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_r
                                      : result.status());
 }
 
-bool GptDevicePartitioner::FindGptDevices(const fbl::unique_fd& devfs_root, GptDevices* out) {
-  fbl::unique_fd d_fd;
+bool GptDevicePartitioner::FindGptFds(const fbl::unique_fd& devfs_root, GptFds* out) {
+  zx::result gpt_clients = FindGptDevices(devfs_root);
+  if (gpt_clients.is_error()) {
+    return false;
+  }
+  GptFds local;
+  for (GptClients& client : gpt_clients.value()) {
+    fbl::unique_fd fd;
+    if (zx_status_t status =
+            fdio_fd_create(client.block.TakeChannel().release(), fd.reset_and_get_address());
+        status != ZX_OK) {
+      return false;
+    }
+    local.emplace_back(std::move(client.topological_path), std::move(fd));
+  }
+  *out = std::move(local);
+  return true;
+}
+
+zx::result<std::vector<GptDevicePartitioner::GptClients>> GptDevicePartitioner::FindGptDevices(
+    const fbl::unique_fd& devfs_root) {
+  fbl::unique_fd block_fd;
   if (zx_status_t status =
-          fdio_open_fd_at(devfs_root.get(), "class/block", 0, d_fd.reset_and_get_address());
+          fdio_open_fd_at(devfs_root.get(), "class/block", 0, block_fd.reset_and_get_address());
       status != ZX_OK) {
     ERROR("Cannot inspect block devices: %s\n", zx_status_get_string(status));
-    return false;
+    return zx::error(status);
   }
-  DIR* d = fdopendir(d_fd.release());
+  DIR* d = fdopendir(block_fd.duplicate().release());
   if (d == nullptr) {
     ERROR("Cannot inspect block devices: %s\n", strerror(errno));
-    return false;
+    return zx::error(ZX_ERR_INTERNAL);
   }
   const auto closer = fit::defer([d]() { closedir(d); });
+  fdio_cpp::FdioCaller block_caller(std::move(block_fd));
 
   struct dirent* de;
-  GptDevices found_devices;
+  std::vector<GptClients> found_devices;
   while ((de = readdir(d)) != nullptr) {
     if (std::string_view{de->d_name} == ".") {
       continue;
     }
-    fbl::unique_fd fd;
-    if (zx_status_t status = fdio_open_fd_at(dirfd(d), de->d_name, 0, fd.reset_and_get_address());
+    zx::result block_endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
+    if (block_endpoints.is_error()) {
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    if (zx_status_t status =
+            fdio_service_connect_at(block_caller.borrow_channel(), de->d_name,
+                                    block_endpoints->server.TakeChannel().release());
         status != ZX_OK) {
-      ERROR("Cannot open %s: %s\n", de->d_name, zx_status_get_string(status));
+      ERROR("Cannot connect %s: %s\n", de->d_name, zx_status_get_string(status));
       continue;
     }
-    fdio_cpp::FdioCaller caller(std::move(fd));
     {
-      const fidl::WireResult result = fidl::WireCall(caller.borrow_as<block::Block>())->GetInfo();
+      const fidl::WireResult result = fidl::WireCall(block_endpoints->client)->GetInfo();
       if (!result.ok()) {
         ERROR("Cannot get block info from %s: %s\n", de->d_name,
               result.FormatDescription().c_str());
@@ -158,8 +183,21 @@ bool GptDevicePartitioner::FindGptDevices(const fbl::unique_fd& devfs_root, GptD
         continue;
       }
     }
+
+    zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+    if (controller_endpoints.is_error()) {
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    std::string controller_path = std::string(de->d_name) + "/device_controller";
+    if (zx_status_t status =
+            fdio_service_connect_at(block_caller.borrow_channel(), controller_path.c_str(),
+                                    controller_endpoints->server.TakeChannel().release());
+        status != ZX_OK) {
+      ERROR("Cannot connect %s: %s\n", de->d_name, zx_status_get_string(status));
+      continue;
+    }
     const fidl::WireResult result =
-        fidl::WireCall(caller.borrow_as<device::Controller>())->GetTopologicalPath();
+        fidl::WireCall(controller_endpoints->client)->GetTopologicalPath();
     if (!result.ok()) {
       ERROR("Cannot get topological path from %s: %s\n", de->d_name,
             result.FormatDescription().c_str());
@@ -178,17 +216,20 @@ bool GptDevicePartitioner::FindGptDevices(const fbl::unique_fd& devfs_root, GptD
     // partition itself.
     if (path_str.find("part-") == std::string::npos &&
         path_str.find("/fvm/") == std::string::npos) {
-      found_devices.emplace_back(path_str, caller.release());
+      found_devices.emplace_back(GptClients{
+          .topological_path = path_str,
+          .block = std::move(block_endpoints->client),
+          .controller = std::move(controller_endpoints->client),
+      });
     }
   }
 
   if (found_devices.empty()) {
     ERROR("No candidate GPT found\n");
-    return false;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  *out = std::move(found_devices);
-  return true;
+  return zx::ok(std::move(found_devices));
 }
 
 zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::InitializeProvidedGptDevice(
@@ -262,8 +303,8 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
     return zx::ok(InitializeGptResult{std::move(status.value()), false});
   }
 
-  GptDevices gpt_devices;
-  if (!FindGptDevices(devfs_root, &gpt_devices)) {
+  GptFds gpt_fds;
+  if (!FindGptFds(devfs_root, &gpt_fds)) {
     ERROR("Failed to find GPT\n");
     return zx::error(ZX_ERR_NOT_FOUND);
   }
@@ -271,7 +312,7 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
   std::vector<fbl::unique_fd> non_removable_gpt_devices;
 
   std::unique_ptr<GptDevicePartitioner> gpt_partitioner;
-  for (auto& [_, gpt_device] : gpt_devices) {
+  for (auto& [_, gpt_device] : gpt_fds) {
     fdio_cpp::FdioCaller caller(std::move(gpt_device));
     zx::result device = caller.clone_as<fuchsia_hardware_block_volume::Volume>();
     if (device.is_error()) {
@@ -344,7 +385,7 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
       "Unable to find a valid GPT on this device with the expected partitions. "
       "Please run *one* of the following command(s):\n");
 
-  for (const auto& [gpt_path, _] : gpt_devices) {
+  for (const auto& [gpt_path, _] : gpt_fds) {
     ERROR("fx init-partition-tables %s\n", gpt_path.c_str());
   }
 

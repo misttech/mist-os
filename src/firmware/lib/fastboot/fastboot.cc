@@ -633,9 +633,9 @@ zx::result<> Fastboot::OemAddStagedBootloaderFile(const std::string& command,
   return SendResponse(ResponseType::kOkay, "", transport);
 }
 
-bool Fastboot::FindGptDevices(paver::GptDevicePartitioner::GptDevices& gpt_devices) {
+bool Fastboot::FindGptDevices(paver::GptDevicePartitioner::GptFds& gpt_devices) {
   auto fd = fbl::unique_fd(open("/dev", O_RDONLY));
-  return paver::GptDevicePartitioner::FindGptDevices(fd, &gpt_devices);
+  return paver::GptDevicePartitioner::FindGptFds(fd, &gpt_devices);
 }
 
 zx::result<fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>> Fastboot::ConnectToDynamicDataSink(
@@ -647,7 +647,7 @@ zx::result<fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>> Fastboot::Conne
                          .status_value());
   }
 
-  paver::GptDevicePartitioner::GptDevices gpt_devices;
+  paver::GptDevicePartitioner::GptFds gpt_devices;
   if (!FindGptDevices(gpt_devices)) {
     return zx::error(SendResponse(ResponseType::kFail, "Failed to find gpt devices", transport,
                                   zx::error(ZX_ERR_INTERNAL))
@@ -655,7 +655,7 @@ zx::result<fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>> Fastboot::Conne
   }
 
   // Filter out ramdisk block devices.
-  paver::GptDevicePartitioner::GptDevices non_ramdisk_devices;
+  paver::GptDevicePartitioner::GptFds non_ramdisk_devices;
   for (auto& [path, fd] : gpt_devices) {
     if (path.find(kRamDiskString) != std::string::npos) {
       continue;

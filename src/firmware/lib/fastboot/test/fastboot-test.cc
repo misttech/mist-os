@@ -886,7 +886,7 @@ class FastbootFakeGptDevices : public Fastboot {
       : Fastboot(max_download_size, std::move(svc_root)),
         block_topology_paths_(std::move(block_topology_paths)) {}
 
-  bool FindGptDevices(paver::GptDevicePartitioner::GptDevices& gpt_devices) override {
+  bool FindGptDevices(paver::GptDevicePartitioner::GptFds& gpt_devices) override {
     for (auto& ele : block_topology_paths_) {
       // fd doesn't matter, test won't be using it. We just give a valid one.
       gpt_devices.emplace_back(ele, fbl::unique_fd(open("/svc", O_RDONLY)));
