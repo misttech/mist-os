@@ -1170,6 +1170,15 @@ void PlatformBus::DdkInit(ddk::InitTxn txn) {
     return txn.Reply(status.error_value());
   }
 
+  device.name() = "fake-battery";
+  device.vid() = PDEV_VID_GENERIC;
+  device.pid() = PDEV_PID_GENERIC;
+  device.did() = PDEV_DID_FAKE_BATTERY;
+  status = NodeAddInternal(device);
+  if (status.is_error()) {
+    return txn.Reply(status.error_value());
+  }
+
   return txn.Reply(ZX_OK);  // This will make the device visible and able to be unbound.
 }
 

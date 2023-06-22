@@ -19,11 +19,19 @@ class PowerSourceProtocolServer : public fidl::WireServer<fuchsia_hardware_power
  public:
   explicit PowerSourceProtocolServer() = default;
 
+  // Sets a signal on state_event_, notifying clients that power source state has changed.
+  zx_status_t SignalClient();
+  // Clears the above state.
+  zx_status_t ClearSignal();
+
   void GetPowerInfo(GetPowerInfoCompleter::Sync& completer) override;
 
   void GetStateChangeEvent(GetStateChangeEventCompleter::Sync& completer) override;
 
   void GetBatteryInfo(GetBatteryInfoCompleter::Sync& completer) override;
+
+ private:
+  zx::event state_event_;
 };
 
 class Driver;

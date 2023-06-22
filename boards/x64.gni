@@ -33,6 +33,9 @@ _bootfs_deps = [
 
   # Driver to handle oneshot reboot flags for bootloader
   "//src/devices/block/drivers/abr-shim",
+
+  # Add the fake battery drive to devices without battery
+  "//src/power/fake-battery:fake-battery",
 ]
 
 # Additional drivers to support running as a virtualization guest.

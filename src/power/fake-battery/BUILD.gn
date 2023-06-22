@@ -9,6 +9,7 @@ driver_bind_rules("fake_battery_bind") {
   rules = "fake-battery-driver.bind"
   bind_output = "fake-battery-driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
+  deps += [ "//src/devices/bind/fuchsia.platform" ]
 }
 
 source_set("fake_battery_driver_lib") {
@@ -37,6 +38,10 @@ fuchsia_driver_component("fake_battery_component") {
   manifest = "meta/fake_battery_driver.cml"
   deps = [ ":fake_battery_driver" ]
   info = "component-info.json"
+}
+
+fuchsia_driver_package("fake-battery") {
+  driver_components = [ ":fake_battery_component" ]
 }
 
 executable("cpp_test") {

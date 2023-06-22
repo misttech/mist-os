@@ -41,6 +41,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   BT_HCI_EMULATOR = 0x30,
   POWER_CORE = 0x31,
   DEVICETREE = 0x32,
+  FAKE_BATTERY = 0x33,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_PID {

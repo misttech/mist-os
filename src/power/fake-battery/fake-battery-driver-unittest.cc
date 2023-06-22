@@ -17,6 +17,8 @@
 
 #include <gtest/gtest.h>
 
+#include "fidl/fuchsia.hardware.powersource/cpp/natural_types.h"
+
 using fuchsia_hardware_powersource::wire::BatteryUnit;
 using fuchsia_hardware_powersource::wire::PowerType;
 
@@ -42,18 +44,16 @@ class FakeBatteryDriverTest : public ::testing::Test {
         test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
                                    std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, init_result.status_value());
-    zx::result driver = fdf_testing::StartDriver<fake_battery::Driver>(
-        std::move(start_args->start_args), test_driver_dispatcher_);
-    EXPECT_EQ(ZX_OK, driver.status_value());
-    driver_ = driver.value();
+    zx::result start_result = driver_.Start(std::move(start_args->start_args)).Await();
+    EXPECT_EQ(ZX_OK, start_result.status_value());
   }
 
   void TearDown() override {
-    zx::result result = fdf_testing::TeardownDriver(driver_, test_driver_dispatcher_);
-    EXPECT_EQ(ZX_OK, result.status_value());
+    zx::result prepare_stop_result = driver_.PrepareStop().Await();
+    EXPECT_EQ(ZX_OK, prepare_stop_result.status_value());
   }
 
-  fake_battery::Driver* driver() { return driver_; }
+  fdf_testing::DriverUnderTest<fake_battery::Driver>& driver() { return driver_; }
 
   async_dispatcher_t* env_dispatcher() { return test_env_dispatcher_.dispatcher(); }
 
@@ -78,7 +78,7 @@ class FakeBatteryDriverTest : public ::testing::Test {
   async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
       env_dispatcher(), std::in_place};
 
-  fake_battery::Driver* driver_;
+  fdf_testing::DriverUnderTest<fake_battery::Driver> driver_;
 };
 
 TEST_F(FakeBatteryDriverTest, CanGetInfo) {
@@ -99,8 +99,9 @@ TEST_F(FakeBatteryDriverTest, CanGetInfo) {
       ASSERT_EQ(result.status(), ZX_OK);
       ASSERT_EQ(result.value().status, ZX_OK);
       const auto& info = result.value().info;
-      ASSERT_EQ(PowerType::kBattery, info.type);
-      ASSERT_EQ(fuchsia_hardware_powersource::kPowerStateCharging, info.state);
+      ASSERT_EQ(info.type, PowerType::kBattery);
+      ASSERT_EQ(info.state, fuchsia_hardware_powersource::kPowerStateCharging |
+                                fuchsia_hardware_powersource::kPowerStateOnline);
     }
     {
       fidl::WireResult result = this_client->GetBatteryInfo();

@@ -7,6 +7,8 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
+#include "fidl/fuchsia.hardware.powersource/cpp/natural_types.h"
+
 using fuchsia_hardware_powersource::wire::BatteryInfo;
 using fuchsia_hardware_powersource::wire::BatteryUnit;
 using fuchsia_hardware_powersource::wire::PowerType;
@@ -14,16 +16,40 @@ using fuchsia_hardware_powersource::wire::SourceInfo;
 
 namespace fake_battery {
 
+zx_status_t PowerSourceProtocolServer::ClearSignal() {
+  zx_status_t status = state_event_.signal(ZX_USER_SIGNAL_0, 0);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to clear signal on event: %s", zx_status_get_string(status));
+  }
+  return status;
+}
+
+zx_status_t PowerSourceProtocolServer::SignalClient() {
+  zx_status_t status = state_event_.signal(0, ZX_USER_SIGNAL_0);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to set signal on event: %s", zx_status_get_string(status));
+  }
+  return status;
+}
+
 void PowerSourceProtocolServer::GetPowerInfo(GetPowerInfoCompleter::Sync& completer) {
-  SourceInfo source_info{PowerType::kBattery, fuchsia_hardware_powersource::kPowerStateCharging};
+  SourceInfo source_info{PowerType::kBattery,  // PowerType::kAc,
+                         fuchsia_hardware_powersource::kPowerStateCharging |
+                             fuchsia_hardware_powersource::kPowerStateOnline};
   completer.Reply(ZX_OK, source_info);
 }
 
-// TODO(bihai): There is no unit test on this function yet. Will learn from acpi implementation
-// and unit test later.
+// TODO(bihai): There is no unit test on this function yet. We will depcreated this and soft
+// transition to a new set of API.
 void PowerSourceProtocolServer::GetStateChangeEvent(GetStateChangeEventCompleter::Sync& completer) {
   zx::event clone;
-  completer.Reply(ZX_OK, std::move(clone));
+  zx::event::create(0, &state_event_);
+  zx_status_t status = state_event_.duplicate(ZX_RIGHT_WAIT | ZX_RIGHT_TRANSFER, &clone);
+  if (status == ZX_OK) {
+    // Clear signal before returning.
+    ClearSignal();
+  }
+  completer.Reply(status, std::move(clone));
 }
 
 void PowerSourceProtocolServer::GetBatteryInfo(GetBatteryInfoCompleter::Sync& completer) {
@@ -69,8 +95,9 @@ class Driver : public fdf::DriverBase {
       return connector.take_error();
     }
 
-    auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena).connector(
-        std::move(connector.value()));
+    auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
+                     .connector(std::move(connector.value()))
+                     .class_name("power");
 
     auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                     .name(arena, node_name)

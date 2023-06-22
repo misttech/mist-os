@@ -60,6 +60,7 @@ __BEGIN_CDECLS
 #define PDEV_DID_BT_HCI_EMULATOR        0x30  // Bluetooth HCI emulator for test
 #define PDEV_DID_POWER_CORE             0x31  // Power core
 #define PDEV_DID_DEVICETREE_NODE        0x32  // Node published by devicetree driver
+#define PDEV_DID_FAKE_BATTERY           0x33  // Fake battery for test
 
 // QEMU emulator
 #define PDEV_VID_QEMU               0x01
