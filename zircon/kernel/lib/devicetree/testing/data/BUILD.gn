@@ -5,6 +5,7 @@
 # https://opensource.org/licenses/MIT
 
 import("//build/components.gni")
+import("//build/devicetree/devicetree.gni")
 import("//build/testing/host_test_data.gni")
 
 # Real device produced device tree binary format files. These files are the blobs obtained from such devices.
@@ -12,31 +13,47 @@ import("//build/testing/host_test_data.gni")
 #
 # NOTE: Do NOT regenerate 'dtb' files from the dts file, this might change the structure of the blob obtained
 # from the device.
-#
-# Synthetic devicetree blobs meant for testing, they are not required to reflect any real node.
-dtbs_all = [
+dtb_real = [
   "qemu-arm-gic2.dtb",
   "qemu-arm-gic3.dtb",
   "qemu-riscv.dtb",
   "sifive-hifive-unmatched.dtb",
   "vision-five-2.dtb",
-  "synthetic/chosen.dtb",
-  "synthetic/complex_no_properties.dtb",
-  "synthetic/complex_with_alias.dtb",
-  "synthetic/complex_with_alias_first.dtb",
-  "synthetic/empty.dtb",
-  "synthetic/memory_complex.dtb",
-  "synthetic/memory.dtb",
-  "synthetic/memory_reservations.dtb",
-  "synthetic/reserved_memory.dtb",
-  "synthetic/simple_with_properties.dtb",
-  "synthetic/psci-hvc.dtb",
-  "synthetic/psci-smc.dtb",
 ]
+
+# Synthetic devicetree source files meant for testing, they are not required to reflect any real node.
+dts_synthetic = [
+  "synthetic/chosen.dts",
+  "synthetic/complex_no_properties.dts",
+  "synthetic/complex_with_alias.dts",
+  "synthetic/complex_with_alias_first.dts",
+  "synthetic/empty.dts",
+  "synthetic/memory_complex.dts",
+  "synthetic/memory.dts",
+  "synthetic/memory_reservations.dts",
+  "synthetic/reserved_memory.dts",
+  "synthetic/simple_with_properties.dts",
+  "synthetic/psci-hvc.dts",
+  "synthetic/psci-smc.dts",
+]
+
+# Compile the synthetic source file to get blobs.
+dtb_synthetic = []
+dtb_synthetic_deps = []
+foreach(dts_file, dts_synthetic) {
+  dtb_target = get_path_info(dts_file, "name")
+  dtb(dtb_target) {
+    sources = [ dts_file ]
+  }
+  dtb_synthetic += get_target_outputs(":$dtb_target")
+  dtb_synthetic_deps += [ ":$dtb_target" ]
+}
+
+dtb_all = dtb_real + dtb_synthetic
 
 # Check for no overlapping files, so we guarantee that they all fit in the same subdirectory.
 filenames = []
-foreach(dtb, dtbs_all) {
+foreach(dtb, dtb_all) {
   curr = [ get_path_info(dtb, "file") ]
   assert(filenames + curr - curr == filenames,
          "dtb_all file names must be unique. '${curr[0]}' is duplicated.")
@@ -58,12 +75,14 @@ config("data_path") {
 
 if (is_host) {
   host_test_data("data") {
-    sources = dtbs_all
+    sources = dtb_all
     outputs = [ "$root_out_dir/$runtime_path/{{source_file_part}}" ]
+    deps = dtb_synthetic_deps
   }
 } else {
   resource("data") {
-    sources = dtbs_all
+    sources = dtb_all
     outputs = [ "$runtime_path/{{source_file_part}}" ]
+    deps = dtb_synthetic_deps
   }
 }

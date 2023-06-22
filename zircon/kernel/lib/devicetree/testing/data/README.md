@@ -15,7 +15,6 @@ compiler application, and submitted together with the corresponding binary file.
 
 # Devicetree Synthetic Data
 
-The 'synthetic' directory contains devicetree source (.dts) and binary (.dtb) files for
-use in devicetree tests. Unlike the data contained in this directory, the synthetic 'dtb'
-are compiled from handwritten 'dts' files. The 'synthetic' directory provides an update
-script to recompile from source with [update.sh](synthetic/update.sh).
+The 'synthetic' directory contains devicetree source (.dts) for use in devicetree tests.
+Unlike the data contained in this directory, the synthetic 'dtb' are compiled from
+handwritten 'dts' files.
