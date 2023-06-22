@@ -4,24 +4,19 @@
 
 use {
     super::config::StreamSink,
-    anyhow::{anyhow, Error},
+    anyhow::Error,
     async_trait::async_trait,
     cm_logger::scoped::ScopedLogger,
     fidl::prelude::*,
     fidl_fuchsia_logger::LogSinkMarker,
-    fidl_fuchsia_process as fproc,
-    fuchsia_async::{self as fasync, ReadableHandle as _, ReadableState},
+    fidl_fuchsia_process as fproc, fuchsia_async as fasync,
     fuchsia_runtime::{HandleInfo, HandleType},
     fuchsia_zircon as zx,
-    futures::{Stream, StreamExt},
+    futures::StreamExt,
     once_cell::unsync::OnceCell,
     runner::component::ComponentNamespace,
-    std::{
-        boxed::Box,
-        pin::Pin,
-        sync::Arc,
-        task::{Context, Poll},
-    },
+    socket_parsing::NewlineChunker,
+    std::{boxed::Box, sync::Arc},
     tracing::{info, warn, Subscriber},
     zx::HandleBased,
 };
@@ -30,7 +25,6 @@ const STDOUT_FD: i32 = 1;
 const STDERR_FD: i32 = 2;
 const SVC_DIRECTORY_NAME: &str = "/svc";
 const SYSLOG_PROTOCOL_NAME: &str = LogSinkMarker::PROTOCOL_NAME;
-const NEWLINE: u8 = b'\n';
 
 /// Max size for message when draining input stream socket. This number is
 /// slightly smaller than size allowed by Archivist (LogSink service implementation).
@@ -116,7 +110,7 @@ fn new_socket_bound_to_fd(fd: i32) -> (zx::Socket, fproc::HandleInfo) {
 /// are split into lines and separated into chunks no greater than
 /// MAX_MESSAGE_SIZE.
 async fn drain_lines(socket: zx::Socket, writer: &mut dyn LogWriter) -> Result<(), Error> {
-    let chunker = NewlineChunker::new(socket)?;
+    let chunker = NewlineChunker::new(socket, MAX_MESSAGE_SIZE)?;
     futures::pin_mut!(chunker);
 
     while let Some(chunk_or_line) = chunker.next().await {
@@ -124,137 +118,6 @@ async fn drain_lines(socket: zx::Socket, writer: &mut dyn LogWriter) -> Result<(
     }
 
     Ok(())
-}
-
-/// Splits the bytes from a streaming socket into newlines suitable for forwarding to LogSink.
-/// Returned chunks may not be complete newlines if single lines are over the size limit for a log
-/// message.
-///
-/// This implementation prioritizes standing memory usage over the number of copies or allocations
-/// made. Log forwarding is not particularly throughput sensitive, but keeping around lots of large
-/// buffers takes up memory.
-struct NewlineChunker {
-    socket: fasync::Socket,
-    buffer: Vec<u8>,
-    is_terminated: bool,
-}
-
-impl NewlineChunker {
-    fn new(socket: zx::Socket) -> Result<Self, Error> {
-        let socket = fasync::Socket::from_socket(socket)
-            .map_err(|s| anyhow!("Failed to create fasync::socket from zx::socket: {}", s))?;
-        Ok(Self { socket, buffer: vec![], is_terminated: false })
-    }
-
-    /// Removes and returns the next line or maximum-size chunk from the head of the buffer if
-    /// available.
-    fn next_chunk_from_buffer(&mut self) -> Option<Vec<u8>> {
-        let new_tail_start =
-            if let Some(mut newline_pos) = self.buffer.iter().position(|&b| b == NEWLINE) {
-                // start the tail 1 past the last newline encountered
-                while let Some(&NEWLINE) = self.buffer.get(newline_pos + 1) {
-                    newline_pos += 1;
-                }
-                newline_pos + 1
-            } else if self.buffer.len() >= MAX_MESSAGE_SIZE {
-                // we have to check the length *after* looking for newlines in case a single socket
-                // read was larger than the max size but contained newlines in the first
-                // MAX_MESSAGE_SIZE bytes
-                MAX_MESSAGE_SIZE
-            } else {
-                // no newlines, and the bytes in the buffer are too few to force chunking
-                return None;
-            };
-
-        // the tail becomes the head for the next chunk
-        let new_tail = self.buffer.split_off(new_tail_start);
-        let mut next_chunk = std::mem::replace(&mut self.buffer, new_tail);
-
-        // remove the newlines from the end of the chunk we're returning
-        while let Some(&NEWLINE) = next_chunk.last() {
-            next_chunk.pop();
-        }
-        Some(next_chunk)
-    }
-
-    fn end_of_stream(&mut self) -> Poll<Option<Result<Vec<u8>, Error>>> {
-        if !self.buffer.is_empty() {
-            // the buffer is under the forced chunk size because the first return didn't happen
-            Poll::Ready(Some(Ok(std::mem::replace(&mut self.buffer, vec![]))))
-        } else {
-            // end the stream
-            self.is_terminated = true;
-            Poll::Ready(None)
-        }
-    }
-}
-
-impl Stream for NewlineChunker {
-    type Item = Result<Vec<u8>, Error>;
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.get_mut();
-
-        if this.is_terminated {
-            return Poll::Ready(None);
-        }
-
-        // first check to see if previous socket reads have left us with lines in the buffer
-        if let Some(chunk) = this.next_chunk_from_buffer() {
-            return Poll::Ready(Some(Ok(chunk)));
-        }
-
-        // we don't have a chunk to return, poll for reading the socket
-        match futures::ready!(this.socket.poll_readable(cx))? {
-            ReadableState::Closed => return this.end_of_stream(),
-            ReadableState::Readable | ReadableState::ReadableAndClosed => {}
-        }
-
-        // find out how much buffer we should make available
-        let bytes_in_socket = this.socket.as_ref().outstanding_read_bytes()?;
-        if bytes_in_socket == 0 {
-            // if there are no bytes available this socket should not be considered readable
-            this.socket.need_readable(cx)?;
-            return Poll::Pending;
-        }
-
-        // don't make the buffer bigger than necessary to get a chunk out
-        let bytes_to_read = std::cmp::min(bytes_in_socket, MAX_MESSAGE_SIZE);
-        let prev_len = this.buffer.len();
-
-        // grow the size of the buffer to make space for the pending read, if it fails we'll need
-        // to shrink it back down before any subsequent calls to poll_next
-        this.buffer.resize(prev_len + bytes_to_read, 0);
-
-        let bytes_read = match this.socket.as_ref().read(&mut this.buffer[prev_len..]) {
-            Ok(b) => b,
-            Err(zx::Status::PEER_CLOSED) => return this.end_of_stream(),
-            Err(zx::Status::SHOULD_WAIT) => {
-                // reset the size of the buffer to exclude the 0's we wrote above
-                this.buffer.truncate(prev_len);
-                return Poll::Ready(Some(Err(anyhow!(
-                    "Got SHOULD_WAIT from socket read after confirming outstanding_read_bytes > 0"
-                ))));
-            }
-            Err(e) => {
-                // reset the size of the buffer to exclude the 0's we wrote above
-                this.buffer.truncate(prev_len);
-                return Poll::Ready(Some(Err(e.into())));
-            }
-        };
-
-        // handle possible short reads
-        this.buffer.truncate(prev_len + bytes_read);
-
-        // we got something out of the socket
-        if let Some(chunk) = this.next_chunk_from_buffer() {
-            // and its enough for a chunk
-            Poll::Ready(Some(Ok(chunk)))
-        } else {
-            // it is not enough for a chunk, request notification when there's more
-            this.socket.need_readable(cx)?;
-            Poll::Pending
-        }
-    }
 }
 
 /// Object capable of writing a stream of bytes.

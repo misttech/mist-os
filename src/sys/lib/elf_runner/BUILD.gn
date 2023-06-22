@@ -39,6 +39,7 @@ rustc_library("elf_runner") {
     "//src/sys/lib/moniker",
     "//src/sys/lib/routing",
     "//src/sys/lib/runner",
+    "//src/sys/lib/socket_parsing",
     "//src/sys/lib/task-exceptions",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

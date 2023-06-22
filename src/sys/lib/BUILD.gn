@@ -31,6 +31,7 @@ group("tests") {
     "routing:host-routing-tests",
     "runner:tests",
     "socket-to-stdio:tests",
+    "socket_parsing:tests",
     "task-exceptions:tests",
   ]
 }
