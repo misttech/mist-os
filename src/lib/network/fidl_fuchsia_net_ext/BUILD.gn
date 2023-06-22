@@ -12,12 +12,15 @@ rustc_library("fidl_fuchsia_net_ext") {
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//src/connectivity/lib/net-types",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:paste",
     "//third_party/rust_crates:serde",
   ]
   test_deps = [
     "//src/connectivity/lib/net-declare",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:paste",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:test-case",
   ]
 
   sources = [ "src/lib.rs" ]

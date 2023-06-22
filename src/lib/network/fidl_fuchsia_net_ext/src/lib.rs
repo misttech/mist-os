@@ -11,6 +11,7 @@ use fidl_fuchsia_net as fidl;
 
 use anyhow;
 use net_types::{ethernet, ip, Witness as _};
+use paste::paste;
 
 /// Extension trait to provides access to FIDL types.
 pub trait NetTypesIpAddressExt: ip::IpAddress {
@@ -267,40 +268,41 @@ impl std::str::FromStr for IpAddress {
 }
 
 macro_rules! generate_address_type {
-    ( $new_type:ident, $std_type:ident ) => {
-        #[derive(PartialEq, Eq, Debug, Clone, Copy)]
-        pub struct $new_type(pub std::net::$std_type);
+    ( $ip:ident ) => {
+        paste! {
+            #[derive(PartialEq, Eq, Debug, Clone, Copy)]
+            pub struct [<Ip $ip Address>](pub std::net::[<Ip $ip Addr>]);
 
-        impl std::fmt::Display for $new_type {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-                let Self(addr) = self;
-                write!(f, "{}", addr)
+            impl std::fmt::Display for [<Ip $ip Address>] {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+                    let Self(addr) = self;
+                    write!(f, "{}", addr)
+                }
             }
-        }
 
-        impl From<fidl::$new_type> for $new_type {
-            fn from(fidl::$new_type { addr }: fidl::$new_type) -> Self {
-                Self(addr.into())
+            impl From<fidl::[<Ip $ip Address>]> for [<Ip $ip Address>] {
+                fn from(fidl::[<Ip $ip Address>] { addr }: fidl::[<Ip $ip Address>]) -> Self {
+                    Self(addr.into())
+                }
             }
-        }
 
-        impl From<$new_type> for fidl::$new_type {
-            fn from(addr: $new_type) -> fidl::$new_type {
-                let $new_type(addr) = addr;
-                fidl::$new_type { addr: addr.octets() }
+            impl From<[<Ip $ip Address>]> for fidl::[<Ip $ip Address>] {
+                fn from([<Ip $ip Address>](addr): [<Ip $ip Address>]) -> Self {
+                    Self { addr: addr.octets() }
+                }
             }
-        }
 
-        impl std::str::FromStr for $new_type {
-            type Err = std::net::AddrParseError;
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
-                Ok(Self(s.parse()?))
+            impl std::str::FromStr for [<Ip $ip Address>] {
+                type Err = std::net::AddrParseError;
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    Ok(Self(s.parse()?))
+                }
             }
         }
     };
 }
-generate_address_type!(Ipv4Address, Ipv4Addr);
-generate_address_type!(Ipv6Address, Ipv6Addr);
+generate_address_type!(v4);
+generate_address_type!(v6);
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct Subnet {
@@ -395,6 +397,86 @@ pub fn apply_subnet_mask(subnet: fidl::Subnet) -> fidl::Subnet {
     };
     fidl::Subnet { addr, prefix_len }
 }
+
+macro_rules! generate_subnet_type {
+    ( $ip:ident, $prefix_len:literal ) => {
+        paste! {
+            #[derive(PartialEq, Eq, Debug, Clone, Copy)]
+            pub struct [<Subnet $ip:upper>] {
+                pub addr: [<Ip $ip Address>],
+                pub prefix_len: u8,
+            }
+
+            impl std::fmt::Display for [<Subnet $ip:upper>] {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+                    let Self { addr, prefix_len } = self;
+                    write!(f, "{}/{}", addr, prefix_len)
+                }
+            }
+
+            impl std::str::FromStr for [<Subnet $ip:upper>] {
+                type Err = anyhow::Error;
+
+                // Parse a Subnet from a CIDR-notated IP address.
+                //
+                // NB: if we need additional CIDR related functionality in the future,
+                // we should consider pulling in https://crates.io/crates/cidr
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    let mut pieces = s.split('/');
+                    let addr = pieces
+                        .next()
+                        .expect("String#split should never return an empty iterator")
+                        .parse::<std::net::[<Ip $ip Addr>]>()?;
+
+                    let addr_len = $prefix_len;
+                    let validated_prefix = match pieces.next() {
+                        Some(p) => {
+                            let parsed_len = p.parse::<u8>()?;
+                            if parsed_len > addr_len {
+                                Err(anyhow::format_err!(
+                                    "prefix length provided ({} bits) too large. address {} is only {} bits long",
+                                    parsed_len,
+                                    addr,
+                                    addr_len
+                                ))
+                            } else {
+                                Ok(parsed_len)
+                            }
+                        }
+                        None => Ok(addr_len),
+                    };
+
+                    let () = match pieces.next() {
+                        Some(_) => Err(anyhow::format_err!(
+                            "more than one '/' separator found while attempting to parse CIDR string {}",
+                            s
+                        )),
+                        None => Ok(()),
+                    }?;
+                    let addr = [<Ip $ip Address>](addr);
+                    Ok([<Subnet $ip:upper>] { addr, prefix_len: validated_prefix? })
+                }
+            }
+
+            impl From<fidl::[<Ip $ip AddressWithPrefix>]> for [<Subnet $ip:upper>] {
+                fn from(
+                    fidl::[<Ip $ip AddressWithPrefix>] { addr, prefix_len }:
+                        fidl::[<Ip $ip AddressWithPrefix>]
+                ) -> Self {
+                    Self { addr: addr.into(), prefix_len }
+                }
+            }
+
+            impl From<[<Subnet $ip:upper>]> for fidl::[<Ip $ip AddressWithPrefix>] {
+                fn from([<Subnet $ip:upper>] { addr, prefix_len }: [<Subnet $ip:upper>]) -> Self {
+                    Self { addr: addr.into(), prefix_len }
+                }
+            }
+        }
+    };
+}
+generate_subnet_type!(v4, 32);
+generate_subnet_type!(v6, 128);
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Hash)]
 pub struct MacAddress {
@@ -529,11 +611,15 @@ impl From<SocketAddress> for fidl::SocketAddress {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use assert_matches::assert_matches;
     use net_declare::{
         fidl_ip_v4_with_prefix, fidl_ip_v6_with_prefix, fidl_subnet, net_addr_subnet,
-        net_addr_subnet_v4, net_addr_subnet_v6, net_subnet_v4, net_subnet_v6,
+        net_addr_subnet_v4, net_addr_subnet_v6, net_subnet_v4, net_subnet_v6, std_ip, std_ip_v4,
+        std_ip_v6,
     };
+    use test_case::test_case;
+
     use std::collections::HashMap;
     use std::str::FromStr;
 
@@ -579,40 +665,44 @@ mod tests {
         assert_eq!(fidl_subnet!("fd::/64"), net_subnet_v6!("fd::/64").into_ext());
     }
 
-    #[test]
-    fn test_subnet() {
-        let err_str_subnets = vec![
-            // Note "1.2.3.4" or "::" is a valid form. Subnet's FromStr trait allows
-            // missing prefix, and assumes the legally maximum prefix length.
-            "",
-            "/32",                              // no ip address
-            " /32",                             // no ip address
-            "1.2.3.4/8/8",                      // too many slashes
-            "1.2.3.4/33",                       // prefix too long
-            "192.168.32.1:8080",                // that's a port, not a prefix
-            "e80::e1bf:4fe9:fb62:e3f4/129",     // prefix too long
-            "e80::e1bf:4fe9:fb62:e3f4/32%eth0", // zone index
-        ];
-        for e in err_str_subnets {
-            if Subnet::from_str(e).is_ok() {
-                eprintln!(
-                    "a malformed str is wrongfully convertitable to Subnet struct: \"{}\"",
-                    e
-                );
-                assert!(false);
+    // Note "1.2.3.4" or "::" is a valid form. Subnet's FromStr trait allows
+    // missing prefix, and assumes the legally maximum prefix length.
+    macro_rules! subnet_from_str_invalid {
+        ($typ:ty) => {
+            paste! {
+                #[test_case("")]
+                #[test_case("/32")]                                   // no ip address
+                #[test_case(" /32"; "space_slash_32")]                // no ip address
+                #[test_case("192.0.2.0/8/8")]                         // too many slashes
+                #[test_case("192.0.2.0/33")]                          // prefix too long
+                #[test_case("192.0.2.0:8080")]                        // that's a port, not a prefix
+                #[test_case("2001:db8::e1bf:4fe9:fb62:e3f4/129")]     // prefix too long
+                #[test_case("2001:db8::e1bf:4fe9:fb62:e3f4/32%eth0")] // zone index
+                fn [<$typ:snake _from_str_invalid>](s: &str) {
+                    let _: anyhow::Error = $typ::from_str(s).expect_err(&format!(
+                        "a malformed str is wrongfully convertitable to Subnet struct: \"{}\"",
+                        s
+                    ));
+                }
             }
-        }
-
-        let want_str = "1.2.3.4/18";
-        let want_ext = Subnet {
-            addr: IpAddress(std::net::IpAddr::V4(std::net::Ipv4Addr::new(1, 2, 3, 4))),
-            prefix_len: 18,
         };
-        let want_fidl = fidl::Subnet {
-            addr: fidl::IpAddress::Ipv4(fidl::Ipv4Address { addr: [1, 2, 3, 4] }),
-            prefix_len: 18,
-        };
+    }
 
+    subnet_from_str_invalid!(Subnet);
+    subnet_from_str_invalid!(SubnetV4);
+    subnet_from_str_invalid!(SubnetV6);
+
+    #[test_case(
+        "192.0.2.0/24",
+        Subnet { addr: IpAddress(std_ip!("192.0.2.0")), prefix_len: 24 },
+        fidl_subnet!("192.0.2.0/24")
+    )]
+    #[test_case(
+        "2001:db8::/32",
+        Subnet { addr: IpAddress(std_ip!("2001:db8::")), prefix_len: 32 },
+        fidl_subnet!("2001:db8::/32")
+    )]
+    fn subnet_conversions(want_str: &str, want_ext: Subnet, want_fidl: fidl::Subnet) {
         let got_ext = Subnet::from_str(want_str).ok().expect("conversion error");
         let got_fidl: fidl::Subnet = got_ext.into();
         let got_ext_back = Subnet::from(got_fidl);
@@ -622,6 +712,36 @@ mod tests {
         assert_eq!(want_fidl, got_fidl);
         assert_eq!(got_ext, got_ext_back);
         assert_eq!(want_str, got_str);
+    }
+
+    #[test]
+    fn subnet_v4_from_str() {
+        assert_eq!(
+            SubnetV4::from_str("192.0.2.0/24")
+                .expect("should be able to parse 192.0.2.0/24 into SubnetV4"),
+            SubnetV4 { addr: Ipv4Address(std_ip_v4!("192.0.2.0")), prefix_len: 24 }
+        );
+    }
+
+    #[test]
+    fn subnet_v4_from_v6_str() {
+        let _: anyhow::Error = SubnetV4::from_str("2001:db8::/24")
+            .expect_err("IPv6 subnet should not be parsed as SubnetV4 successfully");
+    }
+
+    #[test]
+    fn subnet_v6_from_str() {
+        assert_eq!(
+            SubnetV6::from_str("2001:db8::/32")
+                .expect("should be able to parse 2001:db8::/32 into SubnetV6"),
+            SubnetV6 { addr: Ipv6Address(std_ip_v6!("2001:db8::")), prefix_len: 32 }
+        );
+    }
+
+    #[test]
+    fn subnet_v6_from_v4_str() {
+        let _: anyhow::Error = SubnetV6::from_str("192.0.2.0/24")
+            .expect_err("IPv4 subnet should not be parsed as SubnetV6 successfully");
     }
 
     #[test]
