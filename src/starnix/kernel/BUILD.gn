@@ -293,6 +293,7 @@ rustc_binary("starnix_kernel_bin") {
     "task/kernel.rs",
     "task/kernel_threads.rs",
     "task/mod.rs",
+    "task/net.rs",
     "task/pid_table.rs",
     "task/process_group.rs",
     "task/seccomp.rs",

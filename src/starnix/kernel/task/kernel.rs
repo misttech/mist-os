@@ -135,6 +135,10 @@ pub struct Kernel {
     /// A struct containing a VMO with a vDSO implementation, if implemented for a given architecture, and possibly an offset for a sigreturn function.
     pub vdso: Vdso,
 
+    /// The table of devices installed on the netstack and their associated
+    /// state local to this `Kernel`.
+    pub netstack_devices: Arc<NetstackDevices>,
+
     /// The implementation of generic Netlink protocol families.
     generic_netlink: OnceCell<GenericNetlink<NetlinkToClientSender<GenericMessage>>>,
 
@@ -150,15 +154,27 @@ pub struct Kernel {
 /// leak.
 struct InterfacesHandlerImpl(Weak<Kernel>);
 
+impl InterfacesHandlerImpl {
+    fn with_netstack_devices<F: FnOnce(&Arc<NetstackDevices>, Option<&FileSystemHandle>)>(
+        &mut self,
+        f: F,
+    ) {
+        let Self(rc) = self;
+        let Some(rc) = rc.upgrade() else {
+            // The kernel may be getting torn-down.
+            return
+        };
+        f(&rc.netstack_devices, rc.proc_fs.get())
+    }
+}
+
 impl InterfacesHandler for InterfacesHandlerImpl {
-    fn handle_new_link(&mut self, _name: &str) {
-        // TODO(https://fxbug.dev/128995): Create per-device /proc/sys/net
-        // directories.
+    fn handle_new_link(&mut self, name: &str) {
+        self.with_netstack_devices(|devs, proc_fs| devs.add_dev(name, proc_fs))
     }
 
-    fn handle_deleted_link(&mut self, _name: &str) {
-        // TODO(https://fxbug.dev/128995): Remove per-device /proc/sys/net
-        // directories.
+    fn handle_deleted_link(&mut self, name: &str) {
+        self.with_netstack_devices(|devs, _proc_fs| devs.remove_dev(name))
     }
 }
 
@@ -207,7 +223,7 @@ impl Kernel {
             shared_futexes: Default::default(),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
             vdso: Vdso::new(),
-
+            netstack_devices: Arc::default(),
             generic_netlink: OnceCell::new(),
             network_netlink: OnceCell::new(),
         }))

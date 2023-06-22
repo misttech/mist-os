@@ -8,3 +8,4 @@ mod proc_directory;
 mod sysctl;
 
 pub use fs::*;
+pub use sysctl::ProcSysNetDev;

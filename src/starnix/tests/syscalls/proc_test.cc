@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
 #include "src/starnix/tests/syscalls/proc_test_base.h"
@@ -108,3 +109,39 @@ TEST_F(ProcUptimeTest, UptimeByChar) {
   EXPECT_LE(v3.first, v2.first);
   EXPECT_LE(v3.second, v2.second);
 }
+
+class ProcSysNetTest : public ProcTestBase,
+                       public ::testing::WithParamInterface<std::tuple<const char*, const char*>> {
+ protected:
+  void SetUp() override {
+    ProcTestBase::SetUp();
+
+    fd.reset();
+
+    auto const& [dev, path_fmt] = GetParam();
+    char buf[100] = {};
+    sprintf(buf, path_fmt, dev);
+    std::string path = proc_path() + "/sys/net" + buf;
+    ASSERT_TRUE(fd = fbl::unique_fd(open(path.c_str(), O_RDWR)))
+        << "path: " + path + "; " + strerror(errno);
+  }
+
+  fbl::unique_fd fd;
+};
+
+TEST_P(ProcSysNetTest, Write) {
+  constexpr uint8_t kWriteBuf = 127;
+  ASSERT_EQ(write(fd.get(), &kWriteBuf, sizeof(kWriteBuf)), static_cast<ssize_t>(sizeof(kWriteBuf)))
+      << strerror(errno);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ProcSysNetTest, ProcSysNetTest,
+    ::testing::Combine(
+        ::testing::Values("all", "default"),
+        ::testing::Values("/ipv4/neigh/%s/ucast_solicit", "/ipv4/neigh/%s/retrans_time_ms",
+                          "/ipv4/neigh/%s/mcast_resolicit", "/ipv6/conf/%s/accept_ra",
+                          "/ipv6/conf/%s/dad_transmits", "/ipv6/conf/%s/use_tempaddr",
+                          "/ipv6/conf/%s/addr_gen_mode", "/ipv6/conf/%s/stable_secret",
+                          "/ipv6/conf/%s/disable_ipv6", "/ipv6/neigh/%s/ucast_solicit",
+                          "/ipv6/neigh/%s/retrans_time_ms", "/ipv6/neigh/%s/mcast_resolicit")));

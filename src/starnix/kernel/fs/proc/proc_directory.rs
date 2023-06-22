@@ -64,7 +64,7 @@ impl ProcDirectory {
             // for init but not optional for a lot of the system!
             &b"cgroups"[..] => fs.create_node(BytesFile::new_node(vec![]), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
             &b"stat"[..] =>  fs.create_node(StatFile::new_node(&kernel_stats), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
-            &b"sys"[..] => sysctl_directory(fs),
+            &b"sys"[..] => sysctl_directory(fs, kernel),
             &b"pressure"[..] => pressure_directory(fs),
             &b"net"[..] => net_directory(fs),
             &b"uptime"[..] =>

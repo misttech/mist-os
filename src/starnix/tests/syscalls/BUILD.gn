@@ -94,6 +94,7 @@ test("syscalls_test_bin") {
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/fbl",
   ]
   include_dirs = [
     "//third_party/android/platform/bionic/libc/kernel/uapi",
