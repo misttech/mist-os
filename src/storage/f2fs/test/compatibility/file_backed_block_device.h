@@ -19,10 +19,12 @@ class FileBackedBlockDevice : public block_client::BlockDevice {
 
   FileBackedBlockDevice(fbl::unique_fd fd, const uint64_t block_count, const uint32_t block_size);
 
-  zx::result<std::string> GetDevicePath() const final { return zx::error(ZX_ERR_NOT_SUPPORTED); }
+  zx::result<std::string> GetTopologicalPath() const final {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
 
-  fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const override {
-    ZX_ASSERT(false);
+  zx::result<> Rebind(std::string_view url_suffix) const override {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   zx_status_t VolumeGetInfo(
