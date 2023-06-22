@@ -10,7 +10,7 @@
 #[macro_use]
 extern crate macro_rules_attribute;
 
-use crate::execution::Container;
+use crate::execution::{Container, ContainerServiceConfig};
 use anyhow::Error;
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_component_runner as frunner;
@@ -20,7 +20,6 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime as fruntime;
 use futures::{StreamExt, TryStreamExt};
-use std::rc::Rc;
 
 #[cfg(target_arch = "x86_64")]
 use fuchsia_inspect as inspect;
@@ -103,6 +102,15 @@ enum KernelServices {
     ContainerController(fstarcontainer::ControllerRequestStream),
 }
 
+async fn build_container(
+    stream: frunner::ComponentRunnerRequestStream,
+    returned_config: &mut Option<ContainerServiceConfig>,
+) -> Result<Container, Error> {
+    let (container, config) = execution::create_component_from_stream(stream).await?;
+    *returned_config = Some(config);
+    Ok(container)
+}
+
 #[fuchsia::main(logging_tags = ["starnix"])]
 async fn main() -> Result<(), Error> {
     // Because the starnix kernel state is shared among all of the processes in the same job,
@@ -116,7 +124,7 @@ async fn main() -> Result<(), Error> {
         fuchsia_trace::Scope::Thread
     );
 
-    let container = async_lock::OnceCell::<Rc<Container>>::new();
+    let container = async_lock::OnceCell::<Container>::new();
 
     maybe_serve_lifecycle();
 
@@ -146,10 +154,17 @@ async fn main() -> Result<(), Error> {
     fs.for_each_concurrent(None, |request: KernelServices| async {
         match request {
             KernelServices::ContainerRunner(stream) => {
-                container
-                    .get_or_try_init(|| execution::create_component_from_stream(stream))
+                let mut config: Option<ContainerServiceConfig> = None;
+                let container = container
+                    .get_or_try_init(|| build_container(stream, &mut config))
                     .await
                     .expect("failed to start container");
+                if let Some(config) = config {
+                    container
+                        .serve(config)
+                        .await
+                        .expect("failed to serve the expected services from the container");
+                }
             }
             KernelServices::ComponentRunner(stream) => {
                 execution::serve_component_runner(stream, container.wait().await)

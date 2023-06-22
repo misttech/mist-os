@@ -21,7 +21,7 @@ use fuchsia_zircon::Task as _;
 use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use starnix_kernel_config::Config;
-use std::{collections::BTreeMap, ffi::CString, rc::Rc, sync::Arc};
+use std::{collections::BTreeMap, ffi::CString, sync::Arc};
 
 use crate::{
     auth::Credentials,
@@ -118,12 +118,70 @@ fn to_cstr(str: &str) -> CString {
     CString::new(str.to_string()).unwrap()
 }
 
+#[must_use = "The container must run serve on this config"]
+pub struct ContainerServiceConfig {
+    config: ConfigWrapper,
+    request_stream: frunner::ComponentControllerRequestStream,
+    receiver: oneshot::Receiver<Result<ExitStatus, Error>>,
+}
+
 pub struct Container {
     /// The `Kernel` object that is associated with the container.
     pub kernel: Arc<Kernel>,
 
     /// Inspect node holding information about the state of the container.
     _node: inspect::Node,
+}
+
+impl Container {
+    async fn serve_outgoing_directory(
+        &self,
+        outgoing_dir: Option<zx::Channel>,
+    ) -> Result<(), Error> {
+        if let Some(outgoing_dir) = outgoing_dir {
+            // Add `ComponentRunner` to the exposed services of the container, and then serve the
+            // outgoing directory.
+            let mut fs = ServiceFs::new_local();
+            fs.dir("svc")
+                .add_fidl_service(ExposedServices::ComponentRunner)
+                .add_fidl_service(ExposedServices::ContainerController);
+
+            // Expose the root of the container's filesystem.
+            let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy()?;
+            fs.add_remote("fs_root", fs_root);
+            expose_root(self, fs_root_server_end)?;
+
+            fs.serve_connection(outgoing_dir.into()).map_err(|_| errno!(EINVAL))?;
+
+            fs.for_each_concurrent(None, |request_stream| async {
+                match request_stream {
+                    ExposedServices::ComponentRunner(request_stream) => {
+                        match serve_component_runner(request_stream, self).await {
+                            Ok(_) => {}
+                            Err(e) => {
+                                log_error!("Error serving component runner: {:?}", e);
+                            }
+                        }
+                    }
+                    ExposedServices::ContainerController(request_stream) => {
+                        serve_container_controller(request_stream, self)
+                            .await
+                            .expect("failed to start container.")
+                    }
+                }
+            })
+            .await
+        }
+        Ok(())
+    }
+
+    pub async fn serve(&self, service_config: ContainerServiceConfig) -> Result<(), Error> {
+        let (r, _) = futures::join!(
+            self.serve_outgoing_directory(service_config.config.outgoing_dir),
+            server_component_controller(service_config.request_stream, service_config.receiver)
+        );
+        r
+    }
 }
 
 /// The services that are exposed in the container component's outgoing directory.
@@ -174,16 +232,16 @@ async fn server_component_controller(
 
 pub async fn create_component_from_stream(
     mut request_stream: frunner::ComponentRunnerRequestStream,
-) -> Result<Rc<Container>, Error> {
+) -> Result<(Container, ContainerServiceConfig), Error> {
     if let Some(event) = request_stream.try_next().await? {
         match event {
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
                 let request_stream = controller.into_stream()?;
-                let config = get_config_from_component_start_info(start_info);
+                let mut config = get_config_from_component_start_info(start_info);
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
-                let container = create_container(config, sender).await?;
-                fasync::Task::local(server_component_controller(request_stream, receiver)).detach();
-                return Ok(container);
+                let container = create_container(&mut config, sender).await?;
+                let service_config = ContainerServiceConfig { config, request_stream, receiver };
+                return Ok((container, service_config));
             }
         }
     }
@@ -191,9 +249,9 @@ pub async fn create_component_from_stream(
 }
 
 async fn create_container(
-    mut config: ConfigWrapper,
+    config: &mut ConfigWrapper,
     task_complete: oneshot::Sender<TaskResult>,
-) -> Result<Rc<Container>, Error> {
+) -> Result<Container, Error> {
     trace_duration!(trace_category_starnix!(), trace_name_create_container!());
     const DEFAULT_INIT: &str = "/container/init";
 
@@ -216,17 +274,17 @@ async fn create_container(
     let node = inspect::component::inspector().root().create_child("container");
     create_container_inspect(kernel.clone(), &node);
 
-    let mut init_task = create_init_task(&kernel, &config)?;
-    let fs_context = create_fs_context(&init_task, &config, &pkg_dir_proxy)?;
+    let mut init_task = create_init_task(&kernel, config)?;
+    let fs_context = create_fs_context(&init_task, config, &pkg_dir_proxy)?;
     init_task.set_fs(fs_context.clone());
     kernel.kthreads.init(&kernel, fs_context)?;
     let system_task = kernel.kthreads.system_task();
 
-    mount_filesystems(system_task, &config, &pkg_dir_proxy)?;
+    mount_filesystems(system_task, config, &pkg_dir_proxy)?;
 
     // Hack to allow mounting apexes before apexd is working.
     // TODO(tbodt): Remove once apexd works.
-    mount_apexes(system_task, &config)?;
+    mount_apexes(system_task, config)?;
 
     // Run all common features that were specified in the .cml.
     run_features(&config.features, system_task)
@@ -258,50 +316,7 @@ async fn create_container(
         wait_for_init_file(&startup_file_path, system_task).await?;
     };
 
-    let container = Rc::new(Container { kernel, _node: node });
-
-    if let Some(outgoing_dir) = config.outgoing_dir.take() {
-        // Add `ComponentRunner` to the exposed services of the container, and then serve the
-        // outgoing directory.
-        let mut fs = ServiceFs::new_local();
-        fs.dir("svc")
-            .add_fidl_service(ExposedServices::ComponentRunner)
-            .add_fidl_service(ExposedServices::ContainerController);
-
-        // Expose the root of the container's filesystem.
-        let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy()?;
-        fs.add_remote("fs_root", fs_root);
-        expose_root(&container, fs_root_server_end)?;
-
-        fs.serve_connection(outgoing_dir.into()).map_err(|_| errno!(EINVAL))?;
-
-        fasync::Task::local({
-            let container = container.clone();
-            async move {
-                fs.for_each_concurrent(None, |request_stream| async {
-                    match request_stream {
-                        ExposedServices::ComponentRunner(request_stream) => {
-                            match serve_component_runner(request_stream, &container).await {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    log_error!("Error serving component runner: {:?}", e);
-                                }
-                            }
-                        }
-                        ExposedServices::ContainerController(request_stream) => {
-                            serve_container_controller(request_stream, &container)
-                                .await
-                                .expect("failed to start container.")
-                        }
-                    }
-                })
-                .await;
-            }
-        })
-        .detach();
-    }
-
-    Ok(container)
+    Ok(Container { kernel, _node: node })
 }
 
 fn create_fs_context(
