@@ -238,6 +238,7 @@ pub enum TelemetryEvent {
         result: fidl_sme::ConnectResult,
         multiple_bss_candidates: bool,
         ap_state: client::types::ApState,
+        network_is_likely_hidden: bool,
     },
     /// Notify the telemetry event loop that the client has disconnected.
     /// Subsequently, the telemetry event loop will increment the downtime counters periodically
@@ -465,6 +466,7 @@ struct ConnectedState {
     prev_counters: Option<fidl_fuchsia_wlan_stats::IfaceCounterStats>,
     multiple_bss_candidates: bool,
     ap_state: client::types::ApState,
+    network_is_likely_hidden: bool,
 
     last_signal_report: fasync::Time,
     num_consecutive_get_counter_stats_failures: InspectableU64,
@@ -1006,6 +1008,7 @@ impl Telemetry {
                 result,
                 multiple_bss_candidates,
                 ap_state,
+                network_is_likely_hidden,
             } => {
                 let connect_start_time = match &self.connection_state {
                     ConnectionState::Idle(state) => state.connect_start_time,
@@ -1030,7 +1033,11 @@ impl Telemetry {
                     self.stats_logger.log_stat(StatOp::AddConnectSuccessfulCount).await;
 
                     self.stats_logger
-                        .log_device_connected_cobalt_metrics(multiple_bss_candidates, &ap_state)
+                        .log_device_connected_cobalt_metrics(
+                            multiple_bss_candidates,
+                            &ap_state,
+                            network_is_likely_hidden,
+                        )
                         .await;
                     if let ConnectionState::Disconnected(state) = &self.connection_state {
                         if state.latest_no_saved_neighbor_time.is_some() {
@@ -1084,6 +1091,7 @@ impl Telemetry {
                         prev_counters: None,
                         multiple_bss_candidates,
                         ap_state,
+                        network_is_likely_hidden,
 
                         // We have not received a signal report yet, but since this is used as
                         // indicator for whether driver is still responsive, set it to the
@@ -1134,6 +1142,7 @@ impl Telemetry {
                             .log_device_connected_cobalt_metrics(
                                 state.multiple_bss_candidates,
                                 &state.ap_state,
+                                state.network_is_likely_hidden,
                             )
                             .await;
                     }
@@ -1362,7 +1371,11 @@ impl Telemetry {
         self.stats_logger.log_daily_cobalt_metrics().await;
         if let ConnectionState::Connected(state) = &self.connection_state {
             self.stats_logger
-                .log_device_connected_cobalt_metrics(state.multiple_bss_candidates, &state.ap_state)
+                .log_device_connected_cobalt_metrics(
+                    state.multiple_bss_candidates,
+                    &state.ap_state,
+                    state.network_is_likely_hidden,
+                )
                 .await;
         }
     }
@@ -2626,6 +2639,7 @@ impl StatsLogger {
         &mut self,
         multiple_bss_candidates: bool,
         ap_state: &client::types::ApState,
+        network_is_likely_hidden: bool,
     ) {
         let mut metric_events = vec![];
         metric_events.push(MetricEvent {
@@ -2705,6 +2719,14 @@ impl StatsLogger {
             &mut metric_events,
             ap_state.tracked.channel.primary,
         );
+
+        if network_is_likely_hidden {
+            metric_events.push(MetricEvent {
+                metric_id: metrics::CONNECT_TO_LIKELY_HIDDEN_NETWORK_METRIC_ID,
+                event_codes: vec![],
+                payload: MetricEventPayload::Count(1),
+            });
+        }
 
         log_cobalt_1dot1_batch!(
             self.cobalt_1dot1_proxy,
@@ -4166,6 +4188,7 @@ mod tests {
                 result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
                 multiple_bss_candidates: true,
                 ap_state: random_bss_description!(Wpa1).into(),
+                network_is_likely_hidden: false,
             };
             test_helper.telemetry_sender.send(event);
 
@@ -4206,6 +4229,7 @@ mod tests {
                 result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
                 multiple_bss_candidates: true,
                 ap_state: random_bss_description!(Wpa1).into(),
+                network_is_likely_hidden: false,
             };
             test_helper.telemetry_sender.send(event);
 
@@ -5132,6 +5156,7 @@ mod tests {
                 result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
                 multiple_bss_candidates: true,
                 ap_state: random_bss_description!(Wpa1).into(),
+                network_is_likely_hidden: true,
             };
             test_helper.telemetry_sender.send(event);
         }
@@ -5735,6 +5760,7 @@ mod tests {
             result: fake_connect_result(fidl_ieee80211::StatusCode::Success),
             multiple_bss_candidates: true,
             ap_state,
+            network_is_likely_hidden: true,
         };
         test_helper.telemetry_sender.send(event);
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -5809,6 +5835,11 @@ mod tests {
             test_helper.get_logged_metrics(metrics::POLICY_CONNECTION_ATTEMPTS_METRIC_ID);
         assert_eq!(fidl_connect_count.len(), 1);
         assert_eq!(fidl_connect_count[0].payload, MetricEventPayload::Count(1));
+
+        let network_is_likely_hidden =
+            test_helper.get_logged_metrics(metrics::CONNECT_TO_LIKELY_HIDDEN_NETWORK_METRIC_ID);
+        assert_eq!(network_is_likely_hidden.len(), 1);
+        assert_eq!(network_is_likely_hidden[0].payload, MetricEventPayload::Count(1));
     }
 
     #[fuchsia::test]
@@ -5821,6 +5852,7 @@ mod tests {
             result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedCapabilitiesMismatch),
             multiple_bss_candidates: true,
             ap_state: random_bss_description!(Wpa2).into(),
+            network_is_likely_hidden: true,
         };
         test_helper.telemetry_sender.send(event);
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -5846,6 +5878,7 @@ mod tests {
                 result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
                 multiple_bss_candidates: true,
                 ap_state: random_bss_description!(Wpa1).into(),
+                network_is_likely_hidden: true,
             };
             test_helper.telemetry_sender.send(event);
         }
@@ -5887,6 +5920,7 @@ mod tests {
                 result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
                 multiple_bss_candidates: true,
                 ap_state: random_bss_description!(Wpa1).into(),
+                network_is_likely_hidden: true,
             };
             test_helper.telemetry_sender.send(event);
         }
@@ -6068,6 +6102,7 @@ mod tests {
                 result: fake_connect_result(code),
                 multiple_bss_candidates: first_connect_result_params.0,
                 ap_state: first_connect_result_params.1.clone().into(),
+                network_is_likely_hidden: true,
             };
             test_helper.telemetry_sender.send(event);
         }
@@ -6085,6 +6120,7 @@ mod tests {
                 result: fake_connect_result(code),
                 multiple_bss_candidates: second_connect_result_params.0,
                 ap_state: second_connect_result_params.1.clone().into(),
+                network_is_likely_hidden: true,
             };
             test_helper.telemetry_sender.send(event);
         }
@@ -6439,6 +6475,11 @@ mod tests {
             ap_oui_connected[0].payload,
             MetricEventPayload::StringValue("00F620".to_string())
         );
+
+        let network_is_likely_hidden =
+            test_helper.get_logged_metrics(metrics::CONNECT_TO_LIKELY_HIDDEN_NETWORK_METRIC_ID);
+        assert_eq!(network_is_likely_hidden.len(), 1);
+        assert_eq!(network_is_likely_hidden[0].payload, MetricEventPayload::Count(1));
     }
 
     #[fuchsia::test]
@@ -6480,6 +6521,7 @@ mod tests {
         assert_eq!(connected_bss_transition_mgmt.len(), 0);
     }
 
+    #[test_case(metrics::CONNECT_TO_LIKELY_HIDDEN_NETWORK_METRIC_ID, None; "connect_to_likely_hidden_network")]
     #[test_case(metrics::NUMBER_OF_CONNECTED_DEVICES_METRIC_ID, None; "number_of_connected_devices")]
     #[test_case(metrics::CONNECTED_NETWORK_SECURITY_TYPE_METRIC_ID, None; "breakdown_by_security_type")]
     #[test_case(metrics::DEVICE_CONNECTED_TO_AP_BREAKDOWN_BY_IS_MULTI_BSS_METRIC_ID, None; "breakdown_by_is_multi_bss")]
@@ -7548,6 +7590,7 @@ mod tests {
                 result: fake_connect_result(fidl_ieee80211::StatusCode::Success),
                 multiple_bss_candidates: true,
                 ap_state: ap_state.into(),
+                network_is_likely_hidden: true,
             };
             self.telemetry_sender.send(event);
         }

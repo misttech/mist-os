@@ -58,6 +58,10 @@ pub const PROB_HIDDEN_INCREMENT_NOT_SEEN_ACTIVE: f32 = 0.14;
 // "HIDDEN_PROBABILITY_HIGH" range.
 pub const HIDDEN_PROBABILITY_HIGH: f32 =
     PROB_HIDDEN_DEFAULT - PROB_HIDDEN_INCREMENT_NOT_SEEN_ACTIVE;
+// The probability at which we decisively claim a network to be hidden. Implementation detail: we
+// assume a network to be hidden iff we connect only after observing the network in an active scan,
+// not a passive scan.
+pub const PROB_IS_HIDDEN: f32 = PROB_HIDDEN_IF_CONNECT_ACTIVE;
 
 pub type SaveError = fidl_policy::NetworkConfigChangeError;
 
@@ -298,6 +302,10 @@ impl NetworkConfig {
                 self.hidden_probability = new_prob.max(PROB_HIDDEN_MIN_FROM_NOT_SEEN_ACTIVE);
             }
         }
+    }
+
+    pub fn is_hidden(&self) -> bool {
+        self.hidden_probability >= PROB_IS_HIDDEN
     }
 }
 
@@ -1379,6 +1387,18 @@ mod tests {
         // still reflect that we think the network is hidden after the connect.
         network_config.update_hidden_prob(HiddenProbEvent::NotSeenActive);
         assert_eq!(network_config.hidden_probability, PROB_HIDDEN_IF_CONNECT_ACTIVE);
+    }
+
+    #[fuchsia::test]
+    fn test_is_hidden_implementation() {
+        let mut config = NetworkConfig::new(
+            NetworkIdentifier::try_from("foo", SecurityType::Wpa2).unwrap(),
+            policy_wpa_password(),
+            false,
+        )
+        .expect("Error creating network config for foo");
+        config.update_hidden_prob(HiddenProbEvent::ConnectActive);
+        assert!(config.is_hidden());
     }
 
     fn policy_wep_key() -> Credential {

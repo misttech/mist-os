@@ -460,6 +460,20 @@ async fn connecting_state<'a>(
         )
         .await;
 
+    let network_is_likely_hidden = match common_options
+        .saved_networks_manager
+        .lookup(&options.connect_selection.target.network)
+        .await
+        .iter()
+        .find(|&config| config.credential == options.connect_selection.target.credential)
+    {
+        Some(config) => config.is_hidden(),
+        None => {
+            error!("Could not lookup if connected network is hidden.");
+            false
+        }
+    };
+
     // Log the connect result for metrics.
     common_options.telemetry_sender.send(TelemetryEvent::ConnectResult {
         ap_state: ap_state.clone(),
@@ -467,6 +481,7 @@ async fn connecting_state<'a>(
         policy_connect_reason: Some(options.connect_selection.reason),
         multiple_bss_candidates: options.connect_selection.target.network_has_multiple_bss,
         iface_id: common_options.iface_id,
+        network_is_likely_hidden,
     });
 
     match (sme_result.code, sme_result.is_credential_rejected) {
@@ -488,6 +503,7 @@ async fn connecting_state<'a>(
                 connection_attempt_time: start_time,
                 time_to_connect: fasync::Time::now() - start_time,
                 past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
+                network_is_likely_hidden,
             };
             return Ok(connected_state(common_options, connected_options).into_state());
         }
@@ -526,6 +542,7 @@ struct ConnectedOptions {
     multiple_bss_candidates: bool,
     currently_fulfilled_connection: types::ConnectSelection,
     connect_txn_stream: fidl_sme::ConnectTransactionEventStream,
+    network_is_likely_hidden: bool,
     /// Time at which connect was first attempted, historical data for network scoring.
     pub connection_attempt_time: fasync::Time,
     /// Duration from connection attempt to success, historical data for network scoring.
@@ -628,6 +645,7 @@ async fn connected_state(
                                 // it likely remains the same.
                                 multiple_bss_candidates: options.multiple_bss_candidates,
                                 ap_state: (*options.ap_state).clone(),
+                                network_is_likely_hidden: options.network_is_likely_hidden,
                             });
                             !connected
                         }
@@ -1303,7 +1321,7 @@ mod tests {
         // Check that connected telemetry event is sent
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::ConnectResult { iface_id: 1, policy_connect_reason, result, multiple_bss_candidates, ap_state })) => {
+            Ok(Some(TelemetryEvent::ConnectResult { iface_id: 1, policy_connect_reason, result, multiple_bss_candidates, ap_state, network_is_likely_hidden: _ })) => {
                 assert_eq!(bss_description, ap_state.original().clone().into());
                 assert_eq!(multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                 assert_eq!(policy_connect_reason, Some(connect_selection.reason));
@@ -1418,12 +1436,11 @@ mod tests {
         // Check that connect result telemetry event is sent
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::ConnectResult { iface_id: 1, policy_connect_reason, result, multiple_bss_candidates, ap_state })) => {
+            Ok(Some(TelemetryEvent::ConnectResult { iface_id: 1, policy_connect_reason, result, multiple_bss_candidates, ap_state, network_is_likely_hidden: _ })) => {
                 assert_eq!(bss_description, ap_state.original().clone().into());
                 assert_eq!(multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                 assert_eq!(policy_connect_reason, Some(connect_selection.reason));
                 assert_eq!(result, connect_result);
-
             }
         );
 
@@ -1867,6 +1884,7 @@ mod tests {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             ap_state: Box::new(ap_state.clone()),
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
             connection_attempt_time,
             time_to_connect,
             past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
@@ -1994,6 +2012,7 @@ mod tests {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             ap_state: Box::new(ap_state.clone()),
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
             connection_attempt_time,
             time_to_connect,
             past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
@@ -2080,6 +2099,7 @@ mod tests {
             ap_state: Box::new(ap_state.clone()),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
             past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
@@ -2243,6 +2263,7 @@ mod tests {
             ap_state: Box::new(ap_state.clone()),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
             past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
@@ -2295,6 +2316,7 @@ mod tests {
             ap_state: Box::new(first_ap_state.clone()),
             multiple_bss_candidates: first_connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
             connection_attempt_time,
             time_to_connect,
             past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
@@ -2466,6 +2488,7 @@ mod tests {
             ap_state: Box::new(ap_state.clone()),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
             past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
@@ -2520,6 +2543,7 @@ mod tests {
             ap_state: Box::new(ap_state.clone()),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
             past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
@@ -2577,6 +2601,7 @@ mod tests {
             ap_state: Box::new(ap_state),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
             past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
@@ -2684,6 +2709,7 @@ mod tests {
             ap_state: Box::new(ap_state),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
             past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
@@ -2819,12 +2845,12 @@ mod tests {
             ap_state: Box::new(ap_state),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
             past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
-
         let connect_txn_handle = connect_txn_stream.control_handle();
         let fut = run_state_machine(initial_state);
         pin_mut!(fut);
@@ -2904,6 +2930,7 @@ mod tests {
             ap_state: Box::new(ap_state),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
             past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
@@ -2986,6 +3013,7 @@ mod tests {
             ap_state: Box::new(ap_state),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
             past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
