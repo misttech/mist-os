@@ -255,4 +255,12 @@ TEST_F(FuseTest, Link) {
   ASSERT_EQ(ino, stats.st_ino);
 }
 
+TEST_F(FuseTest, Unlink) {
+  ASSERT_TRUE(Mount());
+  std::string witness = GetMountDir() + "/witness";
+  ASSERT_TRUE(ScopedFD(open(witness.c_str(), O_RDONLY)).is_valid());
+  ASSERT_EQ(unlink(witness.c_str()), 0);
+  ASSERT_FALSE(ScopedFD(open(witness.c_str(), O_RDONLY)).is_valid());
+}
+
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_

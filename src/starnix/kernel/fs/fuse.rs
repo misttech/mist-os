@@ -593,12 +593,13 @@ impl FsNodeOps for Arc<FuseNode> {
     fn unlink(
         &self,
         _node: &FsNode,
-        _current_task: &CurrentTask,
-        _name: &FsStr,
+        current_task: &CurrentTask,
+        name: &FsStr,
         _child: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        not_implemented!("FsNodeOps::unlink");
-        error!(ENOTSUP)
+        self.connection
+            .execute_operation(current_task, self, FuseOperation::Unlink(name.to_owned()))
+            .map(|_| ())
     }
 
     fn truncate(
@@ -1005,6 +1006,10 @@ enum FuseOperation {
         // Name of the link
         FsString,
     ),
+    Unlink(
+        // Name of the file to unlink
+        FsString,
+    ),
     Write(
         uapi::fuse_write_in,
         // Content to write
@@ -1088,6 +1093,7 @@ impl FuseOperation {
                 len += Self::write_null_terminated(data, target)?;
                 Ok(len)
             }
+            Self::Unlink(name) => Self::write_null_terminated(data, name),
             Self::Write(fuse_write_in, content) => {
                 let mut len = data.write_all(fuse_write_in.as_bytes())?;
                 len += data.write_all(content)?;
@@ -1123,6 +1129,7 @@ impl FuseOperation {
             Self::Seek(_) => uapi::fuse_opcode_FUSE_LSEEK,
             Self::Statfs => uapi::fuse_opcode_FUSE_STATFS,
             Self::Symlink(_, _) => uapi::fuse_opcode_FUSE_SYMLINK,
+            Self::Unlink(_) => uapi::fuse_opcode_FUSE_UNLINK,
             Self::Write(_, _) => uapi::fuse_opcode_FUSE_WRITE,
         }
     }
@@ -1151,6 +1158,7 @@ impl FuseOperation {
             Self::Symlink(target, name) => {
                 (target.as_bytes().len() + name.as_bytes().len() + 2) as u32
             }
+            Self::Unlink(name) => (name.as_bytes().len() + 1) as u32,
             Self::Write(_, content) => {
                 (std::mem::size_of::<uapi::fuse_write_in>() + content.len()) as u32
             }
@@ -1193,7 +1201,7 @@ impl FuseOperation {
                 Ok(FuseResponse::Poll(Self::to_response::<uapi::fuse_poll_out>(&buffer)))
             }
             Self::Read(_) | Self::Readlink => Ok(FuseResponse::Read(buffer)),
-            Self::Release(_) | Self::Flush(_) => Ok(FuseResponse::None),
+            Self::Flush(_) | Self::Release(_) | Self::Unlink(_) => Ok(FuseResponse::None),
             Self::Statfs => {
                 Ok(FuseResponse::Statfs(Self::to_response::<uapi::fuse_statfs_out>(&buffer)))
             }
