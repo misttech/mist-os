@@ -78,6 +78,14 @@ legacy_cache_package_labels +=
 legacy_cache_package_labels +=
     [ "//src/diagnostics/validator/inspect:validator" ]
 
+# Add test validation packages for use in tests.
+# TODO(fxbug.dev/127138): Remove once we support packages in the SDK and we want to put this
+# in the SDK.
+legacy_cache_package_labels += [
+  "//src/tests/fidl/client_suite/harness",
+  "//src/tests/fidl/server_suite/harness",
+]
+
 # Use the product assembly config target to specify the product configuration.
 fuchsia_product_assembly_config_label = "//products/terminal"
 
