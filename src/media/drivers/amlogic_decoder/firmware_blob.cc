@@ -196,7 +196,7 @@ std::string FirmwareTypeToFormat(FirmwareBlob::FirmwareType type) {
     case FirmwareBlob::FirmwareType::kDec_Vc1_G12a:
       return "vc1_g12a";
     default:
-      LOG(ERROR, "Unrecognized firmware type: %d", type);
+      LOG(ERROR, "Unrecognized firmware type: %d", static_cast<int>(type));
       return "";
   }
 }
@@ -221,7 +221,7 @@ std::vector<std::string> DeviceTypeToCpu(DeviceType device_type) {
       cpu_names.push_back("sm1");
       break;
     default:
-      LOG(ERROR, "Unrecognized device type: %d", device_type);
+      LOG(ERROR, "Unrecognized device type: %d", static_cast<int>(device_type));
   }
   return cpu_names;
 }
@@ -240,12 +240,13 @@ zx_status_t FirmwareBlob::GetFirmwareData(FirmwareType firmware_type, uint8_t** 
       *data_out = reinterpret_cast<uint8_t*>(ptr_) + it->second.offset;
       *size_out = it->second.size;
       LOG(INFO, "Got firmware with cpu_name %s and format %s for type %d and device type %d",
-          &cpu_name[0], &format_name[0], firmware_type, device_type_);
+          &cpu_name[0], &format_name[0], static_cast<int>(firmware_type),
+          static_cast<int>(device_type_));
       return ZX_OK;
     }
   }
-  DECODE_ERROR("Couldn't find firmware for type: %d and device type: %d", firmware_type,
-               device_type_);
+  DECODE_ERROR("Couldn't find firmware for type: %d and device type: %d",
+               static_cast<int>(firmware_type), static_cast<int>(device_type_));
   return ZX_ERR_INVALID_ARGS;
 }
 

@@ -774,8 +774,8 @@ zx_status_t AmlogicVideo::TeeSmcLoadVideoFirmware(FirmwareBlob::FirmwareType ind
   params.arg2 = static_cast<uint32_t>(vdec);
   zx_status_t status = zx_smc_call(secure_monitor_.get(), &params, &result);
   if (status != ZX_OK) {
-    LOG(ERROR, "Failed to kFuncIdLoadVideoFirmware - index: %u vdec: %u status: %d", index, vdec,
-        status);
+    LOG(ERROR, "Failed to kFuncIdLoadVideoFirmware - index: %u vdec: %u status: %d",
+        static_cast<unsigned int>(index), static_cast<unsigned int>(vdec), status);
     return status;
   }
   if (result.arg0 != 0) {
