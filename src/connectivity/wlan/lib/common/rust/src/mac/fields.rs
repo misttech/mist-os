@@ -17,6 +17,12 @@ impl FrameType {
     pub const CTRL: Self = Self(1);
     pub const DATA: Self = Self(2);
     pub const EXT: Self = Self(3);
+
+    pub fn is_supported(&self) -> bool {
+        let FrameType(inner) = *self;
+        let FrameType(max) = FrameType::EXT;
+        !(inner > max)
+    }
 }
 
 // IEEE Std 802.11-2016, 9.2.4.1.3
@@ -51,6 +57,12 @@ impl MgmtSubtype {
     pub const ACTION: Self = Self(0b1101);
     pub const ACTION_NO_ACK: Self = Self(0b1110);
     // 1111 reserved
+
+    pub fn is_supported(&self) -> bool {
+        let MgmtSubtype(inner) = *self;
+        let MgmtSubtype(max) = MgmtSubtype::ACTION_NO_ACK;
+        !(inner == 0b0111 || inner == 0b1111 || inner > max)
+    }
 }
 
 // IEEE Std 802.11-2016, 9.2.4.1.3

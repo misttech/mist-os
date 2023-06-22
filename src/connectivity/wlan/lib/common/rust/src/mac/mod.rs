@@ -45,6 +45,105 @@ pub fn is_multicast(addr: MacAddr) -> bool {
     addr[0] & 0x01 != 0
 }
 
+// TODO(fxbug.dev/128928): Use this in the `MacFrame::Data` variant.
+pub struct DataFrame<B> {
+    // Data Header: fixed fields
+    pub fixed_fields: LayoutVerified<B, FixedDataHdrFields>,
+    // Data Header: optional fields
+    pub addr4: Option<LayoutVerified<B, Addr4>>,
+    pub qos_ctrl: Option<UnalignedView<B, QosControl>>,
+    pub ht_ctrl: Option<UnalignedView<B, HtControl>>,
+    // Body
+    pub body: B,
+}
+
+impl<B> DataFrame<B>
+where
+    B: ByteSlice,
+{
+    pub fn parse(bytes: B, is_body_aligned: bool) -> Option<Self> {
+        let mut reader = BufferReader::new(bytes);
+        let fc = FrameControl(reader.peek_value()?);
+        matches!(fc.frame_type(), FrameType::DATA)
+            .then(|| {
+                // Parse fixed header fields
+                let fixed_fields = reader.read()?;
+
+                // Parse optional header fields
+                let addr4 = if fc.to_ds() && fc.from_ds() { Some(reader.read()?) } else { None };
+                let qos_ctrl =
+                    if fc.data_subtype().qos() { Some(reader.read_unaligned()?) } else { None };
+                let ht_ctrl = if fc.htc_order() { Some(reader.read_unaligned()?) } else { None };
+
+                // Skip optional padding if body alignment is used.
+                if is_body_aligned {
+                    let full_hdr_len = FixedDataHdrFields::len(
+                        Presence::<Addr4>::from_bool(addr4.is_some()),
+                        Presence::<QosControl>::from_bool(qos_ctrl.is_some()),
+                        Presence::<HtControl>::from_bool(ht_ctrl.is_some()),
+                    );
+                    skip_body_alignment_padding(full_hdr_len, &mut reader)?
+                };
+                Some(DataFrame {
+                    fixed_fields,
+                    addr4,
+                    qos_ctrl,
+                    ht_ctrl,
+                    body: reader.into_remaining(),
+                })
+            })
+            .flatten()
+    }
+}
+
+impl<B> IntoIterator for DataFrame<B>
+where
+    B: ByteSlice,
+{
+    type IntoIter = MsduIterator<B>;
+    type Item = Msdu<B>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.into()
+    }
+}
+
+// TODO(fxbug.dev/128928): Use this in the `MacFrame::Mgmt` variant.
+pub struct MgmtFrame<B> {
+    // Management Header: fixed fields
+    pub mgmt_hdr: LayoutVerified<B, MgmtHdr>,
+    // Management Header: optional fields
+    pub ht_ctrl: Option<UnalignedView<B, HtControl>>,
+    // Body
+    pub body: B,
+}
+
+impl<B> MgmtFrame<B>
+where
+    B: ByteSlice,
+{
+    pub fn parse(bytes: B, is_body_aligned: bool) -> Option<Self> {
+        let mut reader = BufferReader::new(bytes);
+        let fc = FrameControl(reader.peek_value()?);
+        matches!(fc.frame_type(), FrameType::MGMT)
+            .then(|| {
+                // Parse fixed header fields
+                let mgmt_hdr = reader.read()?;
+
+                // Parse optional header fields
+                let ht_ctrl = if fc.htc_order() { Some(reader.read_unaligned()?) } else { None };
+                // Skip optional padding if body alignment is used.
+                if is_body_aligned {
+                    let full_hdr_len =
+                        MgmtHdr::len(Presence::<HtControl>::from_bool(ht_ctrl.is_some()));
+                    skip_body_alignment_padding(full_hdr_len, &mut reader)?
+                }
+                Some(MgmtFrame { mgmt_hdr, ht_ctrl, body: reader.into_remaining() })
+            })
+            .flatten()
+    }
+}
+
 pub enum MacFrame<B> {
     Mgmt {
         // Management Header: fixed fields

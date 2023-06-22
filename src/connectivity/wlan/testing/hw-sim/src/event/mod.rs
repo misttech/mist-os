@@ -56,7 +56,10 @@
 //! [`Option`]: core::option::Option
 
 mod convert;
+mod extract;
 mod filter;
+
+pub mod buffered;
 
 use {
     anyhow::Context as _,
@@ -71,6 +74,7 @@ use {
 
 pub use crate::event::{
     convert::Try,
+    extract::{extract, extract_and_match, Stateful},
     filter::{on_join_bss, on_scan, on_set_channel, on_set_country, on_start_mac, on_transmit},
     Handled::{Matched, Unmatched},
 };

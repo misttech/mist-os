@@ -13,6 +13,104 @@ mod status;
 
 pub use {fields::*, reason::*, status::*};
 
+// TODO(fxbug.dev/128928): Use this in the `MgmtBody::AssocReq` variant.
+#[derive(Debug)]
+pub struct ActionFrame<const NO_ACK: bool, B>
+where
+    B: ByteSlice,
+{
+    pub action_hdr: LayoutVerified<B, ActionHdr>,
+    pub elements: B,
+}
+
+impl<const NO_ACK: bool, B> ActionFrame<NO_ACK, B>
+where
+    B: ByteSlice,
+{
+    pub fn parse(bytes: B) -> Option<Self> {
+        LayoutVerified::new_unaligned_from_prefix(bytes)
+            .map(|(action_hdr, elements)| ActionFrame { action_hdr, elements })
+    }
+}
+
+// TODO(fxbug.dev/128928): Use this in the `MgmtBody::AssocReq` variant.
+#[derive(Debug)]
+pub struct AssocReqFrame<B>
+where
+    B: ByteSlice,
+{
+    pub assoc_req_hdr: LayoutVerified<B, AssocReqHdr>,
+    pub elements: B,
+}
+
+impl<B> AssocReqFrame<B>
+where
+    B: ByteSlice,
+{
+    pub fn parse(bytes: B) -> Option<Self> {
+        LayoutVerified::new_unaligned_from_prefix(bytes)
+            .map(|(assoc_req_hdr, elements)| AssocReqFrame { assoc_req_hdr, elements })
+    }
+}
+
+// TODO(fxbug.dev/128928): Use this in the `MgmtBody::AssocResp` variant.
+#[derive(Debug)]
+pub struct AssocRespFrame<B>
+where
+    B: ByteSlice,
+{
+    pub assoc_resp_hdr: LayoutVerified<B, AssocRespHdr>,
+    pub elements: B,
+}
+
+impl<B> AssocRespFrame<B>
+where
+    B: ByteSlice,
+{
+    pub fn parse(bytes: B) -> Option<Self> {
+        LayoutVerified::new_unaligned_from_prefix(bytes)
+            .map(|(assoc_resp_hdr, elements)| AssocRespFrame { assoc_resp_hdr, elements })
+    }
+}
+
+// TODO(fxbug.dev/128928): Use this in the `MgmtBody::Auth` variant.
+#[derive(Debug)]
+pub struct AuthFrame<B>
+where
+    B: ByteSlice,
+{
+    pub auth_hdr: LayoutVerified<B, AuthHdr>,
+    pub elements: B,
+}
+
+impl<B> AuthFrame<B>
+where
+    B: ByteSlice,
+{
+    pub fn parse(bytes: B) -> Option<Self> {
+        LayoutVerified::new_unaligned_from_prefix(bytes)
+            .map(|(auth_hdr, elements)| AuthFrame { auth_hdr, elements })
+    }
+}
+
+// TODO(fxbug.dev/128928): Use this in the `MgmtBody::AssocResp` variant.
+#[derive(Debug)]
+pub struct ProbeReqFrame<B>
+where
+    B: ByteSlice,
+{
+    pub elements: B,
+}
+
+impl<B> ProbeReqFrame<B>
+where
+    B: ByteSlice,
+{
+    pub fn parse(bytes: B) -> Option<Self> {
+        Some(ProbeReqFrame { elements: bytes })
+    }
+}
+
 #[derive(Debug)]
 pub enum MgmtBody<B: ByteSlice> {
     Beacon { bcn_hdr: LayoutVerified<B, BeaconHdr>, elements: B },

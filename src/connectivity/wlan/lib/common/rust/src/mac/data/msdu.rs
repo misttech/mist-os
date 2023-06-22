@@ -6,7 +6,7 @@ use {
     crate::{
         big_endian::BigEndianU16,
         buffer_reader::BufferReader,
-        mac::{data::*, MacAddr, MacFrame},
+        mac::{data::*, DataFrame, MacAddr, MacFrame},
     },
     zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned},
 };
@@ -116,6 +116,27 @@ impl<B: ByteSlice> MsduIterator<B> {
                 ))
             }
             _ => None,
+        }
+    }
+}
+
+impl<B> From<DataFrame<B>> for MsduIterator<B>
+where
+    B: ByteSlice,
+{
+    fn from(frame: DataFrame<B>) -> Self {
+        let fc = frame.fixed_fields.frame_ctrl;
+        if fc.data_subtype().null() {
+            MsduIterator::Null
+        } else if frame.qos_ctrl.map_or(false, |qos_ctrl| qos_ctrl.get().amsdu_present()) {
+            MsduIterator::Amsdu(BufferReader::new(frame.body))
+        } else {
+            MsduIterator::Llc {
+                dst_addr: data_dst_addr(&frame.fixed_fields),
+                src_addr: data_src_addr(&frame.fixed_fields, frame.addr4.map(|addr4| *addr4))
+                    .expect("failed to reparse data frame source address"),
+                body: Some(frame.body),
+            }
         }
     }
 }
