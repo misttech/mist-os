@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_INTEL_I915_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_INTEL_I915_H_
 
+#include <fidl/fuchsia.hardware.pci/cpp/wire_types.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/intelgpucore/cpp/banjo.h>
@@ -171,7 +172,7 @@ class Controller : public DeviceType,
     pipe_manager_ = std::move(pipe_manager);
   }
   void SetPowerWellForTesting(std::unique_ptr<Power> power_well) { power_ = std::move(power_well); }
-  void SetMmioForTesting(fdf::MmioBuffer mmio_space) { mmio_space_ = std::move(mmio_space); }
+  void SetMmioForTesting(const fdf::MmioView& mmio_space) { mmio_space_.emplace(mmio_space); }
 
   void ResetMmioSpaceForTesting() { mmio_space_.reset(); }
 
@@ -307,14 +308,12 @@ class Controller : public DeviceType,
   Interrupts interrupts_;     // Internal locking
 
   ddk::Pci pci_;
-  struct {
-    mmio_buffer_t mmio;
-    int32_t count = 0;
-  } mapped_bars_[fuchsia_hardware_pci::wire::kMaxBarCount] __TA_GUARDED(bar_lock_);
+  std::array<std::optional<fdf::MmioBuffer>, fuchsia_hardware_pci::wire::kMaxBarCount> mapped_bars_
+      __TA_GUARDED(bar_lock_);
   mtx_t bar_lock_;
   // The mmio_space_ is read only. The internal registers are guarded by various locks where
   // appropriate.
-  std::optional<fdf::MmioBuffer> mmio_space_;
+  std::optional<fdf::MmioView> mmio_space_;
 
   std::optional<PchEngine> pch_engine_;
   std::unique_ptr<Power> power_;

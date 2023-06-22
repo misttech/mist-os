@@ -137,6 +137,7 @@ test("intel-i915-test") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire_testing",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//src/devices/lib/mmio:test_helper",
     "//src/devices/pci/testing:pci-protocol-fake",
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",

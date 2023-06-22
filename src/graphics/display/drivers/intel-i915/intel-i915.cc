@@ -2046,18 +2046,18 @@ zx_status_t Controller::IntelGpuCoreMapPciMmio(uint32_t pci_bar, uint8_t** addr_
     return ZX_ERR_INVALID_ARGS;
   }
   fbl::AutoLock lock(&bar_lock_);
-  if (mapped_bars_[pci_bar].count == 0) {
+  if (!mapped_bars_[pci_bar]) {
     zx_status_t status =
-        pci_.MapMmio(pci_bar, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mapped_bars_[pci_bar].mmio);
+        pci_.MapMmio(pci_bar, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mapped_bars_[pci_bar]);
     if (status != ZX_OK) {
       return status;
     }
   }
 
-  // TODO(fxbug.dev/56253): Add MMIO_PTR to cast.
-  *addr_out = (uint8_t*)mapped_bars_[pci_bar].mmio.vaddr;
-  *size_out = mapped_bars_[pci_bar].mmio.size;
-  mapped_bars_[pci_bar].count++;
+  // TODO(fxbug.dev/56253): Add MMIO_PTR to cast. This cannot be done as long as
+  // IntelGpuCoreMapPciMmio is a signature provided by banjo.
+  *addr_out = reinterpret_cast<uint8_t*>(reinterpret_cast<uintptr_t>(mapped_bars_[pci_bar]->get()));
+  *size_out = mapped_bars_[pci_bar]->get_size();
   return ZX_OK;
 }
 
@@ -2065,13 +2065,7 @@ zx_status_t Controller::IntelGpuCoreUnmapPciMmio(uint32_t pci_bar) {
   if (pci_bar > fuchsia_hardware_pci::wire::kMaxBarCount) {
     return ZX_ERR_INVALID_ARGS;
   }
-  fbl::AutoLock lock(&bar_lock_);
-  if (mapped_bars_[pci_bar].count == 0) {
-    return ZX_OK;
-  }
-  if (--mapped_bars_[pci_bar].count == 0) {
-    mmio_buffer_release(&mapped_bars_[pci_bar].mmio);
-  }
+  // No work needs to be done with MmioBuffers in use.
   return ZX_OK;
 }
 
@@ -2374,7 +2368,7 @@ zx_status_t Controller::Init() {
   {
     fbl::AutoLock lock(&bar_lock_);
     fbl::AllocChecker ac;
-    mmio_space_ = fdf::MmioBuffer(mapped_bars_[0].mmio);
+    mmio_space_.emplace(mapped_bars_[0]->View(0));
   }
 
   zxlogf(TRACE, "Reading fuses and straps");
@@ -2522,26 +2516,6 @@ Controller::~Controller() {
     for (Pipe* pipe : *pipe_manager_) {
       fbl::AutoLock lock(&display_lock_);
       interrupts()->EnablePipeInterrupts(pipe->pipe_id(), /*enable=*/true);
-    }
-  }
-  // Release anything leaked by the gpu-core client.
-  fbl::AutoLock lock(&bar_lock_);
-  // Start at 1, because we treat bar 0 specially.
-  for (unsigned i = 1; i < fuchsia_hardware_pci::wire::kMaxBarCount; i++) {
-    if (mapped_bars_[i].count) {
-      zxlogf(WARNING, "Leaked bar %d", i);
-      mapped_bars_[i].count = 1;
-      IntelGpuCoreUnmapPciMmio(i);
-    }
-  }
-
-  // bar 0 should have at most one ref left, otherwise log a leak like above and correct it.
-  // We will leave it with one ref, because mmio_space_ will unmap it on destruction, and
-  // we may need to access mmio_space_ while destroying member variables.
-  if (mapped_bars_[0].count != mmio_space_.has_value()) {
-    zxlogf(WARNING, "Leaked bar 0");
-    if (mapped_bars_[0].count > 0) {
-      mapped_bars_[0].count = 1;
     }
   }
 }
