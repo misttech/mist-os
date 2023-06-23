@@ -26,6 +26,8 @@ namespace pager_tests {
 
 class UserPager;
 
+// This class is not entirely thread-safe, however, some operations may be called concurrently.  In
+// particular, calling `CheckVmar` concurrently with `Replace` is safe.
 class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
  public:
   ~Vmo() = default;
@@ -54,7 +56,10 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
 
   // Sets the new key, replaces the current VMO with `new_vmo` and returns the old one.
   zx::vmo Replace(zx::vmo new_vmo, uint64_t new_key) {
-    key_ = new_key;
+    {
+      std::lock_guard guard(mutex_);
+      key_ = new_key;
+    }
     zx::vmo old_vmo = std::move(vmo_);
     vmo_ = std::move(new_vmo);
     return old_vmo;
@@ -67,7 +72,10 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
   const zx::vmo& vmo() const { return vmo_; }
   uint64_t size() const { return size_; }
   uintptr_t base_addr() const { return base_addr_; }
-  uint64_t key() const { return key_; }
+  uint64_t key() const {
+    std::lock_guard guard(mutex_);
+    return key_;
+  }
 
  private:
   Vmo(zx::vmo vmo, uint64_t size, uint64_t base_addr, uint64_t key)
@@ -79,10 +87,11 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
   uint64_t size_;
   uintptr_t base_addr_;
 
-  // These are set in the ctor, but can be changed by UserPager::ReplaceVmo.
+  // vmo_ and key_ are set in the ctor, but can be changed by UserPager::ReplaceVmo.
   zx::vmo vmo_;
+  mutable std::mutex mutex_;
   // This value is used for both the port packet key and to populate the contents of supplied pages.
-  uint64_t key_;
+  uint64_t key_ __TA_GUARDED(&mutex_);
 };
 
 class UserPager {

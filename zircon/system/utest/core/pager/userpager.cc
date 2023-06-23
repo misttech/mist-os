@@ -16,6 +16,7 @@
 #include <atomic>
 #include <cstdio>
 #include <memory>
+#include <mutex>
 
 #include <fbl/algorithm.h>
 #include <fbl/array.h>
@@ -29,12 +30,19 @@ bool Vmo::CheckVmar(uint64_t offset, uint64_t len, const void* expected) const {
   offset *= zx_system_get_page_size();
 
   for (uint64_t i = offset / sizeof(uint64_t); i < (offset + len) / sizeof(uint64_t); i++) {
-    const auto* base = reinterpret_cast<const uint64_t*>(base_addr_);
+    // The following dereference may block on a pager request.  We've marked this pointer as
+    // volatile to ensure the load is not reordered relative to other "visible side-effects" and to
+    // make sure the compiler knows the value could spontaneously change (e.g. concurrent execution
+    // with `UserPager::ReplaceVmo` which remaps the memory).
+    //
+    // In particular, it's critical that this load occurs before the load of key_ below.  key_ is
+    // loaded after locking the mutex (see `key()`).  In C++ terms, both the volatile load and
+    // `mutex::lock()` are side effects so they may not be reordered relative to one another.  See
+    // also fxbug.dev/129315.
+    const volatile auto* base = reinterpret_cast<const volatile uint64_t*>(base_addr_);
     uint64_t actual_val = base[i];
-    // Make sure we deterministically read from the vmar before reading the
-    // expected value, in case things get remapped.
-    std::atomic_thread_fence(std::memory_order_seq_cst);
-    uint64_t expected_val = expected ? static_cast<const uint64_t*>(expected)[i] : key_ + i;
+
+    uint64_t expected_val = expected ? static_cast<const uint64_t*>(expected)[i] : key() + i;
     if (actual_val != expected_val) {
       printf("mismatch at byte %zu: expected %zx, actual %zx\n", i * sizeof(actual_val),
              expected_val, actual_val);
@@ -72,7 +80,7 @@ bool Vmo::CheckVmo(uint64_t offset, uint64_t len, const void* expected) const {
   for (uint64_t i = 0; i < len / sizeof(uint64_t); i++) {
     auto data_buf = reinterpret_cast<uint64_t*>(buf);
     auto expected_buf = static_cast<const uint64_t*>(expected);
-    if (data_buf[i] != (expected ? expected_buf[i] : key_ + (offset / sizeof(uint64_t)) + i)) {
+    if (data_buf[i] != (expected ? expected_buf[i] : key() + (offset / sizeof(uint64_t)) + i)) {
       return false;
     }
   }
@@ -124,8 +132,9 @@ void Vmo::GenerateBufferContents(void* dest_buffer, uint64_t len, uint64_t paged
   len *= zx_system_get_page_size();
   paged_vmo_offset *= zx_system_get_page_size();
   auto buf = static_cast<uint64_t*>(dest_buffer);
+  const uint64_t val = key();
   for (uint64_t idx = 0; idx < len / sizeof(uint64_t); idx++) {
-    buf[idx] = key_ + (paged_vmo_offset / sizeof(uint64_t)) + idx;
+    buf[idx] = val + (paged_vmo_offset / sizeof(uint64_t)) + idx;
   }
 }
 
@@ -148,7 +157,7 @@ std::unique_ptr<Vmo> Vmo::Clone(uint64_t offset, uint64_t size) {
   }
 
   return std::unique_ptr<Vmo>(
-      new Vmo(std::move(clone), size, addr, key_ + (offset / sizeof(uint64_t))));
+      new Vmo(std::move(clone), size, addr, key() + (offset / sizeof(uint64_t))));
 }
 
 UserPager::UserPager()
@@ -255,7 +264,6 @@ bool UserPager::ReplaceVmo(Vmo* vmo, zx::vmo* old_vmo) {
     fprintf(stderr, "vmar map failed with %s\n", zx_status_get_string(status));
     return false;
   }
-  std::atomic_thread_fence(std::memory_order_seq_cst);
 
   *old_vmo = vmo->Replace(std::move(new_vmo), next_key_);
 
