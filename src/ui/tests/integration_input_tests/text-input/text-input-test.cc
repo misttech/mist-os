@@ -197,7 +197,8 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
          // Protocol{fuchsia::net::interfaces::State::Name_},
          // TODO(fxbug.dev/123550): Do the feedback protocols need to be here? Is
          // including launch_context_provider.shard.cml sufficient?
-         Protocol{fuchsia::kernel::Stats::Name_}, Protocol{fuchsia::process::Launcher::Name_},
+         Protocol{fuchsia::kernel::Stats::Name_}, Protocol{fuchsia::kernel::VmexResource::Name_},
+         Protocol{fuchsia::process::Launcher::Name_},
          Protocol{fuchsia::feedback::ComponentDataRegister::Name_},
          Protocol{fuchsia::feedback::CrashReportingProductRegister::Name_},
          Directory{

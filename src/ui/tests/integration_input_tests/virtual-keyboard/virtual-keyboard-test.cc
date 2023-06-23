@@ -115,7 +115,8 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
     config.use_scene_owner = true;
     config.ui_to_client_services = protocols_required;
     config.passthrough_capabilities = {
-        {Protocol{fuchsia::process::Launcher::Name_},
+        {Protocol{fuchsia::kernel::VmexResource::Name_},
+         Protocol{fuchsia::process::Launcher::Name_},
          Directory{
              .name = "root-ssl-certificates",
              .type = fuchsia::component::decl::DependencyType::STRONG,
@@ -133,7 +134,8 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
     config.ui_to_client_services.push_back(fuchsia::ui::composition::Flatland::Name_);
     config.ui_to_client_services.push_back(fuchsia::ui::composition::Allocator::Name_);
     config.passthrough_capabilities = {
-        {Protocol{fuchsia::process::Launcher::Name_},
+        {Protocol{fuchsia::kernel::VmexResource::Name_},
+         Protocol{fuchsia::process::Launcher::Name_},
          Directory{
              .name = "root-ssl-certificates",
              .type = fuchsia::component::decl::DependencyType::STRONG,

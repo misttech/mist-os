@@ -9,6 +9,7 @@
 #include <fuchsia/fonts/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/intl/cpp/fidl.h>
+#include <fuchsia/kernel/cpp/fidl.h>
 #include <fuchsia/memorypressure/cpp/fidl.h>
 #include <fuchsia/net/interfaces/cpp/fidl.h>
 #include <fuchsia/posix/socket/cpp/fidl.h>
@@ -76,6 +77,7 @@ void SemanticsManagerProxy::RegisterViewForSemantics(
 std::vector<ui_testing::UITestRealm::Config> SemanticsIntegrationTestV2::UIConfigurationsToTest() {
   std::vector<ui_testing::UITestRealm::Config> configs;
   const std::vector<component_testing::Capability> passthrough_capabilities = {
+      Protocol{fuchsia::kernel::VmexResource::Name_},
       Protocol{fuchsia::sys::Environment::Name_},
       Protocol{fuchsia::process::Launcher::Name_},
       Directory{
