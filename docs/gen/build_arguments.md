@@ -111,14 +111,6 @@ From //build/images/args.gni:152
 
 From //build/config/fuchsia/platform_version.gni:43
 
-### appmgr_core_shards
-
-Core shards that are required for including appmgr in a product.
-
-**Current value (from the default):** `["//src/sys/appmgr:appmgr_core_shard"]`
-
-From //src/sys/appmgr/core_shards.gni:7
-
 ### archivist_max_cached_logs_bytes
 
 **Current value (from the default):** `4194304`
@@ -267,7 +259,7 @@ From //products/common/bringup.gni:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:39
+From //BUILD.gn:38
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -275,7 +267,7 @@ From //products/common/bringup.gni:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:39
+From //BUILD.gn:38
 
 ### base_package_labels
 
@@ -291,7 +283,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:47
+From //BUILD.gn:46
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -299,7 +291,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:47
+From //BUILD.gn:46
 
 ### basic_env_names
 
@@ -1040,7 +1032,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:56
+From //BUILD.gn:55
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -1048,7 +1040,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:56
+From //BUILD.gn:55
 
 ### camera_debug
 
@@ -3067,7 +3059,7 @@ This argument is temporary until Rust MLME is ready to be used.
 
 **Current value (from the default):** `false`
 
-From //src/connectivity/wlan/lib/mlme/cpp/BUILD.gn:12
+From //src/connectivity/wlan/lib/mlme/cpp/BUILD.gn:10
 
 ### extra_bazel_assembly_targets
 
@@ -3931,7 +3923,7 @@ From //out/not-default/args.gn:8
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:79
+From //BUILD.gn:78
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3939,7 +3931,7 @@ From //out/not-default/args.gn:8
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:79
+From //BUILD.gn:78
 
 ### host_os
 
@@ -4584,7 +4576,7 @@ From //products/common/bringup.gni:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:40
+From //BUILD.gn:39
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -4592,7 +4584,7 @@ From //products/common/bringup.gni:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:40
+From //BUILD.gn:39
 
 ### legacy_base_package_labels
 
@@ -4602,7 +4594,7 @@ From //products/common/bringup.gni:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:48
+From //BUILD.gn:47
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -4610,7 +4602,7 @@ From //products/common/bringup.gni:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:48
+From //BUILD.gn:47
 
 ### legacy_cache_package_labels
 
@@ -4620,7 +4612,7 @@ From //products/common/bringup.gni:28
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:57
+From //BUILD.gn:56
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -4628,13 +4620,13 @@ From //products/common/bringup.gni:28
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:57
+From //BUILD.gn:56
 
 ### legacy_host_labels
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:80
+From //BUILD.gn:79
 
 ### legacy_product_bootfs_labels
 
@@ -4643,7 +4635,7 @@ product_bootfs_labels = []  (defined in product.gni)
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:70
+From //BUILD.gn:69
 
 ### legacy_product_system_image_deps
 
@@ -4652,7 +4644,7 @@ product_system_image_deps = []  (defined in product.gni)
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:74
+From //BUILD.gn:73
 
 ### legacy_universe_package_labels
 
@@ -4662,7 +4654,7 @@ From //products/common/bringup.gni:31
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:66
+From //BUILD.gn:65
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -4670,7 +4662,7 @@ From //products/common/bringup.gni:31
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:66
+From //BUILD.gn:65
 
 ### local_bench
 
@@ -7622,7 +7614,7 @@ From //products/common/bringup.gni:35
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:90
+From //BUILD.gn:89
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -7630,7 +7622,7 @@ From //products/common/bringup.gni:35
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:90
+From //BUILD.gn:89
 
 ### sdk_cross_compile_host_tools
 
@@ -8133,7 +8125,7 @@ afterwards.
 
 **Current value (from the default):** `""`
 
-From //BUILD.gn:86
+From //BUILD.gn:85
 
 ### testonly_in_containers
 
@@ -8263,7 +8255,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:65
+From //BUILD.gn:64
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
@@ -8271,7 +8263,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:65
+From //BUILD.gn:64
 
 ### update_goldens
 
