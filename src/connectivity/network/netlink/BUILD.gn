@@ -26,6 +26,7 @@ rustc_library("netlink") {
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/network/fidl_fuchsia_net_routes_ext",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:assert_matches",
 
     # TODO(https://github.com/rust-lang/rust/issues/91611): Replace this with
     # #![feature(async_fn_in_trait)] once it supports `Send` bounds.
@@ -48,7 +49,6 @@ rustc_library("netlink") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:test-case",
   ]
