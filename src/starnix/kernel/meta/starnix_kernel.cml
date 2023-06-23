@@ -40,9 +40,12 @@
             availability: "optional",
         },
         {
+            protocol: "fuchsia.kernel.VmexResource",
+            from: "parent",
+        },
+        {
             protocol: [
                 "fuchsia.kernel.Stats",
-                "fuchsia.kernel.VmexResource",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.StateV4",
@@ -50,11 +53,6 @@
                 "fuchsia.posix.socket.packet.Provider",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",
-            ],
-            from: "parent",
-        },
-        {
-            protocol: [
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
