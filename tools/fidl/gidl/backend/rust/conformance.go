@@ -257,7 +257,6 @@ var rustErrorCodeNames = map[ir.ErrorCode]string{
 	ir.NonEmptyStringWithNullBody:         "UnexpectedNullRef",
 	ir.NonEmptyVectorWithNullBody:         "UnexpectedNullRef",
 	ir.NonNullableTypeWithNullValue:       "NotNullable",
-	ir.NonResourceUnknownHandles:          "CannotStoreUnknownHandles",
 	ir.StrictBitsUnknownBit:               "InvalidBitsValue",
 	ir.StrictEnumUnknownValue:             "InvalidEnumValue",
 	ir.StrictUnionUnknownField:            "UnknownUnionTag",

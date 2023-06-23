@@ -92,7 +92,7 @@ pub trait ValueTypeMarker: TypeMarker {
     type Borrowed<'a>: Encode<Self>;
 
     /// Cheaply converts from `&Self::Owned` to `Self::Borrowed`.
-    fn borrow<'a>(value: &'a Self::Owned) -> Self::Borrowed<'a>;
+    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_>;
 }
 
 /// A FIDL resource type marker.
@@ -112,7 +112,7 @@ pub trait ResourceTypeMarker: TypeMarker {
     /// `HandleBased` types this is "take" (it returns an owned handle and
     /// replaces `value` with `Handle::invalid`), and for all other types it is
     /// "borrow" (just converts from one reference to another).
-    fn take_or_borrow<'a>(value: &'a mut Self::Owned) -> Self::Borrowed<'a>;
+    fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_>;
 }
 
 /// A Rust type that can be encoded as the FIDL type `T`.
@@ -396,8 +396,8 @@ impl<'a> Encoder<'a> {
                     resize_vec_no_zeroing(buf, aligned_inline_size);
 
                     // Zero the last 8 bytes in the block to ensure padding bytes are zero.
-                    let padding_ptr = buf.get_unchecked_mut(aligned_inline_size - 8);
-                    mem::transmute::<*mut u8, *mut u64>(padding_ptr).write_unaligned(0);
+                    let padding_ptr = buf.get_unchecked_mut(aligned_inline_size - 8) as *mut u8;
+                    (padding_ptr as *mut u64).write_unaligned(0);
                 }
             }
             handles.truncate(0);
@@ -427,9 +427,8 @@ impl<'a> Encoder<'a> {
         // Safety: The caller ensures `offset` is valid for writing
         // sizeof(T) bytes. Transmuting to a same-or-wider
         // integer or float pointer is safe because we use `write_unaligned`.
-        let ptr = self.buf.get_unchecked_mut(offset);
-        let numeric_ptr = mem::transmute::<*mut u8, *mut T>(ptr);
-        numeric_ptr.write_unaligned(num);
+        let ptr = self.buf.get_unchecked_mut(offset) as *mut u8;
+        (ptr as *mut T).write_unaligned(num);
     }
 
     /// Returns an offset for writing `len` out-of-line bytes (must be nonzero).
@@ -451,8 +450,8 @@ impl<'a> Encoder<'a> {
             resize_vec_no_zeroing(self.buf, new_len);
 
             // Zero the last 8 bytes in the block to ensure padding bytes are zero.
-            let padding_ptr = self.buf.get_unchecked_mut(new_len - 8);
-            mem::transmute::<*mut u8, *mut u64>(padding_ptr).write_unaligned(0);
+            let padding_ptr = self.buf.get_unchecked_mut(new_len - 8) as *mut u8;
+            (padding_ptr as *mut u64).write_unaligned(0);
         }
         new_offset
     }
@@ -472,7 +471,7 @@ impl<'a> Encoder<'a> {
         // Safety:
         // - The caller ensures `offset` is valid for writing `len` bytes.
         // - All u8 pointers are properly aligned.
-        ptr::write_bytes(self.buf.as_mut_ptr().offset(offset as isize), 0, len);
+        ptr::write_bytes(self.buf.as_mut_ptr().add(offset), 0, len);
     }
 }
 
@@ -559,14 +558,14 @@ impl<'a> Decoder<'a> {
             // Safety:
             // padding_end <= self.buf.len() is guaranteed by the caller.
             let last_u64 = unsafe {
-                let last_u64_ptr = self.buf.get_unchecked(padding_end - 8);
-                mem::transmute::<*const u8, *const u64>(last_u64_ptr).read_unaligned()
+                let last_u64_ptr = self.buf.get_unchecked(padding_end - 8) as *const u8;
+                (last_u64_ptr as *const u64).read_unaligned()
             };
             // padding == 0 => mask == 0x0000000000000000
             // padding == 1 => mask == 0xff00000000000000
             // padding == 2 => mask == 0xffff000000000000
             // ...
-            let mask = !(!0u64 >> padding * 8);
+            let mask = !(!0u64 >> (padding * 8));
             if last_u64 & mask != 0 {
                 return Err(self.end_of_block_padding_error(padding_start, padding_end));
             }
@@ -604,9 +603,8 @@ impl<'a> Decoder<'a> {
         // sizeof(T) bytes. Transmuting to a same-or-wider
         // integer pointer is safe because we use `read_unaligned`.
         unsafe {
-            let ptr = self.buf.get_unchecked(offset);
-            let numeric_ptr = mem::transmute::<*const u8, *const T>(ptr);
-            numeric_ptr.read_unaligned()
+            let ptr = self.buf.get_unchecked(offset) as *const u8;
+            (ptr as *const T).read_unaligned()
         }
     }
 
@@ -619,7 +617,7 @@ impl<'a> Decoder<'a> {
         // Compute offsets for out of line block.
         let offset = self.next_out_of_line;
         let aligned_len = round_up_to_align(len, 8);
-        self.next_out_of_line = self.next_out_of_line + aligned_len;
+        self.next_out_of_line += aligned_len;
         if self.next_out_of_line > self.buf.len() {
             return Err(Error::OutOfRange);
         }
@@ -633,15 +631,15 @@ impl<'a> Decoder<'a> {
         //   be zero so the check will not fail.
         debug_assert!(self.next_out_of_line >= 8);
         let last_u64 = unsafe {
-            let last_u64_ptr = self.buf.get_unchecked(self.next_out_of_line - 8);
-            mem::transmute::<*const u8, *const u64>(last_u64_ptr).read_unaligned()
+            let last_u64_ptr = self.buf.get_unchecked(self.next_out_of_line - 8) as *const u8;
+            (last_u64_ptr as *const u64).read_unaligned()
         };
         let padding = aligned_len - len;
         // padding == 0 => mask == 0x0000000000000000
         // padding == 1 => mask == 0xff00000000000000
         // padding == 2 => mask == 0xffff000000000000
         // ...
-        let mask = !(!0u64 >> padding * 8);
+        let mask = !(!0u64 >> (padding * 8));
         if last_u64 & mask != 0 {
             return Err(self.end_of_block_padding_error(offset + len, self.next_out_of_line));
         }
@@ -829,14 +827,14 @@ macro_rules! impl_ambiguous {
 
         impl ValueTypeMarker for $ambiguous {
             type Borrowed<'a> = AmbiguousNever;
-            fn borrow<'a>(value: &'a Self::Owned) -> Self::Borrowed<'a> {
+            fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
                 match *value {}
             }
         }
 
         impl ResourceTypeMarker for $ambiguous {
             type Borrowed<'a> = AmbiguousNever;
-            fn take_or_borrow<'a>(value: &'a mut Self::Owned) -> Self::Borrowed<'a> {
+            fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
                 match *value {}
             }
         }
@@ -909,9 +907,7 @@ unsafe impl Encode<EmptyPayload> for () {
 
 impl Decode<EmptyPayload> for () {
     #[inline(always)]
-    fn new_empty() -> Self {
-        ()
-    }
+    fn new_empty() -> Self {}
 
     #[inline(always)]
     unsafe fn decode(
@@ -945,7 +941,7 @@ unsafe impl TypeMarker for EmptyStruct {
 impl ValueTypeMarker for EmptyStruct {
     type Borrowed<'a> = ();
     #[inline(always)]
-    fn borrow<'a>(value: &'a Self::Owned) -> Self::Borrowed<'a> {
+    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
         *value
     }
 }
@@ -961,9 +957,7 @@ unsafe impl Encode<EmptyStruct> for () {
 
 impl Decode<EmptyStruct> for () {
     #[inline(always)]
-    fn new_empty() -> Self {
-        ()
-    }
+    fn new_empty() -> Self {}
 
     #[inline]
     unsafe fn decode(
@@ -1025,7 +1019,7 @@ mod numeric {
                 type Borrowed<'a> = $numeric_ty;
 
                 #[inline(always)]
-                fn borrow<'a>(value: &'a <Self as TypeMarker>::Owned) -> Self::Borrowed<'a> {
+                fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
                     *value
                 }
             }
@@ -1108,7 +1102,7 @@ impl ValueTypeMarker for bool {
     type Borrowed<'a> = bool;
 
     #[inline(always)]
-    fn borrow<'a>(value: &'a <Self as TypeMarker>::Owned) -> Self::Borrowed<'a> {
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
         *value
     }
 }
@@ -1182,7 +1176,7 @@ unsafe impl<T: TypeMarker, const N: usize> TypeMarker for Array<T, N> {
 impl<T: ValueTypeMarker, const N: usize> ValueTypeMarker for Array<T, N> {
     type Borrowed<'a> = &'a [T::Owned; N];
     #[inline(always)]
-    fn borrow<'a>(value: &'a Self::Owned) -> Self::Borrowed<'a> {
+    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
         value
     }
 }
@@ -1190,7 +1184,7 @@ impl<T: ValueTypeMarker, const N: usize> ValueTypeMarker for Array<T, N> {
 impl<T: ResourceTypeMarker, const N: usize> ResourceTypeMarker for Array<T, N> {
     type Borrowed<'a> = &'a mut [T::Owned; N];
     #[inline(always)]
-    fn take_or_borrow<'a>(value: &'a mut Self::Owned) -> Self::Borrowed<'a> {
+    fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
         value
     }
 }
@@ -1220,7 +1214,7 @@ impl<T: TypeMarker, const N: usize> Decode<Array<T, N>> for [T::Owned; N] {
         unsafe {
             let arr_ptr = arr.as_mut_ptr() as *mut T::Owned;
             for i in 0..N {
-                ptr::write(arr_ptr.offset(i as isize), T::Owned::new_empty());
+                ptr::write(arr_ptr.add(i), T::Owned::new_empty());
             }
             arr.assume_init()
         }
@@ -1364,7 +1358,7 @@ unsafe impl<T: TypeMarker, const N: usize> TypeMarker for Vector<T, N> {
 impl<T: ValueTypeMarker, const N: usize> ValueTypeMarker for Vector<T, N> {
     type Borrowed<'a> = &'a [T::Owned];
     #[inline(always)]
-    fn borrow<'a>(value: &'a Self::Owned) -> Self::Borrowed<'a> {
+    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
         value
     }
 }
@@ -1372,7 +1366,7 @@ impl<T: ValueTypeMarker, const N: usize> ValueTypeMarker for Vector<T, N> {
 impl<T: ResourceTypeMarker, const N: usize> ResourceTypeMarker for Vector<T, N> {
     type Borrowed<'a> = &'a mut [T::Owned];
     #[inline(always)]
-    fn take_or_borrow<'a>(value: &'a mut Self::Owned) -> Self::Borrowed<'a> {
+    fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
         value
     }
 }
@@ -1425,7 +1419,7 @@ unsafe fn encode_vector_value<T: ValueTypeMarker>(
     encoder.write_num(slice.len() as u64, offset);
     encoder.write_num(ALLOC_PRESENT_U64, offset + 8);
     // write_out_of_line must not be called with a zero-sized out-of-line block.
-    if slice.len() == 0 {
+    if slice.is_empty() {
         return Ok(());
     }
     check_length(slice.len(), max_length)?;
@@ -1446,7 +1440,7 @@ unsafe fn encode_vector_resource<T: ResourceTypeMarker>(
     encoder.write_num(slice.len() as u64, offset);
     encoder.write_num(ALLOC_PRESENT_U64, offset + 8);
     // write_out_of_line must not be called with a zero-sized out-of-line block.
-    if slice.len() == 0 {
+    if slice.is_empty() {
         return Ok(());
     }
     check_vector_length(slice.len(), max_length)?;
@@ -1548,7 +1542,7 @@ unsafe impl<const N: usize> TypeMarker for BoundedString<N> {
 impl<const N: usize> ValueTypeMarker for BoundedString<N> {
     type Borrowed<'a> = &'a str;
     #[inline(always)]
-    fn borrow<'a>(value: &'a Self::Owned) -> Self::Borrowed<'a> {
+    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
         value
     }
 }
@@ -1645,7 +1639,7 @@ impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32> Resour
 {
     type Borrowed<'a> = T;
     #[inline(always)]
-    fn take_or_borrow<'a>(value: &'a mut Self::Owned) -> Self::Borrowed<'a> {
+    fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
         mem::replace(value, Handle::invalid().into())
     }
 }
@@ -1793,7 +1787,7 @@ unsafe impl<T: TypeMarker> TypeMarker for Boxed<T> {
 impl<T: ValueTypeMarker> ValueTypeMarker for Optional<T> {
     type Borrowed<'a> = Option<T::Borrowed<'a>>;
     #[inline(always)]
-    fn borrow<'a>(value: &'a Self::Owned) -> Self::Borrowed<'a> {
+    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
         value.as_ref().map(T::borrow)
     }
 }
@@ -1801,7 +1795,7 @@ impl<T: ValueTypeMarker> ValueTypeMarker for Optional<T> {
 impl<T: ValueTypeMarker> ValueTypeMarker for OptionalUnion<T> {
     type Borrowed<'a> = Option<T::Borrowed<'a>>;
     #[inline(always)]
-    fn borrow<'a>(value: &'a Self::Owned) -> Self::Borrowed<'a> {
+    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
         value.as_deref().map(T::borrow)
     }
 }
@@ -1809,7 +1803,7 @@ impl<T: ValueTypeMarker> ValueTypeMarker for OptionalUnion<T> {
 impl<T: ValueTypeMarker> ValueTypeMarker for Boxed<T> {
     type Borrowed<'a> = Option<T::Borrowed<'a>>;
     #[inline(always)]
-    fn borrow<'a>(value: &'a Self::Owned) -> Self::Borrowed<'a> {
+    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
         value.as_deref().map(T::borrow)
     }
 }
@@ -1817,7 +1811,7 @@ impl<T: ValueTypeMarker> ValueTypeMarker for Boxed<T> {
 impl<T: ResourceTypeMarker> ResourceTypeMarker for Optional<T> {
     type Borrowed<'a> = Option<T::Borrowed<'a>>;
     #[inline(always)]
-    fn take_or_borrow<'a>(value: &'a mut Self::Owned) -> Self::Borrowed<'a> {
+    fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
         value.as_mut().map(T::take_or_borrow)
     }
 }
@@ -1825,7 +1819,7 @@ impl<T: ResourceTypeMarker> ResourceTypeMarker for Optional<T> {
 impl<T: ResourceTypeMarker> ResourceTypeMarker for OptionalUnion<T> {
     type Borrowed<'a> = Option<T::Borrowed<'a>>;
     #[inline(always)]
-    fn take_or_borrow<'a>(value: &'a mut Self::Owned) -> Self::Borrowed<'a> {
+    fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
         value.as_deref_mut().map(T::take_or_borrow)
     }
 }
@@ -1833,12 +1827,12 @@ impl<T: ResourceTypeMarker> ResourceTypeMarker for OptionalUnion<T> {
 impl<T: ResourceTypeMarker> ResourceTypeMarker for Boxed<T> {
     type Borrowed<'a> = Option<T::Borrowed<'a>>;
     #[inline(always)]
-    fn take_or_borrow<'a>(value: &'a mut Self::Owned) -> Self::Borrowed<'a> {
+    fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
         value.as_deref_mut().map(T::take_or_borrow)
     }
 }
 
-unsafe impl<'a, T: TypeMarker, E: Encode<T>> Encode<Optional<T>> for Option<E> {
+unsafe impl<T: TypeMarker, E: Encode<T>> Encode<Optional<T>> for Option<E> {
     #[inline]
     unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<Optional<T>>(offset);
@@ -1846,7 +1840,7 @@ unsafe impl<'a, T: TypeMarker, E: Encode<T>> Encode<Optional<T>> for Option<E> {
     }
 }
 
-unsafe impl<'a, T: TypeMarker, E: Encode<T>> Encode<OptionalUnion<T>> for Option<E> {
+unsafe impl<T: TypeMarker, E: Encode<T>> Encode<OptionalUnion<T>> for Option<E> {
     #[inline]
     unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<OptionalUnion<T>>(offset);
@@ -1854,7 +1848,7 @@ unsafe impl<'a, T: TypeMarker, E: Encode<T>> Encode<OptionalUnion<T>> for Option
     }
 }
 
-unsafe impl<'a, T: TypeMarker, E: Encode<T>> Encode<Boxed<T>> for Option<E> {
+unsafe impl<T: TypeMarker, E: Encode<T>> Encode<Boxed<T>> for Option<E> {
     #[inline]
     unsafe fn encode(
         self,
@@ -2158,14 +2152,12 @@ pub unsafe fn decode_envelope_header(
         } else {
             Ok(Some((inlined, num_bytes, num_handles)))
         }
+    } else if num_bytes != 0 {
+        Err(Error::InvalidNumBytesInEnvelope)
+    } else if num_handles != 0 {
+        Err(Error::InvalidNumHandlesInEnvelope)
     } else {
-        if num_bytes != 0 {
-            Err(Error::InvalidNumBytesInEnvelope)
-        } else if num_handles != 0 {
-            Err(Error::InvalidNumHandlesInEnvelope)
-        } else {
-            Ok(None)
-        }
+        Ok(None)
     }
 }
 
@@ -2200,7 +2192,7 @@ pub unsafe fn decode_unknown_envelope(
 #[doc(hidden)] // only exported for use in macros or generated code
 #[inline]
 pub unsafe fn decode_union_inline_portion(
-    decoder: &mut Decoder,
+    decoder: &mut Decoder<'_>,
     offset: usize,
 ) -> Result<(u64, bool, u32, u32)> {
     let ordinal = decoder.read_num::<u64>(offset);
@@ -2290,7 +2282,7 @@ unsafe impl TypeMarker for FrameworkErr {
 impl ValueTypeMarker for FrameworkErr {
     type Borrowed<'a> = Self;
     #[inline(always)]
-    fn borrow<'a>(value: &'a <Self as TypeMarker>::Owned) -> Self::Borrowed<'a> {
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
         *value
     }
 }
@@ -2539,7 +2531,7 @@ unsafe impl TypeMarker for EpitaphBody {
 
 impl ValueTypeMarker for EpitaphBody {
     type Borrowed<'a> = &'a Self;
-    fn borrow<'a>(value: &'a <Self as TypeMarker>::Owned) -> Self::Borrowed<'a> {
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
         value
     }
 }
@@ -2696,10 +2688,10 @@ bitflags! {
     }
 }
 
-impl Into<[u8; 2]> for AtRestFlags {
+impl From<AtRestFlags> for [u8; 2] {
     #[inline]
-    fn into(self) -> [u8; 2] {
-        self.bits.to_le_bytes()
+    fn from(value: AtRestFlags) -> Self {
+        value.bits.to_le_bytes()
     }
 }
 
@@ -2814,7 +2806,7 @@ unsafe impl TypeMarker for TransactionHeader {
 
 impl ValueTypeMarker for TransactionHeader {
     type Borrowed<'a> = &'a Self;
-    fn borrow<'a>(value: &'a <Self as TypeMarker>::Owned) -> Self::Borrowed<'a> {
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
         value
     }
 }
@@ -2824,11 +2816,8 @@ unsafe impl Encode<TransactionHeader> for &TransactionHeader {
     unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<TransactionHeader>(offset);
         unsafe {
-            // Copy the object into the buffer.
-            let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-            #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-            let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut TransactionHeader>(buf_ptr);
-            typed_buf_ptr.write_unaligned((self as *const TransactionHeader).read());
+            let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+            (buf_ptr as *mut TransactionHeader).write_unaligned(*self);
         }
         Ok(())
     }
@@ -2848,11 +2837,10 @@ impl Decode<Self> for TransactionHeader {
         _depth: Depth,
     ) -> Result<()> {
         decoder.debug_check_bounds::<Self>(offset);
-        let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
-        // Copy from the buffer into the object.
         unsafe {
-            let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-            std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 16);
+            let buf_ptr = decoder.buf.as_ptr().add(offset);
+            let obj_ptr = self as *mut TransactionHeader;
+            std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr as *mut u8, 16);
         }
         Ok(())
     }
@@ -2930,8 +2918,8 @@ pub fn persist<T: Persistable>(body: &T) -> Result<Vec<u8>> {
 
 // TODO(fxbug.dev/79584): Kept only for overnet, remove when possible.
 #[doc(hidden)]
-pub fn persist_with_context<'a, T: ValueTypeMarker>(
-    body: T::Borrowed<'a>,
+pub fn persist_with_context<T: ValueTypeMarker>(
+    body: T::Borrowed<'_>,
     context: Context,
 ) -> Result<Vec<u8>> {
     let header = WireMetadata::new_full(context, MAGIC_NUMBER_INITIAL);
@@ -3052,7 +3040,7 @@ pub fn standalone_decode_resource<T: Standalone>(
 /// Panics if any of the handle dispositions uses `HandleOp::Duplicate`. This is
 /// never the case for handle dispositions return by `standalone_encode`.
 pub fn convert_handle_dispositions_to_infos(
-    handle_dispositions: Vec<HandleDisposition>,
+    handle_dispositions: Vec<HandleDisposition<'_>>,
 ) -> Result<Vec<HandleInfo>> {
     let mut infos = Vec::new();
     for hd in handle_dispositions.into_iter() {
@@ -3122,7 +3110,7 @@ unsafe impl TypeMarker for WireMetadata {
 
 impl ValueTypeMarker for WireMetadata {
     type Borrowed<'a> = &'a Self;
-    fn borrow<'a>(value: &'a <Self as TypeMarker>::Owned) -> Self::Borrowed<'a> {
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
         value
     }
 }
@@ -3132,11 +3120,8 @@ unsafe impl Encode<WireMetadata> for &WireMetadata {
     unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<WireMetadata>(offset);
         unsafe {
-            // Copy the object into the buffer.
-            let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-            #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-            let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut WireMetadata>(buf_ptr);
-            typed_buf_ptr.write_unaligned((self as *const WireMetadata).read());
+            let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+            (buf_ptr as *mut WireMetadata).write_unaligned(*self);
         }
         Ok(())
     }
@@ -3156,11 +3141,10 @@ impl Decode<Self> for WireMetadata {
         _depth: Depth,
     ) -> Result<()> {
         decoder.debug_check_bounds::<Self>(offset);
-        let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
-        // Copy from the buffer into the object.
         unsafe {
-            let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-            std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 8);
+            let buf_ptr = decoder.buf.as_ptr().add(offset);
+            let obj_ptr = self as *mut WireMetadata;
+            std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr as *mut u8, 8);
         }
         Ok(())
     }
@@ -3264,7 +3248,7 @@ mod test {
     const SAME_RIGHTS: u32 = crate::handle::Rights::SAME_RIGHTS.bits();
 
     #[track_caller]
-    fn to_infos(dispositions: &mut Vec<HandleDisposition>) -> Vec<HandleInfo> {
+    fn to_infos(dispositions: &mut Vec<HandleDisposition<'_>>) -> Vec<HandleInfo> {
         convert_handle_dispositions_to_infos(mem::take(dispositions)).unwrap()
     }
 
@@ -3274,7 +3258,7 @@ mod test {
         let handle_buf = &mut Vec::new();
         Encoder::encode_with_context::<T>(ctx, buf, handle_buf, start).expect("Encoding failed");
         let mut out = T::Owned::new_empty();
-        Decoder::decode_with_context::<T>(ctx, &buf, &mut to_infos(handle_buf), &mut out)
+        Decoder::decode_with_context::<T>(ctx, buf, &mut to_infos(handle_buf), &mut out)
             .expect("Decoding failed");
         out
     }
@@ -3292,7 +3276,7 @@ mod test {
     }
 
     #[track_caller]
-    fn identity<'a, T>(data: &T::Owned)
+    fn identity<T>(data: &T::Owned)
     where
         T: ValueTypeMarker,
         T::Owned: fmt::Debug + PartialEq,
@@ -3303,7 +3287,7 @@ mod test {
     }
 
     #[track_caller]
-    fn identities<'a, T>(values: &[T::Owned])
+    fn identities<T>(values: &[T::Owned])
     where
         T: ValueTypeMarker,
         T::Owned: fmt::Debug + PartialEq,
@@ -3543,7 +3527,7 @@ mod test {
             .expect("Encoding failed");
 
             let (out_header, out_buf) =
-                decode_transaction_header(&buf).expect("Decoding header failed");
+                decode_transaction_header(buf).expect("Decoding header failed");
             assert_eq!(header, out_header);
 
             let mut body_out = String::new();
@@ -3643,9 +3627,8 @@ mod test {
     #[test]
     fn extra_data_is_disallowed() {
         for ctx in CONTEXTS {
-            let mut output = ();
             assert_matches!(
-                Decoder::decode_with_context::<EmptyPayload>(ctx, &[0], &mut [], &mut output),
+                Decoder::decode_with_context::<EmptyPayload>(ctx, &[0], &mut [], &mut ()),
                 Err(Error::ExtraBytes)
             );
             assert_matches!(
@@ -3657,7 +3640,7 @@ mod test {
                         object_type: ObjectType::NONE,
                         rights: Rights::NONE,
                     }],
-                    &mut output
+                    &mut ()
                 ),
                 Err(Error::ExtraHandles)
             );

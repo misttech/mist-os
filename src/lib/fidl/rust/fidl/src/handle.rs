@@ -99,7 +99,7 @@ pub mod non_fuchsia_handles {
             }
             impl HandleBased for $name {}
             impl AsHandleRef for $name {
-                fn as_handle_ref<'a>(&'a self) -> HandleRef<'a> {
+                fn as_handle_ref(&self) -> HandleRef<'_> {
                     HandleRef::invalid()
                 }
             }

@@ -6,17 +6,9 @@
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
-#![allow(
-    unused_parens, // one-element-tuple-case is not a tuple
-    unused_mut, // not all args require mutation, but many do
-    nonstandard_style, // auto-caps does its best, but is not always successful
-)]
+#![warn(clippy::all)]
+#![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-#[cfg(target_os = "fuchsia")]
-#[allow(unused_imports)]
-use fuchsia_zircon as zx;
-
-#[allow(unused_imports)]
 use {
     bitflags::bitflags,
     fidl::{
@@ -26,6 +18,9 @@ use {
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
 };
+
+#[cfg(target_os = "fuchsia")]
+use fuchsia_zircon as zx;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
@@ -80,7 +75,6 @@ pub struct TopLevelStruct {
 impl fidl::Standalone for TopLevelStruct {}
 
 mod internal {
-    #[allow(unused_imports)]
     use super::*;
 
     unsafe impl fidl::encoding::TypeMarker for ArrayInt16Int8 {
@@ -122,20 +116,16 @@ mod internal {
             encoder.debug_check_bounds::<ArrayInt16Int8>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut ArrayInt16Int8>(buf_ptr);
-                typed_buf_ptr.write_unaligned((self as *const ArrayInt16Int8).read());
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut ArrayInt16Int8)
+                    .write_unaligned((self as *const ArrayInt16Int8).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
-                let ptr = buf_ptr.offset(2);
-                let padding_ptr = std::mem::transmute::<*mut u8, *mut u16>(ptr);
+                let padding_ptr = buf_ptr.offset(2) as *mut u16;
                 padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff00u16);
-                let ptr = buf_ptr.offset(6);
-                let padding_ptr = std::mem::transmute::<*mut u8, *mut u16>(ptr);
+                let padding_ptr = buf_ptr.offset(6) as *mut u16;
                 padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff00u16);
-                let ptr = buf_ptr.offset(10);
-                let padding_ptr = std::mem::transmute::<*mut u8, *mut u16>(ptr);
+                let padding_ptr = buf_ptr.offset(10) as *mut u16;
                 padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff00u16);
             }
             Ok(())
@@ -182,11 +172,10 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             let ptr = unsafe { buf_ptr.offset(2) };
-            let padval =
-                unsafe { std::mem::transmute::<*const u8, *const u16>(ptr).read_unaligned() };
+            let padval = unsafe { (ptr as *const u16).read_unaligned() };
             let maskedval = padval & 0xff00u16;
             if (maskedval != 0) {
                 return Err(fidl::Error::NonZeroPadding {
@@ -194,8 +183,7 @@ mod internal {
                 });
             }
             let ptr = unsafe { buf_ptr.offset(6) };
-            let padval =
-                unsafe { std::mem::transmute::<*const u8, *const u16>(ptr).read_unaligned() };
+            let padval = unsafe { (ptr as *const u16).read_unaligned() };
             let maskedval = padval & 0xff00u16;
             if (maskedval != 0) {
                 return Err(fidl::Error::NonZeroPadding {
@@ -203,8 +191,7 @@ mod internal {
                 });
             }
             let ptr = unsafe { buf_ptr.offset(10) };
-            let padval =
-                unsafe { std::mem::transmute::<*const u8, *const u16>(ptr).read_unaligned() };
+            let padval = unsafe { (ptr as *const u16).read_unaligned() };
             let maskedval = padval & 0xff00u16;
             if (maskedval != 0) {
                 return Err(fidl::Error::NonZeroPadding {
@@ -213,8 +200,7 @@ mod internal {
             }
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 12);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 12);
             }
             Ok(())
         }
@@ -259,14 +245,11 @@ mod internal {
             encoder.debug_check_bounds::<Int16Int8>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut Int16Int8>(buf_ptr);
-                typed_buf_ptr.write_unaligned((self as *const Int16Int8).read());
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut Int16Int8).write_unaligned((self as *const Int16Int8).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
-                let ptr = buf_ptr.offset(2);
-                let padding_ptr = std::mem::transmute::<*mut u8, *mut u16>(ptr);
+                let padding_ptr = buf_ptr.offset(2) as *mut u16;
                 padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff00u16);
             }
             Ok(())
@@ -287,12 +270,12 @@ mod internal {
             // because the unmasked parts will be overwritten by fields.
             match encoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(2);
-                    std::mem::transmute::<*mut u8, *mut u16>(ptr).write_unaligned(0);
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset(2);
+                    (ptr as *mut u16).write_unaligned(0);
                 },
                 fidl::encoding::WireFormatVersion::V2 => unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(2);
-                    std::mem::transmute::<*mut u8, *mut u16>(ptr).write_unaligned(0);
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset(2);
+                    (ptr as *mut u16).write_unaligned(0);
                 },
             };
             // Write the fields.
@@ -324,11 +307,10 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             let ptr = unsafe { buf_ptr.offset(2) };
-            let padval =
-                unsafe { std::mem::transmute::<*const u8, *const u16>(ptr).read_unaligned() };
+            let padval = unsafe { (ptr as *const u16).read_unaligned() };
             let maskedval = padval & 0xff00u16;
             if (maskedval != 0) {
                 return Err(fidl::Error::NonZeroPadding {
@@ -337,8 +319,7 @@ mod internal {
             }
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 4);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
         }
@@ -383,14 +364,11 @@ mod internal {
             encoder.debug_check_bounds::<Int8Int32>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut Int8Int32>(buf_ptr);
-                typed_buf_ptr.write_unaligned((self as *const Int8Int32).read());
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut Int8Int32).write_unaligned((self as *const Int8Int32).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
-                let ptr = buf_ptr.offset(0);
-                let padding_ptr = std::mem::transmute::<*mut u8, *mut u32>(ptr);
+                let padding_ptr = buf_ptr.offset(0) as *mut u32;
                 padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xffffff00u32);
             }
             Ok(())
@@ -411,12 +389,12 @@ mod internal {
             // because the unmasked parts will be overwritten by fields.
             match encoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(0);
-                    std::mem::transmute::<*mut u8, *mut u32>(ptr).write_unaligned(0);
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset(0);
+                    (ptr as *mut u32).write_unaligned(0);
                 },
                 fidl::encoding::WireFormatVersion::V2 => unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(0);
-                    std::mem::transmute::<*mut u8, *mut u32>(ptr).write_unaligned(0);
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset(0);
+                    (ptr as *mut u32).write_unaligned(0);
                 },
             };
             // Write the fields.
@@ -448,11 +426,10 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             let ptr = unsafe { buf_ptr.offset(0) };
-            let padval =
-                unsafe { std::mem::transmute::<*const u8, *const u32>(ptr).read_unaligned() };
+            let padval = unsafe { (ptr as *const u32).read_unaligned() };
             let maskedval = padval & 0xffffff00u32;
             if (maskedval != 0) {
                 return Err(fidl::Error::NonZeroPadding {
@@ -463,8 +440,7 @@ mod internal {
             }
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 8);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
             }
             Ok(())
         }
@@ -550,12 +526,12 @@ mod internal {
             // because the unmasked parts will be overwritten by fields.
             match encoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(8);
-                    std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset(8);
+                    (ptr as *mut u64).write_unaligned(0);
                 },
                 fidl::encoding::WireFormatVersion::V2 => unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(8);
-                    std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset(8);
+                    (ptr as *mut u64).write_unaligned(0);
                 },
             };
             // Write the fields.
@@ -593,10 +569,8 @@ mod internal {
             // Verify that padding bytes are zero.
             match decoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(8) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(8) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffff00000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -607,10 +581,8 @@ mod internal {
                     }
                 }
                 fidl::encoding::WireFormatVersion::V2 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(8) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(8) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffff00000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -680,27 +652,20 @@ mod internal {
             encoder.debug_check_bounds::<StructPaddingTestStruct>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr =
-                    std::mem::transmute::<*mut u8, *mut StructPaddingTestStruct>(buf_ptr);
-                typed_buf_ptr.write_unaligned((self as *const StructPaddingTestStruct).read());
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut StructPaddingTestStruct)
+                    .write_unaligned((self as *const StructPaddingTestStruct).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
-                let ptr = buf_ptr.offset(0);
-                let padding_ptr = std::mem::transmute::<*mut u8, *mut u32>(ptr);
+                let padding_ptr = buf_ptr.offset(0) as *mut u32;
                 padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff000000u32);
-                let ptr = buf_ptr.offset(4);
-                let padding_ptr = std::mem::transmute::<*mut u8, *mut u32>(ptr);
+                let padding_ptr = buf_ptr.offset(4) as *mut u32;
                 padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xffffff00u32);
-                let ptr = buf_ptr.offset(12);
-                let padding_ptr = std::mem::transmute::<*mut u8, *mut u32>(ptr);
+                let padding_ptr = buf_ptr.offset(12) as *mut u32;
                 padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff000000u32);
-                let ptr = buf_ptr.offset(16);
-                let padding_ptr = std::mem::transmute::<*mut u8, *mut u32>(ptr);
+                let padding_ptr = buf_ptr.offset(16) as *mut u32;
                 padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff000000u32);
-                let ptr = buf_ptr.offset(20);
-                let padding_ptr = std::mem::transmute::<*mut u8, *mut u32>(ptr);
+                let padding_ptr = buf_ptr.offset(20) as *mut u32;
                 padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff000000u32);
             }
             Ok(())
@@ -764,11 +729,10 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             let ptr = unsafe { buf_ptr.offset(0) };
-            let padval =
-                unsafe { std::mem::transmute::<*const u8, *const u32>(ptr).read_unaligned() };
+            let padval = unsafe { (ptr as *const u32).read_unaligned() };
             let maskedval = padval & 0xff000000u32;
             if (maskedval != 0) {
                 return Err(fidl::Error::NonZeroPadding {
@@ -778,8 +742,7 @@ mod internal {
                 });
             }
             let ptr = unsafe { buf_ptr.offset(4) };
-            let padval =
-                unsafe { std::mem::transmute::<*const u8, *const u32>(ptr).read_unaligned() };
+            let padval = unsafe { (ptr as *const u32).read_unaligned() };
             let maskedval = padval & 0xffffff00u32;
             if (maskedval != 0) {
                 return Err(fidl::Error::NonZeroPadding {
@@ -789,8 +752,7 @@ mod internal {
                 });
             }
             let ptr = unsafe { buf_ptr.offset(12) };
-            let padval =
-                unsafe { std::mem::transmute::<*const u8, *const u32>(ptr).read_unaligned() };
+            let padval = unsafe { (ptr as *const u32).read_unaligned() };
             let maskedval = padval & 0xff000000u32;
             if (maskedval != 0) {
                 return Err(fidl::Error::NonZeroPadding {
@@ -800,8 +762,7 @@ mod internal {
                 });
             }
             let ptr = unsafe { buf_ptr.offset(16) };
-            let padval =
-                unsafe { std::mem::transmute::<*const u8, *const u32>(ptr).read_unaligned() };
+            let padval = unsafe { (ptr as *const u32).read_unaligned() };
             let maskedval = padval & 0xff000000u32;
             if (maskedval != 0) {
                 return Err(fidl::Error::NonZeroPadding {
@@ -811,8 +772,7 @@ mod internal {
                 });
             }
             let ptr = unsafe { buf_ptr.offset(20) };
-            let padval =
-                unsafe { std::mem::transmute::<*const u8, *const u32>(ptr).read_unaligned() };
+            let padval = unsafe { (ptr as *const u32).read_unaligned() };
             let maskedval = padval & 0xff000000u32;
             if (maskedval != 0) {
                 return Err(fidl::Error::NonZeroPadding {
@@ -823,8 +783,7 @@ mod internal {
             }
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 24);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 24);
             }
             Ok(())
         }

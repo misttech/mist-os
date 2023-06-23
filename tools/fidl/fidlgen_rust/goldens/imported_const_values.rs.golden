@@ -6,17 +6,9 @@
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
-#![allow(
-    unused_parens, // one-element-tuple-case is not a tuple
-    unused_mut, // not all args require mutation, but many do
-    nonstandard_style, // auto-caps does its best, but is not always successful
-)]
+#![warn(clippy::all)]
+#![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-#[cfg(target_os = "fuchsia")]
-#[allow(unused_imports)]
-use fuchsia_zircon as zx;
-
-#[allow(unused_imports)]
 use {
     bitflags::bitflags,
     fidl::{
@@ -26,6 +18,9 @@ use {
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
 };
+
+#[cfg(target_os = "fuchsia")]
+use fuchsia_zircon as zx;
 
 pub const BITS_MEMBER: fidl_test_dependent::MyBits = fidl_test_dependent::MyBits::MEMBER;
 
@@ -41,7 +36,6 @@ pub struct MyStruct;
 impl fidl::Persistable for MyStruct {}
 
 mod internal {
-    #[allow(unused_imports)]
     use super::*;
 
     unsafe impl fidl::encoding::TypeMarker for MyStruct {

@@ -94,11 +94,11 @@ impl ServeInner {
     pub fn send_raw_msg(
         &self,
         bytes: &[u8],
-        handles: &mut Vec<HandleDisposition<'_>>,
+        handles: &mut [HandleDisposition<'_>],
     ) -> Result<(), Error> {
         match self.channel.write_etc(bytes, handles) {
             Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
-            Err(e) => Err(Error::ServerResponseWrite(e.into())),
+            Err(e) => Err(Error::ServerResponseWrite(e)),
         }
     }
 }

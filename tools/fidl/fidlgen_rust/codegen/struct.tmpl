@@ -86,15 +86,12 @@ unsafe impl fidl::encoding::Encode<{{ .Name }}> for &{{ if .IsResourceType }}mut
             {{- /* Case #2: Encode/decode is copy */}}
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut {{ .Name }}>(buf_ptr);
-                typed_buf_ptr.write_unaligned((self as *const {{ .Name }}).read());
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut {{ .Name }}).write_unaligned((self as *const {{ .Name }}).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
                 {{- range .FlattenedPaddingMarkersV2 }}
-                let ptr = buf_ptr.offset({{ .Offset }});
-                let padding_ptr = std::mem::transmute::<*mut u8, *mut {{ .Type }}>(ptr);
+                let padding_ptr = buf_ptr.offset({{ .Offset }}) as *mut {{ .Type }};
                 padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !{{ .Mask }});
                 {{- end }}
             }
@@ -131,16 +128,16 @@ unsafe impl<{{ range $i, $member := .Members }} T{{ $i }}: fidl::encoding::Encod
             fidl::encoding::WireFormatVersion::V1 => {
                 {{- range .PaddingMarkersV1 }}
                 unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset({{ .Offset }});
-                    std::mem::transmute::<*mut u8, *mut {{ .Type }}>(ptr).write_unaligned(0);
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset({{ .Offset }});
+                    (ptr as *mut {{ .Type }}).write_unaligned(0);
                 }
                 {{- end }}
             },
             fidl::encoding::WireFormatVersion::V2 => {
                 {{- range .PaddingMarkersV2 }}
                 unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset({{ .Offset }});
-                    std::mem::transmute::<*mut u8, *mut {{ .Type }}>(ptr).write_unaligned(0);
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset({{ .Offset }});
+                    (ptr as *mut {{ .Type }}).write_unaligned(0);
                 }
                 {{- end }}
             },
@@ -180,11 +177,11 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
             }
         {{- else if .UseFidlStructCopy }}
             {{- /* Case #2: Encode/decode is copy */}}
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             {{- range .FlattenedPaddingMarkersV2 }}
             let ptr = unsafe { buf_ptr.offset({{ .Offset }}) };
-            let padval = unsafe { std::mem::transmute::<*const u8, *const {{ .Type }}>(ptr).read_unaligned() };
+            let padval = unsafe { (ptr as *const {{ .Type }}).read_unaligned() };
             let maskedval = padval & {{ .Mask }};
             if (maskedval != 0) {
                 return Err(fidl::Error::NonZeroPadding {
@@ -194,8 +191,7 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
             {{- end }}
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, {{ .SizeV2 }});
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, {{ .SizeV2 }});
             }
             Ok(())
         {{- else }}
@@ -204,8 +200,8 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
             match decoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => {
                     {{- range .PaddingMarkersV1 }}
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset({{ .Offset }}) };
-                    let padval = unsafe { std::mem::transmute::<*const u8, *const {{ .Type }}>(ptr).read_unaligned() };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset({{ .Offset }}) };
+                    let padval = unsafe { (ptr as *const {{ .Type }}).read_unaligned() };
                     let maskedval = padval & {{ .Mask }};
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -216,8 +212,8 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
                 }
                 fidl::encoding::WireFormatVersion::V2 => {
                     {{- range .PaddingMarkersV2 }}
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset({{ .Offset }}) };
-                    let padval = unsafe { std::mem::transmute::<*const u8, *const {{ .Type }}>(ptr).read_unaligned() };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset({{ .Offset }}) };
+                    let padval = unsafe { (ptr as *const {{ .Type }}).read_unaligned() };
                     let maskedval = padval & {{ .Mask }};
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {

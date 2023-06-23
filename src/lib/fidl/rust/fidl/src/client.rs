@@ -53,10 +53,7 @@ pub struct QueryResponseFut<T>(pub MaybeDone<DecodedQueryResponseFut<T>>);
 
 impl<T: Unpin> FusedFuture for QueryResponseFut<T> {
     fn is_terminated(&self) -> bool {
-        match self.0 {
-            MaybeDone::Gone => true,
-            _ => false,
-        }
+        matches!(self.0, MaybeDone::Gone)
     }
 }
 
@@ -248,7 +245,7 @@ impl Client {
     pub fn send_raw(
         &self,
         bytes: &[u8],
-        handles: &mut Vec<HandleDisposition<'_>>,
+        handles: &mut [HandleDisposition<'_>],
     ) -> Result<(), Error> {
         match self.inner.channel.write_etc(bytes, handles) {
             Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
@@ -331,11 +328,7 @@ enum MessageInterest {
 impl MessageInterest {
     /// Check if a message has been received.
     fn is_received(&self) -> bool {
-        if let MessageInterest::Received(_) = *self {
-            true
-        } else {
-            false
-        }
+        matches!(*self, MessageInterest::Received(_))
     }
 
     fn unwrap_received(self) -> MessageBufEtc {
@@ -400,10 +393,7 @@ impl Unpin for EventReceiver {}
 
 impl FusedStream for EventReceiver {
     fn is_terminated(&self) -> bool {
-        match self.state {
-            EventReceiverState::Terminated => true,
-            _ => false,
-        }
+        matches!(self.state, EventReceiverState::Terminated)
     }
 }
 
@@ -457,20 +447,15 @@ struct EventChannel {
     queue: VecDeque<MessageBufEtc>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 enum EventListener {
     /// No one is listening for the event
+    #[default]
     None,
     /// Someone is listening for the event but has not yet polled
     WillPoll,
     /// Someone is listening for the event and can be woken via the `Waker`
     Some(Waker),
-}
-
-impl Default for EventListener {
-    fn default() -> Self {
-        EventListener::None
-    }
 }
 
 impl EventListener {
@@ -553,17 +538,15 @@ impl ClientInner {
 
         if let Some(msg_buf) = lock.queue.pop_front() {
             Poll::Ready(Ok(msg_buf))
+        } else if let Some(status) = epitaph {
+            Poll::Ready(Err(Error::ClientChannelClosed {
+                status,
+                protocol_name: self.protocol_name,
+                #[cfg(not(target_os = "fuchsia"))]
+                reason: self.channel.closed_reason(),
+            }))
         } else {
-            if let Some(status) = epitaph {
-                Poll::Ready(Err(Error::ClientChannelClosed {
-                    status,
-                    protocol_name: self.protocol_name,
-                    #[cfg(not(target_os = "fuchsia"))]
-                    reason: self.channel.closed_reason(),
-                }))
-            } else {
-                Poll::Pending
-            }
+            Poll::Pending
         }
     }
 
@@ -598,17 +581,15 @@ impl ClientInner {
             // space for a new message.
             let buf = message_interests.remove(interest_id.as_raw_id()).unwrap_received();
             Poll::Ready(Ok(buf))
+        } else if let Some(status) = epitaph {
+            Poll::Ready(Err(Error::ClientChannelClosed {
+                status,
+                protocol_name: self.protocol_name,
+                #[cfg(not(target_os = "fuchsia"))]
+                reason: self.channel.closed_reason(),
+            }))
         } else {
-            if let Some(status) = epitaph {
-                Poll::Ready(Err(Error::ClientChannelClosed {
-                    status,
-                    protocol_name: self.protocol_name,
-                    #[cfg(not(target_os = "fuchsia"))]
-                    reason: self.channel.closed_reason(),
-                }))
-            } else {
-                Poll::Pending
-            }
+            Poll::Pending
         }
     }
 
@@ -664,7 +645,7 @@ impl ClientInner {
                 let mut epitaph_body = Decode::<EpitaphBody>::new_empty();
                 Decoder::decode_into::<EpitaphBody>(
                     &header,
-                    &body_bytes,
+                    body_bytes,
                     handles,
                     &mut epitaph_body,
                 )?;
@@ -941,7 +922,7 @@ mod tests {
         channel.write_etc(bytes, handles).expect("Server channel write failed");
     }
 
-    fn encode_transaction<'a>(
+    fn encode_transaction(
         header: TransactionHeader,
         bytes: &mut Vec<u8>,
         handles: &mut Vec<zx::HandleDisposition<'static>>,

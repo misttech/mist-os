@@ -6,17 +6,9 @@
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
-#![allow(
-    unused_parens, // one-element-tuple-case is not a tuple
-    unused_mut, // not all args require mutation, but many do
-    nonstandard_style, // auto-caps does its best, but is not always successful
-)]
+#![warn(clippy::all)]
+#![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-#[cfg(target_os = "fuchsia")]
-#[allow(unused_imports)]
-use fuchsia_zircon as zx;
-
-#[allow(unused_imports)]
 use {
     bitflags::bitflags,
     fidl::{
@@ -26,6 +18,9 @@ use {
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
 };
+
+#[cfg(target_os = "fuchsia")]
+use fuchsia_zircon as zx;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SuperFooRequest {
@@ -801,7 +796,6 @@ impl Super_FooResponder {
 }
 
 mod internal {
-    #[allow(unused_imports)]
     use super::*;
 
     unsafe impl fidl::encoding::TypeMarker for SuperFooRequest {
@@ -961,10 +955,9 @@ mod internal {
             encoder.debug_check_bounds::<SuperFooResponse>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut SuperFooResponse>(buf_ptr);
-                typed_buf_ptr.write_unaligned((self as *const SuperFooResponse).read());
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut SuperFooResponse)
+                    .write_unaligned((self as *const SuperFooResponse).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
             }
@@ -1010,12 +1003,11 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 8);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
             }
             Ok(())
         }

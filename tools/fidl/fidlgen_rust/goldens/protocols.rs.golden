@@ -6,17 +6,9 @@
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
-#![allow(
-    unused_parens, // one-element-tuple-case is not a tuple
-    unused_mut, // not all args require mutation, but many do
-    nonstandard_style, // auto-caps does its best, but is not always successful
-)]
+#![warn(clippy::all)]
+#![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-#[cfg(target_os = "fuchsia")]
-#[allow(unused_imports)]
-use fuchsia_zircon as zx;
-
-#[allow(unused_imports)]
 use {
     bitflags::bitflags,
     fidl::{
@@ -26,6 +18,9 @@ use {
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
 };
+
+#[cfg(target_os = "fuchsia")]
+use fuchsia_zircon as zx;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u32)]
@@ -6094,7 +6089,6 @@ impl WithProtocolEndsStructContainingEndsResponder {
 }
 
 mod internal {
-    #[allow(unused_imports)]
     use super::*;
     unsafe impl fidl::encoding::TypeMarker for ErrorEnum {
         type Owned = Self;
@@ -6213,11 +6207,9 @@ mod internal {
             encoder.debug_check_bounds::<ChannelProtocolEventARequest>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr =
-                    std::mem::transmute::<*mut u8, *mut ChannelProtocolEventARequest>(buf_ptr);
-                typed_buf_ptr.write_unaligned((self as *const ChannelProtocolEventARequest).read());
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut ChannelProtocolEventARequest)
+                    .write_unaligned((self as *const ChannelProtocolEventARequest).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
             }
@@ -6270,12 +6262,11 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 16);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 16);
             }
             Ok(())
         }
@@ -6331,11 +6322,8 @@ mod internal {
             encoder.debug_check_bounds::<ChannelProtocolMethodARequest>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr =
-                    std::mem::transmute::<*mut u8, *mut ChannelProtocolMethodARequest>(buf_ptr);
-                typed_buf_ptr
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut ChannelProtocolMethodARequest)
                     .write_unaligned((self as *const ChannelProtocolMethodARequest).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
@@ -6389,12 +6377,11 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 16);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 16);
             }
             Ok(())
         }
@@ -6450,11 +6437,8 @@ mod internal {
             encoder.debug_check_bounds::<ChannelProtocolMethodBRequest>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr =
-                    std::mem::transmute::<*mut u8, *mut ChannelProtocolMethodBRequest>(buf_ptr);
-                typed_buf_ptr
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut ChannelProtocolMethodBRequest)
                     .write_unaligned((self as *const ChannelProtocolMethodBRequest).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
@@ -6508,12 +6492,11 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 16);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 16);
             }
             Ok(())
         }
@@ -6569,11 +6552,8 @@ mod internal {
             encoder.debug_check_bounds::<ChannelProtocolMethodBResponse>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr =
-                    std::mem::transmute::<*mut u8, *mut ChannelProtocolMethodBResponse>(buf_ptr);
-                typed_buf_ptr
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut ChannelProtocolMethodBResponse)
                     .write_unaligned((self as *const ChannelProtocolMethodBResponse).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
@@ -6622,12 +6602,11 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 8);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
             }
             Ok(())
         }
@@ -8241,11 +8220,9 @@ mod internal {
             encoder.debug_check_bounds::<TransitionalEventRequest>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr =
-                    std::mem::transmute::<*mut u8, *mut TransitionalEventRequest>(buf_ptr);
-                typed_buf_ptr.write_unaligned((self as *const TransitionalEventRequest).read());
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut TransitionalEventRequest)
+                    .write_unaligned((self as *const TransitionalEventRequest).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
             }
@@ -8293,12 +8270,11 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 8);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
             }
             Ok(())
         }
@@ -8352,11 +8328,9 @@ mod internal {
             encoder.debug_check_bounds::<TransitionalOneWayRequest>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr =
-                    std::mem::transmute::<*mut u8, *mut TransitionalOneWayRequest>(buf_ptr);
-                typed_buf_ptr.write_unaligned((self as *const TransitionalOneWayRequest).read());
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut TransitionalOneWayRequest)
+                    .write_unaligned((self as *const TransitionalOneWayRequest).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
             }
@@ -8404,12 +8378,11 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 8);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
             }
             Ok(())
         }
@@ -8463,11 +8436,9 @@ mod internal {
             encoder.debug_check_bounds::<TransitionalRequestRequest>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr =
-                    std::mem::transmute::<*mut u8, *mut TransitionalRequestRequest>(buf_ptr);
-                typed_buf_ptr.write_unaligned((self as *const TransitionalRequestRequest).read());
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut TransitionalRequestRequest)
+                    .write_unaligned((self as *const TransitionalRequestRequest).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
             }
@@ -8515,12 +8486,11 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 8);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
             }
             Ok(())
         }
@@ -8574,11 +8544,9 @@ mod internal {
             encoder.debug_check_bounds::<TransitionalRequestResponse>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr =
-                    std::mem::transmute::<*mut u8, *mut TransitionalRequestResponse>(buf_ptr);
-                typed_buf_ptr.write_unaligned((self as *const TransitionalRequestResponse).read());
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut TransitionalRequestResponse)
+                    .write_unaligned((self as *const TransitionalRequestResponse).read());
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
             }
@@ -8626,12 +8594,11 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 8);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
             }
             Ok(())
         }
@@ -9515,13 +9482,8 @@ mod internal {
             encoder.debug_check_bounds::<WithErrorSyntaxResponseAsStructResponse>(offset);
             unsafe {
                 // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
-                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                let typed_buf_ptr = std::mem::transmute::<
-                    *mut u8,
-                    *mut WithErrorSyntaxResponseAsStructResponse,
-                >(buf_ptr);
-                typed_buf_ptr.write_unaligned(
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut WithErrorSyntaxResponseAsStructResponse).write_unaligned(
                     (self as *const WithErrorSyntaxResponseAsStructResponse).read(),
                 );
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
@@ -9584,12 +9546,11 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
             // Verify that padding bytes are zero.
             // Copy from the buffer into the object.
             unsafe {
-                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
-                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 24);
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 24);
             }
             Ok(())
         }

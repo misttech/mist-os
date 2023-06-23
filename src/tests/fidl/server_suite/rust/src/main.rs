@@ -78,8 +78,7 @@ fn get_teardown_reason(error: Option<fidl::Error>) -> fidl_fidl_serversuite::Tea
         | fidl::Error::InvalidNumBytesInEnvelope
         | fidl::Error::InvalidHostHandle
         | fidl::Error::IncorrectHandleSubtype { .. }
-        | fidl::Error::MissingExpectedHandleRights { .. }
-        | fidl::Error::CannotStoreUnknownHandles => TeardownReason::DecodingError,
+        | fidl::Error::MissingExpectedHandleRights { .. } => TeardownReason::DecodingError,
 
         fidl::Error::UnknownOrdinal { .. } | fidl::Error::InvalidResponseTxid => {
             TeardownReason::UnexpectedMessage

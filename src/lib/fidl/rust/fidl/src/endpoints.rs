@@ -82,7 +82,7 @@ pub trait Proxy: Sized + Send + Sync {
 
     /// Returns a future that completes when the proxy receives the
     /// `PEER_CLOSED` signal.
-    fn on_closed<'a>(&'a self) -> OnSignals<'a> {
+    fn on_closed(&self) -> OnSignals<'_> {
         self.as_channel().on_closed()
     }
 }
@@ -136,7 +136,7 @@ pub trait ControlHandle {
 
     /// Returns a future that completes when the server receives the
     /// `PEER_CLOSED` signal.
-    fn on_closed<'a>(&'a self) -> OnSignals<'a>;
+    fn on_closed(&self) -> OnSignals<'_>;
 }
 
 /// A type associated with a particular two-way FIDL method, used by servers to
@@ -274,7 +274,7 @@ impl<T: ProtocolMarker> ClientEnd<T> {
 }
 
 impl<T> AsHandleRef for ClientEnd<T> {
-    fn as_handle_ref(&self) -> HandleRef {
+    fn as_handle_ref(&self) -> HandleRef<'_> {
         self.inner.as_handle_ref()
     }
 }
@@ -358,7 +358,7 @@ impl<T> ServerEnd<T> {
 }
 
 impl<T> AsHandleRef for ServerEnd<T> {
-    fn as_handle_ref(&self) -> HandleRef {
+    fn as_handle_ref(&self) -> HandleRef<'_> {
         self.inner.as_handle_ref()
     }
 }

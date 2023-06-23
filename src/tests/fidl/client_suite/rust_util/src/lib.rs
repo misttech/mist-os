@@ -29,13 +29,16 @@ pub fn classify_error(error: fidl::Error) -> FidlErrorKind {
         | fidl::Error::InvalidNumBytesInEnvelope
         | fidl::Error::InvalidHostHandle
         | fidl::Error::IncorrectHandleSubtype { .. }
-        | fidl::Error::MissingExpectedHandleRights { .. }
-        | fidl::Error::CannotStoreUnknownHandles => FidlErrorKind::DecodingError,
+        | fidl::Error::MissingExpectedHandleRights { .. } => FidlErrorKind::DecodingError,
+
         fidl::Error::UnknownOrdinal { .. }
         | fidl::Error::InvalidResponseTxid
         | fidl::Error::UnexpectedSyncResponse => FidlErrorKind::UnexpectedMessage,
+
         fidl::Error::UnsupportedMethod { .. } => FidlErrorKind::UnknownMethod,
+
         fidl::Error::ClientChannelClosed { .. } => FidlErrorKind::ChannelPeerClosed,
+
         _ => FidlErrorKind::OtherError,
     }
 }

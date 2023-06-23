@@ -35,28 +35,28 @@ impl ChannelEpitaphExt for AsyncChannel {
 }
 
 pub(crate) trait ChannelLike {
-    fn write_etc<'a>(
+    fn write_etc(
         &self,
         bytes: &[u8],
-        handles: &mut Vec<HandleDisposition<'a>>,
+        handles: &mut Vec<HandleDisposition<'_>>,
     ) -> Result<(), zx_status::Status>;
 }
 
 impl ChannelLike for Channel {
-    fn write_etc<'a>(
+    fn write_etc(
         &self,
         bytes: &[u8],
-        handles: &mut Vec<HandleDisposition<'a>>,
+        handles: &mut Vec<HandleDisposition<'_>>,
     ) -> Result<(), zx_status::Status> {
         self.write_etc(bytes, handles)
     }
 }
 
 impl ChannelLike for AsyncChannel {
-    fn write_etc<'a>(
+    fn write_etc(
         &self,
         bytes: &[u8],
-        handles: &mut Vec<HandleDisposition<'a>>,
+        handles: &mut Vec<HandleDisposition<'_>>,
     ) -> Result<(), zx_status::Status> {
         self.write_etc(bytes, handles)
     }

@@ -6,17 +6,9 @@
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
-#![allow(
-    unused_parens, // one-element-tuple-case is not a tuple
-    unused_mut, // not all args require mutation, but many do
-    nonstandard_style, // auto-caps does its best, but is not always successful
-)]
+#![warn(clippy::all)]
+#![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-#[cfg(target_os = "fuchsia")]
-#[allow(unused_imports)]
-use fuchsia_zircon as zx;
-
-#[allow(unused_imports)]
 use {
     bitflags::bitflags,
     fidl::{
@@ -26,6 +18,9 @@ use {
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
 };
+
+#[cfg(target_os = "fuchsia")]
+use fuchsia_zircon as zx;
 
 bitflags! {
     #[derive(Default)]
@@ -8737,7 +8732,6 @@ impl ProtocolErrorResourceResponder {
 }
 
 mod internal {
-    #[allow(unused_imports)]
     use super::*;
     unsafe impl fidl::encoding::TypeMarker for Bits {
         type Owned = Self;
@@ -8953,46 +8947,46 @@ mod internal {
             match encoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => {
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(0);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(0);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(32);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(32);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(80);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(80);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(112);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(112);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(176);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(176);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                 }
                 fidl::encoding::WireFormatVersion::V2 => {
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(0);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(0);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(32);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(32);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(80);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(80);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(112);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(112);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(176);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(176);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                 }
             };
@@ -9096,10 +9090,8 @@ mod internal {
             // Verify that padding bytes are zero.
             match decoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(0) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(0) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0x0000ff0000000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9108,10 +9100,8 @@ mod internal {
                                 + ((0x0000ff0000000000u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(32) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(32) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffff00000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9120,10 +9110,8 @@ mod internal {
                                 + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(80) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(80) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0x0000ff0000000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9132,10 +9120,8 @@ mod internal {
                                 + ((0x0000ff0000000000u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(112) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(112) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffff00000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9144,10 +9130,8 @@ mod internal {
                                 + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(176) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(176) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffff00000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9158,10 +9142,8 @@ mod internal {
                     }
                 }
                 fidl::encoding::WireFormatVersion::V2 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(0) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(0) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0x0000ff0000000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9170,10 +9152,8 @@ mod internal {
                                 + ((0x0000ff0000000000u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(32) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(32) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffff00000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9182,10 +9162,8 @@ mod internal {
                                 + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(80) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(80) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0x0000ff0000000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9194,10 +9172,8 @@ mod internal {
                                 + ((0x0000ff0000000000u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(112) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(112) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffff00000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9206,10 +9182,8 @@ mod internal {
                                 + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(176) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(176) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffff00000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9372,12 +9346,12 @@ mod internal {
             // because the unmasked parts will be overwritten by fields.
             match encoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(40);
-                    std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset(40);
+                    (ptr as *mut u64).write_unaligned(0);
                 },
                 fidl::encoding::WireFormatVersion::V2 => unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(40);
-                    std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset(40);
+                    (ptr as *mut u64).write_unaligned(0);
                 },
             };
             // Write the fields.
@@ -9433,10 +9407,8 @@ mod internal {
             // Verify that padding bytes are zero.
             match decoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(40) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(40) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffff0000000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9447,10 +9419,8 @@ mod internal {
                     }
                 }
                 fidl::encoding::WireFormatVersion::V2 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(40) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(40) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffff0000000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9710,30 +9680,30 @@ mod internal {
             match encoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => {
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(0);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(0);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(16);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(16);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(32);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(32);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                 }
                 fidl::encoding::WireFormatVersion::V2 => {
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(0);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(0);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(16);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(16);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(32);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(32);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                 }
             };
@@ -9834,10 +9804,8 @@ mod internal {
             // Verify that padding bytes are zero.
             match decoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(0) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(0) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0x000000000000ff00u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9846,10 +9814,8 @@ mod internal {
                                 + ((0x000000000000ff00u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(16) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(16) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0x000000000000ff00u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9858,10 +9824,8 @@ mod internal {
                                 + ((0x000000000000ff00u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(32) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(32) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffff00000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9872,10 +9836,8 @@ mod internal {
                     }
                 }
                 fidl::encoding::WireFormatVersion::V2 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(0) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(0) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0x000000000000ff00u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9884,10 +9846,8 @@ mod internal {
                                 + ((0x000000000000ff00u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(16) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(16) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0x000000000000ff00u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -9896,10 +9856,8 @@ mod internal {
                                 + ((0x000000000000ff00u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(32) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(32) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffff00000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -10060,12 +10018,12 @@ mod internal {
             // because the unmasked parts will be overwritten by fields.
             match encoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(8);
-                    std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset(8);
+                    (ptr as *mut u64).write_unaligned(0);
                 },
                 fidl::encoding::WireFormatVersion::V2 => unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(8);
-                    std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset(8);
+                    (ptr as *mut u64).write_unaligned(0);
                 },
             };
             // Write the fields.
@@ -10133,10 +10091,8 @@ mod internal {
             // Verify that padding bytes are zero.
             match decoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(8) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(8) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffffffffff00u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -10147,10 +10103,8 @@ mod internal {
                     }
                 }
                 fidl::encoding::WireFormatVersion::V2 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(8) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(8) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffffffffff00u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -10448,22 +10402,22 @@ mod internal {
             match encoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => {
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(16);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(16);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(192);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(192);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                 }
                 fidl::encoding::WireFormatVersion::V2 => {
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(16);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(16);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                     unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(176);
-                        std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(176);
+                        (ptr as *mut u64).write_unaligned(0);
                     }
                 }
             };
@@ -10732,10 +10686,8 @@ mod internal {
             // Verify that padding bytes are zero.
             match decoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(16) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(16) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffffffffff00u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -10744,10 +10696,8 @@ mod internal {
                                 + ((0xffffffffffffff00u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(192) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(192) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffff0000000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -10758,10 +10708,8 @@ mod internal {
                     }
                 }
                 fidl::encoding::WireFormatVersion::V2 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(16) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(16) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffffffffffff00u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
@@ -10770,10 +10718,8 @@ mod internal {
                                 + ((0xffffffffffffff00u64 as u64).trailing_zeros() / 8) as usize,
                         });
                     }
-                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(176) };
-                    let padval = unsafe {
-                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
-                    };
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(176) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
                     let maskedval = padval & 0xffffff0000000000u64;
                     if (maskedval != 0) {
                         return Err(fidl::Error::NonZeroPadding {
