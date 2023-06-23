@@ -4,7 +4,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/sys/cpp/component_context.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
 
@@ -14,14 +14,26 @@
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());
-  std::unique_ptr<sys::ComponentContext> app_context(
-      sys::ComponentContext::CreateAndServeOutgoingDirectory());
+  component::OutgoingDirectory outgoing(loop.dispatcher());
+
+  zx::result<> serve_outgoing_directory_result = outgoing.ServeFromStartupInfo();
+  if (serve_outgoing_directory_result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve outgoing directory: "
+                   << serve_outgoing_directory_result.status_string();
+    return -1;
+  }
 
   FX_LOGS(INFO) << "Starting fake fuchsia.hardware.display.Provider service.";
 
   std::shared_ptr<zx_device> mock_root = MockDevice::FakeRootParent();
-  fake_display::ProviderService fake_display_coordinator_connector(
-      std::move(mock_root), app_context.get(), loop.dispatcher());
+  zx::result<> create_and_publish_service_result =
+      display::FakeDisplayCoordinatorConnector::CreateAndPublishService(
+          mock_root, loop.dispatcher(), outgoing);
+  if (create_and_publish_service_result.is_error()) {
+    FX_LOGS(ERROR) << "Cannot start display Provider server and publish service: "
+                   << create_and_publish_service_result.status_string();
+    return -1;
+  }
 
   loop.Run();
 

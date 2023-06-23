@@ -18,9 +18,12 @@ executable("fake-display-coordinator-connector-unittest-bin") {
   sources = [ "fake-display-coordinator-connector-unittest.cc" ]
 
   deps = [
-    "..:lib",
+    "//sdk/lib/fidl/cpp",
+    "//src/graphics/display/testing/coordinator-provider/fake:service",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]
 }

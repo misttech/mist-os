@@ -11,14 +11,14 @@ executable("bin") {
   sources = [ "main.cc" ]
 
   deps = [
-    ":lib",
+    ":service",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace-provider",
   ]
 }
 
-source_set("lib") {
+source_set("service") {
   testonly = true
 
   configs += [ "//build/config:all_source" ]
@@ -28,10 +28,17 @@ source_set("lib") {
     "service.h",
   ]
 
+  deps = [ "//src/graphics/display/drivers/fake:sysmem-proxy-device" ]
+
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/sys/cpp",
     "//src/graphics/display/drivers/fake:fake-display-stack",
-    "//src/graphics/display/drivers/fake:sysmem-proxy-device",
+  ]
+
+  visibility = [
+    ":bin",
+    "tests:*",
   ]
 }

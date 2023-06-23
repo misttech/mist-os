@@ -2,16 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <zircon/types.h>
 
 #include <chrono>
 #include <thread>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "gmock/gmock.h"
+#include "lib/fidl/cpp/wire/status.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/testing/coordinator-provider/fake/service.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace {
 
@@ -25,98 +31,179 @@ class FakeDisplayCoordinatorConnectorTest : public gtest::TestLoopFixture {
   void SetUp() override {
     TestLoopFixture::SetUp();
 
-    service_ = std::make_unique<fake_display::ProviderService>(MockDevice::FakeRootParent(),
-                                                               nullptr, dispatcher());
+    coordinator_connector_ = std::make_unique<display::FakeDisplayCoordinatorConnector>(
+        MockDevice::FakeRootParent(), dispatcher());
+
+    zx::result<fidl::Endpoints<fuchsia_hardware_display::Provider>> provider_endpoints_result =
+        fidl::CreateEndpoints<fuchsia_hardware_display::Provider>();
+    ASSERT_OK(provider_endpoints_result.status_value());
+    auto [client_end, server_end] = std::move(provider_endpoints_result.value());
+
+    fidl::BindServer(dispatcher(), std::move(server_end), coordinator_connector_.get());
+    provider_client_ = fidl::Client(std::move(client_end), dispatcher());
   }
 
   void TearDown() override {
-    // TODO(fxbug.dev/66466): this shouldn't be necessary, but without it there will be ASAN
-    // failures, as the coordinator connections established by the tests haven't finished being torn
-    // down.
-    while (service_->coordinator_claimed() || service_->virtcon_coordinator_claimed()) {
-      std::this_thread::sleep_for(kSleepTime);
-      RunLoopUntilIdle();
-    }
-
-    service_.reset();
     RunLoopUntilIdle();
+    coordinator_connector_.reset();
   }
 
-  fake_display::ProviderService* service() { return service_.get(); }
+  fidl::Client<fuchsia_hardware_display::Provider>& provider_client() { return provider_client_; }
+  display::FakeDisplayCoordinatorConnector* coordinator_connector() {
+    return coordinator_connector_.get();
+  }
 
- private:
-  std::unique_ptr<fake_display::ProviderService> service_;
+ protected:
+  fidl::Client<fuchsia_hardware_display::Provider> provider_client_;
+  std::unique_ptr<display::FakeDisplayCoordinatorConnector> coordinator_connector_;
 };
 
-struct Request {
-  fidl::InterfacePtr<fuchsia::hardware::display::Coordinator> coordinator;
-};
-
-Request NewRequest() { return Request(); }
+fidl::Endpoints<fuchsia_hardware_display::Coordinator> NewCoordinatorEndpoints() {
+  zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> endpoints_result =
+      fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
+  EXPECT_OK(endpoints_result.status_value());
+  return std::move(endpoints_result.value());
+}
 
 }  // anonymous namespace
 
-TEST_F(FakeDisplayCoordinatorConnectorTest, NoConflictWithVirtcon) {
+TEST_F(FakeDisplayCoordinatorConnectorTest, TeardownClientChannelAfterCoordinatorConnector) {
   // Count the number of connections that were ever made.
-  uint32_t num_connections = 0;
-  uint32_t num_virtcon_connections = 0;
+  int num_connections = 0;
 
-  auto req = NewRequest();
-  service()->OpenCoordinatorForPrimary(
-      req.coordinator.NewRequest(), [&num_connections](zx_status_t status) { ++num_connections; });
+  std::vector<fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>>
+      primary_results;
 
-  auto req2 = NewRequest();
-  service()->OpenCoordinatorForVirtcon(
-      req2.coordinator.NewRequest(),
-      [&num_virtcon_connections](zx_status_t status) { ++num_virtcon_connections; });
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator1 = NewCoordinatorEndpoints();
+  provider_client()
+      ->OpenCoordinatorForPrimary(std::move(coordinator1.server))
+      .Then(
+          [&num_connections, &primary_results](
+              fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>& result) {
+            primary_results.push_back(std::move(result));
+            ++num_connections;
+          });
 
-  EXPECT_EQ(num_connections, 1U);
-  EXPECT_EQ(num_virtcon_connections, 1U);
+  RunLoopUntilIdle();
+
+  EXPECT_THAT(primary_results,
+              testing::ElementsAre(
+                  fidl::Response<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>(
+                      {.s = ZX_OK})));
+
+  coordinator_connector_.reset();
+  // Client connection is closed with epitaphs so the test loop should have
+  // pending task.
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  coordinator1.client.reset();
+  // Now that the coordinator connector is closed.
+  EXPECT_FALSE(RunLoopUntilIdle());
+}
+
+TEST_F(FakeDisplayCoordinatorConnectorTest, NoConflictWithVirtcon) {
+  std::vector<fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>>
+      primary_results;
+  std::vector<fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForVirtcon>>
+      virtcon_results;
+
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator1 = NewCoordinatorEndpoints();
+  provider_client()
+      ->OpenCoordinatorForPrimary(std::move(coordinator1.server))
+      .Then(
+          [&](fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>& result) {
+            primary_results.push_back(std::move(result));
+          });
+
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator2 = NewCoordinatorEndpoints();
+  provider_client()
+      ->OpenCoordinatorForVirtcon(std::move(coordinator2.server))
+      .Then(
+          [&](fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForVirtcon>& result) {
+            virtcon_results.push_back(std::move(result));
+          });
+
+  RunLoopUntilIdle();
+
+  EXPECT_THAT(primary_results,
+              testing::ElementsAre(
+                  fidl::Response<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>(
+                      {.s = ZX_OK})));
+  EXPECT_THAT(virtcon_results,
+              testing::ElementsAre(
+                  fidl::Response<fuchsia_hardware_display::Provider::OpenCoordinatorForVirtcon>(
+                      {.s = ZX_OK})));
 }
 
 TEST_F(FakeDisplayCoordinatorConnectorTest, MultipleConnections) {
-  // Count the number of connections that were ever made.
-  uint32_t num_connections = 0;
+  std::vector<fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>>
+      primary_results_connection1, primary_results_connection2, primary_results_connection3;
 
-  auto req = NewRequest();
-  service()->OpenCoordinatorForPrimary(
-      req.coordinator.NewRequest(),
-      [&num_connections](zx_status_t status) { EXPECT_EQ(++num_connections, 1U); });
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator1 = NewCoordinatorEndpoints();
+  provider_client()
+      ->OpenCoordinatorForPrimary(std::move(coordinator1.server))
+      .Then(
+          [&](fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>& result) {
+            primary_results_connection1.push_back(std::move(result));
+          });
 
-  auto req2 = NewRequest();
-  service()->OpenCoordinatorForPrimary(
-      req2.coordinator.NewRequest(),
-      [&num_connections](zx_status_t status) { EXPECT_EQ(++num_connections, 2U); });
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator2 = NewCoordinatorEndpoints();
+  provider_client()
+      ->OpenCoordinatorForPrimary(std::move(coordinator2.server))
+      .Then(
+          [&](fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>& result) {
+            primary_results_connection2.push_back(std::move(result));
+          });
 
-  auto req3 = NewRequest();
-  service()->OpenCoordinatorForPrimary(
-      req3.coordinator.NewRequest(),
-      [&num_connections](zx_status_t status) { EXPECT_EQ(++num_connections, 3U); });
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator3 = NewCoordinatorEndpoints();
+  provider_client()
+      ->OpenCoordinatorForPrimary(std::move(coordinator3.server))
+      .Then(
+          [&](fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>& result) {
+            primary_results_connection3.push_back(std::move(result));
+          });
 
-  EXPECT_EQ(num_connections, 1U);
-  EXPECT_EQ(service()->num_queued_requests(), 2U);
+  RunLoopUntilIdle();
+
+  EXPECT_THAT(primary_results_connection1,
+              testing::ElementsAre(
+                  fidl::Response<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>(
+                      {.s = ZX_OK})));
+  EXPECT_THAT(primary_results_connection2, testing::IsEmpty());
+  EXPECT_THAT(primary_results_connection3, testing::IsEmpty());
+  primary_results_connection1.clear();
 
   // Drop the first connection, which will enable the second connection to be made.
-  req.coordinator.Unbind();
-  while (service()->num_queued_requests() == 2) {
+  coordinator1.client.reset();
+
+  while (!RunLoopUntilIdle()) {
     // Real wall clock time must elapse for the service to handle a kernel notification
     // that the channel has closed.
     std::this_thread::sleep_for(kSleepTime);
-    RunLoopUntilIdle();
   }
 
-  EXPECT_EQ(num_connections, 2U);
-  EXPECT_EQ(service()->num_queued_requests(), 1U);
+  EXPECT_THAT(primary_results_connection1, testing::IsEmpty());
+  EXPECT_THAT(primary_results_connection2,
+              testing::ElementsAre(
+                  fidl::Response<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>(
+                      {.s = ZX_OK})));
+  EXPECT_THAT(primary_results_connection3, testing::IsEmpty());
+  primary_results_connection2.clear();
 
   // Drop the second connection, which will enable the third connection to be made.
-  req2.coordinator.Unbind();
-  while (service()->num_queued_requests() == 1) {
+  coordinator2.client.reset();
+
+  while (!RunLoopUntilIdle()) {
     // Real wall clock time must elapse for the service to handle a kernel notification
     // that the channel has closed.
     std::this_thread::sleep_for(kSleepTime);
-    RunLoopUntilIdle();
   }
 
-  EXPECT_EQ(num_connections, 3U);
-  EXPECT_EQ(service()->num_queued_requests(), 0U);
+  EXPECT_THAT(primary_results_connection1, testing::IsEmpty());
+  EXPECT_THAT(primary_results_connection2, testing::IsEmpty());
+  EXPECT_THAT(primary_results_connection3,
+              testing::ElementsAre(
+                  fidl::Response<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>(
+                      {.s = ZX_OK})));
+  primary_results_connection3.clear();
 }

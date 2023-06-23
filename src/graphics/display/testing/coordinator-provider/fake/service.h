@@ -5,80 +5,130 @@
 #ifndef SRC_GRAPHICS_DISPLAY_TESTING_COORDINATOR_PROVIDER_FAKE_SERVICE_H_
 #define SRC_GRAPHICS_DISPLAY_TESTING_COORDINATOR_PROVIDER_FAKE_SERVICE_H_
 
-#include <fuchsia/hardware/display/cpp/fidl.h>
-#include <lib/fidl/cpp/binding_set.h>
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/fidl/cpp/wire/channel.h>
 
 #include <memory>
 #include <queue>
 
 #include "src/graphics/display/drivers/fake/fake-display-stack.h"
-#include "src/lib/fxl/macros.h"
 
-namespace sys {
-class ComponentContext;
-}  // namespace sys
+namespace display {
 
-namespace fake_display {
-
-// Not thread-safe.  The assumption is that the public methods will be invoked by FIDL bindings
-// on a single-threaded event-loop.
-class ProviderService : public fuchsia::hardware::display::Provider {
+// Connects clients to a fake display-coordinator device with a fake-display
+// display engine.
+//
+// FakeDisplayCoordinatorConnector is not thread-safe. All public methods must
+// be invoked on a single-threaded event loop with the same `dispatcher`
+// provided on FakeDisplayCoordinatorConnector creation.
+class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_display::Provider> {
  public:
-  // |app_context| is used to publish this service.
-  ProviderService(std::shared_ptr<zx_device> parent, sys::ComponentContext* app_context,
-                  async_dispatcher_t* dispatcher);
-  ~ProviderService();
+  // Creates a FakeDisplayCoordinatorConnector and publish its service to
+  // `component`'s outgoing service directory.
+  // Callers must guarantee that all FIDL methods run on `dispatcher`.
+  static zx::result<> CreateAndPublishService(std::shared_ptr<zx_device> mock_root,
+                                              async_dispatcher_t* dispatcher,
+                                              component::OutgoingDirectory& outgoing);
 
-  // |fuchsia::hardware::display::Provider|.
-  void OpenCoordinatorForVirtcon(
-      ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> coordinator_request,
-      OpenCoordinatorForVirtconCallback callback) override;
+  // Creates a FakeDisplayCoordinatorConnector.
+  // Callers are responsible for binding incoming FIDL clients to it.
+  // Callers must guarantee that all FIDL methods run on `dispatcher`.
+  FakeDisplayCoordinatorConnector(std::shared_ptr<zx_device> mock_root,
+                                  async_dispatcher_t* dispatcher);
+  ~FakeDisplayCoordinatorConnector() override;
 
-  // |fuchsia::hardware::display::Provider|.
-  void OpenCoordinatorForPrimary(
-      ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> coordinator_request,
-      OpenCoordinatorForPrimaryCallback callback) override;
+  // Disallow copy, assign and move.
+  FakeDisplayCoordinatorConnector(const FakeDisplayCoordinatorConnector&) = delete;
+  FakeDisplayCoordinatorConnector(FakeDisplayCoordinatorConnector&&) = delete;
+  FakeDisplayCoordinatorConnector operator=(const FakeDisplayCoordinatorConnector&) = delete;
+  FakeDisplayCoordinatorConnector operator=(FakeDisplayCoordinatorConnector&&) = delete;
 
-  // For tests.
-  size_t num_queued_requests() const { return state_->queued_requests.size(); }
-  size_t num_virtcon_queued_requests() const { return state_->virtcon_queued_requests.size(); }
-  bool coordinator_claimed() const { return state_->coordinator_claimed; }
-  bool virtcon_coordinator_claimed() const { return state_->virtcon_coordinator_claimed; }
+  // `fidl::Server<fuchsia_hardware_display::Provider>`
+  void OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequest& request,
+                                 OpenCoordinatorForVirtconCompleter::Sync& completer) override;
+  void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequest& request,
+                                 OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
+
+  // Check coordinator clients' connection status for tests only.
+  int GetNumQueuedPrimaryRequestsTestOnly() const {
+    return static_cast<int>(state_->queued_primary_requests.size());
+  }
 
  private:
-  struct Request {
+  struct OpenCoordinatorRequest {
     bool is_virtcon;
-    zx::channel device;
-    ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> coordinator_request;
-    OpenCoordinatorForPrimaryCallback callback;
+    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_request;
+    fit::function<void(zx_status_t)> on_coordinator_opened;
   };
 
   // Encapsulates state for thread safety, since |display::FakeDisplayStack| invokes callbacks
   // from other threads.
+  // TODO(fxbug.dev/129571): The comments are vague since it lacks the thread-
+  // safety model of the struct. We need to rigorize the thread-safety model and
+  // make sure that the access pattern is correct.
   struct State {
     async_dispatcher_t* const dispatcher;
 
-    std::unique_ptr<display::FakeDisplayStack> tree;
+    const std::unique_ptr<display::FakeDisplayStack> fake_display_stack;
 
-    bool coordinator_claimed = false;
+    bool primary_coordinator_claimed = false;
     bool virtcon_coordinator_claimed = false;
-    std::queue<Request> queued_requests;
-    std::queue<Request> virtcon_queued_requests;
+    std::queue<OpenCoordinatorRequest> queued_primary_requests;
+    std::queue<OpenCoordinatorRequest> queued_virtcon_requests;
+
+    bool IsCoordinatorClaimed(bool use_virtcon_coordinator) const {
+      return use_virtcon_coordinator ? virtcon_coordinator_claimed : primary_coordinator_claimed;
+    }
+    // Claim the coordinator of the specified connection type, which must not
+    // already be claimed.
+    void MarkCoordinatorClaimed(bool use_virtcon_coordinator) {
+      bool& claimed =
+          use_virtcon_coordinator ? virtcon_coordinator_claimed : primary_coordinator_claimed;
+      ZX_ASSERT_MSG(!claimed, "%s coordinator already claimed",
+                    use_virtcon_coordinator ? "virtcon" : "primary");
+      claimed = true;
+    }
+    // Unclaim the coordinator of the specified connection type, which must
+    // already be claimed.
+    void MarkCoordinatorUnclaimed(bool use_virtcon_coordinator) {
+      bool& claimed =
+          use_virtcon_coordinator ? virtcon_coordinator_claimed : primary_coordinator_claimed;
+      ZX_ASSERT_MSG(claimed, "%s coordinator not claimed",
+                    use_virtcon_coordinator ? "virtcon" : "primary");
+      claimed = false;
+    }
+    std::queue<OpenCoordinatorRequest>& GetQueuedRequests(bool use_virtcon_coordinator) {
+      return use_virtcon_coordinator ? queued_virtcon_requests : queued_primary_requests;
+    }
   };
 
-  // Called by OpenVirtconCoordinator() and OpenCoordinator().
-  void ConnectOrDeferClient(Request request);
+  // Connects `request` to the fake display coordinator if the coordinator is
+  // available, or queue `request` and defer it until the coordinator is
+  // available.
+  //
+  // Must be called from `state_->dispatcher` thread.
+  void ConnectOrDeferClient(OpenCoordinatorRequest request);
 
-  // Must be called from main dispatcher thread.
-  static void ConnectClient(Request request, const std::shared_ptr<State>& state);
+  // Release the current coordinator and connects it to the next queued request
+  // of the same request type specified by `use_virtcon_coordinator` if there
+  // exists any queued request.
+  //
+  // The fake coordinator must be valid and claimed by the client about to
+  // release the coordinator.
+  // Must be called from `state->dispatcher` thread.
+  static void ReleaseCoordinatorAndConnectToNextQueuedClient(bool use_virtcon_coordinator,
+                                                             std::shared_ptr<State> state);
+
+  // Connects `request` to the fake display coordinator.
+  //
+  // The fake coordinator must be valid and not yet claimed by other clients.
+  // Must be called from `state->dispatcher` thread.
+  static void ConnectClient(OpenCoordinatorRequest request, const std::shared_ptr<State>& state);
 
   std::shared_ptr<State> state_;
-
-  fidl::BindingSet<fuchsia::hardware::display::Provider> bindings_;
-
-  FXL_DISALLOW_COPY_ASSIGN_AND_MOVE(ProviderService);
 };
 
-}  // namespace fake_display
+}  // namespace display
 
 #endif  // SRC_GRAPHICS_DISPLAY_TESTING_COORDINATOR_PROVIDER_FAKE_SERVICE_H_
