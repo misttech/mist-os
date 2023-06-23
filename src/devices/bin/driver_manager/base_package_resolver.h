@@ -28,12 +28,11 @@ class BasePackageResolver : public PackageResolverInterface {
   // Connects to the base package resolver service if not already connected.
   zx_status_t ConnectToResolverService();
 
-  // Creates the directory client for a fuchsia-pkg:// |package_url|.
-  zx::result<fidl::WireSyncClient<fuchsia_io::Directory>> Resolve(
-      const component::FuchsiaPkgUrl& package_url);
+  // Returns a resolved component for a fuchsia-pkg:// |component_url|.
+  zx::result<fidl::WireSyncClient<fuchsia_io::Directory>> Resolve(const std::string& component_url);
 
   fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args_;
-  fidl::WireSyncClient<fuchsia_pkg::PackageResolver> resolver_client_;
+  fidl::WireSyncClient<fuchsia_component_resolution::Resolver> resolver_client_;
 };
 }  // namespace internal
 

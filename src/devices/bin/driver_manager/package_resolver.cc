@@ -26,7 +26,7 @@ zx::result<std::unique_ptr<Driver>> PackageResolver::FetchDriver(const std::stri
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  zx::result package_dir_result = Resolve(parsed_url);
+  zx::result package_dir_result = Resolve(parsed_url.ToString());
   if (!package_dir_result.is_ok()) {
     LOGF(ERROR, "Failed to resolve package url %s, err %d", parsed_url.ToString().c_str(),
          package_dir_result.status_value());
@@ -85,8 +85,8 @@ zx::result<std::unique_ptr<Driver>> PackageResolver::FetchDriver(const std::stri
 }
 
 zx_status_t PackageResolver::ConnectToResolverService() {
-  zx::result client_end =
-      component::Connect<fuchsia_pkg::PackageResolver>("/svc/fuchsia.pkg.PackageResolver-full");
+  zx::result client_end = component::Connect<fuchsia_component_resolution::Resolver>(
+      "/svc/fuchsia.component.resolution.Resolver-full");
   if (client_end.is_error()) {
     return client_end.error_value();
   }
@@ -95,7 +95,7 @@ zx_status_t PackageResolver::ConnectToResolverService() {
 }
 
 zx::result<fidl::WireSyncClient<fio::Directory>> PackageResolver::Resolve(
-    const component::FuchsiaPkgUrl& package_url) {
+    const std::string& component_url) {
   if (!resolver_client_.is_valid()) {
     zx_status_t status = ConnectToResolverService();
     if (status != ZX_OK) {
@@ -103,42 +103,43 @@ zx::result<fidl::WireSyncClient<fio::Directory>> PackageResolver::Resolve(
       return zx::error(status);
     }
   }
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
 
   // TODO(fxbug.dev/123042) This is synchronous for now so we can get the proof of concept working.
   // Eventually we will want to do this asynchronously.
-  fidl::WireResult result = resolver_client_->Resolve(
-      ::fidl::StringView(fidl::StringView::FromExternal(package_url.package_path())),
-      std::move(endpoints->server));
+  fidl::WireResult result =
+      resolver_client_->Resolve(::fidl::StringView(fidl::StringView::FromExternal(component_url)));
   if (!result.ok() || result->is_error()) {
     LOGF(ERROR, "Failed to resolve package");
     if (!result.ok()) {
       return zx::error(ZX_ERR_INTERNAL);
     } else {
       switch (result->error_value()) {
-        case fuchsia_pkg::wire::ResolveError::kIo:
+        case fuchsia_component_resolution::wire::ResolverError::kIo:
           return zx::error(ZX_ERR_IO);
-        case fuchsia_pkg::wire::ResolveError::kAccessDenied:
-          return zx::error(ZX_ERR_ACCESS_DENIED);
-        case fuchsia_pkg::wire::ResolveError::kRepoNotFound:
+        case fuchsia_component_resolution::wire::ResolverError::kManifestNotFound:
           return zx::error(ZX_ERR_NOT_FOUND);
-        case fuchsia_pkg::wire::ResolveError::kPackageNotFound:
+        case fuchsia_component_resolution::wire::ResolverError::kPackageNotFound:
           return zx::error(ZX_ERR_NOT_FOUND);
-        case fuchsia_pkg::wire::ResolveError::kUnavailableBlob:
+        case fuchsia_component_resolution::wire::ResolverError::kResourceUnavailable:
           return zx::error(ZX_ERR_UNAVAILABLE);
-        case fuchsia_pkg::wire::ResolveError::kInvalidUrl:
+        case fuchsia_component_resolution::wire::ResolverError::kInvalidManifest:
           return zx::error(ZX_ERR_INVALID_ARGS);
-        case fuchsia_pkg::wire::ResolveError::kNoSpace:
+        case fuchsia_component_resolution::wire::ResolverError::kInvalidArgs:
+          return zx::error(ZX_ERR_INVALID_ARGS);
+        case fuchsia_component_resolution::wire::ResolverError::kInvalidAbiRevision:
+          return zx::error(ZX_ERR_INVALID_ARGS);
+        case fuchsia_component_resolution::wire::ResolverError::kNoSpace:
           return zx::error(ZX_ERR_NO_SPACE);
+        case fuchsia_component_resolution::wire::ResolverError::kNotSupported:
+          return zx::error(ZX_ERR_NOT_SUPPORTED);
+        case fuchsia_component_resolution::wire::ResolverError::kAbiRevisionNotFound:
+          return zx::error(ZX_ERR_NOT_FOUND);
         default:
           return zx::error(ZX_ERR_INTERNAL);
       }
     }
   }
-  return zx::ok(fidl::WireSyncClient(std::move(endpoints->client)));
+  return zx::ok(fidl::WireSyncClient(std::move(result.value()->component.package().directory())));
 }
 
 zx::result<zx::vmo> PackageResolver::LoadDriver(

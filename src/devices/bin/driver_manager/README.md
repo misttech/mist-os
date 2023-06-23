@@ -23,7 +23,7 @@ Driver Manager has two sources of drivers identified by `fuchsia-pkg://` URLs:
   1. the base resolver
   2. the full resolver, if ephemeral drivers are enabled
 
-Both the base resolver and full resolver provide package directories using the
-`fuchsia.pkg/PackageResolver` FIDL interface. To disambiguate these sources, Driver Manager
-consumes the base resolver capability as `fuchsia.pkg/PackageResolver-base` and the full resolver
-capability as `fuchsia.pkg/PackageResolver-full`.
+Both the base resolver and full resolver resolve components using the
+`fuchsia.component.resolution/Resolver` FIDL interface. To disambiguate these sources, Driver Manager
+consumes the base resolver capability as `fuchsia.component.resolution/Resolver-base` and the full resolver
+capability as `fuchsia.component.resolution/Resolver-full`.

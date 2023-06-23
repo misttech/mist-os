@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
+#include <fidl/fuchsia.component.resolution/cpp/wire.h>
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.diagnostics/cpp/fidl.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.driver.test/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
-#include <fidl/fuchsia.pkg/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/dispatcher.h>
 #include <lib/component/incoming/cpp/clone.h>
@@ -212,34 +212,82 @@ class FakeRootJob final : public fidl::WireServer<fuchsia_kernel::RootJob> {
   }
 };
 
-class FakeFullPackageResolver final : public fidl::WireServer<fuchsia_pkg::PackageResolver> {
+class FakeFullComponentResolver final
+    : public fidl::WireServer<fuchsia_component_resolution::Resolver> {
   void Resolve(ResolveRequestView request, ResolveCompleter::Sync& completer) override {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    if (endpoints.is_error()) {
+      FX_SLOG(ERROR, "FakeBaseComponentResolver failed to create directory endpoints");
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
+    }
+
     auto status = fdio_open("/pkg",
                             static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory |
                                                   fuchsia_io::wire::OpenFlags::kRightReadable |
                                                   fuchsia_io::wire::OpenFlags::kRightExecutable),
-                            request->dir.TakeChannel().release());
+                            endpoints->server.TakeChannel().release());
     if (status != ZX_OK) {
-      completer.ReplyError(fuchsia_pkg::wire::ResolveError::kInternal);
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
       return;
     }
 
-    auto resolution_context = fuchsia_pkg::wire::ResolutionContext({});
-    completer.ReplySuccess(resolution_context);
+    auto file = fidl::CreateEndpoints<fuchsia_io::File>();
+    if (file.is_error()) {
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
+      return;
+    }
+    std::string_view url = request->component_url.get();
+    auto i = url.find("meta/");
+    if (i == std::string::npos) {
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
+      return;
+    }
+    auto relative_path = url.substr(i);
+    status = fdio_open_at(endpoints->client.channel().get(), std::string(relative_path).data(),
+                          static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable),
+                          file->server.channel().release());
+    if (status != ZX_OK) {
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
+      return;
+    }
+    fidl::WireResult result =
+        fidl::WireCall(file->client)->GetBackingMemory(fuchsia_io::wire::VmoFlags::kRead);
+    if (!result.ok()) {
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
+      return;
+    }
+    auto& response = result.value();
+    if (response.is_error()) {
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
+      return;
+    }
+    zx::vmo& vmo = response.value()->vmo;
+    uint64_t size;
+    status = vmo.get_prop_content_size(&size);
+    if (status != ZX_OK) {
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
+    }
+
+    fidl::Arena arena;
+    auto package = fuchsia_component_resolution::wire::Package::Builder(arena)
+                       .directory(std::move(endpoints->client))
+                       .Build();
+    auto component = fuchsia_component_resolution::wire::Component::Builder(arena)
+                         .url(request->component_url)
+                         .decl(fuchsia_mem::wire::Data::WithBuffer(arena,
+                                                                   fuchsia_mem::wire::Buffer{
+                                                                       .vmo = std::move(vmo),
+                                                                       .size = size,
+                                                                   }))
+                         .package(package)
+                         .Build();
+    completer.ReplySuccess(component);
   }
 
   void ResolveWithContext(ResolveWithContextRequestView request,
                           ResolveWithContextCompleter::Sync& completer) override {
-    FX_SLOG(ERROR, "ResolveWithContext is not yet implemented in FakeFullPackageResolver");
-    completer.ReplyError(fuchsia_pkg::wire::ResolveError::kInternal);
-  }
-
-  void GetHash(GetHashRequestView request, GetHashCompleter::Sync& completer) override {
-    // Even given the same URL, GetHash is not guaranteed to return the hash of the previously
-    // resolved package (e.g. the package repository could have been updated in between calls).
-    // Clients should obtain the package's hash by reading the package's meta entry as a file.
-    FX_SLOG(ERROR, "GetHash is not implemented in FakeFullPackageResolver");
-    completer.ReplyError(ZX_ERR_INTERNAL);
+    FX_SLOG(ERROR, "ResolveWithContext is not yet implemented in FakeFullComponentResolver");
+    completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
   }
 };
 
@@ -423,8 +471,9 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       return;
     }
 
-    result = outgoing_->AddProtocol<fuchsia_pkg::PackageResolver>(
-        std::make_unique<FakeFullPackageResolver>(), "fuchsia.pkg.PackageResolver-full");
+    result = outgoing_->AddProtocol<fuchsia_component_resolution::Resolver>(
+        std::make_unique<FakeFullComponentResolver>(),
+        "fuchsia.component.resolution.Resolver-full");
     if (result.is_error()) {
       completer.Reply(result.take_error());
       return;

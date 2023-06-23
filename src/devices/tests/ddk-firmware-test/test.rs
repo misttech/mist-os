@@ -5,7 +5,10 @@
 use {
     anyhow::Error,
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
+    fidl::endpoints::{create_proxy, ClientEnd, Proxy},
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
+    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
+    fuchsia_async::Task,
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
     },
@@ -72,37 +75,48 @@ impl DirectoryEntry for FakePackageVariant {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
 }
-
-struct FakeBasePackageResolver {
-    base_packages: HashMap<String, Arc<dyn DirectoryEntry>>,
+struct FakeBaseComponentResolver {
+    base_packages: HashMap<String, fio::DirectoryProxy>,
 }
 
-impl FakeBasePackageResolver {
-    pub fn new(base_packages: HashMap<String, Arc<dyn DirectoryEntry>>) -> Self {
+impl FakeBaseComponentResolver {
+    pub fn new(base_packages: HashMap<String, fio::DirectoryProxy>) -> Self {
         Self { base_packages }
     }
 
     pub async fn handle_request_stream(
         self: Arc<Self>,
-        mut stream: fpkg::PackageResolverRequestStream,
+        mut stream: fresolution::ResolverRequestStream,
     ) {
-        while let Some(req) =
-            stream.try_next().await.expect("read fuchsia.pkg/PackageResolver request stream")
+        while let Some(req) = stream
+            .try_next()
+            .await
+            .expect("read fuchsia.component.resolution/Resolver request stream")
         {
             match req {
-                fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } => {
-                    let Some(pkg) = self.base_packages.get(&package_url) else {
-                        panic!("FakeBasePackageResolver resolve unknown package {package_url}");
+                fresolution::ResolverRequest::Resolve { component_url, responder } => {
+                    let pkg = match self.base_packages.get(&component_url) {
+                        Some(proxy) => {
+                            let proxy_clone = fuchsia_fs::directory::clone_no_describe(proxy, None)
+                                .expect("failed to clone");
+                            ClientEnd::new(proxy_clone.into_channel().unwrap().into_zx_channel())
+                        }
+                        None => panic!(
+                            "FakeBaseComponentResolver resolve unknown component {component_url}"
+                        ),
                     };
-                    let () = pkg.clone().open(
-                        ExecutionScope::new(),
-                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-                        vfs::path::Path::dot(),
-                        dir.into_channel().into(),
-                    );
-                    let () = responder
-                        .send(Ok(&fpkg::ResolutionContext { bytes: vec![] }))
-                        .expect("send resolve response");
+                    responder
+                        .send(Ok(fresolution::Component {
+                            decl: Some(fmem::Data::Bytes(
+                                fidl::persist(&fdecl::Component::default()).unwrap(),
+                            )),
+                            package: Some(fresolution::Package {
+                                directory: Some(pkg),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        }))
+                        .expect("error sending response");
                 }
                 req => panic!("unexpected fuchsia.pkg/PackageResolver request {req:?}"),
             }
@@ -110,51 +124,50 @@ impl FakeBasePackageResolver {
     }
 }
 
+fn serve_vfs_dir(
+    root: Arc<impl DirectoryEntry>,
+    server_end: ServerEnd<fio::NodeMarker>,
+) -> Task<()> {
+    let fs_scope = ExecutionScope::new();
+    root.open(
+        fs_scope.clone(),
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        vfs::path::Path::dot(),
+        server_end,
+    );
+
+    Task::spawn(async move { fs_scope.wait().await })
+}
+
 async fn serve_fake_filesystem(
-    base_manifest: Arc<VmoFile>,
-    base_packages: HashMap<String, Arc<dyn DirectoryEntry>>,
+    base_packages: HashMap<String, fio::DirectoryProxy>,
     handles: LocalComponentHandles,
 ) -> Result<(), anyhow::Error> {
-    let fs_scope = vfs::execution_scope::ExecutionScope::new();
     let root: Directory = vfs::pseudo_directory! {
         "svc" => vfs::pseudo_directory! {
-            "fuchsia.pkg.PackageResolver-base" => vfs::service::host(move |stream| {
+            "fuchsia.component.resolution.Resolver-base" => vfs::service::host(move |stream| {
                 let base_packages = base_packages.clone();
-                Arc::new(FakeBasePackageResolver::new(base_packages)).handle_request_stream(stream)
+                Arc::new(FakeBaseComponentResolver::new(base_packages)).handle_request_stream(stream)
             }
             ),
         },
         "boot" => vfs::pseudo_directory! {
             "meta" => vfs::pseudo_directory! {},
-            "config" => vfs::pseudo_directory! {
-              "driver_index" => vfs::pseudo_directory! {
-                "base_driver_manifest" => base_manifest
-              }
-            },
         },
     };
-    root.open(
-        fs_scope.clone(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        vfs::path::Path::dot(),
-        ServerEnd::new(handles.outgoing_dir.into_channel()),
-    );
-    fs_scope.wait().await;
+    serve_vfs_dir(root, ServerEnd::new(handles.outgoing_dir.into_channel())).await;
     Ok::<(), anyhow::Error>(())
 }
 
 async fn create_realm(
-    base_manifest: Arc<VmoFile>,
-    base_packages: HashMap<String, Arc<dyn DirectoryEntry>>,
+    base_packages: HashMap<String, fio::DirectoryProxy>,
 ) -> Result<fuchsia_component_test::RealmInstance, Error> {
     let builder = RealmBuilder::new().await?;
 
     let fake_filesystem = builder
         .add_local_child(
             "fake_filesystem",
-            move |h: LocalComponentHandles| {
-                serve_fake_filesystem(base_manifest.clone(), base_packages.clone(), h).boxed()
-            },
+            move |h: LocalComponentHandles| serve_fake_filesystem(base_packages.clone(), h).boxed(),
             ChildOptions::new().eager(),
         )
         .await
@@ -171,7 +184,9 @@ async fn create_realm(
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.pkg.PackageResolver-base"))
+                .capability(Capability::protocol_by_name(
+                    "fuchsia.component.resolution.Resolver-base",
+                ))
                 .capability(Capability::directory("boot").path("/boot").rights(fio::R_STAR_DIR))
                 .from(&fake_filesystem)
                 .to(&driver_manager),
@@ -239,12 +254,22 @@ async fn load_package_firmware_test() -> Result<(), Error> {
         ),
     );
 
-    let base_packages = HashMap::from([(
-        "fuchsia-pkg://fuchsia.com/my-package".to_owned(),
-        Arc::new(my_package) as Arc<dyn DirectoryEntry>,
-    )]);
+    let (config_client, config_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let _config_task = serve_vfs_dir(
+        vfs::pseudo_directory! {
+            "config" => vfs::pseudo_directory! { "base-driver-manifest.json" => base_manifest },
+        },
+        ServerEnd::new(config_server.into_channel()),
+    );
 
-    let instance = create_realm(base_manifest, base_packages).await?;
+    let (pkg_client, pkg_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let _pkg_task = serve_vfs_dir(my_package.into(), ServerEnd::new(pkg_server.into_channel()));
+    let base_packages = HashMap::from([
+        ("fuchsia-pkg://fuchsia.com/driver-manager-base-config".to_owned(), config_client),
+        ("fuchsia-pkg://fuchsia.com/my-package".to_owned(), pkg_client),
+    ]);
+
+    let instance = create_realm(base_packages).await?;
 
     // This is unused but connecting to it causes DriverManager to start.
     let _admin = instance

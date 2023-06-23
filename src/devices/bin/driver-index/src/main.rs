@@ -5,12 +5,12 @@
 use {
     crate::composite_node_spec_manager::CompositeNodeSpecManager,
     crate::match_common::{node_to_device_property, node_to_device_property_no_autobind},
-    crate::resolved_driver::{load_driver, DriverPackageType, ResolvedDriver},
+    crate::resolved_driver::{load_boot_driver, DriverPackageType, ResolvedDriver},
     anyhow::{self, Context},
     bind::interpreter::decode_bind_rules::DecodedRules,
     driver_index_config::Config,
-    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
-    fidl_fuchsia_driver_index as fdi,
+    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_driver_development as fdd,
+    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi,
     fidl_fuchsia_driver_index::{DriverIndexRequest, DriverIndexRequestStream},
     fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_component::client,
@@ -82,7 +82,7 @@ async fn load_boot_drivers(
     {
         let url_string = "fuchsia-boot:///#meta/".to_string() + &entry.name;
         let url = url::Url::parse(&url_string)?;
-        let driver = load_driver(&dir, url, DriverPackageType::Boot, None).await;
+        let driver = load_boot_driver(&dir, url, DriverPackageType::Boot, None).await;
         if let Err(e) = driver {
             tracing::error!("Failed to load boot driver: {}: {}", url_string, e);
             continue;
@@ -127,7 +127,7 @@ struct Indexer {
     // Contains the ephemeral drivers. This is wrapped in a RefCell since the
     // ephemeral drivers are added after the driver index server has started
     // through the FIDL API, fuchsia.driver.registrar.Register.
-    ephemeral_drivers: RefCell<HashMap<fidl_fuchsia_pkg::PackageUrl, ResolvedDriver>>,
+    ephemeral_drivers: RefCell<HashMap<url::Url, ResolvedDriver>>,
 }
 
 impl Indexer {
@@ -310,10 +310,15 @@ impl Indexer {
     async fn register_driver(
         &self,
         pkg_url: fidl_fuchsia_pkg::PackageUrl,
-        resolver: &fidl_fuchsia_pkg::PackageResolverProxy,
+        resolver: &fresolution::ResolverProxy,
     ) -> Result<(), i32> {
+        let component_url = url::Url::parse(&pkg_url.url).map_err(|e| {
+            tracing::error!("Couldn't parse driver url: {}: error: {}", &pkg_url.url, e);
+            Status::ADDRESS_UNREACHABLE.into_raw()
+        })?;
+
         for boot_driver in self.boot_repo.iter() {
-            if boot_driver.component_url.as_str() == pkg_url.url.as_str() {
+            if boot_driver.component_url == component_url {
                 tracing::warn!("Driver being registered already exists in boot list.");
                 return Err(Status::ALREADY_EXISTS.into_raw());
             }
@@ -322,7 +327,7 @@ impl Indexer {
         match self.base_repo.borrow().deref() {
             BaseRepo::Resolved(resolved_base_drivers) => {
                 for base_driver in resolved_base_drivers {
-                    if base_driver.component_url.as_str() == pkg_url.url.as_str() {
+                    if base_driver.component_url == component_url {
                         tracing::warn!("Driver being registered already exists in base list.");
                         return Err(Status::ALREADY_EXISTS.into_raw());
                     }
@@ -331,15 +336,9 @@ impl Indexer {
             _ => (),
         };
 
-        let url = match url::Url::parse(&pkg_url.url) {
-            Ok(u) => Ok(u),
-            Err(e) => {
-                tracing::error!("Couldn't parse driver url: {}: error: {}", &pkg_url.url, e);
-                Err(Status::ADDRESS_UNREACHABLE.into_raw())
-            }
-        }?;
-
-        let resolve = ResolvedDriver::resolve(url, &resolver, DriverPackageType::Universe).await;
+        let resolve =
+            ResolvedDriver::resolve(component_url.clone(), &resolver, DriverPackageType::Universe)
+                .await;
 
         if resolve.is_err() {
             return Err(resolve.err().unwrap().into_raw());
@@ -351,12 +350,12 @@ impl Indexer {
         composite_node_spec_manager.new_driver_available(resolved_driver.clone());
 
         let mut ephemeral_drivers = self.ephemeral_drivers.borrow_mut();
-        let existing = ephemeral_drivers.insert(pkg_url.clone(), resolved_driver);
+        let existing = ephemeral_drivers.insert(component_url.clone(), resolved_driver);
 
         if let Some(existing_driver) = existing {
             tracing::info!("Updating existing ephemeral driver {}.", existing_driver);
         } else {
-            tracing::info!("Registered driver successfully: {}.", pkg_url.url);
+            tracing::info!("Registered driver successfully: {}.", component_url);
         }
 
         Ok(())
@@ -471,7 +470,7 @@ async fn run_driver_development_server(
 async fn run_driver_registrar_server(
     indexer: Rc<Indexer>,
     stream: fdr::DriverRegistrarRequestStream,
-    full_resolver: &Option<fidl_fuchsia_pkg::PackageResolverProxy>,
+    full_resolver: &Option<fresolution::ResolverProxy>,
 ) -> Result<(), anyhow::Error> {
     stream
         .map(|result| result.context("failed request"))
@@ -551,7 +550,7 @@ async fn run_index_server(
 async fn load_base_drivers(
     indexer: Rc<Indexer>,
     boot: &fio::DirectoryProxy,
-    resolver: &fidl_fuchsia_pkg::PackageResolverProxy,
+    resolver: &fresolution::ResolverProxy,
     eager_drivers: &HashSet<url::Url>,
     disabled_drivers: &HashSet<url::Url>,
 ) -> Result<(), anyhow::Error> {
@@ -575,7 +574,7 @@ async fn load_base_drivers(
 
 async fn load_drivers(
     manifest: fio::FileProxy,
-    resolver: &fidl_fuchsia_pkg::PackageResolverProxy,
+    resolver: &fresolution::ResolverProxy,
     eager_drivers: &HashSet<url::Url>,
     disabled_drivers: &HashSet<url::Url>,
 ) -> Result<Vec<ResolvedDriver>, anyhow::Error> {
@@ -627,8 +626,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let full_resolver = if config.enable_ephemeral_drivers {
         Some(
-            client::connect_to_protocol_at_path::<fidl_fuchsia_pkg::PackageResolverMarker>(
-                "/svc/fuchsia.pkg.PackageResolver-full",
+            client::connect_to_protocol_at_path::<fresolution::ResolverMarker>(
+                "/svc/fuchsia.component.resolution.Resolver-full",
             )
             .context("Failed to connect to full package resolver")?,
         )
@@ -679,10 +678,11 @@ async fn main() -> Result<(), anyhow::Error> {
     let (res1, _) = futures::future::join(
         async {
             if should_load_base_drivers {
-                let base_resolver = client::connect_to_protocol_at_path::<
-                    fidl_fuchsia_pkg::PackageResolverMarker,
-                >("/svc/fuchsia.pkg.PackageResolver-base")
-                .context("Failed to connect to base package resolver")?;
+                let base_resolver =
+                    client::connect_to_protocol_at_path::<fresolution::ResolverMarker>(
+                        "/svc/fuchsia.component.resolution.Resolver-base",
+                    )
+                    .context("Failed to connect to base component resolver")?;
                 load_base_drivers(
                     index.clone(),
                     &boot,
@@ -736,7 +736,8 @@ mod tests {
             interpreter::decode_bind_rules::DecodedRules,
             parser::bind_library::ValueType,
         },
-        fidl_fuchsia_data as fdata, fidl_fuchsia_pkg as fpkg,
+        fidl::endpoints::{ClientEnd, Proxy},
+        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_mem as fmem,
         std::collections::HashMap,
     };
 
@@ -791,53 +792,54 @@ mod tests {
         return driver_infos;
     }
 
+    async fn resolve_component_from_namespace(
+        component_url: &str,
+    ) -> Result<fresolution::Component, anyhow::Error> {
+        let (client_end, server_end) = fidl::endpoints::create_endpoints();
+        fuchsia_fs::directory::open_channel_in_namespace(
+            "/pkg",
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+            server_end,
+        )?;
+        let proxy = client_end.into_proxy()?;
+        let component_url = url::Url::parse(component_url)?;
+        let decl_file = fuchsia_fs::directory::open_file_no_describe(
+            &proxy,
+            component_url.fragment().unwrap(),
+            fio::OpenFlags::RIGHT_READABLE,
+        )?;
+        let decl: fdecl::Component = fuchsia_fs::file::read_fidl(&decl_file).await?;
+        Ok(fresolution::Component {
+            decl: Some(fmem::Data::Bytes(fidl::persist(&decl).unwrap())),
+            package: Some(fresolution::Package {
+                directory: Some(ClientEnd::new(proxy.into_channel().unwrap().into())),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+    }
+
     async fn run_resolver_server(
-        stream: fidl_fuchsia_pkg::PackageResolverRequestStream,
+        stream: fresolution::ResolverRequestStream,
     ) -> Result<(), anyhow::Error> {
         stream
             .map(|result| result.context("failed request"))
             .try_for_each(|request| async {
                 match request {
-                    fidl_fuchsia_pkg::PackageResolverRequest::Resolve {
-                        package_url: _,
-                        dir,
-                        responder,
-                    } => {
-                        let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY;
-                        fuchsia_fs::directory::open_channel_in_namespace("/pkg", flags, dir)
-                            .unwrap();
-                        responder
-                            .send(Ok(&fidl_fuchsia_pkg::ResolutionContext { bytes: vec![] }))
-                            .context("error sending response")?;
+                    fresolution::ResolverRequest::Resolve { component_url, responder } => {
+                        let component = resolve_component_from_namespace(&component_url).await?;
+                        responder.send(Ok(component)).context("error sending response")?;
                     }
-                    fidl_fuchsia_pkg::PackageResolverRequest::ResolveWithContext {
-                        package_url: _,
+                    fresolution::ResolverRequest::ResolveWithContext {
+                        component_url: _,
                         context: _,
-                        dir: _,
                         responder,
                     } => {
                         tracing::error!(
                             "ResolveWithContext is not currently implemented in driver-index"
                         );
                         responder
-                            .send(Err(fidl_fuchsia_pkg::ResolveError::Internal))
-                            .context("error sending response")?;
-                    }
-                    fidl_fuchsia_pkg::PackageResolverRequest::GetHash {
-                        package_url: _,
-                        responder,
-                    } => {
-                        // This package hash is arbitrary and is not tested for
-                        // driver index's tests, however, `GetHash` must return
-                        // something in order to avoid failing to load
-                        // driver packages.
-                        responder
-                            .send(Ok(&fpkg::BlobId {
-                                merkle_root: [
-                                    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-                                    19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
-                                ],
-                            }))
+                            .send(Err(fresolution::ResolverError::Internal))
                             .context("error sending response")?;
                     }
                 }
@@ -883,8 +885,7 @@ mod tests {
     #[fuchsia::test]
     async fn read_from_json() {
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
@@ -1502,7 +1503,7 @@ mod tests {
         let pkg = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
             .context("Failed to open /pkg")
             .unwrap();
-        let fallback_driver = load_driver(&pkg, driver_url, DriverPackageType::Boot, None)
+        let fallback_driver = load_boot_driver(&pkg, driver_url, DriverPackageType::Boot, None)
             .await
             .unwrap()
             .expect("Fallback driver was not loaded");
@@ -1540,8 +1541,7 @@ mod tests {
         .unwrap();
 
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
 
         let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved(std::vec![]), false));
 
@@ -1615,8 +1615,7 @@ mod tests {
         .unwrap();
 
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
 
         let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved(std::vec![]), false));
 
@@ -3255,8 +3254,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fdr::DriverRegistrarMarker>().unwrap();
 
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
 
         let full_resolver = Some(resolver);
 
@@ -3330,8 +3328,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fdr::DriverRegistrarMarker>().unwrap();
 
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
 
         let (development_proxy, development_stream) =
             fidl::endpoints::create_proxy_and_stream::<fdd::DriverIndexMarker>().unwrap();
@@ -3404,8 +3401,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fdr::DriverRegistrarMarker>().unwrap();
 
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
 
         let full_resolver = Some(resolver);
 
@@ -3469,8 +3465,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fdr::DriverRegistrarMarker>().unwrap();
 
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
 
         let full_resolver = Some(resolver);
 

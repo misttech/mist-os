@@ -89,12 +89,7 @@ zx::result<std::unique_ptr<Driver>> BasePackageResolver::FetchDriver(
 zx::result<fidl::WireSyncClient<fio::Directory>> BasePackageResolver::GetPackageDir(
     const std::string& url) {
   if (component::FuchsiaPkgUrl::IsFuchsiaPkgScheme(url)) {
-    component::FuchsiaPkgUrl parsed_url;
-    if (!parsed_url.Parse(url)) {
-      LOGF(ERROR, "Failed to parse fuchsia url: %s", url.c_str());
-      return zx::error(ZX_ERR_INTERNAL);
-    }
-    return Resolve(parsed_url);
+    return Resolve(url);
   }
 
   zx::result base_path_result = GetBasePathFromUrl(url);
@@ -120,7 +115,7 @@ zx::result<fidl::WireSyncClient<fio::Directory>> BasePackageResolver::GetPackage
 }
 
 zx::result<fidl::WireSyncClient<fio::Directory>> BasePackageResolver::Resolve(
-    const component::FuchsiaPkgUrl& package_url) {
+    const std::string& component_url) {
   if (!resolver_client_.is_valid()) {
     if (zx_status_t status = ConnectToResolverService(); status != ZX_OK) {
       LOGF(ERROR, "Failed to connect to base package resolver service %s",
@@ -128,47 +123,48 @@ zx::result<fidl::WireSyncClient<fio::Directory>> BasePackageResolver::Resolve(
       return zx::error(status);
     }
   }
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
 
   // TODO(fxbug.dev/123042) This is synchronous for now so we can get the proof of concept working.
   // Eventually we will want to do this asynchronously.
-  auto result = resolver_client_->Resolve(
-      fidl::StringView(fidl::StringView::FromExternal(package_url.package_path())),
-      std::move(endpoints->server));
+  auto result =
+      resolver_client_->Resolve(fidl::StringView(fidl::StringView::FromExternal(component_url)));
   if (!result.ok() || result->is_error()) {
     LOGF(ERROR, "Failed to resolve base package");
     if (!result.ok()) {
       return zx::error(ZX_ERR_INTERNAL);
     } else {
       switch (result->error_value()) {
-        case fuchsia_pkg::wire::ResolveError::kIo:
+        case fuchsia_component_resolution::wire::ResolverError::kIo:
           return zx::error(ZX_ERR_IO);
-        case fuchsia_pkg::wire::ResolveError::kAccessDenied:
-          return zx::error(ZX_ERR_ACCESS_DENIED);
-        case fuchsia_pkg::wire::ResolveError::kRepoNotFound:
+        case fuchsia_component_resolution::wire::ResolverError::kManifestNotFound:
           return zx::error(ZX_ERR_NOT_FOUND);
-        case fuchsia_pkg::wire::ResolveError::kPackageNotFound:
+        case fuchsia_component_resolution::wire::ResolverError::kPackageNotFound:
           return zx::error(ZX_ERR_NOT_FOUND);
-        case fuchsia_pkg::wire::ResolveError::kUnavailableBlob:
+        case fuchsia_component_resolution::wire::ResolverError::kResourceUnavailable:
           return zx::error(ZX_ERR_UNAVAILABLE);
-        case fuchsia_pkg::wire::ResolveError::kInvalidUrl:
+        case fuchsia_component_resolution::wire::ResolverError::kInvalidManifest:
           return zx::error(ZX_ERR_INVALID_ARGS);
-        case fuchsia_pkg::wire::ResolveError::kNoSpace:
+        case fuchsia_component_resolution::wire::ResolverError::kInvalidArgs:
+          return zx::error(ZX_ERR_INVALID_ARGS);
+        case fuchsia_component_resolution::wire::ResolverError::kInvalidAbiRevision:
+          return zx::error(ZX_ERR_INVALID_ARGS);
+        case fuchsia_component_resolution::wire::ResolverError::kNoSpace:
           return zx::error(ZX_ERR_NO_SPACE);
+        case fuchsia_component_resolution::wire::ResolverError::kNotSupported:
+          return zx::error(ZX_ERR_NOT_SUPPORTED);
+        case fuchsia_component_resolution::wire::ResolverError::kAbiRevisionNotFound:
+          return zx::error(ZX_ERR_NOT_FOUND);
         default:
           return zx::error(ZX_ERR_INTERNAL);
       }
     }
   }
-  return zx::ok(fidl::WireSyncClient(std::move(endpoints->client)));
+  return zx::ok(fidl::WireSyncClient(std::move(result.value()->component.package().directory())));
 }
 
 zx_status_t BasePackageResolver::ConnectToResolverService() {
-  auto client_end =
-      component::Connect<fuchsia_pkg::PackageResolver>("/svc/fuchsia.pkg.PackageResolver-base");
+  auto client_end = component::Connect<fuchsia_component_resolution::Resolver>(
+      "/svc/fuchsia.component.resolution.Resolver-base");
   if (client_end.is_error()) {
     return client_end.error_value();
   }
