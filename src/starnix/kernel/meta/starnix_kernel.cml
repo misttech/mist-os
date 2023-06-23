@@ -50,13 +50,13 @@
                 "fuchsia.posix.socket.packet.Provider",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
         },
         {
             protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.display.singleton.Info",
