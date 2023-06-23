@@ -14,7 +14,7 @@
 
 #include "magma_system_connection.h"
 #include "msd_cc.h"
-#include "zircon_connection.h"
+#include "primary_fidl_server.h"
 
 namespace msd {
 class MagmaSystemBuffer;
@@ -35,7 +35,7 @@ class MagmaSystemDevice {
 
   // Opens a connection to the device. On success, returns the connection handle
   // to be passed to the client.
-  static std::shared_ptr<msd::ZirconConnection> Open(
+  static std::shared_ptr<msd::PrimaryFidlServer> Open(
       std::shared_ptr<MagmaSystemDevice> device, msd_client_id_t client_id,
       fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
       fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification);
@@ -51,7 +51,7 @@ class MagmaSystemDevice {
 
   // Called on driver thread.  |device_handle| may be used by the connection thread for
   // initialization/configuration but should not be retained.
-  void StartConnectionThread(std::shared_ptr<msd::ZirconConnection> platform_connection,
+  void StartConnectionThread(std::shared_ptr<msd::PrimaryFidlServer> fidl_server,
                              fit::function<void(const char*)> set_thread_priority);
 
   // Called on connection thread
@@ -77,7 +77,7 @@ class MagmaSystemDevice {
 
   struct Connection {
     std::thread thread;
-    std::weak_ptr<msd::ZirconConnection> connection;
+    std::weak_ptr<msd::PrimaryFidlServer> server;
   };
 
   std::unique_ptr<std::unordered_map<std::thread::id, Connection>> connection_map_;

@@ -16,7 +16,7 @@
 #include "platform_handle.h"
 #include "platform_port.h"
 #include "platform_semaphore.h"
-#include "src/graphics/lib/magma/src/sys_driver/zircon_connection.h"
+#include "src/graphics/lib/magma/src/sys_driver/primary_fidl_server.h"
 
 #if defined(__Fuchsia__)
 #include "zircon/zircon_platform_connection_client.h"  // nogncheck
@@ -42,7 +42,7 @@ static inline int64_t page_size() { return sysconf(_SC_PAGESIZE); }
 // test thread, we lock the shared data mutex to ensure safety of memory accesses.
 class FlowControlChecker {
  public:
-  FlowControlChecker(std::shared_ptr<msd::ZirconConnection> connection,
+  FlowControlChecker(std::shared_ptr<msd::PrimaryFidlServer> connection,
                      std::shared_ptr<magma::PlatformConnectionClient> client_connection)
       : connection_(connection), client_connection_(client_connection) {}
 
@@ -81,7 +81,7 @@ class FlowControlChecker {
     Release();
   }
 
-  std::shared_ptr<msd::ZirconConnection> connection_;
+  std::shared_ptr<msd::PrimaryFidlServer> connection_;
   std::shared_ptr<magma::PlatformConnectionClient> client_connection_;
   bool flow_control_checked_ = false;
   bool flow_control_skipped_ = false;
@@ -128,7 +128,7 @@ class TestPlatformConnection {
       std::shared_ptr<SharedData> shared_data = std::make_shared<SharedData>());
 
   TestPlatformConnection(std::shared_ptr<magma::PlatformConnectionClient> client_connection,
-                         std::thread ipc_thread, std::shared_ptr<msd::ZirconConnection> connection,
+                         std::thread ipc_thread, std::shared_ptr<msd::PrimaryFidlServer> connection,
                          std::shared_ptr<SharedData> shared_data)
       : client_connection_(client_connection),
         ipc_thread_(std::move(ipc_thread)),
@@ -307,7 +307,7 @@ class TestPlatformConnection {
   void TestNotificationChannel() {
     FlowControlSkip();
 
-    // Notification requests will be sent when the ZirconConnection is created, before this test is
+    // Notification requests will be sent when the:PrimaryFidlServer is created, before this test is
     // called.
 
     {
@@ -470,18 +470,18 @@ class TestPlatformConnection {
   }
 
  private:
-  static void IpcThreadFunc(std::shared_ptr<msd::ZirconConnection> connection) {
-    msd::ZirconConnection::RunLoop(std::move(connection), [](const char* role_profile) {});
+  static void IpcThreadFunc(std::shared_ptr<msd::PrimaryFidlServer> connection) {
+    msd::PrimaryFidlServer::RunLoop(std::move(connection), [](const char* role_profile) {});
   }
 
   std::shared_ptr<magma::PlatformConnectionClient> client_connection_;
   std::thread ipc_thread_;
-  std::shared_ptr<msd::ZirconConnection> connection_;
+  std::shared_ptr<msd::PrimaryFidlServer> connection_;
   msd::FlowControlChecker flow_control_checker_;
   std::shared_ptr<SharedData> shared_data_;
 };
 
-class TestDelegate : public msd::ZirconConnection::Delegate {
+class TestDelegate : public msd::PrimaryFidlServer::Delegate {
  public:
   TestDelegate(std::shared_ptr<SharedData> shared_data) : shared_data_(shared_data) {}
 
@@ -636,7 +636,7 @@ class TestDelegate : public msd::ZirconConnection::Delegate {
   }
 
   magma::Status CreatePerformanceCounterBufferPool(
-      std::unique_ptr<msd::PlatformPerfCountPool> pool) override {
+      std::unique_ptr<msd::PerfCountPoolServer> pool) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
     shared_data_->pool_id = pool->pool_id();
     constexpr uint32_t kTriggerId = 1;
@@ -718,8 +718,8 @@ std::unique_ptr<TestPlatformConnection> TestPlatformConnection::Create(
     return MAGMA_DRETP(nullptr, "Failed to create notification endpoints");
 
   auto connection =
-      msd::ZirconConnection::Create(std::move(delegate), 1u, std::move(endpoints->server),
-                                    std::move(notification_endpoints->server));
+      msd::PrimaryFidlServer::Create(std::move(delegate), 1u, std::move(endpoints->server),
+                                     std::move(notification_endpoints->server));
   if (!connection)
     return MAGMA_DRETP(nullptr, "failed to create PlatformConnection");
 

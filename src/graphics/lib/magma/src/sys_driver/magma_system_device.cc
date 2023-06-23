@@ -20,7 +20,7 @@ uint32_t MagmaSystemDevice::GetDeviceId() {
   return static_cast<uint32_t>(result);
 }
 
-std::shared_ptr<msd::ZirconConnection> MagmaSystemDevice::Open(
+std::shared_ptr<msd::PrimaryFidlServer> MagmaSystemDevice::Open(
     std::shared_ptr<MagmaSystemDevice> device, msd_client_id_t client_id,
     fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
     fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification) {
@@ -28,21 +28,20 @@ std::shared_ptr<msd::ZirconConnection> MagmaSystemDevice::Open(
   if (!msd_connection)
     return MAGMA_DRETP(nullptr, "msd_device_open failed");
 
-  return msd::ZirconConnection::Create(
+  return msd::PrimaryFidlServer::Create(
       std::make_unique<MagmaSystemConnection>(std::move(device), std::move(msd_connection)),
       client_id, std::move(primary), std::move(notification));
 }
 
 void MagmaSystemDevice::StartConnectionThread(
-    std::shared_ptr<msd::ZirconConnection> platform_connection,
+    std::shared_ptr<msd::PrimaryFidlServer> fidl_server,
     fit::function<void(const char*)> set_thread_priority) {
   std::unique_lock<std::mutex> lock(connection_list_mutex_);
 
-  std::thread thread(msd::ZirconConnection::RunLoop, platform_connection,
-                     std::move(set_thread_priority));
+  std::thread thread(msd::PrimaryFidlServer::RunLoop, fidl_server, std::move(set_thread_priority));
 
   connection_map_->insert(std::pair<std::thread::id, Connection>(
-      thread.get_id(), Connection{std::move(thread), platform_connection}));
+      thread.get_id(), Connection{std::move(thread), fidl_server}));
 }
 
 void MagmaSystemDevice::ConnectionClosed(std::thread::id thread_id) {
@@ -65,7 +64,7 @@ void MagmaSystemDevice::Shutdown() {
   lock.unlock();
 
   for (auto& element : *map) {
-    auto locked = element.second.connection.lock();
+    auto locked = element.second.server.lock();
     if (locked) {
       locked->Shutdown();
     }
@@ -93,9 +92,9 @@ magma::Status MagmaSystemDevice::Query(uint64_t id, magma_handle_t* result_buffe
   zx::vmo vmo;
   switch (id) {
     case MAGMA_QUERY_MAXIMUM_INFLIGHT_PARAMS:
-      *result_out = msd::ZirconConnection::kMaxInflightMessages;
+      *result_out = msd::PrimaryFidlServer::kMaxInflightMessages;
       *result_out <<= 32;
-      *result_out |= msd::ZirconConnection::kMaxInflightMemoryMB;
+      *result_out |= msd::PrimaryFidlServer::kMaxInflightMemoryMB;
       return MAGMA_STATUS_OK;
   }
   magma_status_t status = msd_dev()->Query(id, &vmo, result_out);

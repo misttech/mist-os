@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "zircon_connection.h"
+#include "primary_fidl_server.h"
 
 #include <lib/async/cpp/task.h>
 #include <lib/magma/magma_common_defs.h>
@@ -40,9 +40,9 @@ std::optional<int> GetBufferOp(fuchsia_gpu_magma::BufferOp fidl_type) {
 
 namespace msd {
 
-class ZirconPlatformPerfCountPool : public PlatformPerfCountPool {
+class FidlPerfCountPoolServer : public PerfCountPoolServer {
  public:
-  ZirconPlatformPerfCountPool(uint64_t id, zx::channel channel)
+  FidlPerfCountPoolServer(uint64_t id, zx::channel channel)
       : pool_id_(id), server_end_(std::move(channel)) {}
 
   uint64_t pool_id() override { return pool_id_; }
@@ -79,9 +79,9 @@ class ZirconPlatformPerfCountPool : public PlatformPerfCountPool {
   fidl::ServerEnd<fuchsia_gpu_magma::PerformanceCounterEvents> server_end_;
 };
 
-void ZirconConnection::SetError(fidl::CompleterBase* completer, magma_status_t error) {
+void PrimaryFidlServer::SetError(fidl::CompleterBase* completer, magma_status_t error) {
   if (!error_) {
-    error_ = MAGMA_DRET_MSG(error, "ZirconConnection encountered dispatcher error");
+    error_ = MAGMA_DRET_MSG(error, "PrimaryFidlServer encountered dispatcher error");
     if (completer) {
       completer->Close(magma::ToZxStatus(error));
     } else {
@@ -91,9 +91,9 @@ void ZirconConnection::SetError(fidl::CompleterBase* completer, magma_status_t e
   }
 }
 
-bool ZirconConnection::Bind(fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary) {
-  fidl::OnUnboundFn<ZirconConnection> unbind_callback =
-      [](ZirconConnection* self, fidl::UnbindInfo unbind_info,
+bool PrimaryFidlServer::Bind(fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary) {
+  fidl::OnUnboundFn<PrimaryFidlServer> unbind_callback =
+      [](PrimaryFidlServer* self, fidl::UnbindInfo unbind_info,
          fidl::ServerEnd<fuchsia_gpu_magma::Primary> server_channel) {
         // |kDispatcherError| indicates the async loop itself is shutting down,
         // which could only happen when |interface| is being destructed.
@@ -111,7 +111,7 @@ bool ZirconConnection::Bind(fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary)
   return true;
 }
 
-void ZirconConnection::Shutdown() {
+void PrimaryFidlServer::Shutdown() {
   async::PostTask(async_loop()->dispatcher(), [this]() {
     if (server_binding_) {
       server_binding_->Close(ZX_ERR_CANCELED);
@@ -120,33 +120,33 @@ void ZirconConnection::Shutdown() {
   });
 }
 
-bool ZirconConnection::HandleRequest() {
+bool PrimaryFidlServer::HandleRequest() {
   zx_status_t status = async_loop_.Run(zx::time::infinite(), true /* once */);
   if (status != ZX_OK)
     return false;
   return true;
 }
 
-void ZirconConnection::NotificationChannelSend(cpp20::span<uint8_t> data) {
+void PrimaryFidlServer::NotificationChannelSend(cpp20::span<uint8_t> data) {
   zx_status_t status = server_notification_endpoint_.write(
       0, data.data(), static_cast<uint32_t>(data.size()), nullptr, 0);
   if (status != ZX_OK)
     MAGMA_DLOG("Failed writing to channel: %s", zx_status_get_string(status));
 }
-void ZirconConnection::ContextKilled() {
+void PrimaryFidlServer::ContextKilled() {
   async::PostTask(async_loop_.dispatcher(),
                   [this]() { SetError(nullptr, MAGMA_STATUS_CONTEXT_KILLED); });
 }
 
-void ZirconConnection::PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) {
+void PrimaryFidlServer::PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) {
   MAGMA_DASSERT(false);
 }
 
-void ZirconConnection::EnableFlowControl(EnableFlowControlCompleter::Sync& completer) {
+void PrimaryFidlServer::EnableFlowControl(EnableFlowControlCompleter::Sync& completer) {
   flow_control_enabled_ = true;
 }
 
-void ZirconConnection::FlowControl(uint64_t size) {
+void PrimaryFidlServer::FlowControl(uint64_t size) {
   if (!flow_control_enabled_)
     return;
 
@@ -176,11 +176,11 @@ void ZirconConnection::FlowControl(uint64_t size) {
   }
 }
 
-void ZirconConnection::ImportObject2(ImportObject2RequestView request,
-                                     ImportObject2Completer::Sync& completer) {
-  TRACE_DURATION("magma", "ZirconConnection::ImportObject2", "type",
+void PrimaryFidlServer::ImportObject2(ImportObject2RequestView request,
+                                      ImportObject2Completer::Sync& completer) {
+  TRACE_DURATION("magma", "PrimaryFidlServer::ImportObject2", "type",
                  static_cast<uint32_t>(request->object_type));
-  MAGMA_DLOG("ZirconConnection: ImportObject2");
+  MAGMA_DLOG("PrimaryFidlServer: ImportObject2");
 
   auto object_type = ValidateObjectType(request->object_type);
   if (!object_type) {
@@ -204,11 +204,11 @@ void ZirconConnection::ImportObject2(ImportObject2RequestView request,
     SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
 }
 
-void ZirconConnection::ReleaseObject(ReleaseObjectRequestView request,
-                                     ReleaseObjectCompleter::Sync& completer) {
-  TRACE_DURATION("magma", "ZirconConnection::ReleaseObject", "type",
+void PrimaryFidlServer::ReleaseObject(ReleaseObjectRequestView request,
+                                      ReleaseObjectCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "PrimaryFidlServer::ReleaseObject", "type",
                  static_cast<uint32_t>(request->object_type));
-  MAGMA_DLOG("ZirconConnection: ReleaseObject");
+  MAGMA_DLOG("PrimaryFidlServer: ReleaseObject");
   FlowControl();
 
   auto object_type = ValidateObjectType(request->object_type);
@@ -221,10 +221,10 @@ void ZirconConnection::ReleaseObject(ReleaseObjectRequestView request,
     SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
 }
 
-void ZirconConnection::CreateContext(CreateContextRequestView request,
-                                     CreateContextCompleter::Sync& completer) {
-  TRACE_DURATION("magma", "ZirconConnection::CreateContext");
-  MAGMA_DLOG("ZirconConnection: CreateContext");
+void PrimaryFidlServer::CreateContext(CreateContextRequestView request,
+                                      CreateContextCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "PrimaryFidlServer::CreateContext");
+  MAGMA_DLOG("PrimaryFidlServer: CreateContext");
   FlowControl();
 
   magma::Status status = delegate_->CreateContext(request->context_id);
@@ -232,10 +232,10 @@ void ZirconConnection::CreateContext(CreateContextRequestView request,
     SetError(&completer, status.get());
 }
 
-void ZirconConnection::DestroyContext(DestroyContextRequestView request,
-                                      DestroyContextCompleter::Sync& completer) {
-  TRACE_DURATION("magma", "ZirconConnection::DestroyContext");
-  MAGMA_DLOG("ZirconConnection: DestroyContext");
+void PrimaryFidlServer::DestroyContext(DestroyContextRequestView request,
+                                       DestroyContextCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "PrimaryFidlServer::DestroyContext");
+  MAGMA_DLOG("PrimaryFidlServer: DestroyContext");
   FlowControl();
 
   magma::Status status = delegate_->DestroyContext(request->context_id);
@@ -243,9 +243,9 @@ void ZirconConnection::DestroyContext(DestroyContextRequestView request,
     SetError(&completer, status.get());
 }
 
-void ZirconConnection::ExecuteCommand(ExecuteCommandRequestView request,
-                                      ExecuteCommandCompleter::Sync& completer) {
-  TRACE_DURATION("magma", "ZirconConnection::ExecuteCommand");
+void PrimaryFidlServer::ExecuteCommand(ExecuteCommandRequestView request,
+                                       ExecuteCommandCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "PrimaryFidlServer::ExecuteCommand");
   FlowControl();
 
   // TODO(fxbug.dev/92606) - support > 1 command buffer
@@ -294,11 +294,11 @@ void ZirconConnection::ExecuteCommand(ExecuteCommandRequestView request,
     SetError(&completer, status.get());
 }
 
-void ZirconConnection::ExecuteImmediateCommands(
+void PrimaryFidlServer::ExecuteImmediateCommands(
     ExecuteImmediateCommandsRequestView request,
     ExecuteImmediateCommandsCompleter::Sync& completer) {
-  TRACE_DURATION("magma", "ZirconConnection::ExecuteImmediateCommands");
-  MAGMA_DLOG("ZirconConnection: ExecuteImmediateCommands");
+  TRACE_DURATION("magma", "PrimaryFidlServer::ExecuteImmediateCommands");
+  MAGMA_DLOG("PrimaryFidlServer: ExecuteImmediateCommands");
   FlowControl();
 
   magma::Status status = delegate_->ExecuteImmediateCommands(
@@ -308,16 +308,16 @@ void ZirconConnection::ExecuteImmediateCommands(
     SetError(&completer, status.get());
 }
 
-void ZirconConnection::Flush(FlushCompleter::Sync& completer) {
-  TRACE_DURATION("magma", "ZirconConnection::Flush");
-  MAGMA_DLOG("ZirconConnection: Flush");
+void PrimaryFidlServer::Flush(FlushCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "PrimaryFidlServer::Flush");
+  MAGMA_DLOG("PrimaryFidlServer: Flush");
   completer.Reply();
 }
 
-void ZirconConnection::MapBuffer(MapBufferRequestView request,
-                                 MapBufferCompleter::Sync& completer) {
-  TRACE_DURATION("magma", "ZirconConnection::MapBuffer");
-  MAGMA_DLOG("ZirconConnection: MapBufferFIDL");
+void PrimaryFidlServer::MapBuffer(MapBufferRequestView request,
+                                  MapBufferCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "PrimaryFidlServer::MapBuffer");
+  MAGMA_DLOG("PrimaryFidlServer: MapBufferFIDL");
   FlowControl();
 
   if (!request->has_range() || !request->has_hw_va()) {
@@ -334,10 +334,10 @@ void ZirconConnection::MapBuffer(MapBufferRequestView request,
     SetError(&completer, status.get());
 }
 
-void ZirconConnection::UnmapBuffer(UnmapBufferRequestView request,
-                                   UnmapBufferCompleter::Sync& completer) {
-  TRACE_DURATION("magma", "ZirconConnection::UnmapBuffer");
-  MAGMA_DLOG("ZirconConnection: UnmapBufferFIDL");
+void PrimaryFidlServer::UnmapBuffer(UnmapBufferRequestView request,
+                                    UnmapBufferCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "PrimaryFidlServer::UnmapBuffer");
+  MAGMA_DLOG("PrimaryFidlServer: UnmapBufferFIDL");
   FlowControl();
 
   if (!request->has_buffer_id() || !request->has_hw_va()) {
@@ -350,10 +350,10 @@ void ZirconConnection::UnmapBuffer(UnmapBufferRequestView request,
     SetError(&completer, status.get());
 }
 
-void ZirconConnection::BufferRangeOp2(BufferRangeOp2RequestView request,
-                                      BufferRangeOp2Completer::Sync& completer) {
-  TRACE_DURATION("magma", "ZirconConnection::BufferRangeOp2");
-  MAGMA_DLOG("ZirconConnection:::BufferRangeOp2");
+void PrimaryFidlServer::BufferRangeOp2(BufferRangeOp2RequestView request,
+                                       BufferRangeOp2Completer::Sync& completer) {
+  TRACE_DURATION("magma", "PrimaryFidlServer::BufferRangeOp2");
+  MAGMA_DLOG("PrimaryFidlServer:::BufferRangeOp2");
   FlowControl();
 
   std::optional<int> buffer_op = GetBufferOp(request->op);
@@ -370,10 +370,10 @@ void ZirconConnection::BufferRangeOp2(BufferRangeOp2RequestView request,
   }
 }
 
-void ZirconConnection::EnablePerformanceCounterAccess(
+void PrimaryFidlServer::EnablePerformanceCounterAccess(
     EnablePerformanceCounterAccessRequestView request,
     EnablePerformanceCounterAccessCompleter::Sync& completer) {
-  MAGMA_DLOG("ZirconConnection:::EnablePerformanceCounterAccess");
+  MAGMA_DLOG("PrimaryFidlServer:::EnablePerformanceCounterAccess");
   FlowControl();
 
   magma::Status status =
@@ -383,13 +383,13 @@ void ZirconConnection::EnablePerformanceCounterAccess(
   }
 }
 
-void ZirconConnection::IsPerformanceCounterAccessAllowed(
+void PrimaryFidlServer::IsPerformanceCounterAccessAllowed(
     IsPerformanceCounterAccessAllowedCompleter::Sync& completer) {
-  MAGMA_DLOG("ZirconConnection:::IsPerformanceCounterAccessAllowed");
+  MAGMA_DLOG("PrimaryFidlServer:::IsPerformanceCounterAccessAllowed");
   completer.Reply(delegate_->IsPerformanceCounterAccessAllowed());
 }
 
-void ZirconConnection::EnablePerformanceCounters(
+void PrimaryFidlServer::EnablePerformanceCounters(
     EnablePerformanceCountersRequestView request,
     EnablePerformanceCountersCompleter::Sync& completer) {
   FlowControl();
@@ -400,19 +400,19 @@ void ZirconConnection::EnablePerformanceCounters(
   }
 }
 
-void ZirconConnection::CreatePerformanceCounterBufferPool(
+void PrimaryFidlServer::CreatePerformanceCounterBufferPool(
     CreatePerformanceCounterBufferPoolRequestView request,
     CreatePerformanceCounterBufferPoolCompleter::Sync& completer) {
   FlowControl();
-  auto pool = std::make_unique<ZirconPlatformPerfCountPool>(request->pool_id,
-                                                            request->event_channel.TakeChannel());
+  auto pool = std::make_unique<FidlPerfCountPoolServer>(request->pool_id,
+                                                        request->event_channel.TakeChannel());
   magma::Status status = delegate_->CreatePerformanceCounterBufferPool(std::move(pool));
   if (!status) {
     SetError(&completer, status.get());
   }
 }
 
-void ZirconConnection::ReleasePerformanceCounterBufferPool(
+void PrimaryFidlServer::ReleasePerformanceCounterBufferPool(
     ReleasePerformanceCounterBufferPoolRequestView request,
     ReleasePerformanceCounterBufferPoolCompleter::Sync& completer) {
   FlowControl();
@@ -422,7 +422,7 @@ void ZirconConnection::ReleasePerformanceCounterBufferPool(
   }
 }
 
-void ZirconConnection::AddPerformanceCounterBufferOffsetsToPool(
+void PrimaryFidlServer::AddPerformanceCounterBufferOffsetsToPool(
     AddPerformanceCounterBufferOffsetsToPoolRequestView request,
     AddPerformanceCounterBufferOffsetsToPoolCompleter::Sync& completer) {
   FlowControl();
@@ -435,7 +435,7 @@ void ZirconConnection::AddPerformanceCounterBufferOffsetsToPool(
   }
 }
 
-void ZirconConnection::RemovePerformanceCounterBufferFromPool(
+void PrimaryFidlServer::RemovePerformanceCounterBufferFromPool(
     RemovePerformanceCounterBufferFromPoolRequestView request,
     RemovePerformanceCounterBufferFromPoolCompleter::Sync& completer) {
   FlowControl();
@@ -446,8 +446,8 @@ void ZirconConnection::RemovePerformanceCounterBufferFromPool(
   }
 }
 
-void ZirconConnection::DumpPerformanceCounters(DumpPerformanceCountersRequestView request,
-                                               DumpPerformanceCountersCompleter::Sync& completer) {
+void PrimaryFidlServer::DumpPerformanceCounters(DumpPerformanceCountersRequestView request,
+                                                DumpPerformanceCountersCompleter::Sync& completer) {
   FlowControl();
   magma::Status status = delegate_->DumpPerformanceCounters(request->pool_id, request->trigger_id);
   if (!status) {
@@ -455,7 +455,7 @@ void ZirconConnection::DumpPerformanceCounters(DumpPerformanceCountersRequestVie
   }
 }
 
-void ZirconConnection::ClearPerformanceCounters(
+void PrimaryFidlServer::ClearPerformanceCounters(
     ClearPerformanceCountersRequestView request,
     ClearPerformanceCountersCompleter::Sync& completer) {
   FlowControl();
@@ -467,7 +467,7 @@ void ZirconConnection::ClearPerformanceCounters(
 }
 
 // static
-std::shared_ptr<ZirconConnection> ZirconConnection::Create(
+std::shared_ptr<PrimaryFidlServer> PrimaryFidlServer::Create(
     std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
     fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
     fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification) {
@@ -475,7 +475,7 @@ std::shared_ptr<ZirconConnection> ZirconConnection::Create(
     return MAGMA_DRETP(nullptr, "attempting to create PlatformConnection with null delegate");
 
   auto connection =
-      std::make_shared<ZirconConnection>(std::move(delegate), client_id, std::move(notification));
+      std::make_shared<PrimaryFidlServer>(std::move(delegate), client_id, std::move(notification));
 
   if (!connection->Bind(std::move(primary)))
     return MAGMA_DRETP(nullptr, "Bind failed");

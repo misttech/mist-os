@@ -15,7 +15,7 @@ source_set("magma_system_tests") {
     "test_magma_system_context.cc",
     "test_magma_system_device.cc",
     "test_notification_handler.cc",
-    "test_zircon_connection.cc",
+    "test_primary_fidl_server.cc",
   ]
 
   deps = [

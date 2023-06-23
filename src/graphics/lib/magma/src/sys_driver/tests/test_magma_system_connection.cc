@@ -41,7 +41,7 @@ class MsdMockConnection_ContextManagement : public MsdMockConnection {
   uint32_t active_context_count_ = 0;
 };
 
-class MockPerfCountPool : public msd::PlatformPerfCountPool {
+class MockPerfCountPool : public msd::PerfCountPoolServer {
  public:
   MockPerfCountPool(uint64_t pool_id) : pool_id_(pool_id) {}
 

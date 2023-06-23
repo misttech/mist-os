@@ -332,7 +332,7 @@ magma::Status MagmaSystemConnection::EnablePerformanceCounters(const uint64_t* c
 }
 
 magma::Status MagmaSystemConnection::CreatePerformanceCounterBufferPool(
-    std::unique_ptr<msd::PlatformPerfCountPool> pool) {
+    std::unique_ptr<msd::PerfCountPoolServer> pool) {
   if (!can_access_performance_counters_)
     return MAGMA_DRET(MAGMA_STATUS_ACCESS_DENIED);
 

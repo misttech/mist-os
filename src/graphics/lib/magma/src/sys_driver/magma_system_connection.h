@@ -15,13 +15,13 @@
 #include "magma_system_context.h"
 #include "magma_util/macros.h"
 #include "msd_cc.h"
-#include "zircon_connection.h"
+#include "primary_fidl_server.h"
 
 namespace msd {
 class MagmaSystemDevice;
 
 class MagmaSystemConnection : private MagmaSystemContext::Owner,
-                              public msd::ZirconConnection::Delegate,
+                              public msd::PrimaryFidlServer::Delegate,
                               msd::NotificationHandler {
  public:
   MagmaSystemConnection(std::weak_ptr<MagmaSystemDevice> device,
@@ -53,7 +53,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   magma::Status EnablePerformanceCounters(const uint64_t* counters,
                                           uint64_t counter_count) override;
   magma::Status CreatePerformanceCounterBufferPool(
-      std::unique_ptr<msd::PlatformPerfCountPool> pool) override;
+      std::unique_ptr<msd::PerfCountPoolServer> pool) override;
   magma::Status ReleasePerformanceCounterBufferPool(uint64_t pool_id) override;
   magma::Status AddPerformanceCounterBufferOffsetToPool(uint64_t pool_id, uint64_t buffer_id,
                                                         uint64_t buffer_offset,
@@ -100,7 +100,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   };
   struct PoolReference {
     std::unique_ptr<msd::PerfCountPool> msd_pool;
-    std::unique_ptr<msd::PlatformPerfCountPool> platform_pool;
+    std::unique_ptr<msd::PerfCountPoolServer> platform_pool;
   };
 
   // MagmaSystemContext::Owner

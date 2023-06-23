@@ -23,9 +23,9 @@
 
 namespace msd {
 
-class PlatformPerfCountPool {
+class PerfCountPoolServer {
  public:
-  virtual ~PlatformPerfCountPool() = default;
+  virtual ~PerfCountPoolServer() = default;
   virtual uint64_t pool_id() = 0;
   // Sends a OnPerformanceCounterReadCompleted. May be called from any thread.
   virtual magma::Status SendPerformanceCounterCompletion(uint32_t trigger_id, uint64_t buffer_id,
@@ -33,8 +33,8 @@ class PlatformPerfCountPool {
                                                          uint32_t result_flags) = 0;
 };
 
-class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
-                         public msd::NotificationHandler {
+class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
+                          public msd::NotificationHandler {
  public:
   static constexpr uint32_t kMaxInflightMessages = 1000;
   static constexpr uint32_t kMaxInflightMemoryMB = 100;
@@ -69,7 +69,7 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
     virtual magma::Status EnablePerformanceCounters(const uint64_t* counters,
                                                     uint64_t counter_count) = 0;
     virtual magma::Status CreatePerformanceCounterBufferPool(
-        std::unique_ptr<PlatformPerfCountPool> pool) = 0;
+        std::unique_ptr<PerfCountPoolServer> pool) = 0;
     virtual magma::Status ReleasePerformanceCounterBufferPool(uint64_t pool_id) = 0;
     virtual magma::Status AddPerformanceCounterBufferOffsetToPool(uint64_t pool_id,
                                                                   uint64_t buffer_id,
@@ -82,13 +82,13 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
                                                    uint64_t counter_count) = 0;
   };
 
-  static std::shared_ptr<ZirconConnection> Create(
+  static std::shared_ptr<PrimaryFidlServer> Create(
       std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
       fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
       fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification);
 
-  ZirconConnection(std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
-                   fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification)
+  PrimaryFidlServer(std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
+                    fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification)
       : client_id_(client_id),
         delegate_(std::move(delegate)),
         server_notification_endpoint_(notification.TakeChannel()),
@@ -96,7 +96,7 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
     delegate_->SetNotificationCallback(this);
   }
 
-  ~ZirconConnection() override {
+  ~PrimaryFidlServer() override {
     delegate_->SetNotificationCallback(nullptr);
     async_loop_.Shutdown();
     delegate_.reset();
@@ -110,7 +110,7 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
 
   async::Loop* async_loop() { return &async_loop_; }
 
-  static void RunLoop(std::shared_ptr<msd::ZirconConnection> connection,
+  static void RunLoop(std::shared_ptr<msd::PrimaryFidlServer> connection,
                       fit::function<void(const char*)> set_thread_priority) {
     pthread_setname_np(pthread_self(),
                        ("ConnectionThread " + std::to_string(connection->client_id_)).c_str());
