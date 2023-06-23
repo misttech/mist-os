@@ -500,30 +500,24 @@ suite_labels = [
   udp_unbound_test_label,
 ]
 
-ns2_labels = []
-foreach(label, suite_labels) {
-  ns2_labels += [ ":${label}_ns2" ]
-}
-
-group("ns2-tests") {
-  testonly = true
-  public_deps = ns2_labels
-}
-
 ns3_labels = []
 foreach(label, suite_labels) {
   ns3_labels += [ ":${label}_ns3" ]
 }
 
-group("ns3-tests") {
-  testonly = true
-  public_deps = ns3_labels
+all_packages = ns3_labels
+
+ns2_labels = []
+foreach(label, suite_labels) {
+  ns2_labels += [ ":${label}_ns2" ]
+}
+
+# RISC-V on Fuchsia does not support Golang.
+if (target_cpu != "riscv64") {
+  all_packages += ns2_labels
 }
 
 group("tests") {
   testonly = true
-  public_deps = [
-    ":ns2-tests",
-    ":ns3-tests",
-  ]
+  public_deps = all_packages
 }
