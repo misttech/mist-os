@@ -16,8 +16,6 @@ icu_rustc_library("input_pipeline") {
     "//sdk/fidl/fuchsia.factory:fuchsia.factory_rust",
     "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
     "//sdk/fidl/fuchsia.input.injection:fuchsia.input.injection_rust",
-    "//sdk/fidl/fuchsia.input.interaction:fuchsia.input.interaction_rust",
-    "//sdk/fidl/fuchsia.input.interaction.observation:fuchsia.input.interaction.observation_rust",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_rust",
     "//sdk/fidl/fuchsia.input.wayland:fuchsia.input.wayland_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -87,7 +85,6 @@ icu_rustc_library("input_pipeline") {
   ]
 
   sources = [
-    "src/activity.rs",
     "src/autorepeater.rs",
     "src/chromebook_keyboard_handler.rs",
     "src/consumer_controls_binding.rs",
