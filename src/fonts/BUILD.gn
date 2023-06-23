@@ -210,6 +210,13 @@ fuchsia_component("font_provider_hermetic_for_test") {
   }
 }
 
+# A hermetic fonts provider which includes the fonts resources useful for
+# testing.
+fuchsia_package("fonts_hermetic_for_test") {
+  testonly = true
+  deps = [ ":font_provider_hermetic_for_test" ]
+}
+
 fuchsia_test_package("font_provider_unit_tests") {
   test_components = [ ":font_provider_unit_tests_cmp" ]
   validate_structured_config = false
