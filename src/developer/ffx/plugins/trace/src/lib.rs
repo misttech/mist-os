@@ -472,7 +472,17 @@ async fn handle_recording_result(
         Ok(t) => Ok(t),
         Err(e) => match e {
             RecordingError::TargetProxyOpen => {
-                ffx_bail!("Trace unable to open target proxy.");
+                ffx_bail!(
+                    "Error: ffx trace was unable to connect to trace_manager on the device.
+
+Note that tracing is available for eng and core products, but not user or userdebug.
+To fix general connection issues, you could also try:
+
+$ ffx doctor
+
+For a tutorial on getting started with tracing, visit:
+https://fuchsia.dev/fuchsia-src/development/sdk/ffx/record-traces"
+                );
             }
             RecordingError::RecordingAlreadyStarted => {
                 // TODO(85098): Also return file info (which output file is being written to).
