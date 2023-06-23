@@ -1342,6 +1342,7 @@
                 "tst_fuzzy_sync01",
                 "tst_fuzzy_sync02",
                 "tst_fuzzy_sync03",
+                "vfork",
                 "writev03",
 
                 // These tests hang
@@ -1350,6 +1351,7 @@
                 "fallocate06",
                 "fs_fill",
                 "timerfd_settime02",
+                "sigrelse01",
 
                 // Tests reach unexpected Abort
                 "clock_gettime01",

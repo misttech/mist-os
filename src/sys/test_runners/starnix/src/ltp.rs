@@ -3,13 +3,69 @@
 // found in the LICENSE file.
 
 use crate::helpers::*;
-use anyhow::{anyhow, Context, Error};
+use anyhow::{anyhow, Context as _, Error};
 use fidl::endpoints::{create_proxy, Proxy};
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_test as ftest;
-use futures::AsyncReadExt;
+use fuchsia_zircon as zx;
+use futures::{AsyncReadExt, StreamExt};
+use socket_parsing::NewlineChunker;
+
+/// `Results` represent the results of an LTP test run as reported by the test
+/// binary's `stderr`.
+#[derive(Default)]
+struct Results {
+    passed: Option<usize>,
+    failed: Option<usize>,
+    broken: Option<usize>,
+    skipped: Option<usize>,
+    warnings: Option<usize>,
+}
+
+impl Results {
+    /// Returns whether or not these results should be reported as a "pass" to the test
+    /// framework.
+    fn passed(&self) -> bool {
+        match self {
+            Self { failed: Some(0), broken: Some(0), warnings: Some(0), .. } => true,
+            _ => false,
+        }
+    }
+
+    /// Parses results from `input` and adds the to the provided `Results` instance.
+    fn count_results(&mut self, input: &[u8]) {
+        match input {
+            input if input.starts_with(b"passed") => {
+                self.passed = Results::parse_number(&input);
+            }
+            input if input.starts_with(b"failed") => {
+                self.failed = Results::parse_number(&input);
+            }
+            input if input.starts_with(b"broken") => {
+                self.broken = Results::parse_number(&input);
+            }
+            input if input.starts_with(b"skipped") => {
+                self.skipped = Results::parse_number(&input);
+            }
+            input if input.starts_with(b"warnings") => {
+                self.warnings = Results::parse_number(&input);
+            }
+            _ => {}
+        };
+    }
+
+    fn parse_number(input: &[u8]) -> Option<usize> {
+        let input = String::from_utf8_lossy(input);
+        input
+            .split_whitespace()
+            .flat_map(|s| s.parse::<usize>())
+            .collect::<Vec<usize>>()
+            .first()
+            .copied()
+    }
+}
 
 pub async fn get_cases_list_for_ltp(
     mut start_info: frunner::ComponentStartInfo,
@@ -59,12 +115,42 @@ pub async fn run_ltp_cases(
     let base_path = get_str_value_from_dict(program, "tests_dir")?;
     for test in tests {
         let test_path = format!("{}/{}", base_path, test.name.as_ref().expect("No test name"));
-        let (component_controller, std_handles) =
+        let (component_controller, component_std_handles) =
             start_command(&mut start_info, component_runner, &base_path, &test_path, &[])?;
+
+        // Create the proxy socket endpoints to hand off to the run listener.
+        let (sender_stderr, listener_stderr) = zx::Socket::create_stream();
+        let parsed_std_handles = ftest::StdHandles {
+            out: component_std_handles.out,
+            err: Some(listener_stderr),
+            ..Default::default()
+        };
         let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
-        run_listener_proxy.on_test_case_started(&test, std_handles, case_listener)?;
+        run_listener_proxy.on_test_case_started(&test, parsed_std_handles, case_listener)?;
+
+        /// Max size for message when draining input stream socket. This number is
+        /// slightly smaller than size allowed by Archivist (LogSink service implementation).
+        const MAX_MESSAGE_SIZE: usize = 30720;
+
+        // Read stderr from the test component and:
+        //   - forward the logs to the run listener
+        //   - parse the logs for test results
+        let mut stderr_lines =
+            NewlineChunker::new_with_newlines(component_std_handles.err.unwrap(), MAX_MESSAGE_SIZE)
+                .unwrap();
+
+        let mut parsed_results = Results::default();
+        while let Some(Ok(line)) = stderr_lines.next().await {
+            let _ = sender_stderr.write(&line);
+            parsed_results.count_results(&line);
+        }
 
         let result = read_result(component_controller.take_event_stream()).await;
+
+        tracing::info!("Passed based on log parsing: {:?}", parsed_results.passed());
+
+        // TODO(b/287506763): We should use the `Results` to determine whether or not the
+        // LTP test result matches expectations.
         case_listener_proxy.finished(&result)?;
     }
 

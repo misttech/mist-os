@@ -27,6 +27,7 @@ pub struct NewlineChunker {
     buffer: Vec<u8>,
     is_terminated: bool,
     max_message_size: usize,
+    trim_newlines: bool,
 }
 
 impl NewlineChunker {
@@ -34,7 +35,26 @@ impl NewlineChunker {
     pub fn new(socket: zx::Socket, max_message_size: usize) -> Result<Self, Error> {
         let socket = fasync::Socket::from_socket(socket)
             .map_err(|s| anyhow!("Failed to create fasync::socket from zx::socket: {}", s))?;
-        Ok(Self { socket, buffer: vec![], is_terminated: false, max_message_size })
+        Ok(Self {
+            socket,
+            buffer: vec![],
+            is_terminated: false,
+            max_message_size,
+            trim_newlines: true,
+        })
+    }
+
+    /// Creates a `NewlineChunker` that includes the trailing `\n` in each line.
+    pub fn new_with_newlines(socket: zx::Socket, max_message_size: usize) -> Result<Self, Error> {
+        let socket = fasync::Socket::from_socket(socket)
+            .map_err(|s| anyhow!("Failed to create fasync::socket from zx::socket: {}", s))?;
+        Ok(Self {
+            socket,
+            buffer: vec![],
+            is_terminated: false,
+            max_message_size,
+            trim_newlines: false,
+        })
     }
 
     /// Removes and returns the next line or maximum-size chunk from the head of the buffer if
@@ -61,9 +81,11 @@ impl NewlineChunker {
         let new_tail = self.buffer.split_off(new_tail_start);
         let mut next_chunk = std::mem::replace(&mut self.buffer, new_tail);
 
-        // remove the newlines from the end of the chunk we're returning
-        while let Some(&NEWLINE) = next_chunk.last() {
-            next_chunk.pop();
+        if self.trim_newlines {
+            // remove the newlines from the end of the chunk we're returning
+            while let Some(&NEWLINE) = next_chunk.last() {
+                next_chunk.pop();
+            }
         }
 
         Some(next_chunk)
@@ -172,6 +194,16 @@ mod tests {
         assert_eq!(chunker.next().await.unwrap().unwrap(), b"test3".to_vec());
         std::mem::drop(s2);
         assert!(chunker.next().await.is_none());
+    }
+
+    #[fuchsia::test]
+    async fn parse_bytes_with_newlines_included() {
+        let (s1, s2) = zx::Socket::create_stream();
+        let mut chunker = NewlineChunker::new_with_newlines(s1, 100).unwrap();
+        s2.write(b"test1\ntest2\ntest3\n").expect("Failed to write");
+        assert_eq!(chunker.next().await.unwrap().unwrap(), b"test1\n".to_vec());
+        assert_eq!(chunker.next().await.unwrap().unwrap(), b"test2\n".to_vec());
+        assert_eq!(chunker.next().await.unwrap().unwrap(), b"test3\n".to_vec());
     }
 
     #[fuchsia::test]

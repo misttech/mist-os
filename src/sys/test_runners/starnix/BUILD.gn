@@ -29,6 +29,7 @@ rustc_binary("bin") {
     "//src/performance/lib/fuchsiaperf",
     "//src/starnix/lib/kernel_manager",
     "//src/sys/lib/runner",
+    "//src/sys/lib/socket_parsing",
     "//src/sys/test_runners:lib",
     "//src/sys/test_runners/gtest:lib",
     "//third_party/rust_crates:anyhow",
