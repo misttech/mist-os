@@ -5,8 +5,8 @@
 #ifndef SRC_DEVICES_LIGHT_SENSOR_DRIVERS_AMS_LIGHT_TCS3400_H_
 #define SRC_DEVICES_LIGHT_SENSOR_DRIVERS_AMS_LIGHT_TCS3400_H_
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/device-protocol/i2c-channel.h>
@@ -61,11 +61,11 @@ class Tcs3400Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
   // Visible for testing.
   static zx::result<Tcs3400Device*> CreateAndGetDevice(void* ctx, zx_device_t* parent);
 
-  Tcs3400Device(zx_device_t* device, ddk::I2cChannel i2c, ddk::GpioProtocolClient gpio,
-                zx::port port)
+  Tcs3400Device(zx_device_t* device, ddk::I2cChannel i2c,
+                fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio, zx::port port)
       : DeviceType(device),
         i2c_(std::move(i2c)),
-        gpio_(gpio),
+        gpio_(std::move(gpio)),
         port_(std::move(port)),
         loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
   ~Tcs3400Device() override = default;
@@ -96,7 +96,7 @@ class Tcs3400Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
   static constexpr size_t kFeatureAndDescriptorBufferSize = 512;
 
   ddk::I2cChannel i2c_;  // Accessed by the main thread only before thread_ has been started.
-  ddk::GpioProtocolClient gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_;
   zx::interrupt irq_;
   thrd_t thread_ = {};
   zx::port port_;

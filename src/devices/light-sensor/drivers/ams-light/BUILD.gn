@@ -30,8 +30,8 @@ fuchsia_driver("ams-light-driver") {
   sources = [ "tcs3400.cc" ]
   deps = [
     ":tcs3400_light_bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
     "//sdk/lib/input_report_reader",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
@@ -63,10 +63,11 @@ test("ams-light-test-bin") {
   ]
   deps = [
     ":tcs3400_light_bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp_mock",
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
+    "//src/devices/gpio/testing/fake-gpio",
 
     # TODO(https://fxbug.dev/113997): Fix thread unsafety and switch to
     # "//sdk/lib/component/outgoing/cpp".

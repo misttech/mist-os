@@ -550,9 +550,11 @@ zx::result<Tcs3400Device*> Tcs3400Device::CreateAndGetDevice(void* ctx, zx_devic
     return zx::error(ZX_ERR_NO_RESOURCES);
   }
 
-  ddk::GpioProtocolClient gpio(parent, "gpio");
-  if (!gpio.is_valid()) {
-    return zx::error(ZX_ERR_NO_RESOURCES);
+  zx::result gpio =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(parent, "gpio");
+  if (gpio.is_error()) {
+    zxlogf(ERROR, "Failed to connect to gpio protocol: %s", gpio.status_string());
+    return gpio.take_error();
   }
 
   zx::port port;
@@ -562,8 +564,8 @@ zx::result<Tcs3400Device*> Tcs3400Device::CreateAndGetDevice(void* ctx, zx_devic
     return zx::error(status);
   }
 
-  auto dev =
-      std::make_unique<tcs::Tcs3400Device>(parent, std::move(channel), gpio, std::move(port));
+  auto dev = std::make_unique<tcs::Tcs3400Device>(parent, std::move(channel),
+                                                  std::move(gpio.value()), std::move(port));
   status = dev->Bind();
   if (status != ZX_OK) {
     zxlogf(ERROR, "bind failed: %d", status);
@@ -693,14 +695,30 @@ zx_status_t Tcs3400Device::WriteReg(uint8_t reg, uint8_t value) {
 
 zx_status_t Tcs3400Device::Bind() {
   {
-    gpio_.ConfigIn(GPIO_NO_PULL);
-
-    auto status = gpio_.GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW, &irq_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "gpio_get_interrupt failed: %d", status);
-      return status;
+    fidl::WireResult result = gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigIn request to gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure gpio to input: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
     }
   }
+
+  fidl::WireResult interrupt_result = gpio_->GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW);
+  if (!interrupt_result.ok()) {
+    zxlogf(ERROR, "Failed to send GetInterrupt request to gpio: %s",
+           interrupt_result.status_string());
+    return interrupt_result.status();
+  }
+  if (interrupt_result->is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt from gpio: %s",
+           zx_status_get_string(interrupt_result->error_value()));
+    return interrupt_result->error_value();
+  }
+  irq_ = std::move(interrupt_result->value()->irq);
 
   zx_status_t status = irq_.bind(port_, TCS_INTERRUPT, 0);
   if (status != ZX_OK) {

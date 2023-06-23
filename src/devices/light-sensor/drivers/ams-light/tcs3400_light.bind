@@ -12,6 +12,6 @@ primary node "i2c" {
 }
 
 node "gpio" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.LIGHT_INTERRUPT;
 }

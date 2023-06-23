@@ -4,7 +4,7 @@
 
 #include "tcs3400.h"
 
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -19,6 +19,7 @@
 #include <fbl/mutex.h>
 #include <zxtest/zxtest.h>
 
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "tcs3400-regs.h"
 
@@ -113,34 +114,38 @@ class Tcs3400Test : public zxtest::Test {
     fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kLightSensorMetadata,
                               sizeof(kLightSensorMetadata));
 
+    // Create i2c fragment.
     auto service_result = outgoing_.AddService<fuchsia_hardware_i2c::Service>(
         fuchsia_hardware_i2c::Service::InstanceHandler(
             {.device = fake_i2c_.bind_handler(loop_.dispatcher())}));
     ZX_ASSERT(service_result.is_ok());
-
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ZX_ASSERT(endpoints.is_ok());
     ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
-
     fake_parent_->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints->client),
                                  "i2c");
 
-    fake_parent_->AddProtocol(ZX_PROTOCOL_GPIO, mock_gpio_.GetProto()->ops,
-                              mock_gpio_.GetProto()->ctx, "gpio");
-
+    // Create gpio fragment.
     ASSERT_OK(zx::interrupt::create(zx::resource(ZX_HANDLE_INVALID), 0, ZX_INTERRUPT_VIRTUAL,
                                     &gpio_interrupt_));
-
     zx::interrupt gpio_interrupt;
     ASSERT_OK(gpio_interrupt_.duplicate(ZX_RIGHT_SAME_RIGHTS, &gpio_interrupt));
-
-    mock_gpio_.ExpectConfigIn(ZX_OK, GPIO_NO_PULL);
-    mock_gpio_.ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(gpio_interrupt));
+    fake_gpio_.SetInterrupt(zx::ok(std::move(gpio_interrupt)));
+    service_result = outgoing_.AddService<fuchsia_hardware_gpio::Service>(
+        fuchsia_hardware_gpio::Service::InstanceHandler(
+            {.device = fake_gpio_.bind_handler(loop_.dispatcher())}));
+    ZX_ASSERT(service_result.is_ok());
+    endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+    fake_parent_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(endpoints->client),
+                                 "gpio");
 
     EXPECT_OK(loop_.StartThread());
 
     const auto status = Tcs3400Device::CreateAndGetDevice(nullptr, fake_parent_.get());
     ASSERT_TRUE(status.is_ok());
+    ASSERT_EQ(fuchsia_hardware_gpio::GpioFlags::kNoPull, fake_gpio_.GetReadFlags());
     device_ = status.value();
 
     fake_i2c_.WaitForConfiguration();
@@ -241,11 +246,11 @@ class Tcs3400Test : public zxtest::Test {
   }
 
   FakeLightSensor fake_i2c_;
+  fake_gpio::FakeGpio fake_gpio_;
   zx::interrupt gpio_interrupt_;
   Tcs3400Device* device_ = nullptr;
 
  private:
-  ddk::MockGpio mock_gpio_;
   std::shared_ptr<MockDevice> fake_parent_;
   async::Loop loop_;
   component::OutgoingDirectory outgoing_;
@@ -919,36 +924,31 @@ class Tcs3400MetadataTest : public zxtest::Test {
     std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
     fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-    FakeLightSensor fake_i2c;
-    ddk::MockGpio mock_gpio;
-
     async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
     component::OutgoingDirectory outgoing(loop.dispatcher());
 
+    // Create i2c fragment.
+    FakeLightSensor fake_i2c;
     auto service_result = outgoing.AddService<fuchsia_hardware_i2c::Service>(
         fuchsia_hardware_i2c::Service::InstanceHandler(
             {.device = fake_i2c.bind_handler(loop.dispatcher())}));
     ZX_ASSERT(service_result.is_ok());
-
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ZX_ASSERT(endpoints.is_ok());
     ZX_ASSERT(outgoing.Serve(std::move(endpoints->server)).is_ok());
-
     fake_parent->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints->client),
                                 "i2c");
-
-    fake_parent->AddProtocol(ZX_PROTOCOL_GPIO, mock_gpio.GetProto()->ops, mock_gpio.GetProto()->ctx,
-                             "gpio");
-
-    zx::interrupt gpio_interrupt;
-    ASSERT_OK(zx::interrupt::create(zx::resource(ZX_HANDLE_INVALID), 0, ZX_INTERRUPT_VIRTUAL,
-                                    &gpio_interrupt));
-
-    zx::interrupt gpio_interrupt_dup;
-    ASSERT_OK(gpio_interrupt.duplicate(ZX_RIGHT_SAME_RIGHTS, &gpio_interrupt_dup));
-
-    mock_gpio.ExpectConfigIn(ZX_OK, GPIO_NO_PULL);
-    mock_gpio.ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(gpio_interrupt_dup));
+    // Create gpio fragment.
+    fake_gpio::FakeGpio fake_gpio;
+    service_result = outgoing.AddService<fuchsia_hardware_gpio::Service>(
+        fuchsia_hardware_gpio::Service::InstanceHandler(
+            {.device = fake_gpio.bind_handler(loop.dispatcher())}));
+    ZX_ASSERT(service_result.is_ok());
+    endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(outgoing.Serve(std::move(endpoints->server)).is_ok());
+    fake_parent->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(endpoints->client),
+                                "gpio");
 
     fake_i2c.SetRegister(TCS_I2C_ATIME, 0xff);
     fake_i2c.SetRegister(TCS_I2C_CONTROL, 0xff);
@@ -957,6 +957,7 @@ class Tcs3400MetadataTest : public zxtest::Test {
 
     const auto status = Tcs3400Device::CreateAndGetDevice(nullptr, fake_parent.get());
     ASSERT_TRUE(status.is_ok());
+    ASSERT_EQ(fuchsia_hardware_gpio::GpioFlags::kNoPull, fake_gpio.GetReadFlags());
 
     fake_i2c.WaitForConfiguration();
 
@@ -992,24 +993,28 @@ TEST(Tcs3400Test, TooManyI2cErrors) {
   parameters.gain = 64;
   parameters.integration_time_us = 708'900;  // For atime = 0x01.
 
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+
   mock_i2c::MockI2c mock_i2c;
   mock_i2c
       .ExpectWriteStop({0x81, 0x01}, ZX_ERR_INTERNAL)   // error, will retry.
       .ExpectWriteStop({0x81, 0x01}, ZX_ERR_INTERNAL)   // error, will retry.
       .ExpectWriteStop({0x81, 0x01}, ZX_ERR_INTERNAL);  // error, we are done.
+  auto i2c_endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
+  EXPECT_TRUE(i2c_endpoints.is_ok());
+  fidl::BindServer(loop.dispatcher(), std::move(i2c_endpoints->server), &mock_i2c);
 
-  ddk::GpioProtocolClient gpio;
+  fake_gpio::FakeGpio fake_gpio;
+  auto gpio_endpoints = fidl::CreateEndpoints<fuchsia_hardware_gpio::Gpio>();
+  ASSERT_TRUE(gpio_endpoints.is_ok());
+  fidl::BindServer(loop.dispatcher(), std::move(gpio_endpoints->server), &fake_gpio);
+
   zx::port port;
   ASSERT_OK(zx::port::create(0, &port));
 
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  EXPECT_TRUE(endpoints.is_ok());
-
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
-
   EXPECT_OK(loop.StartThread());
-  Tcs3400Device device(fake_parent.get(), std::move(endpoints->client), gpio, std::move(port));
+  Tcs3400Device device(fake_parent.get(), std::move(i2c_endpoints->client),
+                       std::move(gpio_endpoints->client), std::move(port));
 
   fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &parameters,
                            sizeof(metadata::LightSensorParams));
