@@ -242,7 +242,7 @@ static void x86_debug_restore_state(const Thread* thread) {
   if (unlikely(thread->arch().track_debug_state)) {
     x86_write_hw_debug_regs(&thread->arch().debug_state);
   } else {
-    // We don't know if the currenty CPU has debugging enable or not, but we do know that |thread|
+    // We don't know if the current CPU has debugging enabled or not, but we do know that |thread|
     // shouldn't have it enabled so disable.
     x86_disable_debug_state();
   }
