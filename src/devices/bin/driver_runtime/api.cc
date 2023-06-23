@@ -239,25 +239,12 @@ __EXPORT bool fdf_env_dispatcher_has_queued_tasks(fdf_dispatcher_t* dispatcher) 
   return dispatcher->HasQueuedTasks();
 }
 
-__EXPORT zx_status_t fdf_testing_run_until_idle() {
-  return driver_runtime::DispatcherCoordinator::TestingRunUntilIdle();
-}
-
 __EXPORT void fdf_internal_wait_until_all_dispatchers_idle() {
   return driver_runtime::DispatcherCoordinator::WaitUntilDispatchersIdle();
 }
 
 __EXPORT void fdf_internal_wait_until_all_dispatchers_destroyed() {
   return driver_runtime::DispatcherCoordinator::WaitUntilDispatchersDestroyed();
-}
-
-__EXPORT zx_status_t fdf_testing_set_default_dispatcher(fdf_dispatcher_t* dispatcher) {
-  if (!driver_context::IsCallStackEmpty()) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  driver_context::SetDefaultTestingDispatcher(static_cast<driver_runtime::Dispatcher*>(dispatcher));
-  return ZX_OK;
 }
 
 __EXPORT zx_status_t fdf_testing_create_unmanaged_dispatcher(
@@ -274,4 +261,27 @@ __EXPORT zx_status_t fdf_testing_create_unmanaged_dispatcher(
   }
   *out_dispatcher = static_cast<fdf_dispatcher*>(dispatcher);
   return ZX_OK;
+}
+
+__EXPORT zx_status_t fdf_testing_set_default_dispatcher(fdf_dispatcher_t* dispatcher) {
+  if (!driver_context::IsCallStackEmpty()) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  driver_context::SetDefaultTestingDispatcher(static_cast<driver_runtime::Dispatcher*>(dispatcher));
+  return ZX_OK;
+}
+
+__EXPORT zx_status_t fdf_testing_run(zx_time_t deadline, bool once) {
+  return driver_runtime::DispatcherCoordinator::TestingRun(zx::time(deadline), once);
+}
+
+__EXPORT zx_status_t fdf_testing_run_until_idle() {
+  return driver_runtime::DispatcherCoordinator::TestingRunUntilIdle();
+}
+
+__EXPORT void fdf_testing_quit() { driver_runtime::DispatcherCoordinator::TestingQuit(); }
+
+__EXPORT zx_status_t fdf_testing_reset_quit() {
+  return driver_runtime::DispatcherCoordinator::TestingResetQuit();
 }

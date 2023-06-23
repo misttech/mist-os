@@ -1429,11 +1429,42 @@ void DispatcherCoordinator::WaitUntilDispatchersDestroyed() {
 }
 
 // static
+zx_status_t DispatcherCoordinator::TestingRun(zx::time deadline, bool once) {
+  std::optional<Dispatcher::ThreadPool>& unmanaged_thread_pool =
+      GetDispatcherCoordinator().unmanaged_thread_pool_;
+  if (unmanaged_thread_pool.has_value()) {
+    return unmanaged_thread_pool.value().loop()->Run(deadline, once);
+  }
+
+  return ZX_ERR_BAD_STATE;
+}
+
+// static
 zx_status_t DispatcherCoordinator::TestingRunUntilIdle() {
   std::optional<Dispatcher::ThreadPool>& unmanaged_thread_pool =
       GetDispatcherCoordinator().unmanaged_thread_pool_;
   if (unmanaged_thread_pool.has_value()) {
     return unmanaged_thread_pool.value().loop()->RunUntilIdle();
+  }
+
+  return ZX_ERR_BAD_STATE;
+}
+
+// static
+void DispatcherCoordinator::TestingQuit() {
+  std::optional<Dispatcher::ThreadPool>& unmanaged_thread_pool =
+      GetDispatcherCoordinator().unmanaged_thread_pool_;
+  if (unmanaged_thread_pool.has_value()) {
+    unmanaged_thread_pool.value().loop()->Quit();
+  }
+}
+
+// static
+zx_status_t DispatcherCoordinator::TestingResetQuit() {
+  std::optional<Dispatcher::ThreadPool>& unmanaged_thread_pool =
+      GetDispatcherCoordinator().unmanaged_thread_pool_;
+  if (unmanaged_thread_pool.has_value()) {
+    return unmanaged_thread_pool.value().loop()->ResetQuit();
   }
 
   return ZX_ERR_BAD_STATE;

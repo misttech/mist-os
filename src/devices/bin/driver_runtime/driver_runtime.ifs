@@ -35,6 +35,9 @@ Symbols:
   - { Name: fdf_internal_wait_until_all_dispatchers_destroyed, Type: Func }
   - { Name: fdf_internal_wait_until_all_dispatchers_idle, Type: Func }
   - { Name: fdf_testing_create_unmanaged_dispatcher, Type: Func }
+  - { Name: fdf_testing_quit, Type: Func }
+  - { Name: fdf_testing_reset_quit, Type: Func }
+  - { Name: fdf_testing_run, Type: Func }
   - { Name: fdf_testing_run_until_idle, Type: Func }
   - { Name: fdf_testing_set_default_dispatcher, Type: Func }
   - { Name: fdf_token_register, Type: Func }

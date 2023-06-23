@@ -2302,6 +2302,59 @@ TEST_F(DispatcherTest, SyncDispatcherCancelRequestDuringShutdown) {
 }
 
 //
+// Run/Quit tests
+//
+
+TEST_F(DispatcherTest, RunThenQuitAndRunAgain) {
+  const void* driver = CreateFakeDriver();
+
+  fdf_dispatcher_t* dispatcher;
+  ASSERT_NO_FATAL_FAILURE(CreateUnmanagedDispatcher(0, __func__, driver, &dispatcher));
+
+  // Calls quit in 100ms
+  std::atomic_bool ran = false;
+  ASSERT_OK(async::PostTaskForTime(
+      fdf_dispatcher_get_async_dispatcher(dispatcher),
+      [&] {
+        ran = true;
+        fdf_testing_quit();
+      },
+      zx::deadline_after(zx::msec(100))));
+
+  // We should hit our 1ms deadline before quit happens.
+  ASSERT_EQ(ZX_ERR_TIMED_OUT, fdf_testing_run(zx::deadline_after(zx::msec(1)).get(), false));
+  ASSERT_FALSE(ran);
+
+  // This time quit task should run before our 1s deadline.
+  ASSERT_EQ(ZX_ERR_CANCELED, fdf_testing_run(zx::deadline_after(zx::sec(1)).get(), false));
+  ASSERT_TRUE(ran);
+
+  // Reset quit.
+  fdf_testing_reset_quit();
+  ran = false;
+
+  // Calls quit in 100ms
+  ASSERT_OK(async::PostTaskForTime(
+      fdf_dispatcher_get_async_dispatcher(dispatcher),
+      [&] {
+        ran = true;
+        fdf_testing_quit();
+      },
+      zx::deadline_after(zx::msec(100))));
+
+  // We should hit our 1ms deadline again.
+  ASSERT_EQ(ZX_ERR_TIMED_OUT, fdf_testing_run(zx::deadline_after(zx::msec(1)).get(), false));
+  ASSERT_FALSE(ran);
+
+  // Quit task should run before our 1s deadline again.
+  ASSERT_EQ(ZX_ERR_CANCELED, fdf_testing_run(zx::deadline_after(zx::sec(1)).get(), false));
+  ASSERT_TRUE(ran);
+
+  // Reset quit.
+  fdf_testing_reset_quit();
+}
+
+//
 // Misc tests
 //
 

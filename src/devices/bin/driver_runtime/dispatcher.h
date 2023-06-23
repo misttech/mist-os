@@ -738,7 +738,10 @@ class DispatcherCoordinator {
   static void DestroyAllDispatchers();
   static void WaitUntilDispatchersIdle();
   static void WaitUntilDispatchersDestroyed();
+  static zx_status_t TestingRun(zx::time deadline, bool once);
   static zx_status_t TestingRunUntilIdle();
+  static void TestingQuit();
+  static zx_status_t TestingResetQuit();
   static zx_status_t ShutdownDispatchersAsync(const void* driver,
                                               fdf_env_driver_shutdown_observer_t* observer);
 
