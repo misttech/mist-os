@@ -302,16 +302,11 @@ impl VolumesDirectory {
                 }
             }),
         )?;
-        let blob_handler = volume.clone();
         if as_blob {
+            let root = volume.root().clone();
             svc_dir.add_entry(
                 BlobCreatorMarker::PROTOCOL_NAME,
-                vfs::service::host(move |requests| {
-                    let blob_handler = blob_handler.clone();
-                    async move {
-                        let _ = blob_handler.root_clone().handle_blob_requests(requests).await;
-                    }
-                }),
+                vfs::service::host(move |r| root.clone().handle_blob_requests(r)),
             )?;
         }
         // Use the volume's scope here which should be OK for now.  In theory the scope represents a

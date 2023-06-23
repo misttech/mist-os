@@ -387,10 +387,7 @@ pub trait RootDir: FxNode + DirectoryEntry {
 
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode>;
 
-    async fn handle_blob_requests(
-        self: Arc<Self>,
-        requests: BlobCreatorRequestStream,
-    ) -> Result<(), Error>;
+    async fn handle_blob_requests(self: Arc<Self>, _requests: BlobCreatorRequestStream) {}
 }
 
 #[derive(Clone)]
@@ -425,10 +422,6 @@ impl FxVolumeAndRoot {
 
     pub fn root(&self) -> &Arc<dyn RootDir> {
         &self.root
-    }
-
-    pub fn root_clone(&self) -> Arc<dyn RootDir> {
-        self.root.clone()
     }
 
     // The same as root but downcasted to FxDirectory.

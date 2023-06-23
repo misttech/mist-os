@@ -478,7 +478,6 @@ impl BlobWriterProtocol for FxUnsealedBlob {
 
 #[cfg(test)]
 mod tests {
-
     use {
         super::*,
         crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture},

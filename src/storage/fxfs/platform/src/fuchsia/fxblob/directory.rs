@@ -28,11 +28,10 @@ use {
     fidl_fuchsia_io::{
         self as fio, FilesystemInfo, NodeAttributeFlags, NodeAttributes, NodeMarker, WatchMask,
     },
-    fuchsia_async as fasync,
     fuchsia_hash::Hash,
     fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
     fuchsia_zircon::{self as zx, Status},
-    futures::{lock::Mutex as AsyncMutex, FutureExt, TryStreamExt},
+    futures::{FutureExt, TryStreamExt},
     fxfs::{
         errors::FxfsError,
         log::*,
@@ -45,7 +44,7 @@ use {
         },
         serialized_types::BlobMetadata,
     },
-    std::{collections::HashMap, str::FromStr, sync::Arc},
+    std::{str::FromStr, sync::Arc},
     vfs::{
         directory::{
             dirents_sink::{self, Sink},
@@ -80,41 +79,23 @@ impl RootDir for BlobDirectory {
     }
 
     /// TODO(fxbug.dev/127530): Support delivery blobs ([`FxDeliveryBlob`]) using this protocol.
-    async fn handle_blob_requests(
-        self: Arc<Self>,
-        mut requests: BlobCreatorRequestStream,
-    ) -> Result<(), Error> {
-        let blob_state: AsyncMutex<HashMap<Hash, fasync::Task<()>>> =
-            AsyncMutex::new(HashMap::default());
-        while let Some(request) = requests.try_next().await? {
+    async fn handle_blob_requests(self: Arc<Self>, mut requests: BlobCreatorRequestStream) {
+        while let Ok(Some(request)) = requests.try_next().await {
             match request {
                 BlobCreatorRequest::Create { responder, hash, .. } => {
-                    let mut blob_state = blob_state.lock().await;
-                    let hash = Hash::from(hash);
-                    let res = if blob_state.contains_key(&hash) {
-                        Err(CreateBlobError::AlreadyExists)
-                    } else {
-                        match self.create_blob(&hash).await {
-                            Ok((task, client_end)) => {
-                                blob_state.insert(hash, task);
-                                Ok(client_end)
-                            }
-                            Err(e) => {
-                                tracing::error!("blob service: create failed: {:?}", e);
-                                Err(e)
-                            }
-                        }
-                    };
-                    responder.send(res).unwrap_or_else(|e| {
-                        tracing::error!("failed to send Create response. error: {:?}", e);
-                    });
+                    // TODO(fxbug.dev/129357): Figure out how we handle concurrent writes to the
+                    // same blob.
+                    responder
+                        .send(self.create_blob(&Hash::from(hash)).await.map_err(|error| {
+                            tracing::error!(?error, "blob service: create failed");
+                            error
+                        }))
+                        .unwrap_or_else(|error| {
+                            tracing::error!(?error, "failed to send Create response");
+                        });
                 }
             }
         }
-        for (_, task) in std::mem::take(&mut *blob_state.lock().await) {
-            task.await;
-        }
-        Ok(())
     }
 }
 
@@ -285,7 +266,7 @@ impl BlobDirectory {
     async fn create_blob(
         self: &Arc<Self>,
         hash: &Hash,
-    ) -> Result<(fasync::Task<()>, ClientEnd<BlobWriterMarker>), CreateBlobError> {
+    ) -> Result<ClientEnd<BlobWriterMarker>, CreateBlobError> {
         let flags = fio::OpenFlags::CREATE
             | fio::OpenFlags::RIGHT_WRITABLE
             | fio::OpenFlags::RIGHT_READABLE;
@@ -311,12 +292,12 @@ impl BlobDirectory {
         })?;
         let client_end = ClientEnd::new(client_channel.into());
         let this = self.clone();
-        let task = fasync::Task::spawn(async move {
+        self.volume().scope().spawn(async move {
             if let Err(e) = this.handle_blob_writer_requests(unsealed_blob, server_end).await {
                 tracing::error!("Failed to handle blob writer requests: {}", e);
             }
         });
-        return Ok((task, client_end));
+        return Ok(client_end);
     }
 
     async fn handle_blob_writer_requests(
