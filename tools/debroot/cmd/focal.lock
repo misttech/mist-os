@@ -1,6 +1,46 @@
-hash: 6beb8cfca4fb4f033b157e646b768d9bb0ca33d2e9d653aec54b552c73dd1deb
-updated: 2023-06-06T23:27:09.446298627Z
+hash: 8cc806dbf34ae1b2849d0c8f18d94911abe3ecd449403cb053b5953b2535adc0
+updated: 2023-06-23T07:09:13.145479484Z
 packages:
+- package: libasound2
+  version: 1.2.2-2.1ubuntu2.5
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/a/alsa-lib/libasound2_1.2.2-2.1ubuntu2.5_amd64.deb
+  hash: 5ea02b4590b210bb2d4a180007184c10e8941d0ee1f025361950b0d0084578a6
+- package: libasound2
+  version: 1.2.2-2.1ubuntu2.5
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/a/alsa-lib/libasound2_1.2.2-2.1ubuntu2.5_i386.deb
+  hash: ab6c0a835cfb1190ad4b8d11b589587262cca0d421f21172ec2253333a2dec97
+- package: libasound2
+  version: 1.2.2-2.1ubuntu2.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2_1.2.2-2.1ubuntu2.5_arm64.deb
+  hash: 3cf3900c1b9e5aa90c340099b15f04d8f93c078cd69acf1856ea65fea42b003e
+- package: libasound2
+  version: 1.2.2-2.1ubuntu2.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2_1.2.2-2.1ubuntu2.5_armhf.deb
+  hash: e6f602fdb98fb912615452a5f8bcaec964e3d996b46880b6cf7f8097d6615de8
+- package: libasound2
+  version: 1.2.2-2.1ubuntu2.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2_1.2.2-2.1ubuntu2.5_riscv64.deb
+  hash: ee3e9b54eac9427057e80cb297aafe3b92276106bbd79189cfe46a1a9c7f84ca
+- package: libasound2-dev
+  version: 1.2.2-2.1ubuntu2.5
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/a/alsa-lib/libasound2-dev_1.2.2-2.1ubuntu2.5_amd64.deb
+  hash: f10cbb3ccdab80e162e64255e3dfe1e04b02fe1d59d082a7a3d760f0623da9dc
+- package: libasound2-dev
+  version: 1.2.2-2.1ubuntu2.5
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/a/alsa-lib/libasound2-dev_1.2.2-2.1ubuntu2.5_i386.deb
+  hash: 12d417c9d904a0732f8ed816f66cccbfea6e2e731af15f3fbf91a1c3d732f807
+- package: libasound2-dev
+  version: 1.2.2-2.1ubuntu2.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2-dev_1.2.2-2.1ubuntu2.5_arm64.deb
+  hash: df662c7a6f0d7f3fbaafa6ed629ebc35f5eef6c56af577589b2a53292cd80b43
+- package: libasound2-dev
+  version: 1.2.2-2.1ubuntu2.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2-dev_1.2.2-2.1ubuntu2.5_armhf.deb
+  hash: 759f75a99967921556078e6fae34a840b54a5c7ca4ca1c13acbe21dcebff8afa
+- package: libasound2-dev
+  version: 1.2.2-2.1ubuntu2.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2-dev_1.2.2-2.1ubuntu2.5_riscv64.deb
+  hash: 72f9532b556c907af22f6eba3098044632ba052b3d23a04b32bd1c826acc2331
 - package: libc6
   version: 2.31-0ubuntu9.9
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/g/glibc/libc6_2.31-0ubuntu9.9_amd64.deb
@@ -182,85 +222,85 @@ packages:
   url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.8/libpython3.8-dev_3.8.10-0ubuntu1~20.04.8_riscv64.deb
   hash: a2a5c357728faf1e1410d2dc33108eda38b12121b67d9aeae654f3447fde7d06
 - package: libx11-6
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-6_1.6.9-2ubuntu1.2_amd64.deb
-  hash: 89a57280ffb92322089e70e0cf3b7a62567f0a0ad58e9dc988c4610de877917d
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-6_1.6.9-2ubuntu1.5_amd64.deb
+  hash: 50ce34775156c64643463c93bd9e7b5186425fc46a7ce457b938c25fbbeda99b
 - package: libx11-6
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-6_1.6.9-2ubuntu1.2_i386.deb
-  hash: 038f9d76dce3d3780755bb652327669604bce6bae46d297e3ae3462fdc48aa20
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-6_1.6.9-2ubuntu1.5_i386.deb
+  hash: 29bef12802b47dd0dc103e0ee4d2eb1cecb8ff8a9f928a71953b20743d4f5fc7
 - package: libx11-6
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-6_1.6.9-2ubuntu1.2_arm64.deb
-  hash: 983cc237bc7d73ccec8d9b5cb3860ec31334f124feafe553b42303f376c239e0
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-6_1.6.9-2ubuntu1.5_arm64.deb
+  hash: c0ef567cbb2d314511c99f357653038c34ed49b7a5338eb127af0ce16dae1df5
 - package: libx11-6
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-6_1.6.9-2ubuntu1.2_armhf.deb
-  hash: 9d534c9c3d4cb5c17c5c2cf47347c49131356879e83601a4a1921ac3371f26a7
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-6_1.6.9-2ubuntu1.5_armhf.deb
+  hash: 615dd1f88cf7085867d7114fe5a42d85a2eb7e43dc8b7808d234106ea88d9cf1
 - package: libx11-6
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-6_1.6.9-2ubuntu1.2_riscv64.deb
-  hash: 7fb8e16703adf92a20b2918bc86138d11e21f24a7277a1894b6fdeb26ee9c3a7
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-6_1.6.9-2ubuntu1.5_riscv64.deb
+  hash: c3d574a5f116579d1bda1c9d43a1ae9cf2dae5ab534b753f2eb80fb21ce65911
 - package: libx11-dev
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-dev_1.6.9-2ubuntu1.2_amd64.deb
-  hash: 3907b2dad043feb700df008f27bc8c70238e9c99076820e9b7ca4d5ab2869d23
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-dev_1.6.9-2ubuntu1.5_amd64.deb
+  hash: e2b0aa8aaf7298637f2d1cba90c1ae7fd23509983c128de134db40ba28e28233
 - package: libx11-dev
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-dev_1.6.9-2ubuntu1.2_i386.deb
-  hash: 49c7d9f96cae757a4cef62eaca835773dee081dcf7c133f9535dd54a1c2df878
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-dev_1.6.9-2ubuntu1.5_i386.deb
+  hash: 480c5af538d7ac3561c625ecb2f5f17d74e1cd5975e5bf82e6d8da7999c27999
 - package: libx11-dev
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-dev_1.6.9-2ubuntu1.2_arm64.deb
-  hash: 534d1989d9b97074cbfeb53a4b1c1c5b0eb864e9508241a7a296345c06a2f223
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-dev_1.6.9-2ubuntu1.5_arm64.deb
+  hash: 5fdd18c77bc4f0bce0481893ddc2148789f90f009b597aa95adefca6d958810e
 - package: libx11-dev
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-dev_1.6.9-2ubuntu1.2_armhf.deb
-  hash: 99222ffb0758e1e373e308f72a10536367efdeb40b58e3fb18d408566a47226a
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-dev_1.6.9-2ubuntu1.5_armhf.deb
+  hash: f0cda99c74fd8ef2e977a99278ae27e16d4db9fa0853ef7b81e830cc4246adca
 - package: libx11-dev
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-dev_1.6.9-2ubuntu1.2_riscv64.deb
-  hash: c41a073d624c8377d5c902fd966d444ddb68b68a857fd35eb14b957ea7c7e6f7
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-dev_1.6.9-2ubuntu1.5_riscv64.deb
+  hash: 36e0aff9bdb892c6ec32abc48c3037204dceb0188a1b5bc1169746285fad1175
 - package: libx11-xcb-dev
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-xcb-dev_1.6.9-2ubuntu1.2_amd64.deb
-  hash: 2d2352417558afbee42e38cce87ed17683b09c779cafb2d2650dca168c418af1
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-xcb-dev_1.6.9-2ubuntu1.5_amd64.deb
+  hash: 3231eba356f2aee6de336745e676727eb86c7b508a060738f87562704596d998
 - package: libx11-xcb-dev
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-xcb-dev_1.6.9-2ubuntu1.2_i386.deb
-  hash: f158436fc68efa192582baa95eb288dec630ebfa874435c5b655053abe939269
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-xcb-dev_1.6.9-2ubuntu1.5_i386.deb
+  hash: b8e251ba8f7278966a95c4edce2fa7315b524fb364140128c8b9ab87a89151cf
 - package: libx11-xcb-dev
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-xcb-dev_1.6.9-2ubuntu1.2_arm64.deb
-  hash: e1173639d469802a918cf845864121a771684831644253717d0c42021eafa2da
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-xcb-dev_1.6.9-2ubuntu1.5_arm64.deb
+  hash: f49cbf99724587e533f8c1f28830cab7da1779e0f418edf431039ac37c246ac2
 - package: libx11-xcb-dev
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-xcb-dev_1.6.9-2ubuntu1.2_armhf.deb
-  hash: 86be96f042e555777adc6b51c6d1073552a4694a6bb4aa0a491d8510b73aeae8
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-xcb-dev_1.6.9-2ubuntu1.5_armhf.deb
+  hash: b9a3d7938591705baaa9e7a403e1af0940f1b3ac34ec0bdb29abd78267b00921
 - package: libx11-xcb-dev
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-xcb-dev_1.6.9-2ubuntu1.2_riscv64.deb
-  hash: 1ba3e5f7e2631c08794cea2d5ffa017e030cc3715953c33ada62e2166f19ba40
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-xcb-dev_1.6.9-2ubuntu1.5_riscv64.deb
+  hash: 97231bbfa2904e7a8743b36f7e976d24a2642d076dbbc8e18908475e86115658
 - package: libx11-xcb1
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-xcb1_1.6.9-2ubuntu1.2_amd64.deb
-  hash: 7dad462f5dbec695e9b0b223a6ff44cf385c96b21bbfc625c4ccabaee2aee58b
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-xcb1_1.6.9-2ubuntu1.5_amd64.deb
+  hash: 7be303c60e97c4c7953d9583f49712020d760e6b7b8afe543533a9bc6da93d18
 - package: libx11-xcb1
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-xcb1_1.6.9-2ubuntu1.2_i386.deb
-  hash: 5d59229a34c420599ed11bec6434018e06cf5288737da020c7b2d5a34e8571b4
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-xcb1_1.6.9-2ubuntu1.5_i386.deb
+  hash: 7b7117f1ef6beb1bc20580f158f2d37392d08e7bbacbeb50fe36f0bf922d62df
 - package: libx11-xcb1
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-xcb1_1.6.9-2ubuntu1.2_arm64.deb
-  hash: 469db36e9e073de9cb05d83ed6330be973c7e9d450da748fc23a884ee41bb18f
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-xcb1_1.6.9-2ubuntu1.5_arm64.deb
+  hash: 3fca47fc8a594181ab3da42d9ec918cd6319a81940614de4c259bd8bd8743b72
 - package: libx11-xcb1
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-xcb1_1.6.9-2ubuntu1.2_armhf.deb
-  hash: cd03610ce7e29023fceeb140869bd13e9adffa151e9984475fff43fec7239d16
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-xcb1_1.6.9-2ubuntu1.5_armhf.deb
+  hash: a3f057d15e7819783c82b58af4a11af8db09275fd44ca017375c4836e30a89bb
 - package: libx11-xcb1
-  version: 2:1.6.9-2ubuntu1.2
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-xcb1_1.6.9-2ubuntu1.2_riscv64.deb
-  hash: 28b861d06dce856934ab2af5a3883606b6753c46ae1d8810715b33bc7b77bff0
+  version: 2:1.6.9-2ubuntu1.5
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-xcb1_1.6.9-2ubuntu1.5_riscv64.deb
+  hash: 9f959f7b438ab1f03b0663e221da038d3b307fba23de06fededf980f00a93990
 - package: libxau-dev
   version: 1:1.0.9-0ubuntu1
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libxau/libxau-dev_1.0.9-0ubuntu1_amd64.deb
@@ -782,25 +822,25 @@ packages:
   url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libxxf86vm/libxxf86vm1_1.1.4-1build1_riscv64.deb
   hash: 9c9c57225d56889e24dfdfbbe1c466a22e53d1fae02bbd6f457effc43f282bac
 - package: linux-libc-dev
-  version: 5.4.0-150.167
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_5.4.0-150.167_amd64.deb
-  hash: 245b86e5778cfef07204d6892f362528375e96263feaa2884d6336daf906357a
+  version: 5.4.0-152.169
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_5.4.0-152.169_amd64.deb
+  hash: 1ae91af8a52052dd2ee42aeead8727b54ae2f86e234a67d2fc1d4c9cf082de6a
 - package: linux-libc-dev
-  version: 5.4.0-150.167
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_5.4.0-150.167_i386.deb
-  hash: bd7dfd8d17a1b0388fe7e77dc326c7ab523effd88b34163392aa50eb38255c79
+  version: 5.4.0-152.169
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_5.4.0-152.169_i386.deb
+  hash: d67094a1391df27317e7a0838a03b5da043fddb5b46cb8f7147134d7e55ed20b
 - package: linux-libc-dev
-  version: 5.4.0-150.167
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.4.0-150.167_arm64.deb
-  hash: 1c91faa5d9f22f1bca3da8a3295004adb849f903b437f73b64c5a7cef92a8efe
+  version: 5.4.0-152.169
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.4.0-152.169_arm64.deb
+  hash: 25ac93b43deea3e42a4b44bb0e3a8f014099519bda23a9636b3b6c14b25ed32d
 - package: linux-libc-dev
-  version: 5.4.0-150.167
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.4.0-150.167_armhf.deb
-  hash: 5080feb4060bba1ce6b890dcc3a37bac786dabeb62aa7b009ba1adb61ad30a68
+  version: 5.4.0-152.169
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.4.0-152.169_armhf.deb
+  hash: e9f4c4a7d3e573b4622e1ae9d67f107bdbf9e2634b74fa4c85972e904fef984f
 - package: linux-libc-dev
-  version: 5.4.0-150.167
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.4.0-150.167_riscv64.deb
-  hash: 2eff9ef72f1d510f92fbce3b6b2f8001e0543f683fc4de51fc3183c7039ad256
+  version: 5.4.0-152.169
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.4.0-152.169_riscv64.deb
+  hash: 2df6b5e4d9d4c49b76c38551be3ef1b260d42ba1d5c6d8c4d30cccebcc6fb6d6
 - package: mesa-common-dev
   version: 21.2.6-0ubuntu0.1~20.04.2
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/mesa-common-dev_21.2.6-0ubuntu0.1~20.04.2_amd64.deb
@@ -823,23 +863,23 @@ packages:
   hash: 417842fd9acd8dfbba574a0acda2056f314fa4134f4f463ce851af1164d04b23
 - package: x11proto-core-dev
   version: 2019.2-1ubuntu1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-core-dev_2019.2-1ubuntu1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-core-dev_2019.2-1ubuntu1_all.deb
   hash: a952dce35c7b06b3a0e32d7bb16eb2c3922bdaa977813200b09223daabbee42a
 - package: x11proto-dev
   version: 2019.2-1ubuntu1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-dev_2019.2-1ubuntu1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-dev_2019.2-1ubuntu1_all.deb
   hash: 4144072931cbfbb422b465ae4775ce906d01ea816d432ed820b301e08cfef975
 - package: x11proto-gl-dev
   version: 2019.2-1ubuntu1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-gl-dev_2019.2-1ubuntu1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-gl-dev_2019.2-1ubuntu1_all.deb
   hash: 1c089d1544ea95e798ab69a4a17461d285e205f2b8459b2e9a8ab83fe78d0fa2
 - package: x11proto-input-dev
   version: 2019.2-1ubuntu1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-input-dev_2019.2-1ubuntu1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-input-dev_2019.2-1ubuntu1_all.deb
   hash: a0dd87a759faecd8e855b282ed911cf136ad7bae7253a40b764972b2d28da2d8
 - package: x11proto-kb-dev
   version: 2019.2-1ubuntu1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-kb-dev_2019.2-1ubuntu1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-kb-dev_2019.2-1ubuntu1_all.deb
   hash: df8863856683375fb8631af100af6e2695e946731b1c32e5eca49005e2c22a49
 - package: x11proto-randr-dev
   version: 2019.2-1ubuntu1

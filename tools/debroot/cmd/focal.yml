@@ -17,6 +17,8 @@ sources:
   - http://us.ports.ubuntu.com/ubuntu-ports
 keyring: ubuntu-archive-keyring.gpg
 packages:
+  - package: libasound2
+  - package: libasound2-dev
   - package: libc6
   - package: libc6-dev
   - package: libgl1

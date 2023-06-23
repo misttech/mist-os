@@ -1,6 +1,38 @@
-hash: 07d74b8dde6d51e304cc0fed9ca95d4716f8d4bde0952067b1f654996511afd5
-updated: 2023-06-06T23:55:42.554901727Z
+hash: 1fcb911c3e8d376e2dd7edbd73f531a48f8401579c13d5dff941a57e438b6073
+updated: 2023-06-23T07:15:19.451534863Z
 packages:
+- package: libasound2
+  version: 1.0.27.2-3ubuntu7
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/a/alsa-lib/libasound2_1.0.27.2-3ubuntu7_amd64.deb
+  hash: 04dbcbb653c059a0a605f8eac645f2a679ad8e63bd0b1fd290af404bf61503ff
+- package: libasound2
+  version: 1.0.27.2-3ubuntu7
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/a/alsa-lib/libasound2_1.0.27.2-3ubuntu7_i386.deb
+  hash: 4abc006761310ffb94a99cdae24db25e4ba697e3231a7a97d75a90d669a0bf45
+- package: libasound2
+  version: 1.0.27.2-3ubuntu7
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2_1.0.27.2-3ubuntu7_arm64.deb
+  hash: 1320643edab487778d80adf8109d8c549f79cdb8997c33e50ca167980a920f52
+- package: libasound2
+  version: 1.0.27.2-3ubuntu7
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2_1.0.27.2-3ubuntu7_armhf.deb
+  hash: 706e9ab62c808d1bd8725668c09974044614c70c3eb5f2e1853e9765753ebcc4
+- package: libasound2-dev
+  version: 1.0.27.2-3ubuntu7
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/a/alsa-lib/libasound2-dev_1.0.27.2-3ubuntu7_amd64.deb
+  hash: 0fbc23a308d6430896cc21233a84e59812285304b9f5221125d553fc64f2cf9e
+- package: libasound2-dev
+  version: 1.0.27.2-3ubuntu7
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/a/alsa-lib/libasound2-dev_1.0.27.2-3ubuntu7_i386.deb
+  hash: 7063e563bce0c51deb23eec372872904ba192227f27056a3ee7f219699c73022
+- package: libasound2-dev
+  version: 1.0.27.2-3ubuntu7
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2-dev_1.0.27.2-3ubuntu7_arm64.deb
+  hash: 4c0fcd8ac9e805376c4de588aee0ab5dbc89f2157c1e03ddab1748d671a01f05
+- package: libasound2-dev
+  version: 1.0.27.2-3ubuntu7
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2-dev_1.0.27.2-3ubuntu7_armhf.deb
+  hash: 868a8d77aa9b07d93c1bd4df032e6396ec0ad430b6f4e4307cf83623e6e5267a
 - package: libc6
   version: 2.19-0ubuntu6.15
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/e/eglibc/libc6_2.19-0ubuntu6.15_amd64.deb
@@ -651,7 +683,7 @@ packages:
   hash: f498eb367d11d82e3150c826bc239d789c5e8b42055706c83315c9966bf76ca2
 - package: x11proto-gl-dev
   version: 1.4.17-1
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/x11proto-gl/x11proto-gl-dev_1.4.17-1_all.deb
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/x11proto-gl/x11proto-gl-dev_1.4.17-1_all.deb
   hash: 6fc8ce114b0e25912207b53d8ee26bcd136ff94801e63b82b903e1a9a3c76ed1
 - package: x11proto-input-dev
   version: 2.3-1
@@ -663,11 +695,11 @@ packages:
   hash: d1bfc998cf8237291eaf913dc703a6cb7ea02d127a347d275767b1d1adc7d654
 - package: x11proto-randr-dev
   version: 1.5.0-1~trusty2
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/x11proto-randr/x11proto-randr-dev_1.5.0-1~trusty2_all.deb
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/x11proto-randr/x11proto-randr-dev_1.5.0-1~trusty2_all.deb
   hash: 762b4a9d05552a9c6b2b9c2529cc5f0b3e136727dfa7b98658f4193e3959e63d
 - package: x11proto-render-dev
   version: 2:0.11.1-2
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/x11proto-render/x11proto-render-dev_0.11.1-2_all.deb
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/x11proto-render/x11proto-render-dev_0.11.1-2_all.deb
   hash: 02080f5bb875bb1cd6e78a09e5b317ced150523596d4df47cc2767fc28fb5173
 - package: x11proto-xext-dev
   version: 7.3.0-1
