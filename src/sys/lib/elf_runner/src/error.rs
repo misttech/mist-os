@@ -91,6 +91,9 @@ pub enum ElfRunnerError {
     #[error("component start info does not have resolved URL")]
     MissingResolvedUrl,
 
+    #[error("component start info does not have runtime dir")]
+    MissingRuntimeDir,
+
     #[error("component resolved URL is malformed")]
     BadResolvedUrl(String),
 
@@ -166,6 +169,7 @@ impl ElfRunnerError {
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
             ElfRunnerError::MissingResolvedUrl { .. } => zx::Status::INVALID_ARGS,
+            ElfRunnerError::MissingRuntimeDir { .. } => zx::Status::INVALID_ARGS,
             ElfRunnerError::BadResolvedUrl { .. } => zx::Status::INVALID_ARGS,
             ElfRunnerError::ProgramBinaryError { .. } => zx::Status::INVALID_ARGS,
             ElfRunnerError::ComponentNamespaceError { .. } => zx::Status::INVALID_ARGS,
