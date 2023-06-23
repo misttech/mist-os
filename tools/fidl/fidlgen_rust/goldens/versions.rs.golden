@@ -29,6 +29,10 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
+pub const ADDED_AT_HEAD: bool = true;
+
+pub const CONST: u32 = 0;
+
 bitflags! {
     #[derive(Default)]
     pub struct Bits: u32 {
@@ -59,10 +63,6 @@ fidl_bits! {
     flexible: true,
 }
 
-pub const ADDED_AT_HEAD: bool = true;
-
-pub const CONST: u32 = 0;
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[non_exhaustive]
 pub enum Enum {
@@ -71,6 +71,7 @@ pub enum Enum {
     #[doc(hidden)]
     __Unknown(u32),
 }
+
 /// Pattern that matches an unknown `Enum` member.
 #[macro_export]
 macro_rules! EnumUnknown {
@@ -128,7 +129,57 @@ fidl_enum! {
     flexible: true,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct Struct {
+    pub x: u32,
+}
+
+impl fidl::Persistable for Struct {}
+
+fidl_struct! {
+    copy: true,
+    name: Struct,
+    members: [
+        x {
+            ty: u32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Table {
+    pub x: Option<u32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for Table {}
+
+fidl_table! {
+    name: Table,
+    members: [
+        x {
+            ty: u32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug)]
 pub enum Union {
     X(u32),
     #[deprecated = "Use `Union::unknown()` to construct and `UnionUnknown!()` to exhaustively match."]
@@ -138,6 +189,7 @@ pub enum Union {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `Union` member.
 #[macro_export]
 macro_rules! UnionUnknown {
@@ -165,6 +217,7 @@ impl Union {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -180,6 +233,7 @@ impl Union {
         }
     }
 }
+
 impl fidl::Persistable for Union {}
 
 fidl_union! {
@@ -191,54 +245,6 @@ fidl_union! {
         },
     ],
     unknown_member: __Unknown,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct Struct {
-    pub x: u32,
-}
-impl fidl::Persistable for Struct {}
-
-fidl_struct! {
-    copy: true,
-    name: Struct,
-    members: [
-        x {
-            ty: u32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct Table {
-    pub x: Option<u32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for Table {}
-
-fidl_table! {
-    name: Table,
-    members: [
-        x {
-            ty: u32,
-            ordinal: 1,
-        },
-    ],
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -447,6 +453,7 @@ impl futures::Stream for OtherProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum OtherProtocolRequest {}
 
@@ -517,6 +524,7 @@ impl ProtocolSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ProtocolEvent, fidl::Error> {
         ProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#foo(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -562,6 +570,7 @@ impl ProtocolProxy {
     pub fn take_event_stream(&self) -> ProtocolEventStream {
         ProtocolEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#foo(&self) -> Result<(), fidl::Error> {
         ProtocolProxyInterface::r#foo(self)
     }
@@ -719,6 +728,7 @@ impl futures::Stream for ProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum ProtocolRequest {
     Foo { control_handle: ProtocolControlHandle },

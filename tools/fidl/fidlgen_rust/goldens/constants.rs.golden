@@ -29,6 +29,42 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
+pub const BOOL: bool = true;
+
+pub const FLOAT32: f32 = 3.14159;
+
+pub const FLOAT64: f64 = 3.14159;
+
+pub const INT16: i16 = 4;
+
+pub const INT32: i32 = 4;
+
+pub const INT64: i64 = 4;
+
+pub const INT8: i8 = 4;
+
+pub const STRING: &str = "string";
+
+pub const UINT16: u16 = 4;
+
+pub const UINT32: u32 = 4;
+
+pub const UINT64: u64 = 4;
+
+pub const UINT8: u8 = 4;
+
+pub const BITS_PRIMITIVE_VAL: u32 = BitsType::VALUE.bits();
+
+pub const BITS_VAL: BitsType = BitsType::VALUE;
+
+pub const ENUM_PRIMITIVE_VAL: i32 = EnumType::Value.into_primitive();
+
+pub const ENUM_VAL: EnumType = EnumType::Value;
+
+pub const OR_RESULT: BitsType = BitsType::from_bits_truncate(7);
+
+pub const OR_RESULT_PRIMITIVE_VAL: u32 = 5;
+
 bitflags! {
     #[derive(Default)]
     pub struct Bits: u32 {
@@ -84,42 +120,6 @@ fidl_bits! {
     prim_ty: u32,
     strict: true,
 }
-
-pub const BOOL: bool = true;
-
-pub const FLOAT32: f32 = 3.14159;
-
-pub const FLOAT64: f64 = 3.14159;
-
-pub const INT16: i16 = 4;
-
-pub const INT32: i32 = 4;
-
-pub const INT64: i64 = 4;
-
-pub const INT8: i8 = 4;
-
-pub const STRING: &str = "string";
-
-pub const UINT16: u16 = 4;
-
-pub const UINT32: u32 = 4;
-
-pub const UINT64: u64 = 4;
-
-pub const UINT8: u8 = 4;
-
-pub const BITS_PRIMITIVE_VAL: u32 = BitsType::VALUE.bits();
-
-pub const BITS_VAL: BitsType = BitsType::VALUE;
-
-pub const ENUM_PRIMITIVE_VAL: i32 = EnumType::Value.into_primitive();
-
-pub const ENUM_VAL: EnumType = EnumType::Value;
-
-pub const OR_RESULT: BitsType = BitsType::from_bits_truncate(7);
-
-pub const OR_RESULT_PRIMITIVE_VAL: u32 = 5;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u32)]
@@ -191,7 +191,7 @@ fidl_enum! {
     min_member: Value,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Struct {
     pub int64_with_default: i64,
     pub string_with_default: String,
@@ -199,6 +199,7 @@ pub struct Struct {
     pub enum_with_default: Enum,
     pub bits_with_default: Bits,
 }
+
 impl fidl::Persistable for Struct {}
 
 fidl_struct! {

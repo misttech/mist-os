@@ -29,71 +29,12 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum UnionLargeArray {
-    A([u32; 100]),
-}
-
-impl UnionLargeArray {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::A(_) => 1,
-        }
-    }
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
-}
-impl fidl::Persistable for UnionLargeArray {}
-
-fidl_union! {
-    name: UnionLargeArray,
-    members: [
-        A {
-            ty: fidl::encoding::Array<u32, 100>,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum UnionSmallArray {
-    A([u32; 2]),
-}
-
-impl UnionSmallArray {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::A(_) => 1,
-        }
-    }
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
-}
-impl fidl::Persistable for UnionSmallArray {}
-
-fidl_union! {
-    name: UnionSmallArray,
-    members: [
-        A {
-            ty: fidl::encoding::Array<u32, 2>,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct StructLargeArray {
     pub a: [u32; 100],
 }
+
 impl fidl::Persistable for StructLargeArray {}
 
 fidl_struct! {
@@ -118,11 +59,12 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct StructSmallArray {
     pub a: [u32; 2],
 }
+
 impl fidl::Persistable for StructSmallArray {}
 
 fidl_struct! {
@@ -147,13 +89,14 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TableLargeArray {
     pub a: Option<[u32; 100]>,
     #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for TableLargeArray {}
 
 fidl_table! {
@@ -166,19 +109,84 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TableSmallArray {
     pub a: Option<[u32; 2]>,
     #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for TableSmallArray {}
 
 fidl_table! {
     name: TableSmallArray,
     members: [
         a {
+            ty: fidl::encoding::Array<u32, 2>,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum UnionLargeArray {
+    A([u32; 100]),
+}
+
+impl UnionLargeArray {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::A(_) => 1,
+        }
+    }
+
+    #[deprecated = "Strict unions should not use `is_unknown`"]
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        false
+    }
+}
+
+impl fidl::Persistable for UnionLargeArray {}
+
+fidl_union! {
+    name: UnionLargeArray,
+    members: [
+        A {
+            ty: fidl::encoding::Array<u32, 100>,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum UnionSmallArray {
+    A([u32; 2]),
+}
+
+impl UnionSmallArray {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::A(_) => 1,
+        }
+    }
+
+    #[deprecated = "Strict unions should not use `is_unknown`"]
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        false
+    }
+}
+
+impl fidl::Persistable for UnionSmallArray {}
+
+fidl_union! {
+    name: UnionSmallArray,
+    members: [
+        A {
             ty: fidl::encoding::Array<u32, 2>,
             ordinal: 1,
         },

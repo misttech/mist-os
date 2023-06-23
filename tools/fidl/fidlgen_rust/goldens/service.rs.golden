@@ -64,6 +64,7 @@ impl FirstProtocolSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<FirstProtocolEvent, fidl::Error> {
         FirstProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#method_on_first(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -109,6 +110,7 @@ impl FirstProtocolProxy {
     pub fn take_event_stream(&self) -> FirstProtocolEventStream {
         FirstProtocolEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#method_on_first(&self) -> Result<(), fidl::Error> {
         FirstProtocolProxyInterface::r#method_on_first(self)
     }
@@ -267,6 +269,7 @@ impl futures::Stream for FirstProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum FirstProtocolRequest {
     MethodOnFirst { control_handle: FirstProtocolControlHandle },
@@ -350,6 +353,7 @@ impl SecondProtocolSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<SecondProtocolEvent, fidl::Error> {
         SecondProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#method_on_second(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -395,6 +399,7 @@ impl SecondProtocolProxy {
     pub fn take_event_stream(&self) -> SecondProtocolEventStream {
         SecondProtocolEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#method_on_second(&self) -> Result<(), fidl::Error> {
         SecondProtocolProxyInterface::r#method_on_second(self)
     }
@@ -554,6 +559,7 @@ impl futures::Stream for SecondProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum SecondProtocolRequest {
     MethodOnSecond { control_handle: SecondProtocolControlHandle },

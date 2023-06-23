@@ -4,7 +4,7 @@
 // found in the LICENSE file.
 */}}
 
-{{- define "BitsDeclaration" -}}
+{{- define "BitsDeclaration" }}
 bitflags! {
     {{- range .DocComments }}
     ///{{ . }}
@@ -21,7 +21,7 @@ bitflags! {
 }
 
 impl {{ .Name }} {
-{{- if .IsStrict }}
+    {{- if .IsStrict }}
     #[deprecated = "Strict bits should not use `has_unknown_bits`"]
     #[inline(always)]
     pub fn has_unknown_bits(&self) -> bool {
@@ -33,7 +33,7 @@ impl {{ .Name }} {
     pub fn get_unknown_bits(&self) -> {{ .UnderlyingType }} {
         0
     }
-{{- else }}
+    {{- else }}
     #[inline(always)]
     pub fn from_bits_allow_unknown(bits: {{ .UnderlyingType }}) -> Self {
         {{- /* TODO(fxbug.dev/124335): Use `from_bits_retain` instead. */}}
@@ -49,7 +49,7 @@ impl {{ .Name }} {
     pub fn get_unknown_bits(&self) -> {{ .UnderlyingType }} {
         self.bits & !Self::all().bits
     }
-{{- end }}
+    {{- end }}
 }
 
 fidl_bits! {
@@ -61,4 +61,4 @@ fidl_bits! {
     flexible: true,
     {{- end }}
 }
-{{ end }}
+{{- end }}

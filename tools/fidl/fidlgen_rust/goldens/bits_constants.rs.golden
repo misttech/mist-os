@@ -29,6 +29,12 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
+pub const CONST1: BitsType = BitsType::A;
+
+pub const CONST2: BitsType = BitsType::from_bits_truncate(129);
+
+pub const CONST3: BitsType = BitsType::from_bits_truncate(131);
+
 bitflags! {
     #[derive(Default)]
     pub struct BitsType: u32 {
@@ -57,9 +63,3 @@ fidl_bits! {
     prim_ty: u32,
     strict: true,
 }
-
-pub const CONST1: BitsType = BitsType::A;
-
-pub const CONST2: BitsType = BitsType::from_bits_truncate(129);
-
-pub const CONST3: BitsType = BitsType::from_bits_truncate(131);

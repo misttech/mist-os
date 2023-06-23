@@ -21,11 +21,7 @@ pub struct {{ .Name }} {
     pub __non_exhaustive: (),
 }
 
-{{- if .IsResourceType }}
-impl fidl::Standalone for {{ .Name }} {}
-{{- else }}
-impl fidl::Persistable for {{ .Name }} {}
-{{- end }}
+impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone{{ end }} for {{ .Name }} {}
 
 fidl_table! {
     name: {{ .Name }},

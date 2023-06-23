@@ -4,66 +4,65 @@
 // found in the LICENSE file.
 */}}
 
-{{- define "ServiceDeclaration" -}}
-{{- $service := . }}
+{{- define "ServiceDeclaration" }}
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct {{ $service.Name }}Marker;
+pub struct {{ .Name }}Marker;
 
 #[cfg(target_os = "fuchsia")]
-impl fidl::endpoints::ServiceMarker for {{ $service.Name }}Marker {
-    type Proxy = {{ $service.Name }}Proxy;
-    type Request = {{ $service.Name }}Request;
-    const SERVICE_NAME: &'static str = "{{ $service.ServiceName }}";
+impl fidl::endpoints::ServiceMarker for {{ .Name }}Marker {
+    type Proxy = {{ .Name }}Proxy;
+    type Request = {{ .Name }}Request;
+    const SERVICE_NAME: &'static str = "{{ .ServiceName }}";
 }
 
-/// A request for one of the member protocols of {{ $service.Name }}.
+/// A request for one of the member protocols of {{ .Name }}.
 ///
-{{- range $service.DocComments }}
+{{- range .DocComments }}
 ///{{ . }}
 {{- end }}
 #[cfg(target_os = "fuchsia")]
-pub enum {{ $service.Name }}Request {
-    {{- range $member := $service.Members }}
-    {{- range $member.DocComments }}
+pub enum {{ .Name }}Request {
+    {{- range .Members }}
+    {{- range .DocComments }}
     ///{{ . }}
     {{- end }}
-    {{ $member.CamelName }}({{ $member.ProtocolType }}RequestStream),
+    {{ .CamelName }}({{ .ProtocolType }}RequestStream),
     {{- end }}
 }
 
 #[cfg(target_os = "fuchsia")]
-impl fidl::endpoints::ServiceRequest for {{ $service.Name }}Request {
-    type Service = {{ $service.Name }}Marker;
+impl fidl::endpoints::ServiceRequest for {{ .Name }}Request {
+    type Service = {{ .Name }}Marker;
 
     fn dispatch(name: &str, _channel: fidl::AsyncChannel) -> Self {
         match name {
-            {{- range $member := $service.Members }}
-            "{{ $member.Name }}" => Self::{{ $member.CamelName }}(
-                <{{ $member.ProtocolType }}RequestStream as fidl::endpoints::RequestStream>::from_channel(_channel),
+            {{- range .Members }}
+            "{{ .Name }}" => Self::{{ .CamelName }}(
+                <{{ .ProtocolType }}RequestStream as fidl::endpoints::RequestStream>::from_channel(_channel),
             ),
             {{- end }}
-            _ => panic!("no such member protocol name for service {{ $service.Name }}"),
+            _ => panic!("no such member protocol name for service {{ .Name }}"),
         }
     }
 
     fn member_names() -> &'static [&'static str] {
         &[
-        {{- range $member := $service.Members }}
-            "{{ $member.Name }}",
+        {{- range .Members }}
+            "{{ .Name }}",
         {{- end }}
         ]
     }
 }
 
-{{- range $service.DocComments }}
+{{- range .DocComments }}
 ///{{ . }}
 {{- end }}
 #[cfg(target_os = "fuchsia")]
-pub struct {{ $service.Name }}Proxy(Box<dyn fidl::endpoints::MemberOpener>);
+pub struct {{ .Name }}Proxy(Box<dyn fidl::endpoints::MemberOpener>);
 
 #[cfg(target_os = "fuchsia")]
-impl fidl::endpoints::ServiceProxy for {{ $service.Name }}Proxy {
-    type Service = {{ $service.Name }}Marker;
+impl fidl::endpoints::ServiceProxy for {{ .Name }}Proxy {
+    type Service = {{ .Name }}Marker;
 
     fn from_member_opener(opener: Box<dyn fidl::endpoints::MemberOpener>) -> Self {
         Self(opener)
@@ -71,20 +70,20 @@ impl fidl::endpoints::ServiceProxy for {{ $service.Name }}Proxy {
 }
 
 #[cfg(target_os = "fuchsia")]
-impl {{ $service.Name }}Proxy {
-    {{- range $member := $service.Members }}
-    {{- range $member.DocComments }}
+impl {{ .Name }}Proxy {
+    {{- range .Members }}
+    {{- range .DocComments }}
     ///{{ . }}
     {{- end }}
-    pub fn connect_to_{{ $member.SnakeName }}(&self) -> Result<{{ $member.ProtocolType }}Proxy, fidl::Error> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<{{ $member.ProtocolType }}Marker>()?;
-        self.connect_channel_to_{{ $member.SnakeName }}(server_end)?;
+    pub fn connect_to_{{ .SnakeName }}(&self) -> Result<{{ .ProtocolType }}Proxy, fidl::Error> {
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<{{ .ProtocolType }}Marker>()?;
+        self.connect_channel_to_{{ .SnakeName }}(server_end)?;
         Ok(proxy)
     }
 
-    /// Like `connect_to_{{ $member.SnakeName }}`, but accepts a server end.
-    pub fn connect_channel_to_{{ $member.SnakeName }}(&self, server_end: fidl::endpoints::ServerEnd<{{ $member.ProtocolType }}Marker>) -> Result<(), fidl::Error> {
-        self.0.open_member("{{ $member.Name }}", server_end.into_channel())
+    /// Like `connect_to_{{ .SnakeName }}`, but accepts a server end.
+    pub fn connect_channel_to_{{ .SnakeName }}(&self, server_end: fidl::endpoints::ServerEnd<{{ .ProtocolType }}Marker>) -> Result<(), fidl::Error> {
+        self.0.open_member("{{ .Name }}", server_end.into_channel())
     }
     {{- end }}
 }

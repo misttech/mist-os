@@ -30,7 +30,907 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsAjarProtocolStrictEventFieldsRequest {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventFieldsRequest {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsAjarProtocolStrictEventFieldsRequest,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventFieldsRequest {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsClosedProtocolStrictEventFieldsRequest,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsProtocolFlexibleEventFieldsRequest {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventFieldsRequest {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsProtocolFlexibleEventFieldsRequest,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsProtocolStrictEventFieldsRequest {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolStrictEventFieldsRequest {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsProtocolStrictEventFieldsRequest,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsProtocolStrictTwoWayFieldsResponse {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayFieldsResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsProtocolStrictTwoWayFieldsResponse,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsProtocolFlexibleEventFieldsErrResponse {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventFieldsErrResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsProtocolFlexibleEventFieldsErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsProtocolStrictEventFieldsErrResponse {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolStrictEventFieldsErrResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsProtocolStrictEventFieldsErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
+    pub some_field: i32,
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableRequest {}
+
+fidl_table! {
+    name: UnknownInteractionsAjarProtocolFlexibleEventTableRequest,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsAjarProtocolStrictEventTableRequest {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventTableRequest {}
+
+fidl_table! {
+    name: UnknownInteractionsAjarProtocolStrictEventTableRequest,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {}
+
+fidl_table! {
+    name: UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {}
+
+fidl_table! {
+    name: UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsAjarProtocolStrictEventTableErrResponse {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventTableErrResponse {}
+
+fidl_table! {
+    name: UnknownInteractionsAjarProtocolStrictEventTableErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {}
+
+fidl_table! {
+    name: UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsClosedProtocolStrictEventTableRequest {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventTableRequest {}
+
+fidl_table! {
+    name: UnknownInteractionsClosedProtocolStrictEventTableRequest,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {}
+
+fidl_table! {
+    name: UnknownInteractionsClosedProtocolStrictTwoWayTableResponse,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsClosedProtocolStrictEventTableErrResponse {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventTableErrResponse {}
+
+fidl_table! {
+    name: UnknownInteractionsClosedProtocolStrictEventTableErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {}
+
+fidl_table! {
+    name: UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsProtocolFlexibleEventTableRequest {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventTableRequest {}
+
+fidl_table! {
+    name: UnknownInteractionsProtocolFlexibleEventTableRequest,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsProtocolStrictEventTableRequest {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolStrictEventTableRequest {}
+
+fidl_table! {
+    name: UnknownInteractionsProtocolStrictEventTableRequest,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsProtocolStrictTwoWayTableResponse {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayTableResponse {}
+
+fidl_table! {
+    name: UnknownInteractionsProtocolStrictTwoWayTableResponse,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsProtocolFlexibleEventTableErrResponse {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventTableErrResponse {}
+
+fidl_table! {
+    name: UnknownInteractionsProtocolFlexibleEventTableErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {}
+
+fidl_table! {
+    name: UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableResponse {}
+
+fidl_table! {
+    name: UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsProtocolStrictEventTableErrResponse {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolStrictEventTableErrResponse {}
+
+fidl_table! {
+    name: UnknownInteractionsProtocolStrictEventTableErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
+    pub some_field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayTableErrResponse {}
+
+fidl_table! {
+    name: UnknownInteractionsProtocolStrictTwoWayTableErrResponse,
+    members: [
+        some_field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::unknown()` to construct and `UnknownInteractionsAjarProtocolFlexibleEventUnionRequestUnknown!()` to exhaustively match."]
@@ -40,6 +940,7 @@ pub enum UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsAjarProtocolFlexibleEventUnionRequest` member.
 #[macro_export]
 macro_rules! UnknownInteractionsAjarProtocolFlexibleEventUnionRequestUnknown {
@@ -67,6 +968,7 @@ impl UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -82,6 +984,7 @@ impl UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {}
 
 fidl_union! {
@@ -95,7 +998,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsAjarProtocolStrictEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictEventUnionRequest::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictEventUnionRequestUnknown!()` to exhaustively match."]
@@ -105,6 +1008,7 @@ pub enum UnknownInteractionsAjarProtocolStrictEventUnionRequest {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsAjarProtocolStrictEventUnionRequest` member.
 #[macro_export]
 macro_rules! UnknownInteractionsAjarProtocolStrictEventUnionRequestUnknown {
@@ -132,6 +1036,7 @@ impl UnknownInteractionsAjarProtocolStrictEventUnionRequest {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -147,6 +1052,7 @@ impl UnknownInteractionsAjarProtocolStrictEventUnionRequest {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventUnionRequest {}
 
 fidl_union! {
@@ -160,7 +1066,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
@@ -170,6 +1076,7 @@ pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse` member.
 #[macro_export]
 macro_rules! UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseUnknown {
@@ -197,6 +1104,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -212,6 +1120,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {}
 
 fidl_union! {
@@ -225,7 +1134,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponseUnknown!()` to exhaustively match."]
@@ -235,6 +1144,7 @@ pub enum UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse` member.
 #[macro_export]
 macro_rules! UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponseUnknown {
@@ -262,6 +1172,7 @@ impl UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -277,6 +1188,7 @@ impl UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {}
 
 fidl_union! {
@@ -290,7 +1202,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictEventUnionErrResponseUnknown!()` to exhaustively match."]
@@ -300,6 +1212,7 @@ pub enum UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsAjarProtocolStrictEventUnionErrResponse` member.
 #[macro_export]
 macro_rules! UnknownInteractionsAjarProtocolStrictEventUnionErrResponseUnknown {
@@ -327,6 +1240,7 @@ impl UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -342,6 +1256,7 @@ impl UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {}
 
 fidl_union! {
@@ -355,7 +1270,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
@@ -365,6 +1280,7 @@ pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse` member.
 #[macro_export]
 macro_rules! UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponseUnknown {
@@ -392,6 +1308,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -407,6 +1324,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {}
 
 fidl_union! {
@@ -420,7 +1338,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsClosedProtocolStrictEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictEventUnionRequest::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictEventUnionRequestUnknown!()` to exhaustively match."]
@@ -430,6 +1348,7 @@ pub enum UnknownInteractionsClosedProtocolStrictEventUnionRequest {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsClosedProtocolStrictEventUnionRequest` member.
 #[macro_export]
 macro_rules! UnknownInteractionsClosedProtocolStrictEventUnionRequestUnknown {
@@ -457,6 +1376,7 @@ impl UnknownInteractionsClosedProtocolStrictEventUnionRequest {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -472,6 +1392,7 @@ impl UnknownInteractionsClosedProtocolStrictEventUnionRequest {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventUnionRequest {}
 
 fidl_union! {
@@ -485,7 +1406,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
@@ -495,6 +1416,7 @@ pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse` member.
 #[macro_export]
 macro_rules! UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseUnknown {
@@ -522,6 +1444,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -537,6 +1460,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {}
 
 fidl_union! {
@@ -550,7 +1474,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictEventUnionErrResponseUnknown!()` to exhaustively match."]
@@ -560,6 +1484,7 @@ pub enum UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsClosedProtocolStrictEventUnionErrResponse` member.
 #[macro_export]
 macro_rules! UnknownInteractionsClosedProtocolStrictEventUnionErrResponseUnknown {
@@ -587,6 +1512,7 @@ impl UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -602,6 +1528,7 @@ impl UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {}
 
 fidl_union! {
@@ -615,7 +1542,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
@@ -625,6 +1552,7 @@ pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse` member.
 #[macro_export]
 macro_rules! UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponseUnknown {
@@ -652,6 +1580,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -667,6 +1596,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {}
 
 fidl_union! {
@@ -680,7 +1610,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolFlexibleEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolFlexibleEventUnionRequest::unknown()` to construct and `UnknownInteractionsProtocolFlexibleEventUnionRequestUnknown!()` to exhaustively match."]
@@ -690,6 +1620,7 @@ pub enum UnknownInteractionsProtocolFlexibleEventUnionRequest {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsProtocolFlexibleEventUnionRequest` member.
 #[macro_export]
 macro_rules! UnknownInteractionsProtocolFlexibleEventUnionRequestUnknown {
@@ -717,6 +1648,7 @@ impl UnknownInteractionsProtocolFlexibleEventUnionRequest {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -732,6 +1664,7 @@ impl UnknownInteractionsProtocolFlexibleEventUnionRequest {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventUnionRequest {}
 
 fidl_union! {
@@ -745,7 +1678,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolStrictEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolStrictEventUnionRequest::unknown()` to construct and `UnknownInteractionsProtocolStrictEventUnionRequestUnknown!()` to exhaustively match."]
@@ -755,6 +1688,7 @@ pub enum UnknownInteractionsProtocolStrictEventUnionRequest {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsProtocolStrictEventUnionRequest` member.
 #[macro_export]
 macro_rules! UnknownInteractionsProtocolStrictEventUnionRequestUnknown {
@@ -782,6 +1716,7 @@ impl UnknownInteractionsProtocolStrictEventUnionRequest {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -797,6 +1732,7 @@ impl UnknownInteractionsProtocolStrictEventUnionRequest {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsProtocolStrictEventUnionRequest {}
 
 fidl_union! {
@@ -810,7 +1746,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
@@ -820,6 +1756,7 @@ pub enum UnknownInteractionsProtocolStrictTwoWayUnionResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsProtocolStrictTwoWayUnionResponse` member.
 #[macro_export]
 macro_rules! UnknownInteractionsProtocolStrictTwoWayUnionResponseUnknown {
@@ -847,6 +1784,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -862,6 +1800,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionResponse {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayUnionResponse {}
 
 fidl_union! {
@@ -875,7 +1814,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolFlexibleEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolFlexibleEventUnionErrResponseUnknown!()` to exhaustively match."]
@@ -885,6 +1824,7 @@ pub enum UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsProtocolFlexibleEventUnionErrResponse` member.
 #[macro_export]
 macro_rules! UnknownInteractionsProtocolFlexibleEventUnionErrResponseUnknown {
@@ -912,6 +1852,7 @@ impl UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -927,6 +1868,7 @@ impl UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventUnionErrResponse {}
 
 fidl_union! {
@@ -940,7 +1882,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
@@ -950,6 +1892,7 @@ pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse` member.
 #[macro_export]
 macro_rules! UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponseUnknown {
@@ -977,6 +1920,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -992,6 +1936,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {}
 
 fidl_union! {
@@ -1005,7 +1950,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsProtocolFlexibleTwoWayUnionResponseUnknown!()` to exhaustively match."]
@@ -1015,6 +1960,7 @@ pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsProtocolFlexibleTwoWayUnionResponse` member.
 #[macro_export]
 macro_rules! UnknownInteractionsProtocolFlexibleTwoWayUnionResponseUnknown {
@@ -1042,6 +1988,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -1057,6 +2004,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {}
 
 fidl_union! {
@@ -1070,7 +2018,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolStrictEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolStrictEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolStrictEventUnionErrResponseUnknown!()` to exhaustively match."]
@@ -1080,6 +2028,7 @@ pub enum UnknownInteractionsProtocolStrictEventUnionErrResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsProtocolStrictEventUnionErrResponse` member.
 #[macro_export]
 macro_rules! UnknownInteractionsProtocolStrictEventUnionErrResponseUnknown {
@@ -1107,6 +2056,7 @@ impl UnknownInteractionsProtocolStrictEventUnionErrResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -1122,6 +2072,7 @@ impl UnknownInteractionsProtocolStrictEventUnionErrResponse {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsProtocolStrictEventUnionErrResponse {}
 
 fidl_union! {
@@ -1135,7 +2086,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
@@ -1145,6 +2096,7 @@ pub enum UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `UnknownInteractionsProtocolStrictTwoWayUnionErrResponse` member.
 #[macro_export]
 macro_rules! UnknownInteractionsProtocolStrictTwoWayUnionErrResponseUnknown {
@@ -1172,6 +2124,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -1187,6 +2140,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
         }
     }
 }
+
 impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {}
 
 fidl_union! {
@@ -1198,870 +2152,6 @@ fidl_union! {
         },
     ],
     unknown_member: __Unknown,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsAjarProtocolStrictEventFieldsRequest {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventFieldsRequest {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsAjarProtocolStrictEventFieldsRequest,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventFieldsRequest {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsClosedProtocolStrictEventFieldsRequest,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsProtocolFlexibleEventFieldsRequest {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventFieldsRequest {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsProtocolFlexibleEventFieldsRequest,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsProtocolStrictEventFieldsRequest {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsProtocolStrictEventFieldsRequest {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsProtocolStrictEventFieldsRequest,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsProtocolStrictTwoWayFieldsResponse {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayFieldsResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsProtocolStrictTwoWayFieldsResponse,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsProtocolFlexibleEventFieldsErrResponse {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventFieldsErrResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsProtocolFlexibleEventFieldsErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsProtocolStrictEventFieldsErrResponse {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsProtocolStrictEventFieldsErrResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsProtocolStrictEventFieldsErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(C)]
-pub struct UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
-    pub some_field: i32,
-}
-impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableRequest {}
-
-fidl_table! {
-    name: UnknownInteractionsAjarProtocolFlexibleEventTableRequest,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsAjarProtocolStrictEventTableRequest {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventTableRequest {}
-
-fidl_table! {
-    name: UnknownInteractionsAjarProtocolStrictEventTableRequest,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {}
-
-fidl_table! {
-    name: UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {}
-
-fidl_table! {
-    name: UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsAjarProtocolStrictEventTableErrResponse {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventTableErrResponse {}
-
-fidl_table! {
-    name: UnknownInteractionsAjarProtocolStrictEventTableErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {}
-
-fidl_table! {
-    name: UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsClosedProtocolStrictEventTableRequest {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventTableRequest {}
-
-fidl_table! {
-    name: UnknownInteractionsClosedProtocolStrictEventTableRequest,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {}
-
-fidl_table! {
-    name: UnknownInteractionsClosedProtocolStrictTwoWayTableResponse,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsClosedProtocolStrictEventTableErrResponse {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventTableErrResponse {}
-
-fidl_table! {
-    name: UnknownInteractionsClosedProtocolStrictEventTableErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {}
-
-fidl_table! {
-    name: UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsProtocolFlexibleEventTableRequest {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventTableRequest {}
-
-fidl_table! {
-    name: UnknownInteractionsProtocolFlexibleEventTableRequest,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsProtocolStrictEventTableRequest {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsProtocolStrictEventTableRequest {}
-
-fidl_table! {
-    name: UnknownInteractionsProtocolStrictEventTableRequest,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsProtocolStrictTwoWayTableResponse {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayTableResponse {}
-
-fidl_table! {
-    name: UnknownInteractionsProtocolStrictTwoWayTableResponse,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsProtocolFlexibleEventTableErrResponse {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventTableErrResponse {}
-
-fidl_table! {
-    name: UnknownInteractionsProtocolFlexibleEventTableErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {}
-
-fidl_table! {
-    name: UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableResponse {}
-
-fidl_table! {
-    name: UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsProtocolStrictEventTableErrResponse {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsProtocolStrictEventTableErrResponse {}
-
-fidl_table! {
-    name: UnknownInteractionsProtocolStrictEventTableErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
-    pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayTableErrResponse {}
-
-fidl_table! {
-    name: UnknownInteractionsProtocolStrictTwoWayTableErrResponse,
-    members: [
-        some_field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -2154,6 +2244,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
     ) -> Result<UnknownInteractionsAjarProtocolEvent, fidl::Error> {
         UnknownInteractionsAjarProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#strict_one_way(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -2161,6 +2252,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#flexible_one_way(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -2168,6 +2260,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn r#strict_two_way(&self, ___deadline: zx::Time) -> Result<(), fidl::Error> {
         let _response =
             self.client.send_query::<fidl::encoding::EmptyPayload, fidl::encoding::EmptyPayload>(
@@ -2178,67 +2271,68 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
             )?;
         Ok(_response)
     }
+
     pub fn r#strict_two_way_fields(&self, ___deadline: zx::Time) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse,
-            >(
-                (),
-                0x1947e36d61e4493a,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse,
+        >(
+            (),
+            0x1947e36d61e4493a,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.some_field)
     }
+
     pub fn r#strict_two_way_union(
         &self,
         ___deadline: zx::Time,
     ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
-            >(
-                (),
-                0x5177371967e0e6d1,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
+        >(
+            (),
+            0x5177371967e0e6d1,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response)
     }
+
     pub fn r#strict_two_way_table(
         &self,
         ___deadline: zx::Time,
     ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
-            >(
-                (),
-                0x6f8f9343b34e2ed4,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
+        >(
+            (),
+            0x6f8f9343b34e2ed4,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response)
     }
+
     pub fn r#strict_two_way_err(
         &self,
         ___deadline: zx::Time,
     ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayErrResult, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
-            >(
-                (),
-                0x5b47637577c69006,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
+        >(
+            (),
+            0x5b47637577c69006,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#strict_two_way_fields_err(
         &self,
         ___deadline: zx::Time,
@@ -2253,6 +2347,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
             )?;
         Ok(_response.map(|x| x.some_field))
     }
+
     pub fn r#strict_two_way_union_err(
         &self,
         ___deadline: zx::Time,
@@ -2267,6 +2362,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
             )?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#strict_two_way_table_err(
         &self,
         ___deadline: zx::Time,
@@ -2322,47 +2418,57 @@ impl UnknownInteractionsAjarProtocolProxy {
             event_receiver: self.client.take_event_receiver(),
         }
     }
+
     pub fn r#strict_one_way(&self) -> Result<(), fidl::Error> {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_one_way(self)
     }
+
     pub fn r#flexible_one_way(&self) -> Result<(), fidl::Error> {
         UnknownInteractionsAjarProtocolProxyInterface::r#flexible_one_way(self)
     }
+
     pub fn r#strict_two_way(&self) -> fidl::client::QueryResponseFut<()> {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way(self)
     }
+
     pub fn r#strict_two_way_fields(&self) -> fidl::client::QueryResponseFut<i32> {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way_fields(self)
     }
+
     pub fn r#strict_two_way_union(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>
     {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way_union(self)
     }
+
     pub fn r#strict_two_way_table(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse>
     {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way_table(self)
     }
+
     pub fn r#strict_two_way_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayErrResult> {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way_err(self)
     }
+
     pub fn r#strict_two_way_fields_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult>
     {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way_fields_err(self)
     }
+
     pub fn r#strict_two_way_union_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult>
     {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way_union_err(self)
     }
+
     pub fn r#strict_two_way_table_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult>
@@ -2379,6 +2485,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     fn r#flexible_one_way(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -2386,6 +2493,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     type StrictTwoWayResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#strict_two_way(&self) -> Self::StrictTwoWayResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
@@ -2400,6 +2508,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
             _decode,
         )
     }
+
     type StrictTwoWayFieldsResponseFut = fidl::client::QueryResponseFut<i32>;
     fn r#strict_two_way_fields(&self) -> Self::StrictTwoWayFieldsResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
@@ -2415,6 +2524,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
             _decode,
         )
     }
+
     type StrictTwoWayUnionResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>;
     fn r#strict_two_way_union(&self) -> Self::StrictTwoWayUnionResponseFut {
@@ -2436,6 +2546,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
             _decode,
         )
     }
+
     type StrictTwoWayTableResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse>;
     fn r#strict_two_way_table(&self) -> Self::StrictTwoWayTableResponseFut {
@@ -2457,6 +2568,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
             _decode,
         )
     }
+
     type StrictTwoWayErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayErrResult>;
     fn r#strict_two_way_err(&self) -> Self::StrictTwoWayErrResponseFut {
@@ -2478,6 +2590,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
             _decode,
         )
     }
+
     type StrictTwoWayFieldsErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult>;
     fn r#strict_two_way_fields_err(&self) -> Self::StrictTwoWayFieldsErrResponseFut {
@@ -2503,6 +2616,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
             _decode,
         )
     }
+
     type StrictTwoWayUnionErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult>;
     fn r#strict_two_way_union_err(&self) -> Self::StrictTwoWayUnionErrResponseFut {
@@ -2528,6 +2642,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
             _decode,
         )
     }
+
     type StrictTwoWayTableErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult>;
     fn r#strict_two_way_table_err(&self) -> Self::StrictTwoWayTableErrResponseFut {
@@ -3184,6 +3299,7 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum UnknownInteractionsAjarProtocolRequest {
     StrictOneWay {
@@ -3234,6 +3350,7 @@ impl UnknownInteractionsAjarProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_flexible_one_way(self) -> Option<(UnknownInteractionsAjarProtocolControlHandle)> {
         if let UnknownInteractionsAjarProtocolRequest::FlexibleOneWay { control_handle } = self {
@@ -3242,6 +3359,7 @@ impl UnknownInteractionsAjarProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way(
         self,
@@ -3252,6 +3370,7 @@ impl UnknownInteractionsAjarProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_fields(
         self,
@@ -3262,6 +3381,7 @@ impl UnknownInteractionsAjarProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_union(
         self,
@@ -3272,6 +3392,7 @@ impl UnknownInteractionsAjarProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_table(
         self,
@@ -3282,6 +3403,7 @@ impl UnknownInteractionsAjarProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_err(
         self,
@@ -3292,6 +3414,7 @@ impl UnknownInteractionsAjarProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_fields_err(
         self,
@@ -3302,6 +3425,7 @@ impl UnknownInteractionsAjarProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_union_err(
         self,
@@ -3312,6 +3436,7 @@ impl UnknownInteractionsAjarProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_table_err(
         self,
@@ -3387,6 +3512,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_fields(&self, mut some_field: i32) -> Result<(), fidl::Error> {
         self.inner.send::<UnknownInteractionsAjarProtocolStrictEventFieldsRequest>(
             (some_field,),
@@ -3395,6 +3521,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_union(
         &self,
         mut payload: &UnknownInteractionsAjarProtocolStrictEventUnionRequest,
@@ -3406,6 +3533,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_table(
         &self,
         mut payload: &UnknownInteractionsAjarProtocolStrictEventTableRequest,
@@ -3417,6 +3545,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_err(&self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>>(
             result,
@@ -3425,6 +3554,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_fields_err(
         &self,
         mut result: Result<i32, i32>,
@@ -3439,6 +3569,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_union_err(
         &self,
         mut result: Result<&UnknownInteractionsAjarProtocolStrictEventUnionErrResponse, i32>,
@@ -3448,6 +3579,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             i32,
         >>(result, 0, 0xab5b2d1199942b, fidl::encoding::DynamicFlags::empty())
     }
+
     pub fn send_strict_event_table_err(
         &self,
         mut result: Result<&UnknownInteractionsAjarProtocolStrictEventTableErrResponse, i32>,
@@ -3457,6 +3589,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             i32,
         >>(result, 0, 0x6c6abc426c7c8406, fidl::encoding::DynamicFlags::empty())
     }
+
     pub fn send_flexible_event(&self) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -3465,6 +3598,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn send_flexible_event_fields(&self, mut some_field: i32) -> Result<(), fidl::Error> {
         self.inner.send::<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>(
             (some_field,),
@@ -3473,6 +3607,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn send_flexible_event_union(
         &self,
         mut payload: &UnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
@@ -3484,6 +3619,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn send_flexible_event_table(
         &self,
         mut payload: &UnknownInteractionsAjarProtocolFlexibleEventTableRequest,
@@ -3495,6 +3631,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn send_flexible_event_err(&self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>>(
             result,
@@ -3503,6 +3640,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn send_flexible_event_fields_err(
         &self,
         mut result: Result<i32, i32>,
@@ -3517,6 +3655,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn send_flexible_event_union_err(
         &self,
         mut result: Result<&UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse, i32>,
@@ -3526,6 +3665,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
             i32,
         >>(result, 0, 0xc1637e7694d6680, fidl::encoding::DynamicFlags::FLEXIBLE)
     }
+
     pub fn send_flexible_event_table_err(
         &self,
         mut result: Result<&UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse, i32>,
@@ -3536,6 +3676,7 @@ impl UnknownInteractionsAjarProtocolControlHandle {
         >>(result, 0, 0x6e69d4c524bf3a27, fidl::encoding::DynamicFlags::FLEXIBLE)
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayResponder {
@@ -3609,6 +3750,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponder {
@@ -3684,6 +3826,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayUnionResponder {
@@ -3768,6 +3911,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableResponder {
@@ -3852,6 +3996,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayTableResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayErrResponder {
@@ -3927,6 +4072,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayErrResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponder {
@@ -4005,6 +4151,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponder {
@@ -4092,6 +4239,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponder {
@@ -4274,6 +4422,7 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
     ) -> Result<UnknownInteractionsClosedProtocolEvent, fidl::Error> {
         UnknownInteractionsClosedProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#strict_one_way(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -4281,6 +4430,7 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#strict_two_way(&self, ___deadline: zx::Time) -> Result<(), fidl::Error> {
         let _response =
             self.client.send_query::<fidl::encoding::EmptyPayload, fidl::encoding::EmptyPayload>(
@@ -4291,67 +4441,68 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
             )?;
         Ok(_response)
     }
+
     pub fn r#strict_two_way_fields(&self, ___deadline: zx::Time) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse,
-            >(
-                (),
-                0x1323afa3e0541253,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse,
+        >(
+            (),
+            0x1323afa3e0541253,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.some_field)
     }
+
     pub fn r#strict_two_way_union(
         &self,
         ___deadline: zx::Time,
     ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
-            >(
-                (),
-                0x68b32554eb0f6fa7,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
+        >(
+            (),
+            0x68b32554eb0f6fa7,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response)
     }
+
     pub fn r#strict_two_way_table(
         &self,
         ___deadline: zx::Time,
     ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                UnknownInteractionsClosedProtocolStrictTwoWayTableResponse,
-            >(
-                (),
-                0x6e4a94d44b69e785,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            UnknownInteractionsClosedProtocolStrictTwoWayTableResponse,
+        >(
+            (),
+            0x6e4a94d44b69e785,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response)
     }
+
     pub fn r#strict_two_way_err(
         &self,
         ___deadline: zx::Time,
     ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayErrResult, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
-            >(
-                (),
-                0x4fa35d5433db4d3a,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
+        >(
+            (),
+            0x4fa35d5433db4d3a,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#strict_two_way_fields_err(
         &self,
         ___deadline: zx::Time,
@@ -4366,6 +4517,7 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
             )?;
         Ok(_response.map(|x| x.some_field))
     }
+
     pub fn r#strict_two_way_union_err(
         &self,
         ___deadline: zx::Time,
@@ -4380,6 +4532,7 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
             )?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#strict_two_way_table_err(
         &self,
         ___deadline: zx::Time,
@@ -4434,45 +4587,54 @@ impl UnknownInteractionsClosedProtocolProxy {
             event_receiver: self.client.take_event_receiver(),
         }
     }
+
     pub fn r#strict_one_way(&self) -> Result<(), fidl::Error> {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_one_way(self)
     }
+
     pub fn r#strict_two_way(&self) -> fidl::client::QueryResponseFut<()> {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way(self)
     }
+
     pub fn r#strict_two_way_fields(&self) -> fidl::client::QueryResponseFut<i32> {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way_fields(self)
     }
+
     pub fn r#strict_two_way_union(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>
     {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way_union(self)
     }
+
     pub fn r#strict_two_way_table(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse>
     {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way_table(self)
     }
+
     pub fn r#strict_two_way_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayErrResult>
     {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way_err(self)
     }
+
     pub fn r#strict_two_way_fields_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult>
     {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way_fields_err(self)
     }
+
     pub fn r#strict_two_way_union_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult>
     {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way_union_err(self)
     }
+
     pub fn r#strict_two_way_table_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult>
@@ -4489,6 +4651,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     type StrictTwoWayResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#strict_two_way(&self) -> Self::StrictTwoWayResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
@@ -4503,6 +4666,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
             _decode,
         )
     }
+
     type StrictTwoWayFieldsResponseFut = fidl::client::QueryResponseFut<i32>;
     fn r#strict_two_way_fields(&self) -> Self::StrictTwoWayFieldsResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
@@ -4518,6 +4682,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
             _decode,
         )
     }
+
     type StrictTwoWayUnionResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>;
     fn r#strict_two_way_union(&self) -> Self::StrictTwoWayUnionResponseFut {
@@ -4540,6 +4705,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
             _decode,
         )
     }
+
     type StrictTwoWayTableResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse>;
     fn r#strict_two_way_table(&self) -> Self::StrictTwoWayTableResponseFut {
@@ -4562,6 +4728,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
             _decode,
         )
     }
+
     type StrictTwoWayErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayErrResult>;
     fn r#strict_two_way_err(&self) -> Self::StrictTwoWayErrResponseFut {
@@ -4583,6 +4750,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
             _decode,
         )
     }
+
     type StrictTwoWayFieldsErrResponseFut = fidl::client::QueryResponseFut<
         UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult,
     >;
@@ -4609,6 +4777,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
             _decode,
         )
     }
+
     type StrictTwoWayUnionErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult>;
     fn r#strict_two_way_union_err(&self) -> Self::StrictTwoWayUnionErrResponseFut {
@@ -4634,6 +4803,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
             _decode,
         )
     }
+
     type StrictTwoWayTableErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult>;
     fn r#strict_two_way_table_err(&self) -> Self::StrictTwoWayTableErrResponseFut {
@@ -5075,6 +5245,7 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum UnknownInteractionsClosedProtocolRequest {
     StrictOneWay {
@@ -5115,6 +5286,7 @@ impl UnknownInteractionsClosedProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way(
         self,
@@ -5125,6 +5297,7 @@ impl UnknownInteractionsClosedProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_fields(
         self,
@@ -5135,6 +5308,7 @@ impl UnknownInteractionsClosedProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_union(
         self,
@@ -5145,6 +5319,7 @@ impl UnknownInteractionsClosedProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_table(
         self,
@@ -5155,6 +5330,7 @@ impl UnknownInteractionsClosedProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_err(
         self,
@@ -5165,6 +5341,7 @@ impl UnknownInteractionsClosedProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_fields_err(
         self,
@@ -5176,6 +5353,7 @@ impl UnknownInteractionsClosedProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_union_err(
         self,
@@ -5186,6 +5364,7 @@ impl UnknownInteractionsClosedProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_table_err(
         self,
@@ -5259,6 +5438,7 @@ impl UnknownInteractionsClosedProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_fields(&self, mut some_field: i32) -> Result<(), fidl::Error> {
         self.inner.send::<UnknownInteractionsClosedProtocolStrictEventFieldsRequest>(
             (some_field,),
@@ -5267,6 +5447,7 @@ impl UnknownInteractionsClosedProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_union(
         &self,
         mut payload: &UnknownInteractionsClosedProtocolStrictEventUnionRequest,
@@ -5278,6 +5459,7 @@ impl UnknownInteractionsClosedProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_table(
         &self,
         mut payload: &UnknownInteractionsClosedProtocolStrictEventTableRequest,
@@ -5289,6 +5471,7 @@ impl UnknownInteractionsClosedProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_err(&self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>>(
             result,
@@ -5297,6 +5480,7 @@ impl UnknownInteractionsClosedProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_fields_err(
         &self,
         mut result: Result<i32, i32>,
@@ -5311,6 +5495,7 @@ impl UnknownInteractionsClosedProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_union_err(
         &self,
         mut result: Result<&UnknownInteractionsClosedProtocolStrictEventUnionErrResponse, i32>,
@@ -5320,6 +5505,7 @@ impl UnknownInteractionsClosedProtocolControlHandle {
             i32,
         >>(result, 0, 0x6dcf67f2a1d16034, fidl::encoding::DynamicFlags::empty())
     }
+
     pub fn send_strict_event_table_err(
         &self,
         mut result: Result<&UnknownInteractionsClosedProtocolStrictEventTableErrResponse, i32>,
@@ -5330,6 +5516,7 @@ impl UnknownInteractionsClosedProtocolControlHandle {
         >>(result, 0, 0x4e90e92eafa9eefa, fidl::encoding::DynamicFlags::empty())
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayResponder {
@@ -5403,6 +5590,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponder {
@@ -5478,6 +5666,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayUnionResponder {
@@ -5562,6 +5751,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableResponder {
@@ -5646,6 +5836,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayTableResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayErrResponder {
@@ -5721,6 +5912,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayErrResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponder {
@@ -5801,6 +5993,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponder {
@@ -5888,6 +6081,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponder {
@@ -6098,6 +6292,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
     ) -> Result<UnknownInteractionsProtocolEvent, fidl::Error> {
         UnknownInteractionsProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#strict_one_way(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -6105,6 +6300,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#flexible_one_way(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -6112,6 +6308,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn r#strict_two_way(&self, ___deadline: zx::Time) -> Result<(), fidl::Error> {
         let _response =
             self.client.send_query::<fidl::encoding::EmptyPayload, fidl::encoding::EmptyPayload>(
@@ -6122,67 +6319,68 @@ impl UnknownInteractionsProtocolSynchronousProxy {
             )?;
         Ok(_response)
     }
+
     pub fn r#strict_two_way_fields(&self, ___deadline: zx::Time) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                UnknownInteractionsProtocolStrictTwoWayFieldsResponse,
-            >(
-                (),
-                0x334f4e7fff460ae3,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            UnknownInteractionsProtocolStrictTwoWayFieldsResponse,
+        >(
+            (),
+            0x334f4e7fff460ae3,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.some_field)
     }
+
     pub fn r#strict_two_way_union(
         &self,
         ___deadline: zx::Time,
     ) -> Result<UnknownInteractionsProtocolStrictTwoWayUnionResponse, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                UnknownInteractionsProtocolStrictTwoWayUnionResponse,
-            >(
-                (),
-                0x2212805eca592cad,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            UnknownInteractionsProtocolStrictTwoWayUnionResponse,
+        >(
+            (),
+            0x2212805eca592cad,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response)
     }
+
     pub fn r#strict_two_way_table(
         &self,
         ___deadline: zx::Time,
     ) -> Result<UnknownInteractionsProtocolStrictTwoWayTableResponse, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                UnknownInteractionsProtocolStrictTwoWayTableResponse,
-            >(
-                (),
-                0x746ebf8659ff23b7,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            UnknownInteractionsProtocolStrictTwoWayTableResponse,
+        >(
+            (),
+            0x746ebf8659ff23b7,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response)
     }
+
     pub fn r#strict_two_way_err(
         &self,
         ___deadline: zx::Time,
     ) -> Result<UnknownInteractionsProtocolStrictTwoWayErrResult, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
-            >(
-                (),
-                0x6d1c6002c51bb967,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
+        >(
+            (),
+            0x6d1c6002c51bb967,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#strict_two_way_fields_err(
         &self,
         ___deadline: zx::Time,
@@ -6197,6 +6395,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
             )?;
         Ok(_response.map(|x| x.some_field))
     }
+
     pub fn r#strict_two_way_union_err(
         &self,
         ___deadline: zx::Time,
@@ -6211,6 +6410,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
             )?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#strict_two_way_table_err(
         &self,
         ___deadline: zx::Time,
@@ -6225,20 +6425,21 @@ impl UnknownInteractionsProtocolSynchronousProxy {
             )?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#flexible_two_way(&self, ___deadline: zx::Time) -> Result<(), fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                fidl::encoding::FlexibleType<fidl::encoding::EmptyStruct>,
-            >(
-                (),
-                0x4a5bb3397008b7c,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-                ___deadline,
-            )?
-            .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way")?
-            ;
+            fidl::encoding::EmptyPayload,
+            fidl::encoding::FlexibleType<fidl::encoding::EmptyStruct>,
+        >(
+            (),
+            0x4a5bb3397008b7c,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+            ___deadline,
+        )?
+        .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way")?;
         Ok(_response)
     }
+
     pub fn r#flexible_two_way_fields(&self, ___deadline: zx::Time) -> Result<i32, fidl::Error> {
         let _response =
             self.client
@@ -6250,6 +6451,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
                 .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_fields")?;
         Ok(_response.some_field)
     }
+
     pub fn r#flexible_two_way_union(
         &self,
         ___deadline: zx::Time,
@@ -6264,6 +6466,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
                 .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_union")?;
         Ok(_response)
     }
+
     pub fn r#flexible_two_way_table(
         &self,
         ___deadline: zx::Time,
@@ -6278,23 +6481,24 @@ impl UnknownInteractionsProtocolSynchronousProxy {
                 .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_table")?;
         Ok(_response)
     }
+
     pub fn r#flexible_two_way_err(
         &self,
         ___deadline: zx::Time,
     ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayErrResult, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                fidl::encoding::FlexibleResultType<fidl::encoding::EmptyStruct, i32>,
-            >(
-                (),
-                0x61240f878cc37c07,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-                ___deadline,
-            )?
-            .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_err")?
-            ;
+            fidl::encoding::EmptyPayload,
+            fidl::encoding::FlexibleResultType<fidl::encoding::EmptyStruct, i32>,
+        >(
+            (),
+            0x61240f878cc37c07,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+            ___deadline,
+        )?
+        .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_err")?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#flexible_two_way_fields_err(
         &self,
         ___deadline: zx::Time,
@@ -6310,6 +6514,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_fields_err")?;
         Ok(_response.map(|x| x.some_field))
     }
+
     pub fn r#flexible_two_way_union_err(
         &self,
         ___deadline: zx::Time,
@@ -6325,6 +6530,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_union_err")?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#flexible_two_way_table_err(
         &self,
         ___deadline: zx::Time,
@@ -6379,84 +6585,102 @@ impl UnknownInteractionsProtocolProxy {
     pub fn take_event_stream(&self) -> UnknownInteractionsProtocolEventStream {
         UnknownInteractionsProtocolEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#strict_one_way(&self) -> Result<(), fidl::Error> {
         UnknownInteractionsProtocolProxyInterface::r#strict_one_way(self)
     }
+
     pub fn r#flexible_one_way(&self) -> Result<(), fidl::Error> {
         UnknownInteractionsProtocolProxyInterface::r#flexible_one_way(self)
     }
+
     pub fn r#strict_two_way(&self) -> fidl::client::QueryResponseFut<()> {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way(self)
     }
+
     pub fn r#strict_two_way_fields(&self) -> fidl::client::QueryResponseFut<i32> {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_fields(self)
     }
+
     pub fn r#strict_two_way_union(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayUnionResponse> {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_union(self)
     }
+
     pub fn r#strict_two_way_table(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayTableResponse> {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_table(self)
     }
+
     pub fn r#strict_two_way_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayErrResult> {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_err(self)
     }
+
     pub fn r#strict_two_way_fields_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayFieldsErrResult>
     {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_fields_err(self)
     }
+
     pub fn r#strict_two_way_union_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayUnionErrResult> {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_union_err(self)
     }
+
     pub fn r#strict_two_way_table_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayTableErrResult> {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_table_err(self)
     }
+
     pub fn r#flexible_two_way(&self) -> fidl::client::QueryResponseFut<()> {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way(self)
     }
+
     pub fn r#flexible_two_way_fields(&self) -> fidl::client::QueryResponseFut<i32> {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way_fields(self)
     }
+
     pub fn r#flexible_two_way_union(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
     {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way_union(self)
     }
+
     pub fn r#flexible_two_way_table(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayTableResponse>
     {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way_table(self)
     }
+
     pub fn r#flexible_two_way_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayErrResult> {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way_err(self)
     }
+
     pub fn r#flexible_two_way_fields_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult>
     {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way_fields_err(self)
     }
+
     pub fn r#flexible_two_way_union_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult>
     {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way_union_err(self)
     }
+
     pub fn r#flexible_two_way_table_err(
         &self,
     ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayTableErrResult>
@@ -6473,6 +6697,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     fn r#flexible_one_way(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -6480,6 +6705,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     type StrictTwoWayResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#strict_two_way(&self) -> Self::StrictTwoWayResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
@@ -6494,6 +6720,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type StrictTwoWayFieldsResponseFut = fidl::client::QueryResponseFut<i32>;
     fn r#strict_two_way_fields(&self) -> Self::StrictTwoWayFieldsResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
@@ -6509,6 +6736,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type StrictTwoWayUnionResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayUnionResponse>;
     fn r#strict_two_way_union(&self) -> Self::StrictTwoWayUnionResponseFut {
@@ -6530,6 +6758,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type StrictTwoWayTableResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayTableResponse>;
     fn r#strict_two_way_table(&self) -> Self::StrictTwoWayTableResponseFut {
@@ -6551,6 +6780,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type StrictTwoWayErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayErrResult>;
     fn r#strict_two_way_err(&self) -> Self::StrictTwoWayErrResponseFut {
@@ -6572,6 +6802,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type StrictTwoWayFieldsErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayFieldsErrResult>;
     fn r#strict_two_way_fields_err(&self) -> Self::StrictTwoWayFieldsErrResponseFut {
@@ -6596,6 +6827,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type StrictTwoWayUnionErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayUnionErrResult>;
     fn r#strict_two_way_union_err(&self) -> Self::StrictTwoWayUnionErrResponseFut {
@@ -6620,6 +6852,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type StrictTwoWayTableErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayTableErrResult>;
     fn r#strict_two_way_table_err(&self) -> Self::StrictTwoWayTableErrResponseFut {
@@ -6644,6 +6877,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type FlexibleTwoWayResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#flexible_two_way(&self) -> Self::FlexibleTwoWayResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
@@ -6660,6 +6894,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type FlexibleTwoWayFieldsResponseFut = fidl::client::QueryResponseFut<i32>;
     fn r#flexible_two_way_fields(&self) -> Self::FlexibleTwoWayFieldsResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
@@ -6678,6 +6913,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type FlexibleTwoWayUnionResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>;
     fn r#flexible_two_way_union(&self) -> Self::FlexibleTwoWayUnionResponseFut {
@@ -6702,6 +6938,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type FlexibleTwoWayTableResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayTableResponse>;
     fn r#flexible_two_way_table(&self) -> Self::FlexibleTwoWayTableResponseFut {
@@ -6726,6 +6963,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type FlexibleTwoWayErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayErrResult>;
     fn r#flexible_two_way_err(&self) -> Self::FlexibleTwoWayErrResponseFut {
@@ -6748,6 +6986,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type FlexibleTwoWayFieldsErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult>;
     fn r#flexible_two_way_fields_err(&self) -> Self::FlexibleTwoWayFieldsErrResponseFut {
@@ -6773,6 +7012,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type FlexibleTwoWayUnionErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult>;
     fn r#flexible_two_way_union_err(&self) -> Self::FlexibleTwoWayUnionErrResponseFut {
@@ -6798,6 +7038,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             _decode,
         )
     }
+
     type FlexibleTwoWayTableErrResponseFut =
         fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayTableErrResult>;
     fn r#flexible_two_way_table_err(&self) -> Self::FlexibleTwoWayTableErrResponseFut {
@@ -7608,6 +7849,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum UnknownInteractionsProtocolRequest {
     StrictOneWay {
@@ -7683,6 +7925,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_flexible_one_way(self) -> Option<(UnknownInteractionsProtocolControlHandle)> {
         if let UnknownInteractionsProtocolRequest::FlexibleOneWay { control_handle } = self {
@@ -7691,6 +7934,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way(self) -> Option<(UnknownInteractionsProtocolStrictTwoWayResponder)> {
         if let UnknownInteractionsProtocolRequest::StrictTwoWay { responder } = self {
@@ -7699,6 +7943,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_fields(
         self,
@@ -7709,6 +7954,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_union(
         self,
@@ -7719,6 +7965,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_table(
         self,
@@ -7729,6 +7976,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_err(
         self,
@@ -7739,6 +7987,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_fields_err(
         self,
@@ -7749,6 +7998,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_union_err(
         self,
@@ -7759,6 +8009,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_strict_two_way_table_err(
         self,
@@ -7769,6 +8020,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_flexible_two_way(
         self,
@@ -7779,6 +8031,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_flexible_two_way_fields(
         self,
@@ -7789,6 +8042,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_flexible_two_way_union(
         self,
@@ -7799,6 +8053,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_flexible_two_way_table(
         self,
@@ -7809,6 +8064,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_flexible_two_way_err(
         self,
@@ -7819,6 +8075,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_flexible_two_way_fields_err(
         self,
@@ -7829,6 +8086,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_flexible_two_way_union_err(
         self,
@@ -7839,6 +8097,7 @@ impl UnknownInteractionsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_flexible_two_way_table_err(
         self,
@@ -7935,6 +8194,7 @@ impl UnknownInteractionsProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_fields(&self, mut some_field: i32) -> Result<(), fidl::Error> {
         self.inner.send::<UnknownInteractionsProtocolStrictEventFieldsRequest>(
             (some_field,),
@@ -7943,6 +8203,7 @@ impl UnknownInteractionsProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_union(
         &self,
         mut payload: &UnknownInteractionsProtocolStrictEventUnionRequest,
@@ -7954,6 +8215,7 @@ impl UnknownInteractionsProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_table(
         &self,
         mut payload: &UnknownInteractionsProtocolStrictEventTableRequest,
@@ -7965,6 +8227,7 @@ impl UnknownInteractionsProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_err(&self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>>(
             result,
@@ -7973,6 +8236,7 @@ impl UnknownInteractionsProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_fields_err(
         &self,
         mut result: Result<i32, i32>,
@@ -7987,6 +8251,7 @@ impl UnknownInteractionsProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_strict_event_union_err(
         &self,
         mut result: Result<&UnknownInteractionsProtocolStrictEventUnionErrResponse, i32>,
@@ -7996,6 +8261,7 @@ impl UnknownInteractionsProtocolControlHandle {
             i32,
         >>(result, 0, 0x40f96851e6f82abb, fidl::encoding::DynamicFlags::empty())
     }
+
     pub fn send_strict_event_table_err(
         &self,
         mut result: Result<&UnknownInteractionsProtocolStrictEventTableErrResponse, i32>,
@@ -8005,6 +8271,7 @@ impl UnknownInteractionsProtocolControlHandle {
             i32,
         >>(result, 0, 0x6ca24cbed7b2784a, fidl::encoding::DynamicFlags::empty())
     }
+
     pub fn send_flexible_event(&self) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -8013,6 +8280,7 @@ impl UnknownInteractionsProtocolControlHandle {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn send_flexible_event_fields(&self, mut some_field: i32) -> Result<(), fidl::Error> {
         self.inner.send::<UnknownInteractionsProtocolFlexibleEventFieldsRequest>(
             (some_field,),
@@ -8021,6 +8289,7 @@ impl UnknownInteractionsProtocolControlHandle {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn send_flexible_event_union(
         &self,
         mut payload: &UnknownInteractionsProtocolFlexibleEventUnionRequest,
@@ -8032,6 +8301,7 @@ impl UnknownInteractionsProtocolControlHandle {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn send_flexible_event_table(
         &self,
         mut payload: &UnknownInteractionsProtocolFlexibleEventTableRequest,
@@ -8043,6 +8313,7 @@ impl UnknownInteractionsProtocolControlHandle {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn send_flexible_event_err(&self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>>(
             result,
@@ -8051,6 +8322,7 @@ impl UnknownInteractionsProtocolControlHandle {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn send_flexible_event_fields_err(
         &self,
         mut result: Result<i32, i32>,
@@ -8065,6 +8337,7 @@ impl UnknownInteractionsProtocolControlHandle {
             fidl::encoding::DynamicFlags::FLEXIBLE,
         )
     }
+
     pub fn send_flexible_event_union_err(
         &self,
         mut result: Result<&UnknownInteractionsProtocolFlexibleEventUnionErrResponse, i32>,
@@ -8074,6 +8347,7 @@ impl UnknownInteractionsProtocolControlHandle {
             i32,
         >>(result, 0, 0xc94989e5f6707ec, fidl::encoding::DynamicFlags::FLEXIBLE)
     }
+
     pub fn send_flexible_event_table_err(
         &self,
         mut result: Result<&UnknownInteractionsProtocolFlexibleEventTableErrResponse, i32>,
@@ -8084,6 +8358,7 @@ impl UnknownInteractionsProtocolControlHandle {
         >>(result, 0, 0x4dca02085aeb2d43, fidl::encoding::DynamicFlags::FLEXIBLE)
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolStrictTwoWayResponder {
@@ -8157,6 +8432,7 @@ impl UnknownInteractionsProtocolStrictTwoWayResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolStrictTwoWayFieldsResponder {
@@ -8232,6 +8508,7 @@ impl UnknownInteractionsProtocolStrictTwoWayFieldsResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolStrictTwoWayUnionResponder {
@@ -8316,6 +8593,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolStrictTwoWayTableResponder {
@@ -8400,6 +8678,7 @@ impl UnknownInteractionsProtocolStrictTwoWayTableResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolStrictTwoWayErrResponder {
@@ -8475,6 +8754,7 @@ impl UnknownInteractionsProtocolStrictTwoWayErrResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolStrictTwoWayFieldsErrResponder {
@@ -8553,6 +8833,7 @@ impl UnknownInteractionsProtocolStrictTwoWayFieldsErrResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolStrictTwoWayUnionErrResponder {
@@ -8640,6 +8921,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionErrResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolStrictTwoWayTableErrResponder {
@@ -8727,6 +9009,7 @@ impl UnknownInteractionsProtocolStrictTwoWayTableErrResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayResponder {
@@ -8802,6 +9085,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsResponder {
@@ -8879,6 +9163,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayFieldsResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayUnionResponder {
@@ -8965,6 +9250,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayTableResponder {
@@ -9051,6 +9337,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayTableResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayErrResponder {
@@ -9126,6 +9413,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayErrResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponder {
@@ -9204,6 +9492,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponder {
@@ -9291,6 +9580,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayTableErrResponder {

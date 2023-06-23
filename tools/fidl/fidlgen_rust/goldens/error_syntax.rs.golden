@@ -29,10 +29,11 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
     pub s: String,
 }
+
 impl fidl::Persistable for ExampleUseOfErrorSyntaxCallWhichMayFailRequest {}
 
 fidl_struct! {
@@ -56,11 +57,12 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct ExampleUseOfErrorSyntaxCallWhichMayFailResponse {
     pub value: i64,
 }
+
 impl fidl::Persistable for ExampleUseOfErrorSyntaxCallWhichMayFailResponse {}
 
 fidl_struct! {
@@ -135,6 +137,7 @@ impl ExampleUseOfErrorSyntaxSynchronousProxy {
     ) -> Result<ExampleUseOfErrorSyntaxEvent, fidl::Error> {
         ExampleUseOfErrorSyntaxEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#composed_call_which_may_fail(
         &self,
         mut s: &str,
@@ -144,32 +147,31 @@ impl ExampleUseOfErrorSyntaxSynchronousProxy {
         fidl::Error,
     > {
         let _response = self.client.send_query::<
-                fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest,
-                fidl::encoding::ResultType<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse, u32>,
-            >(
-                (s,),
-                0x3179cf8f46814221,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest,
+            fidl::encoding::ResultType<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse, u32>,
+        >(
+            (s,),
+            0x3179cf8f46814221,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x.value))
     }
+
     pub fn r#call_which_may_fail(
         &self,
         mut s: &str,
         ___deadline: zx::Time,
     ) -> Result<ExampleUseOfErrorSyntaxCallWhichMayFailResult, fidl::Error> {
         let _response = self.client.send_query::<
-                ExampleUseOfErrorSyntaxCallWhichMayFailRequest,
-                fidl::encoding::ResultType<ExampleUseOfErrorSyntaxCallWhichMayFailResponse, u32>,
-            >(
-                (s,),
-                0x3424ff83ce3004a2,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            ExampleUseOfErrorSyntaxCallWhichMayFailRequest,
+            fidl::encoding::ResultType<ExampleUseOfErrorSyntaxCallWhichMayFailResponse, u32>,
+        >(
+            (s,),
+            0x3424ff83ce3004a2,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x.value))
     }
 }
@@ -211,6 +213,7 @@ impl ExampleUseOfErrorSyntaxProxy {
     pub fn take_event_stream(&self) -> ExampleUseOfErrorSyntaxEventStream {
         ExampleUseOfErrorSyntaxEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#composed_call_which_may_fail(
         &self,
         mut s: &str,
@@ -219,6 +222,7 @@ impl ExampleUseOfErrorSyntaxProxy {
     > {
         ExampleUseOfErrorSyntaxProxyInterface::r#composed_call_which_may_fail(self, s)
     }
+
     pub fn r#call_which_may_fail(
         &self,
         mut s: &str,
@@ -241,8 +245,7 @@ impl ExampleUseOfErrorSyntaxProxyInterface for ExampleUseOfErrorSyntaxProxy {
             fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResult,
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<fidl::encoding::ResultType<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse, u32>>(_buf?)?
-            ;
+            let _response = fidl::client::decode_transaction_body::<fidl::encoding::ResultType<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse, u32>>(_buf?)?;
             Ok(_response.map(|x| x.value))
         }
         self.client.send_query_and_decode::<
@@ -255,6 +258,7 @@ impl ExampleUseOfErrorSyntaxProxyInterface for ExampleUseOfErrorSyntaxProxy {
             _decode,
         )
     }
+
     type CallWhichMayFailResponseFut =
         fidl::client::QueryResponseFut<ExampleUseOfErrorSyntaxCallWhichMayFailResult>;
     fn r#call_which_may_fail(&self, mut s: &str) -> Self::CallWhichMayFailResponseFut {
@@ -441,6 +445,7 @@ impl futures::Stream for ExampleUseOfErrorSyntaxRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum ExampleUseOfErrorSyntaxRequest {
     ComposedCallWhichMayFail {
@@ -464,6 +469,7 @@ impl ExampleUseOfErrorSyntaxRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_call_which_may_fail(
         self,
@@ -510,6 +516,7 @@ impl fidl::endpoints::ControlHandle for ExampleUseOfErrorSyntaxControlHandle {
 }
 
 impl ExampleUseOfErrorSyntaxControlHandle {}
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct ExampleUseOfErrorSyntaxComposedCallWhichMayFailResponder {
@@ -583,6 +590,7 @@ impl ExampleUseOfErrorSyntaxComposedCallWhichMayFailResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct ExampleUseOfErrorSyntaxCallWhichMayFailResponder {

@@ -31,6 +31,7 @@ pub enum {{ .Name }} {
 }
 
 {{- if .IsFlexible }}
+{{ "" }}
 /// Pattern that matches an unknown `{{ .Name }}` member.
 #[macro_export]
 macro_rules! {{ .Name }}Unknown {
@@ -54,25 +55,17 @@ impl {{ .Name }} {
     #[inline]
     pub fn ordinal(&self) -> u64 {
         match *self {
-{{- range .Members }}
+            {{- range .Members }}
             Self::{{ .Name }}(_) => {{ .Ordinal }},
-{{- end }}
-{{- if .IsFlexible }}
+            {{- end }}
+            {{- if .IsFlexible }}
             #[allow(deprecated)]
             Self::__Unknown { ordinal } => ordinal,
-{{- end }}
+            {{- end }}
         }
     }
-
-{{- if .IsStrict }}
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
-{{- end }}
-
-{{- if .IsFlexible }}
+    {{ "" }}
+    {{- if .IsFlexible }}
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -89,14 +82,16 @@ impl {{ .Name }} {
             {{- end }}
         }
     }
-{{- end }}
+    {{- else }}
+    #[deprecated = "Strict unions should not use `is_unknown`"]
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        false
+    }
+    {{- end }}
 }
 
-{{- if .IsResourceType }}
-impl fidl::Standalone for {{ .Name }} {}
-{{- else }}
-impl fidl::Persistable for {{ .Name }} {}
-{{- end }}
+impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone{{ end }} for {{ .Name }} {}
 
 fidl_union! {
     name: {{ .Name }},

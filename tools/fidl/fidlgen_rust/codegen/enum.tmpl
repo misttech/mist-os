@@ -4,7 +4,7 @@
 // found in the LICENSE file.
 */}}
 
-{{- define "EnumDeclaration" -}}
+{{- define "EnumDeclaration" }}
 {{- range .DocComments }}
 ///{{ . }}
 {{- end }}
@@ -29,6 +29,7 @@ pub enum {{ .Name }} {
 }
 
 {{- if .IsFlexible }}
+{{ "" }}
 /// Pattern that matches an unknown `{{ .Name }}` member.
 #[macro_export]
 macro_rules! {{ .Name }}Unknown {
@@ -46,8 +47,8 @@ impl {{ .Name }} {
             _ => None,
         }
     }
-
-{{ if .IsStrict }}
+    {{ "" }}
+    {{- if .IsStrict }}
     #[inline]
     pub const fn into_primitive(self) -> {{ .UnderlyingType }} {
         self as {{ .UnderlyingType }}
@@ -58,7 +59,7 @@ impl {{ .Name }} {
     pub fn is_unknown(&self) -> bool {
         false
     }
-{{- else }}
+    {{- else }}
     #[inline]
     pub fn from_primitive_allow_unknown(prim: {{ .UnderlyingType }}) -> Self {
         match prim {
@@ -97,7 +98,7 @@ impl {{ .Name }} {
             {{- end }}
         }
     }
-{{- end }}
+    {{- end }}
 }
 
 fidl_enum! {
@@ -110,4 +111,4 @@ fidl_enum! {
     flexible: true,
     {{- end }}
 }
-{{ end }}
+{{- end }}

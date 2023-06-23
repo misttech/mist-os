@@ -100,6 +100,7 @@ pub enum Op {
     #[doc(hidden)]
     __Unknown(u32),
 }
+
 /// Pattern that matches an unknown `Op` member.
 #[macro_export]
 macro_rules! OpUnknown {
@@ -172,6 +173,7 @@ pub enum SomeProtocolSomeMethodError {
     #[doc(hidden)]
     __Unknown(u32),
 }
+
 /// Pattern that matches an unknown `SomeProtocolSomeMethodError` member.
 #[macro_export]
 macro_rules! SomeProtocolSomeMethodErrorUnknown {
@@ -232,156 +234,13 @@ fidl_enum! {
     flexible: true,
 }
 
-#[derive(Debug, Clone)]
-pub enum Expression {
-    Value(u64),
-    BinOp(OverrideTest),
-    FunctionApplication(FunctionApplication),
-    #[deprecated = "Use `Expression::unknown()` to construct and `ExpressionUnknown!()` to exhaustively match."]
-    #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
-    },
-}
-/// Pattern that matches an unknown `Expression` member.
-#[macro_export]
-macro_rules! ExpressionUnknown {
-    () => {
-        _
-    };
-}
-
-// Custom PartialEq so that unknown variants are not equal to themselves.
-impl PartialEq for Expression {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Value(x), Self::Value(y)) => *x == *y,
-            (Self::BinOp(x), Self::BinOp(y)) => *x == *y,
-            (Self::FunctionApplication(x), Self::FunctionApplication(y)) => *x == *y,
-            _ => false,
-        }
-    }
-}
-
-impl Expression {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::Value(_) => 1,
-            Self::BinOp(_) => 2,
-            Self::FunctionApplication(_) => 3,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
-        }
-    }
-    #[inline]
-    pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
-            _ => false,
-        }
-    }
-}
-impl fidl::Persistable for Expression {}
-
-fidl_union! {
-    name: Expression,
-    members: [
-        Value {
-            ty: u64,
-            ordinal: 1,
-        },
-        BinOp {
-            ty: OverrideTest,
-            ordinal: 2,
-        },
-        FunctionApplication {
-            ty: FunctionApplication,
-            ordinal: 3,
-        },
-    ],
-    unknown_member: __Unknown,
-}
-
-#[derive(Debug, Clone)]
-pub enum UnionMember {
-    UnionData(u8),
-    #[deprecated = "Use `UnionMember::unknown()` to construct and `UnionMemberUnknown!()` to exhaustively match."]
-    #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
-    },
-}
-/// Pattern that matches an unknown `UnionMember` member.
-#[macro_export]
-macro_rules! UnionMemberUnknown {
-    () => {
-        _
-    };
-}
-
-// Custom PartialEq so that unknown variants are not equal to themselves.
-impl PartialEq for UnionMember {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::UnionData(x), Self::UnionData(y)) => *x == *y,
-            _ => false,
-        }
-    }
-}
-
-impl UnionMember {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::UnionData(_) => 2,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
-        }
-    }
-    #[inline]
-    pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
-            _ => false,
-        }
-    }
-}
-impl fidl::Persistable for UnionMember {}
-
-fidl_union! {
-    name: UnionMember,
-    members: [
-        UnionData {
-            ty: u8,
-            ordinal: 2,
-        },
-    ],
-    unknown_member: __Unknown,
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct OverrideTest {
     pub op: Op,
     pub left: Option<Box<Expression>>,
     pub right: Option<Box<Expression>>,
 }
+
 impl fidl::Persistable for OverrideTest {}
 
 fidl_struct! {
@@ -429,11 +288,12 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SomeProtocolSomeMethodRequest {
     pub union_member: UnionMember,
     pub table_member: TableMember,
 }
+
 impl fidl::Persistable for SomeProtocolSomeMethodRequest {}
 
 fidl_struct! {
@@ -464,10 +324,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SomeProtocolSomeMethodResponse {
     pub bits_member: BitsMember,
 }
+
 impl fidl::Persistable for SomeProtocolSomeMethodResponse {}
 
 fidl_struct! {
@@ -491,11 +352,12 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct TableData {
     pub data: u8,
 }
+
 impl fidl::Persistable for TableData {}
 
 fidl_struct! {
@@ -520,7 +382,7 @@ fidl_struct! {
     align_v2: 1,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct FunctionApplication {
     pub func: Option<String>,
     pub args: Option<Vec<Option<Box<Expression>>>>,
@@ -529,6 +391,7 @@ pub struct FunctionApplication {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for FunctionApplication {}
 
 fidl_table! {
@@ -549,13 +412,14 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TableMember {
     pub table_data: Option<Vec<TableData>>,
     #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for TableMember {}
 
 fidl_table! {
@@ -566,6 +430,156 @@ fidl_table! {
             ordinal: 2,
         },
     ],
+}
+
+#[derive(Clone, Debug)]
+pub enum Expression {
+    Value(u64),
+    BinOp(OverrideTest),
+    FunctionApplication(FunctionApplication),
+    #[deprecated = "Use `Expression::unknown()` to construct and `ExpressionUnknown!()` to exhaustively match."]
+    #[doc(hidden)]
+    #[non_exhaustive]
+    __Unknown {
+        ordinal: u64,
+    },
+}
+
+/// Pattern that matches an unknown `Expression` member.
+#[macro_export]
+macro_rules! ExpressionUnknown {
+    () => {
+        _
+    };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for Expression {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Value(x), Self::Value(y)) => *x == *y,
+            (Self::BinOp(x), Self::BinOp(y)) => *x == *y,
+            (Self::FunctionApplication(x), Self::FunctionApplication(y)) => *x == *y,
+            _ => false,
+        }
+    }
+}
+
+impl Expression {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Value(_) => 1,
+            Self::BinOp(_) => 2,
+            Self::FunctionApplication(_) => 3,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+
+    #[inline]
+    pub fn unknown_variant_for_testing() -> Self {
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
+    }
+
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        match self {
+            #[allow(deprecated)]
+            Self::__Unknown { .. } => true,
+            _ => false,
+        }
+    }
+}
+
+impl fidl::Persistable for Expression {}
+
+fidl_union! {
+    name: Expression,
+    members: [
+        Value {
+            ty: u64,
+            ordinal: 1,
+        },
+        BinOp {
+            ty: OverrideTest,
+            ordinal: 2,
+        },
+        FunctionApplication {
+            ty: FunctionApplication,
+            ordinal: 3,
+        },
+    ],
+    unknown_member: __Unknown,
+}
+
+#[derive(Clone, Debug)]
+pub enum UnionMember {
+    UnionData(u8),
+    #[deprecated = "Use `UnionMember::unknown()` to construct and `UnionMemberUnknown!()` to exhaustively match."]
+    #[doc(hidden)]
+    #[non_exhaustive]
+    __Unknown {
+        ordinal: u64,
+    },
+}
+
+/// Pattern that matches an unknown `UnionMember` member.
+#[macro_export]
+macro_rules! UnionMemberUnknown {
+    () => {
+        _
+    };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnionMember {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::UnionData(x), Self::UnionData(y)) => *x == *y,
+            _ => false,
+        }
+    }
+}
+
+impl UnionMember {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::UnionData(_) => 2,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+
+    #[inline]
+    pub fn unknown_variant_for_testing() -> Self {
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
+    }
+
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        match self {
+            #[allow(deprecated)]
+            Self::__Unknown { .. } => true,
+            _ => false,
+        }
+    }
+}
+
+impl fidl::Persistable for UnionMember {}
+
+fidl_union! {
+    name: UnionMember,
+    members: [
+        UnionData {
+            ty: u8,
+            ordinal: 2,
+        },
+    ],
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -610,6 +624,7 @@ impl SomeProtocolSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<SomeProtocolEvent, fidl::Error> {
         SomeProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#some_method(
         &self,
         mut union_member: &UnionMember,
@@ -666,6 +681,7 @@ impl SomeProtocolProxy {
     pub fn take_event_stream(&self) -> SomeProtocolEventStream {
         SomeProtocolEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#some_method(
         &self,
         mut union_member: &UnionMember,
@@ -855,6 +871,7 @@ impl futures::Stream for SomeProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum SomeProtocolRequest {
     SomeMethod {
@@ -908,6 +925,7 @@ impl fidl::endpoints::ControlHandle for SomeProtocolControlHandle {
 }
 
 impl SomeProtocolControlHandle {}
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct SomeProtocolSomeMethodResponder {

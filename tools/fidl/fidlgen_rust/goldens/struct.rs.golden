@@ -29,11 +29,12 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct BasicStruct {
     pub x: u32,
     pub y: String,
 }
+
 impl fidl::Persistable for BasicStruct {}
 
 fidl_struct! {
@@ -74,11 +75,12 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Simple {
     pub f1: u8,
     pub f2: bool,
 }
+
 impl fidl::Persistable for Simple {}
 
 fidl_struct! {

@@ -65,131 +65,9 @@ fidl_enum! {
     min_member: None,
 }
 
-#[derive(Debug)]
-pub enum EmptyResourceUnion {
-    #[deprecated = "Use `EmptyResourceUnion::unknown()` to construct and `EmptyResourceUnionUnknown!()` to exhaustively match."]
-    #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown { ordinal: u64 },
-}
-/// Pattern that matches an unknown `EmptyResourceUnion` member.
-#[macro_export]
-macro_rules! EmptyResourceUnionUnknown {
-    () => {
-        _
-    };
-}
-
-// Custom PartialEq so that unknown variants are not equal to themselves.
-impl PartialEq for EmptyResourceUnion {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            _ => false,
-        }
-    }
-}
-
-impl EmptyResourceUnion {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
-        }
-    }
-    #[inline]
-    pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
-        }
-    }
-}
-impl fidl::Standalone for EmptyResourceUnion {}
-
-fidl_union! {
-    name: EmptyResourceUnion,
-    resource: true,
-    members: [
-    ],
-    unknown_member: __Unknown,
-}
-
-#[derive(Debug)]
-pub enum UnionWithHandle {
-    H(fidl::Vmo),
-    #[deprecated = "Use `UnionWithHandle::unknown()` to construct and `UnionWithHandleUnknown!()` to exhaustively match."]
-    #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
-    },
-}
-/// Pattern that matches an unknown `UnionWithHandle` member.
-#[macro_export]
-macro_rules! UnionWithHandleUnknown {
-    () => {
-        _
-    };
-}
-
-// Custom PartialEq so that unknown variants are not equal to themselves.
-impl PartialEq for UnionWithHandle {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::H(x), Self::H(y)) => *x == *y,
-            _ => false,
-        }
-    }
-}
-
-impl UnionWithHandle {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::H(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
-        }
-    }
-    #[inline]
-    pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
-            _ => false,
-        }
-    }
-}
-impl fidl::Standalone for UnionWithHandle {}
-
-fidl_union! {
-    name: UnionWithHandle,
-    resource: true,
-    members: [
-        H {
-            ty: fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>,
-            resource: true,
-            ordinal: 1,
-        },
-    ],
-    unknown_member: __Unknown,
-}
-
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct EmptyResourceStruct;
+
 impl fidl::Standalone for EmptyResourceStruct {}
 
 fidl_struct! {
@@ -207,6 +85,7 @@ pub struct HandlesInTypes {
     pub table_with_handle: TableWithHandle,
     pub union_with_handle: UnionWithHandle,
 }
+
 impl fidl::Standalone for HandlesInTypes {}
 
 fidl_struct! {
@@ -298,6 +177,7 @@ pub struct EmptyResourceTable {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Standalone for EmptyResourceTable {}
 
 fidl_table! {
@@ -314,6 +194,7 @@ pub struct TableWithHandle {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Standalone for TableWithHandle {}
 
 fidl_table! {
@@ -326,4 +207,133 @@ fidl_table! {
             ordinal: 1,
         },
     ],
+}
+
+#[derive(Debug)]
+pub enum EmptyResourceUnion {
+    #[deprecated = "Use `EmptyResourceUnion::unknown()` to construct and `EmptyResourceUnionUnknown!()` to exhaustively match."]
+    #[doc(hidden)]
+    #[non_exhaustive]
+    __Unknown { ordinal: u64 },
+}
+
+/// Pattern that matches an unknown `EmptyResourceUnion` member.
+#[macro_export]
+macro_rules! EmptyResourceUnionUnknown {
+    () => {
+        _
+    };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for EmptyResourceUnion {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            _ => false,
+        }
+    }
+}
+
+impl EmptyResourceUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+
+    #[inline]
+    pub fn unknown_variant_for_testing() -> Self {
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
+    }
+
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        match self {
+            #[allow(deprecated)]
+            Self::__Unknown { .. } => true,
+        }
+    }
+}
+
+impl fidl::Standalone for EmptyResourceUnion {}
+
+fidl_union! {
+    name: EmptyResourceUnion,
+    resource: true,
+    members: [
+    ],
+    unknown_member: __Unknown,
+}
+
+#[derive(Debug)]
+pub enum UnionWithHandle {
+    H(fidl::Vmo),
+    #[deprecated = "Use `UnionWithHandle::unknown()` to construct and `UnionWithHandleUnknown!()` to exhaustively match."]
+    #[doc(hidden)]
+    #[non_exhaustive]
+    __Unknown {
+        ordinal: u64,
+    },
+}
+
+/// Pattern that matches an unknown `UnionWithHandle` member.
+#[macro_export]
+macro_rules! UnionWithHandleUnknown {
+    () => {
+        _
+    };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnionWithHandle {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::H(x), Self::H(y)) => *x == *y,
+            _ => false,
+        }
+    }
+}
+
+impl UnionWithHandle {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::H(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+
+    #[inline]
+    pub fn unknown_variant_for_testing() -> Self {
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
+    }
+
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        match self {
+            #[allow(deprecated)]
+            Self::__Unknown { .. } => true,
+            _ => false,
+        }
+    }
+}
+
+impl fidl::Standalone for UnionWithHandle {}
+
+fidl_union! {
+    name: UnionWithHandle,
+    resource: true,
+    members: [
+        H {
+            ty: fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>,
+            resource: true,
+            ordinal: 1,
+        },
+    ],
+    unknown_member: __Unknown,
 }

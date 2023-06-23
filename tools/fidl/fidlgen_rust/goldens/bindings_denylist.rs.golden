@@ -31,10 +31,11 @@ use {
 
 pub const ALL_BINDINGS: u32 = 0;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DenyEachBindingOnlyDenyCppRequest {
     pub a: bool,
 }
+
 impl fidl::Persistable for DenyEachBindingOnlyDenyCppRequest {}
 
 fidl_struct! {
@@ -58,10 +59,11 @@ fidl_struct! {
     align_v2: 1,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DenyEachBindingOnlyDenyDartRequest {
     pub a: bool,
 }
+
 impl fidl::Persistable for DenyEachBindingOnlyDenyDartRequest {}
 
 fidl_struct! {
@@ -85,10 +87,11 @@ fidl_struct! {
     align_v2: 1,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DenyEachBindingOnlyDenyGoRequest {
     pub a: bool,
 }
+
 impl fidl::Persistable for DenyEachBindingOnlyDenyGoRequest {}
 
 fidl_struct! {
@@ -112,10 +115,11 @@ fidl_struct! {
     align_v2: 1,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DenyEachBindingOnlyDenyLibfuzzerRequest {
     pub a: bool,
 }
+
 impl fidl::Persistable for DenyEachBindingOnlyDenyLibfuzzerRequest {}
 
 fidl_struct! {
@@ -139,10 +143,11 @@ fidl_struct! {
     align_v2: 1,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DenyEachBindingOnlyDenySyzkallerRequest {
     pub a: bool,
 }
+
 impl fidl::Persistable for DenyEachBindingOnlyDenySyzkallerRequest {}
 
 fidl_struct! {
@@ -166,11 +171,12 @@ fidl_struct! {
     align_v2: 1,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct DenyEachBindingOnlyDenyCppResponse {
     pub b: i32,
 }
+
 impl fidl::Persistable for DenyEachBindingOnlyDenyCppResponse {}
 
 fidl_struct! {
@@ -195,11 +201,12 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct DenyEachBindingOnlyDenyDartResponse {
     pub b: i32,
 }
+
 impl fidl::Persistable for DenyEachBindingOnlyDenyDartResponse {}
 
 fidl_struct! {
@@ -224,11 +231,12 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct DenyEachBindingOnlyDenyGoResponse {
     pub b: i32,
 }
+
 impl fidl::Persistable for DenyEachBindingOnlyDenyGoResponse {}
 
 fidl_struct! {
@@ -253,11 +261,12 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct DenyEachBindingOnlyDenyLibfuzzerResponse {
     pub b: i32,
 }
+
 impl fidl::Persistable for DenyEachBindingOnlyDenyLibfuzzerResponse {}
 
 fidl_struct! {
@@ -282,11 +291,12 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct DenyEachBindingOnlyDenySyzkallerResponse {
     pub b: i32,
 }
+
 impl fidl::Persistable for DenyEachBindingOnlyDenySyzkallerResponse {}
 
 fidl_struct! {
@@ -311,10 +321,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MemberOnlyAppearsInImportingLibrary {
     pub a: bool,
 }
+
 impl fidl::Persistable for MemberOnlyAppearsInImportingLibrary {}
 
 fidl_struct! {
@@ -338,10 +349,11 @@ fidl_struct! {
     align_v2: 1,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct OnlyAppearsInImportingLibrary {
     pub member_only_appears_in_importing_library: MemberOnlyAppearsInImportingLibrary,
 }
+
 impl fidl::Persistable for OnlyAppearsInImportingLibrary {}
 
 fidl_struct! {
@@ -365,12 +377,13 @@ fidl_struct! {
     align_v2: 1,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct OnlyRust {
     #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for OnlyRust {}
 
 fidl_table! {
@@ -584,6 +597,7 @@ impl futures::Stream for AllowedRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum AllowedRequest {}
 
@@ -673,89 +687,89 @@ impl DenyEachBindingSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<DenyEachBindingEvent, fidl::Error> {
         DenyEachBindingEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#only_deny_cpp(
         &self,
         mut a: bool,
         ___deadline: zx::Time,
     ) -> Result<DenyEachBindingOnlyDenyCppResult, fidl::Error> {
         let _response = self.client.send_query::<
-                DenyEachBindingOnlyDenyCppRequest,
-                fidl::encoding::ResultType<DenyEachBindingOnlyDenyCppResponse, u32>,
-            >(
-                (a,),
-                0x290bad96051b1b92,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            DenyEachBindingOnlyDenyCppRequest,
+            fidl::encoding::ResultType<DenyEachBindingOnlyDenyCppResponse, u32>,
+        >(
+            (a,),
+            0x290bad96051b1b92,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x.b))
     }
+
     pub fn r#only_deny_dart(
         &self,
         mut a: bool,
         ___deadline: zx::Time,
     ) -> Result<DenyEachBindingOnlyDenyDartResult, fidl::Error> {
         let _response = self.client.send_query::<
-                DenyEachBindingOnlyDenyDartRequest,
-                fidl::encoding::ResultType<DenyEachBindingOnlyDenyDartResponse, u32>,
-            >(
-                (a,),
-                0x75384066a26d87d7,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            DenyEachBindingOnlyDenyDartRequest,
+            fidl::encoding::ResultType<DenyEachBindingOnlyDenyDartResponse, u32>,
+        >(
+            (a,),
+            0x75384066a26d87d7,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x.b))
     }
+
     pub fn r#only_deny_go(
         &self,
         mut a: bool,
         ___deadline: zx::Time,
     ) -> Result<DenyEachBindingOnlyDenyGoResult, fidl::Error> {
         let _response = self.client.send_query::<
-                DenyEachBindingOnlyDenyGoRequest,
-                fidl::encoding::ResultType<DenyEachBindingOnlyDenyGoResponse, u32>,
-            >(
-                (a,),
-                0x657655b981478d99,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            DenyEachBindingOnlyDenyGoRequest,
+            fidl::encoding::ResultType<DenyEachBindingOnlyDenyGoResponse, u32>,
+        >(
+            (a,),
+            0x657655b981478d99,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x.b))
     }
+
     pub fn r#only_deny_libfuzzer(
         &self,
         mut a: bool,
         ___deadline: zx::Time,
     ) -> Result<DenyEachBindingOnlyDenyLibfuzzerResult, fidl::Error> {
         let _response = self.client.send_query::<
-                DenyEachBindingOnlyDenyLibfuzzerRequest,
-                fidl::encoding::ResultType<DenyEachBindingOnlyDenyLibfuzzerResponse, u32>,
-            >(
-                (a,),
-                0x1e4f89c329617b1e,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            DenyEachBindingOnlyDenyLibfuzzerRequest,
+            fidl::encoding::ResultType<DenyEachBindingOnlyDenyLibfuzzerResponse, u32>,
+        >(
+            (a,),
+            0x1e4f89c329617b1e,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x.b))
     }
+
     pub fn r#only_deny_syzkaller(
         &self,
         mut a: bool,
         ___deadline: zx::Time,
     ) -> Result<DenyEachBindingOnlyDenySyzkallerResult, fidl::Error> {
         let _response = self.client.send_query::<
-                DenyEachBindingOnlyDenySyzkallerRequest,
-                fidl::encoding::ResultType<DenyEachBindingOnlyDenySyzkallerResponse, u32>,
-            >(
-                (a,),
-                0x202ee614a749e98a,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            DenyEachBindingOnlyDenySyzkallerRequest,
+            fidl::encoding::ResultType<DenyEachBindingOnlyDenySyzkallerResponse, u32>,
+        >(
+            (a,),
+            0x202ee614a749e98a,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x.b))
     }
 }
@@ -796,30 +810,35 @@ impl DenyEachBindingProxy {
     pub fn take_event_stream(&self) -> DenyEachBindingEventStream {
         DenyEachBindingEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#only_deny_cpp(
         &self,
         mut a: bool,
     ) -> fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyCppResult> {
         DenyEachBindingProxyInterface::r#only_deny_cpp(self, a)
     }
+
     pub fn r#only_deny_dart(
         &self,
         mut a: bool,
     ) -> fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyDartResult> {
         DenyEachBindingProxyInterface::r#only_deny_dart(self, a)
     }
+
     pub fn r#only_deny_go(
         &self,
         mut a: bool,
     ) -> fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyGoResult> {
         DenyEachBindingProxyInterface::r#only_deny_go(self, a)
     }
+
     pub fn r#only_deny_libfuzzer(
         &self,
         mut a: bool,
     ) -> fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyLibfuzzerResult> {
         DenyEachBindingProxyInterface::r#only_deny_libfuzzer(self, a)
     }
+
     pub fn r#only_deny_syzkaller(
         &self,
         mut a: bool,
@@ -849,6 +868,7 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
             _decode,
         )
     }
+
     type OnlyDenyDartResponseFut =
         fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyDartResult>;
     fn r#only_deny_dart(&self, mut a: bool) -> Self::OnlyDenyDartResponseFut {
@@ -870,6 +890,7 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
             _decode,
         )
     }
+
     type OnlyDenyGoResponseFut = fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyGoResult>;
     fn r#only_deny_go(&self, mut a: bool) -> Self::OnlyDenyGoResponseFut {
         fn _decode(
@@ -890,6 +911,7 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
             _decode,
         )
     }
+
     type OnlyDenyLibfuzzerResponseFut =
         fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyLibfuzzerResult>;
     fn r#only_deny_libfuzzer(&self, mut a: bool) -> Self::OnlyDenyLibfuzzerResponseFut {
@@ -911,6 +933,7 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
             _decode,
         )
     }
+
     type OnlyDenySyzkallerResponseFut =
         fidl::client::QueryResponseFut<DenyEachBindingOnlyDenySyzkallerResult>;
     fn r#only_deny_syzkaller(&self, mut a: bool) -> Self::OnlyDenySyzkallerResponseFut {
@@ -1166,6 +1189,7 @@ impl futures::Stream for DenyEachBindingRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum DenyEachBindingRequest {
     OnlyDenyCpp { a: bool, responder: DenyEachBindingOnlyDenyCppResponder },
@@ -1184,6 +1208,7 @@ impl DenyEachBindingRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_only_deny_dart(self) -> Option<(bool, DenyEachBindingOnlyDenyDartResponder)> {
         if let DenyEachBindingRequest::OnlyDenyDart { a, responder } = self {
@@ -1192,6 +1217,7 @@ impl DenyEachBindingRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_only_deny_go(self) -> Option<(bool, DenyEachBindingOnlyDenyGoResponder)> {
         if let DenyEachBindingRequest::OnlyDenyGo { a, responder } = self {
@@ -1200,6 +1226,7 @@ impl DenyEachBindingRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_only_deny_libfuzzer(
         self,
@@ -1210,6 +1237,7 @@ impl DenyEachBindingRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_only_deny_syzkaller(
         self,
@@ -1257,6 +1285,7 @@ impl fidl::endpoints::ControlHandle for DenyEachBindingControlHandle {
 }
 
 impl DenyEachBindingControlHandle {}
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct DenyEachBindingOnlyDenyCppResponder {
@@ -1332,6 +1361,7 @@ impl DenyEachBindingOnlyDenyCppResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct DenyEachBindingOnlyDenyDartResponder {
@@ -1407,6 +1437,7 @@ impl DenyEachBindingOnlyDenyDartResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct DenyEachBindingOnlyDenyGoResponder {
@@ -1482,6 +1513,7 @@ impl DenyEachBindingOnlyDenyGoResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct DenyEachBindingOnlyDenyLibfuzzerResponder {
@@ -1557,6 +1589,7 @@ impl DenyEachBindingOnlyDenyLibfuzzerResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct DenyEachBindingOnlyDenySyzkallerResponder {
@@ -1673,6 +1706,7 @@ impl ImportsSameNameContextSynchronousProxy {
     ) -> Result<ImportsSameNameContextEvent, fidl::Error> {
         ImportsSameNameContextEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#unattributed(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -1680,6 +1714,7 @@ impl ImportsSameNameContextSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#always_appears_in_importing_library(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -1726,9 +1761,11 @@ impl ImportsSameNameContextProxy {
     pub fn take_event_stream(&self) -> ImportsSameNameContextEventStream {
         ImportsSameNameContextEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#unattributed(&self) -> Result<(), fidl::Error> {
         ImportsSameNameContextProxyInterface::r#unattributed(self)
     }
+
     pub fn r#always_appears_in_importing_library(&self) -> Result<(), fidl::Error> {
         ImportsSameNameContextProxyInterface::r#always_appears_in_importing_library(self)
     }
@@ -1742,6 +1779,7 @@ impl ImportsSameNameContextProxyInterface for ImportsSameNameContextProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     fn r#always_appears_in_importing_library(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -1904,6 +1942,7 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum ImportsSameNameContextRequest {
     Unattributed { control_handle: ImportsSameNameContextControlHandle },
@@ -1919,6 +1958,7 @@ impl ImportsSameNameContextRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_always_appears_in_importing_library(
         self,

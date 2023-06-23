@@ -29,11 +29,12 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ExampleUseOfVectors {
     pub vector_of_uint8: Vec<u8>,
     pub vector_of_vector_of_bool: Vec<Vec<bool>>,
 }
+
 impl fidl::Persistable for ExampleUseOfVectors {}
 
 fidl_struct! {

@@ -29,11 +29,12 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct Payload {
     pub value: u32,
 }
+
 impl fidl::Persistable for Payload {}
 
 fidl_struct! {

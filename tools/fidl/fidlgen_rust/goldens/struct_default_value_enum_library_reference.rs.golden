@@ -29,10 +29,11 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Foo {
     pub field: fidl_test_dependent::MyEnum,
 }
+
 impl fidl::Persistable for Foo {}
 
 fidl_struct! {

@@ -29,10 +29,11 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ChildSecondRequest {
     pub request: fidl::endpoints::ServerEnd<ParentMarker>,
 }
+
 impl fidl::Standalone for ChildSecondRequest {}
 
 fidl_struct! {
@@ -58,10 +59,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ParentFirstRequest {
     pub request: fidl::endpoints::ServerEnd<ParentMarker>,
 }
+
 impl fidl::Standalone for ParentFirstRequest {}
 
 fidl_struct! {
@@ -127,6 +129,7 @@ impl ChildSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ChildEvent, fidl::Error> {
         ChildEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#first(
         &self,
         mut request: fidl::endpoints::ServerEnd<ParentMarker>,
@@ -137,6 +140,7 @@ impl ChildSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#second(
         &self,
         mut request: fidl::endpoints::ServerEnd<ParentMarker>,
@@ -185,12 +189,14 @@ impl ChildProxy {
     pub fn take_event_stream(&self) -> ChildEventStream {
         ChildEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#first(
         &self,
         mut request: fidl::endpoints::ServerEnd<ParentMarker>,
     ) -> Result<(), fidl::Error> {
         ChildProxyInterface::r#first(self, request)
     }
+
     pub fn r#second(
         &self,
         mut request: fidl::endpoints::ServerEnd<ParentMarker>,
@@ -210,6 +216,7 @@ impl ChildProxyInterface for ChildProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     fn r#second(
         &self,
         mut request: fidl::endpoints::ServerEnd<ParentMarker>,
@@ -376,6 +383,7 @@ impl futures::Stream for ChildRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum ChildRequest {
     First { request: fidl::endpoints::ServerEnd<ParentMarker>, control_handle: ChildControlHandle },
@@ -393,6 +401,7 @@ impl ChildRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_second(
         self,
@@ -474,6 +483,7 @@ impl ParentSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ParentEvent, fidl::Error> {
         ParentEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#first(
         &self,
         mut request: fidl::endpoints::ServerEnd<ParentMarker>,
@@ -522,6 +532,7 @@ impl ParentProxy {
     pub fn take_event_stream(&self) -> ParentEventStream {
         ParentEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#first(
         &self,
         mut request: fidl::endpoints::ServerEnd<ParentMarker>,
@@ -685,6 +696,7 @@ impl futures::Stream for ParentRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum ParentRequest {
     First { request: fidl::endpoints::ServerEnd<ParentMarker>, control_handle: ParentControlHandle },

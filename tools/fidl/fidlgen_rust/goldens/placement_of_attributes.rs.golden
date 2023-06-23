@@ -29,6 +29,8 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
+pub const EXAMPLE_CONST: u32 = 0;
+
 bitflags! {
     #[derive(Default)]
     pub struct ExampleBits: u32 {
@@ -55,8 +57,6 @@ fidl_bits! {
     prim_ty: u32,
     strict: true,
 }
-
-pub const EXAMPLE_CONST: u32 = 0;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u32)]
@@ -92,40 +92,11 @@ fidl_enum! {
     min_member: Member,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum ExampleUnion {
-    Variant(u32),
-}
-
-impl ExampleUnion {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::Variant(_) => 1,
-        }
-    }
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
-}
-impl fidl::Persistable for ExampleUnion {}
-
-fidl_union! {
-    name: ExampleUnion,
-    members: [
-        Variant {
-            ty: u32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ExampleProtocolMethodRequest {
     pub arg: fidl_test_exampleusing::Empty,
 }
+
 impl fidl::Persistable for ExampleProtocolMethodRequest {}
 
 fidl_struct! {
@@ -149,11 +120,12 @@ fidl_struct! {
     align_v2: 1,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct ExampleStruct {
     pub member: u32,
 }
+
 impl fidl::Persistable for ExampleStruct {}
 
 fidl_struct! {
@@ -178,19 +150,52 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExampleTable {
     pub member: Option<u32>,
     #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for ExampleTable {}
 
 fidl_table! {
     name: ExampleTable,
     members: [
         member {
+            ty: u32,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum ExampleUnion {
+    Variant(u32),
+}
+
+impl ExampleUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Variant(_) => 1,
+        }
+    }
+
+    #[deprecated = "Strict unions should not use `is_unknown`"]
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        false
+    }
+}
+
+impl fidl::Persistable for ExampleUnion {}
+
+fidl_union! {
+    name: ExampleUnion,
+    members: [
+        Variant {
             ty: u32,
             ordinal: 1,
         },
@@ -232,6 +237,7 @@ impl ExampleProtocolSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ExampleProtocolEvent, fidl::Error> {
         ExampleProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#method(&self, mut arg: &fidl_test_exampleusing::Empty) -> Result<(), fidl::Error> {
         self.client.send::<ExampleProtocolMethodRequest>(
             (arg,),
@@ -277,6 +283,7 @@ impl ExampleProtocolProxy {
     pub fn take_event_stream(&self) -> ExampleProtocolEventStream {
         ExampleProtocolEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#method(&self, mut arg: &fidl_test_exampleusing::Empty) -> Result<(), fidl::Error> {
         ExampleProtocolProxyInterface::r#method(self, arg)
     }
@@ -436,6 +443,7 @@ impl futures::Stream for ExampleProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum ExampleProtocolRequest {
     Method { arg: fidl_test_exampleusing::Empty, control_handle: ExampleProtocolControlHandle },

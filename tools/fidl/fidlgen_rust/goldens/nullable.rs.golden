@@ -29,47 +29,12 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
-pub enum SimpleUnion {
-    A(i32),
-    B(f32),
-}
-
-impl SimpleUnion {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::A(_) => 1,
-            Self::B(_) => 2,
-        }
-    }
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
-}
-impl fidl::Persistable for SimpleUnion {}
-
-fidl_union! {
-    name: SimpleUnion,
-    members: [
-        A {
-            ty: i32,
-            ordinal: 1,
-        },
-        B {
-            ty: f32,
-            ordinal: 2,
-        },
-    ],
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct Int32Wrapper {
     pub val: i32,
 }
+
 impl fidl::Persistable for Int32Wrapper {}
 
 fidl_struct! {
@@ -94,12 +59,13 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct SimpleProtocolAddRequest {
     pub a: i32,
     pub b: i32,
 }
+
 impl fidl::Persistable for SimpleProtocolAddRequest {}
 
 fidl_struct! {
@@ -131,11 +97,12 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct SimpleProtocolAddResponse {
     pub sum: i32,
 }
+
 impl fidl::Persistable for SimpleProtocolAddResponse {}
 
 fidl_struct! {
@@ -160,10 +127,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructWithNullableHandle {
     pub val: Option<fidl::Vmo>,
 }
+
 impl fidl::Standalone for StructWithNullableHandle {}
 
 fidl_struct! {
@@ -189,10 +157,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructWithNullableProtocol {
     pub val: Option<fidl::endpoints::ClientEnd<SimpleProtocolMarker>>,
 }
+
 impl fidl::Standalone for StructWithNullableProtocol {}
 
 fidl_struct! {
@@ -218,10 +187,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructWithNullableRequest {
     pub val: Option<fidl::endpoints::ServerEnd<SimpleProtocolMarker>>,
 }
+
 impl fidl::Standalone for StructWithNullableRequest {}
 
 fidl_struct! {
@@ -247,10 +217,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructWithNullableString {
     pub val: Option<String>,
 }
+
 impl fidl::Persistable for StructWithNullableString {}
 
 fidl_struct! {
@@ -274,10 +245,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructWithNullableStruct {
     pub val: Option<Box<Int32Wrapper>>,
 }
+
 impl fidl::Persistable for StructWithNullableStruct {}
 
 fidl_struct! {
@@ -301,10 +273,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct StructWithNullableUnion {
     pub val: Option<Box<SimpleUnion>>,
 }
+
 impl fidl::Persistable for StructWithNullableUnion {}
 
 fidl_struct! {
@@ -328,10 +301,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructWithNullableVector {
     pub val: Option<Vec<i32>>,
 }
+
 impl fidl::Persistable for StructWithNullableVector {}
 
 fidl_struct! {
@@ -353,6 +327,44 @@ fidl_struct! {
     size_v2: 16,
     align_v1: 8,
     align_v2: 8,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub enum SimpleUnion {
+    A(i32),
+    B(f32),
+}
+
+impl SimpleUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::A(_) => 1,
+            Self::B(_) => 2,
+        }
+    }
+
+    #[deprecated = "Strict unions should not use `is_unknown`"]
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        false
+    }
+}
+
+impl fidl::Persistable for SimpleUnion {}
+
+fidl_union! {
+    name: SimpleUnion,
+    members: [
+        A {
+            ty: i32,
+            ordinal: 1,
+        },
+        B {
+            ty: f32,
+            ordinal: 2,
+        },
+    ],
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -391,6 +403,7 @@ impl SimpleProtocolSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<SimpleProtocolEvent, fidl::Error> {
         SimpleProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#add(&self, mut a: i32, mut b: i32, ___deadline: zx::Time) -> Result<i32, fidl::Error> {
         let _response =
             self.client.send_query::<SimpleProtocolAddRequest, SimpleProtocolAddResponse>(
@@ -439,6 +452,7 @@ impl SimpleProtocolProxy {
     pub fn take_event_stream(&self) -> SimpleProtocolEventStream {
         SimpleProtocolEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#add(&self, mut a: i32, mut b: i32) -> fidl::client::QueryResponseFut<i32> {
         SimpleProtocolProxyInterface::r#add(self, a, b)
     }
@@ -614,6 +628,7 @@ impl futures::Stream for SimpleProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum SimpleProtocolRequest {
     Add { a: i32, b: i32, responder: SimpleProtocolAddResponder },
@@ -661,6 +676,7 @@ impl fidl::endpoints::ControlHandle for SimpleProtocolControlHandle {
 }
 
 impl SimpleProtocolControlHandle {}
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct SimpleProtocolAddResponder {

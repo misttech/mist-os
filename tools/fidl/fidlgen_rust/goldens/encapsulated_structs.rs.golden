@@ -29,11 +29,12 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct ArrayInt16Int8 {
     pub arr: [Int16Int8; 3],
 }
+
 impl fidl::Persistable for ArrayInt16Int8 {}
 
 fidl_struct! {
@@ -88,12 +89,13 @@ fidl_struct! {
     align_v2: 2,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct Int16Int8 {
     pub a: i16,
     pub b: i8,
 }
+
 impl fidl::Persistable for Int16Int8 {}
 
 fidl_struct! {
@@ -135,12 +137,13 @@ fidl_struct! {
     align_v2: 2,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct Int8Int32 {
     pub a: i8,
     pub b: i32,
 }
+
 impl fidl::Persistable for Int8Int32 {}
 
 fidl_struct! {
@@ -182,11 +185,12 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct NonInlineStructTestStruct {
     pub element: Option<Box<Int16Int8>>,
     pub h: fidl::Handle,
 }
+
 impl fidl::Standalone for NonInlineStructTestStruct {}
 
 fidl_struct! {
@@ -229,13 +233,14 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct StructPaddingTestStruct {
     pub trailing: Int16Int8,
     pub inner: Int8Int32,
     pub array: ArrayInt16Int8,
 }
+
 impl fidl::Persistable for StructPaddingTestStruct {}
 
 fidl_struct! {
@@ -324,11 +329,12 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TopLevelStruct {
     pub a: StructPaddingTestStruct,
     pub b: NonInlineStructTestStruct,
 }
+
 impl fidl::Standalone for TopLevelStruct {}
 
 fidl_struct! {

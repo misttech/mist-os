@@ -29,7 +29,7 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Testing {
     pub u1: u64,
     pub u2: Vec<u64>,
@@ -60,6 +60,7 @@ pub struct Testing {
     pub aa2: Vec<[u64; 2]>,
     pub aa3: [[u64; 2]; 3],
 }
+
 impl fidl::Standalone for Testing {}
 
 fidl_struct! {
@@ -492,6 +493,7 @@ impl futures::Stream for MyProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum MyProtocolRequest {}
 

@@ -1634,6 +1634,7 @@ func (v derives) String() string {
 	if len(parts) == 0 {
 		return ""
 	}
+	sort.Strings(parts)
 	return fmt.Sprintf("#[derive(%s)]", strings.Join(parts, ", "))
 }
 

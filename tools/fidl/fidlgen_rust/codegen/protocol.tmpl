@@ -4,20 +4,19 @@
 // found in the LICENSE file.
 */}}
 
-{{- define "ProtocolDeclaration" -}}
+{{- define "ProtocolDeclaration" }}
 {{- $protocol := . }}
-
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct {{ $protocol.Name }}Marker;
 
 impl fidl::endpoints::ProtocolMarker for {{ $protocol.Name }}Marker {
     type Proxy = {{ $protocol.Name }}Proxy;
     type RequestStream = {{ $protocol.Name }}RequestStream;
-{{- if .ProtocolName }}
+    {{- if .ProtocolName }}
     const DEBUG_NAME: &'static str = "{{ $protocol.ProtocolName }}";
-{{- else }}
+    {{- else }}
     const DEBUG_NAME: &'static str = "(anonymous) {{ $protocol.Name }}";
-{{- end }}
+    {{- end }}
 }
 
 {{- if $protocol.ProtocolName }}
@@ -84,10 +83,12 @@ impl {{ $protocol.Name }}SynchronousProxy {
 
     {{- range $method := $protocol.Methods }}
     {{- if $method.HasRequest }}
+    {{ "" }}
     {{- range .DocComments }}
     ///{{ . }}
     {{- end }}
-    pub fn r#{{ $method.Name }}(&self,
+    pub fn r#{{ $method.Name }}(
+        &self,
         {{- range $method.Request.Parameters }}
         mut {{ .Name }}: {{ .Type }},
         {{- end }}
@@ -96,26 +97,25 @@ impl {{ $protocol.Name }}SynchronousProxy {
         {{- end }}
     ) -> Result<{{- or $method.Response.TupleType "()" }}, fidl::Error> {
         {{- if $method.HasResponse }}
-            let _response = self.client.send_query::<
-                {{ $method.Request.FidlType }},
-                {{ $method.Response.FidlType }},
-            >(
-                {{ $method.Request.EncodeExpr }},
-                {{ $method.Ordinal | printf "%#x" }},
-                {{ $method.DynamicFlags }},
-                ___deadline,
-            )?
-            {{- if $method.IsFlexible }}
-            .into_result::<{{ $protocol.Name }}Marker>("{{ $method.Name }}")?
-            {{- end }}
-            ;
-            Ok({{ call $method.Response.ConvertToTuple "_response" }})
+        let _response = self.client.send_query::<
+            {{ $method.Request.FidlType }},
+            {{ $method.Response.FidlType }},
+        >(
+            {{ $method.Request.EncodeExpr }},
+            {{ $method.Ordinal | printf "%#x" }},
+            {{ $method.DynamicFlags }},
+            ___deadline,
+        )?
+        {{- if $method.IsFlexible }}
+        .into_result::<{{ $protocol.Name }}Marker>("{{ $method.Name }}")?
+        {{- end }};
+        Ok({{ call $method.Response.ConvertToTuple "_response" }})
         {{- else }}
-            self.client.send::<{{ $method.Request.FidlType }}>(
-                {{ $method.Request.EncodeExpr }},
-                {{ $method.Ordinal | printf "%#x" }},
-                {{ $method.DynamicFlags }},
-            )
+        self.client.send::<{{ $method.Request.FidlType }}>(
+            {{ $method.Request.EncodeExpr }},
+            {{ $method.Ordinal | printf "%#x" }},
+            {{ $method.DynamicFlags }},
+        )
         {{- end }}
     }
     {{- end }}
@@ -163,10 +163,12 @@ impl {{ $protocol.Name }}Proxy {
 
     {{- range $method := $protocol.Methods }}
     {{- if $method.HasRequest }}
+    {{ "" }}
     {{- range .DocComments }}
     ///{{ . }}
     {{- end }}
-    pub fn r#{{ $method.Name }}(&self,
+    pub fn r#{{ $method.Name }}(
+        &self,
         {{- range $request := $method.Request.Parameters }}
         mut {{ $request.Name }}: {{ $request.Type }},
         {{- end }}
@@ -188,13 +190,12 @@ impl {{ $protocol.Name }}Proxy {
 
 impl {{ $protocol.Name }}ProxyInterface for {{ $protocol.Name }}Proxy {
     {{- range $method := $protocol.Methods }}
-    {{- if and $method.HasRequest $method.HasResponse }}
-    type {{ $method.CamelName }}ResponseFut = fidl::client::QueryResponseFut<{{ $method.Response.TupleType }}>;
-    {{- end }}
-
     {{- if $method.HasRequest }}
+    {{ "" }}
     {{- if $method.HasResponse }}
-    fn r#{{ $method.Name }}(&self,
+    type {{ $method.CamelName }}ResponseFut = fidl::client::QueryResponseFut<{{ $method.Response.TupleType }}>;
+    fn r#{{ $method.Name }}(
+        &self,
         {{- range $method.Request.Parameters }}
         mut {{ .Name }}: {{ .Type }},
         {{- end }}
@@ -203,8 +204,7 @@ impl {{ $protocol.Name }}ProxyInterface for {{ $protocol.Name }}Proxy {
             let _response = fidl::client::decode_transaction_body::<{{ $method.Response.FidlType }}>(_buf?)?
             {{- if $method.IsFlexible }}
             .into_result::<{{ $protocol.Name }}Marker>("{{ $method.Name }}")?
-            {{- end }}
-            ;
+            {{- end }};
             Ok({{ call $method.Response.ConvertToTuple "_response" }})
         }
         self.client.send_query_and_decode::<
@@ -218,7 +218,8 @@ impl {{ $protocol.Name }}ProxyInterface for {{ $protocol.Name }}Proxy {
         )
     }
     {{- else }}
-    fn r#{{ $method.Name }}(&self,
+    fn r#{{ $method.Name }}(
+        &self,
         {{- range $method.Request.Parameters }}
         mut {{ .Name }}: {{ .Type }},
         {{- end }}
@@ -377,9 +378,7 @@ impl fidl::endpoints::RequestStream for {{ $protocol.Name }}RequestStream {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool)
-        -> Self
-    {
+    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -504,7 +503,7 @@ impl futures::Stream for {{ $protocol.Name }}RequestStream {
         })
     }
 }
-
+{{ "" }}
 {{- range .DocComments }}
 ///{{ . }}
 {{- end }}
@@ -545,6 +544,7 @@ pub enum {{ $protocol.Name }}Request {
 impl {{ $protocol.Name }}Request {
     {{- range $method := $protocol.Methods }}
     {{- if $method.HasRequest }}
+    {{ "" }}
     #[allow(irrefutable_let_patterns)]
     pub fn into_{{ $method.Name }}(self) -> Option<(
         {{- range $method.Request.Parameters }}
@@ -632,6 +632,7 @@ impl fidl::endpoints::ControlHandle for {{ $protocol.Name }}ControlHandle {
 impl {{ $protocol.Name }}ControlHandle {
     {{- range $method := $protocol.Methods }}
     {{- if not $method.HasRequest }}
+    {{ "" }}
     pub fn send_{{ $method.Name }}(&self,
         {{- range $method.Response.Parameters }}
         mut {{ .Name }}: {{ .Type }},
@@ -646,10 +647,10 @@ impl {{ $protocol.Name }}ControlHandle {
     }
     {{- end }}
     {{- end }}
-
 }
 
 {{- range $method := $protocol.Methods }}
+{{ "" }}
 {{- if and $method.HasRequest $method.HasResponse }}
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
@@ -722,7 +723,8 @@ impl {{ $protocol.Name }}{{ $method.CamelName }}Responder {
         r
     }
 
-    fn send_raw(&self,
+    fn send_raw(
+        &self,
         {{- range $method.Response.Parameters }}
         mut {{ .Name }}: {{ .Type }},
         {{- end }}

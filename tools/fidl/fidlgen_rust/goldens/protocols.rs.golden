@@ -65,77 +65,13 @@ fidl_enum! {
     min_member: ErrFoo,
 }
 
-#[derive(Debug, Clone)]
-pub enum TheUnion {
-    V(u32),
-    #[deprecated = "Use `TheUnion::unknown()` to construct and `TheUnionUnknown!()` to exhaustively match."]
-    #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
-    },
-}
-/// Pattern that matches an unknown `TheUnion` member.
-#[macro_export]
-macro_rules! TheUnionUnknown {
-    () => {
-        _
-    };
-}
-
-// Custom PartialEq so that unknown variants are not equal to themselves.
-impl PartialEq for TheUnion {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::V(x), Self::V(y)) => *x == *y,
-            _ => false,
-        }
-    }
-}
-
-impl TheUnion {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::V(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
-        }
-    }
-    #[inline]
-    pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
-            _ => false,
-        }
-    }
-}
-impl fidl::Persistable for TheUnion {}
-
-fidl_union! {
-    name: TheUnion,
-    members: [
-        V {
-            ty: u32,
-            ordinal: 1,
-        },
-    ],
-    unknown_member: __Unknown,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct ChannelProtocolEventARequest {
     pub a: i64,
     pub b: i64,
 }
+
 impl fidl::Persistable for ChannelProtocolEventARequest {}
 
 fidl_struct! {
@@ -167,12 +103,13 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct ChannelProtocolMethodARequest {
     pub a: i64,
     pub b: i64,
 }
+
 impl fidl::Persistable for ChannelProtocolMethodARequest {}
 
 fidl_struct! {
@@ -204,12 +141,13 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct ChannelProtocolMethodBRequest {
     pub a: i64,
     pub b: i64,
 }
+
 impl fidl::Persistable for ChannelProtocolMethodBRequest {}
 
 fidl_struct! {
@@ -241,11 +179,12 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct ChannelProtocolMethodBResponse {
     pub result: i64,
 }
+
 impl fidl::Persistable for ChannelProtocolMethodBResponse {}
 
 fidl_struct! {
@@ -270,10 +209,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ChannelProtocolMutateSocketRequest {
     pub a: fidl::Socket,
 }
+
 impl fidl::Standalone for ChannelProtocolMutateSocketRequest {}
 
 fidl_struct! {
@@ -299,10 +239,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ChannelProtocolMutateSocketResponse {
     pub b: fidl::Socket,
 }
+
 impl fidl::Standalone for ChannelProtocolMutateSocketResponse {}
 
 fidl_struct! {
@@ -328,10 +269,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ChannelProtocolTakeHandleRequest {
     pub h: fidl::Handle,
 }
+
 impl fidl::Standalone for ChannelProtocolTakeHandleRequest {}
 
 fidl_struct! {
@@ -357,10 +299,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct HandleRightsProtocolAnEventRequest {
     pub h: fidl::Socket,
 }
+
 impl fidl::Standalone for HandleRightsProtocolAnEventRequest {}
 
 fidl_struct! {
@@ -386,10 +329,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct HandleRightsProtocolNoResponseMethodRequest {
     pub h: fidl::Socket,
 }
+
 impl fidl::Standalone for HandleRightsProtocolNoResponseMethodRequest {}
 
 fidl_struct! {
@@ -415,10 +359,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct HandleRightsProtocolResponseMethodRequest {
     pub h: fidl::Socket,
 }
+
 impl fidl::Standalone for HandleRightsProtocolResponseMethodRequest {}
 
 fidl_struct! {
@@ -444,10 +389,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct HandleRightsProtocolResponseMethodResponse {
     pub h: fidl::Socket,
 }
+
 impl fidl::Standalone for HandleRightsProtocolResponseMethodResponse {}
 
 fidl_struct! {
@@ -473,7 +419,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ManyParametersFifteenRequest {
     pub p1: bool,
     pub p2: bool,
@@ -491,6 +437,7 @@ pub struct ManyParametersFifteenRequest {
     pub p14: bool,
     pub p15: bool,
 }
+
 impl fidl::Persistable for ManyParametersFifteenRequest {}
 
 fidl_struct! {
@@ -612,10 +559,11 @@ fidl_struct! {
     align_v2: 1,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MethodWithUnionUnionMethodRequest {
     pub u: TheUnion,
 }
+
 impl fidl::Persistable for MethodWithUnionUnionMethodRequest {}
 
 fidl_struct! {
@@ -639,10 +587,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MethodWithUnionUnionMethodResponse {
     pub u: Option<Box<TheUnion>>,
 }
+
 impl fidl::Persistable for MethodWithUnionUnionMethodResponse {}
 
 fidl_struct! {
@@ -666,13 +615,14 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ProtocolEnds {
     pub client: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
     pub server: fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>,
     pub client_opt: Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
     pub server_opt: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
 }
+
 impl fidl::Standalone for ProtocolEnds {}
 
 fidl_struct! {
@@ -722,11 +672,12 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct TransitionalEventRequest {
     pub x: i64,
 }
+
 impl fidl::Persistable for TransitionalEventRequest {}
 
 fidl_struct! {
@@ -751,11 +702,12 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct TransitionalOneWayRequest {
     pub x: i64,
 }
+
 impl fidl::Persistable for TransitionalOneWayRequest {}
 
 fidl_struct! {
@@ -780,11 +732,12 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct TransitionalRequestRequest {
     pub x: i64,
 }
+
 impl fidl::Persistable for TransitionalRequestRequest {}
 
 fidl_struct! {
@@ -809,11 +762,12 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct TransitionalRequestResponse {
     pub y: i64,
 }
+
 impl fidl::Persistable for TransitionalRequestResponse {}
 
 fidl_struct! {
@@ -838,10 +792,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WithAndWithoutRequestResponseNoRequestWithResponseResponse {
     pub ret: String,
 }
+
 impl fidl::Persistable for WithAndWithoutRequestResponseNoRequestWithResponseResponse {}
 
 fidl_struct! {
@@ -865,10 +820,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WithAndWithoutRequestResponseOnWithResponseRequest {
     pub ret: String,
 }
+
 impl fidl::Persistable for WithAndWithoutRequestResponseOnWithResponseRequest {}
 
 fidl_struct! {
@@ -892,10 +848,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
     pub arg: String,
 }
+
 impl fidl::Persistable for WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {}
 
 fidl_struct! {
@@ -919,10 +876,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WithAndWithoutRequestResponseWithRequestNoResponseRequest {
     pub arg: String,
 }
+
 impl fidl::Persistable for WithAndWithoutRequestResponseWithRequestNoResponseRequest {}
 
 fidl_struct! {
@@ -946,10 +904,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WithAndWithoutRequestResponseWithRequestWithResponseRequest {
     pub arg: String,
 }
+
 impl fidl::Persistable for WithAndWithoutRequestResponseWithRequestWithResponseRequest {}
 
 fidl_struct! {
@@ -973,10 +932,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WithAndWithoutRequestResponseWithRequestWithResponseResponse {
     pub ret: String,
 }
+
 impl fidl::Persistable for WithAndWithoutRequestResponseWithRequestWithResponseResponse {}
 
 fidl_struct! {
@@ -1000,10 +960,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WithErrorSyntaxHandleInResultResponse {
     pub h: fidl::Handle,
 }
+
 impl fidl::Standalone for WithErrorSyntaxHandleInResultResponse {}
 
 fidl_struct! {
@@ -1029,13 +990,14 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct WithErrorSyntaxResponseAsStructResponse {
     pub a: i64,
     pub b: i64,
     pub c: i64,
 }
+
 impl fidl::Persistable for WithErrorSyntaxResponseAsStructResponse {}
 
 fidl_struct! {
@@ -1074,10 +1036,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WithProtocolEndsClientEndsRequest {
     pub in_: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
 }
+
 impl fidl::Standalone for WithProtocolEndsClientEndsRequest {}
 
 fidl_struct! {
@@ -1103,10 +1066,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WithProtocolEndsClientEndsResponse {
     pub out: Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
 }
+
 impl fidl::Standalone for WithProtocolEndsClientEndsResponse {}
 
 fidl_struct! {
@@ -1132,10 +1096,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WithProtocolEndsServerEndsRequest {
     pub in_: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
 }
+
 impl fidl::Standalone for WithProtocolEndsServerEndsRequest {}
 
 fidl_struct! {
@@ -1161,10 +1126,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WithProtocolEndsServerEndsResponse {
     pub out: fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>,
 }
+
 impl fidl::Standalone for WithProtocolEndsServerEndsResponse {}
 
 fidl_struct! {
@@ -1190,10 +1156,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WithProtocolEndsStructContainingEndsRequest {
     pub in_: ProtocolEnds,
 }
+
 impl fidl::Standalone for WithProtocolEndsStructContainingEndsRequest {}
 
 fidl_struct! {
@@ -1219,10 +1186,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WithProtocolEndsStructContainingEndsResponse {
     pub out: ProtocolEnds,
 }
+
 impl fidl::Standalone for WithProtocolEndsStructContainingEndsResponse {}
 
 fidl_struct! {
@@ -1246,6 +1214,74 @@ fidl_struct! {
     size_v2: 16,
     align_v1: 4,
     align_v2: 4,
+}
+
+#[derive(Clone, Debug)]
+pub enum TheUnion {
+    V(u32),
+    #[deprecated = "Use `TheUnion::unknown()` to construct and `TheUnionUnknown!()` to exhaustively match."]
+    #[doc(hidden)]
+    #[non_exhaustive]
+    __Unknown {
+        ordinal: u64,
+    },
+}
+
+/// Pattern that matches an unknown `TheUnion` member.
+#[macro_export]
+macro_rules! TheUnionUnknown {
+    () => {
+        _
+    };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for TheUnion {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::V(x), Self::V(y)) => *x == *y,
+            _ => false,
+        }
+    }
+}
+
+impl TheUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::V(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+
+    #[inline]
+    pub fn unknown_variant_for_testing() -> Self {
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
+    }
+
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        match self {
+            #[allow(deprecated)]
+            Self::__Unknown { .. } => true,
+            _ => false,
+        }
+    }
+}
+
+impl fidl::Persistable for TheUnion {}
+
+fidl_union! {
+    name: TheUnion,
+    members: [
+        V {
+            ty: u32,
+            ordinal: 1,
+        },
+    ],
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -1461,6 +1497,7 @@ impl futures::Stream for AnotherDiscoverableProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum AnotherDiscoverableProtocolRequest {}
 
@@ -1538,6 +1575,7 @@ impl ChannelProtocolSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ChannelProtocolEvent, fidl::Error> {
         ChannelProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#method_a(&self, mut a: i64, mut b: i64) -> Result<(), fidl::Error> {
         self.client.send::<ChannelProtocolMethodARequest>(
             (a, b),
@@ -1545,6 +1583,7 @@ impl ChannelProtocolSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#method_b(
         &self,
         mut a: i64,
@@ -1561,6 +1600,7 @@ impl ChannelProtocolSynchronousProxy {
             )?;
         Ok(_response.result)
     }
+
     pub fn r#take_handle(
         &self,
         mut h: fidl::Handle,
@@ -1576,6 +1616,7 @@ impl ChannelProtocolSynchronousProxy {
             )?;
         Ok(_response)
     }
+
     pub fn r#mutate_socket(
         &self,
         mut a: fidl::Socket,
@@ -1629,15 +1670,19 @@ impl ChannelProtocolProxy {
     pub fn take_event_stream(&self) -> ChannelProtocolEventStream {
         ChannelProtocolEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#method_a(&self, mut a: i64, mut b: i64) -> Result<(), fidl::Error> {
         ChannelProtocolProxyInterface::r#method_a(self, a, b)
     }
+
     pub fn r#method_b(&self, mut a: i64, mut b: i64) -> fidl::client::QueryResponseFut<i64> {
         ChannelProtocolProxyInterface::r#method_b(self, a, b)
     }
+
     pub fn r#take_handle(&self, mut h: fidl::Handle) -> fidl::client::QueryResponseFut<()> {
         ChannelProtocolProxyInterface::r#take_handle(self, h)
     }
+
     pub fn r#mutate_socket(
         &self,
         mut a: fidl::Socket,
@@ -1654,6 +1699,7 @@ impl ChannelProtocolProxyInterface for ChannelProtocolProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     type MethodBResponseFut = fidl::client::QueryResponseFut<i64>;
     fn r#method_b(&self, mut a: i64, mut b: i64) -> Self::MethodBResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i64, fidl::Error> {
@@ -1668,6 +1714,7 @@ impl ChannelProtocolProxyInterface for ChannelProtocolProxy {
             _decode,
         )
     }
+
     type TakeHandleResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#take_handle(&self, mut h: fidl::Handle) -> Self::TakeHandleResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
@@ -1682,6 +1729,7 @@ impl ChannelProtocolProxyInterface for ChannelProtocolProxy {
             _decode,
         )
     }
+
     type MutateSocketResponseFut = fidl::client::QueryResponseFut<fidl::Socket>;
     fn r#mutate_socket(&self, mut a: fidl::Socket) -> Self::MutateSocketResponseFut {
         fn _decode(
@@ -1927,6 +1975,7 @@ impl futures::Stream for ChannelProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum ChannelProtocolRequest {
     MethodA { a: i64, b: i64, control_handle: ChannelProtocolControlHandle },
@@ -1944,6 +1993,7 @@ impl ChannelProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_method_b(self) -> Option<(i64, i64, ChannelProtocolMethodBResponder)> {
         if let ChannelProtocolRequest::MethodB { a, b, responder } = self {
@@ -1952,6 +2002,7 @@ impl ChannelProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_take_handle(self) -> Option<(fidl::Handle, ChannelProtocolTakeHandleResponder)> {
         if let ChannelProtocolRequest::TakeHandle { h, responder } = self {
@@ -1960,6 +2011,7 @@ impl ChannelProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_mutate_socket(
         self,
@@ -2015,6 +2067,7 @@ impl ChannelProtocolControlHandle {
         )
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct ChannelProtocolMethodBResponder {
@@ -2088,6 +2141,7 @@ impl ChannelProtocolMethodBResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct ChannelProtocolTakeHandleResponder {
@@ -2161,6 +2215,7 @@ impl ChannelProtocolTakeHandleResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct ChannelProtocolMutateSocketResponder {
@@ -2275,6 +2330,7 @@ impl DiscoverableProtocolSynchronousProxy {
     ) -> Result<DiscoverableProtocolEvent, fidl::Error> {
         DiscoverableProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#method(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -2321,6 +2377,7 @@ impl DiscoverableProtocolProxy {
     pub fn take_event_stream(&self) -> DiscoverableProtocolEventStream {
         DiscoverableProtocolEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#method(&self) -> Result<(), fidl::Error> {
         DiscoverableProtocolProxyInterface::r#method(self)
     }
@@ -2481,6 +2538,7 @@ impl futures::Stream for DiscoverableProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum DiscoverableProtocolRequest {
     Method { control_handle: DiscoverableProtocolControlHandle },
@@ -2571,6 +2629,7 @@ impl HandleRightsProtocolSynchronousProxy {
     ) -> Result<HandleRightsProtocolEvent, fidl::Error> {
         HandleRightsProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#no_response_method(&self, mut h: fidl::Socket) -> Result<(), fidl::Error> {
         self.client.send::<HandleRightsProtocolNoResponseMethodRequest>(
             (h,),
@@ -2578,21 +2637,21 @@ impl HandleRightsProtocolSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#response_method(
         &self,
         mut h: fidl::Socket,
         ___deadline: zx::Time,
     ) -> Result<fidl::Socket, fidl::Error> {
         let _response = self.client.send_query::<
-                HandleRightsProtocolResponseMethodRequest,
-                HandleRightsProtocolResponseMethodResponse,
-            >(
-                (h,),
-                0x52a8f194ac143547,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            HandleRightsProtocolResponseMethodRequest,
+            HandleRightsProtocolResponseMethodResponse,
+        >(
+            (h,),
+            0x52a8f194ac143547,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.h)
     }
 }
@@ -2634,9 +2693,11 @@ impl HandleRightsProtocolProxy {
     pub fn take_event_stream(&self) -> HandleRightsProtocolEventStream {
         HandleRightsProtocolEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#no_response_method(&self, mut h: fidl::Socket) -> Result<(), fidl::Error> {
         HandleRightsProtocolProxyInterface::r#no_response_method(self, h)
     }
+
     pub fn r#response_method(
         &self,
         mut h: fidl::Socket,
@@ -2653,6 +2714,7 @@ impl HandleRightsProtocolProxyInterface for HandleRightsProtocolProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     type ResponseMethodResponseFut = fidl::client::QueryResponseFut<fidl::Socket>;
     fn r#response_method(&self, mut h: fidl::Socket) -> Self::ResponseMethodResponseFut {
         fn _decode(
@@ -2854,6 +2916,7 @@ impl futures::Stream for HandleRightsProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum HandleRightsProtocolRequest {
     NoResponseMethod { h: fidl::Socket, control_handle: HandleRightsProtocolControlHandle },
@@ -2871,6 +2934,7 @@ impl HandleRightsProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_response_method(
         self,
@@ -2924,6 +2988,7 @@ impl HandleRightsProtocolControlHandle {
         )
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct HandleRightsProtocolResponseMethodResponder {
@@ -3050,6 +3115,7 @@ impl ManyParametersSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ManyParametersEvent, fidl::Error> {
         ManyParametersEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#fifteen(
         &self,
         mut p1: bool,
@@ -3112,6 +3178,7 @@ impl ManyParametersProxy {
     pub fn take_event_stream(&self) -> ManyParametersEventStream {
         ManyParametersEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#fifteen(
         &self,
         mut p1: bool,
@@ -3325,6 +3392,7 @@ impl futures::Stream for ManyParametersRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum ManyParametersRequest {
     Fifteen {
@@ -3464,6 +3532,7 @@ impl MethodWithUnionSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<MethodWithUnionEvent, fidl::Error> {
         MethodWithUnionEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#union_method(
         &self,
         mut u: &TheUnion,
@@ -3517,6 +3586,7 @@ impl MethodWithUnionProxy {
     pub fn take_event_stream(&self) -> MethodWithUnionEventStream {
         MethodWithUnionEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#union_method(
         &self,
         mut u: &TheUnion,
@@ -3697,6 +3767,7 @@ impl futures::Stream for MethodWithUnionRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum MethodWithUnionRequest {
     UnionMethod { u: TheUnion, responder: MethodWithUnionUnionMethodResponder },
@@ -3744,6 +3815,7 @@ impl fidl::endpoints::ControlHandle for MethodWithUnionControlHandle {
 }
 
 impl MethodWithUnionControlHandle {}
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct MethodWithUnionUnionMethodResponder {
@@ -3861,6 +3933,7 @@ impl TransitionalSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<TransitionalEvent, fidl::Error> {
         TransitionalEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#request(&self, mut x: i64, ___deadline: zx::Time) -> Result<i64, fidl::Error> {
         let _response =
             self.client.send_query::<TransitionalRequestRequest, TransitionalRequestResponse>(
@@ -3871,6 +3944,7 @@ impl TransitionalSynchronousProxy {
             )?;
         Ok(_response.y)
     }
+
     pub fn r#one_way(&self, mut x: i64) -> Result<(), fidl::Error> {
         self.client.send::<TransitionalOneWayRequest>(
             (x,),
@@ -3916,9 +3990,11 @@ impl TransitionalProxy {
     pub fn take_event_stream(&self) -> TransitionalEventStream {
         TransitionalEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#request(&self, mut x: i64) -> fidl::client::QueryResponseFut<i64> {
         TransitionalProxyInterface::r#request(self, x)
     }
+
     pub fn r#one_way(&self, mut x: i64) -> Result<(), fidl::Error> {
         TransitionalProxyInterface::r#one_way(self, x)
     }
@@ -3939,6 +4015,7 @@ impl TransitionalProxyInterface for TransitionalProxy {
             _decode,
         )
     }
+
     fn r#one_way(&self, mut x: i64) -> Result<(), fidl::Error> {
         self.client.send::<TransitionalOneWayRequest>(
             (x,),
@@ -4132,6 +4209,7 @@ impl futures::Stream for TransitionalRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum TransitionalRequest {
     Request { x: i64, responder: TransitionalRequestResponder },
@@ -4147,6 +4225,7 @@ impl TransitionalRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_one_way(self) -> Option<(i64, TransitionalControlHandle)> {
         if let TransitionalRequest::OneWay { x, control_handle } = self {
@@ -4198,6 +4277,7 @@ impl TransitionalControlHandle {
         )
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct TransitionalRequestResponder {
@@ -4325,6 +4405,7 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
     ) -> Result<WithAndWithoutRequestResponseEvent, fidl::Error> {
         WithAndWithoutRequestResponseEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#no_request_no_response(&self) -> Result<(), fidl::Error> {
         self.client.send::<fidl::encoding::EmptyPayload>(
             (),
@@ -4332,6 +4413,7 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#no_request_empty_response(&self, ___deadline: zx::Time) -> Result<(), fidl::Error> {
         let _response =
             self.client.send_query::<fidl::encoding::EmptyPayload, fidl::encoding::EmptyPayload>(
@@ -4342,19 +4424,20 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
             )?;
         Ok(_response)
     }
+
     pub fn r#no_request_with_response(&self, ___deadline: zx::Time) -> Result<String, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                WithAndWithoutRequestResponseNoRequestWithResponseResponse,
-            >(
-                (),
-                0x7d6b2fcf0e2a65bd,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            WithAndWithoutRequestResponseNoRequestWithResponseResponse,
+        >(
+            (),
+            0x7d6b2fcf0e2a65bd,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.ret)
     }
+
     pub fn r#with_request_no_response(&self, mut arg: &str) -> Result<(), fidl::Error> {
         self.client.send::<WithAndWithoutRequestResponseWithRequestNoResponseRequest>(
             (arg,),
@@ -4362,38 +4445,38 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#with_request_empty_response(
         &self,
         mut arg: &str,
         ___deadline: zx::Time,
     ) -> Result<(), fidl::Error> {
         let _response = self.client.send_query::<
-                WithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
-                fidl::encoding::EmptyPayload,
-            >(
-                (arg,),
-                0x27ee4d2bd405df5f,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            WithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
+            fidl::encoding::EmptyPayload,
+        >(
+            (arg,),
+            0x27ee4d2bd405df5f,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response)
     }
+
     pub fn r#with_request_with_response(
         &self,
         mut arg: &str,
         ___deadline: zx::Time,
     ) -> Result<String, fidl::Error> {
         let _response = self.client.send_query::<
-                WithAndWithoutRequestResponseWithRequestWithResponseRequest,
-                WithAndWithoutRequestResponseWithRequestWithResponseResponse,
-            >(
-                (arg,),
-                0x590e91945d58f5b1,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            WithAndWithoutRequestResponseWithRequestWithResponseRequest,
+            WithAndWithoutRequestResponseWithRequestWithResponseResponse,
+        >(
+            (arg,),
+            0x590e91945d58f5b1,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.ret)
     }
 }
@@ -4437,24 +4520,30 @@ impl WithAndWithoutRequestResponseProxy {
             event_receiver: self.client.take_event_receiver(),
         }
     }
+
     pub fn r#no_request_no_response(&self) -> Result<(), fidl::Error> {
         WithAndWithoutRequestResponseProxyInterface::r#no_request_no_response(self)
     }
+
     pub fn r#no_request_empty_response(&self) -> fidl::client::QueryResponseFut<()> {
         WithAndWithoutRequestResponseProxyInterface::r#no_request_empty_response(self)
     }
+
     pub fn r#no_request_with_response(&self) -> fidl::client::QueryResponseFut<String> {
         WithAndWithoutRequestResponseProxyInterface::r#no_request_with_response(self)
     }
+
     pub fn r#with_request_no_response(&self, mut arg: &str) -> Result<(), fidl::Error> {
         WithAndWithoutRequestResponseProxyInterface::r#with_request_no_response(self, arg)
     }
+
     pub fn r#with_request_empty_response(
         &self,
         mut arg: &str,
     ) -> fidl::client::QueryResponseFut<()> {
         WithAndWithoutRequestResponseProxyInterface::r#with_request_empty_response(self, arg)
     }
+
     pub fn r#with_request_with_response(
         &self,
         mut arg: &str,
@@ -4471,6 +4560,7 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     type NoRequestEmptyResponseResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#no_request_empty_response(&self) -> Self::NoRequestEmptyResponseResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
@@ -4485,6 +4575,7 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
             _decode,
         )
     }
+
     type NoRequestWithResponseResponseFut = fidl::client::QueryResponseFut<String>;
     fn r#no_request_with_response(&self) -> Self::NoRequestWithResponseResponseFut {
         fn _decode(
@@ -4502,6 +4593,7 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
             _decode,
         )
     }
+
     fn r#with_request_no_response(&self, mut arg: &str) -> Result<(), fidl::Error> {
         self.client.send::<WithAndWithoutRequestResponseWithRequestNoResponseRequest>(
             (arg,),
@@ -4509,6 +4601,7 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     type WithRequestEmptyResponseResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#with_request_empty_response(
         &self,
@@ -4529,6 +4622,7 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
             _decode,
         )
     }
+
     type WithRequestWithResponseResponseFut = fidl::client::QueryResponseFut<String>;
     fn r#with_request_with_response(
         &self,
@@ -4808,6 +4902,7 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum WithAndWithoutRequestResponseRequest {
     NoRequestNoResponse {
@@ -4844,6 +4939,7 @@ impl WithAndWithoutRequestResponseRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_no_request_empty_response(
         self,
@@ -4854,6 +4950,7 @@ impl WithAndWithoutRequestResponseRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_no_request_with_response(
         self,
@@ -4864,6 +4961,7 @@ impl WithAndWithoutRequestResponseRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_with_request_no_response(
         self,
@@ -4876,6 +4974,7 @@ impl WithAndWithoutRequestResponseRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_with_request_empty_response(
         self,
@@ -4888,6 +4987,7 @@ impl WithAndWithoutRequestResponseRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_with_request_with_response(
         self,
@@ -4958,6 +5058,7 @@ impl WithAndWithoutRequestResponseControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_on_with_response(&self, mut ret: &str) -> Result<(), fidl::Error> {
         self.inner.send::<WithAndWithoutRequestResponseOnWithResponseRequest>(
             (ret,),
@@ -4967,6 +5068,7 @@ impl WithAndWithoutRequestResponseControlHandle {
         )
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct WithAndWithoutRequestResponseNoRequestEmptyResponseResponder {
@@ -5040,6 +5142,7 @@ impl WithAndWithoutRequestResponseNoRequestEmptyResponseResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct WithAndWithoutRequestResponseNoRequestWithResponseResponder {
@@ -5115,6 +5218,7 @@ impl WithAndWithoutRequestResponseNoRequestWithResponseResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct WithAndWithoutRequestResponseWithRequestEmptyResponseResponder {
@@ -5188,6 +5292,7 @@ impl WithAndWithoutRequestResponseWithRequestEmptyResponseResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct WithAndWithoutRequestResponseWithRequestWithResponseResponder {
@@ -5314,68 +5419,68 @@ impl WithErrorSyntaxSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<WithErrorSyntaxEvent, fidl::Error> {
         WithErrorSyntaxEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#response_as_struct(
         &self,
         ___deadline: zx::Time,
     ) -> Result<WithErrorSyntaxResponseAsStructResult, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<WithErrorSyntaxResponseAsStructResponse, u32>,
-            >(
-                (),
-                0x3b902a6d8d24693,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            fidl::encoding::ResultType<WithErrorSyntaxResponseAsStructResponse, u32>,
+        >(
+            (),
+            0x3b902a6d8d24693,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| (x.a, x.b, x.c)))
     }
+
     pub fn r#error_as_primitive(
         &self,
         ___deadline: zx::Time,
     ) -> Result<WithErrorSyntaxErrorAsPrimitiveResult, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<fidl::encoding::EmptyStruct, u32>,
-            >(
-                (),
-                0x602fd6bd920135e7,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            fidl::encoding::ResultType<fidl::encoding::EmptyStruct, u32>,
+        >(
+            (),
+            0x602fd6bd920135e7,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#error_as_enum(
         &self,
         ___deadline: zx::Time,
     ) -> Result<WithErrorSyntaxErrorAsEnumResult, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<fidl::encoding::EmptyStruct, ErrorEnum>,
-            >(
-                (),
-                0x4c371e1673212f43,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            fidl::encoding::ResultType<fidl::encoding::EmptyStruct, ErrorEnum>,
+        >(
+            (),
+            0x4c371e1673212f43,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#handle_in_result(
         &self,
         ___deadline: zx::Time,
     ) -> Result<WithErrorSyntaxHandleInResultResult, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl::encoding::EmptyPayload,
-                fidl::encoding::ResultType<WithErrorSyntaxHandleInResultResponse, u32>,
-            >(
-                (),
-                0x13092c5b835b0cbf,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl::encoding::EmptyPayload,
+            fidl::encoding::ResultType<WithErrorSyntaxHandleInResultResponse, u32>,
+        >(
+            (),
+            0x13092c5b835b0cbf,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x.h))
     }
 }
@@ -5416,21 +5521,25 @@ impl WithErrorSyntaxProxy {
     pub fn take_event_stream(&self) -> WithErrorSyntaxEventStream {
         WithErrorSyntaxEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#response_as_struct(
         &self,
     ) -> fidl::client::QueryResponseFut<WithErrorSyntaxResponseAsStructResult> {
         WithErrorSyntaxProxyInterface::r#response_as_struct(self)
     }
+
     pub fn r#error_as_primitive(
         &self,
     ) -> fidl::client::QueryResponseFut<WithErrorSyntaxErrorAsPrimitiveResult> {
         WithErrorSyntaxProxyInterface::r#error_as_primitive(self)
     }
+
     pub fn r#error_as_enum(
         &self,
     ) -> fidl::client::QueryResponseFut<WithErrorSyntaxErrorAsEnumResult> {
         WithErrorSyntaxProxyInterface::r#error_as_enum(self)
     }
+
     pub fn r#handle_in_result(
         &self,
     ) -> fidl::client::QueryResponseFut<WithErrorSyntaxHandleInResultResult> {
@@ -5460,6 +5569,7 @@ impl WithErrorSyntaxProxyInterface for WithErrorSyntaxProxy {
             _decode,
         )
     }
+
     type ErrorAsPrimitiveResponseFut =
         fidl::client::QueryResponseFut<WithErrorSyntaxErrorAsPrimitiveResult>;
     fn r#error_as_primitive(&self) -> Self::ErrorAsPrimitiveResponseFut {
@@ -5481,6 +5591,7 @@ impl WithErrorSyntaxProxyInterface for WithErrorSyntaxProxy {
             _decode,
         )
     }
+
     type ErrorAsEnumResponseFut = fidl::client::QueryResponseFut<WithErrorSyntaxErrorAsEnumResult>;
     fn r#error_as_enum(&self) -> Self::ErrorAsEnumResponseFut {
         fn _decode(
@@ -5501,6 +5612,7 @@ impl WithErrorSyntaxProxyInterface for WithErrorSyntaxProxy {
             _decode,
         )
     }
+
     type HandleInResultResponseFut =
         fidl::client::QueryResponseFut<WithErrorSyntaxHandleInResultResult>;
     fn r#handle_in_result(&self) -> Self::HandleInResultResponseFut {
@@ -5728,6 +5840,7 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum WithErrorSyntaxRequest {
     ResponseAsStruct { responder: WithErrorSyntaxResponseAsStructResponder },
@@ -5745,6 +5858,7 @@ impl WithErrorSyntaxRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_error_as_primitive(self) -> Option<(WithErrorSyntaxErrorAsPrimitiveResponder)> {
         if let WithErrorSyntaxRequest::ErrorAsPrimitive { responder } = self {
@@ -5753,6 +5867,7 @@ impl WithErrorSyntaxRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_error_as_enum(self) -> Option<(WithErrorSyntaxErrorAsEnumResponder)> {
         if let WithErrorSyntaxRequest::ErrorAsEnum { responder } = self {
@@ -5761,6 +5876,7 @@ impl WithErrorSyntaxRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_handle_in_result(self) -> Option<(WithErrorSyntaxHandleInResultResponder)> {
         if let WithErrorSyntaxRequest::HandleInResult { responder } = self {
@@ -5805,6 +5921,7 @@ impl fidl::endpoints::ControlHandle for WithErrorSyntaxControlHandle {
 }
 
 impl WithErrorSyntaxControlHandle {}
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct WithErrorSyntaxResponseAsStructResponder {
@@ -5883,6 +6000,7 @@ impl WithErrorSyntaxResponseAsStructResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct WithErrorSyntaxErrorAsPrimitiveResponder {
@@ -5958,6 +6076,7 @@ impl WithErrorSyntaxErrorAsPrimitiveResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct WithErrorSyntaxErrorAsEnumResponder {
@@ -6036,6 +6155,7 @@ impl WithErrorSyntaxErrorAsEnumResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct WithErrorSyntaxHandleInResultResponder {
@@ -6169,6 +6289,7 @@ impl WithProtocolEndsSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<WithProtocolEndsEvent, fidl::Error> {
         WithProtocolEndsEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#client_ends(
         &self,
         mut in_: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
@@ -6184,6 +6305,7 @@ impl WithProtocolEndsSynchronousProxy {
             )?;
         Ok(_response.out)
     }
+
     pub fn r#server_ends(
         &self,
         mut in_: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
@@ -6199,21 +6321,21 @@ impl WithProtocolEndsSynchronousProxy {
             )?;
         Ok(_response.out)
     }
+
     pub fn r#struct_containing_ends(
         &self,
         mut in_: ProtocolEnds,
         ___deadline: zx::Time,
     ) -> Result<ProtocolEnds, fidl::Error> {
         let _response = self.client.send_query::<
-                WithProtocolEndsStructContainingEndsRequest,
-                WithProtocolEndsStructContainingEndsResponse,
-            >(
-                (&mut in_,),
-                0x3893f0baad26f5d5,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            WithProtocolEndsStructContainingEndsRequest,
+            WithProtocolEndsStructContainingEndsResponse,
+        >(
+            (&mut in_,),
+            0x3893f0baad26f5d5,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.out)
     }
 }
@@ -6254,6 +6376,7 @@ impl WithProtocolEndsProxy {
     pub fn take_event_stream(&self) -> WithProtocolEndsEventStream {
         WithProtocolEndsEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#client_ends(
         &self,
         mut in_: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
@@ -6262,6 +6385,7 @@ impl WithProtocolEndsProxy {
     > {
         WithProtocolEndsProxyInterface::r#client_ends(self, in_)
     }
+
     pub fn r#server_ends(
         &self,
         mut in_: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
@@ -6269,6 +6393,7 @@ impl WithProtocolEndsProxy {
     {
         WithProtocolEndsProxyInterface::r#server_ends(self, in_)
     }
+
     pub fn r#struct_containing_ends(
         &self,
         mut in_: ProtocolEnds,
@@ -6303,6 +6428,7 @@ impl WithProtocolEndsProxyInterface for WithProtocolEndsProxy {
             _decode,
         )
     }
+
     type ServerEndsResponseFut =
         fidl::client::QueryResponseFut<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>;
     fn r#server_ends(
@@ -6326,6 +6452,7 @@ impl WithProtocolEndsProxyInterface for WithProtocolEndsProxy {
             _decode,
         )
     }
+
     type StructContainingEndsResponseFut = fidl::client::QueryResponseFut<ProtocolEnds>;
     fn r#struct_containing_ends(
         &self,
@@ -6541,6 +6668,7 @@ impl futures::Stream for WithProtocolEndsRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum WithProtocolEndsRequest {
     ClientEnds {
@@ -6571,6 +6699,7 @@ impl WithProtocolEndsRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_server_ends(
         self,
@@ -6584,6 +6713,7 @@ impl WithProtocolEndsRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_struct_containing_ends(
         self,
@@ -6629,6 +6759,7 @@ impl fidl::endpoints::ControlHandle for WithProtocolEndsControlHandle {
 }
 
 impl WithProtocolEndsControlHandle {}
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct WithProtocolEndsClientEndsResponder {
@@ -6711,6 +6842,7 @@ impl WithProtocolEndsClientEndsResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct WithProtocolEndsServerEndsResponder {
@@ -6793,6 +6925,7 @@ impl WithProtocolEndsServerEndsResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct WithProtocolEndsStructContainingEndsResponder {

@@ -29,10 +29,11 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ExampleFooRequest {
     pub s: String,
 }
+
 impl fidl::Persistable for ExampleFooRequest {}
 
 fidl_struct! {
@@ -56,11 +57,12 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct ExampleFooResponse {
     pub y: i64,
 }
+
 impl fidl::Persistable for ExampleFooResponse {}
 
 fidl_struct! {
@@ -122,6 +124,7 @@ impl ExampleSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ExampleEvent, fidl::Error> {
         ExampleEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#foo(
         &self,
         mut s: &str,
@@ -175,6 +178,7 @@ impl ExampleProxy {
     pub fn take_event_stream(&self) -> ExampleEventStream {
         ExampleEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#foo(&self, mut s: &str) -> fidl::client::QueryResponseFut<ExampleFooResult> {
         ExampleProxyInterface::r#foo(self, s)
     }
@@ -350,6 +354,7 @@ impl futures::Stream for ExampleRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum ExampleRequest {
     Foo { s: String, responder: ExampleFooResponder },
@@ -397,6 +402,7 @@ impl fidl::endpoints::ControlHandle for ExampleControlHandle {
 }
 
 impl ExampleControlHandle {}
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct ExampleFooResponder {

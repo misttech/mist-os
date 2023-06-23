@@ -37,8 +37,9 @@ pub const ENUM_MEMBER: fidl_test_dependent::MyEnum = fidl_test_dependent::MyEnum
 
 pub const ENUM_MEMBER_PRIMITIVE: u8 = fidl_test_dependent::MyEnum::Member.into_primitive();
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MyStruct;
+
 impl fidl::Persistable for MyStruct {}
 
 fidl_struct! {

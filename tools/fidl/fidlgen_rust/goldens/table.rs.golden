@@ -29,12 +29,13 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct EmptyTable {
     #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for EmptyTable {}
 
 fidl_table! {
@@ -43,12 +44,13 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExtensionTable {
     #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for ExtensionTable {}
 
 fidl_table! {
@@ -57,7 +59,7 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct NewerSimpleTable {
     pub x: Option<i64>,
     pub y: Option<i64>,
@@ -66,6 +68,7 @@ pub struct NewerSimpleTable {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for NewerSimpleTable {}
 
 fidl_table! {
@@ -86,13 +89,14 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct OlderSimpleTable {
     pub x: Option<i64>,
     #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for OlderSimpleTable {}
 
 fidl_table! {
@@ -105,7 +109,7 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ReverseOrdinalTable {
     pub z: Option<i64>,
     pub y: Option<i64>,
@@ -114,6 +118,7 @@ pub struct ReverseOrdinalTable {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for ReverseOrdinalTable {}
 
 fidl_table! {
@@ -134,7 +139,7 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct SimpleTable {
     pub x: Option<i64>,
     pub y: Option<i64>,
@@ -142,6 +147,7 @@ pub struct SimpleTable {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for SimpleTable {}
 
 fidl_table! {
@@ -158,7 +164,7 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct SixtyFourOrdinalTable {
     pub v1: Option<i64>,
     pub v2: Option<i64>,
@@ -228,6 +234,7 @@ pub struct SixtyFourOrdinalTable {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for SixtyFourOrdinalTable {}
 
 fidl_table! {
@@ -492,13 +499,14 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TableWithAttributes {
     pub x: Option<i64>,
     #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for TableWithAttributes {}
 
 fidl_table! {

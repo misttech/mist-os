@@ -29,7 +29,119 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProtocolRequestFlexibleResponseStrictRequest {
+    pub s: FlexibleFoo,
+}
+
+impl fidl::Persistable for ProtocolRequestFlexibleResponseStrictRequest {}
+
+fidl_struct! {
+    name: ProtocolRequestFlexibleResponseStrictRequest,
+    members: [
+        s {
+            ty: FlexibleFoo,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 24,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ProtocolRequestFlexibleResponseStrictResponse {
+    pub f: StrictFoo,
+}
+
+impl fidl::Persistable for ProtocolRequestFlexibleResponseStrictResponse {}
+
+fidl_struct! {
+    name: ProtocolRequestFlexibleResponseStrictResponse,
+    members: [
+        f {
+            ty: StrictFoo,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 24,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ProtocolRequestStrictResponseFlexibleRequest {
+    pub s: StrictFoo,
+}
+
+impl fidl::Persistable for ProtocolRequestStrictResponseFlexibleRequest {}
+
+fidl_struct! {
+    name: ProtocolRequestStrictResponseFlexibleRequest,
+    members: [
+        s {
+            ty: StrictFoo,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 24,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProtocolRequestStrictResponseFlexibleResponse {
+    pub f: FlexibleFoo,
+}
+
+impl fidl::Persistable for ProtocolRequestStrictResponseFlexibleResponse {}
+
+fidl_struct! {
+    name: ProtocolRequestStrictResponseFlexibleResponse,
+    members: [
+        f {
+            ty: FlexibleFoo,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 24,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Clone, Debug)]
 pub enum FlexibleFoo {
     S(String),
     I(i32),
@@ -40,6 +152,7 @@ pub enum FlexibleFoo {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `FlexibleFoo` member.
 #[macro_export]
 macro_rules! FlexibleFooUnknown {
@@ -69,6 +182,7 @@ impl FlexibleFoo {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -84,6 +198,7 @@ impl FlexibleFoo {
         }
     }
 }
+
 impl fidl::Persistable for FlexibleFoo {}
 
 fidl_union! {
@@ -101,7 +216,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum StrictFoo {
     S(String),
     I(i32),
@@ -115,12 +230,14 @@ impl StrictFoo {
             Self::I(_) => 2,
         }
     }
+
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
         false
     }
 }
+
 impl fidl::Persistable for StrictFoo {}
 
 fidl_union! {
@@ -135,114 +252,6 @@ fidl_union! {
             ordinal: 2,
         },
     ],
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ProtocolRequestFlexibleResponseStrictRequest {
-    pub s: FlexibleFoo,
-}
-impl fidl::Persistable for ProtocolRequestFlexibleResponseStrictRequest {}
-
-fidl_struct! {
-    name: ProtocolRequestFlexibleResponseStrictRequest,
-    members: [
-        s {
-            ty: FlexibleFoo,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 24,
-    size_v2: 16,
-    align_v1: 8,
-    align_v2: 8,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct ProtocolRequestFlexibleResponseStrictResponse {
-    pub f: StrictFoo,
-}
-impl fidl::Persistable for ProtocolRequestFlexibleResponseStrictResponse {}
-
-fidl_struct! {
-    name: ProtocolRequestFlexibleResponseStrictResponse,
-    members: [
-        f {
-            ty: StrictFoo,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 24,
-    size_v2: 16,
-    align_v1: 8,
-    align_v2: 8,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct ProtocolRequestStrictResponseFlexibleRequest {
-    pub s: StrictFoo,
-}
-impl fidl::Persistable for ProtocolRequestStrictResponseFlexibleRequest {}
-
-fidl_struct! {
-    name: ProtocolRequestStrictResponseFlexibleRequest,
-    members: [
-        s {
-            ty: StrictFoo,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 24,
-    size_v2: 16,
-    align_v1: 8,
-    align_v2: 8,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ProtocolRequestStrictResponseFlexibleResponse {
-    pub f: FlexibleFoo,
-}
-impl fidl::Persistable for ProtocolRequestStrictResponseFlexibleResponse {}
-
-fidl_struct! {
-    name: ProtocolRequestStrictResponseFlexibleResponse,
-    members: [
-        f {
-            ty: FlexibleFoo,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 24,
-    size_v2: 16,
-    align_v1: 8,
-    align_v2: 8,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -291,38 +300,38 @@ impl ProtocolSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ProtocolEvent, fidl::Error> {
         ProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#request_strict_response_flexible(
         &self,
         mut s: &StrictFoo,
         ___deadline: zx::Time,
     ) -> Result<FlexibleFoo, fidl::Error> {
         let _response = self.client.send_query::<
-                ProtocolRequestStrictResponseFlexibleRequest,
-                ProtocolRequestStrictResponseFlexibleResponse,
-            >(
-                (s,),
-                0x9b8c7d3d118df13,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            ProtocolRequestStrictResponseFlexibleRequest,
+            ProtocolRequestStrictResponseFlexibleResponse,
+        >(
+            (s,),
+            0x9b8c7d3d118df13,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.f)
     }
+
     pub fn r#request_flexible_response_strict(
         &self,
         mut s: &FlexibleFoo,
         ___deadline: zx::Time,
     ) -> Result<StrictFoo, fidl::Error> {
         let _response = self.client.send_query::<
-                ProtocolRequestFlexibleResponseStrictRequest,
-                ProtocolRequestFlexibleResponseStrictResponse,
-            >(
-                (s,),
-                0x480c77690533acb7,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            ProtocolRequestFlexibleResponseStrictRequest,
+            ProtocolRequestFlexibleResponseStrictResponse,
+        >(
+            (s,),
+            0x480c77690533acb7,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.f)
     }
 }
@@ -363,12 +372,14 @@ impl ProtocolProxy {
     pub fn take_event_stream(&self) -> ProtocolEventStream {
         ProtocolEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#request_strict_response_flexible(
         &self,
         mut s: &StrictFoo,
     ) -> fidl::client::QueryResponseFut<FlexibleFoo> {
         ProtocolProxyInterface::r#request_strict_response_flexible(self, s)
     }
+
     pub fn r#request_flexible_response_strict(
         &self,
         mut s: &FlexibleFoo,
@@ -399,6 +410,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 _decode,
             )
     }
+
     type RequestFlexibleResponseStrictResponseFut = fidl::client::QueryResponseFut<StrictFoo>;
     fn r#request_flexible_response_strict(
         &self,
@@ -586,6 +598,7 @@ impl futures::Stream for ProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum ProtocolRequest {
     RequestStrictResponseFlexible {
@@ -609,6 +622,7 @@ impl ProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_request_flexible_response_strict(
         self,
@@ -657,6 +671,7 @@ impl fidl::endpoints::ControlHandle for ProtocolControlHandle {
 }
 
 impl ProtocolControlHandle {}
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct ProtocolRequestStrictResponseFlexibleResponder {
@@ -732,6 +747,7 @@ impl ProtocolRequestStrictResponseFlexibleResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct ProtocolRequestFlexibleResponseStrictResponder {

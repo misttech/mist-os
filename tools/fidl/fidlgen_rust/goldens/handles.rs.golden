@@ -29,7 +29,7 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Handles {
     pub plain_handle: fidl::Handle,
     pub bti_handle: fidl::Bti,
@@ -66,6 +66,7 @@ pub struct Handles {
     pub some_protocol: fidl::endpoints::ClientEnd<SomeProtocolMarker>,
     pub request_some_protocol: fidl::endpoints::ServerEnd<SomeProtocolMarker>,
 }
+
 impl fidl::Standalone for Handles {}
 
 fidl_struct! {
@@ -561,6 +562,7 @@ impl futures::Stream for SomeProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum SomeProtocolRequest {}
 

@@ -29,7 +29,107 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LocalTablePayload {
+    pub a: Option<u16>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for LocalTablePayload {}
+
+fidl_table! {
+    name: LocalTablePayload,
+    members: [
+        a {
+            ty: u16,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MainProtocolOneWayAnonRequest {
+    pub a: Option<u16>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for MainProtocolOneWayAnonRequest {}
+
+fidl_table! {
+    name: MainProtocolOneWayAnonRequest,
+    members: [
+        a {
+            ty: u16,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MainProtocolTwoWayAnonResponse {
+    pub a: Option<u16>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for MainProtocolTwoWayAnonResponse {}
+
+fidl_table! {
+    name: MainProtocolTwoWayAnonResponse,
+    members: [
+        a {
+            ty: u16,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MainProtocolTwoWayAnonWithErrorRequest {
+    pub a: Option<u16>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
+
+fidl_table! {
+    name: MainProtocolTwoWayAnonWithErrorRequest,
+    members: [
+        a {
+            ty: u16,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MainProtocolOnAnonWithErrorResponse {
+    pub a: Option<u16>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl fidl::Persistable for MainProtocolOnAnonWithErrorResponse {}
+
+fidl_table! {
+    name: MainProtocolOnAnonWithErrorResponse,
+    members: [
+        a {
+            ty: u16,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Debug)]
 pub enum LocalUnionPayload {
     B(bool),
     #[deprecated = "Use `LocalUnionPayload::unknown()` to construct and `LocalUnionPayloadUnknown!()` to exhaustively match."]
@@ -39,6 +139,7 @@ pub enum LocalUnionPayload {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `LocalUnionPayload` member.
 #[macro_export]
 macro_rules! LocalUnionPayloadUnknown {
@@ -66,6 +167,7 @@ impl LocalUnionPayload {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -81,6 +183,7 @@ impl LocalUnionPayload {
         }
     }
 }
+
 impl fidl::Persistable for LocalUnionPayload {}
 
 fidl_union! {
@@ -94,7 +197,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum MainProtocolOnAnonRequest {
     B(bool),
     #[deprecated = "Use `MainProtocolOnAnonRequest::unknown()` to construct and `MainProtocolOnAnonRequestUnknown!()` to exhaustively match."]
@@ -104,6 +207,7 @@ pub enum MainProtocolOnAnonRequest {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `MainProtocolOnAnonRequest` member.
 #[macro_export]
 macro_rules! MainProtocolOnAnonRequestUnknown {
@@ -131,6 +235,7 @@ impl MainProtocolOnAnonRequest {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -146,6 +251,7 @@ impl MainProtocolOnAnonRequest {
         }
     }
 }
+
 impl fidl::Persistable for MainProtocolOnAnonRequest {}
 
 fidl_union! {
@@ -159,7 +265,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum MainProtocolTwoWayAnonRequest {
     B(bool),
     #[deprecated = "Use `MainProtocolTwoWayAnonRequest::unknown()` to construct and `MainProtocolTwoWayAnonRequestUnknown!()` to exhaustively match."]
@@ -169,6 +275,7 @@ pub enum MainProtocolTwoWayAnonRequest {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `MainProtocolTwoWayAnonRequest` member.
 #[macro_export]
 macro_rules! MainProtocolTwoWayAnonRequestUnknown {
@@ -196,6 +303,7 @@ impl MainProtocolTwoWayAnonRequest {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -211,6 +319,7 @@ impl MainProtocolTwoWayAnonRequest {
         }
     }
 }
+
 impl fidl::Persistable for MainProtocolTwoWayAnonRequest {}
 
 fidl_union! {
@@ -224,7 +333,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum MainProtocolTwoWayAnonWithErrorResponse {
     B(bool),
     #[deprecated = "Use `MainProtocolTwoWayAnonWithErrorResponse::unknown()` to construct and `MainProtocolTwoWayAnonWithErrorResponseUnknown!()` to exhaustively match."]
@@ -234,6 +343,7 @@ pub enum MainProtocolTwoWayAnonWithErrorResponse {
         ordinal: u64,
     },
 }
+
 /// Pattern that matches an unknown `MainProtocolTwoWayAnonWithErrorResponse` member.
 #[macro_export]
 macro_rules! MainProtocolTwoWayAnonWithErrorResponseUnknown {
@@ -261,6 +371,7 @@ impl MainProtocolTwoWayAnonWithErrorResponse {
             Self::__Unknown { ordinal } => ordinal,
         }
     }
+
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -276,6 +387,7 @@ impl MainProtocolTwoWayAnonWithErrorResponse {
         }
     }
 }
+
 impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorResponse {}
 
 fidl_union! {
@@ -287,101 +399,6 @@ fidl_union! {
         },
     ],
     unknown_member: __Unknown,
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct LocalTablePayload {
-    pub a: Option<u16>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for LocalTablePayload {}
-
-fidl_table! {
-    name: LocalTablePayload,
-    members: [
-        a {
-            ty: u16,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct MainProtocolOneWayAnonRequest {
-    pub a: Option<u16>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for MainProtocolOneWayAnonRequest {}
-
-fidl_table! {
-    name: MainProtocolOneWayAnonRequest,
-    members: [
-        a {
-            ty: u16,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct MainProtocolTwoWayAnonResponse {
-    pub a: Option<u16>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for MainProtocolTwoWayAnonResponse {}
-
-fidl_table! {
-    name: MainProtocolTwoWayAnonResponse,
-    members: [
-        a {
-            ty: u16,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct MainProtocolTwoWayAnonWithErrorRequest {
-    pub a: Option<u16>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
-
-fidl_table! {
-    name: MainProtocolTwoWayAnonWithErrorRequest,
-    members: [
-        a {
-            ty: u16,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct MainProtocolOnAnonWithErrorResponse {
-    pub a: Option<u16>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-    #[doc(hidden)]
-    pub __non_exhaustive: (),
-}
-impl fidl::Persistable for MainProtocolOnAnonWithErrorResponse {}
-
-fidl_table! {
-    name: MainProtocolOnAnonWithErrorResponse,
-    members: [
-        a {
-            ty: u16,
-            ordinal: 1,
-        },
-    ],
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -502,6 +519,7 @@ impl MainProtocolSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<MainProtocolEvent, fidl::Error> {
         MainProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#one_way_anon_composed(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ComposedProtocolOneWayAnonComposedRequest,
@@ -513,6 +531,7 @@ impl MainProtocolSynchronousProxy {
                 fidl::encoding::DynamicFlags::empty(),
             )
     }
+
     pub fn r#two_way_anon_composed(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
@@ -522,17 +541,17 @@ impl MainProtocolSynchronousProxy {
         fidl::Error,
     > {
         let _response = self.client.send_query::<
-                fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
-                fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse,
-            >(
-                payload,
-                0x16afa17ea70d3370,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
+            fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse,
+        >(
+            payload,
+            0x16afa17ea70d3370,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response)
     }
+
     pub fn r#two_way_anon_composed_with_error(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest,
@@ -542,17 +561,17 @@ impl MainProtocolSynchronousProxy {
         fidl::Error,
     > {
         let _response = self.client.send_query::<
-                fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest,
-                fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,
-            >(
-                payload,
-                0x2ed33746b7bb119d,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest,
+            fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,
+        >(
+            payload,
+            0x2ed33746b7bb119d,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#one_way_named_composed(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportTablePayload,
@@ -563,23 +582,24 @@ impl MainProtocolSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#two_way_named_composed(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
         ___deadline: zx::Time,
     ) -> Result<fidl_test_protocollayouts_imported::ImportTablePayload, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl_test_protocollayouts_imported::ImportUnionPayload,
-                fidl_test_protocollayouts_imported::ImportTablePayload,
-            >(
-                payload,
-                0xf67f27cae663810,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl_test_protocollayouts_imported::ImportUnionPayload,
+            fidl_test_protocollayouts_imported::ImportTablePayload,
+        >(
+            payload,
+            0xf67f27cae663810,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response)
     }
+
     pub fn r#two_way_named_composed_with_error(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportTablePayload,
@@ -589,17 +609,17 @@ impl MainProtocolSynchronousProxy {
         fidl::Error,
     > {
         let _response = self.client.send_query::<
-                fidl_test_protocollayouts_imported::ImportTablePayload,
-                fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ImportUnionPayload, u32>,
-            >(
-                payload,
-                0x30dac4182813ef7f,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl_test_protocollayouts_imported::ImportTablePayload,
+            fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ImportUnionPayload, u32>,
+        >(
+            payload,
+            0x30dac4182813ef7f,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#one_way_import(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportTablePayload,
@@ -610,40 +630,41 @@ impl MainProtocolSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#two_way_import(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
         ___deadline: zx::Time,
     ) -> Result<fidl_test_protocollayouts_imported::ImportTablePayload, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl_test_protocollayouts_imported::ImportUnionPayload,
-                fidl_test_protocollayouts_imported::ImportTablePayload,
-            >(
-                payload,
-                0x2bf680c8f0d40604,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl_test_protocollayouts_imported::ImportUnionPayload,
+            fidl_test_protocollayouts_imported::ImportTablePayload,
+        >(
+            payload,
+            0x2bf680c8f0d40604,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response)
     }
+
     pub fn r#two_way_import_with_error(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportTablePayload,
         ___deadline: zx::Time,
     ) -> Result<MainProtocolTwoWayImportWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
-                fidl_test_protocollayouts_imported::ImportTablePayload,
-                fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ImportUnionPayload, u32>,
-            >(
-                payload,
-                0x432093586084ff0a,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            fidl_test_protocollayouts_imported::ImportTablePayload,
+            fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ImportUnionPayload, u32>,
+        >(
+            payload,
+            0x432093586084ff0a,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#one_way_local(&self, mut payload: &LocalTablePayload) -> Result<(), fidl::Error> {
         self.client.send::<LocalTablePayload>(
             payload,
@@ -651,6 +672,7 @@ impl MainProtocolSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#two_way_local(
         &self,
         mut payload: &LocalUnionPayload,
@@ -664,6 +686,7 @@ impl MainProtocolSynchronousProxy {
         )?;
         Ok(_response)
     }
+
     pub fn r#two_way_local_with_error(
         &self,
         mut payload: &LocalTablePayload,
@@ -679,6 +702,7 @@ impl MainProtocolSynchronousProxy {
             )?;
         Ok(_response.map(|x| x))
     }
+
     pub fn r#one_way_anon(
         &self,
         mut payload: &MainProtocolOneWayAnonRequest,
@@ -689,6 +713,7 @@ impl MainProtocolSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#two_way_anon(
         &self,
         mut payload: &MainProtocolTwoWayAnonRequest,
@@ -704,21 +729,21 @@ impl MainProtocolSynchronousProxy {
             )?;
         Ok(_response)
     }
+
     pub fn r#two_way_anon_with_error(
         &self,
         mut payload: &MainProtocolTwoWayAnonWithErrorRequest,
         ___deadline: zx::Time,
     ) -> Result<MainProtocolTwoWayAnonWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
-                MainProtocolTwoWayAnonWithErrorRequest,
-                fidl::encoding::ResultType<MainProtocolTwoWayAnonWithErrorResponse, u32>,
-            >(
-                payload,
-                0x6bd5fcf6f7b46df1,
-                fidl::encoding::DynamicFlags::empty(),
-                ___deadline,
-            )?
-            ;
+            MainProtocolTwoWayAnonWithErrorRequest,
+            fidl::encoding::ResultType<MainProtocolTwoWayAnonWithErrorResponse, u32>,
+        >(
+            payload,
+            0x6bd5fcf6f7b46df1,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
         Ok(_response.map(|x| x))
     }
 }
@@ -759,12 +784,14 @@ impl MainProtocolProxy {
     pub fn take_event_stream(&self) -> MainProtocolEventStream {
         MainProtocolEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#one_way_anon_composed(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ComposedProtocolOneWayAnonComposedRequest,
     ) -> Result<(), fidl::Error> {
         MainProtocolProxyInterface::r#one_way_anon_composed(self, payload)
     }
+
     pub fn r#two_way_anon_composed(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
@@ -773,6 +800,7 @@ impl MainProtocolProxy {
     > {
         MainProtocolProxyInterface::r#two_way_anon_composed(self, payload)
     }
+
     pub fn r#two_way_anon_composed_with_error(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest,
@@ -781,12 +809,14 @@ impl MainProtocolProxy {
     > {
         MainProtocolProxyInterface::r#two_way_anon_composed_with_error(self, payload)
     }
+
     pub fn r#one_way_named_composed(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportTablePayload,
     ) -> Result<(), fidl::Error> {
         MainProtocolProxyInterface::r#one_way_named_composed(self, payload)
     }
+
     pub fn r#two_way_named_composed(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
@@ -794,6 +824,7 @@ impl MainProtocolProxy {
     {
         MainProtocolProxyInterface::r#two_way_named_composed(self, payload)
     }
+
     pub fn r#two_way_named_composed_with_error(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportTablePayload,
@@ -802,12 +833,14 @@ impl MainProtocolProxy {
     > {
         MainProtocolProxyInterface::r#two_way_named_composed_with_error(self, payload)
     }
+
     pub fn r#one_way_import(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportTablePayload,
     ) -> Result<(), fidl::Error> {
         MainProtocolProxyInterface::r#one_way_import(self, payload)
     }
+
     pub fn r#two_way_import(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
@@ -815,39 +848,46 @@ impl MainProtocolProxy {
     {
         MainProtocolProxyInterface::r#two_way_import(self, payload)
     }
+
     pub fn r#two_way_import_with_error(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportTablePayload,
     ) -> fidl::client::QueryResponseFut<MainProtocolTwoWayImportWithErrorResult> {
         MainProtocolProxyInterface::r#two_way_import_with_error(self, payload)
     }
+
     pub fn r#one_way_local(&self, mut payload: &LocalTablePayload) -> Result<(), fidl::Error> {
         MainProtocolProxyInterface::r#one_way_local(self, payload)
     }
+
     pub fn r#two_way_local(
         &self,
         mut payload: &LocalUnionPayload,
     ) -> fidl::client::QueryResponseFut<LocalTablePayload> {
         MainProtocolProxyInterface::r#two_way_local(self, payload)
     }
+
     pub fn r#two_way_local_with_error(
         &self,
         mut payload: &LocalTablePayload,
     ) -> fidl::client::QueryResponseFut<MainProtocolTwoWayLocalWithErrorResult> {
         MainProtocolProxyInterface::r#two_way_local_with_error(self, payload)
     }
+
     pub fn r#one_way_anon(
         &self,
         mut payload: &MainProtocolOneWayAnonRequest,
     ) -> Result<(), fidl::Error> {
         MainProtocolProxyInterface::r#one_way_anon(self, payload)
     }
+
     pub fn r#two_way_anon(
         &self,
         mut payload: &MainProtocolTwoWayAnonRequest,
     ) -> fidl::client::QueryResponseFut<MainProtocolTwoWayAnonResponse> {
         MainProtocolProxyInterface::r#two_way_anon(self, payload)
     }
+
     pub fn r#two_way_anon_with_error(
         &self,
         mut payload: &MainProtocolTwoWayAnonWithErrorRequest,
@@ -868,6 +908,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
                 fidl::encoding::DynamicFlags::empty(),
             )
     }
+
     type TwoWayAnonComposedResponseFut = fidl::client::QueryResponseFut<
         fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse,
     >;
@@ -896,6 +937,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             _decode,
         )
     }
+
     type TwoWayAnonComposedWithErrorResponseFut = fidl::client::QueryResponseFut<
         fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResult,
     >;
@@ -909,8 +951,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResult,
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>>(_buf?)?
-            ;
+            let _response = fidl::client::decode_transaction_body::<fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>>(_buf?)?;
             Ok(_response.map(|x| x))
         }
         self.client.send_query_and_decode::<
@@ -923,6 +964,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             _decode,
         )
     }
+
     fn r#one_way_named_composed(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportTablePayload,
@@ -933,6 +975,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     type TwoWayNamedComposedResponseFut =
         fidl::client::QueryResponseFut<fidl_test_protocollayouts_imported::ImportTablePayload>;
     fn r#two_way_named_composed(
@@ -957,6 +1000,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             _decode,
         )
     }
+
     type TwoWayNamedComposedWithErrorResponseFut = fidl::client::QueryResponseFut<
         fidl_test_protocollayouts_imported::ComposedProtocolTwoWayNamedComposedWithErrorResult,
     >;
@@ -988,6 +1032,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             _decode,
         )
     }
+
     fn r#one_way_import(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportTablePayload,
@@ -998,6 +1043,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     type TwoWayImportResponseFut =
         fidl::client::QueryResponseFut<fidl_test_protocollayouts_imported::ImportTablePayload>;
     fn r#two_way_import(
@@ -1022,6 +1068,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             _decode,
         )
     }
+
     type TwoWayImportWithErrorResponseFut =
         fidl::client::QueryResponseFut<MainProtocolTwoWayImportWithErrorResult>;
     fn r#two_way_import_with_error(
@@ -1049,6 +1096,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             _decode,
         )
     }
+
     fn r#one_way_local(&self, mut payload: &LocalTablePayload) -> Result<(), fidl::Error> {
         self.client.send::<LocalTablePayload>(
             payload,
@@ -1056,6 +1104,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     type TwoWayLocalResponseFut = fidl::client::QueryResponseFut<LocalTablePayload>;
     fn r#two_way_local(&self, mut payload: &LocalUnionPayload) -> Self::TwoWayLocalResponseFut {
         fn _decode(
@@ -1071,6 +1120,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             _decode,
         )
     }
+
     type TwoWayLocalWithErrorResponseFut =
         fidl::client::QueryResponseFut<MainProtocolTwoWayLocalWithErrorResult>;
     fn r#two_way_local_with_error(
@@ -1093,6 +1143,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
                 _decode,
             )
     }
+
     fn r#one_way_anon(
         &self,
         mut payload: &MainProtocolOneWayAnonRequest,
@@ -1103,6 +1154,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     type TwoWayAnonResponseFut = fidl::client::QueryResponseFut<MainProtocolTwoWayAnonResponse>;
     fn r#two_way_anon(
         &self,
@@ -1123,6 +1175,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
                 _decode,
             )
     }
+
     type TwoWayAnonWithErrorResponseFut =
         fidl::client::QueryResponseFut<MainProtocolTwoWayAnonWithErrorResult>;
     fn r#two_way_anon_with_error(
@@ -1709,6 +1762,7 @@ impl futures::Stream for MainProtocolRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum MainProtocolRequest {
     OneWayAnonComposed {
@@ -1788,6 +1842,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_two_way_anon_composed(
         self,
@@ -1801,6 +1856,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_two_way_anon_composed_with_error(
         self,
@@ -1814,6 +1870,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_one_way_named_composed(
         self,
@@ -1825,6 +1882,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_two_way_named_composed(
         self,
@@ -1838,6 +1896,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_two_way_named_composed_with_error(
         self,
@@ -1851,6 +1910,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_one_way_import(
         self,
@@ -1862,6 +1922,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_two_way_import(
         self,
@@ -1875,6 +1936,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_two_way_import_with_error(
         self,
@@ -1888,6 +1950,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_one_way_local(self) -> Option<(LocalTablePayload, MainProtocolControlHandle)> {
         if let MainProtocolRequest::OneWayLocal { payload, control_handle } = self {
@@ -1896,6 +1959,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_two_way_local(
         self,
@@ -1906,6 +1970,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_two_way_local_with_error(
         self,
@@ -1916,6 +1981,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_one_way_anon(
         self,
@@ -1926,6 +1992,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_two_way_anon(
         self,
@@ -1936,6 +2003,7 @@ impl MainProtocolRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_two_way_anon_with_error(
         self,
@@ -2010,6 +2078,7 @@ impl MainProtocolControlHandle {
                 fidl::encoding::DynamicFlags::empty(),
             )
     }
+
     pub fn send_on_anon_composed_with_error(
         &self,
         mut result: Result<
@@ -2022,6 +2091,7 @@ impl MainProtocolControlHandle {
             u32,
         >>(result, 0, 0x9e24af9a2790a3b, fidl::encoding::DynamicFlags::empty())
     }
+
     pub fn send_on_named_composed(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
@@ -2033,6 +2103,7 @@ impl MainProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_on_named_composed_with_error(
         &self,
         mut result: Result<&fidl_test_protocollayouts_imported::ImportTablePayload, u32>,
@@ -2042,6 +2113,7 @@ impl MainProtocolControlHandle {
             u32,
         >>(result, 0, 0x67eb74dad2a05c0b, fidl::encoding::DynamicFlags::empty())
     }
+
     pub fn send_on_import(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
@@ -2053,6 +2125,7 @@ impl MainProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_on_import_with_error(
         &self,
         mut result: Result<&fidl_test_protocollayouts_imported::ImportTablePayload, u32>,
@@ -2062,6 +2135,7 @@ impl MainProtocolControlHandle {
             u32,
         >>(result, 0, 0xf988d72f8ee4fd7, fidl::encoding::DynamicFlags::empty())
     }
+
     pub fn send_on_local(&self, mut payload: &LocalUnionPayload) -> Result<(), fidl::Error> {
         self.inner.send::<LocalUnionPayload>(
             payload,
@@ -2070,6 +2144,7 @@ impl MainProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_on_local_with_error(
         &self,
         mut result: Result<&LocalTablePayload, u32>,
@@ -2081,6 +2156,7 @@ impl MainProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_on_anon(&self, mut payload: &MainProtocolOnAnonRequest) -> Result<(), fidl::Error> {
         self.inner.send::<MainProtocolOnAnonRequest>(
             payload,
@@ -2089,6 +2165,7 @@ impl MainProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn send_on_anon_with_error(
         &self,
         mut result: Result<&MainProtocolOnAnonWithErrorResponse, u32>,
@@ -2101,6 +2178,7 @@ impl MainProtocolControlHandle {
         )
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct MainProtocolTwoWayAnonComposedResponder {
@@ -2185,6 +2263,7 @@ impl MainProtocolTwoWayAnonComposedResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct MainProtocolTwoWayAnonComposedWithErrorResponder {
@@ -2267,6 +2346,7 @@ impl MainProtocolTwoWayAnonComposedWithErrorResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct MainProtocolTwoWayNamedComposedResponder {
@@ -2351,6 +2431,7 @@ impl MainProtocolTwoWayNamedComposedResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct MainProtocolTwoWayNamedComposedWithErrorResponder {
@@ -2438,6 +2519,7 @@ impl MainProtocolTwoWayNamedComposedWithErrorResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct MainProtocolTwoWayImportResponder {
@@ -2522,6 +2604,7 @@ impl MainProtocolTwoWayImportResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct MainProtocolTwoWayImportWithErrorResponder {
@@ -2609,6 +2692,7 @@ impl MainProtocolTwoWayImportWithErrorResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct MainProtocolTwoWayLocalResponder {
@@ -2685,6 +2769,7 @@ impl MainProtocolTwoWayLocalResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct MainProtocolTwoWayLocalWithErrorResponder {
@@ -2763,6 +2848,7 @@ impl MainProtocolTwoWayLocalWithErrorResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct MainProtocolTwoWayAnonResponder {
@@ -2839,6 +2925,7 @@ impl MainProtocolTwoWayAnonResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct MainProtocolTwoWayAnonWithErrorResponder {

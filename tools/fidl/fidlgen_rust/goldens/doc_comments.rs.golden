@@ -29,6 +29,11 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
+/// const comment #1
+///
+/// const comment #3
+pub const C: i32 = 4;
+
 bitflags! {
     /// flexible bits comment #1
     ///
@@ -106,11 +111,6 @@ fidl_bits! {
     strict: true,
 }
 
-/// const comment #1
-///
-/// const comment #3
-pub const C: i32 = 4;
-
 /// flexible enum comment #1.
 ///
 /// flexible enum comment #2.
@@ -129,6 +129,7 @@ pub enum MyFlexibleEnum {
     #[doc(hidden)]
     __Unknown(u32),
 }
+
 /// Pattern that matches an unknown `MyFlexibleEnum` member.
 #[macro_export]
 macro_rules! MyFlexibleEnumUnknown {
@@ -234,115 +235,10 @@ fidl_enum! {
     min_member: Foo,
 }
 
-/// flexible union comment #1
-///
-/// flexible union comment #3
-#[derive(Debug, Clone)]
-pub enum FlexibleUnion {
-    /// union member comment #1
-    ///
-    /// union member comment #3
-    Field(i32),
-    #[deprecated = "Use `FlexibleUnion::unknown()` to construct and `FlexibleUnionUnknown!()` to exhaustively match."]
-    #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown { ordinal: u64 },
-}
-/// Pattern that matches an unknown `FlexibleUnion` member.
-#[macro_export]
-macro_rules! FlexibleUnionUnknown {
-    () => {
-        _
-    };
-}
-
-// Custom PartialEq so that unknown variants are not equal to themselves.
-impl PartialEq for FlexibleUnion {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Field(x), Self::Field(y)) => *x == *y,
-            _ => false,
-        }
-    }
-}
-
-impl FlexibleUnion {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::Field(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
-        }
-    }
-    #[inline]
-    pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
-            _ => false,
-        }
-    }
-}
-impl fidl::Persistable for FlexibleUnion {}
-
-fidl_union! {
-    name: FlexibleUnion,
-    members: [
-        Field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-    unknown_member: __Unknown,
-}
-
-/// strict union comment #1
-///
-/// strict union comment #3
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum StrictUnion {
-    /// union member comment #1
-    ///
-    /// union member comment #3
-    Field(i32),
-}
-
-impl StrictUnion {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::Field(_) => 1,
-        }
-    }
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
-}
-impl fidl::Persistable for StrictUnion {}
-
-fidl_union! {
-    name: StrictUnion,
-    members: [
-        Field {
-            ty: i32,
-            ordinal: 1,
-        },
-    ],
-}
-
 /// struct comment #1
 ///
 /// struct comment #3
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct Struct {
     /// struct member comment #1
@@ -350,6 +246,7 @@ pub struct Struct {
     /// struct member comment #3
     pub field: i32,
 }
+
 impl fidl::Persistable for Struct {}
 
 fidl_struct! {
@@ -377,7 +274,7 @@ fidl_struct! {
 /// table comment #1
 ///
 /// table comment #3
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Table {
     /// table field comment #1
     ///
@@ -387,12 +284,123 @@ pub struct Table {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
+
 impl fidl::Persistable for Table {}
 
 fidl_table! {
     name: Table,
     members: [
         field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+}
+
+/// flexible union comment #1
+///
+/// flexible union comment #3
+#[derive(Clone, Debug)]
+pub enum FlexibleUnion {
+    /// union member comment #1
+    ///
+    /// union member comment #3
+    Field(i32),
+    #[deprecated = "Use `FlexibleUnion::unknown()` to construct and `FlexibleUnionUnknown!()` to exhaustively match."]
+    #[doc(hidden)]
+    #[non_exhaustive]
+    __Unknown { ordinal: u64 },
+}
+
+/// Pattern that matches an unknown `FlexibleUnion` member.
+#[macro_export]
+macro_rules! FlexibleUnionUnknown {
+    () => {
+        _
+    };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for FlexibleUnion {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Field(x), Self::Field(y)) => *x == *y,
+            _ => false,
+        }
+    }
+}
+
+impl FlexibleUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Field(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+
+    #[inline]
+    pub fn unknown_variant_for_testing() -> Self {
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
+    }
+
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        match self {
+            #[allow(deprecated)]
+            Self::__Unknown { .. } => true,
+            _ => false,
+        }
+    }
+}
+
+impl fidl::Persistable for FlexibleUnion {}
+
+fidl_union! {
+    name: FlexibleUnion,
+    members: [
+        Field {
+            ty: i32,
+            ordinal: 1,
+        },
+    ],
+    unknown_member: __Unknown,
+}
+
+/// strict union comment #1
+///
+/// strict union comment #3
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum StrictUnion {
+    /// union member comment #1
+    ///
+    /// union member comment #3
+    Field(i32),
+}
+
+impl StrictUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Field(_) => 1,
+        }
+    }
+
+    #[deprecated = "Strict unions should not use `is_unknown`"]
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        false
+    }
+}
+
+impl fidl::Persistable for StrictUnion {}
+
+fidl_union! {
+    name: StrictUnion,
+    members: [
+        Field {
             ty: i32,
             ordinal: 1,
         },
@@ -434,6 +442,7 @@ impl InterfaceSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<InterfaceEvent, fidl::Error> {
         InterfaceEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     /// method comment #1
     ///
     /// method comment #3
@@ -482,6 +491,7 @@ impl InterfaceProxy {
     pub fn take_event_stream(&self) -> InterfaceEventStream {
         InterfaceEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     /// method comment #1
     ///
     /// method comment #3
@@ -663,6 +673,7 @@ impl futures::Stream for InterfaceRequestStream {
         })
     }
 }
+
 /// interface comment #1
 ///
 /// interface comment #3

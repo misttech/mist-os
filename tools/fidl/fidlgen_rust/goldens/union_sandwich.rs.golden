@@ -29,132 +29,13 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum UnionSize12Alignment4 {
-    Variant([u8; 6]),
-}
-
-impl UnionSize12Alignment4 {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::Variant(_) => 1,
-        }
-    }
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
-}
-impl fidl::Persistable for UnionSize12Alignment4 {}
-
-fidl_union! {
-    name: UnionSize12Alignment4,
-    members: [
-        Variant {
-            ty: fidl::encoding::Array<u8, 6>,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum UnionSize24Alignment8 {
-    Variant(StructSize16Alignment8),
-}
-
-impl UnionSize24Alignment8 {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::Variant(_) => 1,
-        }
-    }
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
-}
-impl fidl::Persistable for UnionSize24Alignment8 {}
-
-fidl_union! {
-    name: UnionSize24Alignment8,
-    members: [
-        Variant {
-            ty: StructSize16Alignment8,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum UnionSize36Alignment4 {
-    Variant([u8; 32]),
-}
-
-impl UnionSize36Alignment4 {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::Variant(_) => 1,
-        }
-    }
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
-}
-impl fidl::Persistable for UnionSize36Alignment4 {}
-
-fidl_union! {
-    name: UnionSize36Alignment4,
-    members: [
-        Variant {
-            ty: fidl::encoding::Array<u8, 32>,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum UnionSize8Alignment4 {
-    Variant(u32),
-}
-
-impl UnionSize8Alignment4 {
-    #[inline]
-    pub fn ordinal(&self) -> u64 {
-        match *self {
-            Self::Variant(_) => 1,
-        }
-    }
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
-}
-impl fidl::Persistable for UnionSize8Alignment4 {}
-
-fidl_union! {
-    name: UnionSize8Alignment4,
-    members: [
-        Variant {
-            ty: u32,
-            ordinal: 1,
-        },
-    ],
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SandwichUnionSize12Alignment4 {
     pub before: u32,
     pub union: UnionSize12Alignment4,
     pub after: i32,
 }
+
 impl fidl::Persistable for SandwichUnionSize12Alignment4 {}
 
 fidl_struct! {
@@ -212,12 +93,13 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SandwichUnionSize24Alignment8 {
     pub before: u32,
     pub union: UnionSize24Alignment8,
     pub after: u32,
 }
+
 impl fidl::Persistable for SandwichUnionSize24Alignment8 {}
 
 fidl_struct! {
@@ -275,12 +157,13 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SandwichUnionSize36Alignment4 {
     pub before: u32,
     pub union: UnionSize36Alignment4,
     pub after: u32,
 }
+
 impl fidl::Persistable for SandwichUnionSize36Alignment4 {}
 
 fidl_struct! {
@@ -338,12 +221,13 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SandwichUnionSize8Alignment4 {
     pub before: u32,
     pub union: UnionSize8Alignment4,
     pub after: u32,
 }
+
 impl fidl::Persistable for SandwichUnionSize8Alignment4 {}
 
 fidl_struct! {
@@ -401,12 +285,13 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct StructSize16Alignment8 {
     pub f1: u64,
     pub f2: u64,
 }
+
 impl fidl::Persistable for StructSize16Alignment8 {}
 
 fidl_struct! {
@@ -436,4 +321,132 @@ fidl_struct! {
     size_v2: 16,
     align_v1: 8,
     align_v2: 8,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum UnionSize12Alignment4 {
+    Variant([u8; 6]),
+}
+
+impl UnionSize12Alignment4 {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Variant(_) => 1,
+        }
+    }
+
+    #[deprecated = "Strict unions should not use `is_unknown`"]
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        false
+    }
+}
+
+impl fidl::Persistable for UnionSize12Alignment4 {}
+
+fidl_union! {
+    name: UnionSize12Alignment4,
+    members: [
+        Variant {
+            ty: fidl::encoding::Array<u8, 6>,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum UnionSize24Alignment8 {
+    Variant(StructSize16Alignment8),
+}
+
+impl UnionSize24Alignment8 {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Variant(_) => 1,
+        }
+    }
+
+    #[deprecated = "Strict unions should not use `is_unknown`"]
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        false
+    }
+}
+
+impl fidl::Persistable for UnionSize24Alignment8 {}
+
+fidl_union! {
+    name: UnionSize24Alignment8,
+    members: [
+        Variant {
+            ty: StructSize16Alignment8,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum UnionSize36Alignment4 {
+    Variant([u8; 32]),
+}
+
+impl UnionSize36Alignment4 {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Variant(_) => 1,
+        }
+    }
+
+    #[deprecated = "Strict unions should not use `is_unknown`"]
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        false
+    }
+}
+
+impl fidl::Persistable for UnionSize36Alignment4 {}
+
+fidl_union! {
+    name: UnionSize36Alignment4,
+    members: [
+        Variant {
+            ty: fidl::encoding::Array<u8, 32>,
+            ordinal: 1,
+        },
+    ],
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum UnionSize8Alignment4 {
+    Variant(u32),
+}
+
+impl UnionSize8Alignment4 {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Variant(_) => 1,
+        }
+    }
+
+    #[deprecated = "Strict unions should not use `is_unknown`"]
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        false
+    }
+}
+
+impl fidl::Persistable for UnionSize8Alignment4 {}
+
+fidl_union! {
+    name: UnionSize8Alignment4,
+    members: [
+        Variant {
+            ty: u32,
+            ordinal: 1,
+        },
+    ],
 }

@@ -29,10 +29,11 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ParentGetChildRequestResponse {
     pub r: fidl::endpoints::ServerEnd<ChildMarker>,
 }
+
 impl fidl::Standalone for ParentGetChildRequestResponse {}
 
 fidl_struct! {
@@ -58,10 +59,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ParentGetChildResponse {
     pub c: fidl::endpoints::ClientEnd<ChildMarker>,
 }
+
 impl fidl::Standalone for ParentGetChildResponse {}
 
 fidl_struct! {
@@ -87,10 +89,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ParentTakeChildRequest {
     pub c: fidl::endpoints::ClientEnd<ChildMarker>,
 }
+
 impl fidl::Standalone for ParentTakeChildRequest {}
 
 fidl_struct! {
@@ -116,10 +119,11 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ParentTakeChildRequestRequest {
     pub r: fidl::endpoints::ServerEnd<ChildMarker>,
 }
+
 impl fidl::Standalone for ParentTakeChildRequestRequest {}
 
 fidl_struct! {
@@ -350,6 +354,7 @@ impl futures::Stream for ChildRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum ChildRequest {}
 
@@ -430,6 +435,7 @@ impl ParentSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ParentEvent, fidl::Error> {
         ParentEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#get_child(
         &self,
         ___deadline: zx::Time,
@@ -443,6 +449,7 @@ impl ParentSynchronousProxy {
             )?;
         Ok(_response.c)
     }
+
     pub fn r#get_child_request(
         &self,
         ___deadline: zx::Time,
@@ -456,6 +463,7 @@ impl ParentSynchronousProxy {
             )?;
         Ok(_response.r)
     }
+
     pub fn r#take_child(
         &self,
         mut c: fidl::endpoints::ClientEnd<ChildMarker>,
@@ -466,6 +474,7 @@ impl ParentSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     pub fn r#take_child_request(
         &self,
         mut r: fidl::endpoints::ServerEnd<ChildMarker>,
@@ -514,22 +523,26 @@ impl ParentProxy {
     pub fn take_event_stream(&self) -> ParentEventStream {
         ParentEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#get_child(
         &self,
     ) -> fidl::client::QueryResponseFut<fidl::endpoints::ClientEnd<ChildMarker>> {
         ParentProxyInterface::r#get_child(self)
     }
+
     pub fn r#get_child_request(
         &self,
     ) -> fidl::client::QueryResponseFut<fidl::endpoints::ServerEnd<ChildMarker>> {
         ParentProxyInterface::r#get_child_request(self)
     }
+
     pub fn r#take_child(
         &self,
         mut c: fidl::endpoints::ClientEnd<ChildMarker>,
     ) -> Result<(), fidl::Error> {
         ParentProxyInterface::r#take_child(self, c)
     }
+
     pub fn r#take_child_request(
         &self,
         mut r: fidl::endpoints::ServerEnd<ChildMarker>,
@@ -558,6 +571,7 @@ impl ParentProxyInterface for ParentProxy {
             _decode,
         )
     }
+
     type GetChildRequestResponseFut =
         fidl::client::QueryResponseFut<fidl::endpoints::ServerEnd<ChildMarker>>;
     fn r#get_child_request(&self) -> Self::GetChildRequestResponseFut {
@@ -578,6 +592,7 @@ impl ParentProxyInterface for ParentProxy {
             _decode,
         )
     }
+
     fn r#take_child(
         &self,
         mut c: fidl::endpoints::ClientEnd<ChildMarker>,
@@ -588,6 +603,7 @@ impl ParentProxyInterface for ParentProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
+
     fn r#take_child_request(
         &self,
         mut r: fidl::endpoints::ServerEnd<ChildMarker>,
@@ -790,6 +806,7 @@ impl futures::Stream for ParentRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum ParentRequest {
     GetChild {
@@ -817,6 +834,7 @@ impl ParentRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_get_child_request(self) -> Option<(ParentGetChildRequestResponder)> {
         if let ParentRequest::GetChildRequest { responder } = self {
@@ -825,6 +843,7 @@ impl ParentRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_take_child(
         self,
@@ -835,6 +854,7 @@ impl ParentRequest {
             None
         }
     }
+
     #[allow(irrefutable_let_patterns)]
     pub fn into_take_child_request(
         self,
@@ -881,6 +901,7 @@ impl fidl::endpoints::ControlHandle for ParentControlHandle {
 }
 
 impl ParentControlHandle {}
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct ParentGetChildResponder {
@@ -957,6 +978,7 @@ impl ParentGetChildResponder {
         })
     }
 }
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct ParentGetChildRequestResponder {

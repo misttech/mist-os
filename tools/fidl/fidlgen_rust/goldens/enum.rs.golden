@@ -36,6 +36,7 @@ pub enum MyEmptyFlexibleEnum {
     #[doc(hidden)]
     __Unknown(u32),
 }
+
 /// Pattern that matches an unknown `MyEmptyFlexibleEnum` member.
 #[macro_export]
 macro_rules! MyEmptyFlexibleEnumUnknown {
@@ -98,6 +99,7 @@ pub enum MyFlexibleEnum {
     #[doc(hidden)]
     __Unknown(u32),
 }
+
 /// Pattern that matches an unknown `MyFlexibleEnum` member.
 #[macro_export]
 macro_rules! MyFlexibleEnumUnknown {
@@ -168,6 +170,7 @@ pub enum MyFlexibleEnumWithCustomUnknown {
     #[doc(hidden)]
     __Unknown(u32),
 }
+
 /// Pattern that matches an unknown `MyFlexibleEnumWithCustomUnknown` member.
 #[macro_export]
 macro_rules! MyFlexibleEnumWithCustomUnknownUnknown {

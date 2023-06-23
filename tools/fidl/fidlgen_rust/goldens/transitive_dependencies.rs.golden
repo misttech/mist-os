@@ -29,10 +29,11 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Baz {
     pub g: fidl_test_middle::Bar,
 }
+
 impl fidl::Persistable for Baz {}
 
 fidl_struct! {

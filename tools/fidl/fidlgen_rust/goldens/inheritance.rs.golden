@@ -29,10 +29,11 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SuperFooRequest {
     pub s: String,
 }
+
 impl fidl::Persistable for SuperFooRequest {}
 
 fidl_struct! {
@@ -56,11 +57,12 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct SuperFooResponse {
     pub y: i64,
 }
+
 impl fidl::Persistable for SuperFooResponse {}
 
 fidl_struct! {
@@ -121,6 +123,7 @@ impl SubSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<SubEvent, fidl::Error> {
         SubEvent::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#foo(&self, mut s: &str, ___deadline: zx::Time) -> Result<i64, fidl::Error> {
         let _response = self.client.send_query::<SuperFooRequest, SuperFooResponse>(
             (s,),
@@ -168,6 +171,7 @@ impl SubProxy {
     pub fn take_event_stream(&self) -> SubEventStream {
         SubEventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#foo(&self, mut s: &str) -> fidl::client::QueryResponseFut<i64> {
         SubProxyInterface::r#foo(self, s)
     }
@@ -339,6 +343,7 @@ impl futures::Stream for SubRequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum SubRequest {
     Foo { s: String, responder: SubFooResponder },
@@ -386,6 +391,7 @@ impl fidl::endpoints::ControlHandle for SubControlHandle {
 }
 
 impl SubControlHandle {}
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct SubFooResponder {
@@ -496,6 +502,7 @@ impl Super_SynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<Super_Event, fidl::Error> {
         Super_Event::decode(self.client.wait_for_event(deadline)?)
     }
+
     pub fn r#foo(&self, mut s: &str, ___deadline: zx::Time) -> Result<i64, fidl::Error> {
         let _response = self.client.send_query::<SuperFooRequest, SuperFooResponse>(
             (s,),
@@ -543,6 +550,7 @@ impl Super_Proxy {
     pub fn take_event_stream(&self) -> Super_EventStream {
         Super_EventStream { event_receiver: self.client.take_event_receiver() }
     }
+
     pub fn r#foo(&self, mut s: &str) -> fidl::client::QueryResponseFut<i64> {
         Super_ProxyInterface::r#foo(self, s)
     }
@@ -714,6 +722,7 @@ impl futures::Stream for Super_RequestStream {
         })
     }
 }
+
 #[derive(Debug)]
 pub enum Super_Request {
     Foo { s: String, responder: Super_FooResponder },
@@ -761,6 +770,7 @@ impl fidl::endpoints::ControlHandle for Super_ControlHandle {
 }
 
 impl Super_ControlHandle {}
+
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
 pub struct Super_FooResponder {
