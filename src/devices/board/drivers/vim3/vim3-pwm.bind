@@ -14,11 +14,11 @@ primary node "pwm" {
 }
 
 node "gpio-wifi" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a311d.GPIOX_PIN_ID.PIN_16; // VIM3_WIFI_32K
 }
 
 node "gpio-bt" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a311d.GPIOX_PIN_ID.PIN_17; // VIM3_BT_EN
 }

@@ -25,16 +25,28 @@ zx_status_t PwmInitDevice::Create(void* ctx, zx_device_t* parent) {
     return client_end.status_value();
   }
   fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm(std::move(client_end.value()));
-  ddk::GpioProtocolClient wifi_gpio(parent, "gpio-wifi");
-  ddk::GpioProtocolClient bt_gpio(parent, "gpio-bt");
-  if (!pwm.is_valid() || !wifi_gpio.is_valid() || !bt_gpio.is_valid()) {
-    zxlogf(ERROR, "could not get fragments");
-    return ZX_ERR_NO_RESOURCES;
+
+  const char* kWifiGpioFragmentName = "gpio-wifi";
+  zx::result wifi_gpio = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      parent, kWifiGpioFragmentName);
+  if (wifi_gpio.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio FIDL protocol from fragment %s: %s", kWifiGpioFragmentName,
+           wifi_gpio.status_string());
+    return wifi_gpio.status_value();
+  }
+
+  const char* kBtGpioFragmentName = "gpio-bt";
+  zx::result bt_gpio = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      parent, kBtGpioFragmentName);
+  if (bt_gpio.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio FIDL protocol from fragment %s: %s", kBtGpioFragmentName,
+           bt_gpio.status_string());
+    return bt_gpio.status_value();
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<PwmInitDevice> dev(new (&ac)
-                                         PwmInitDevice(parent, std::move(pwm), wifi_gpio, bt_gpio));
+  std::unique_ptr<PwmInitDevice> dev(new (&ac) PwmInitDevice(
+      parent, std::move(pwm), std::move(wifi_gpio.value()), std::move(bt_gpio.value())));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -61,12 +73,19 @@ zx_status_t PwmInitDevice::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t PwmInitDevice::Init() {
-  zx_status_t status = ZX_OK;
-
   // Configure SOC_WIFI_LPO_32k768 pin for PWM_E
-  if (((status = wifi_gpio_.SetAltFunction(1)) != ZX_OK)) {
-    zxlogf(ERROR, "could not initialize GPIO for WIFI");
-    return ZX_ERR_NO_RESOURCES;
+  {
+    fidl::WireResult result = wifi_gpio_->SetAltFunction(1);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send SetAltFunction request to wifi gpio: %s",
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to set wifi gpio's alt function: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
   // Enable PWM_CLK_* for WIFI 32K768
@@ -126,14 +145,26 @@ zx_status_t PwmInitDevice::Init() {
   }
 
   // set GPIO to reset Bluetooth module
-  if ((status = bt_gpio_.ConfigOut(0)) != ZX_OK) {
-    zxlogf(ERROR, "Could not initialize GPIO for Bluetooth");
-    return status;
+  fidl::WireResult config_result = bt_gpio_->ConfigOut(0);
+  if (!config_result.ok()) {
+    zxlogf(ERROR, "Failed to send ConfigOut request to bt gpio: %s", config_result.status_string());
+    return config_result.status();
+  }
+  if (config_result->is_error()) {
+    zxlogf(ERROR, "Failed to configure bt gpio to output: %s",
+           zx_status_get_string(config_result->error_value()));
+    return config_result->error_value();
   }
   usleep(10 * 1000);
-  if ((status = bt_gpio_.Write(1)) != ZX_OK) {
-    zxlogf(ERROR, "Could not initialize GPIO for Bluetooth");
-    return status;
+  fidl::WireResult write_result = bt_gpio_->Write(1);
+  if (!write_result.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to bt gpio: %s", write_result.status_string());
+    return write_result.status();
+  }
+  if (write_result->is_error()) {
+    zxlogf(ERROR, "Failed to write to bt gpio: %s",
+           zx_status_get_string(write_result->error_value()));
+    return write_result->error_value();
   }
   usleep(100 * 1000);
 

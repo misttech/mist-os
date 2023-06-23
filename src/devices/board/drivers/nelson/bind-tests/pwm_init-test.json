@@ -19,7 +19,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE",
                     "fuchsia.BIND_GPIO_PIN": "fuchsia.amlogic.platform.s905d3.GPIOX_PIN_ID.PIN_16"
                 }
             }
@@ -32,7 +32,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE",
                     "fuchsia.BIND_GPIO_PIN": "fuchsia.amlogic.platform.s905d3.GPIOX_PIN_ID.PIN_17"
                 }
             }

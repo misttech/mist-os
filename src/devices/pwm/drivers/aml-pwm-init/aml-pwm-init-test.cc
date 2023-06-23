@@ -4,8 +4,8 @@
 
 #include "aml-pwm-init.h"
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pwm/cpp/wire_test_base.h>
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
@@ -14,6 +14,9 @@
 #include <list>
 
 #include <fbl/alloc_checker.h>
+#include <zxtest/zxtest.h>
+
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 
 bool operator==(const fuchsia_hardware_pwm::wire::PwmConfig& lhs,
                 const fuchsia_hardware_pwm::wire::PwmConfig& rhs) {
@@ -84,11 +87,12 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
 class FakePwmInitDevice : public PwmInitDevice {
  public:
   static std::unique_ptr<FakePwmInitDevice> Create(
-      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm, const gpio_protocol_t* wifi_gpio,
-      const gpio_protocol_t* bt_gpio) {
+      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm,
+      fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> wifi_gpio,
+      fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> bt_gpio) {
     fbl::AllocChecker ac;
     auto device = fbl::make_unique_checked<FakePwmInitDevice>(
-        &ac, std::move(pwm), ddk::GpioProtocolClient(wifi_gpio), ddk::GpioProtocolClient(bt_gpio));
+        &ac, std::move(pwm), std::move(wifi_gpio), std::move(bt_gpio));
     if (!ac.check()) {
       zxlogf(ERROR, "%s: device object alloc failed", __func__);
       return nullptr;
@@ -99,21 +103,25 @@ class FakePwmInitDevice : public PwmInitDevice {
   }
 
   explicit FakePwmInitDevice(fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm,
-                             ddk::GpioProtocolClient wifi_gpio, ddk::GpioProtocolClient bt_gpio)
-      : PwmInitDevice(nullptr, std::move(pwm), wifi_gpio, bt_gpio) {}
+                             fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> wifi_gpio,
+                             fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> bt_gpio)
+      : PwmInitDevice(nullptr, std::move(pwm), std::move(wifi_gpio), std::move(bt_gpio)) {}
 };
 
 TEST(PwmInitDeviceTest, InitTest) {
-  async::Loop pwm_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  async_patterns::TestDispatcherBound<MockPwmServer> pwm_{pwm_loop_.dispatcher(), std::in_place};
-  EXPECT_OK(pwm_loop_.StartThread("pwm-servers"));
+  async::Loop fidl_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<MockPwmServer> pwm{fidl_loop.dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> wifi_gpio{fidl_loop.dispatcher(),
+                                                                     std::in_place};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> bt_gpio{fidl_loop.dispatcher(),
+                                                                   std::in_place};
+  EXPECT_OK(fidl_loop.StartThread("fidl-servers"));
 
-  auto pwm_client_ = pwm_.SyncCall(&MockPwmServer::BindServer);
-  ddk::MockGpio wifi_gpio_;
-  ddk::MockGpio bt_gpio_;
+  auto pwm_client = pwm.SyncCall(&MockPwmServer::BindServer);
+  auto wifi_gpio_client = wifi_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
+  auto bt_gpio_client = bt_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
 
-  wifi_gpio_.ExpectSetAltFunction(ZX_OK, 1);
-  pwm_.SyncCall(&MockPwmServer::ExpectEnable);
+  pwm.SyncCall(&MockPwmServer::ExpectEnable);
   aml_pwm::mode_config two_timer = {
       .mode = aml_pwm::Mode::kTwoTimer,
       .two_timer =
@@ -130,17 +138,19 @@ TEST(PwmInitDeviceTest, InitTest) {
       .duty_cycle = static_cast<float>(49.931787176),
       .mode_config = fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&two_timer),
                                                              sizeof(two_timer))};
-  pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, init_cfg);
-  bt_gpio_.ExpectConfigOut(ZX_OK, 0);
-  bt_gpio_.ExpectWrite(ZX_OK, 1);
+  pwm.SyncCall(&MockPwmServer::ExpectSetConfig, init_cfg);
 
-  std::unique_ptr<FakePwmInitDevice> dev_ =
-      FakePwmInitDevice::Create(std::move(pwm_client_), wifi_gpio_.GetProto(), bt_gpio_.GetProto());
-  ASSERT_NOT_NULL(dev_);
+  std::unique_ptr<FakePwmInitDevice> dev = FakePwmInitDevice::Create(
+      std::move(pwm_client), std::move(wifi_gpio_client), std::move(bt_gpio_client));
+  ASSERT_NOT_NULL(dev);
 
-  pwm_.SyncCall(&MockPwmServer::VerifyAndClear);
-  wifi_gpio_.VerifyAndClear();
-  bt_gpio_.VerifyAndClear();
+  ASSERT_EQ(1, wifi_gpio.SyncCall(&fake_gpio::FakeGpio::GetAltFunction));
+  auto write_values = bt_gpio.SyncCall(&fake_gpio::FakeGpio::GetWriteValues);
+  ASSERT_EQ(2, write_values.size());
+  ASSERT_EQ(0, write_values[0]);
+  ASSERT_EQ(1, write_values[1]);
+
+  pwm.SyncCall(&MockPwmServer::VerifyAndClear);
 }
 
 }  // namespace pwm_init

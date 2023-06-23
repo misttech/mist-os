@@ -17,6 +17,7 @@
     },
     use: [
         { service: "fuchsia.hardware.clock.Service" },
+        { service: "fuchsia.hardware.gpio.Service" },
         { service: "fuchsia.hardware.pwm.Service" },
     ],
 }
