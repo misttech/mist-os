@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -37,30 +35,140 @@ pub struct ExampleUseOfVectors {
 
 impl fidl::Persistable for ExampleUseOfVectors {}
 
-fidl_struct! {
-    name: ExampleUseOfVectors,
-    members: [
-        vector_of_uint8 {
-            ty: fidl::encoding::UnboundedVector<u8>,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-        vector_of_vector_of_bool {
-            ty: fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<bool>>,
-            index: 1,
-            typevar: T1,
-            offset_v1: 16,
-            offset_v2: 16,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 32,
-    size_v2: 32,
-    align_v1: 8,
-    align_v2: 8,
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+
+    unsafe impl fidl::encoding::TypeMarker for ExampleUseOfVectors {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 32,
+                fidl::encoding::WireFormatVersion::V2 => 32,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for ExampleUseOfVectors {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<ExampleUseOfVectors> for &ExampleUseOfVectors {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ExampleUseOfVectors>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<ExampleUseOfVectors>::encode(
+                (
+                    <fidl::encoding::UnboundedVector<u8> as fidl::encoding::ValueTypeMarker>::borrow(&self.vector_of_uint8),
+                    <fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<bool>> as fidl::encoding::ValueTypeMarker>::borrow(&self.vector_of_vector_of_bool),
+                ),
+                encoder, offset, _depth
+            )
+        }
+    }
+    unsafe impl<
+            T0: fidl::encoding::Encode<fidl::encoding::UnboundedVector<u8>>,
+            T1: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<bool>>,
+            >,
+        > fidl::encoding::Encode<ExampleUseOfVectors> for (T0, T1)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ExampleUseOfVectors>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 16,
+                fidl::encoding::WireFormatVersion::V2 => 16,
+            };
+            self.1.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for ExampleUseOfVectors {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self {
+                vector_of_uint8: fidl::new_empty!(fidl::encoding::UnboundedVector<u8>),
+                vector_of_vector_of_bool: fidl::new_empty!(
+                    fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<bool>>
+                ),
+            }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(
+                fidl::encoding::UnboundedVector<u8>,
+                &mut self.vector_of_uint8,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 16,
+                fidl::encoding::WireFormatVersion::V2 => 16,
+            };
+            fidl::decode!(
+                fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<bool>>,
+                &mut self.vector_of_vector_of_bool,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            Ok(())
+        }
+    }
 }

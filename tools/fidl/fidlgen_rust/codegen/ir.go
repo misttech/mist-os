@@ -121,6 +121,14 @@ type Table struct {
 	Members []TableMember
 }
 
+func (t *Table) ReversedMembers() []TableMember {
+	var r []TableMember
+	for i := len(t.Members) - 1; i >= 0; i-- {
+		r = append(r, t.Members[i])
+	}
+	return r
+}
+
 type TableMember struct {
 	fidlgen.TableMember
 	Type    Type

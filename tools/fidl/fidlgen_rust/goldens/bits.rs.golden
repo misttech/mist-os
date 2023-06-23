@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -52,12 +50,6 @@ impl EmptyBits {
     }
 }
 
-fidl_bits! {
-    name: EmptyBits,
-    prim_ty: u32,
-    flexible: true,
-}
-
 bitflags! {
     #[derive(Default)]
     pub struct FlexibleBits: u64 {
@@ -83,12 +75,6 @@ impl FlexibleBits {
     }
 }
 
-fidl_bits! {
-    name: FlexibleBits,
-    prim_ty: u64,
-    flexible: true,
-}
-
 bitflags! {
     #[derive(Default)]
     pub struct MyBits: u32 {
@@ -110,12 +96,6 @@ impl MyBits {
     pub fn get_unknown_bits(&self) -> u32 {
         0
     }
-}
-
-fidl_bits! {
-    name: MyBits,
-    prim_ty: u32,
-    strict: true,
 }
 
 bitflags! {
@@ -140,8 +120,241 @@ impl StrictBits {
     }
 }
 
-fidl_bits! {
-    name: StrictBits,
-    prim_ty: u64,
-    strict: true,
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+    unsafe impl fidl::encoding::TypeMarker for EmptyBits {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            4
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            4
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for EmptyBits {
+        type Borrowed<'a> = Self;
+        #[inline(always)]
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            *value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Self> for EmptyBits {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Self>(offset);
+            encoder.write_num(self.bits, offset);
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for EmptyBits {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::empty()
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let prim = decoder.read_num::<u32>(offset);
+            *self = Self::from_bits_allow_unknown(prim);
+            Ok(())
+        }
+    }
+    unsafe impl fidl::encoding::TypeMarker for FlexibleBits {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            8
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            8
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for FlexibleBits {
+        type Borrowed<'a> = Self;
+        #[inline(always)]
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            *value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Self> for FlexibleBits {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Self>(offset);
+            encoder.write_num(self.bits, offset);
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for FlexibleBits {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::empty()
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let prim = decoder.read_num::<u64>(offset);
+            *self = Self::from_bits_allow_unknown(prim);
+            Ok(())
+        }
+    }
+    unsafe impl fidl::encoding::TypeMarker for MyBits {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            4
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            4
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for MyBits {
+        type Borrowed<'a> = Self;
+        #[inline(always)]
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            *value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Self> for MyBits {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Self>(offset);
+            if self.bits & Self::all().bits != self.bits {
+                return Err(fidl::Error::InvalidBitsValue);
+            }
+            encoder.write_num(self.bits, offset);
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for MyBits {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::empty()
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let prim = decoder.read_num::<u32>(offset);
+            *self = Self::from_bits(prim).ok_or(fidl::Error::InvalidBitsValue)?;
+            Ok(())
+        }
+    }
+    unsafe impl fidl::encoding::TypeMarker for StrictBits {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            8
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            8
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for StrictBits {
+        type Borrowed<'a> = Self;
+        #[inline(always)]
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            *value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Self> for StrictBits {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Self>(offset);
+            if self.bits & Self::all().bits != self.bits {
+                return Err(fidl::Error::InvalidBitsValue);
+            }
+            encoder.write_num(self.bits, offset);
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for StrictBits {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::empty()
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let prim = decoder.read_num::<u64>(offset);
+            *self = Self::from_bits(prim).ok_or(fidl::Error::InvalidBitsValue)?;
+            Ok(())
+        }
+    }
 }

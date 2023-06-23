@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -883,4 +881,9 @@ impl SingleMemberServiceProxy {
     ) -> Result<(), fidl::Error> {
         self.0.open_member("single_member", server_end.into_channel())
     }
+}
+
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
 }

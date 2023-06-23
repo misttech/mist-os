@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -36,23 +34,114 @@ pub struct Baz {
 
 impl fidl::Persistable for Baz {}
 
-fidl_struct! {
-    name: Baz,
-    members: [
-        g {
-            ty: fidl_test_middle::Bar,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+
+    unsafe impl fidl::encoding::TypeMarker for Baz {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for Baz {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Baz> for &Baz {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Baz>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<Baz>::encode(
+                (<fidl_test_middle::Bar as fidl::encoding::ValueTypeMarker>::borrow(&self.g),),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<fidl_test_middle::Bar>> fidl::encoding::Encode<Baz>
+        for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Baz>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for Baz {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { g: fidl::new_empty!(fidl_test_middle::Bar) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(
+                fidl_test_middle::Bar,
+                &mut self.g,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            Ok(())
+        }
+    }
 }

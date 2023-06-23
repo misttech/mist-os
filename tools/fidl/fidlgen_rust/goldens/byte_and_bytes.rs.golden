@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -37,24 +35,115 @@ pub struct ByteAndBytes {
 
 impl fidl::Persistable for ByteAndBytes {}
 
-fidl_struct! {
-    copy: true,
-    name: ByteAndBytes,
-    members: [
-        single_byte {
-            ty: u8,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 1,
-    size_v2: 1,
-    align_v1: 1,
-    align_v2: 1,
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+
+    unsafe impl fidl::encoding::TypeMarker for ByteAndBytes {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            true
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            true
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for ByteAndBytes {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<ByteAndBytes> for &ByteAndBytes {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ByteAndBytes>(offset);
+            unsafe {
+                // Copy the object into the buffer.
+                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+                let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut ByteAndBytes>(buf_ptr);
+                typed_buf_ptr.write_unaligned((self as *const ByteAndBytes).read());
+                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
+                // done second because the memcpy will write garbage to these bytes.
+            }
+            Ok(())
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<u8>> fidl::encoding::Encode<ByteAndBytes> for (T0,) {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ByteAndBytes>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for ByteAndBytes {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { single_byte: fidl::new_empty!(u8) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            // Verify that padding bytes are zero.
+            // Copy from the buffer into the object.
+            unsafe {
+                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 1);
+            }
+            Ok(())
+        }
+    }
 }

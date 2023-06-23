@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -37,28 +35,6 @@ pub struct StructLargeArray {
 
 impl fidl::Persistable for StructLargeArray {}
 
-fidl_struct! {
-    copy: true,
-    name: StructLargeArray,
-    members: [
-        a {
-            ty: fidl::encoding::Array<u32, 100>,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 400,
-    size_v2: 400,
-    align_v1: 4,
-    align_v2: 4,
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct StructSmallArray {
@@ -66,28 +42,6 @@ pub struct StructSmallArray {
 }
 
 impl fidl::Persistable for StructSmallArray {}
-
-fidl_struct! {
-    copy: true,
-    name: StructSmallArray,
-    members: [
-        a {
-            ty: fidl::encoding::Array<u32, 2>,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 8,
-    size_v2: 8,
-    align_v1: 4,
-    align_v2: 4,
-}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TableLargeArray {
@@ -99,16 +53,6 @@ pub struct TableLargeArray {
 
 impl fidl::Persistable for TableLargeArray {}
 
-fidl_table! {
-    name: TableLargeArray,
-    members: [
-        a {
-            ty: fidl::encoding::Array<u32, 100>,
-            ordinal: 1,
-        },
-    ],
-}
-
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TableSmallArray {
     pub a: Option<[u32; 2]>,
@@ -118,16 +62,6 @@ pub struct TableSmallArray {
 }
 
 impl fidl::Persistable for TableSmallArray {}
-
-fidl_table! {
-    name: TableSmallArray,
-    members: [
-        a {
-            ty: fidl::encoding::Array<u32, 2>,
-            ordinal: 1,
-        },
-    ],
-}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum UnionLargeArray {
@@ -151,16 +85,6 @@ impl UnionLargeArray {
 
 impl fidl::Persistable for UnionLargeArray {}
 
-fidl_union! {
-    name: UnionLargeArray,
-    members: [
-        A {
-            ty: fidl::encoding::Array<u32, 100>,
-            ordinal: 1,
-        },
-    ],
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum UnionSmallArray {
     A([u32; 2]),
@@ -183,12 +107,812 @@ impl UnionSmallArray {
 
 impl fidl::Persistable for UnionSmallArray {}
 
-fidl_union! {
-    name: UnionSmallArray,
-    members: [
-        A {
-            ty: fidl::encoding::Array<u32, 2>,
-            ordinal: 1,
-        },
-    ],
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+
+    unsafe impl fidl::encoding::TypeMarker for StructLargeArray {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 400,
+                fidl::encoding::WireFormatVersion::V2 => 400,
+            }
+        }
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            true
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            true
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for StructLargeArray {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<StructLargeArray> for &StructLargeArray {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<StructLargeArray>(offset);
+            unsafe {
+                // Copy the object into the buffer.
+                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+                let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut StructLargeArray>(buf_ptr);
+                typed_buf_ptr.write_unaligned((self as *const StructLargeArray).read());
+                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
+                // done second because the memcpy will write garbage to these bytes.
+            }
+            Ok(())
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<fidl::encoding::Array<u32, 100>>>
+        fidl::encoding::Encode<StructLargeArray> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<StructLargeArray>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for StructLargeArray {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { a: fidl::new_empty!(fidl::encoding::Array<u32, 100>) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            // Verify that padding bytes are zero.
+            // Copy from the buffer into the object.
+            unsafe {
+                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 400);
+            }
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for StructSmallArray {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            }
+        }
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            true
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            true
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for StructSmallArray {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<StructSmallArray> for &StructSmallArray {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<StructSmallArray>(offset);
+            unsafe {
+                // Copy the object into the buffer.
+                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+                let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut StructSmallArray>(buf_ptr);
+                typed_buf_ptr.write_unaligned((self as *const StructSmallArray).read());
+                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
+                // done second because the memcpy will write garbage to these bytes.
+            }
+            Ok(())
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<fidl::encoding::Array<u32, 2>>>
+        fidl::encoding::Encode<StructSmallArray> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<StructSmallArray>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for StructSmallArray {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { a: fidl::new_empty!(fidl::encoding::Array<u32, 2>) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            // Verify that padding bytes are zero.
+            // Copy from the buffer into the object.
+            unsafe {
+                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 8);
+            }
+            Ok(())
+        }
+    }
+
+    impl TableLargeArray {
+        #[inline(always)]
+        fn max_ordinal_present(&self) -> u64 {
+            if let Some(_) = self.a {
+                return 1;
+            }
+            0
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for TableLargeArray {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            8
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            16
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for TableLargeArray {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<TableLargeArray> for &TableLargeArray {
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            mut depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<TableLargeArray>(offset);
+            // Vector header
+            let max_ordinal: u64 = self.max_ordinal_present();
+            encoder.write_num(max_ordinal, offset);
+            encoder.write_num(fidl::encoding::ALLOC_PRESENT_U64, offset + 8);
+            // write_out_of_line must not be called with a zero-sized out-of-line block.
+            if max_ordinal == 0 {
+                return Ok(());
+            }
+            depth.increment()?;
+            let envelope_size = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 16,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            let bytes_len = (max_ordinal as usize) * envelope_size;
+            #[allow(unused_variables)]
+            let offset = encoder.out_of_line_offset(bytes_len);
+            let mut _prev_end_offset: usize = 0;
+            if 1 > max_ordinal {
+                return Ok(());
+            }
+
+            // Write at offset+(ordinal-1)*envelope_size, since ordinals are one-based and envelopes
+            // are envelope_size bytes.
+            let cur_offset: usize = (1 - 1) * envelope_size;
+
+            // Zero reserved fields.
+            encoder.padding(offset + _prev_end_offset, cur_offset - _prev_end_offset);
+
+            // Safety:
+            // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
+            // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
+            //   envelope_size bytes, there is always sufficient room.
+            fidl::encoding::encode_in_envelope_optional::<fidl::encoding::Array<u32, 100>>(
+                self.a.as_ref().map(
+                    <fidl::encoding::Array<u32, 100> as fidl::encoding::ValueTypeMarker>::borrow,
+                ),
+                encoder,
+                offset + cur_offset,
+                depth,
+            )?;
+
+            _prev_end_offset = cur_offset + envelope_size;
+
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for TableLargeArray {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::default()
+        }
+
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            mut depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let len = match fidl::encoding::decode_vector_header(decoder, offset)? {
+                None => return Err(fidl::Error::NotNullable),
+                Some(len) => len,
+            };
+            depth.increment()?;
+            let envelope_size = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 16,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            let bytes_len = len * envelope_size;
+            let offset = decoder.out_of_line_offset(bytes_len)?;
+            // Decode the envelope for each type.
+            let mut _next_ordinal_to_read = 0;
+            let mut next_offset = offset;
+            let end_offset = offset + bytes_len;
+            _next_ordinal_to_read += 1;
+            if next_offset >= end_offset {
+                return Ok(());
+            }
+
+            // Decode unknown envelopes for gaps in ordinals.
+            while _next_ordinal_to_read < 1 {
+                fidl::encoding::decode_unknown_envelope(decoder, next_offset, depth)?;
+                _next_ordinal_to_read += 1;
+                next_offset += envelope_size;
+            }
+
+            let next_out_of_line = decoder.next_out_of_line();
+            let handles_before = decoder.remaining_handles();
+            if let Some((inlined, num_bytes, num_handles)) =
+                fidl::encoding::decode_envelope_header(decoder, next_offset)?
+            {
+                let member_inline_size =
+                    <fidl::encoding::Array<u32, 100> as fidl::encoding::TypeMarker>::inline_size(
+                        decoder.context,
+                    );
+                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
+                    if inlined != (member_inline_size <= 4) {
+                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
+                    }
+                }
+                let inner_offset;
+                let mut inner_depth = depth.clone();
+                if inlined {
+                    decoder.check_inline_envelope_padding(next_offset, member_inline_size)?;
+                    inner_offset = next_offset;
+                } else {
+                    inner_offset = decoder.out_of_line_offset(member_inline_size)?;
+                    inner_depth.increment()?;
+                }
+                let val_ref =
+                    self.a.get_or_insert_with(|| fidl::new_empty!(fidl::encoding::Array<u32, 100>));
+                fidl::decode!(fidl::encoding::Array<u32, 100>, val_ref, decoder, inner_offset, inner_depth)?;
+                if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
+                {
+                    return Err(fidl::Error::InvalidNumBytesInEnvelope);
+                }
+                if handles_before != decoder.remaining_handles() + (num_handles as usize) {
+                    return Err(fidl::Error::InvalidNumHandlesInEnvelope);
+                }
+            }
+
+            next_offset += envelope_size;
+
+            // Decode the remaining unknown envelopes.
+            while next_offset < end_offset {
+                _next_ordinal_to_read += 1;
+                fidl::encoding::decode_unknown_envelope(decoder, next_offset, depth)?;
+                next_offset += envelope_size;
+            }
+
+            Ok(())
+        }
+    }
+
+    impl TableSmallArray {
+        #[inline(always)]
+        fn max_ordinal_present(&self) -> u64 {
+            if let Some(_) = self.a {
+                return 1;
+            }
+            0
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for TableSmallArray {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            8
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            16
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for TableSmallArray {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<TableSmallArray> for &TableSmallArray {
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            mut depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<TableSmallArray>(offset);
+            // Vector header
+            let max_ordinal: u64 = self.max_ordinal_present();
+            encoder.write_num(max_ordinal, offset);
+            encoder.write_num(fidl::encoding::ALLOC_PRESENT_U64, offset + 8);
+            // write_out_of_line must not be called with a zero-sized out-of-line block.
+            if max_ordinal == 0 {
+                return Ok(());
+            }
+            depth.increment()?;
+            let envelope_size = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 16,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            let bytes_len = (max_ordinal as usize) * envelope_size;
+            #[allow(unused_variables)]
+            let offset = encoder.out_of_line_offset(bytes_len);
+            let mut _prev_end_offset: usize = 0;
+            if 1 > max_ordinal {
+                return Ok(());
+            }
+
+            // Write at offset+(ordinal-1)*envelope_size, since ordinals are one-based and envelopes
+            // are envelope_size bytes.
+            let cur_offset: usize = (1 - 1) * envelope_size;
+
+            // Zero reserved fields.
+            encoder.padding(offset + _prev_end_offset, cur_offset - _prev_end_offset);
+
+            // Safety:
+            // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
+            // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
+            //   envelope_size bytes, there is always sufficient room.
+            fidl::encoding::encode_in_envelope_optional::<fidl::encoding::Array<u32, 2>>(
+                self.a.as_ref().map(
+                    <fidl::encoding::Array<u32, 2> as fidl::encoding::ValueTypeMarker>::borrow,
+                ),
+                encoder,
+                offset + cur_offset,
+                depth,
+            )?;
+
+            _prev_end_offset = cur_offset + envelope_size;
+
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for TableSmallArray {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::default()
+        }
+
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            mut depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let len = match fidl::encoding::decode_vector_header(decoder, offset)? {
+                None => return Err(fidl::Error::NotNullable),
+                Some(len) => len,
+            };
+            depth.increment()?;
+            let envelope_size = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 16,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            let bytes_len = len * envelope_size;
+            let offset = decoder.out_of_line_offset(bytes_len)?;
+            // Decode the envelope for each type.
+            let mut _next_ordinal_to_read = 0;
+            let mut next_offset = offset;
+            let end_offset = offset + bytes_len;
+            _next_ordinal_to_read += 1;
+            if next_offset >= end_offset {
+                return Ok(());
+            }
+
+            // Decode unknown envelopes for gaps in ordinals.
+            while _next_ordinal_to_read < 1 {
+                fidl::encoding::decode_unknown_envelope(decoder, next_offset, depth)?;
+                _next_ordinal_to_read += 1;
+                next_offset += envelope_size;
+            }
+
+            let next_out_of_line = decoder.next_out_of_line();
+            let handles_before = decoder.remaining_handles();
+            if let Some((inlined, num_bytes, num_handles)) =
+                fidl::encoding::decode_envelope_header(decoder, next_offset)?
+            {
+                let member_inline_size =
+                    <fidl::encoding::Array<u32, 2> as fidl::encoding::TypeMarker>::inline_size(
+                        decoder.context,
+                    );
+                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
+                    if inlined != (member_inline_size <= 4) {
+                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
+                    }
+                }
+                let inner_offset;
+                let mut inner_depth = depth.clone();
+                if inlined {
+                    decoder.check_inline_envelope_padding(next_offset, member_inline_size)?;
+                    inner_offset = next_offset;
+                } else {
+                    inner_offset = decoder.out_of_line_offset(member_inline_size)?;
+                    inner_depth.increment()?;
+                }
+                let val_ref =
+                    self.a.get_or_insert_with(|| fidl::new_empty!(fidl::encoding::Array<u32, 2>));
+                fidl::decode!(fidl::encoding::Array<u32, 2>, val_ref, decoder, inner_offset, inner_depth)?;
+                if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
+                {
+                    return Err(fidl::Error::InvalidNumBytesInEnvelope);
+                }
+                if handles_before != decoder.remaining_handles() + (num_handles as usize) {
+                    return Err(fidl::Error::InvalidNumHandlesInEnvelope);
+                }
+            }
+
+            next_offset += envelope_size;
+
+            // Decode the remaining unknown envelopes.
+            while next_offset < end_offset {
+                _next_ordinal_to_read += 1;
+                fidl::encoding::decode_unknown_envelope(decoder, next_offset, depth)?;
+                next_offset += envelope_size;
+            }
+
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for UnionLargeArray {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            8
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 16,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for UnionLargeArray {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<UnionLargeArray> for &UnionLargeArray {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<UnionLargeArray>(offset);
+            encoder.write_num::<u64>(self.ordinal(), offset);
+            match self {
+                UnionLargeArray::A(ref val) => fidl::encoding::encode_in_envelope::<
+                    fidl::encoding::Array<u32, 100>,
+                >(
+                    <fidl::encoding::Array<u32, 100> as fidl::encoding::ValueTypeMarker>::borrow(
+                        val,
+                    ),
+                    encoder,
+                    offset + 8,
+                    _depth,
+                ),
+            }
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for UnionLargeArray {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::A(fidl::new_empty!(fidl::encoding::Array<u32, 100>))
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            mut depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            #[allow(unused_variables)]
+            let next_out_of_line = decoder.next_out_of_line();
+            let handles_before = decoder.remaining_handles();
+            let (ordinal, inlined, num_bytes, num_handles) =
+                fidl::encoding::decode_union_inline_portion(decoder, offset)?;
+
+            let member_inline_size = match ordinal {
+                1 => <fidl::encoding::Array<u32, 100> as fidl::encoding::TypeMarker>::inline_size(
+                    decoder.context,
+                ),
+                _ => return Err(fidl::Error::UnknownUnionTag),
+            };
+
+            if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
+                }
+            }
+            let _inner_offset;
+            if inlined {
+                decoder.check_inline_envelope_padding(offset + 8, member_inline_size)?;
+                _inner_offset = offset + 8;
+            } else {
+                depth.increment()?;
+                _inner_offset = decoder.out_of_line_offset(member_inline_size)?;
+            }
+            match ordinal {
+                1 => {
+                    #[allow(irrefutable_let_patterns)]
+                    if let UnionLargeArray::A(_) = self {
+                        // Do nothing, read the value into the object
+                    } else {
+                        // Initialize `self` to the right variant
+                        *self =
+                            UnionLargeArray::A(fidl::new_empty!(fidl::encoding::Array<u32, 100>));
+                    }
+                    #[allow(irrefutable_let_patterns)]
+                    if let UnionLargeArray::A(ref mut val) = self {
+                        fidl::decode!(fidl::encoding::Array<u32, 100>, val, decoder, _inner_offset, depth)?;
+                    } else {
+                        unreachable!()
+                    }
+                }
+                ordinal => panic!("unexpected ordinal {:?}", ordinal),
+            }
+            if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
+                return Err(fidl::Error::InvalidNumBytesInEnvelope);
+            }
+            if handles_before != decoder.remaining_handles() + (num_handles as usize) {
+                return Err(fidl::Error::InvalidNumHandlesInEnvelope);
+            }
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for UnionSmallArray {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            8
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 16,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for UnionSmallArray {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<UnionSmallArray> for &UnionSmallArray {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<UnionSmallArray>(offset);
+            encoder.write_num::<u64>(self.ordinal(), offset);
+            match self {
+                UnionSmallArray::A(ref val) => fidl::encoding::encode_in_envelope::<
+                    fidl::encoding::Array<u32, 2>,
+                >(
+                    <fidl::encoding::Array<u32, 2> as fidl::encoding::ValueTypeMarker>::borrow(val),
+                    encoder,
+                    offset + 8,
+                    _depth,
+                ),
+            }
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for UnionSmallArray {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::A(fidl::new_empty!(fidl::encoding::Array<u32, 2>))
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            mut depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            #[allow(unused_variables)]
+            let next_out_of_line = decoder.next_out_of_line();
+            let handles_before = decoder.remaining_handles();
+            let (ordinal, inlined, num_bytes, num_handles) =
+                fidl::encoding::decode_union_inline_portion(decoder, offset)?;
+
+            let member_inline_size = match ordinal {
+                1 => <fidl::encoding::Array<u32, 2> as fidl::encoding::TypeMarker>::inline_size(
+                    decoder.context,
+                ),
+                _ => return Err(fidl::Error::UnknownUnionTag),
+            };
+
+            if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
+                }
+            }
+            let _inner_offset;
+            if inlined {
+                decoder.check_inline_envelope_padding(offset + 8, member_inline_size)?;
+                _inner_offset = offset + 8;
+            } else {
+                depth.increment()?;
+                _inner_offset = decoder.out_of_line_offset(member_inline_size)?;
+            }
+            match ordinal {
+                1 => {
+                    #[allow(irrefutable_let_patterns)]
+                    if let UnionSmallArray::A(_) = self {
+                        // Do nothing, read the value into the object
+                    } else {
+                        // Initialize `self` to the right variant
+                        *self = UnionSmallArray::A(fidl::new_empty!(fidl::encoding::Array<u32, 2>));
+                    }
+                    #[allow(irrefutable_let_patterns)]
+                    if let UnionSmallArray::A(ref mut val) = self {
+                        fidl::decode!(fidl::encoding::Array<u32, 2>, val, decoder, _inner_offset, depth)?;
+                    } else {
+                        unreachable!()
+                    }
+                }
+                ordinal => panic!("unexpected ordinal {:?}", ordinal),
+            }
+            if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
+                return Err(fidl::Error::InvalidNumBytesInEnvelope);
+            }
+            if handles_before != decoder.remaining_handles() + (num_handles as usize) {
+                return Err(fidl::Error::InvalidNumHandlesInEnvelope);
+            }
+            Ok(())
+        }
+    }
 }

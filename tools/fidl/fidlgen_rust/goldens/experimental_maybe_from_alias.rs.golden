@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -62,230 +60,6 @@ pub struct Testing {
 }
 
 impl fidl::Standalone for Testing {}
-
-fidl_struct! {
-    name: Testing,
-    resource: true,
-    members: [
-        u1 {
-            ty: u64,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-        u2 {
-            ty: fidl::encoding::Vector<u64, 1>,
-            index: 1,
-            typevar: T1,
-            offset_v1: 8,
-            offset_v2: 8,
-        },
-        u3 {
-            ty: fidl::encoding::Array<u64, 1>,
-            index: 2,
-            typevar: T2,
-            offset_v1: 24,
-            offset_v2: 24,
-        },
-        u4 {
-            ty: fidl::encoding::UnboundedVector<fidl::encoding::Vector<u64, 1>>,
-            index: 3,
-            typevar: T3,
-            offset_v1: 32,
-            offset_v2: 32,
-        },
-        u5 {
-            ty: fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>,
-            index: 4,
-            typevar: T4,
-            offset_v1: 48,
-            offset_v2: 48,
-        },
-        u6 {
-            ty: fidl::encoding::Array<fidl::encoding::Vector<u64, 1>, 4>,
-            index: 5,
-            typevar: T5,
-            offset_v1: 64,
-            offset_v2: 64,
-        },
-        u7 {
-            ty: fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>,
-            index: 6,
-            typevar: T6,
-            offset_v1: 128,
-            offset_v2: 128,
-        },
-        v1 {
-            ty: fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
-            index: 7,
-            typevar: T7,
-            offset_v1: 160,
-            offset_v2: 160,
-        },
-        v2 {
-            ty: fidl::encoding::UnboundedVector<fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>>,
-            index: 8,
-            typevar: T8,
-            offset_v1: 176,
-            offset_v2: 176,
-        },
-        v3 {
-            ty: fidl::encoding::Array<fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>, 4>,
-            index: 9,
-            typevar: T9,
-            offset_v1: 192,
-            offset_v2: 192,
-        },
-        a1 {
-            ty: fidl::encoding::Array<u64, 1>,
-            index: 10,
-            typevar: T10,
-            offset_v1: 256,
-            offset_v2: 256,
-        },
-        a2 {
-            ty: fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>,
-            index: 11,
-            typevar: T11,
-            offset_v1: 264,
-            offset_v2: 264,
-        },
-        a3 {
-            ty: fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>,
-            index: 12,
-            typevar: T12,
-            offset_v1: 280,
-            offset_v2: 280,
-        },
-        r1 {
-            ty: fidl::encoding::Optional<fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>>,
-            resource: true,
-            index: 13,
-            typevar: T13,
-            offset_v1: 312,
-            offset_v2: 312,
-        },
-        r2 {
-            ty: fidl::encoding::UnboundedVector<fidl::encoding::Optional<fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>>>,
-            resource: true,
-            index: 14,
-            typevar: T14,
-            offset_v1: 320,
-            offset_v2: 320,
-        },
-        r3 {
-            ty: fidl::encoding::Array<fidl::encoding::Optional<fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>>, 4>,
-            resource: true,
-            index: 15,
-            typevar: T15,
-            offset_v1: 336,
-            offset_v2: 336,
-        },
-        b1 {
-            ty: fidl::encoding::UnboundedVector<u8>,
-            index: 16,
-            typevar: T16,
-            offset_v1: 352,
-            offset_v2: 352,
-        },
-        b2 {
-            ty: fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>>,
-            index: 17,
-            typevar: T17,
-            offset_v1: 368,
-            offset_v2: 368,
-        },
-        b3 {
-            ty: fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 4>,
-            index: 18,
-            typevar: T18,
-            offset_v1: 384,
-            offset_v2: 384,
-        },
-        s1 {
-            ty: fidl::encoding::UnboundedString,
-            index: 19,
-            typevar: T19,
-            offset_v1: 448,
-            offset_v2: 448,
-        },
-        s2 {
-            ty: fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
-            index: 20,
-            typevar: T20,
-            offset_v1: 464,
-            offset_v2: 464,
-        },
-        s3 {
-            ty: fidl::encoding::Array<fidl::encoding::UnboundedString, 4>,
-            index: 21,
-            typevar: T21,
-            offset_v1: 480,
-            offset_v2: 480,
-        },
-        vv1 {
-            ty: fidl::encoding::Vector<u64, 2>,
-            index: 22,
-            typevar: T22,
-            offset_v1: 544,
-            offset_v2: 544,
-        },
-        vv2 {
-            ty: fidl::encoding::Vector<fidl::encoding::Vector<u64, 2>, 3>,
-            index: 23,
-            typevar: T23,
-            offset_v1: 560,
-            offset_v2: 560,
-        },
-        vv3 {
-            ty: fidl::encoding::Array<fidl::encoding::Vector<u64, 2>, 3>,
-            index: 24,
-            typevar: T24,
-            offset_v1: 576,
-            offset_v2: 576,
-        },
-        aa1 {
-            ty: fidl::encoding::Array<u64, 2>,
-            index: 25,
-            typevar: T25,
-            offset_v1: 624,
-            offset_v2: 624,
-        },
-        aa2 {
-            ty: fidl::encoding::Vector<fidl::encoding::Array<u64, 2>, 3>,
-            index: 26,
-            typevar: T26,
-            offset_v1: 640,
-            offset_v2: 640,
-        },
-        aa3 {
-            ty: fidl::encoding::Array<fidl::encoding::Array<u64, 2>, 3>,
-            index: 27,
-            typevar: T27,
-            offset_v1: 656,
-            offset_v2: 656,
-        },
-    ],
-    padding_v1: [
-        {
-            ty: u64,
-            offset: 312,
-            mask: 0xffffffff00000000u64,
-        },
-    ],
-    padding_v2: [
-        {
-            ty: u64,
-            offset: 312,
-            mask: 0xffffffff00000000u64,
-        },
-    ],
-    size_v1: 704,
-    size_v2: 704,
-    align_v1: 8,
-    align_v2: 8,
-}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct MyProtocolMarker;
@@ -528,3 +302,735 @@ impl fidl::endpoints::ControlHandle for MyProtocolControlHandle {
 }
 
 impl MyProtocolControlHandle {}
+
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+
+    unsafe impl fidl::encoding::TypeMarker for Testing {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 704,
+                fidl::encoding::WireFormatVersion::V2 => 704,
+            }
+        }
+    }
+    impl fidl::encoding::ResourceTypeMarker for Testing {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Testing> for &mut Testing {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Testing>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<Testing>::encode(
+                (
+                    <u64 as fidl::encoding::ValueTypeMarker>::borrow(&self.u1),
+                    <fidl::encoding::Vector<u64, 1> as fidl::encoding::ValueTypeMarker>::borrow(&self.u2),
+                    <fidl::encoding::Array<u64, 1> as fidl::encoding::ValueTypeMarker>::borrow(&self.u3),
+                    <fidl::encoding::UnboundedVector<fidl::encoding::Vector<u64, 1>> as fidl::encoding::ValueTypeMarker>::borrow(&self.u4),
+                    <fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>> as fidl::encoding::ValueTypeMarker>::borrow(&self.u5),
+                    <fidl::encoding::Array<fidl::encoding::Vector<u64, 1>, 4> as fidl::encoding::ValueTypeMarker>::borrow(&self.u6),
+                    <fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4> as fidl::encoding::ValueTypeMarker>::borrow(&self.u7),
+                    <fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>> as fidl::encoding::ValueTypeMarker>::borrow(&self.v1),
+                    <fidl::encoding::UnboundedVector<fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>> as fidl::encoding::ValueTypeMarker>::borrow(&self.v2),
+                    <fidl::encoding::Array<fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>, 4> as fidl::encoding::ValueTypeMarker>::borrow(&self.v3),
+                    <fidl::encoding::Array<u64, 1> as fidl::encoding::ValueTypeMarker>::borrow(&self.a1),
+                    <fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>> as fidl::encoding::ValueTypeMarker>::borrow(&self.a2),
+                    <fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4> as fidl::encoding::ValueTypeMarker>::borrow(&self.a3),
+                    <fidl::encoding::Optional<fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.r1),
+                    <fidl::encoding::UnboundedVector<fidl::encoding::Optional<fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>>> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.r2),
+                    <fidl::encoding::Array<fidl::encoding::Optional<fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>>, 4> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.r3),
+                    <fidl::encoding::UnboundedVector<u8> as fidl::encoding::ValueTypeMarker>::borrow(&self.b1),
+                    <fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>> as fidl::encoding::ValueTypeMarker>::borrow(&self.b2),
+                    <fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 4> as fidl::encoding::ValueTypeMarker>::borrow(&self.b3),
+                    <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(&self.s1),
+                    <fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString> as fidl::encoding::ValueTypeMarker>::borrow(&self.s2),
+                    <fidl::encoding::Array<fidl::encoding::UnboundedString, 4> as fidl::encoding::ValueTypeMarker>::borrow(&self.s3),
+                    <fidl::encoding::Vector<u64, 2> as fidl::encoding::ValueTypeMarker>::borrow(&self.vv1),
+                    <fidl::encoding::Vector<fidl::encoding::Vector<u64, 2>, 3> as fidl::encoding::ValueTypeMarker>::borrow(&self.vv2),
+                    <fidl::encoding::Array<fidl::encoding::Vector<u64, 2>, 3> as fidl::encoding::ValueTypeMarker>::borrow(&self.vv3),
+                    <fidl::encoding::Array<u64, 2> as fidl::encoding::ValueTypeMarker>::borrow(&self.aa1),
+                    <fidl::encoding::Vector<fidl::encoding::Array<u64, 2>, 3> as fidl::encoding::ValueTypeMarker>::borrow(&self.aa2),
+                    <fidl::encoding::Array<fidl::encoding::Array<u64, 2>, 3> as fidl::encoding::ValueTypeMarker>::borrow(&self.aa3),
+                ),
+                encoder, offset, _depth
+            )
+        }
+    }
+    unsafe impl<
+            T0: fidl::encoding::Encode<u64>,
+            T1: fidl::encoding::Encode<fidl::encoding::Vector<u64, 1>>,
+            T2: fidl::encoding::Encode<fidl::encoding::Array<u64, 1>>,
+            T3: fidl::encoding::Encode<fidl::encoding::UnboundedVector<fidl::encoding::Vector<u64, 1>>>,
+            T4: fidl::encoding::Encode<fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>>,
+            T5: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Vector<u64, 1>, 4>>,
+            T6: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>>,
+            T7: fidl::encoding::Encode<fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>>,
+            T8: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<
+                    fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
+                >,
+            >,
+            T9: fidl::encoding::Encode<
+                fidl::encoding::Array<
+                    fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
+                    4,
+                >,
+            >,
+            T10: fidl::encoding::Encode<fidl::encoding::Array<u64, 1>>,
+            T11: fidl::encoding::Encode<fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>>,
+            T12: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>>,
+            T13: fidl::encoding::Encode<
+                fidl::encoding::Optional<
+                    fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
+                >,
+            >,
+            T14: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<
+                    fidl::encoding::Optional<
+                        fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
+                    >,
+                >,
+            >,
+            T15: fidl::encoding::Encode<
+                fidl::encoding::Array<
+                    fidl::encoding::Optional<
+                        fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
+                    >,
+                    4,
+                >,
+            >,
+            T16: fidl::encoding::Encode<fidl::encoding::UnboundedVector<u8>>,
+            T17: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>>,
+            >,
+            T18: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 4>>,
+            T19: fidl::encoding::Encode<fidl::encoding::UnboundedString>,
+            T20: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+            >,
+            T21: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::UnboundedString, 4>>,
+            T22: fidl::encoding::Encode<fidl::encoding::Vector<u64, 2>>,
+            T23: fidl::encoding::Encode<fidl::encoding::Vector<fidl::encoding::Vector<u64, 2>, 3>>,
+            T24: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Vector<u64, 2>, 3>>,
+            T25: fidl::encoding::Encode<fidl::encoding::Array<u64, 2>>,
+            T26: fidl::encoding::Encode<fidl::encoding::Vector<fidl::encoding::Array<u64, 2>, 3>>,
+            T27: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Array<u64, 2>, 3>>,
+        > fidl::encoding::Encode<Testing>
+        for (
+            T0,
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            T9,
+            T10,
+            T11,
+            T12,
+            T13,
+            T14,
+            T15,
+            T16,
+            T17,
+            T18,
+            T19,
+            T20,
+            T21,
+            T22,
+            T23,
+            T24,
+            T25,
+            T26,
+            T27,
+        )
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Testing>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => unsafe {
+                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(312);
+                    std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                },
+                fidl::encoding::WireFormatVersion::V2 => unsafe {
+                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(312);
+                    std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                },
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            self.1.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 24,
+            };
+            self.2.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 32,
+                fidl::encoding::WireFormatVersion::V2 => 32,
+            };
+            self.3.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 48,
+                fidl::encoding::WireFormatVersion::V2 => 48,
+            };
+            self.4.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 64,
+                fidl::encoding::WireFormatVersion::V2 => 64,
+            };
+            self.5.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 128,
+                fidl::encoding::WireFormatVersion::V2 => 128,
+            };
+            self.6.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 160,
+                fidl::encoding::WireFormatVersion::V2 => 160,
+            };
+            self.7.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 176,
+                fidl::encoding::WireFormatVersion::V2 => 176,
+            };
+            self.8.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 192,
+                fidl::encoding::WireFormatVersion::V2 => 192,
+            };
+            self.9.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 256,
+                fidl::encoding::WireFormatVersion::V2 => 256,
+            };
+            self.10.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 264,
+                fidl::encoding::WireFormatVersion::V2 => 264,
+            };
+            self.11.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 280,
+                fidl::encoding::WireFormatVersion::V2 => 280,
+            };
+            self.12.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 312,
+                fidl::encoding::WireFormatVersion::V2 => 312,
+            };
+            self.13.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 320,
+                fidl::encoding::WireFormatVersion::V2 => 320,
+            };
+            self.14.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 336,
+                fidl::encoding::WireFormatVersion::V2 => 336,
+            };
+            self.15.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 352,
+                fidl::encoding::WireFormatVersion::V2 => 352,
+            };
+            self.16.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 368,
+                fidl::encoding::WireFormatVersion::V2 => 368,
+            };
+            self.17.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 384,
+                fidl::encoding::WireFormatVersion::V2 => 384,
+            };
+            self.18.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 448,
+                fidl::encoding::WireFormatVersion::V2 => 448,
+            };
+            self.19.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 464,
+                fidl::encoding::WireFormatVersion::V2 => 464,
+            };
+            self.20.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 480,
+                fidl::encoding::WireFormatVersion::V2 => 480,
+            };
+            self.21.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 544,
+                fidl::encoding::WireFormatVersion::V2 => 544,
+            };
+            self.22.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 560,
+                fidl::encoding::WireFormatVersion::V2 => 560,
+            };
+            self.23.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 576,
+                fidl::encoding::WireFormatVersion::V2 => 576,
+            };
+            self.24.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 624,
+                fidl::encoding::WireFormatVersion::V2 => 624,
+            };
+            self.25.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 640,
+                fidl::encoding::WireFormatVersion::V2 => 640,
+            };
+            self.26.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 656,
+                fidl::encoding::WireFormatVersion::V2 => 656,
+            };
+            self.27.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for Testing {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self {
+                u1: fidl::new_empty!(u64),
+                u2: fidl::new_empty!(fidl::encoding::Vector<u64, 1>),
+                u3: fidl::new_empty!(fidl::encoding::Array<u64, 1>),
+                u4: fidl::new_empty!(
+                    fidl::encoding::UnboundedVector<fidl::encoding::Vector<u64, 1>>
+                ),
+                u5: fidl::new_empty!(
+                    fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>
+                ),
+                u6: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::Vector<u64, 1>, 4>),
+                u7: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>),
+                v1: fidl::new_empty!(
+                    fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>
+                ),
+                v2: fidl::new_empty!(
+                    fidl::encoding::UnboundedVector<
+                        fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
+                    >
+                ),
+                v3: fidl::new_empty!(
+                    fidl::encoding::Array<
+                        fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
+                        4,
+                    >
+                ),
+                a1: fidl::new_empty!(fidl::encoding::Array<u64, 1>),
+                a2: fidl::new_empty!(
+                    fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>
+                ),
+                a3: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>),
+                r1: fidl::new_empty!(
+                    fidl::encoding::Optional<
+                        fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
+                    >
+                ),
+                r2: fidl::new_empty!(
+                    fidl::encoding::UnboundedVector<
+                        fidl::encoding::Optional<
+                            fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
+                        >,
+                    >
+                ),
+                r3: fidl::new_empty!(
+                    fidl::encoding::Array<
+                        fidl::encoding::Optional<
+                            fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
+                        >,
+                        4,
+                    >
+                ),
+                b1: fidl::new_empty!(fidl::encoding::UnboundedVector<u8>),
+                b2: fidl::new_empty!(
+                    fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>>
+                ),
+                b3: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 4>),
+                s1: fidl::new_empty!(fidl::encoding::UnboundedString),
+                s2: fidl::new_empty!(
+                    fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>
+                ),
+                s3: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::UnboundedString, 4>),
+                vv1: fidl::new_empty!(fidl::encoding::Vector<u64, 2>),
+                vv2: fidl::new_empty!(fidl::encoding::Vector<fidl::encoding::Vector<u64, 2>, 3>),
+                vv3: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::Vector<u64, 2>, 3>),
+                aa1: fidl::new_empty!(fidl::encoding::Array<u64, 2>),
+                aa2: fidl::new_empty!(fidl::encoding::Vector<fidl::encoding::Array<u64, 2>, 3>),
+                aa3: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::Array<u64, 2>, 3>),
+            }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {
+                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(312) };
+                    let padval = unsafe {
+                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
+                    };
+                    let maskedval = padval & 0xffffffff00000000u64;
+                    if (maskedval != 0) {
+                        return Err(fidl::Error::NonZeroPadding {
+                            padding_start: offset
+                                + 312
+                                + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                        });
+                    }
+                }
+                fidl::encoding::WireFormatVersion::V2 => {
+                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(312) };
+                    let padval = unsafe {
+                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
+                    };
+                    let maskedval = padval & 0xffffffff00000000u64;
+                    if (maskedval != 0) {
+                        return Err(fidl::Error::NonZeroPadding {
+                            padding_start: offset
+                                + 312
+                                + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                        });
+                    }
+                }
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(u64, &mut self.u1, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            fidl::decode!(fidl::encoding::Vector<u64, 1>, &mut self.u2, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 24,
+            };
+            fidl::decode!(fidl::encoding::Array<u64, 1>, &mut self.u3, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 32,
+                fidl::encoding::WireFormatVersion::V2 => 32,
+            };
+            fidl::decode!(
+                fidl::encoding::UnboundedVector<fidl::encoding::Vector<u64, 1>>,
+                &mut self.u4,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 48,
+                fidl::encoding::WireFormatVersion::V2 => 48,
+            };
+            fidl::decode!(
+                fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>,
+                &mut self.u5,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 64,
+                fidl::encoding::WireFormatVersion::V2 => 64,
+            };
+            fidl::decode!(
+                fidl::encoding::Array<fidl::encoding::Vector<u64, 1>, 4>,
+                &mut self.u6,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 128,
+                fidl::encoding::WireFormatVersion::V2 => 128,
+            };
+            fidl::decode!(
+                fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>,
+                &mut self.u7,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 160,
+                fidl::encoding::WireFormatVersion::V2 => 160,
+            };
+            fidl::decode!(
+                fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
+                &mut self.v1,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 176,
+                fidl::encoding::WireFormatVersion::V2 => 176,
+            };
+            fidl::decode!(
+                fidl::encoding::UnboundedVector<
+                    fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
+                >,
+                &mut self.v2,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 192,
+                fidl::encoding::WireFormatVersion::V2 => 192,
+            };
+            fidl::decode!(
+                fidl::encoding::Array<
+                    fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
+                    4,
+                >,
+                &mut self.v3,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 256,
+                fidl::encoding::WireFormatVersion::V2 => 256,
+            };
+            fidl::decode!(fidl::encoding::Array<u64, 1>, &mut self.a1, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 264,
+                fidl::encoding::WireFormatVersion::V2 => 264,
+            };
+            fidl::decode!(
+                fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>,
+                &mut self.a2,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 280,
+                fidl::encoding::WireFormatVersion::V2 => 280,
+            };
+            fidl::decode!(
+                fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>,
+                &mut self.a3,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 312,
+                fidl::encoding::WireFormatVersion::V2 => 312,
+            };
+            fidl::decode!(
+                fidl::encoding::Optional<
+                    fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
+                >,
+                &mut self.r1,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 320,
+                fidl::encoding::WireFormatVersion::V2 => 320,
+            };
+            fidl::decode!(
+                fidl::encoding::UnboundedVector<
+                    fidl::encoding::Optional<
+                        fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
+                    >,
+                >,
+                &mut self.r2,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 336,
+                fidl::encoding::WireFormatVersion::V2 => 336,
+            };
+            fidl::decode!(
+                fidl::encoding::Array<
+                    fidl::encoding::Optional<
+                        fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
+                    >,
+                    4,
+                >,
+                &mut self.r3,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 352,
+                fidl::encoding::WireFormatVersion::V2 => 352,
+            };
+            fidl::decode!(
+                fidl::encoding::UnboundedVector<u8>,
+                &mut self.b1,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 368,
+                fidl::encoding::WireFormatVersion::V2 => 368,
+            };
+            fidl::decode!(
+                fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>>,
+                &mut self.b2,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 384,
+                fidl::encoding::WireFormatVersion::V2 => 384,
+            };
+            fidl::decode!(
+                fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 4>,
+                &mut self.b3,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 448,
+                fidl::encoding::WireFormatVersion::V2 => 448,
+            };
+            fidl::decode!(
+                fidl::encoding::UnboundedString,
+                &mut self.s1,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 464,
+                fidl::encoding::WireFormatVersion::V2 => 464,
+            };
+            fidl::decode!(
+                fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                &mut self.s2,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 480,
+                fidl::encoding::WireFormatVersion::V2 => 480,
+            };
+            fidl::decode!(fidl::encoding::Array<fidl::encoding::UnboundedString, 4>, &mut self.s3, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 544,
+                fidl::encoding::WireFormatVersion::V2 => 544,
+            };
+            fidl::decode!(fidl::encoding::Vector<u64, 2>, &mut self.vv1, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 560,
+                fidl::encoding::WireFormatVersion::V2 => 560,
+            };
+            fidl::decode!(
+                fidl::encoding::Vector<fidl::encoding::Vector<u64, 2>, 3>,
+                &mut self.vv2,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 576,
+                fidl::encoding::WireFormatVersion::V2 => 576,
+            };
+            fidl::decode!(
+                fidl::encoding::Array<fidl::encoding::Vector<u64, 2>, 3>,
+                &mut self.vv3,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 624,
+                fidl::encoding::WireFormatVersion::V2 => 624,
+            };
+            fidl::decode!(fidl::encoding::Array<u64, 2>, &mut self.aa1, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 640,
+                fidl::encoding::WireFormatVersion::V2 => 640,
+            };
+            fidl::decode!(
+                fidl::encoding::Vector<fidl::encoding::Array<u64, 2>, 3>,
+                &mut self.aa2,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 656,
+                fidl::encoding::WireFormatVersion::V2 => 656,
+            };
+            fidl::decode!(
+                fidl::encoding::Array<fidl::encoding::Array<u64, 2>, 3>,
+                &mut self.aa3,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            Ok(())
+        }
+    }
+}

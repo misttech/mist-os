@@ -100,15 +100,70 @@ impl {{ .Name }} {
     }
     {{- end }}
 }
+{{ end }}
 
-fidl_enum! {
-    name: {{ .Name }},
-    prim_ty: {{ .UnderlyingType }},
-    {{- if .IsStrict }}
-    strict: true,
-    min_member: {{ .MinMember }},
-    {{- else }}
-    flexible: true,
-    {{- end }}
+{{- define "EnumInternal" -}}
+unsafe impl fidl::encoding::TypeMarker for {{ .Name }} {
+    type Owned = Self;
+
+    #[inline(always)]
+    fn inline_align(_context: fidl::encoding::Context) -> usize {
+        std::mem::align_of::<{{ .UnderlyingType }}>()
+    }
+
+    #[inline(always)]
+    fn inline_size(_context: fidl::encoding::Context) -> usize {
+        std::mem::size_of::<{{ .UnderlyingType }}>()
+    }
+
+    #[inline(always)]
+    fn encode_is_copy() -> bool {
+        {{ .IsStrict }}
+    }
+
+    #[inline(always)]
+    fn decode_is_copy() -> bool {
+        false
+    }
+}
+
+impl fidl::encoding::ValueTypeMarker for {{ .Name }} {
+    type Borrowed<'a> = Self;
+    #[inline(always)]
+    fn borrow<'a>(value: &'a <Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
+        *value
+    }
+}
+
+unsafe impl fidl::encoding::Encode<Self> for {{ .Name }} {
+    #[inline]
+    unsafe fn encode(self, encoder: &mut fidl::encoding::Encoder<'_>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
+        encoder.debug_check_bounds::<Self>(offset);
+        encoder.write_num(self.into_primitive(), offset);
+        Ok(())
+    }
+}
+
+impl fidl::encoding::Decode<Self> for {{ .Name }} {
+    #[inline(always)]
+    fn new_empty() -> Self {
+        {{- if .IsStrict }}
+        Self::{{ .MinMember }}
+        {{- else }}
+        Self::unknown()
+        {{- end }}
+    }
+
+    #[inline]
+    unsafe fn decode(&mut self, decoder: &mut fidl::encoding::Decoder<'_>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
+        decoder.debug_check_bounds::<Self>(offset);
+        let prim = decoder.read_num::<{{ .UnderlyingType }}>(offset);
+        {{ if .IsStrict }}
+        *self = Self::from_primitive(prim).ok_or(fidl::Error::InvalidEnumValue)?;
+        {{- else }}
+        *self = Self::from_primitive_allow_unknown(prim);
+        {{- end }}
+        Ok(())
+    }
 }
 {{- end }}

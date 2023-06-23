@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -93,12 +91,6 @@ impl BitsType {
     }
 }
 
-fidl_bits! {
-    name: BitsType,
-    prim_ty: u32,
-    strict: true,
-}
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(i32)]
 pub enum EnumType {
@@ -128,9 +120,135 @@ impl EnumType {
     }
 }
 
-fidl_enum! {
-    name: EnumType,
-    prim_ty: i32,
-    strict: true,
-    min_member: Value,
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+    unsafe impl fidl::encoding::TypeMarker for BitsType {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            4
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            4
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for BitsType {
+        type Borrowed<'a> = Self;
+        #[inline(always)]
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            *value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Self> for BitsType {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Self>(offset);
+            if self.bits & Self::all().bits != self.bits {
+                return Err(fidl::Error::InvalidBitsValue);
+            }
+            encoder.write_num(self.bits, offset);
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for BitsType {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::empty()
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let prim = decoder.read_num::<u32>(offset);
+            *self = Self::from_bits(prim).ok_or(fidl::Error::InvalidBitsValue)?;
+            Ok(())
+        }
+    }
+    unsafe impl fidl::encoding::TypeMarker for EnumType {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            std::mem::align_of::<i32>()
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            std::mem::size_of::<i32>()
+        }
+
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            true
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            false
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for EnumType {
+        type Borrowed<'a> = Self;
+        #[inline(always)]
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            *value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Self> for EnumType {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Self>(offset);
+            encoder.write_num(self.into_primitive(), offset);
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for EnumType {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::Value
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let prim = decoder.read_num::<i32>(offset);
+
+            *self = Self::from_primitive(prim).ok_or(fidl::Error::InvalidEnumValue)?;
+            Ok(())
+        }
+    }
 }

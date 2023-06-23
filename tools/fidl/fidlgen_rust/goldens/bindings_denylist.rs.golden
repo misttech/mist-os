@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -38,54 +36,12 @@ pub struct DenyEachBindingOnlyDenyCppRequest {
 
 impl fidl::Persistable for DenyEachBindingOnlyDenyCppRequest {}
 
-fidl_struct! {
-    name: DenyEachBindingOnlyDenyCppRequest,
-    members: [
-        a {
-            ty: bool,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 1,
-    size_v2: 1,
-    align_v1: 1,
-    align_v2: 1,
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DenyEachBindingOnlyDenyDartRequest {
     pub a: bool,
 }
 
 impl fidl::Persistable for DenyEachBindingOnlyDenyDartRequest {}
-
-fidl_struct! {
-    name: DenyEachBindingOnlyDenyDartRequest,
-    members: [
-        a {
-            ty: bool,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 1,
-    size_v2: 1,
-    align_v1: 1,
-    align_v2: 1,
-}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DenyEachBindingOnlyDenyGoRequest {
@@ -94,27 +50,6 @@ pub struct DenyEachBindingOnlyDenyGoRequest {
 
 impl fidl::Persistable for DenyEachBindingOnlyDenyGoRequest {}
 
-fidl_struct! {
-    name: DenyEachBindingOnlyDenyGoRequest,
-    members: [
-        a {
-            ty: bool,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 1,
-    size_v2: 1,
-    align_v1: 1,
-    align_v2: 1,
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DenyEachBindingOnlyDenyLibfuzzerRequest {
     pub a: bool,
@@ -122,54 +57,12 @@ pub struct DenyEachBindingOnlyDenyLibfuzzerRequest {
 
 impl fidl::Persistable for DenyEachBindingOnlyDenyLibfuzzerRequest {}
 
-fidl_struct! {
-    name: DenyEachBindingOnlyDenyLibfuzzerRequest,
-    members: [
-        a {
-            ty: bool,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 1,
-    size_v2: 1,
-    align_v1: 1,
-    align_v2: 1,
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DenyEachBindingOnlyDenySyzkallerRequest {
     pub a: bool,
 }
 
 impl fidl::Persistable for DenyEachBindingOnlyDenySyzkallerRequest {}
-
-fidl_struct! {
-    name: DenyEachBindingOnlyDenySyzkallerRequest,
-    members: [
-        a {
-            ty: bool,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 1,
-    size_v2: 1,
-    align_v1: 1,
-    align_v2: 1,
-}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
@@ -179,28 +72,6 @@ pub struct DenyEachBindingOnlyDenyCppResponse {
 
 impl fidl::Persistable for DenyEachBindingOnlyDenyCppResponse {}
 
-fidl_struct! {
-    copy: true,
-    name: DenyEachBindingOnlyDenyCppResponse,
-    members: [
-        b {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct DenyEachBindingOnlyDenyDartResponse {
@@ -208,28 +79,6 @@ pub struct DenyEachBindingOnlyDenyDartResponse {
 }
 
 impl fidl::Persistable for DenyEachBindingOnlyDenyDartResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: DenyEachBindingOnlyDenyDartResponse,
-    members: [
-        b {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
@@ -239,28 +88,6 @@ pub struct DenyEachBindingOnlyDenyGoResponse {
 
 impl fidl::Persistable for DenyEachBindingOnlyDenyGoResponse {}
 
-fidl_struct! {
-    copy: true,
-    name: DenyEachBindingOnlyDenyGoResponse,
-    members: [
-        b {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct DenyEachBindingOnlyDenyLibfuzzerResponse {
@@ -268,28 +95,6 @@ pub struct DenyEachBindingOnlyDenyLibfuzzerResponse {
 }
 
 impl fidl::Persistable for DenyEachBindingOnlyDenyLibfuzzerResponse {}
-
-fidl_struct! {
-    copy: true,
-    name: DenyEachBindingOnlyDenyLibfuzzerResponse,
-    members: [
-        b {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
@@ -299,28 +104,6 @@ pub struct DenyEachBindingOnlyDenySyzkallerResponse {
 
 impl fidl::Persistable for DenyEachBindingOnlyDenySyzkallerResponse {}
 
-fidl_struct! {
-    copy: true,
-    name: DenyEachBindingOnlyDenySyzkallerResponse,
-    members: [
-        b {
-            ty: i32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MemberOnlyAppearsInImportingLibrary {
     pub a: bool,
@@ -328,54 +111,12 @@ pub struct MemberOnlyAppearsInImportingLibrary {
 
 impl fidl::Persistable for MemberOnlyAppearsInImportingLibrary {}
 
-fidl_struct! {
-    name: MemberOnlyAppearsInImportingLibrary,
-    members: [
-        a {
-            ty: bool,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 1,
-    size_v2: 1,
-    align_v1: 1,
-    align_v2: 1,
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct OnlyAppearsInImportingLibrary {
     pub member_only_appears_in_importing_library: MemberOnlyAppearsInImportingLibrary,
 }
 
 impl fidl::Persistable for OnlyAppearsInImportingLibrary {}
-
-fidl_struct! {
-    name: OnlyAppearsInImportingLibrary,
-    members: [
-        member_only_appears_in_importing_library {
-            ty: MemberOnlyAppearsInImportingLibrary,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 1,
-    size_v2: 1,
-    align_v1: 1,
-    align_v2: 1,
-}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct OnlyRust {
@@ -385,12 +126,6 @@ pub struct OnlyRust {
 }
 
 impl fidl::Persistable for OnlyRust {}
-
-fidl_table! {
-    name: OnlyRust,
-    members: [
-    ],
-}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AllowedMarker;
@@ -2007,3 +1742,1420 @@ impl fidl::endpoints::ControlHandle for ImportsSameNameContextControlHandle {
 }
 
 impl ImportsSameNameContextControlHandle {}
+
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+
+    unsafe impl fidl::encoding::TypeMarker for DenyEachBindingOnlyDenyCppRequest {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyCppRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyCppRequest>
+        for &DenyEachBindingOnlyDenyCppRequest
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyCppRequest>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<DenyEachBindingOnlyDenyCppRequest>::encode(
+                (<bool as fidl::encoding::ValueTypeMarker>::borrow(&self.a),),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<bool>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyCppRequest> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyCppRequest>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyCppRequest {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { a: fidl::new_empty!(bool) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(bool, &mut self.a, decoder, offset + member_offset, _depth)?;
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for DenyEachBindingOnlyDenyDartRequest {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyDartRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyDartRequest>
+        for &DenyEachBindingOnlyDenyDartRequest
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyDartRequest>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<DenyEachBindingOnlyDenyDartRequest>::encode(
+                (<bool as fidl::encoding::ValueTypeMarker>::borrow(&self.a),),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<bool>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyDartRequest> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyDartRequest>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyDartRequest {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { a: fidl::new_empty!(bool) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(bool, &mut self.a, decoder, offset + member_offset, _depth)?;
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for DenyEachBindingOnlyDenyGoRequest {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyGoRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyGoRequest>
+        for &DenyEachBindingOnlyDenyGoRequest
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyGoRequest>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<DenyEachBindingOnlyDenyGoRequest>::encode(
+                (<bool as fidl::encoding::ValueTypeMarker>::borrow(&self.a),),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<bool>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyGoRequest> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyGoRequest>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyGoRequest {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { a: fidl::new_empty!(bool) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(bool, &mut self.a, decoder, offset + member_offset, _depth)?;
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for DenyEachBindingOnlyDenyLibfuzzerRequest {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyLibfuzzerRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyLibfuzzerRequest>
+        for &DenyEachBindingOnlyDenyLibfuzzerRequest
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyLibfuzzerRequest>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<DenyEachBindingOnlyDenyLibfuzzerRequest>::encode(
+                (<bool as fidl::encoding::ValueTypeMarker>::borrow(&self.a),),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<bool>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyLibfuzzerRequest> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyLibfuzzerRequest>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyLibfuzzerRequest {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { a: fidl::new_empty!(bool) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(bool, &mut self.a, decoder, offset + member_offset, _depth)?;
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for DenyEachBindingOnlyDenySyzkallerRequest {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenySyzkallerRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenySyzkallerRequest>
+        for &DenyEachBindingOnlyDenySyzkallerRequest
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenySyzkallerRequest>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<DenyEachBindingOnlyDenySyzkallerRequest>::encode(
+                (<bool as fidl::encoding::ValueTypeMarker>::borrow(&self.a),),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<bool>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenySyzkallerRequest> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenySyzkallerRequest>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenySyzkallerRequest {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { a: fidl::new_empty!(bool) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(bool, &mut self.a, decoder, offset + member_offset, _depth)?;
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for DenyEachBindingOnlyDenyCppResponse {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            true
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            true
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyCppResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyCppResponse>
+        for &DenyEachBindingOnlyDenyCppResponse
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyCppResponse>(offset);
+            unsafe {
+                // Copy the object into the buffer.
+                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+                let typed_buf_ptr = std::mem::transmute::<
+                    *mut u8,
+                    *mut DenyEachBindingOnlyDenyCppResponse,
+                >(buf_ptr);
+                typed_buf_ptr
+                    .write_unaligned((self as *const DenyEachBindingOnlyDenyCppResponse).read());
+                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
+                // done second because the memcpy will write garbage to these bytes.
+            }
+            Ok(())
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<i32>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyCppResponse> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyCppResponse>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyCppResponse {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { b: fidl::new_empty!(i32) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            // Verify that padding bytes are zero.
+            // Copy from the buffer into the object.
+            unsafe {
+                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 4);
+            }
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for DenyEachBindingOnlyDenyDartResponse {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            true
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            true
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyDartResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyDartResponse>
+        for &DenyEachBindingOnlyDenyDartResponse
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyDartResponse>(offset);
+            unsafe {
+                // Copy the object into the buffer.
+                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+                let typed_buf_ptr = std::mem::transmute::<
+                    *mut u8,
+                    *mut DenyEachBindingOnlyDenyDartResponse,
+                >(buf_ptr);
+                typed_buf_ptr
+                    .write_unaligned((self as *const DenyEachBindingOnlyDenyDartResponse).read());
+                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
+                // done second because the memcpy will write garbage to these bytes.
+            }
+            Ok(())
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<i32>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyDartResponse> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyDartResponse>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyDartResponse {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { b: fidl::new_empty!(i32) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            // Verify that padding bytes are zero.
+            // Copy from the buffer into the object.
+            unsafe {
+                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 4);
+            }
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for DenyEachBindingOnlyDenyGoResponse {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            true
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            true
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyGoResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyGoResponse>
+        for &DenyEachBindingOnlyDenyGoResponse
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyGoResponse>(offset);
+            unsafe {
+                // Copy the object into the buffer.
+                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+                let typed_buf_ptr =
+                    std::mem::transmute::<*mut u8, *mut DenyEachBindingOnlyDenyGoResponse>(buf_ptr);
+                typed_buf_ptr
+                    .write_unaligned((self as *const DenyEachBindingOnlyDenyGoResponse).read());
+                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
+                // done second because the memcpy will write garbage to these bytes.
+            }
+            Ok(())
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<i32>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyGoResponse> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyGoResponse>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyGoResponse {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { b: fidl::new_empty!(i32) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            // Verify that padding bytes are zero.
+            // Copy from the buffer into the object.
+            unsafe {
+                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 4);
+            }
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for DenyEachBindingOnlyDenyLibfuzzerResponse {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            true
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            true
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyLibfuzzerResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyLibfuzzerResponse>
+        for &DenyEachBindingOnlyDenyLibfuzzerResponse
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyLibfuzzerResponse>(offset);
+            unsafe {
+                // Copy the object into the buffer.
+                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+                let typed_buf_ptr = std::mem::transmute::<
+                    *mut u8,
+                    *mut DenyEachBindingOnlyDenyLibfuzzerResponse,
+                >(buf_ptr);
+                typed_buf_ptr.write_unaligned(
+                    (self as *const DenyEachBindingOnlyDenyLibfuzzerResponse).read(),
+                );
+                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
+                // done second because the memcpy will write garbage to these bytes.
+            }
+            Ok(())
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<i32>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyLibfuzzerResponse> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyLibfuzzerResponse>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyLibfuzzerResponse {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { b: fidl::new_empty!(i32) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            // Verify that padding bytes are zero.
+            // Copy from the buffer into the object.
+            unsafe {
+                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 4);
+            }
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for DenyEachBindingOnlyDenySyzkallerResponse {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            true
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            true
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenySyzkallerResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenySyzkallerResponse>
+        for &DenyEachBindingOnlyDenySyzkallerResponse
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenySyzkallerResponse>(offset);
+            unsafe {
+                // Copy the object into the buffer.
+                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+                let typed_buf_ptr = std::mem::transmute::<
+                    *mut u8,
+                    *mut DenyEachBindingOnlyDenySyzkallerResponse,
+                >(buf_ptr);
+                typed_buf_ptr.write_unaligned(
+                    (self as *const DenyEachBindingOnlyDenySyzkallerResponse).read(),
+                );
+                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
+                // done second because the memcpy will write garbage to these bytes.
+            }
+            Ok(())
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<i32>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenySyzkallerResponse> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<DenyEachBindingOnlyDenySyzkallerResponse>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenySyzkallerResponse {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { b: fidl::new_empty!(i32) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            // Verify that padding bytes are zero.
+            // Copy from the buffer into the object.
+            unsafe {
+                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 4);
+            }
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for MemberOnlyAppearsInImportingLibrary {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for MemberOnlyAppearsInImportingLibrary {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<MemberOnlyAppearsInImportingLibrary>
+        for &MemberOnlyAppearsInImportingLibrary
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<MemberOnlyAppearsInImportingLibrary>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<MemberOnlyAppearsInImportingLibrary>::encode(
+                (<bool as fidl::encoding::ValueTypeMarker>::borrow(&self.a),),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<bool>>
+        fidl::encoding::Encode<MemberOnlyAppearsInImportingLibrary> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<MemberOnlyAppearsInImportingLibrary>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for MemberOnlyAppearsInImportingLibrary {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { a: fidl::new_empty!(bool) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(bool, &mut self.a, decoder, offset + member_offset, _depth)?;
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for OnlyAppearsInImportingLibrary {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for OnlyAppearsInImportingLibrary {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<OnlyAppearsInImportingLibrary>
+        for &OnlyAppearsInImportingLibrary
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<OnlyAppearsInImportingLibrary>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<OnlyAppearsInImportingLibrary>::encode(
+                (<MemberOnlyAppearsInImportingLibrary as fidl::encoding::ValueTypeMarker>::borrow(
+                    &self.member_only_appears_in_importing_library,
+                ),),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<MemberOnlyAppearsInImportingLibrary>>
+        fidl::encoding::Encode<OnlyAppearsInImportingLibrary> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<OnlyAppearsInImportingLibrary>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for OnlyAppearsInImportingLibrary {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self {
+                member_only_appears_in_importing_library: fidl::new_empty!(
+                    MemberOnlyAppearsInImportingLibrary
+                ),
+            }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(
+                MemberOnlyAppearsInImportingLibrary,
+                &mut self.member_only_appears_in_importing_library,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            Ok(())
+        }
+    }
+
+    impl OnlyRust {
+        #[inline(always)]
+        fn max_ordinal_present(&self) -> u64 {
+            0
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for OnlyRust {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            8
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            16
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for OnlyRust {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<OnlyRust> for &OnlyRust {
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            mut depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<OnlyRust>(offset);
+            // Vector header
+            let max_ordinal: u64 = self.max_ordinal_present();
+            encoder.write_num(max_ordinal, offset);
+            encoder.write_num(fidl::encoding::ALLOC_PRESENT_U64, offset + 8);
+            // write_out_of_line must not be called with a zero-sized out-of-line block.
+            if max_ordinal == 0 {
+                return Ok(());
+            }
+            depth.increment()?;
+            let envelope_size = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 16,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            let bytes_len = (max_ordinal as usize) * envelope_size;
+            #[allow(unused_variables)]
+            let offset = encoder.out_of_line_offset(bytes_len);
+            let mut _prev_end_offset: usize = 0;
+
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for OnlyRust {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::default()
+        }
+
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            mut depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let len = match fidl::encoding::decode_vector_header(decoder, offset)? {
+                None => return Err(fidl::Error::NotNullable),
+                Some(len) => len,
+            };
+            depth.increment()?;
+            let envelope_size = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 16,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            let bytes_len = len * envelope_size;
+            let offset = decoder.out_of_line_offset(bytes_len)?;
+            // Decode the envelope for each type.
+            let mut _next_ordinal_to_read = 0;
+            let mut next_offset = offset;
+            let end_offset = offset + bytes_len;
+
+            // Decode the remaining unknown envelopes.
+            while next_offset < end_offset {
+                _next_ordinal_to_read += 1;
+                fidl::encoding::decode_unknown_envelope(decoder, next_offset, depth)?;
+                next_offset += envelope_size;
+            }
+
+            Ok(())
+        }
+    }
+}

@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -37,44 +35,6 @@ pub struct BasicStruct {
 
 impl fidl::Persistable for BasicStruct {}
 
-fidl_struct! {
-    name: BasicStruct,
-    members: [
-        x {
-            ty: u32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-        y {
-            ty: fidl::encoding::UnboundedString,
-            index: 1,
-            typevar: T1,
-            offset_v1: 8,
-            offset_v2: 8,
-        },
-    ],
-    padding_v1: [
-        {
-            ty: u64,
-            offset: 0,
-            mask: 0xffffffff00000000u64,
-        },
-    ],
-    padding_v2: [
-        {
-            ty: u64,
-            offset: 0,
-            mask: 0xffffffff00000000u64,
-        },
-    ],
-    size_v1: 24,
-    size_v2: 24,
-    align_v1: 8,
-    align_v2: 8,
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Simple {
     pub f1: u8,
@@ -83,30 +43,277 @@ pub struct Simple {
 
 impl fidl::Persistable for Simple {}
 
-fidl_struct! {
-    name: Simple,
-    members: [
-        f1 {
-            ty: u8,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-        f2 {
-            ty: bool,
-            index: 1,
-            typevar: T1,
-            offset_v1: 1,
-            offset_v2: 1,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 2,
-    size_v2: 2,
-    align_v1: 1,
-    align_v2: 1,
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+
+    unsafe impl fidl::encoding::TypeMarker for BasicStruct {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 24,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for BasicStruct {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<BasicStruct> for &BasicStruct {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<BasicStruct>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<BasicStruct>::encode(
+                (
+                    <u32 as fidl::encoding::ValueTypeMarker>::borrow(&self.x),
+                    <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(
+                        &self.y,
+                    ),
+                ),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<
+            T0: fidl::encoding::Encode<u32>,
+            T1: fidl::encoding::Encode<fidl::encoding::UnboundedString>,
+        > fidl::encoding::Encode<BasicStruct> for (T0, T1)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<BasicStruct>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => unsafe {
+                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(0);
+                    std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                },
+                fidl::encoding::WireFormatVersion::V2 => unsafe {
+                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(0);
+                    std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                },
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            self.1.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for BasicStruct {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { x: fidl::new_empty!(u32), y: fidl::new_empty!(fidl::encoding::UnboundedString) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {
+                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(0) };
+                    let padval = unsafe {
+                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
+                    };
+                    let maskedval = padval & 0xffffffff00000000u64;
+                    if (maskedval != 0) {
+                        return Err(fidl::Error::NonZeroPadding {
+                            padding_start: offset
+                                + 0
+                                + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                        });
+                    }
+                }
+                fidl::encoding::WireFormatVersion::V2 => {
+                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(0) };
+                    let padval = unsafe {
+                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
+                    };
+                    let maskedval = padval & 0xffffffff00000000u64;
+                    if (maskedval != 0) {
+                        return Err(fidl::Error::NonZeroPadding {
+                            padding_start: offset
+                                + 0
+                                + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                        });
+                    }
+                }
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(u32, &mut self.x, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            fidl::decode!(
+                fidl::encoding::UnboundedString,
+                &mut self.y,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for Simple {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 2,
+                fidl::encoding::WireFormatVersion::V2 => 2,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for Simple {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Simple> for &Simple {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Simple>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<Simple>::encode(
+                (
+                    <u8 as fidl::encoding::ValueTypeMarker>::borrow(&self.f1),
+                    <bool as fidl::encoding::ValueTypeMarker>::borrow(&self.f2),
+                ),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<u8>, T1: fidl::encoding::Encode<bool>>
+        fidl::encoding::Encode<Simple> for (T0, T1)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Simple>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            };
+            self.1.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for Simple {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { f1: fidl::new_empty!(u8), f2: fidl::new_empty!(bool) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(u8, &mut self.f1, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 1,
+                fidl::encoding::WireFormatVersion::V2 => 1,
+            };
+            fidl::decode!(bool, &mut self.f2, decoder, offset + member_offset, _depth)?;
+            Ok(())
+        }
+    }
 }

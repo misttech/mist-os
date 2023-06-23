@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -82,12 +80,6 @@ impl MyEmptyFlexibleEnum {
             Self::__Unknown(_) => true,
         }
     }
-}
-
-fidl_enum! {
-    name: MyEmptyFlexibleEnum,
-    prim_ty: u32,
-    flexible: true,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -152,12 +144,6 @@ impl MyFlexibleEnum {
             _ => false,
         }
     }
-}
-
-fidl_enum! {
-    name: MyFlexibleEnum,
-    prim_ty: u32,
-    flexible: true,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -228,12 +214,6 @@ impl MyFlexibleEnumWithCustomUnknown {
     }
 }
 
-fidl_enum! {
-    name: MyFlexibleEnumWithCustomUnknown,
-    prim_ty: u32,
-    flexible: true,
-}
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u32)]
 pub enum MyStrictEnum {
@@ -263,9 +243,279 @@ impl MyStrictEnum {
     }
 }
 
-fidl_enum! {
-    name: MyStrictEnum,
-    prim_ty: u32,
-    strict: true,
-    min_member: Foo,
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+    unsafe impl fidl::encoding::TypeMarker for MyEmptyFlexibleEnum {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            std::mem::align_of::<u32>()
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            std::mem::size_of::<u32>()
+        }
+
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            false
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            false
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for MyEmptyFlexibleEnum {
+        type Borrowed<'a> = Self;
+        #[inline(always)]
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            *value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Self> for MyEmptyFlexibleEnum {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Self>(offset);
+            encoder.write_num(self.into_primitive(), offset);
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for MyEmptyFlexibleEnum {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::unknown()
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let prim = decoder.read_num::<u32>(offset);
+
+            *self = Self::from_primitive_allow_unknown(prim);
+            Ok(())
+        }
+    }
+    unsafe impl fidl::encoding::TypeMarker for MyFlexibleEnum {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            std::mem::align_of::<u32>()
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            std::mem::size_of::<u32>()
+        }
+
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            false
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            false
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for MyFlexibleEnum {
+        type Borrowed<'a> = Self;
+        #[inline(always)]
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            *value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Self> for MyFlexibleEnum {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Self>(offset);
+            encoder.write_num(self.into_primitive(), offset);
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for MyFlexibleEnum {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::unknown()
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let prim = decoder.read_num::<u32>(offset);
+
+            *self = Self::from_primitive_allow_unknown(prim);
+            Ok(())
+        }
+    }
+    unsafe impl fidl::encoding::TypeMarker for MyFlexibleEnumWithCustomUnknown {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            std::mem::align_of::<u32>()
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            std::mem::size_of::<u32>()
+        }
+
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            false
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            false
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for MyFlexibleEnumWithCustomUnknown {
+        type Borrowed<'a> = Self;
+        #[inline(always)]
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            *value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Self> for MyFlexibleEnumWithCustomUnknown {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Self>(offset);
+            encoder.write_num(self.into_primitive(), offset);
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for MyFlexibleEnumWithCustomUnknown {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::unknown()
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let prim = decoder.read_num::<u32>(offset);
+
+            *self = Self::from_primitive_allow_unknown(prim);
+            Ok(())
+        }
+    }
+    unsafe impl fidl::encoding::TypeMarker for MyStrictEnum {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            std::mem::align_of::<u32>()
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            std::mem::size_of::<u32>()
+        }
+
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            true
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            false
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for MyStrictEnum {
+        type Borrowed<'a> = Self;
+        #[inline(always)]
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            *value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Self> for MyStrictEnum {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Self>(offset);
+            encoder.write_num(self.into_primitive(), offset);
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for MyStrictEnum {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::Foo
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let prim = decoder.read_num::<u32>(offset);
+
+            *self = Self::from_primitive(prim).ok_or(fidl::Error::InvalidEnumValue)?;
+            Ok(())
+        }
+    }
 }

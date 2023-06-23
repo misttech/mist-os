@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -68,293 +66,6 @@ pub struct Handles {
 }
 
 impl fidl::Standalone for Handles {}
-
-fidl_struct! {
-    name: Handles,
-    resource: true,
-    members: [
-        plain_handle {
-            ty: fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>,
-            resource: true,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-        bti_handle {
-            ty: fidl::encoding::HandleType<fidl::Bti, { fidl::ObjectType::BTI.into_raw() }, 2147483648>,
-            resource: true,
-            index: 1,
-            typevar: T1,
-            offset_v1: 4,
-            offset_v2: 4,
-        },
-        channel_handle {
-            ty: fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>,
-            resource: true,
-            index: 2,
-            typevar: T2,
-            offset_v1: 8,
-            offset_v2: 8,
-        },
-        clock_handle {
-            ty: fidl::encoding::HandleType<fidl::Clock, { fidl::ObjectType::CLOCK.into_raw() }, 2147483648>,
-            resource: true,
-            index: 3,
-            typevar: T3,
-            offset_v1: 12,
-            offset_v2: 12,
-        },
-        debuglog_handle {
-            ty: fidl::encoding::HandleType<fidl::DebugLog, { fidl::ObjectType::DEBUGLOG.into_raw() }, 2147483648>,
-            resource: true,
-            index: 4,
-            typevar: T4,
-            offset_v1: 16,
-            offset_v2: 16,
-        },
-        event_handle {
-            ty: fidl::encoding::HandleType<fidl::Event, { fidl::ObjectType::EVENT.into_raw() }, 2147483648>,
-            resource: true,
-            index: 5,
-            typevar: T5,
-            offset_v1: 20,
-            offset_v2: 20,
-        },
-        eventpair_handle {
-            ty: fidl::encoding::HandleType<fidl::EventPair, { fidl::ObjectType::EVENTPAIR.into_raw() }, 2147483648>,
-            resource: true,
-            index: 6,
-            typevar: T6,
-            offset_v1: 24,
-            offset_v2: 24,
-        },
-        exception_handle {
-            ty: fidl::encoding::HandleType<fidl::Exception, { fidl::ObjectType::EXCEPTION.into_raw() }, 2147483648>,
-            resource: true,
-            index: 7,
-            typevar: T7,
-            offset_v1: 28,
-            offset_v2: 28,
-        },
-        fifo_handle {
-            ty: fidl::encoding::HandleType<fidl::Fifo, { fidl::ObjectType::FIFO.into_raw() }, 2147483648>,
-            resource: true,
-            index: 8,
-            typevar: T8,
-            offset_v1: 32,
-            offset_v2: 32,
-        },
-        guest_handle {
-            ty: fidl::encoding::HandleType<fidl::Guest, { fidl::ObjectType::GUEST.into_raw() }, 2147483648>,
-            resource: true,
-            index: 9,
-            typevar: T9,
-            offset_v1: 36,
-            offset_v2: 36,
-        },
-        interrupt_handle {
-            ty: fidl::encoding::HandleType<fidl::Interrupt, { fidl::ObjectType::INTERRUPT.into_raw() }, 2147483648>,
-            resource: true,
-            index: 10,
-            typevar: T10,
-            offset_v1: 40,
-            offset_v2: 40,
-        },
-        iommu_handle {
-            ty: fidl::encoding::HandleType<fidl::Iommu, { fidl::ObjectType::IOMMU.into_raw() }, 2147483648>,
-            resource: true,
-            index: 11,
-            typevar: T11,
-            offset_v1: 44,
-            offset_v2: 44,
-        },
-        job_handle {
-            ty: fidl::encoding::HandleType<fidl::Job, { fidl::ObjectType::JOB.into_raw() }, 2147483648>,
-            resource: true,
-            index: 12,
-            typevar: T12,
-            offset_v1: 48,
-            offset_v2: 48,
-        },
-        msi_handle {
-            ty: fidl::encoding::HandleType<fidl::Msi, { fidl::ObjectType::MSI.into_raw() }, 2147483648>,
-            resource: true,
-            index: 13,
-            typevar: T13,
-            offset_v1: 52,
-            offset_v2: 52,
-        },
-        pager_handle {
-            ty: fidl::encoding::HandleType<fidl::Pager, { fidl::ObjectType::PAGER.into_raw() }, 2147483648>,
-            resource: true,
-            index: 14,
-            typevar: T14,
-            offset_v1: 56,
-            offset_v2: 56,
-        },
-        pmt_handle {
-            ty: fidl::encoding::HandleType<fidl::Pmt, { fidl::ObjectType::PMT.into_raw() }, 2147483648>,
-            resource: true,
-            index: 15,
-            typevar: T15,
-            offset_v1: 60,
-            offset_v2: 60,
-        },
-        port_handle {
-            ty: fidl::encoding::HandleType<fidl::Port, { fidl::ObjectType::PORT.into_raw() }, 2147483648>,
-            resource: true,
-            index: 16,
-            typevar: T16,
-            offset_v1: 64,
-            offset_v2: 64,
-        },
-        process_handle {
-            ty: fidl::encoding::HandleType<fidl::Process, { fidl::ObjectType::PROCESS.into_raw() }, 2147483648>,
-            resource: true,
-            index: 17,
-            typevar: T17,
-            offset_v1: 68,
-            offset_v2: 68,
-        },
-        profile_handle {
-            ty: fidl::encoding::HandleType<fidl::Profile, { fidl::ObjectType::PROFILE.into_raw() }, 2147483648>,
-            resource: true,
-            index: 18,
-            typevar: T18,
-            offset_v1: 72,
-            offset_v2: 72,
-        },
-        resource_handle {
-            ty: fidl::encoding::HandleType<fidl::Resource, { fidl::ObjectType::RESOURCE.into_raw() }, 2147483648>,
-            resource: true,
-            index: 19,
-            typevar: T19,
-            offset_v1: 76,
-            offset_v2: 76,
-        },
-        socket_handle {
-            ty: fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 2147483648>,
-            resource: true,
-            index: 20,
-            typevar: T20,
-            offset_v1: 80,
-            offset_v2: 80,
-        },
-        stream_handle {
-            ty: fidl::encoding::HandleType<fidl::Stream, { fidl::ObjectType::STREAM.into_raw() }, 2147483648>,
-            resource: true,
-            index: 21,
-            typevar: T21,
-            offset_v1: 84,
-            offset_v2: 84,
-        },
-        suspendtoken_handle {
-            ty: fidl::encoding::HandleType<fidl::SuspendToken, { fidl::ObjectType::SUSPEND_TOKEN.into_raw() }, 2147483648>,
-            resource: true,
-            index: 22,
-            typevar: T22,
-            offset_v1: 88,
-            offset_v2: 88,
-        },
-        thread_handle {
-            ty: fidl::encoding::HandleType<fidl::Thread, { fidl::ObjectType::THREAD.into_raw() }, 2147483648>,
-            resource: true,
-            index: 23,
-            typevar: T23,
-            offset_v1: 92,
-            offset_v2: 92,
-        },
-        timer_handle {
-            ty: fidl::encoding::HandleType<fidl::Timer, { fidl::ObjectType::TIMER.into_raw() }, 2147483648>,
-            resource: true,
-            index: 24,
-            typevar: T24,
-            offset_v1: 96,
-            offset_v2: 96,
-        },
-        vcpu_handle {
-            ty: fidl::encoding::HandleType<fidl::Vcpu, { fidl::ObjectType::VCPU.into_raw() }, 2147483648>,
-            resource: true,
-            index: 25,
-            typevar: T25,
-            offset_v1: 100,
-            offset_v2: 100,
-        },
-        vmar_handle {
-            ty: fidl::encoding::HandleType<fidl::Vmar, { fidl::ObjectType::VMAR.into_raw() }, 2147483648>,
-            resource: true,
-            index: 26,
-            typevar: T26,
-            offset_v1: 104,
-            offset_v2: 104,
-        },
-        vmo_handle {
-            ty: fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>,
-            resource: true,
-            index: 27,
-            typevar: T27,
-            offset_v1: 108,
-            offset_v2: 108,
-        },
-        rights_handle {
-            ty: fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 5>,
-            resource: true,
-            index: 28,
-            typevar: T28,
-            offset_v1: 112,
-            offset_v2: 112,
-        },
-        aliased_plain_handle_field {
-            ty: fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>,
-            resource: true,
-            index: 29,
-            typevar: T29,
-            offset_v1: 116,
-            offset_v2: 116,
-        },
-        aliased_subtype_handle_field {
-            ty: fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>,
-            resource: true,
-            index: 30,
-            typevar: T30,
-            offset_v1: 120,
-            offset_v2: 120,
-        },
-        aliased_rights_handle_field {
-            ty: fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 1>,
-            resource: true,
-            index: 31,
-            typevar: T31,
-            offset_v1: 124,
-            offset_v2: 124,
-        },
-        some_protocol {
-            ty: fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<SomeProtocolMarker>>,
-            resource: true,
-            index: 32,
-            typevar: T32,
-            offset_v1: 128,
-            offset_v2: 128,
-        },
-        request_some_protocol {
-            ty: fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<SomeProtocolMarker>>,
-            resource: true,
-            index: 33,
-            typevar: T33,
-            offset_v1: 132,
-            offset_v2: 132,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 136,
-    size_v2: 136,
-    align_v1: 4,
-    align_v2: 4,
-}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SomeProtocolMarker;
@@ -597,3 +308,781 @@ impl fidl::endpoints::ControlHandle for SomeProtocolControlHandle {
 }
 
 impl SomeProtocolControlHandle {}
+
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+
+    unsafe impl fidl::encoding::TypeMarker for Handles {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 136,
+                fidl::encoding::WireFormatVersion::V2 => 136,
+            }
+        }
+    }
+    impl fidl::encoding::ResourceTypeMarker for Handles {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Handles> for &mut Handles {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Handles>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<Handles>::encode(
+                (
+                    <fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.plain_handle),
+                    <fidl::encoding::HandleType<fidl::Bti, { fidl::ObjectType::BTI.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.bti_handle),
+                    <fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.channel_handle),
+                    <fidl::encoding::HandleType<fidl::Clock, { fidl::ObjectType::CLOCK.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.clock_handle),
+                    <fidl::encoding::HandleType<fidl::DebugLog, { fidl::ObjectType::DEBUGLOG.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.debuglog_handle),
+                    <fidl::encoding::HandleType<fidl::Event, { fidl::ObjectType::EVENT.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.event_handle),
+                    <fidl::encoding::HandleType<fidl::EventPair, { fidl::ObjectType::EVENTPAIR.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.eventpair_handle),
+                    <fidl::encoding::HandleType<fidl::Exception, { fidl::ObjectType::EXCEPTION.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.exception_handle),
+                    <fidl::encoding::HandleType<fidl::Fifo, { fidl::ObjectType::FIFO.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.fifo_handle),
+                    <fidl::encoding::HandleType<fidl::Guest, { fidl::ObjectType::GUEST.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.guest_handle),
+                    <fidl::encoding::HandleType<fidl::Interrupt, { fidl::ObjectType::INTERRUPT.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.interrupt_handle),
+                    <fidl::encoding::HandleType<fidl::Iommu, { fidl::ObjectType::IOMMU.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.iommu_handle),
+                    <fidl::encoding::HandleType<fidl::Job, { fidl::ObjectType::JOB.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.job_handle),
+                    <fidl::encoding::HandleType<fidl::Msi, { fidl::ObjectType::MSI.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.msi_handle),
+                    <fidl::encoding::HandleType<fidl::Pager, { fidl::ObjectType::PAGER.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.pager_handle),
+                    <fidl::encoding::HandleType<fidl::Pmt, { fidl::ObjectType::PMT.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.pmt_handle),
+                    <fidl::encoding::HandleType<fidl::Port, { fidl::ObjectType::PORT.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.port_handle),
+                    <fidl::encoding::HandleType<fidl::Process, { fidl::ObjectType::PROCESS.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.process_handle),
+                    <fidl::encoding::HandleType<fidl::Profile, { fidl::ObjectType::PROFILE.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.profile_handle),
+                    <fidl::encoding::HandleType<fidl::Resource, { fidl::ObjectType::RESOURCE.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.resource_handle),
+                    <fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.socket_handle),
+                    <fidl::encoding::HandleType<fidl::Stream, { fidl::ObjectType::STREAM.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.stream_handle),
+                    <fidl::encoding::HandleType<fidl::SuspendToken, { fidl::ObjectType::SUSPEND_TOKEN.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.suspendtoken_handle),
+                    <fidl::encoding::HandleType<fidl::Thread, { fidl::ObjectType::THREAD.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.thread_handle),
+                    <fidl::encoding::HandleType<fidl::Timer, { fidl::ObjectType::TIMER.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.timer_handle),
+                    <fidl::encoding::HandleType<fidl::Vcpu, { fidl::ObjectType::VCPU.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.vcpu_handle),
+                    <fidl::encoding::HandleType<fidl::Vmar, { fidl::ObjectType::VMAR.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.vmar_handle),
+                    <fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.vmo_handle),
+                    <fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 5> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.rights_handle),
+                    <fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.aliased_plain_handle_field),
+                    <fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.aliased_subtype_handle_field),
+                    <fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 1> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.aliased_rights_handle_field),
+                    <fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<SomeProtocolMarker>> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.some_protocol),
+                    <fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<SomeProtocolMarker>> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.request_some_protocol),
+                ),
+                encoder, offset, _depth
+            )
+        }
+    }
+    unsafe impl<
+            T0: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Handle,
+                    { fidl::ObjectType::NONE.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T1: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Bti,
+                    { fidl::ObjectType::BTI.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T2: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Channel,
+                    { fidl::ObjectType::CHANNEL.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T3: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Clock,
+                    { fidl::ObjectType::CLOCK.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T4: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::DebugLog,
+                    { fidl::ObjectType::DEBUGLOG.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T5: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Event,
+                    { fidl::ObjectType::EVENT.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T6: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::EventPair,
+                    { fidl::ObjectType::EVENTPAIR.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T7: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Exception,
+                    { fidl::ObjectType::EXCEPTION.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T8: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Fifo,
+                    { fidl::ObjectType::FIFO.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T9: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Guest,
+                    { fidl::ObjectType::GUEST.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T10: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Interrupt,
+                    { fidl::ObjectType::INTERRUPT.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T11: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Iommu,
+                    { fidl::ObjectType::IOMMU.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T12: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Job,
+                    { fidl::ObjectType::JOB.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T13: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Msi,
+                    { fidl::ObjectType::MSI.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T14: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Pager,
+                    { fidl::ObjectType::PAGER.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T15: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Pmt,
+                    { fidl::ObjectType::PMT.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T16: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Port,
+                    { fidl::ObjectType::PORT.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T17: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Process,
+                    { fidl::ObjectType::PROCESS.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T18: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Profile,
+                    { fidl::ObjectType::PROFILE.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T19: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Resource,
+                    { fidl::ObjectType::RESOURCE.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T20: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Socket,
+                    { fidl::ObjectType::SOCKET.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T21: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Stream,
+                    { fidl::ObjectType::STREAM.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T22: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::SuspendToken,
+                    { fidl::ObjectType::SUSPEND_TOKEN.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T23: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Thread,
+                    { fidl::ObjectType::THREAD.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T24: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Timer,
+                    { fidl::ObjectType::TIMER.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T25: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Vcpu,
+                    { fidl::ObjectType::VCPU.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T26: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Vmar,
+                    { fidl::ObjectType::VMAR.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T27: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Vmo,
+                    { fidl::ObjectType::VMO.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T28: fidl::encoding::Encode<
+                fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 5>,
+            >,
+            T29: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Handle,
+                    { fidl::ObjectType::NONE.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T30: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Vmo,
+                    { fidl::ObjectType::VMO.into_raw() },
+                    2147483648,
+                >,
+            >,
+            T31: fidl::encoding::Encode<
+                fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 1>,
+            >,
+            T32: fidl::encoding::Encode<
+                fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<SomeProtocolMarker>>,
+            >,
+            T33: fidl::encoding::Encode<
+                fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<SomeProtocolMarker>>,
+            >,
+        > fidl::encoding::Encode<Handles>
+        for (
+            T0,
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            T9,
+            T10,
+            T11,
+            T12,
+            T13,
+            T14,
+            T15,
+            T16,
+            T17,
+            T18,
+            T19,
+            T20,
+            T21,
+            T22,
+            T23,
+            T24,
+            T25,
+            T26,
+            T27,
+            T28,
+            T29,
+            T30,
+            T31,
+            T32,
+            T33,
+        )
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Handles>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            };
+            self.1.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            self.2.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 12,
+                fidl::encoding::WireFormatVersion::V2 => 12,
+            };
+            self.3.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 16,
+                fidl::encoding::WireFormatVersion::V2 => 16,
+            };
+            self.4.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 20,
+                fidl::encoding::WireFormatVersion::V2 => 20,
+            };
+            self.5.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 24,
+            };
+            self.6.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 28,
+                fidl::encoding::WireFormatVersion::V2 => 28,
+            };
+            self.7.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 32,
+                fidl::encoding::WireFormatVersion::V2 => 32,
+            };
+            self.8.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 36,
+                fidl::encoding::WireFormatVersion::V2 => 36,
+            };
+            self.9.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 40,
+                fidl::encoding::WireFormatVersion::V2 => 40,
+            };
+            self.10.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 44,
+                fidl::encoding::WireFormatVersion::V2 => 44,
+            };
+            self.11.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 48,
+                fidl::encoding::WireFormatVersion::V2 => 48,
+            };
+            self.12.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 52,
+                fidl::encoding::WireFormatVersion::V2 => 52,
+            };
+            self.13.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 56,
+                fidl::encoding::WireFormatVersion::V2 => 56,
+            };
+            self.14.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 60,
+                fidl::encoding::WireFormatVersion::V2 => 60,
+            };
+            self.15.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 64,
+                fidl::encoding::WireFormatVersion::V2 => 64,
+            };
+            self.16.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 68,
+                fidl::encoding::WireFormatVersion::V2 => 68,
+            };
+            self.17.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 72,
+                fidl::encoding::WireFormatVersion::V2 => 72,
+            };
+            self.18.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 76,
+                fidl::encoding::WireFormatVersion::V2 => 76,
+            };
+            self.19.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 80,
+                fidl::encoding::WireFormatVersion::V2 => 80,
+            };
+            self.20.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 84,
+                fidl::encoding::WireFormatVersion::V2 => 84,
+            };
+            self.21.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 88,
+                fidl::encoding::WireFormatVersion::V2 => 88,
+            };
+            self.22.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 92,
+                fidl::encoding::WireFormatVersion::V2 => 92,
+            };
+            self.23.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 96,
+                fidl::encoding::WireFormatVersion::V2 => 96,
+            };
+            self.24.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 100,
+                fidl::encoding::WireFormatVersion::V2 => 100,
+            };
+            self.25.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 104,
+                fidl::encoding::WireFormatVersion::V2 => 104,
+            };
+            self.26.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 108,
+                fidl::encoding::WireFormatVersion::V2 => 108,
+            };
+            self.27.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 112,
+                fidl::encoding::WireFormatVersion::V2 => 112,
+            };
+            self.28.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 116,
+                fidl::encoding::WireFormatVersion::V2 => 116,
+            };
+            self.29.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 120,
+                fidl::encoding::WireFormatVersion::V2 => 120,
+            };
+            self.30.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 124,
+                fidl::encoding::WireFormatVersion::V2 => 124,
+            };
+            self.31.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 128,
+                fidl::encoding::WireFormatVersion::V2 => 128,
+            };
+            self.32.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 132,
+                fidl::encoding::WireFormatVersion::V2 => 132,
+            };
+            self.33.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for Handles {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self {
+                plain_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>),
+                bti_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Bti, { fidl::ObjectType::BTI.into_raw() }, 2147483648>),
+                channel_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>),
+                clock_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Clock, { fidl::ObjectType::CLOCK.into_raw() }, 2147483648>),
+                debuglog_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::DebugLog, { fidl::ObjectType::DEBUGLOG.into_raw() }, 2147483648>),
+                event_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Event, { fidl::ObjectType::EVENT.into_raw() }, 2147483648>),
+                eventpair_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::EventPair, { fidl::ObjectType::EVENTPAIR.into_raw() }, 2147483648>),
+                exception_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Exception, { fidl::ObjectType::EXCEPTION.into_raw() }, 2147483648>),
+                fifo_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Fifo, { fidl::ObjectType::FIFO.into_raw() }, 2147483648>),
+                guest_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Guest, { fidl::ObjectType::GUEST.into_raw() }, 2147483648>),
+                interrupt_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Interrupt, { fidl::ObjectType::INTERRUPT.into_raw() }, 2147483648>),
+                iommu_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Iommu, { fidl::ObjectType::IOMMU.into_raw() }, 2147483648>),
+                job_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Job, { fidl::ObjectType::JOB.into_raw() }, 2147483648>),
+                msi_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Msi, { fidl::ObjectType::MSI.into_raw() }, 2147483648>),
+                pager_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Pager, { fidl::ObjectType::PAGER.into_raw() }, 2147483648>),
+                pmt_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Pmt, { fidl::ObjectType::PMT.into_raw() }, 2147483648>),
+                port_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Port, { fidl::ObjectType::PORT.into_raw() }, 2147483648>),
+                process_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Process, { fidl::ObjectType::PROCESS.into_raw() }, 2147483648>),
+                profile_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Profile, { fidl::ObjectType::PROFILE.into_raw() }, 2147483648>),
+                resource_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Resource, { fidl::ObjectType::RESOURCE.into_raw() }, 2147483648>),
+                socket_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 2147483648>),
+                stream_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Stream, { fidl::ObjectType::STREAM.into_raw() }, 2147483648>),
+                suspendtoken_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::SuspendToken, { fidl::ObjectType::SUSPEND_TOKEN.into_raw() }, 2147483648>),
+                thread_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Thread, { fidl::ObjectType::THREAD.into_raw() }, 2147483648>),
+                timer_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Timer, { fidl::ObjectType::TIMER.into_raw() }, 2147483648>),
+                vcpu_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vcpu, { fidl::ObjectType::VCPU.into_raw() }, 2147483648>),
+                vmar_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmar, { fidl::ObjectType::VMAR.into_raw() }, 2147483648>),
+                vmo_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>),
+                rights_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 5>),
+                aliased_plain_handle_field: fidl::new_empty!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>),
+                aliased_subtype_handle_field: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>),
+                aliased_rights_handle_field: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 1>),
+                some_protocol: fidl::new_empty!(
+                    fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<SomeProtocolMarker>>
+                ),
+                request_some_protocol: fidl::new_empty!(
+                    fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<SomeProtocolMarker>>
+                ),
+            }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, &mut self.plain_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Bti, { fidl::ObjectType::BTI.into_raw() }, 2147483648>, &mut self.bti_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, &mut self.channel_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 12,
+                fidl::encoding::WireFormatVersion::V2 => 12,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Clock, { fidl::ObjectType::CLOCK.into_raw() }, 2147483648>, &mut self.clock_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 16,
+                fidl::encoding::WireFormatVersion::V2 => 16,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::DebugLog, { fidl::ObjectType::DEBUGLOG.into_raw() }, 2147483648>, &mut self.debuglog_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 20,
+                fidl::encoding::WireFormatVersion::V2 => 20,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Event, { fidl::ObjectType::EVENT.into_raw() }, 2147483648>, &mut self.event_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 24,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::EventPair, { fidl::ObjectType::EVENTPAIR.into_raw() }, 2147483648>, &mut self.eventpair_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 28,
+                fidl::encoding::WireFormatVersion::V2 => 28,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Exception, { fidl::ObjectType::EXCEPTION.into_raw() }, 2147483648>, &mut self.exception_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 32,
+                fidl::encoding::WireFormatVersion::V2 => 32,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Fifo, { fidl::ObjectType::FIFO.into_raw() }, 2147483648>, &mut self.fifo_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 36,
+                fidl::encoding::WireFormatVersion::V2 => 36,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Guest, { fidl::ObjectType::GUEST.into_raw() }, 2147483648>, &mut self.guest_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 40,
+                fidl::encoding::WireFormatVersion::V2 => 40,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Interrupt, { fidl::ObjectType::INTERRUPT.into_raw() }, 2147483648>, &mut self.interrupt_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 44,
+                fidl::encoding::WireFormatVersion::V2 => 44,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Iommu, { fidl::ObjectType::IOMMU.into_raw() }, 2147483648>, &mut self.iommu_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 48,
+                fidl::encoding::WireFormatVersion::V2 => 48,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Job, { fidl::ObjectType::JOB.into_raw() }, 2147483648>, &mut self.job_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 52,
+                fidl::encoding::WireFormatVersion::V2 => 52,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Msi, { fidl::ObjectType::MSI.into_raw() }, 2147483648>, &mut self.msi_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 56,
+                fidl::encoding::WireFormatVersion::V2 => 56,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Pager, { fidl::ObjectType::PAGER.into_raw() }, 2147483648>, &mut self.pager_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 60,
+                fidl::encoding::WireFormatVersion::V2 => 60,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Pmt, { fidl::ObjectType::PMT.into_raw() }, 2147483648>, &mut self.pmt_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 64,
+                fidl::encoding::WireFormatVersion::V2 => 64,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Port, { fidl::ObjectType::PORT.into_raw() }, 2147483648>, &mut self.port_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 68,
+                fidl::encoding::WireFormatVersion::V2 => 68,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Process, { fidl::ObjectType::PROCESS.into_raw() }, 2147483648>, &mut self.process_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 72,
+                fidl::encoding::WireFormatVersion::V2 => 72,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Profile, { fidl::ObjectType::PROFILE.into_raw() }, 2147483648>, &mut self.profile_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 76,
+                fidl::encoding::WireFormatVersion::V2 => 76,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Resource, { fidl::ObjectType::RESOURCE.into_raw() }, 2147483648>, &mut self.resource_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 80,
+                fidl::encoding::WireFormatVersion::V2 => 80,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 2147483648>, &mut self.socket_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 84,
+                fidl::encoding::WireFormatVersion::V2 => 84,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Stream, { fidl::ObjectType::STREAM.into_raw() }, 2147483648>, &mut self.stream_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 88,
+                fidl::encoding::WireFormatVersion::V2 => 88,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::SuspendToken, { fidl::ObjectType::SUSPEND_TOKEN.into_raw() }, 2147483648>, &mut self.suspendtoken_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 92,
+                fidl::encoding::WireFormatVersion::V2 => 92,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Thread, { fidl::ObjectType::THREAD.into_raw() }, 2147483648>, &mut self.thread_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 96,
+                fidl::encoding::WireFormatVersion::V2 => 96,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Timer, { fidl::ObjectType::TIMER.into_raw() }, 2147483648>, &mut self.timer_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 100,
+                fidl::encoding::WireFormatVersion::V2 => 100,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vcpu, { fidl::ObjectType::VCPU.into_raw() }, 2147483648>, &mut self.vcpu_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 104,
+                fidl::encoding::WireFormatVersion::V2 => 104,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vmar, { fidl::ObjectType::VMAR.into_raw() }, 2147483648>, &mut self.vmar_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 108,
+                fidl::encoding::WireFormatVersion::V2 => 108,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, &mut self.vmo_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 112,
+                fidl::encoding::WireFormatVersion::V2 => 112,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 5>, &mut self.rights_handle, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 116,
+                fidl::encoding::WireFormatVersion::V2 => 116,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, &mut self.aliased_plain_handle_field, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 120,
+                fidl::encoding::WireFormatVersion::V2 => 120,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, &mut self.aliased_subtype_handle_field, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 124,
+                fidl::encoding::WireFormatVersion::V2 => 124,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 1>, &mut self.aliased_rights_handle_field, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 128,
+                fidl::encoding::WireFormatVersion::V2 => 128,
+            };
+            fidl::decode!(
+                fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<SomeProtocolMarker>>,
+                &mut self.some_protocol,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 132,
+                fidl::encoding::WireFormatVersion::V2 => 132,
+            };
+            fidl::decode!(
+                fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<SomeProtocolMarker>>,
+                &mut self.request_some_protocol,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            Ok(())
+        }
+    }
+}

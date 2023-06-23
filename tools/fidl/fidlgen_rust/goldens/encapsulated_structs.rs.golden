@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -37,58 +35,6 @@ pub struct ArrayInt16Int8 {
 
 impl fidl::Persistable for ArrayInt16Int8 {}
 
-fidl_struct! {
-    copy: true,
-    name: ArrayInt16Int8,
-    members: [
-        arr {
-            ty: fidl::encoding::Array<Int16Int8, 3>,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-        {
-            ty: u16,
-            offset: 2,
-            mask: 0xff00u16,
-        },
-        {
-            ty: u16,
-            offset: 6,
-            mask: 0xff00u16,
-        },
-        {
-            ty: u16,
-            offset: 10,
-            mask: 0xff00u16,
-        },
-    ],
-    padding_v2: [
-        {
-            ty: u16,
-            offset: 2,
-            mask: 0xff00u16,
-        },
-        {
-            ty: u16,
-            offset: 6,
-            mask: 0xff00u16,
-        },
-        {
-            ty: u16,
-            offset: 10,
-            mask: 0xff00u16,
-        },
-    ],
-    size_v1: 12,
-    size_v2: 12,
-    align_v1: 2,
-    align_v2: 2,
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct Int16Int8 {
@@ -97,45 +43,6 @@ pub struct Int16Int8 {
 }
 
 impl fidl::Persistable for Int16Int8 {}
-
-fidl_struct! {
-    copy: true,
-    name: Int16Int8,
-    members: [
-        a {
-            ty: i16,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-        b {
-            ty: i8,
-            index: 1,
-            typevar: T1,
-            offset_v1: 2,
-            offset_v2: 2,
-        },
-    ],
-    padding_v1: [
-        {
-            ty: u16,
-            offset: 2,
-            mask: 0xff00u16,
-        },
-    ],
-    padding_v2: [
-        {
-            ty: u16,
-            offset: 2,
-            mask: 0xff00u16,
-        },
-    ],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 2,
-    align_v2: 2,
-}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
@@ -146,45 +53,6 @@ pub struct Int8Int32 {
 
 impl fidl::Persistable for Int8Int32 {}
 
-fidl_struct! {
-    copy: true,
-    name: Int8Int32,
-    members: [
-        a {
-            ty: i8,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-        b {
-            ty: i32,
-            index: 1,
-            typevar: T1,
-            offset_v1: 4,
-            offset_v2: 4,
-        },
-    ],
-    padding_v1: [
-        {
-            ty: u32,
-            offset: 0,
-            mask: 0xffffff00u32,
-        },
-    ],
-    padding_v2: [
-        {
-            ty: u32,
-            offset: 0,
-            mask: 0xffffff00u32,
-        },
-    ],
-    size_v1: 8,
-    size_v2: 8,
-    align_v1: 4,
-    align_v2: 4,
-}
-
 #[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct NonInlineStructTestStruct {
     pub element: Option<Box<Int16Int8>>,
@@ -192,46 +60,6 @@ pub struct NonInlineStructTestStruct {
 }
 
 impl fidl::Standalone for NonInlineStructTestStruct {}
-
-fidl_struct! {
-    name: NonInlineStructTestStruct,
-    resource: true,
-    members: [
-        element {
-            ty: fidl::encoding::Boxed<Int16Int8>,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-        h {
-            ty: fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>,
-            resource: true,
-            index: 1,
-            typevar: T1,
-            offset_v1: 8,
-            offset_v2: 8,
-        },
-    ],
-    padding_v1: [
-        {
-            ty: u64,
-            offset: 8,
-            mask: 0xffffffff00000000u64,
-        },
-    ],
-    padding_v2: [
-        {
-            ty: u64,
-            offset: 8,
-            mask: 0xffffffff00000000u64,
-        },
-    ],
-    size_v1: 16,
-    size_v2: 16,
-    align_v1: 8,
-    align_v2: 8,
-}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
@@ -243,92 +71,6 @@ pub struct StructPaddingTestStruct {
 
 impl fidl::Persistable for StructPaddingTestStruct {}
 
-fidl_struct! {
-    copy: true,
-    name: StructPaddingTestStruct,
-    members: [
-        trailing {
-            ty: Int16Int8,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-        inner {
-            ty: Int8Int32,
-            index: 1,
-            typevar: T1,
-            offset_v1: 4,
-            offset_v2: 4,
-        },
-        array {
-            ty: ArrayInt16Int8,
-            index: 2,
-            typevar: T2,
-            offset_v1: 12,
-            offset_v2: 12,
-        },
-    ],
-    padding_v1: [
-        {
-            ty: u32,
-            offset: 0,
-            mask: 0xff000000u32,
-        },
-        {
-            ty: u32,
-            offset: 4,
-            mask: 0xffffff00u32,
-        },
-        {
-            ty: u32,
-            offset: 12,
-            mask: 0xff000000u32,
-        },
-        {
-            ty: u32,
-            offset: 16,
-            mask: 0xff000000u32,
-        },
-        {
-            ty: u32,
-            offset: 20,
-            mask: 0xff000000u32,
-        },
-    ],
-    padding_v2: [
-        {
-            ty: u32,
-            offset: 0,
-            mask: 0xff000000u32,
-        },
-        {
-            ty: u32,
-            offset: 4,
-            mask: 0xffffff00u32,
-        },
-        {
-            ty: u32,
-            offset: 12,
-            mask: 0xff000000u32,
-        },
-        {
-            ty: u32,
-            offset: 16,
-            mask: 0xff000000u32,
-        },
-        {
-            ty: u32,
-            offset: 20,
-            mask: 0xff000000u32,
-        },
-    ],
-    size_v1: 24,
-    size_v2: 24,
-    align_v1: 4,
-    align_v2: 4,
-}
-
 #[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TopLevelStruct {
     pub a: StructPaddingTestStruct,
@@ -337,32 +79,883 @@ pub struct TopLevelStruct {
 
 impl fidl::Standalone for TopLevelStruct {}
 
-fidl_struct! {
-    name: TopLevelStruct,
-    resource: true,
-    members: [
-        a {
-            ty: StructPaddingTestStruct,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-        b {
-            ty: NonInlineStructTestStruct,
-            resource: true,
-            index: 1,
-            typevar: T1,
-            offset_v1: 24,
-            offset_v2: 24,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 40,
-    size_v2: 40,
-    align_v1: 8,
-    align_v2: 8,
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+
+    unsafe impl fidl::encoding::TypeMarker for ArrayInt16Int8 {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 2,
+                fidl::encoding::WireFormatVersion::V2 => 2,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 12,
+                fidl::encoding::WireFormatVersion::V2 => 12,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for ArrayInt16Int8 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<ArrayInt16Int8> for &ArrayInt16Int8 {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ArrayInt16Int8>(offset);
+            unsafe {
+                // Copy the object into the buffer.
+                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+                let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut ArrayInt16Int8>(buf_ptr);
+                typed_buf_ptr.write_unaligned((self as *const ArrayInt16Int8).read());
+                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
+                // done second because the memcpy will write garbage to these bytes.
+                let ptr = buf_ptr.offset(2);
+                let padding_ptr = std::mem::transmute::<*mut u8, *mut u16>(ptr);
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff00u16);
+                let ptr = buf_ptr.offset(6);
+                let padding_ptr = std::mem::transmute::<*mut u8, *mut u16>(ptr);
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff00u16);
+                let ptr = buf_ptr.offset(10);
+                let padding_ptr = std::mem::transmute::<*mut u8, *mut u16>(ptr);
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff00u16);
+            }
+            Ok(())
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<fidl::encoding::Array<Int16Int8, 3>>>
+        fidl::encoding::Encode<ArrayInt16Int8> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ArrayInt16Int8>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for ArrayInt16Int8 {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { arr: fidl::new_empty!(fidl::encoding::Array<Int16Int8, 3>) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            // Verify that padding bytes are zero.
+            let ptr = unsafe { buf_ptr.offset(2) };
+            let padval =
+                unsafe { std::mem::transmute::<*const u8, *const u16>(ptr).read_unaligned() };
+            let maskedval = padval & 0xff00u16;
+            if (maskedval != 0) {
+                return Err(fidl::Error::NonZeroPadding {
+                    padding_start: offset + 2 + ((0xff00u16 as u64).trailing_zeros() / 8) as usize,
+                });
+            }
+            let ptr = unsafe { buf_ptr.offset(6) };
+            let padval =
+                unsafe { std::mem::transmute::<*const u8, *const u16>(ptr).read_unaligned() };
+            let maskedval = padval & 0xff00u16;
+            if (maskedval != 0) {
+                return Err(fidl::Error::NonZeroPadding {
+                    padding_start: offset + 6 + ((0xff00u16 as u64).trailing_zeros() / 8) as usize,
+                });
+            }
+            let ptr = unsafe { buf_ptr.offset(10) };
+            let padval =
+                unsafe { std::mem::transmute::<*const u8, *const u16>(ptr).read_unaligned() };
+            let maskedval = padval & 0xff00u16;
+            if (maskedval != 0) {
+                return Err(fidl::Error::NonZeroPadding {
+                    padding_start: offset + 10 + ((0xff00u16 as u64).trailing_zeros() / 8) as usize,
+                });
+            }
+            // Copy from the buffer into the object.
+            unsafe {
+                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 12);
+            }
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for Int16Int8 {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 2,
+                fidl::encoding::WireFormatVersion::V2 => 2,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for Int16Int8 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Int16Int8> for &Int16Int8 {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Int16Int8>(offset);
+            unsafe {
+                // Copy the object into the buffer.
+                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+                let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut Int16Int8>(buf_ptr);
+                typed_buf_ptr.write_unaligned((self as *const Int16Int8).read());
+                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
+                // done second because the memcpy will write garbage to these bytes.
+                let ptr = buf_ptr.offset(2);
+                let padding_ptr = std::mem::transmute::<*mut u8, *mut u16>(ptr);
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff00u16);
+            }
+            Ok(())
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<i16>, T1: fidl::encoding::Encode<i8>>
+        fidl::encoding::Encode<Int16Int8> for (T0, T1)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Int16Int8>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => unsafe {
+                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(2);
+                    std::mem::transmute::<*mut u8, *mut u16>(ptr).write_unaligned(0);
+                },
+                fidl::encoding::WireFormatVersion::V2 => unsafe {
+                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(2);
+                    std::mem::transmute::<*mut u8, *mut u16>(ptr).write_unaligned(0);
+                },
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 2,
+                fidl::encoding::WireFormatVersion::V2 => 2,
+            };
+            self.1.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for Int16Int8 {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { a: fidl::new_empty!(i16), b: fidl::new_empty!(i8) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            // Verify that padding bytes are zero.
+            let ptr = unsafe { buf_ptr.offset(2) };
+            let padval =
+                unsafe { std::mem::transmute::<*const u8, *const u16>(ptr).read_unaligned() };
+            let maskedval = padval & 0xff00u16;
+            if (maskedval != 0) {
+                return Err(fidl::Error::NonZeroPadding {
+                    padding_start: offset + 2 + ((0xff00u16 as u64).trailing_zeros() / 8) as usize,
+                });
+            }
+            // Copy from the buffer into the object.
+            unsafe {
+                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 4);
+            }
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for Int8Int32 {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for Int8Int32 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<Int8Int32> for &Int8Int32 {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Int8Int32>(offset);
+            unsafe {
+                // Copy the object into the buffer.
+                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+                let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut Int8Int32>(buf_ptr);
+                typed_buf_ptr.write_unaligned((self as *const Int8Int32).read());
+                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
+                // done second because the memcpy will write garbage to these bytes.
+                let ptr = buf_ptr.offset(0);
+                let padding_ptr = std::mem::transmute::<*mut u8, *mut u32>(ptr);
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xffffff00u32);
+            }
+            Ok(())
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<i8>, T1: fidl::encoding::Encode<i32>>
+        fidl::encoding::Encode<Int8Int32> for (T0, T1)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<Int8Int32>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => unsafe {
+                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(0);
+                    std::mem::transmute::<*mut u8, *mut u32>(ptr).write_unaligned(0);
+                },
+                fidl::encoding::WireFormatVersion::V2 => unsafe {
+                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(0);
+                    std::mem::transmute::<*mut u8, *mut u32>(ptr).write_unaligned(0);
+                },
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            };
+            self.1.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for Int8Int32 {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { a: fidl::new_empty!(i8), b: fidl::new_empty!(i32) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            // Verify that padding bytes are zero.
+            let ptr = unsafe { buf_ptr.offset(0) };
+            let padval =
+                unsafe { std::mem::transmute::<*const u8, *const u32>(ptr).read_unaligned() };
+            let maskedval = padval & 0xffffff00u32;
+            if (maskedval != 0) {
+                return Err(fidl::Error::NonZeroPadding {
+                    padding_start: offset
+                        + 0
+                        + ((0xffffff00u32 as u64).trailing_zeros() / 8) as usize,
+                });
+            }
+            // Copy from the buffer into the object.
+            unsafe {
+                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 8);
+            }
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for NonInlineStructTestStruct {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 16,
+                fidl::encoding::WireFormatVersion::V2 => 16,
+            }
+        }
+    }
+    impl fidl::encoding::ResourceTypeMarker for NonInlineStructTestStruct {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<NonInlineStructTestStruct> for &mut NonInlineStructTestStruct {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<NonInlineStructTestStruct>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<NonInlineStructTestStruct>::encode(
+                (
+                    <fidl::encoding::Boxed<Int16Int8> as fidl::encoding::ValueTypeMarker>::borrow(
+                        &self.element,
+                    ),
+                    <fidl::encoding::HandleType<
+                        fidl::Handle,
+                        { fidl::ObjectType::NONE.into_raw() },
+                        2147483648,
+                    > as fidl::encoding::ResourceTypeMarker>::take_or_borrow(
+                        &mut self.h
+                    ),
+                ),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<
+            T0: fidl::encoding::Encode<fidl::encoding::Boxed<Int16Int8>>,
+            T1: fidl::encoding::Encode<
+                fidl::encoding::HandleType<
+                    fidl::Handle,
+                    { fidl::ObjectType::NONE.into_raw() },
+                    2147483648,
+                >,
+            >,
+        > fidl::encoding::Encode<NonInlineStructTestStruct> for (T0, T1)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<NonInlineStructTestStruct>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => unsafe {
+                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(8);
+                    std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                },
+                fidl::encoding::WireFormatVersion::V2 => unsafe {
+                    let ptr = encoder.buf.as_mut_ptr().offset(offset as isize).offset(8);
+                    std::mem::transmute::<*mut u8, *mut u64>(ptr).write_unaligned(0);
+                },
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            self.1.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for NonInlineStructTestStruct {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self {
+                element: fidl::new_empty!(fidl::encoding::Boxed<Int16Int8>),
+                h: fidl::new_empty!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>),
+            }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {
+                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(8) };
+                    let padval = unsafe {
+                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
+                    };
+                    let maskedval = padval & 0xffffffff00000000u64;
+                    if (maskedval != 0) {
+                        return Err(fidl::Error::NonZeroPadding {
+                            padding_start: offset
+                                + 8
+                                + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                        });
+                    }
+                }
+                fidl::encoding::WireFormatVersion::V2 => {
+                    let ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize).offset(8) };
+                    let padval = unsafe {
+                        std::mem::transmute::<*const u8, *const u64>(ptr).read_unaligned()
+                    };
+                    let maskedval = padval & 0xffffffff00000000u64;
+                    if (maskedval != 0) {
+                        return Err(fidl::Error::NonZeroPadding {
+                            padding_start: offset
+                                + 8
+                                + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                        });
+                    }
+                }
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(
+                fidl::encoding::Boxed<Int16Int8>,
+                &mut self.element,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            };
+            fidl::decode!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, &mut self.h, decoder, offset + member_offset, _depth)?;
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for StructPaddingTestStruct {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 24,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for StructPaddingTestStruct {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<StructPaddingTestStruct> for &StructPaddingTestStruct {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<StructPaddingTestStruct>(offset);
+            unsafe {
+                // Copy the object into the buffer.
+                let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+                #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+                let typed_buf_ptr =
+                    std::mem::transmute::<*mut u8, *mut StructPaddingTestStruct>(buf_ptr);
+                typed_buf_ptr.write_unaligned((self as *const StructPaddingTestStruct).read());
+                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
+                // done second because the memcpy will write garbage to these bytes.
+                let ptr = buf_ptr.offset(0);
+                let padding_ptr = std::mem::transmute::<*mut u8, *mut u32>(ptr);
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff000000u32);
+                let ptr = buf_ptr.offset(4);
+                let padding_ptr = std::mem::transmute::<*mut u8, *mut u32>(ptr);
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xffffff00u32);
+                let ptr = buf_ptr.offset(12);
+                let padding_ptr = std::mem::transmute::<*mut u8, *mut u32>(ptr);
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff000000u32);
+                let ptr = buf_ptr.offset(16);
+                let padding_ptr = std::mem::transmute::<*mut u8, *mut u32>(ptr);
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff000000u32);
+                let ptr = buf_ptr.offset(20);
+                let padding_ptr = std::mem::transmute::<*mut u8, *mut u32>(ptr);
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff000000u32);
+            }
+            Ok(())
+        }
+    }
+    unsafe impl<
+            T0: fidl::encoding::Encode<Int16Int8>,
+            T1: fidl::encoding::Encode<Int8Int32>,
+            T2: fidl::encoding::Encode<ArrayInt16Int8>,
+        > fidl::encoding::Encode<StructPaddingTestStruct> for (T0, T1, T2)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<StructPaddingTestStruct>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 4,
+                fidl::encoding::WireFormatVersion::V2 => 4,
+            };
+            self.1.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 12,
+                fidl::encoding::WireFormatVersion::V2 => 12,
+            };
+            self.2.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for StructPaddingTestStruct {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self {
+                trailing: fidl::new_empty!(Int16Int8),
+                inner: fidl::new_empty!(Int8Int32),
+                array: fidl::new_empty!(ArrayInt16Int8),
+            }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+            // Verify that padding bytes are zero.
+            let ptr = unsafe { buf_ptr.offset(0) };
+            let padval =
+                unsafe { std::mem::transmute::<*const u8, *const u32>(ptr).read_unaligned() };
+            let maskedval = padval & 0xff000000u32;
+            if (maskedval != 0) {
+                return Err(fidl::Error::NonZeroPadding {
+                    padding_start: offset
+                        + 0
+                        + ((0xff000000u32 as u64).trailing_zeros() / 8) as usize,
+                });
+            }
+            let ptr = unsafe { buf_ptr.offset(4) };
+            let padval =
+                unsafe { std::mem::transmute::<*const u8, *const u32>(ptr).read_unaligned() };
+            let maskedval = padval & 0xffffff00u32;
+            if (maskedval != 0) {
+                return Err(fidl::Error::NonZeroPadding {
+                    padding_start: offset
+                        + 4
+                        + ((0xffffff00u32 as u64).trailing_zeros() / 8) as usize,
+                });
+            }
+            let ptr = unsafe { buf_ptr.offset(12) };
+            let padval =
+                unsafe { std::mem::transmute::<*const u8, *const u32>(ptr).read_unaligned() };
+            let maskedval = padval & 0xff000000u32;
+            if (maskedval != 0) {
+                return Err(fidl::Error::NonZeroPadding {
+                    padding_start: offset
+                        + 12
+                        + ((0xff000000u32 as u64).trailing_zeros() / 8) as usize,
+                });
+            }
+            let ptr = unsafe { buf_ptr.offset(16) };
+            let padval =
+                unsafe { std::mem::transmute::<*const u8, *const u32>(ptr).read_unaligned() };
+            let maskedval = padval & 0xff000000u32;
+            if (maskedval != 0) {
+                return Err(fidl::Error::NonZeroPadding {
+                    padding_start: offset
+                        + 16
+                        + ((0xff000000u32 as u64).trailing_zeros() / 8) as usize,
+                });
+            }
+            let ptr = unsafe { buf_ptr.offset(20) };
+            let padval =
+                unsafe { std::mem::transmute::<*const u8, *const u32>(ptr).read_unaligned() };
+            let maskedval = padval & 0xff000000u32;
+            if (maskedval != 0) {
+                return Err(fidl::Error::NonZeroPadding {
+                    padding_start: offset
+                        + 20
+                        + ((0xff000000u32 as u64).trailing_zeros() / 8) as usize,
+                });
+            }
+            // Copy from the buffer into the object.
+            unsafe {
+                let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+                std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 24);
+            }
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for TopLevelStruct {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 40,
+                fidl::encoding::WireFormatVersion::V2 => 40,
+            }
+        }
+    }
+    impl fidl::encoding::ResourceTypeMarker for TopLevelStruct {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<TopLevelStruct> for &mut TopLevelStruct {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<TopLevelStruct>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<TopLevelStruct>::encode(
+                (
+                    <StructPaddingTestStruct as fidl::encoding::ValueTypeMarker>::borrow(&self.a),
+                    <NonInlineStructTestStruct as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.b),
+                ),
+                encoder, offset, _depth
+            )
+        }
+    }
+    unsafe impl<
+            T0: fidl::encoding::Encode<StructPaddingTestStruct>,
+            T1: fidl::encoding::Encode<NonInlineStructTestStruct>,
+        > fidl::encoding::Encode<TopLevelStruct> for (T0, T1)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<TopLevelStruct>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 24,
+            };
+            self.1.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for TopLevelStruct {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self {
+                a: fidl::new_empty!(StructPaddingTestStruct),
+                b: fidl::new_empty!(NonInlineStructTestStruct),
+            }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(
+                StructPaddingTestStruct,
+                &mut self.a,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 24,
+            };
+            fidl::decode!(
+                NonInlineStructTestStruct,
+                &mut self.b,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            Ok(())
+        }
+    }
 }

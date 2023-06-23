@@ -17,8 +17,6 @@
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
 
-#![recursion_limit="512"]
-
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
 use fuchsia_zircon as zx;
@@ -29,11 +27,6 @@ use {
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
     fidl::{
-        fidl_bits,
-        fidl_enum,
-        fidl_struct,
-        fidl_table,
-        fidl_union,
         endpoints::{ControlHandle as _, Responder as _},
         client::QueryResponseFut,
     },
@@ -63,4 +56,25 @@ use {
 {{- range (call .ServicesForTransport "Channel") }}
 {{ template "ServiceDeclaration" . }}
 {{- end }}
+
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+
+    {{- range .Bits }}
+    {{ template "BitsInternal" . }}
+    {{- end }}
+    {{- range .Enums }}
+    {{ template "EnumInternal" . }}
+    {{- end }}
+    {{- range .Structs }}
+    {{ template "StructInternal" . }}
+    {{- end }}
+    {{- range .Tables }}
+    {{ template "TableInternal" . }}
+    {{- end }}
+    {{- range .Unions }}
+    {{ template "UnionInternal" . }}
+    {{- end }}
+}
 {{- end }}

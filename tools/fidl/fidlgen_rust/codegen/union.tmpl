@@ -92,25 +92,149 @@ impl {{ .Name }} {
 }
 
 impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone{{ end }} for {{ .Name }} {}
+{{- end }}
 
-fidl_union! {
-    name: {{ .Name }},
-    {{- if .IsResourceType }}
-    resource: true,
-    {{- end }}
-    members: [
-    {{- range .Members }}
-        {{ .Name }} {
-            ty: {{ .Type.Fidl }},
-            {{- if .Type.IsResourceType }}
-            resource: true,
+{{- define "UnionInternal" }}
+unsafe impl fidl::encoding::TypeMarker for {{ .Name }} {
+    type Owned = Self;
+
+    #[inline(always)]
+    fn inline_align(_context: fidl::encoding::Context) -> usize {
+        8
+    }
+
+    #[inline(always)]
+    fn inline_size(context: fidl::encoding::Context) -> usize {
+        match context.wire_format_version {
+            fidl::encoding::WireFormatVersion::V1 => 24,
+            fidl::encoding::WireFormatVersion::V2 => 16,
+        }
+    }
+}
+
+{{- if .IsResourceType }}
+impl fidl::encoding::ResourceTypeMarker for {{ .Name }} {
+    type Borrowed<'a> = &'a mut Self;
+    fn take_or_borrow<'a>(value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
+        value
+    }
+}
+{{- else }}
+impl fidl::encoding::ValueTypeMarker for {{ .Name }} {
+    type Borrowed<'a> = &'a Self;
+    fn borrow<'a>(value: &'a <Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
+        value
+    }
+}
+{{- end }}
+
+unsafe impl fidl::encoding::Encode<{{ .Name }}> for &{{ if .IsResourceType }}mut {{ end }}{{ .Name }} {
+    #[inline]
+    unsafe fn encode(self, encoder: &mut fidl::encoding::Encoder<'_>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
+        encoder.debug_check_bounds::<{{ .Name }}>(offset);
+        encoder.write_num::<u64>(self.ordinal(), offset);
+        match self {
+            {{- range .Members }}
+            {{ $.Name }}::{{ .Name }}(ref {{ if .Type.IsResourceType }}mut {{ end }}val) => {
+                fidl::encoding::encode_in_envelope::<{{ .Type.Fidl }}>(
+                    {{- if .Type.IsResourceType }}
+                    <{{ .Type.Fidl }} as fidl::encoding::ResourceTypeMarker>::take_or_borrow(val),
+                    {{- else }}
+                    <{{ .Type.Fidl }} as fidl::encoding::ValueTypeMarker>::borrow(val),
+                    {{- end }}
+                    encoder, offset + 8, _depth
+                )
+            }
             {{- end }}
-            ordinal: {{ .Ordinal }},
-        },
-    {{- end }}
-    ],
-    {{- if .IsFlexible }}
-    unknown_member: __Unknown,
-    {{- end }}
+            {{- if .IsFlexible }}
+            #[allow(deprecated)]
+            {{ .Name }}::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
+            {{- end }}
+        }
+    }
+}
+
+impl fidl::encoding::Decode<Self> for {{ .Name }} {
+    #[inline(always)]
+    fn new_empty() -> Self {
+        {{- if .IsFlexible }}
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
+        {{- else }}
+        Self::{{ (index .Members 0).Name }}(fidl::new_empty!({{ (index .Members 0).Type.Fidl }}))
+        {{- end }}
+    }
+
+    #[inline]
+    unsafe fn decode(&mut self, decoder: &mut fidl::encoding::Decoder<'_>, offset: usize, mut depth: fidl::encoding::Depth) -> fidl::Result<()> {
+        decoder.debug_check_bounds::<Self>(offset);
+        #[allow(unused_variables)]
+        let next_out_of_line = decoder.next_out_of_line();
+        let handles_before = decoder.remaining_handles();
+        let (ordinal, inlined, num_bytes, num_handles) = fidl::encoding::decode_union_inline_portion(decoder, offset)?;
+
+        let member_inline_size = match ordinal {
+            {{- range .Members }}
+            {{ .Ordinal }} => <{{ .Type.Fidl }} as fidl::encoding::TypeMarker>::inline_size(decoder.context),
+            {{- end }}
+            {{- if .IsFlexible }}
+            0 => return Err(fidl::Error::UnknownUnionTag),
+            _ => num_bytes as usize,
+            {{- else }}
+            _ => return Err(fidl::Error::UnknownUnionTag),
+            {{- end }}
+        };
+
+        if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
+            if inlined != (member_inline_size <= 4) {
+                return Err(fidl::Error::InvalidInlineBitInEnvelope);
+            }
+        }
+        let _inner_offset;
+        if inlined {
+            decoder.check_inline_envelope_padding(offset + 8, member_inline_size)?;
+            _inner_offset = offset + 8;
+        } else {
+            depth.increment()?;
+            _inner_offset = decoder.out_of_line_offset(member_inline_size)?;
+        }
+        match ordinal {
+            {{- range .Members }}
+            {{ .Ordinal }} => {
+                #[allow(irrefutable_let_patterns)]
+                if let {{ $.Name }}::{{ .Name }}(_) = self {
+                    // Do nothing, read the value into the object
+                } else {
+                    // Initialize `self` to the right variant
+                    *self ={{ $.Name }}::{{ .Name }}(fidl::new_empty!({{ .Type.Fidl }}));
+                }
+                #[allow(irrefutable_let_patterns)]
+                if let {{ $.Name }}::{{ .Name }}(ref mut val) = self {
+                    fidl::decode!({{ .Type.Fidl }}, val, decoder, _inner_offset, depth)?;
+                } else {
+                    unreachable!()
+                }
+            }
+            {{- end }}
+            {{- if .IsFlexible }}
+            #[allow(deprecated)]
+            ordinal => {
+                for _ in 0..num_handles {
+                    decoder.drop_next_handle()?;
+                }
+                *self = {{ .Name }}::__Unknown { ordinal };
+            },
+            {{- else }}
+            ordinal => panic!("unexpected ordinal {:?}", ordinal)
+            {{- end }}
+        }
+        if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
+            return Err(fidl::Error::InvalidNumBytesInEnvelope);
+        }
+        if handles_before != decoder.remaining_handles() + (num_handles as usize) {
+            return Err(fidl::Error::InvalidNumHandlesInEnvelope);
+        }
+        Ok(())
+    }
 }
 {{- end }}

@@ -264,61 +264,6 @@ impl Depth {
 // Helper macros
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Chooses syntax based on on 0-or-1 occurrence metavariables like `$($foo)?`.
-/// Expands to the right-hand side of the first clause whose metavariable is
-/// present, not including the enclosing braces.
-///
-/// # Examples
-///
-/// ```
-/// switch! {
-///     $($foo)? => { 123 }
-///     $($bar)? => { &mut }
-///     _ => { a.b.c }
-/// }
-/// ```
-#[doc(hidden)] // only exported for use in macros or generated code
-#[macro_export]
-macro_rules! switch {
-    ($var:tt => { $($tok:tt)* } $($rest:tt)*) => { $($tok)* };
-    (=> { $($tok:tt)* } $($rest:tt)*) => { $crate::switch! { $($rest)* } };
-    () => {};
-}
-
-/// Reverses the order of brace-enclosed statements.
-///
-/// # Examples
-///
-/// ```
-/// reverse_blocks! {
-///     { println!("A"); }
-///     { println!("B"); }
-///     { println!("C"); }
-/// }
-/// ```
-///
-/// Result:
-///
-/// ```
-/// { println!("C"); }
-/// { println!("B"); }
-/// { println!("A"); }
-/// ```
-#[doc(hidden)] // only exported for use in macros or generated code
-#[macro_export]
-macro_rules! reverse_blocks {
-    ($($b:block)*) => {
-        $crate::reverse_blocks!(@internal { $($b)* } {})
-    };
-    (@internal { $head:block $($tail:block)* } { $($res:block)* }) => {
-        $crate::reverse_blocks!(@internal { $($tail)* } { $head $($res)* })
-    };
-    (@internal {} { $($res:block)* }) => {
-        #[allow(unused_braces)]
-        { $($res)* }
-    };
-}
-
 /// Given `T: TypeMarker`, expands to a `T::Owned::new_empty` call.
 #[doc(hidden)] // only exported for use in macros or generated code
 #[macro_export]
@@ -336,66 +281,6 @@ macro_rules! decode {
         <<$ty as $crate::encoding::TypeMarker>::Owned as $crate::encoding::Decode<$ty>>::decode(
             $out_value, $decoder, $offset, $depth,
         )
-    };
-}
-
-/// Implements `ValueTypeMarker` by reference.
-#[doc(hidden)] // only exported for use in macros or generated code
-#[macro_export]
-macro_rules! impl_value_type_by_ref {
-    ($ty:ty) => {
-        impl $crate::encoding::ValueTypeMarker for $ty {
-            type Borrowed<'a> = &'a <Self as $crate::encoding::TypeMarker>::Owned;
-            #[inline(always)]
-            fn borrow<'a>(
-                value: &'a <Self as $crate::encoding::TypeMarker>::Owned,
-            ) -> Self::Borrowed<'a> {
-                value
-            }
-        }
-    };
-}
-
-/// Implements `ValueTypeMarker` by copy.
-#[doc(hidden)] // only exported for use in macros or generated code
-#[macro_export]
-macro_rules! impl_value_type_by_copy {
-    ($ty:ty) => {
-        impl $crate::encoding::ValueTypeMarker for $ty {
-            type Borrowed<'a> = <Self as $crate::encoding::TypeMarker>::Owned;
-            #[inline(always)]
-            fn borrow<'a>(
-                value: &'a <Self as $crate::encoding::TypeMarker>::Owned,
-            ) -> Self::Borrowed<'a> {
-                *value
-            }
-        }
-    };
-}
-
-/// Implements `ValueTypeMarker` or `ResourceTypeMarker` for a struct, table, or union.
-#[doc(hidden)] // only exported for use in macros or generated code
-#[macro_export]
-macro_rules! impl_value_or_resource_type {
-    ($ty:ty, $($resource:tt)?) => {
-        $crate::switch! {
-            $($resource)? => {
-                impl $crate::encoding::ResourceTypeMarker for $ty {
-                    type Borrowed<'a> = &'a mut Self;
-                    fn take_or_borrow<'a>(value: &'a mut <Self as $crate::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
-                        value
-                    }
-                }
-            }
-            _ => {
-                impl $crate::encoding::ValueTypeMarker for $ty {
-                    type Borrowed<'a> = &'a <Self as $crate::encoding::TypeMarker>::Owned;
-                    fn borrow<'a>(value: &'a <Self as $crate::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
-                        value
-                    }
-                }
-            }
-        }
     };
 }
 
@@ -449,10 +334,10 @@ impl Context {
 #[derive(Debug)]
 pub struct Encoder<'a> {
     /// Encoding context.
-    context: Context,
+    pub context: Context,
 
     /// Buffer to write output data into.
-    buf: &'a mut Vec<u8>,
+    pub buf: &'a mut Vec<u8>,
 
     /// Buffer to write output handles into.
     handles: &'a mut Vec<HandleDisposition<'static>>,
@@ -523,18 +408,6 @@ impl<'a> Encoder<'a> {
         unsafe { x.encode(&mut encoder, 0, Depth(0)) }
     }
 
-    /// Returns the encoding context.
-    #[inline(always)]
-    pub fn context(&self) -> Context {
-        self.context
-    }
-
-    /// Returns the buffer we are encoding into.
-    #[inline(always)]
-    pub fn mut_buffer(&mut self) -> &mut [u8] {
-        self.buf
-    }
-
     /// In debug mode only, asserts that there is enough room in the buffer to
     /// write an object of type `T` at `offset`.
     #[inline(always)]
@@ -584,36 +457,6 @@ impl<'a> Encoder<'a> {
         new_offset
     }
 
-    /// Append bytes to the very end (out-of-line) of the buffer.
-    // TODO(fxbug.dev/122199): Use in encode_vector, or remove if unnecessary.
-    #[inline]
-    pub fn append_out_of_line_bytes(&mut self, bytes: &[u8]) {
-        if bytes.len() == 0 {
-            return;
-        }
-
-        let start = self.buf.len();
-        let end = self.buf.len() + round_up_to_align(bytes.len(), 8);
-
-        // Safety:
-        // - self.buf is initially uninitialized when resized, but it is then
-        //   initialized by a later copy so it leaves this block initialized.
-        // - There is enough room for the 8 byte padding filler because end's
-        //   alignment is rounded up to 8 bytes and bytes.len() != 0.
-        unsafe {
-            resize_vec_no_zeroing(self.buf, end);
-
-            let padding_ptr = self.buf.get_unchecked_mut(end - 8);
-            mem::transmute::<*mut u8, *mut u64>(padding_ptr).write_unaligned(0);
-
-            ptr::copy_nonoverlapping(
-                bytes.as_ptr(),
-                self.buf.as_mut_ptr().offset(start as isize),
-                bytes.len(),
-            );
-        }
-    }
-
     /// Write padding at the specified offset.
     ///
     /// # Safety
@@ -641,10 +484,10 @@ impl<'a> Encoder<'a> {
 #[derive(Debug)]
 pub struct Decoder<'a> {
     /// Decoding context.
-    context: Context,
+    pub context: Context,
 
     /// Buffer from which to read data.
-    buf: &'a [u8],
+    pub buf: &'a [u8],
 
     /// Next out of line block in buf.
     next_out_of_line: usize,
@@ -730,18 +573,6 @@ impl<'a> Decoder<'a> {
         }
 
         Ok(())
-    }
-
-    /// Returns the decoding context.
-    #[inline(always)]
-    pub fn context(&self) -> Context {
-        self.context
-    }
-
-    /// Returns the buffer we are decoding from.
-    #[inline(always)]
-    pub fn buffer(&self) -> &[u8] {
-        self.buf
     }
 
     /// The position of the next out of line block and the end of the current
@@ -1190,7 +1021,14 @@ mod numeric {
                 }
             }
 
-            $crate::impl_value_type_by_copy!($numeric_ty);
+            impl ValueTypeMarker for $numeric_ty {
+                type Borrowed<'a> = $numeric_ty;
+
+                #[inline(always)]
+                fn borrow<'a>(value: &'a <Self as TypeMarker>::Owned) -> Self::Borrowed<'a> {
+                    *value
+                }
+            }
 
             unsafe impl Encode<$numeric_ty> for $numeric_ty {
                 #[inline(always)]
@@ -1266,7 +1104,14 @@ unsafe impl TypeMarker for bool {
     }
 }
 
-impl_value_type_by_copy!(bool);
+impl ValueTypeMarker for bool {
+    type Borrowed<'a> = bool;
+
+    #[inline(always)]
+    fn borrow<'a>(value: &'a <Self as TypeMarker>::Owned) -> Self::Borrowed<'a> {
+        *value
+    }
+}
 
 unsafe impl Encode<bool> for bool {
     #[inline]
@@ -2347,990 +2192,8 @@ pub unsafe fn decode_unknown_envelope(
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Bits
-////////////////////////////////////////////////////////////////////////////////
-
-/// Implements encoding and decoding traits for a Rust struct representing a
-/// FIDL bits. The struct must have been generated by the bitflags crate.
-#[macro_export]
-macro_rules! fidl_bits {
-    (
-        name: $name:ident,
-        prim_ty: $prim_ty:ty,
-        // Must provide `strict: true` or `flexible: true`.
-        $(strict: $strict:tt,)?
-        $(flexible: $flexible:tt,)?
-    ) => {
-        unsafe impl $crate::encoding::TypeMarker for $name {
-            type Owned = Self;
-
-            #[inline(always)]
-            fn inline_align(context: $crate::encoding::Context) -> usize {
-                <$prim_ty as $crate::encoding::TypeMarker>::inline_align(context)
-            }
-
-            #[inline(always)]
-            fn inline_size(context: $crate::encoding::Context) -> usize {
-                <$prim_ty as $crate::encoding::TypeMarker>::inline_size(context)
-            }
-        }
-
-        $crate::impl_value_type_by_copy!($name);
-
-        unsafe impl $crate::encoding::Encode<$name> for $name {
-            #[inline]
-            unsafe fn encode(self, encoder: &mut $crate::encoding::Encoder<'_>, offset: usize, _depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                encoder.debug_check_bounds::<$name>(offset);
-                $crate::switch! {
-                    $($strict)? => {
-                        if self.bits & Self::all().bits != self.bits {
-                            return Err($crate::Error::InvalidBitsValue);
-                        }
-                    }
-                }
-                encoder.write_num(self.bits, offset);
-                Ok(())
-            }
-        }
-
-        impl $crate::encoding::Decode<$name> for $name {
-            #[inline(always)]
-            fn new_empty() -> Self {
-                Self::empty()
-            }
-
-            #[inline]
-            unsafe fn decode(&mut self, decoder: &mut $crate::encoding::Decoder<'_>, offset: usize, _depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                decoder.debug_check_bounds::<$name>(offset);
-                let prim = decoder.read_num::<$prim_ty>(offset);
-                $crate::switch! {
-                    $($strict)? => {
-                        *self = Self::from_bits(prim).ok_or($crate::Error::InvalidBitsValue)?;
-                    }
-                    $($flexible)? => {
-                        *self = Self::from_bits_allow_unknown(prim);
-                    }
-                }
-                Ok(())
-            }
-        }
-    };
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Enums
-////////////////////////////////////////////////////////////////////////////////
-
-/// Implements encoding and decoding traits for a Rust enum representing a FIDL enum.
-#[macro_export]
-macro_rules! fidl_enum {
-    (
-        name: $name:ident,
-        prim_ty: $prim_ty:ty,
-        // Must provide `strict: true` or `flexible: true`.
-        $(
-            strict: $strict:tt,
-            min_member: $min_member:ident,
-        )?
-        $(flexible: $flexible:tt,)?
-    ) => {
-        unsafe impl $crate::encoding::TypeMarker for $name {
-            type Owned = Self;
-
-            #[inline(always)]
-            fn inline_align(context: $crate::encoding::Context) -> usize {
-                <$prim_ty as $crate::encoding::TypeMarker>::inline_align(context)
-            }
-
-            #[inline(always)]
-            fn inline_size(context: $crate::encoding::Context) -> usize {
-                <$prim_ty as $crate::encoding::TypeMarker>::inline_size(context)
-            }
-
-            #[inline(always)]
-            fn encode_is_copy() -> bool {
-                $crate::switch! {
-                    $($strict)? => { true }
-                    $($flexible)? => { false }
-                }
-            }
-
-            #[inline(always)]
-            fn decode_is_copy() -> bool {
-                false
-            }
-        }
-
-        $crate::impl_value_type_by_copy!($name);
-
-        unsafe impl $crate::encoding::Encode<$name> for $name {
-            #[inline]
-            unsafe fn encode(self, encoder: &mut $crate::encoding::Encoder<'_>, offset: usize, _depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                encoder.debug_check_bounds::<$name>(offset);
-                encoder.write_num(self.into_primitive(), offset);
-                Ok(())
-            }
-        }
-
-        impl $crate::encoding::Decode<$name> for $name {
-            #[inline(always)]
-            fn new_empty() -> Self {
-                $crate::switch! {
-                    $($strict)? => { Self::$($min_member)? }
-                    $($flexible)? => { Self::unknown() }
-                }
-            }
-
-            #[inline]
-            unsafe fn decode(&mut self, decoder: &mut $crate::encoding::Decoder<'_>, offset: usize, _depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                decoder.debug_check_bounds::<$name>(offset);
-                let prim = decoder.read_num::<$prim_ty>(offset);
-                $crate::switch! {
-                    $($strict)? => {
-                        *self = Self::from_primitive(prim).ok_or($crate::Error::InvalidEnumValue)?;
-                    }
-                    $($flexible)? => {
-                        *self = Self::from_primitive_allow_unknown(prim);
-                    }
-                }
-                Ok(())
-            }
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Structs
-////////////////////////////////////////////////////////////////////////////////
-
-/// Implements encoding and decoding traits for a Rust struct representing a FIDL struct.
-#[macro_export]
-macro_rules! fidl_struct {
-    (empty: true, $($tok:tt)*) => {
-        $crate::fidl_struct_impl_empty!($($tok)*);
-    };
-    (copy: true, $($tok:tt)*) => {
-        $crate::fidl_struct_impl_copy!($($tok)*);
-        $crate::fidl_struct_impl_tuple!($($tok)*);
-    };
-    ($($tok:tt)*) => {
-        $crate::fidl_struct_impl_noncopy!($($tok)*);
-        $crate::fidl_struct_impl_tuple!($($tok)*);
-    };
-}
-
-/// Helper macro that implements encoding and decoding traits for an empty struct.
-#[doc(hidden)] // only exported for use in macros or generated code
-#[macro_export]
-macro_rules! fidl_struct_impl_empty {
-    (
-        name: $name:ident,
-        $(resource: $resource:tt,)?
-    ) => {
-        unsafe impl $crate::encoding::TypeMarker for $name {
-            type Owned = Self;
-
-            #[inline(always)]
-            fn inline_align(_context: $crate::encoding::Context) -> usize {
-                1
-            }
-
-            #[inline(always)]
-            fn inline_size(_context: $crate::encoding::Context) -> usize {
-                1
-            }
-        }
-
-        $crate::impl_value_or_resource_type!($name, $($resource)?);
-
-        unsafe impl $crate::encoding::Encode<$name> for $crate::switch! {
-            $($resource)? => { &mut $name }
-            _ => { &$name }
-        } {
-            #[inline]
-            unsafe fn encode(self, encoder: &mut $crate::encoding::Encoder<'_>, offset: usize, _depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                encoder.debug_check_bounds::<$name>(offset);
-                encoder.write_num(0u8, offset);
-                Ok(())
-            }
-        }
-
-        impl $crate::encoding::Decode<$name> for $name {
-            #[inline(always)]
-            fn new_empty() -> Self {
-                $name
-            }
-
-            #[inline]
-            unsafe fn decode(&mut self, decoder: &mut $crate::encoding::Decoder<'_>, offset: usize, _depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                decoder.debug_check_bounds::<$name>(offset);
-                match decoder.read_num::<u8>(offset) {
-                    0 => Ok(()),
-                    _ => Err($crate::Error::Invalid),
-                }
-            }
-        }
-    };
-}
-
-/// Helper macro that implements encoding and decoding traits for a struct. The
-/// struct must be `#[repr(C)]` and all fields must be (structs or arrays of)
-/// primitive types or bits or enums that require no validation.
-#[doc(hidden)] // only exported for use in macros or generated code
-#[macro_export]
-macro_rules! fidl_struct_impl_copy {
-    (
-        name: $name:ident,
-        $(resource: $resource:tt,)?
-        members: [$(
-            $member_name:ident {
-                ty: $member_ty:ty,
-                $(resource: $member_resource:tt,)?
-                index: $member_index:tt,
-                typevar: $member_typevar:ident,
-                offset_v1: $member_offset_v1:expr,
-                offset_v2: $member_offset_v2:expr,
-            },
-        )*],
-        // This macro expects flattened padding markers for all padding,
-        // including within nested structures.
-        padding_v1: [$(
-            {
-                ty: $padding_ty_v1:ty,
-                offset: $padding_offset_v1:expr,
-                mask: $padding_mask_v1:expr,
-            },
-        )*],
-        padding_v2: [$(
-            {
-                ty: $padding_ty_v2:ty,
-                offset: $padding_offset_v2:expr,
-                mask: $padding_mask_v2:expr,
-            },
-        )*],
-        size_v1: $size_v1:expr,
-        size_v2: $size_v2:expr,
-        align_v1: $align_v1:expr,
-        align_v2: $align_v2:expr,
-    ) => {
-        $crate::encoding::const_assert_eq!(std::mem::size_of::<$name>(), $size_v1);
-        $crate::encoding::const_assert_eq!($size_v1, $size_v2);
-        $crate::encoding::const_assert_eq!(std::mem::align_of::<$name>(), $align_v1);
-        $crate::encoding::const_assert_eq!($align_v1, $align_v2);
-        $(
-            $crate::encoding::const_assert_eq!($padding_offset_v1, $padding_offset_v2);
-            $crate::encoding::const_assert_eq!($padding_mask_v1, $padding_mask_v2);
-        )*
-
-        unsafe impl $crate::encoding::TypeMarker for $name {
-            type Owned = Self;
-
-            #[inline(always)]
-            fn inline_align(_context: $crate::encoding::Context) -> usize {
-                $align_v1
-            }
-
-            #[inline(always)]
-            fn inline_size(_context: $crate::encoding::Context) -> usize {
-                $size_v1
-            }
-
-            #[inline(always)]
-            fn encode_is_copy() -> bool {
-                #![allow(unreachable_code)]
-                $(
-                    $padding_offset_v1;
-                    return false;
-                )*
-                true
-            }
-
-            #[inline(always)]
-            fn decode_is_copy() -> bool {
-                Self::encode_is_copy()
-            }
-        }
-
-        $crate::impl_value_or_resource_type!($name, $($resource)?);
-
-        unsafe impl $crate::encoding::Encode<$name> for $crate::switch! {
-            $($resource)? => { &mut $name }
-            _ => { &$name }
-        } {
-            #[inline]
-            unsafe fn encode(self, encoder: &mut $crate::encoding::Encoder<'_>, offset: usize, _depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                encoder.debug_check_bounds::<$name>(offset);
-                unsafe {
-                    // Copy the object into the buffer.
-                    let buf_ptr = encoder.mut_buffer().as_mut_ptr().offset(offset as isize);
-                    #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
-                    let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut $name>(buf_ptr);
-                    typed_buf_ptr.write_unaligned((self as *const $name).read());
-                    // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
-                    // done second because the memcpy will write garbage to these bytes.
-                    $(
-                        let ptr = buf_ptr.offset($padding_offset_v1);
-                        let padding_ptr = std::mem::transmute::<*mut u8, *mut $padding_ty_v1>(ptr);
-                        padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !$padding_mask_v1);
-                    )*
-                }
-                Ok(())
-            }
-        }
-
-        impl $crate::encoding::Decode<$name> for $name {
-            #[inline]
-            fn new_empty() -> Self {
-                Self {
-                    $(
-                        $member_name: $crate::new_empty!($member_ty),
-                    )*
-                }
-            }
-
-            #[inline]
-            unsafe fn decode(&mut self, decoder: &mut $crate::encoding::Decoder<'_>, offset: usize, _depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                decoder.debug_check_bounds::<$name>(offset);
-                let buf_ptr = unsafe { decoder.buffer().as_ptr().offset(offset as isize) };
-                // Verify that padding bytes are zero.
-                $(
-                    let ptr = unsafe { buf_ptr.offset($padding_offset_v1) };
-                    let padval = unsafe { std::mem::transmute::<*const u8, *const $padding_ty_v1>(ptr).read_unaligned() };
-                    let maskedval = padval & $padding_mask_v1;
-                    if (maskedval != 0) {
-                        return Err($crate::Error::NonZeroPadding {
-                            padding_start: offset + $padding_offset_v1 + (($padding_mask_v1 as u64).trailing_zeros() / 8) as usize,
-                        });
-                    }
-                )*
-                // Copy from the buffer into the object.
-                unsafe {
-                    let obj_ptr = std::mem::transmute::<*mut $name, *mut u8>(self);
-                    std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, $size_v1);
-                }
-                Ok(())
-            }
-        }
-    }
-}
-
-/// Helper macro that implements encoding and decoding traits for a struct. This
-/// is the general case that encodes/decodes fields one at a time.
-#[doc(hidden)] // only exported for use in macros or generated code
-#[macro_export]
-macro_rules! fidl_struct_impl_noncopy {
-    (
-        name: $name:ident,
-        $(resource: $resource:tt,)?
-        members: [$(
-            $member_name:ident {
-                ty: $member_ty:ty,
-                $(resource: $member_resource:tt,)?
-                index: $member_index:tt,
-                typevar: $member_typevar:ident,
-                offset_v1: $member_offset_v1:expr,
-                offset_v2: $member_offset_v2:expr,
-            },
-        )*],
-        // This macro only expects padding markers between/after fields. The
-        // list must not include padding within a field's inline size.
-        padding_v1: [$(
-            {
-                ty: $padding_ty_v1:ty,
-                offset: $padding_offset_v1:expr,
-                mask: $padding_mask_v1:expr,
-            },
-        )*],
-        padding_v2: [$(
-            {
-                ty: $padding_ty_v2:ty,
-                offset: $padding_offset_v2:expr,
-                mask: $padding_mask_v2:expr,
-            },
-        )*],
-        size_v1: $size_v1:expr,
-        size_v2: $size_v2:expr,
-        align_v1: $align_v1:expr,
-        align_v2: $align_v2:expr,
-    ) => {
-        unsafe impl $crate::encoding::TypeMarker for $name {
-            type Owned = Self;
-
-            #[inline(always)]
-            fn inline_align(context: $crate::encoding::Context) -> usize {
-                match context.wire_format_version {
-                    $crate::encoding::WireFormatVersion::V1 => $align_v1,
-                    $crate::encoding::WireFormatVersion::V2 => $align_v2,
-                }
-            }
-
-            #[inline(always)]
-            fn inline_size(context: $crate::encoding::Context) -> usize {
-                match context.wire_format_version {
-                    $crate::encoding::WireFormatVersion::V1 => $size_v1,
-                    $crate::encoding::WireFormatVersion::V2 => $size_v2,
-                }
-            }
-        }
-
-        $crate::impl_value_or_resource_type!($name, $($resource)?);
-
-        unsafe impl $crate::encoding::Encode<$name> for $crate::switch! {
-            $($resource)? => { &mut $name }
-            _ => { &$name }
-        } {
-            #[inline]
-            unsafe fn encode(self, encoder: &mut $crate::encoding::Encoder<'_>, offset: usize, depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                #![allow(unused_parens)]
-                encoder.debug_check_bounds::<$name>(offset);
-                // Delegate to tuple encoding.
-                $crate::encoding::Encode::<$name>::encode(
-                    ($(
-                        $crate::switch! {
-                            $($member_resource)? => {
-                                (<$member_ty as $crate::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.$member_name))
-                            }
-                            _ => {
-                                (<$member_ty as $crate::encoding::ValueTypeMarker>::borrow(&self.$member_name))
-                            }
-                        },
-                    )*),
-                    encoder, offset, depth
-                )
-            }
-        }
-
-        impl $crate::encoding::Decode<$name> for $name {
-            #[inline]
-            fn new_empty() -> Self {
-                Self {
-                    $(
-                        $member_name: $crate::new_empty!($member_ty),
-                    )*
-                }
-            }
-
-            #[inline]
-            unsafe fn decode(&mut self, decoder: &mut $crate::encoding::Decoder<'_>, offset: usize, depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                decoder.debug_check_bounds::<$name>(offset);
-                // Verify that padding bytes are zero.
-                match decoder.context().wire_format_version {
-                    $crate::encoding::WireFormatVersion::V1 => {
-                        $(
-                            let ptr = unsafe { decoder.buffer().as_ptr().offset(offset as isize).offset($padding_offset_v1) };
-                            let padval = unsafe { std::mem::transmute::<*const u8, *const $padding_ty_v1>(ptr).read_unaligned() };
-                            let maskedval = padval & $padding_mask_v1;
-                            if (maskedval != 0) {
-                                return Err($crate::Error::NonZeroPadding {
-                                    padding_start: offset + $padding_offset_v1 + (($padding_mask_v1 as u64).trailing_zeros() / 8) as usize,
-                                });
-                            }
-                        )*
-                    }
-                    $crate::encoding::WireFormatVersion::V2 => {
-                        $(
-                            let ptr = unsafe { decoder.buffer().as_ptr().offset(offset as isize).offset($padding_offset_v2) };
-                            let padval = unsafe { std::mem::transmute::<*const u8, *const $padding_ty_v2>(ptr).read_unaligned() };
-                            let maskedval = padval & $padding_mask_v2;
-                            if (maskedval != 0) {
-                                return Err($crate::Error::NonZeroPadding {
-                                    padding_start: offset + $padding_offset_v2 + (($padding_mask_v2 as u64).trailing_zeros() / 8) as usize,
-                                });
-                            }
-                        )*
-                    }
-                };
-                $(
-                    let member_offset = match decoder.context().wire_format_version {
-                        $crate::encoding::WireFormatVersion::V1 => $member_offset_v1,
-                        $crate::encoding::WireFormatVersion::V2 => $member_offset_v2,
-                    };
-                    $crate::decode!($member_ty, &mut self.$member_name, decoder, offset + member_offset, depth)?;
-                )*
-                Ok(())
-            }
-        }
-    }
-}
-
-/// Helper macro that implements struct encoding from a tuple, or directly from
-/// the first field's type if there is only one field.
-#[doc(hidden)] // only exported for use in macros or generated code
-#[macro_export]
-macro_rules! fidl_struct_impl_tuple {
-    (
-        name: $name:ident,
-        $(resource: $resource:tt,)?
-        members: [$(
-            $member_name:ident {
-                ty: $member_ty:ty,
-                $(resource: $member_resource:tt,)?
-                index: $member_index:tt,
-                typevar: $member_typevar:ident,
-                offset_v1: $member_offset_v1:expr,
-                offset_v2: $member_offset_v2:expr,
-            },
-        )*],
-        padding_v1: [$(
-            {
-                ty: $padding_ty_v1:ty,
-                offset: $padding_offset_v1:expr,
-                mask: $padding_mask_v1:expr,
-            },
-        )*],
-        padding_v2: [$(
-            {
-                ty: $padding_ty_v2:ty,
-                offset: $padding_offset_v2:expr,
-                mask: $padding_mask_v2:expr,
-            },
-        )*],
-        size_v1: $size_v1:expr,
-        size_v2: $size_v2:expr,
-        align_v1: $align_v1:expr,
-        align_v2: $align_v2:expr,
-    ) => {
-        unsafe impl<$($member_typevar: $crate::encoding::Encode<$member_ty>,)*>
-            $crate::encoding::Encode<$name> for ($($member_typevar,)*)
-        {
-            #[inline]
-            unsafe fn encode(self, encoder: &mut $crate::encoding::Encoder<'_>, offset: usize, depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                encoder.debug_check_bounds::<$name>(offset);
-                // Zero out padding regions. There's no need to apply masks
-                // because the unmasked parts will be overwritten by fields.
-                // TODO(fxbug.dev/123341): Make this consistent with fidl_struct_impl_copy.
-                match encoder.context().wire_format_version {
-                    $crate::encoding::WireFormatVersion::V1 => {
-                        $(
-                            unsafe {
-                                let ptr = encoder.mut_buffer().as_mut_ptr().offset(offset as isize).offset($padding_offset_v1);
-                                std::mem::transmute::<*mut u8, *mut $padding_ty_v1>(ptr).write_unaligned(0);
-                            }
-                        )*
-                    },
-                    $crate::encoding::WireFormatVersion::V2 => {
-                        $(
-                            unsafe {
-                                let ptr = encoder.mut_buffer().as_mut_ptr().offset(offset as isize).offset($padding_offset_v2);
-                                std::mem::transmute::<*mut u8, *mut $padding_ty_v2>(ptr).write_unaligned(0);
-                            }
-                        )*
-                    },
-                };
-                // Write the fields.
-                $(
-                    let member_offset = match encoder.context().wire_format_version {
-                        $crate::encoding::WireFormatVersion::V1 => $member_offset_v1,
-                        $crate::encoding::WireFormatVersion::V2 => $member_offset_v2,
-                    };
-                    self.$member_index.encode(encoder, offset + member_offset, depth)?;
-                )*
-                Ok(())
-            }
-        }
-    };
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Tables
-////////////////////////////////////////////////////////////////////////////////
-
-/// Implements encoding and decoding traits for a Rust struct representing a
-/// FIDL table. All the struct's fields must be `Option`s, except for the
-/// `pub __non_exhaustive: ()` field.
-#[macro_export]
-macro_rules! fidl_table {
-    (
-        name: $name:ident,
-        $(resource: $resource:tt,)?
-        members: [$(
-            // Members must ordered from lowest to highest ordinal.
-            $member_name:ident {
-                ty: $member_ty:ty,
-                $(resource: $member_resource:tt,)?
-                ordinal: $ordinal:expr,
-            },
-        )*],
-    ) => {
-        impl $name {
-            #[inline(always)]
-            fn max_ordinal_present(&self) -> u64 {
-                $crate::reverse_blocks!{$({
-                    if let Some(_) = self.$member_name {
-                        return $ordinal;
-                    }
-                })*}
-                0
-            }
-        }
-
-        unsafe impl $crate::encoding::TypeMarker for $name {
-            type Owned = Self;
-
-            #[inline(always)]
-            fn inline_align(_context: $crate::encoding::Context) -> usize {
-                8
-            }
-
-            #[inline(always)]
-            fn inline_size(_context: $crate::encoding::Context) -> usize {
-                16
-            }
-        }
-
-        $crate::impl_value_or_resource_type!($name, $($resource)?);
-
-        unsafe impl $crate::encoding::Encode<$name> for $crate::switch! {
-            $($resource)? => { &mut $name }
-            _ => { &$name }
-        } {
-            unsafe fn encode(self, encoder: &mut $crate::encoding::Encoder<'_>, offset: usize, mut depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                encoder.debug_check_bounds::<$name>(offset);
-                // Vector header
-                let max_ordinal: u64 = self.max_ordinal_present();
-                encoder.write_num(max_ordinal, offset);
-                encoder.write_num($crate::encoding::ALLOC_PRESENT_U64, offset + 8);
-                // write_out_of_line must not be called with a zero-sized out-of-line block.
-                if max_ordinal == 0 {
-                    return Ok(());
-                }
-                depth.increment()?;
-                let envelope_size = match encoder.context().wire_format_version {
-                    $crate::encoding::WireFormatVersion::V1 => 16,
-                    $crate::encoding::WireFormatVersion::V2 => 8,
-                };
-                let bytes_len = (max_ordinal as usize) * envelope_size;
-                #[allow(unused_variables)]
-                let offset = encoder.out_of_line_offset(bytes_len);
-                let mut _prev_end_offset: usize = 0;
-                $(
-                    if $ordinal > max_ordinal {
-                        return Ok(());
-                    }
-
-                    // Write at offset+(ordinal-1)*envelope_size, since ordinals are one-based and envelopes
-                    // are envelope_size bytes.
-                    let cur_offset: usize = ($ordinal - 1) * envelope_size;
-
-                    // Zero reserved fields.
-                    encoder.padding(offset + _prev_end_offset, cur_offset - _prev_end_offset);
-
-                    // Safety:
-                    // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
-                    // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
-                    //   envelope_size bytes, there is always sufficient room.
-                    $crate::encoding::encode_in_envelope_optional::<$member_ty>(
-                        $crate::switch! {
-                            $($member_resource)? => {
-                                self.$member_name.as_mut().map(<$member_ty as $crate::encoding::ResourceTypeMarker>::take_or_borrow)
-                            }
-                            _ => {
-                                self.$member_name.as_ref().map(<$member_ty as $crate::encoding::ValueTypeMarker>::borrow)
-                            }
-                        },
-                        encoder, offset + cur_offset, depth
-                    )?;
-
-                    _prev_end_offset = cur_offset + envelope_size;
-                )*
-
-                Ok(())
-            }
-        }
-
-        impl $crate::encoding::Decode<$name> for $name {
-            #[inline(always)]
-            fn new_empty() -> Self {
-                Self::default()
-            }
-
-            unsafe fn decode(&mut self, decoder: &mut $crate::encoding::Decoder<'_>, offset: usize, mut depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                decoder.debug_check_bounds::<$name>(offset);
-                let len = match $crate::encoding::decode_vector_header(decoder, offset)? {
-                    None => return Err($crate::Error::NotNullable),
-                    Some(len) => len,
-                };
-                depth.increment()?;
-                let envelope_size = match decoder.context().wire_format_version {
-                    $crate::encoding::WireFormatVersion::V1 => 16,
-                    $crate::encoding::WireFormatVersion::V2 => 8,
-                };
-                let bytes_len = len * envelope_size;
-                let offset = decoder.out_of_line_offset(bytes_len)?;
-                // Decode the envelope for each type.
-                let mut _next_ordinal_to_read = 0;
-                let mut next_offset = offset;
-                let end_offset = offset + bytes_len;
-                $(
-                    _next_ordinal_to_read += 1;
-                    if next_offset >= end_offset {
-                        return Ok(());
-                    }
-
-                    // Decode unknown envelopes for gaps in ordinals.
-                    while _next_ordinal_to_read < $ordinal {
-                        $crate::encoding::decode_unknown_envelope(decoder, next_offset, depth)?;
-                        _next_ordinal_to_read += 1;
-                        next_offset += envelope_size;
-                    }
-
-                    let next_out_of_line = decoder.next_out_of_line();
-                    let handles_before = decoder.remaining_handles();
-                    if let Some((inlined, num_bytes, num_handles)) =
-                        $crate::encoding::decode_envelope_header(decoder, next_offset)?
-                    {
-                        let member_inline_size = <$member_ty as $crate::encoding::TypeMarker>::inline_size(decoder.context());
-                        if let $crate::encoding::WireFormatVersion::V2 = decoder.context().wire_format_version {
-                            if inlined != (member_inline_size <= 4) {
-                                return Err($crate::Error::InvalidInlineBitInEnvelope);
-                            }
-                        }
-                        let inner_offset;
-                        let mut inner_depth = depth.clone();
-                        if inlined {
-                            decoder.check_inline_envelope_padding(next_offset, member_inline_size)?;
-                            inner_offset = next_offset;
-                        } else {
-                            inner_offset = decoder.out_of_line_offset(member_inline_size)?;
-                            inner_depth.increment()?;
-                        }
-                        let val_ref =
-                            self.$member_name.get_or_insert_with(|| $crate::new_empty!($member_ty));
-                        $crate::decode!($member_ty, val_ref, decoder, inner_offset, inner_depth)?;
-                        if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
-                            return Err($crate::Error::InvalidNumBytesInEnvelope);
-                        }
-                        if handles_before != decoder.remaining_handles() + (num_handles as usize) {
-                            return Err($crate::Error::InvalidNumHandlesInEnvelope);
-                        }
-                    }
-
-                    next_offset += envelope_size;
-                )*
-
-                // Decode the remaining unknown envelopes.
-                while next_offset < end_offset {
-                    _next_ordinal_to_read += 1;
-                    $crate::encoding::decode_unknown_envelope(decoder, next_offset, depth)?;
-                    next_offset += envelope_size;
-                }
-
-                Ok(())
-            }
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Unions
 ////////////////////////////////////////////////////////////////////////////////
-
-/// Implements encoding and decoding traits for a Rust enum representing a FIDL union.
-#[macro_export]
-macro_rules! fidl_union {
-    (
-        name: $name:ident,
-        $(resource: $resource:tt,)?
-        members: [$(
-            $member_name:ident {
-                ty: $member_ty:ty,
-                $(resource: $member_resource:tt,)?
-                ordinal: $member_ordinal:expr,
-            },
-        )*],
-        $(unknown_member: $unknown_member:ident,)?
-    ) => {
-        unsafe impl $crate::encoding::TypeMarker for $name {
-            type Owned = Self;
-            $crate::fidl_union_impl_type_fns!();
-        }
-
-        $crate::impl_value_or_resource_type!($name, $($resource)?);
-
-        unsafe impl $crate::encoding::Encode<$name> for $crate::switch! {
-            $($resource)? => { &mut $name }
-            _ => { &$name }
-        } {
-            #[inline]
-            unsafe fn encode(self, encoder: &mut $crate::encoding::Encoder<'_>, offset: usize, depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                encoder.debug_check_bounds::<$name>(offset);
-                encoder.write_num::<u64>(self.ordinal(), offset);
-                match self {
-                    $(
-                        $name::$member_name(
-                            $crate::switch! {
-                                $($member_resource)? => { ref mut val }
-                                _ => { ref val }
-                            }
-                        ) => {
-                            $crate::encoding::encode_in_envelope::<$member_ty>(
-                                $crate::switch! {
-                                    $($member_resource)? => { <$member_ty as $crate::encoding::ResourceTypeMarker>::take_or_borrow(val) }
-                                    _ => { <$member_ty as $crate::encoding::ValueTypeMarker>::borrow(val) }
-                                },
-                                encoder, offset + 8, depth
-                            )
-                        }
-                    )*
-                    $(
-                        #[allow(deprecated)]
-                        $name::$unknown_member { .. } => Err($crate::Error::UnknownUnionTag),
-                    )?
-                }
-            }
-        }
-
-        impl $crate::encoding::Decode<$name> for $name {
-            $crate::fidl_union_impl_decode_fns! {
-                ty: $name,
-                members: [$(
-                    {
-                        ctor: { $name::$member_name },
-                        ty: $member_ty,
-                        ordinal: $member_ordinal,
-                    },
-                )*],
-                $(unknown_ctor: { $name::$unknown_member },)?
-            }
-        }
-    }
-}
-
-/// Helper macro that implements `TypeMarker` functions for a FIDL union.
-#[doc(hidden)] // only exported for use in macros or generated code
-#[macro_export]
-macro_rules! fidl_union_impl_type_fns {
-    () => {
-        #[inline(always)]
-        fn inline_align(_context: $crate::encoding::Context) -> usize {
-            8
-        }
-
-        #[inline(always)]
-        fn inline_size(context: $crate::encoding::Context) -> usize {
-            match context.wire_format_version {
-                $crate::encoding::WireFormatVersion::V1 => 24,
-                $crate::encoding::WireFormatVersion::V2 => 16,
-            }
-        }
-    };
-}
-
-// Helper macro that implements `Decode` functions for a FIDL union.
-#[doc(hidden)] // only exported for use in macros or generated code
-#[macro_export]
-macro_rules! fidl_union_impl_decode_fns {
-    (
-        ty: $ty:ty,
-        members: [$(
-            {
-                ctor: { $($member_ctor:tt)* },
-                ty: $member_ty:ty,
-                ordinal: $member_ordinal:pat,
-            },
-        )*],
-        $(unknown_ctor: { $($unknown_ctor:tt)* },)?
-    ) => {
-        #[inline(always)]
-        fn new_empty() -> Self {
-            #![allow(unreachable_code)]
-            $(
-                return $($member_ctor)*($crate::new_empty!($member_ty));
-            )*
-            $(
-                #[allow(deprecated)]
-                $($unknown_ctor)* { ordinal: 0 }
-            )?
-        }
-
-        #[inline]
-        unsafe fn decode(&mut self, decoder: &mut $crate::encoding::Decoder<'_>, offset: usize, mut depth: $crate::encoding::Depth) -> $crate::Result<()> {
-            decoder.debug_check_bounds::<$ty>(offset);
-            #[allow(unused_variables)]
-            let next_out_of_line = decoder.next_out_of_line();
-            let handles_before = decoder.remaining_handles();
-            let (ordinal, inlined, num_bytes, num_handles) = $crate::encoding::decode_union_inline_portion(decoder, offset)?;
-
-            let member_inline_size = match ordinal {
-                0 => {
-                    return Err($crate::Error::UnknownUnionTag)
-                },
-                $(
-                    $member_ordinal => <$member_ty as $crate::encoding::TypeMarker>::inline_size(decoder.context()),
-                )*
-                _ => {
-                    $crate::switch! {
-                        $({ $($unknown_ctor)* })? => {
-                            num_bytes as usize
-                        }
-                        _ => {
-                            for _ in 0..num_handles {
-                                decoder.drop_next_handle()?;
-                            }
-                            return Err($crate::Error::UnknownUnionTag);
-                        }
-                    }
-                }
-            };
-
-            if let $crate::encoding::WireFormatVersion::V2 = decoder.context().wire_format_version {
-                if inlined != (member_inline_size <= 4) {
-                    return Err($crate::Error::InvalidInlineBitInEnvelope);
-                }
-            }
-            let inner_offset;
-            if inlined {
-                decoder.check_inline_envelope_padding(offset + 8, member_inline_size)?;
-                inner_offset = offset + 8;
-            } else {
-                depth.increment()?;
-                inner_offset = decoder.out_of_line_offset(member_inline_size)?;
-            }
-            match ordinal {
-                $(
-                    $member_ordinal => {
-                        #[allow(irrefutable_let_patterns)]
-                        if let $($member_ctor)*(_) = self {
-                            // Do nothing, read the value into the object
-                        } else {
-                            // Initialize `self` to the right variant
-                            *self = $($member_ctor)*(
-                                $crate::new_empty!($member_ty)
-                            );
-                        }
-                        #[allow(irrefutable_let_patterns)]
-                        if let $($member_ctor)*(ref mut val) = self {
-                            $crate::decode!($member_ty, val, decoder, inner_offset, depth)?;
-                        } else {
-                            unreachable!()
-                        }
-                    }
-                )*
-                $(
-                    #[allow(deprecated)]
-                    ordinal => {
-                        for _ in 0..num_handles {
-                            decoder.drop_next_handle()?;
-                        }
-                        *self = $($unknown_ctor)* { ordinal }
-                    },
-                )?
-                // This should be unreachable, since we already
-                // checked for unknown ordinals above and returned
-                // an error in the strict case.
-                #[allow(unreachable_patterns)]
-                ordinal => panic!("unexpected ordinal {:?}", ordinal)
-            }
-            if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
-                return Err($crate::Error::InvalidNumBytesInEnvelope);
-            }
-            if handles_before != decoder.remaining_handles() + (num_handles as usize) {
-                return Err($crate::Error::InvalidNumHandlesInEnvelope);
-            }
-            Ok(())
-        }
-    };
-}
 
 /// Decodes the inline portion of a union.
 /// Returns `(ordinal, inlined, num_bytes, num_handles)`.
@@ -3400,11 +2263,65 @@ impl FrameworkErr {
     }
 }
 
-fidl_enum! {
-    name: FrameworkErr,
-    prim_ty: i32,
-    strict: true,
-    min_member: UnknownMethod,
+unsafe impl TypeMarker for FrameworkErr {
+    type Owned = Self;
+
+    #[inline(always)]
+    fn inline_align(_context: Context) -> usize {
+        std::mem::align_of::<i32>()
+    }
+
+    #[inline(always)]
+    fn inline_size(_context: Context) -> usize {
+        std::mem::size_of::<i32>()
+    }
+
+    #[inline(always)]
+    fn encode_is_copy() -> bool {
+        true
+    }
+
+    #[inline(always)]
+    fn decode_is_copy() -> bool {
+        false
+    }
+}
+
+impl ValueTypeMarker for FrameworkErr {
+    type Borrowed<'a> = Self;
+    #[inline(always)]
+    fn borrow<'a>(value: &'a <Self as TypeMarker>::Owned) -> Self::Borrowed<'a> {
+        *value
+    }
+}
+
+unsafe impl Encode<Self> for FrameworkErr {
+    #[inline]
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
+        encoder.debug_check_bounds::<Self>(offset);
+        encoder.write_num(self.into_primitive(), offset);
+        Ok(())
+    }
+}
+
+impl Decode<Self> for FrameworkErr {
+    #[inline(always)]
+    fn new_empty() -> Self {
+        Self::UnknownMethod
+    }
+
+    #[inline]
+    unsafe fn decode(
+        &mut self,
+        decoder: &mut Decoder<'_>,
+        offset: usize,
+        _depth: Depth,
+    ) -> Result<()> {
+        decoder.debug_check_bounds::<Self>(offset);
+        let prim = decoder.read_num::<i32>(offset);
+        *self = Self::from_primitive(prim).ok_or(Error::InvalidEnumValue)?;
+        Ok(())
+    }
 }
 
 impl<T> Flexible<T> {
@@ -3465,12 +2382,24 @@ macro_rules! impl_result_union {
     ) => {
         unsafe impl<$($type_param: TypeMarker),*> TypeMarker for $ty {
             type Owned = $owned;
-            fidl_union_impl_type_fns!();
+
+            #[inline(always)]
+            fn inline_align(_context: Context) -> usize {
+                8
+            }
+
+            #[inline(always)]
+            fn inline_size(context: Context) -> usize {
+                match context.wire_format_version {
+                    WireFormatVersion::V1 => 24,
+                    WireFormatVersion::V2 => 16,
+                }
+            }
         }
 
         unsafe impl<$($type_param: TypeMarker, $encode_param: Encode<$type_param>),*> Encode<$ty> for $encode {
             #[inline]
-            unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: $crate::encoding::Depth) -> Result<()> {
+            unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
                 encoder.debug_check_bounds::<$ty>(offset);
                 match self {
                     $(
@@ -3484,11 +2413,66 @@ macro_rules! impl_result_union {
         }
 
         impl<$($type_param: TypeMarker),*> Decode<$ty> for $owned {
-            fidl_union_impl_decode_fns! {
-                ty: $ty,
-                members: [$(
-                    { ctor: { $($member_ctor)* }, ty: $member_ty, ordinal: $member_ordinal, },
-                )*],
+            #[inline(always)]
+            fn new_empty() -> Self {
+                #![allow(unreachable_code)]
+                $(
+                    return $($member_ctor)*(new_empty!($member_ty));
+                )*
+            }
+
+            #[inline]
+            unsafe fn decode(&mut self, decoder: &mut Decoder<'_>, offset: usize, mut depth: Depth) -> Result<()> {
+                decoder.debug_check_bounds::<$ty>(offset);
+                let next_out_of_line = decoder.next_out_of_line();
+                let handles_before = decoder.remaining_handles();
+                let (ordinal, inlined, num_bytes, num_handles) = decode_union_inline_portion(decoder, offset)?;
+                let member_inline_size = match ordinal {
+                    $(
+                        $member_ordinal => <$member_ty as TypeMarker>::inline_size(decoder.context),
+                    )*
+                    _ => return Err(Error::UnknownUnionTag),
+                };
+                if let WireFormatVersion::V2 = decoder.context.wire_format_version {
+                    if inlined != (member_inline_size <= 4) {
+                        return Err(Error::InvalidInlineBitInEnvelope);
+                    }
+                }
+                let inner_offset;
+                if inlined {
+                    decoder.check_inline_envelope_padding(offset + 8, member_inline_size)?;
+                    inner_offset = offset + 8;
+                } else {
+                    depth.increment()?;
+                    inner_offset = decoder.out_of_line_offset(member_inline_size)?;
+                }
+                match ordinal {
+                    $(
+                        $member_ordinal => {
+                            #[allow(irrefutable_let_patterns)]
+                            if let $($member_ctor)*(_) = self {
+                                // Do nothing, read the value into the object
+                            } else {
+                                // Initialize `self` to the right variant
+                                *self = $($member_ctor)*(new_empty!($member_ty));
+                            }
+                            #[allow(irrefutable_let_patterns)]
+                            if let $($member_ctor)*(ref mut val) = self {
+                                decode!($member_ty, val, decoder, inner_offset, depth)?;
+                            } else {
+                                unreachable!()
+                            }
+                        }
+                    )*
+                    ordinal => panic!("unexpected ordinal {:?}", ordinal)
+                }
+                if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
+                    return Err(Error::InvalidNumBytesInEnvelope);
+                }
+                if handles_before != decoder.remaining_handles() + (num_handles as usize) {
+                    return Err(Error::InvalidNumHandlesInEnvelope);
+                }
+                Ok(())
             }
         }
     };
@@ -3539,55 +2523,40 @@ pub struct EpitaphBody {
     pub error: zx_status::Status,
 }
 
-fidl_struct! {
-    copy: true,
-    name: EpitaphBody,
-    members: [
-        error {
-            ty: zx_status::Status,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [],
-    padding_v2: [],
-    size_v1: 4,
-    size_v2: 4,
-    align_v1: 4,
-    align_v2: 4,
-}
-
-unsafe impl TypeMarker for zx_status::Status {
+unsafe impl TypeMarker for EpitaphBody {
     type Owned = Self;
 
     #[inline(always)]
     fn inline_align(_context: Context) -> usize {
-        mem::align_of::<zx_status::zx_status_t>()
+        4
     }
 
     #[inline(always)]
     fn inline_size(_context: Context) -> usize {
-        mem::size_of::<zx_status::zx_status_t>()
+        4
     }
 }
 
-impl_value_type_by_copy!(zx_status::Status);
+impl ValueTypeMarker for EpitaphBody {
+    type Borrowed<'a> = &'a Self;
+    fn borrow<'a>(value: &'a <Self as TypeMarker>::Owned) -> Self::Borrowed<'a> {
+        value
+    }
+}
 
-unsafe impl Encode<zx_status::Status> for zx_status::Status {
+unsafe impl Encode<EpitaphBody> for &EpitaphBody {
     #[inline]
     unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
-        encoder.debug_check_bounds::<zx_status::Status>(offset);
-        encoder.write_num::<i32>(self.into_raw(), offset);
+        encoder.debug_check_bounds::<EpitaphBody>(offset);
+        encoder.write_num::<i32>(self.error.into_raw(), offset);
         Ok(())
     }
 }
 
-impl Decode<zx_status::Status> for zx_status::Status {
+impl Decode<Self> for EpitaphBody {
     #[inline(always)]
     fn new_empty() -> Self {
-        Self::from_raw(0)
+        Self { error: zx_status::Status::from_raw(0) }
     }
 
     #[inline]
@@ -3597,8 +2566,8 @@ impl Decode<zx_status::Status> for zx_status::Status {
         offset: usize,
         _depth: Depth,
     ) -> Result<()> {
-        decoder.debug_check_bounds::<zx_status::Status>(offset);
-        *self = Self::from_raw(decoder.read_num::<i32>(offset));
+        decoder.debug_check_bounds::<Self>(offset);
+        self.error = zx_status::Status::from_raw(decoder.read_num::<i32>(offset));
         Ok(())
     }
 }
@@ -3699,54 +2668,6 @@ impl TransactionHeader {
     pub fn is_compatible(&self) -> bool {
         self.magic_number == MAGIC_NUMBER_INITIAL
     }
-}
-
-fidl_struct! {
-    copy: true,
-    name: TransactionHeader,
-    members: [
-        tx_id {
-            ty: u32,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-        at_rest_flags {
-            ty: Array<u8, 2>,
-            index: 1,
-            typevar: T1,
-            offset_v1: 4,
-            offset_v2: 4,
-        },
-        dynamic_flags {
-            ty: u8,
-            index: 2,
-            typevar: T2,
-            offset_v1: 6,
-            offset_v2: 6,
-        },
-        magic_number {
-            ty: u8,
-            index: 3,
-            typevar: T3,
-            offset_v1: 7,
-            offset_v2: 7,
-        },
-        ordinal {
-            ty: u64,
-            index: 4,
-            typevar: T4,
-            offset_v1: 8,
-            offset_v2: 8,
-        },
-    ],
-    padding_v1: [],
-    padding_v2: [],
-    size_v1: 16,
-    size_v2: 16,
-    align_v1: 8,
-    align_v2: 8,
 }
 
 bitflags! {
@@ -3877,6 +2798,66 @@ pub fn decode_transaction_header(bytes: &[u8]) -> Result<(TransactionHeader, &[u
     Ok((header, body_bytes))
 }
 
+unsafe impl TypeMarker for TransactionHeader {
+    type Owned = Self;
+
+    #[inline(always)]
+    fn inline_align(_context: Context) -> usize {
+        8
+    }
+
+    #[inline(always)]
+    fn inline_size(_context: Context) -> usize {
+        16
+    }
+}
+
+impl ValueTypeMarker for TransactionHeader {
+    type Borrowed<'a> = &'a Self;
+    fn borrow<'a>(value: &'a <Self as TypeMarker>::Owned) -> Self::Borrowed<'a> {
+        value
+    }
+}
+
+unsafe impl Encode<TransactionHeader> for &TransactionHeader {
+    #[inline]
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
+        encoder.debug_check_bounds::<TransactionHeader>(offset);
+        unsafe {
+            // Copy the object into the buffer.
+            let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+            #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+            let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut TransactionHeader>(buf_ptr);
+            typed_buf_ptr.write_unaligned((self as *const TransactionHeader).read());
+        }
+        Ok(())
+    }
+}
+
+impl Decode<Self> for TransactionHeader {
+    #[inline(always)]
+    fn new_empty() -> Self {
+        Self { tx_id: 0, at_rest_flags: [0; 2], dynamic_flags: 0, magic_number: 0, ordinal: 0 }
+    }
+
+    #[inline]
+    unsafe fn decode(
+        &mut self,
+        decoder: &mut Decoder<'_>,
+        offset: usize,
+        _depth: Depth,
+    ) -> Result<()> {
+        decoder.debug_check_bounds::<Self>(offset);
+        let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+        // Copy from the buffer into the object.
+        unsafe {
+            let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+            std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 16);
+        }
+        Ok(())
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Persistence
 ////////////////////////////////////////////////////////////////////////////////
@@ -3908,47 +2889,6 @@ pub struct WireMetadata {
     at_rest_flags: [u8; 2],
     /// Reserved bytes. Must be zero.
     reserved: [u8; 4],
-}
-
-fidl_struct! {
-    copy: true,
-    name: WireMetadata,
-    members: [
-        disambiguator {
-            ty: u8,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-        magic_number {
-            ty: u8,
-            index: 1,
-            typevar: T1,
-            offset_v1: 1,
-            offset_v2: 1,
-        },
-        at_rest_flags {
-            ty: Array<u8, 2>,
-            index: 2,
-            typevar: T2,
-            offset_v1: 2,
-            offset_v2: 2,
-        },
-        reserved {
-            ty: Array<u8, 4>,
-            index: 3,
-            typevar: T3,
-            offset_v1: 4,
-            offset_v2: 4,
-        },
-    ],
-    padding_v1: [],
-    padding_v2: [],
-    size_v1: 8,
-    size_v2: 8,
-    align_v1: 1,
-    align_v2: 1,
 }
 
 impl WireMetadata {
@@ -4163,6 +3103,66 @@ fn decode_wire_metadata(bytes: &[u8]) -> Result<WireMetadata> {
             })
         }
         _ => Err(Error::InvalidHeader),
+    }
+}
+
+unsafe impl TypeMarker for WireMetadata {
+    type Owned = Self;
+
+    #[inline(always)]
+    fn inline_align(_context: Context) -> usize {
+        1
+    }
+
+    #[inline(always)]
+    fn inline_size(_context: Context) -> usize {
+        8
+    }
+}
+
+impl ValueTypeMarker for WireMetadata {
+    type Borrowed<'a> = &'a Self;
+    fn borrow<'a>(value: &'a <Self as TypeMarker>::Owned) -> Self::Borrowed<'a> {
+        value
+    }
+}
+
+unsafe impl Encode<WireMetadata> for &WireMetadata {
+    #[inline]
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
+        encoder.debug_check_bounds::<WireMetadata>(offset);
+        unsafe {
+            // Copy the object into the buffer.
+            let buf_ptr = encoder.buf.as_mut_ptr().offset(offset as isize);
+            #[allow(clippy::transmute_undefined_repr)] // TODO(fxbug.dev/95059)
+            let typed_buf_ptr = std::mem::transmute::<*mut u8, *mut WireMetadata>(buf_ptr);
+            typed_buf_ptr.write_unaligned((self as *const WireMetadata).read());
+        }
+        Ok(())
+    }
+}
+
+impl Decode<Self> for WireMetadata {
+    #[inline(always)]
+    fn new_empty() -> Self {
+        Self { disambiguator: 0, magic_number: 0, at_rest_flags: [0; 2], reserved: [0; 4] }
+    }
+
+    #[inline]
+    unsafe fn decode(
+        &mut self,
+        decoder: &mut Decoder<'_>,
+        offset: usize,
+        _depth: Depth,
+    ) -> Result<()> {
+        decoder.debug_check_bounds::<Self>(offset);
+        let buf_ptr = unsafe { decoder.buf.as_ptr().offset(offset as isize) };
+        // Copy from the buffer into the object.
+        unsafe {
+            let obj_ptr = std::mem::transmute::<*mut Self, *mut u8>(self);
+            std::ptr::copy_nonoverlapping(buf_ptr, obj_ptr, 8);
+        }
+        Ok(())
     }
 }
 
@@ -4434,96 +3434,6 @@ mod test {
     }
 
     #[test]
-    fn result_and_union_compat() {
-        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-        pub struct Empty;
-        fidl_struct! {
-            empty: true,
-            name: Empty,
-        }
-        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-        enum OkayOrError {
-            Okay(Empty),
-            Error(i32),
-        }
-        impl OkayOrError {
-            pub fn ordinal(&self) -> u64 {
-                match *self {
-                    Self::Okay(_) => 1,
-                    Self::Error(_) => 2,
-                }
-            }
-        }
-        fidl_union! {
-            name: OkayOrError,
-            members: [
-                Okay {
-                    ty: Empty,
-                    ordinal: 1,
-                },
-                Error {
-                    ty: i32,
-                    ordinal: 2,
-                },
-            ],
-        };
-        type Res = ResultType<EmptyStruct, i32>;
-
-        for ctx in CONTEXTS {
-            let buf = &mut Vec::new();
-            let handle_buf = &mut Vec::new();
-
-            // result to union
-            Encoder::encode_with_context::<Res>(ctx, buf, handle_buf, Ok::<(), i32>(()))
-                .expect("Encoding failed");
-            let mut out = new_empty!(OkayOrError);
-            Decoder::decode_with_context::<OkayOrError>(
-                ctx,
-                buf,
-                &mut to_infos(handle_buf),
-                &mut out,
-            )
-            .expect("Decoding failed");
-            assert_eq!(out, OkayOrError::Okay(Empty));
-
-            Encoder::encode_with_context::<Res>(ctx, buf, handle_buf, Err::<(), i32>(5))
-                .expect("Encoding failed");
-            Decoder::decode_with_context::<OkayOrError>(
-                ctx,
-                buf,
-                &mut to_infos(handle_buf),
-                &mut out,
-            )
-            .expect("Decoding failed");
-            assert_eq!(out, OkayOrError::Error(5));
-
-            // union to result
-            let mut out: std::result::Result<(), i32> = new_empty!(Res);
-            Encoder::encode_with_context::<OkayOrError>(
-                ctx,
-                buf,
-                handle_buf,
-                &OkayOrError::Okay(Empty),
-            )
-            .expect("Encoding failed");
-            Decoder::decode_with_context::<Res>(ctx, buf, &mut to_infos(handle_buf), &mut out)
-                .expect("Decoding failed");
-            assert_eq!(out, Ok(()));
-
-            Encoder::encode_with_context::<OkayOrError>(
-                ctx,
-                buf,
-                handle_buf,
-                &OkayOrError::Error(3i32),
-            )
-            .expect("Encoding failed");
-            Decoder::decode_with_context::<Res>(ctx, buf, &mut to_infos(handle_buf), &mut out)
-                .expect("Decoding failed");
-            assert_eq!(out, Err(3));
-        }
-    }
-
-    #[test]
     fn encode_decode_result() {
         type Res = ResultType<UnboundedString, u32>;
         for ctx in CONTEXTS {
@@ -4608,196 +3518,6 @@ mod test {
         let mut out = new_empty!(Res);
         let res = Decoder::decode_with_context::<Res>(ctx, bytes, handle_buf, &mut out);
         assert_matches!(res, Err(Error::Invalid));
-    }
-
-    #[derive(Debug, PartialEq)]
-    struct Foo {
-        byte: u8,
-        bignum: u64,
-        string: String,
-    }
-
-    fidl_struct! {
-        name: Foo,
-        members: [
-            byte {
-                ty: u8,
-                index: 0,
-                typevar: T0,
-                offset_v1: 0,
-                offset_v2: 0,
-            },
-            bignum {
-                ty: u64,
-                index: 1,
-                typevar: T1,
-                offset_v1: 8,
-                offset_v2: 8,
-            },
-            string {
-                ty: BoundedString<5>,
-                index: 2,
-                typevar: T2,
-                offset_v1: 16,
-                offset_v2: 16,
-            },
-        ],
-        padding_v1: [
-            {
-                ty: u64,
-                offset: 0,
-                mask: 0xffffffffffffff00,
-            },
-        ],
-        padding_v2: [
-            {
-                ty: u64,
-                offset: 0,
-                mask: 0xffffffffffffff00,
-            },
-        ],
-        size_v1: 32,
-        size_v2: 32,
-        align_v1: 8,
-        align_v2: 8,
-    }
-
-    #[test]
-    fn encode_decode_optional_struct() {
-        for ctx in CONTEXTS {
-            let foo = Foo { byte: 5, bignum: 22, string: "hello".to_string() };
-            assert_eq!(encode_decode::<Boxed<Foo>>(ctx, Some(&foo)), Some(Box::new(foo)));
-            assert_eq!(encode_decode::<Boxed<Foo>>(ctx, None::<&Foo>), None);
-        }
-    }
-
-    #[test]
-    fn decode_struct_with_invalid_padding_fails() {
-        for ctx in CONTEXTS {
-            let foo = &Foo { byte: 0, bignum: 0, string: String::new() };
-            let buf = &mut Vec::new();
-            let handle_buf = &mut Vec::new();
-            Encoder::encode_with_context::<Foo>(ctx, buf, handle_buf, foo)
-                .expect("Encoding failed");
-
-            buf[1] = 42;
-            let out = &mut new_empty!(Foo);
-            let result =
-                Decoder::decode_with_context::<Foo>(ctx, buf, &mut to_infos(handle_buf), out);
-            assert_matches!(result, Err(Error::NonZeroPadding { padding_start: 1 }));
-        }
-    }
-
-    #[test]
-    fn encode_tuple_as_struct() {
-        for ctx in CONTEXTS {
-            assert_eq!(
-                encode_decode::<Foo>(ctx, (5, 10, "foo")),
-                Foo { byte: 5, bignum: 10, string: "foo".to_string() }
-            );
-        }
-    }
-
-    #[derive(Debug, PartialEq)]
-    #[repr(C)]
-    pub struct DirectCopyStruct {
-        a: u64,
-        b: u32,
-        c: u16,
-        d: u16,
-    }
-
-    fidl_struct! {
-        copy: true,
-        name: DirectCopyStruct,
-        members: [
-            a {
-                ty: u64,
-                index: 0,
-                typevar: T0,
-                offset_v1: 0,
-                offset_v2: 0,
-            },
-            b {
-                ty: u32,
-                index: 1,
-                typevar: T1,
-                offset_v1: 8,
-                offset_v2: 8,
-            },
-            c {
-                ty: u16,
-                index: 2,
-                typevar: T2,
-                offset_v1: 12,
-                offset_v2: 12,
-            },
-            d {
-                ty: u16,
-                index: 3,
-                typevar: T3,
-                offset_v1: 14,
-                offset_v2: 14,
-            },
-        ],
-        padding_v1: [],
-        padding_v2: [],
-        size_v1: 16,
-        size_v2: 16,
-        align_v1: 8,
-        align_v2: 8,
-    }
-
-    #[test]
-    fn direct_copy_struct_encode() {
-        let bytes = &[
-            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, //
-            0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, //
-        ];
-        let obj = DirectCopyStruct { a: 0x0807060504030201, b: 0x0c0b0a09, c: 0x0e0d, d: 0x100f };
-        for ctx in CONTEXTS {
-            encode_assert_bytes::<DirectCopyStruct>(ctx, &obj, bytes);
-        }
-    }
-
-    #[test]
-    fn direct_copy_struct_decode() {
-        let bytes = &[
-            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, //
-            0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, //
-        ];
-        let obj = DirectCopyStruct { a: 0x0807060504030201, b: 0x0c0b0a09, c: 0x0e0d, d: 0x100f };
-
-        for ctx in CONTEXTS {
-            let mut out = new_empty!(DirectCopyStruct);
-            Decoder::decode_with_context::<DirectCopyStruct>(ctx, bytes, &mut [], &mut out)
-                .expect("Decoding failed");
-            assert_eq!(out, obj);
-        }
-    }
-
-    #[derive(Debug, PartialEq)]
-    pub struct Int64Struct {
-        x: u64,
-    }
-
-    fidl_struct! {
-        name: Int64Struct,
-        members: [
-            x {
-                ty: u64,
-                index: 0,
-                typevar: T0,
-                offset_v1: 0,
-                offset_v2: 0,
-            },
-        ],
-        padding_v1: [],
-        padding_v2: [],
-        size_v1: 8,
-        size_v2: 8,
-        align_v1: 8,
-        align_v2: 8,
     }
 
     #[test]
@@ -4921,36 +3641,6 @@ mod test {
     }
 
     #[test]
-    fn union_with_64_bit_ordinal() {
-        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-        enum BigOrdinal {
-            X(u64),
-        }
-        impl BigOrdinal {
-            pub fn ordinal(&self) -> u64 {
-                match *self {
-                    Self::X(_) => 0xffffffffffffffffu64,
-                }
-            }
-        }
-        fidl_union! {
-            name: BigOrdinal,
-            members: [
-                X {
-                    ty: u64,
-                    ordinal: 0xffffffffffffffffu64,
-                },
-            ],
-        };
-
-        for ctx in CONTEXTS {
-            let x = BigOrdinal::X(0);
-            assert_eq!(x.ordinal(), u64::MAX);
-            assert_eq!(encode_decode::<BigOrdinal>(ctx, &x).ordinal(), u64::MAX);
-        }
-    }
-
-    #[test]
     fn extra_data_is_disallowed() {
         for ctx in CONTEXTS {
             let mut output = ();
@@ -5012,45 +3702,6 @@ mod test {
             let res = Decoder::decode_with_context::<T>(ctx, bytes, handle_buf, &mut handle_out);
             assert_matches!(res, Err(Error::OutOfRange));
         }
-    }
-
-    #[derive(Debug, Clone, PartialEq)]
-    struct TestSampleTable {
-        #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
-        #[doc(hidden)]
-        __non_exhaustive: (),
-    }
-
-    impl Default for TestSampleTable {
-        fn default() -> Self {
-            #[allow(deprecated)]
-            Self { __non_exhaustive: () }
-        }
-    }
-
-    fidl_table! {
-        name: TestSampleTable,
-        members: [],
-    }
-
-    #[test]
-    fn decode_too_few_handles_unknown_envelope() {
-        let ctx = Context { wire_format_version: WireFormatVersion::V2 };
-        let bytes: &[u8] = &[
-            // Table Size 1 -----------------------------|
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            // Table data ptr present -------------------|
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-            // Out of line vector of table data:
-            // First envelope:
-            // Inline handle ----|  NHandles |  Flags ---|
-            0xff, 0xff, 0xff, 0xff, 0x01, 0x00, 0x01, 0x00,
-        ];
-        let handle_buf = &mut Vec::new();
-
-        let mut out = new_empty!(TestSampleTable);
-        let res = Decoder::decode_with_context::<TestSampleTable>(ctx, bytes, handle_buf, &mut out);
-        assert_matches!(res, Err(Error::OutOfRange));
     }
 
     #[test]

@@ -11,7 +11,6 @@
     unused_mut, // not all args require mutation, but many do
     nonstandard_style, // auto-caps does its best, but is not always successful
 )]
-#![recursion_limit = "512"]
 
 #[cfg(target_os = "fuchsia")]
 #[allow(unused_imports)]
@@ -23,7 +22,6 @@ use {
     fidl::{
         client::QueryResponseFut,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -36,54 +34,12 @@ pub struct ProtocolRequestFlexibleResponseStrictRequest {
 
 impl fidl::Persistable for ProtocolRequestFlexibleResponseStrictRequest {}
 
-fidl_struct! {
-    name: ProtocolRequestFlexibleResponseStrictRequest,
-    members: [
-        s {
-            ty: FlexibleFoo,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 24,
-    size_v2: 16,
-    align_v1: 8,
-    align_v2: 8,
-}
-
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ProtocolRequestFlexibleResponseStrictResponse {
     pub f: StrictFoo,
 }
 
 impl fidl::Persistable for ProtocolRequestFlexibleResponseStrictResponse {}
-
-fidl_struct! {
-    name: ProtocolRequestFlexibleResponseStrictResponse,
-    members: [
-        f {
-            ty: StrictFoo,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 24,
-    size_v2: 16,
-    align_v1: 8,
-    align_v2: 8,
-}
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ProtocolRequestStrictResponseFlexibleRequest {
@@ -92,54 +48,12 @@ pub struct ProtocolRequestStrictResponseFlexibleRequest {
 
 impl fidl::Persistable for ProtocolRequestStrictResponseFlexibleRequest {}
 
-fidl_struct! {
-    name: ProtocolRequestStrictResponseFlexibleRequest,
-    members: [
-        s {
-            ty: StrictFoo,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 24,
-    size_v2: 16,
-    align_v1: 8,
-    align_v2: 8,
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProtocolRequestStrictResponseFlexibleResponse {
     pub f: FlexibleFoo,
 }
 
 impl fidl::Persistable for ProtocolRequestStrictResponseFlexibleResponse {}
-
-fidl_struct! {
-    name: ProtocolRequestStrictResponseFlexibleResponse,
-    members: [
-        f {
-            ty: FlexibleFoo,
-            index: 0,
-            typevar: T0,
-            offset_v1: 0,
-            offset_v2: 0,
-        },
-    ],
-    padding_v1: [
-    ],
-    padding_v2: [
-    ],
-    size_v1: 24,
-    size_v2: 16,
-    align_v1: 8,
-    align_v2: 8,
-}
 
 #[derive(Clone, Debug)]
 pub enum FlexibleFoo {
@@ -201,21 +115,6 @@ impl FlexibleFoo {
 
 impl fidl::Persistable for FlexibleFoo {}
 
-fidl_union! {
-    name: FlexibleFoo,
-    members: [
-        S {
-            ty: fidl::encoding::UnboundedString,
-            ordinal: 1,
-        },
-        I {
-            ty: i32,
-            ordinal: 2,
-        },
-    ],
-    unknown_member: __Unknown,
-}
-
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum StrictFoo {
     S(String),
@@ -239,20 +138,6 @@ impl StrictFoo {
 }
 
 impl fidl::Persistable for StrictFoo {}
-
-fidl_union! {
-    name: StrictFoo,
-    members: [
-        S {
-            ty: fidl::encoding::UnboundedString,
-            ordinal: 1,
-        },
-        I {
-            ty: i32,
-            ordinal: 2,
-        },
-    ],
-}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ProtocolMarker;
@@ -821,5 +706,724 @@ impl ProtocolRequestFlexibleResponseStrictResponder {
             >(bytes, handles, msg)?;
             self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
+    }
+}
+
+mod internal {
+    #[allow(unused_imports)]
+    use super::*;
+
+    unsafe impl fidl::encoding::TypeMarker for ProtocolRequestFlexibleResponseStrictRequest {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 16,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for ProtocolRequestFlexibleResponseStrictRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<ProtocolRequestFlexibleResponseStrictRequest>
+        for &ProtocolRequestFlexibleResponseStrictRequest
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ProtocolRequestFlexibleResponseStrictRequest>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<ProtocolRequestFlexibleResponseStrictRequest>::encode(
+                (<FlexibleFoo as fidl::encoding::ValueTypeMarker>::borrow(&self.s),),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<FlexibleFoo>>
+        fidl::encoding::Encode<ProtocolRequestFlexibleResponseStrictRequest> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ProtocolRequestFlexibleResponseStrictRequest>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for ProtocolRequestFlexibleResponseStrictRequest {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { s: fidl::new_empty!(FlexibleFoo) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(FlexibleFoo, &mut self.s, decoder, offset + member_offset, _depth)?;
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for ProtocolRequestFlexibleResponseStrictResponse {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 16,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for ProtocolRequestFlexibleResponseStrictResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<ProtocolRequestFlexibleResponseStrictResponse>
+        for &ProtocolRequestFlexibleResponseStrictResponse
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ProtocolRequestFlexibleResponseStrictResponse>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<ProtocolRequestFlexibleResponseStrictResponse>::encode(
+                (<StrictFoo as fidl::encoding::ValueTypeMarker>::borrow(&self.f),),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<StrictFoo>>
+        fidl::encoding::Encode<ProtocolRequestFlexibleResponseStrictResponse> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ProtocolRequestFlexibleResponseStrictResponse>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for ProtocolRequestFlexibleResponseStrictResponse {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { f: fidl::new_empty!(StrictFoo) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(StrictFoo, &mut self.f, decoder, offset + member_offset, _depth)?;
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for ProtocolRequestStrictResponseFlexibleRequest {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 16,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for ProtocolRequestStrictResponseFlexibleRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<ProtocolRequestStrictResponseFlexibleRequest>
+        for &ProtocolRequestStrictResponseFlexibleRequest
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ProtocolRequestStrictResponseFlexibleRequest>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<ProtocolRequestStrictResponseFlexibleRequest>::encode(
+                (<StrictFoo as fidl::encoding::ValueTypeMarker>::borrow(&self.s),),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<StrictFoo>>
+        fidl::encoding::Encode<ProtocolRequestStrictResponseFlexibleRequest> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ProtocolRequestStrictResponseFlexibleRequest>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for ProtocolRequestStrictResponseFlexibleRequest {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { s: fidl::new_empty!(StrictFoo) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(StrictFoo, &mut self.s, decoder, offset + member_offset, _depth)?;
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for ProtocolRequestStrictResponseFlexibleResponse {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 8,
+                fidl::encoding::WireFormatVersion::V2 => 8,
+            }
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 16,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for ProtocolRequestStrictResponseFlexibleResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<ProtocolRequestStrictResponseFlexibleResponse>
+        for &ProtocolRequestStrictResponseFlexibleResponse
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ProtocolRequestStrictResponseFlexibleResponse>(offset);
+            // Delegate to tuple encoding.
+            fidl::encoding::Encode::<ProtocolRequestStrictResponseFlexibleResponse>::encode(
+                (<FlexibleFoo as fidl::encoding::ValueTypeMarker>::borrow(&self.f),),
+                encoder,
+                offset,
+                _depth,
+            )
+        }
+    }
+    unsafe impl<T0: fidl::encoding::Encode<FlexibleFoo>>
+        fidl::encoding::Encode<ProtocolRequestStrictResponseFlexibleResponse> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<ProtocolRequestStrictResponseFlexibleResponse>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            Ok(())
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for ProtocolRequestStrictResponseFlexibleResponse {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { f: fidl::new_empty!(FlexibleFoo) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            // Verify that padding bytes are zero.
+            match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => {}
+                fidl::encoding::WireFormatVersion::V2 => {}
+            };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(FlexibleFoo, &mut self.f, decoder, offset + member_offset, _depth)?;
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for FlexibleFoo {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            8
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 16,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for FlexibleFoo {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<FlexibleFoo> for &FlexibleFoo {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<FlexibleFoo>(offset);
+            encoder.write_num::<u64>(self.ordinal(), offset);
+            match self {
+                FlexibleFoo::S(ref val) => fidl::encoding::encode_in_envelope::<
+                    fidl::encoding::UnboundedString,
+                >(
+                    <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(
+                        val,
+                    ),
+                    encoder,
+                    offset + 8,
+                    _depth,
+                ),
+                FlexibleFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32>(
+                    <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
+                    encoder,
+                    offset + 8,
+                    _depth,
+                ),
+                #[allow(deprecated)]
+                FlexibleFoo::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
+            }
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for FlexibleFoo {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal: 0 }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            mut depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            #[allow(unused_variables)]
+            let next_out_of_line = decoder.next_out_of_line();
+            let handles_before = decoder.remaining_handles();
+            let (ordinal, inlined, num_bytes, num_handles) =
+                fidl::encoding::decode_union_inline_portion(decoder, offset)?;
+
+            let member_inline_size = match ordinal {
+                1 => <fidl::encoding::UnboundedString as fidl::encoding::TypeMarker>::inline_size(
+                    decoder.context,
+                ),
+                2 => <i32 as fidl::encoding::TypeMarker>::inline_size(decoder.context),
+                0 => return Err(fidl::Error::UnknownUnionTag),
+                _ => num_bytes as usize,
+            };
+
+            if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
+                }
+            }
+            let _inner_offset;
+            if inlined {
+                decoder.check_inline_envelope_padding(offset + 8, member_inline_size)?;
+                _inner_offset = offset + 8;
+            } else {
+                depth.increment()?;
+                _inner_offset = decoder.out_of_line_offset(member_inline_size)?;
+            }
+            match ordinal {
+                1 => {
+                    #[allow(irrefutable_let_patterns)]
+                    if let FlexibleFoo::S(_) = self {
+                        // Do nothing, read the value into the object
+                    } else {
+                        // Initialize `self` to the right variant
+                        *self = FlexibleFoo::S(fidl::new_empty!(fidl::encoding::UnboundedString));
+                    }
+                    #[allow(irrefutable_let_patterns)]
+                    if let FlexibleFoo::S(ref mut val) = self {
+                        fidl::decode!(
+                            fidl::encoding::UnboundedString,
+                            val,
+                            decoder,
+                            _inner_offset,
+                            depth
+                        )?;
+                    } else {
+                        unreachable!()
+                    }
+                }
+                2 => {
+                    #[allow(irrefutable_let_patterns)]
+                    if let FlexibleFoo::I(_) = self {
+                        // Do nothing, read the value into the object
+                    } else {
+                        // Initialize `self` to the right variant
+                        *self = FlexibleFoo::I(fidl::new_empty!(i32));
+                    }
+                    #[allow(irrefutable_let_patterns)]
+                    if let FlexibleFoo::I(ref mut val) = self {
+                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                    } else {
+                        unreachable!()
+                    }
+                }
+                #[allow(deprecated)]
+                ordinal => {
+                    for _ in 0..num_handles {
+                        decoder.drop_next_handle()?;
+                    }
+                    *self = FlexibleFoo::__Unknown { ordinal };
+                }
+            }
+            if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
+                return Err(fidl::Error::InvalidNumBytesInEnvelope);
+            }
+            if handles_before != decoder.remaining_handles() + (num_handles as usize) {
+                return Err(fidl::Error::InvalidNumHandlesInEnvelope);
+            }
+            Ok(())
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for StrictFoo {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            8
+        }
+
+        #[inline(always)]
+        fn inline_size(context: fidl::encoding::Context) -> usize {
+            match context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 24,
+                fidl::encoding::WireFormatVersion::V2 => 16,
+            }
+        }
+    }
+    impl fidl::encoding::ValueTypeMarker for StrictFoo {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::Encode<StrictFoo> for &StrictFoo {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<StrictFoo>(offset);
+            encoder.write_num::<u64>(self.ordinal(), offset);
+            match self {
+                StrictFoo::S(ref val) => fidl::encoding::encode_in_envelope::<
+                    fidl::encoding::UnboundedString,
+                >(
+                    <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(
+                        val,
+                    ),
+                    encoder,
+                    offset + 8,
+                    _depth,
+                ),
+                StrictFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32>(
+                    <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
+                    encoder,
+                    offset + 8,
+                    _depth,
+                ),
+            }
+        }
+    }
+
+    impl fidl::encoding::Decode<Self> for StrictFoo {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self::S(fidl::new_empty!(fidl::encoding::UnboundedString))
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_>,
+            offset: usize,
+            mut depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            #[allow(unused_variables)]
+            let next_out_of_line = decoder.next_out_of_line();
+            let handles_before = decoder.remaining_handles();
+            let (ordinal, inlined, num_bytes, num_handles) =
+                fidl::encoding::decode_union_inline_portion(decoder, offset)?;
+
+            let member_inline_size = match ordinal {
+                1 => <fidl::encoding::UnboundedString as fidl::encoding::TypeMarker>::inline_size(
+                    decoder.context,
+                ),
+                2 => <i32 as fidl::encoding::TypeMarker>::inline_size(decoder.context),
+                _ => return Err(fidl::Error::UnknownUnionTag),
+            };
+
+            if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
+                }
+            }
+            let _inner_offset;
+            if inlined {
+                decoder.check_inline_envelope_padding(offset + 8, member_inline_size)?;
+                _inner_offset = offset + 8;
+            } else {
+                depth.increment()?;
+                _inner_offset = decoder.out_of_line_offset(member_inline_size)?;
+            }
+            match ordinal {
+                1 => {
+                    #[allow(irrefutable_let_patterns)]
+                    if let StrictFoo::S(_) = self {
+                        // Do nothing, read the value into the object
+                    } else {
+                        // Initialize `self` to the right variant
+                        *self = StrictFoo::S(fidl::new_empty!(fidl::encoding::UnboundedString));
+                    }
+                    #[allow(irrefutable_let_patterns)]
+                    if let StrictFoo::S(ref mut val) = self {
+                        fidl::decode!(
+                            fidl::encoding::UnboundedString,
+                            val,
+                            decoder,
+                            _inner_offset,
+                            depth
+                        )?;
+                    } else {
+                        unreachable!()
+                    }
+                }
+                2 => {
+                    #[allow(irrefutable_let_patterns)]
+                    if let StrictFoo::I(_) = self {
+                        // Do nothing, read the value into the object
+                    } else {
+                        // Initialize `self` to the right variant
+                        *self = StrictFoo::I(fidl::new_empty!(i32));
+                    }
+                    #[allow(irrefutable_let_patterns)]
+                    if let StrictFoo::I(ref mut val) = self {
+                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                    } else {
+                        unreachable!()
+                    }
+                }
+                ordinal => panic!("unexpected ordinal {:?}", ordinal),
+            }
+            if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
+                return Err(fidl::Error::InvalidNumBytesInEnvelope);
+            }
+            if handles_before != decoder.remaining_handles() + (num_handles as usize) {
+                return Err(fidl::Error::InvalidNumHandlesInEnvelope);
+            }
+            Ok(())
+        }
     }
 }
