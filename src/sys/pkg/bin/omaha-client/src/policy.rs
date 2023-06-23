@@ -4,7 +4,6 @@
 
 use crate::{installer::InstallResult, metrics::CobaltMetricsReporter, timer::FuchsiaTimer};
 use anyhow::{anyhow, Context as _, Error};
-use fidl_fuchsia_input_interaction::State;
 use fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderProxy};
 use fidl_fuchsia_update_config::{OptOutMarker, OptOutPreference, OptOutProxy};
 use fidl_fuchsia_update_ext::{query_commit_status, CommitStatus};
@@ -504,6 +503,18 @@ where
 
             OptOutPreference::AllowAllUpdates
         })
+}
+
+/// State is an enumeration of the activity states the system may be in.
+/// This enum is a placeholder for an activity state protocol, when one
+/// becomes available.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum State {
+    Invalid,
+    Active,
+
+    #[cfg(test)]
+    Idle,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
