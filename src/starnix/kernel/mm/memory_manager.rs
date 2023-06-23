@@ -1909,10 +1909,19 @@ impl MemoryManager {
     /// be particularly robust. Certainly the more advanced cases of races (the memory could be
     /// unmapped after this call but before it's used) are not handled.
     ///
+    /// The buffer_size variable is the size of the data structure that needs to fit
+    /// in the given memory.
+    ///
     /// Returns the error EFAULT if invalid.
-    pub fn check_plausible(&self, addr: UserAddress) -> Result<(), Errno> {
-        let _ = self.state.read().mappings.get(&addr).ok_or_else(|| errno!(EFAULT))?;
-        Ok(())
+    pub fn check_plausible(&self, addr: UserAddress, buffer_size: usize) -> Result<(), Errno> {
+        let state = self.state.read();
+
+        if let Some(range) = state.mappings.last_range() {
+            if range.end - buffer_size >= addr {
+                return Ok(());
+            }
+        }
+        error!(EFAULT)
     }
 
     #[cfg(test)]

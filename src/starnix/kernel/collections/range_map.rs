@@ -285,6 +285,15 @@ where
             .map(|(k, value)| (&k.range, value))
     }
 
+    /// Returns the final range in the map.
+    pub fn last_range(&self) -> Option<Range<K>> {
+        if let Some((r, _)) = self.map.last_key_value() {
+            Some(r.range.clone())
+        } else {
+            None
+        }
+    }
+
     /// Associate the keys in the given range with the given value.
     ///
     /// Callers must ensure that the keys in the given range are not already

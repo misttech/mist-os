@@ -188,10 +188,15 @@ TEST(EpollTest, WaitInvalidParams) {
   EXPECT_EQ(-1, epoll_wait(epfd.get(), &event, -1, 0));
   EXPECT_EQ(EINVAL, errno);
 
-  // Pass null for event pointer but valid count.
+  // Pass invalid event pointer but valid count.  Linux seems to believe that
+  // valid means 0 <= ptr < process memory - size of maxevents.
   errno = 0;
-  EXPECT_EQ(-1, epoll_wait(epfd.get(), nullptr, 1, 0));
+  EXPECT_EQ(
+      -1, epoll_wait(epfd.get(), reinterpret_cast<struct epoll_event*>(0xFFFFFFFFFFFFFFFF), 1, 0));
   EXPECT_EQ(EFAULT, errno);
+
+  // Linux believes nullptr is okay, so testing that
+  EXPECT_EQ(0, epoll_wait(epfd.get(), nullptr, 1, 0));
 
   // When both the pointer and the count are invalid, Linux returns EINVAL (it checks the count
   // first).
