@@ -108,7 +108,11 @@ import("//build/toolchain/rbe.gni")
 #
 #   disable_rbe (optional)
 #     Set to true to force this target to build locally, overriding the global
-#     `rust_rbe_enable`.
+#     `rust_rbe_enable`.  This applies to the unit-test as well, unless
+#     `test_disable_rbe` is specified.
+#
+#   test_disable_rbe (optional)
+#     Set to true to build only the unit-test locally.
 #
 #   disable_clippy (optional)
 #     Don't run clippy on this target.
@@ -218,7 +222,11 @@ template("rustc_binary") {
                                "name",
                                "output_name",
                                "source_root",
+                               "test_disable_rbe",
                              ])
+      if (defined(invoker.test_disable_rbe)) {
+        disable_rbe = invoker.test_disable_rbe
+      }
     }
   }
 

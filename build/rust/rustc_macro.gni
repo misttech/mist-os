@@ -78,7 +78,11 @@ import("//build/toolchain/restat.gni")
 #
 #   disable_rbe (optional)
 #     Set to true to force this target to build locally, overriding the global
-#     `rust_rbe_enable`.
+#     `rust_rbe_enable`.  This also applies to the unit-test unless
+#     overridden by `test_disable_rbe`.
+#
+#   test_disable_rbe (optional)
+#     Set to true to build the unit-test locally.
 #
 #   disable_clippy (optional)
 #     Don't run clippy on this target.
@@ -207,8 +211,16 @@ template("rustc_macro") {
         }
         original_target_name = _original_target_name
 
-        forward_variables_from(invoker, "*", [ "name" ])
+        forward_variables_from(invoker,
+                               "*",
+                               [
+                                 "name",
+                                 "test_disable_rbe",
+                               ])
         configs += [ "//build/config/rust:proc_macro_test" ]
+        if (defined(invoker.test_disable_rbe)) {
+          disable_rbe = invoker.test_disable_rbe
+        }
       }
     } else {
       # For convenience, create a forwarding target that points to the on-host

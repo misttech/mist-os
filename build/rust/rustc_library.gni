@@ -97,9 +97,13 @@ import("//build/rust/rustc_test.gni")
 #     "//build/config:highmem".
 #
 #   disable_rbe (optional)
-#     Set to true to force this target to build locally, overriding the global `rust_rbe_enable`.
-#     If with_unit_tests is also true, this setting applies to the unit test as well.
-#     There is currently no way to separately disable RBE for the library and test.
+#     Set to true to force this library to build locally, overriding the global `rust_rbe_enable`.
+#     If with_unit_tests is also true, this setting applies to the unit test
+#     as well, unless overridden by `test_disable_rbe`.
+#
+#   test_disable_rbe (optional)
+#     Set to true to force the library's test to build locally, overriding
+#     `disable_rbe` and the global `rust_rbe_enable`.
 #
 #   disable_clippy (optional)
 #     Don't run clippy on this target.
@@ -172,7 +176,11 @@ template("rustc_library") {
                                "name",
                                "assert_no_deps",
                                "disable_rustdoc",
+                               "test_disable_rbe",
                              ])
+      if (defined(invoker.test_disable_rbe)) {
+        disable_rbe = invoker.test_disable_rbe
+      }
     }
   }
 

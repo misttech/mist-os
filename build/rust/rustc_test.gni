@@ -144,6 +144,7 @@ template("rustc_test_internal") {
 
     _concurrency = concurrent_jobs.remote
     if (!_use_rbe) {
+      disable_rbe = true
       _any_lto = toolchain_variant.tags + [
                    "lto",
                    "thinlto",
