@@ -9,6 +9,7 @@ import enum
 import inspect
 import json
 import keyword
+import os
 import re
 import sys
 import types
@@ -151,6 +152,22 @@ class IR(dict):
             next(d for d in ir[f"{kind}_declarations"] if d["name"] == key))
 
 
+def fidl_ir_prefix_path() -> str:
+    """Returns the prefix to the FIDL IR.
+
+    If FUCHSIA_DIR is not set in the environment, or .fx-build-dir does not exist, this returns an
+    empty string.
+    """
+    fuchsia_dir = os.environ.get("FUCHSIA_DIR")
+    if fuchsia_dir:
+        try:
+            with open(os.path.join(fuchsia_dir, ".fx-build-dir"), "r") as f:
+                build_dir = f.readlines()[0].strip()
+                return os.path.join(fuchsia_dir, build_dir)
+        except FileNotFoundError:
+            return ""
+    return ""
+
 def get_fidl_ir_map() -> Mapping[str, str]:
     """Returns a singleton mapping of library names to FIDL files."""
     # This operates under the assumption that the topmost element in the FIDL IR file is the name
@@ -170,16 +187,18 @@ def get_fidl_ir_map() -> Mapping[str, str]:
     # parameters are set (which can be done automatically when using `fx test`, for example, but
     # again that is only available in tree). This hinders users who are out-of-tree and who wish to
     # simply "play around" with fuchsia controller in an interactive way.
-    with open("all_fidl_json.txt", "r", encoding="UTF-8") as f:
+    prefix = fidl_ir_prefix_path()
+    with open(os.path.join(prefix, "all_fidl_json.txt"), "r", encoding="UTF-8") as f:
         while lib := f.readline().strip():
+            full_path = os.path.join(prefix, lib)
             try:
-                with open(lib, "r", encoding="UTF-8") as ir_file:
+                with open(full_path, "r", encoding="UTF-8") as ir_file:
                     while line := ir_file.readline().strip():
                         if line.startswith(string_start) and line.endswith(
                                 string_end):
                             lib_name = line[len(string_start):-len(string_end)]
                             # This does not check for any conflicts.
-                            LIB_MAP[lib_name] = lib
+                            LIB_MAP[lib_name] = os.path.join(prefix, full_path)
                             break
             except FileNotFoundError:
                 continue
