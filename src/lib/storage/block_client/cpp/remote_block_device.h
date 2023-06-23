@@ -26,6 +26,10 @@ namespace block_client {
 class RemoteBlockDevice final : public BlockDevice {
  public:
   static zx::result<std::unique_ptr<RemoteBlockDevice>> Create(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device,
+      fidl::ClientEnd<fuchsia_device::Controller> controller);
+  // TODO(https://fxbug.dev/127870): Remove this as it relies on multiplexing.
+  static zx::result<std::unique_ptr<RemoteBlockDevice>> Create(
       fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device);
   [[deprecated("Create with Volume instead. All block devices speak Volume.")]] static zx_status_t
   Create(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
@@ -53,9 +57,11 @@ class RemoteBlockDevice final : public BlockDevice {
 
  private:
   RemoteBlockDevice(fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device,
+                    fidl::ClientEnd<fuchsia_device::Controller> controller,
                     fidl::ClientEnd<fuchsia_hardware_block::Session> session, zx::fifo fifo);
 
   fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device_;
+  fidl::ClientEnd<fuchsia_device::Controller> controller_;
   block_client::Client fifo_client_;
 };
 
