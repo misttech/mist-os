@@ -2109,6 +2109,11 @@ pub fn sys_inotify_add_watch(
     user_path: UserCString,
     mask: u32,
 ) -> Result<WdNumber, Errno> {
+    let mask = InotifyMask::from_bits(mask).ok_or_else(|| errno!(EINVAL))?;
+    if !mask.intersects(InotifyMask::ALL_EVENTS) {
+        // Mask must include at least 1 event.
+        return error!(EINVAL);
+    }
     let file = current_task.files.get(fd)?;
     let inotify_file = file.downcast_file::<InotifyFileObject>().ok_or_else(|| errno!(EINVAL))?;
     let watched_node =

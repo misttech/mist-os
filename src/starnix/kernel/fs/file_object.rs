@@ -915,7 +915,7 @@ impl FileObject {
         self.name.update_atime()?;
 
         if bytes_read > 0 {
-            self.notify(IN_ACCESS);
+            self.notify(InotifyMask::ACCESS);
         }
 
         Ok(bytes_read)
@@ -977,7 +977,7 @@ impl FileObject {
         self.node().update_ctime_mtime()?;
 
         if bytes_written > 0 {
-            self.notify(IN_MODIFY);
+            self.notify(InotifyMask::MODIFY);
         }
 
         Ok(bytes_written)
@@ -1242,7 +1242,7 @@ impl FileObject {
     }
 
     // Notifies watchers on the current node and its parent about an event.
-    fn notify(&self, event_mask: u32) {
+    fn notify(&self, event_mask: InotifyMask) {
         if let Some(parent) = self.name.entry.parent() {
             parent.node.watchers.notify(event_mask, &self.name.entry.local_name());
         }
@@ -1254,8 +1254,9 @@ impl Drop for FileObject {
     fn drop(&mut self) {
         self.ops().close(self);
         self.name.entry.node.on_file_closed(self);
-        let event_mask = if self.can_write() { IN_CLOSE_WRITE } else { IN_CLOSE_NOWRITE };
-        self.notify(event_mask);
+        let event =
+            if self.can_write() { InotifyMask::CLOSE_WRITE } else { InotifyMask::CLOSE_NOWRITE };
+        self.notify(event);
     }
 }
 

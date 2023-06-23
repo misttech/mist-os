@@ -43,7 +43,7 @@ struct InotifyState {
 pub struct InotifyWatcher {
     pub watch_id: WdNumber,
 
-    pub mask: u32,
+    pub mask: InotifyMask,
 
     pub inotify: Weak<FileObject>,
 }
@@ -57,7 +57,7 @@ pub struct InotifyWatchers {
 struct InotifyEvent {
     watch_id: WdNumber,
 
-    mask: u32,
+    mask: InotifyMask,
 
     cookie: u32,
 
@@ -86,7 +86,7 @@ impl InotifyFileObject {
     pub fn add_watch(
         &self,
         dir_entry: DirEntryHandle,
-        mask: u32,
+        mask: InotifyMask,
         inotify_file: Weak<FileObject>,
     ) -> Result<WdNumber, Errno> {
         let watch_id;
@@ -108,13 +108,18 @@ impl InotifyFileObject {
         {
             let mut state = self.state.lock();
             dir_entry = state.watches.remove(&watch_id).ok_or_else(|| errno!(EINVAL))?;
-            state.events.push_back(InotifyEvent::new(watch_id, IN_IGNORED, 0, FsString::new()));
+            state.events.push_back(InotifyEvent::new(
+                watch_id,
+                InotifyMask::IGNORED,
+                0,
+                FsString::new(),
+            ));
         }
         dir_entry.node.watchers.remove(file);
         Ok(())
     }
 
-    fn notify(&self, watch_id: WdNumber, event_mask: u32, cookie: u32, name: FsString) {
+    fn notify(&self, watch_id: WdNumber, event_mask: InotifyMask, cookie: u32, name: FsString) {
         let mut state = self.state.lock();
         let event = InotifyEvent::new(watch_id, event_mask, cookie, name);
         state.events.push_back(event);
@@ -222,7 +227,7 @@ impl FileOps for InotifyFileObject {
 
 impl InotifyEvent {
     // Creates a new InotifyEvent and pads name with at least 1 null-byte, aligned to DATA_SIZE.
-    fn new(watch_id: WdNumber, mask: u32, cookie: u32, mut name: FsString) -> Self {
+    fn new(watch_id: WdNumber, mask: InotifyMask, cookie: u32, mut name: FsString) -> Self {
         if !name.is_empty() {
             let len = round_up_to_increment(name.len() + 1, DATA_SIZE)
                 .expect("padded name should not overflow");
@@ -238,7 +243,7 @@ impl InotifyEvent {
     fn write_to(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
         let event = inotify_event {
             wd: self.watch_id.raw(),
-            mask: self.mask,
+            mask: self.mask.bits(),
             cookie: self.cookie,
             len: self.name.len().try_into().map_err(|_| errno!(EINVAL))?,
             // name field is zero-sized; the bytes for the name follows the struct linearly in memory.
@@ -256,7 +261,7 @@ impl InotifyEvent {
 }
 
 impl InotifyWatchers {
-    fn add(&self, mask: u32, watch_id: WdNumber, inotify: Weak<FileObject>) {
+    fn add(&self, mask: InotifyMask, watch_id: WdNumber, inotify: Weak<FileObject>) {
         let mut watchers = self.watchers.lock();
         watchers.push(inotify::InotifyWatcher { watch_id, mask, inotify });
     }
@@ -272,13 +277,13 @@ impl InotifyWatchers {
     }
 
     /// Notifies all watchers that have the specified event mask.
-    pub fn notify(&self, event_mask: u32, name: &FsString) {
+    pub fn notify(&self, event_mask: InotifyMask, name: &FsString) {
         // Clone inotify references so that we don't hold watchers lock when notifying.
         let mut watch_id_to_files: Vec<(WdNumber, Arc<FileObject>)> = vec![];
         {
             let watchers = self.watchers.lock();
             for watcher in &(*watchers) {
-                if watcher.mask & event_mask == event_mask {
+                if watcher.mask.contains(event_mask) {
                     if let Some(file) = watcher.inotify.upgrade() {
                         watch_id_to_files.push((watcher.watch_id, file.clone()));
                     }
@@ -302,7 +307,7 @@ mod tests {
 
     #[::fuchsia::test]
     fn inotify_event() {
-        let event = InotifyEvent::new(WdNumber::from_raw(1), IN_ACCESS, 0, "".into());
+        let event = InotifyEvent::new(WdNumber::from_raw(1), InotifyMask::ACCESS, 0, "".into());
         let mut buffer = VecOutputBuffer::new(DATA_SIZE + 100);
         let bytes_written = event.write_to(&mut buffer).expect("write_to buffer");
 
@@ -314,7 +319,7 @@ mod tests {
     fn inotify_event_with_name() {
         // Create a name that is shorter than DATA_SIZE of 16.
         let name = "file1";
-        let event = InotifyEvent::new(WdNumber::from_raw(1), IN_ACCESS, 0, name.into());
+        let event = InotifyEvent::new(WdNumber::from_raw(1), InotifyMask::ACCESS, 0, name.into());
         let mut buffer = VecOutputBuffer::new(DATA_SIZE + 100);
         let bytes_written = event.write_to(&mut buffer).expect("write_to buffer");
 
@@ -333,7 +338,9 @@ mod tests {
 
         // Use root as the watched directory.
         let root = current_task.fs().root().entry;
-        assert!(inotify.add_watch(root.clone(), IN_ALL_EVENTS, Arc::downgrade(&file)).is_ok());
+        assert!(inotify
+            .add_watch(root.clone(), InotifyMask::ALL_EVENTS, Arc::downgrade(&file))
+            .is_ok());
 
         {
             let watchers = root.node.watchers.watchers.lock();
@@ -341,7 +348,7 @@ mod tests {
         }
 
         // Generate 1 event.
-        root.node.watchers.notify(IN_ACCESS, &"".into());
+        root.node.watchers.notify(InotifyMask::ACCESS, &"".into());
 
         assert_eq!(inotify.available(), DATA_SIZE);
         {
@@ -351,7 +358,7 @@ mod tests {
         }
 
         // Generate another event.
-        root.node.watchers.notify(IN_ATTRIB, &"".into());
+        root.node.watchers.notify(InotifyMask::ATTRIB, &"".into());
 
         assert_eq!(inotify.available(), DATA_SIZE * 2);
         {

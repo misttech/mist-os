@@ -166,7 +166,6 @@
                 "Inotify.UnmatchedEventsAreDiscarded",
                 "Inotify.LinkGeneratesAttribAndCreateEvents",
                 "Inotify.MknodGeneratesCreateEvent",
-                "Inotify.AddWatchWithInvalidEventMaskFails",
                 "Inotify.ControlEvents",
                 "Inotify.KernfsBasic",
                 "Inotify.OneShot",
