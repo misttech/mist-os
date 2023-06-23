@@ -408,6 +408,14 @@ class KernelDriver {
     uart_.Init(io_);
   }
 
+  // Write out a string that Parse() can read back to recreate the driver
+  // state.  This doesn't preserve the driver state, only the configuration.
+  template <typename LockPolicy = DefaultLockPolicy>
+  void Unparse(FILE* out) const {
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
+    uart_.Unparse(out);
+  }
+
   // Configure the UART line control settings.
   //
   // An individual setting given by std::nullopt signifies that it should be

@@ -115,6 +115,9 @@ TEST(UartTests, All) {
   // Match against ZBI items to instantiate.
   EXPECT_FALSE(driver.Match(zbi_header_t{}, nullptr));
 
+  // Make sure Unparse is instantiated.
+  driver.Unparse();
+
   // Use selected driver.
   driver.Visit([](auto&& driver) {
     driver.template Init();
