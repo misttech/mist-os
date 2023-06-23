@@ -156,10 +156,6 @@ if (is_fuchsia) {
       fshost_config = board_fshost_config
     }
 
-    if (images_config_label != false) {
-      assembly_images_config_label = images_config_label
-    }
-
     product_assembly_config_label = fuchsia_product_assembly_config_label
 
     cmdline_deps = [ "//build/input:bootfs" ]
@@ -279,6 +275,18 @@ if (is_fuchsia) {
     }
   }
 
+  if (has_board) {
+    assert(images_config_label != false, "Need to define images_config_label")
+    assert(partitions_config_label != false,
+           "Need to define partitions_config_label")
+  } else {
+    images_config_label = "//boards/images:default"
+    partitions_config_label = "//boards/partitions:default"
+  }
+  _partitions_config_file =
+      get_label_info(partitions_config_label, "target_out_dir") + "/" +
+      get_label_info(partitions_config_label, "name") + ".json"
+
   assembled_system("fuchsia_assembly") {
     forward_variables_from(fuchsia_base, "*")
     output_dir = root_build_dir
@@ -287,19 +295,10 @@ if (is_fuchsia) {
     create_legacy_aib_package = create_legacy_aib_archive
     create_legacy_aib_archive = create_legacy_aib_archive
 
+    assembly_images_config_label = images_config_label
     image_metadata_overrides = legacy_fuchsia_image_metadata_overrides
     must_exist_deps = must_exist
   }
-
-  if (has_board) {
-    assert(partitions_config_label != false,
-           "Need to define partitions_config_label")
-  } else {
-    partitions_config_label = "//boards/partitions:default"
-  }
-  _partitions_config_file =
-      get_label_info(partitions_config_label, "target_out_dir") + "/" +
-      get_label_info(partitions_config_label, "name") + ".json"
 
   update_epoch = update_platform_epoch + update_product_epoch
   update_package("update") {
@@ -531,6 +530,7 @@ if (is_fuchsia) {
     forward_variables_from(fuchsia_base, "*")
     ramdisk_in_zbi = true
 
+    assembly_images_config_label = images_config_label
     image_metadata_overrides = {
       zbi = {
         name = "netboot"
