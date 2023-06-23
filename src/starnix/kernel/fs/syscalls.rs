@@ -55,8 +55,8 @@ pub fn sys_close(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> 
 
 pub fn sys_close_range(
     current_task: &CurrentTask,
-    first: FdNumber,
-    last: FdNumber,
+    first: u32,
+    last: u32,
     flags: u32,
 ) -> Result<(), Errno> {
     if first > last || flags & !(CLOSE_RANGE_UNSHARE | CLOSE_RANGE_CLOEXEC) != 0 {
@@ -65,7 +65,7 @@ pub fn sys_close_range(
     if flags & CLOSE_RANGE_UNSHARE != 0 {
         current_task.files.unshare();
     }
-    let in_range = |fd: FdNumber| fd.raw() >= first.raw() && fd.raw() <= last.raw();
+    let in_range = |fd: FdNumber| fd.raw() as u32 >= first && fd.raw() as u32 <= last;
     if flags & CLOSE_RANGE_CLOEXEC != 0 {
         current_task.files.retain(|fd, flags| {
             if in_range(fd) {
