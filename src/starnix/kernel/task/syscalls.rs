@@ -742,8 +742,7 @@ pub fn sys_prctl(
         }
         PR_SET_SECCOMP => {
             if arg2 == SECCOMP_MODE_STRICT as u64 {
-                // arg3 should always be null, but that's checked in sys_seccomp.
-                return sys_seccomp(current_task, SECCOMP_SET_MODE_STRICT, 0, arg3.into());
+                return sys_seccomp(current_task, SECCOMP_SET_MODE_STRICT, 0, UserAddress::NULL);
             } else if arg2 == SECCOMP_MODE_FILTER as u64 {
                 return sys_seccomp(current_task, SECCOMP_SET_MODE_FILTER, 0, arg3.into());
             }

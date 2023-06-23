@@ -88,7 +88,17 @@ TEST(SeccompTest, Strict) {
   helper.ExpectSignal(SIGKILL);
   helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
-    EXPECT_EQ(0, prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT, 0, 0, 0));
+
+    sock_filter filter[] = {
+        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+    };
+    sock_fprog prog = {
+        .len = ARRAY_SIZE(filter),
+        .filter = filter,
+    };
+    // prog argument should be ignored with prctl(SECCOMP_MODE_STRICT)
+    EXPECT_EQ(0, prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT, &prog, 0, 0));
     syscall(kFilteredSyscall);
   });
 }
@@ -113,7 +123,8 @@ TEST(SeccompTest, FilterToStrictErrors) {
   });
 }
 
-// Checks for attempt to install null filter with FILTER, or non-null filter with STRICT
+// Checks for attempt to install null filter with FILTER, or non-null filter
+// with seccomp(SET_MODE_STRICT)
 TEST(SeccompTest, BadArgs) {
   ForkHelper helper;
   helper.RunInForkedProcess([] {
@@ -129,8 +140,7 @@ TEST(SeccompTest, BadArgs) {
         .len = ARRAY_SIZE(filter),
         .filter = filter,
     };
-
-    EXPECT_EQ(-1, prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT, &prog, NULL, NULL));
+    EXPECT_EQ(-1, syscall(__NR_seccomp, SECCOMP_SET_MODE_STRICT, 0, &prog));
     EXPECT_EQ(EINVAL, errno);
   });
 }
@@ -144,13 +154,24 @@ TEST(SeccompTest, BadNoNewPrivs) {
 
   ForkHelper helper;
   helper.RunInForkedProcess([] {
-    // Neither CAP_SYS_ADMIN nor NO_NEW_PRIVS == 1
-    EXPECT_EQ(-1, prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT, 0, 0, 0));
+    sock_filter filter[] = {
+        // A = seccomp_data.nr
+        BPF_STMT(BPF_LD | BPF_ABS | BPF_W, offsetof(struct seccomp_data, nr)),
+        // if (A == sysno) goto kill
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_getpid, 1, 0),
+        // allow: return SECCOMP_RET_ALLOW
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+        // kill: return SECCOMP_RET_KILL_PROCESS
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
+    };
+    sock_fprog prog = {.len = ARRAY_SIZE(filter), .filter = filter};
+    EXPECT_EQ(-1, syscall(__NR_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog))
+        << "syscall failed with errno " << errno;
     EXPECT_EQ(EACCES, errno);
   });
 }
 
-TEST(SeccompTest, SeccompMax4KMinOne) {
+TEST(SeccompTest, FilterMax4KMinOne) {
   ForkHelper helper;
   helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
@@ -158,8 +179,6 @@ TEST(SeccompTest, SeccompMax4KMinOne) {
     auto filter = std::make_unique<sock_filter[]>(too_big);
     sock_filter val = BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW);
     std::fill(filter.get(), filter.get() + too_big, val);
-
-    EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) << "prctl failed";
 
     struct sock_fprog fprog = {.len = too_big, .filter = filter.get()};
 
@@ -178,23 +197,26 @@ TEST(SeccompTest, SeccompMax4KMinOne) {
 
 #define MAX_INSNS_PER_PATH 32768
 
-// Ensure that the total number of instructions in filters does not exceed the
-// maximum.  Note that each filter has a fixed overhead of 4 instructions.
-TEST(SeccompTest, SeccompMaxTotalInsns) {
+// Ensure that the total number of instructions in filters does not exceed a
+// maximum.  In practice, the "32768 instructions" limitation on Linux doesn't
+// seem to mean 32768 instructions consistently, so it's acceptable just to use
+// that as an upper bound.
+TEST(SeccompTest, FilterMaxTotalInsns) {
   ForkHelper helper;
   helper.RunInForkedProcess([] {
+    const int kFilterSize = BPF_MAXINSNS;
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
-    auto filter = std::make_unique<sock_filter[]>(BPF_MAXINSNS);
+    auto filter = std::make_unique<sock_filter[]>(kFilterSize);
     sock_filter val = BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW);
-    std::fill(filter.get(), filter.get() + BPF_MAXINSNS, val);
+    std::fill(filter.get(), filter.get() + kFilterSize, val);
 
-    EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) << "prctl failed";
+    struct sock_fprog fprog = {.len = kFilterSize, .filter = filter.get()};
 
-    struct sock_fprog fprog = {.len = BPF_MAXINSNS, .filter = filter.get()};
-
-    for (int i = 0; i < (MAX_INSNS_PER_PATH / BPF_MAXINSNS) - 1; i++) {
-      EXPECT_EQ(0, prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &fprog, 0, 0));
+    for (int i = 0; i < (MAX_INSNS_PER_PATH / kFilterSize) - 1; i++) {
+      prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &fprog, 0, 0);
     }
+    // At this point, we've attempted to add enough filters that there should be
+    // a failure.
 
     EXPECT_EQ(-1, prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &fprog, 0, 0));
     EXPECT_EQ(errno, ENOMEM);
