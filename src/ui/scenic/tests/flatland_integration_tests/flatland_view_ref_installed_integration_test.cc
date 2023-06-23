@@ -4,7 +4,6 @@
 
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
-#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
@@ -21,6 +20,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 
 // This test exercises the fuchsia.ui.views.ViewRefInstalled protocol implemented by Scenic
@@ -35,7 +35,7 @@ using RealmRoot = component_testing::RealmRoot;
 using WatchResult = fuv::ViewRefInstalled_Watch_Result;
 
 // Test fixture that sets up an environment with a Scenic we can connect to.
-class FlatlandViewRefInstalledIntegrationTest : public zxtest::Test, public loop_fixture::RealLoop {
+class FlatlandViewRefInstalledIntegrationTest : public zxtest::Test, public LoggingEventLoop {
  protected:
   void SetUp() override {
     // Build the realm topology and route the protocols required by this test fixture from the

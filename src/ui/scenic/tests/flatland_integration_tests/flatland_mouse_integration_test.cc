@@ -6,7 +6,6 @@
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/pointer/cpp/fidl.h>
 #include <fuchsia/ui/pointerinjector/cpp/fidl.h>
-#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
@@ -16,6 +15,7 @@
 #include <zxtest/zxtest.h>
 
 #include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
 
@@ -129,7 +129,7 @@ void ExpectEqualPointer(const fuchsia::ui::pointer::MousePointerSample& pointer_
   }
 }
 
-class FlatlandMouseIntegrationTest : public zxtest::Test, public loop_fixture::RealLoop {
+class FlatlandMouseIntegrationTest : public zxtest::Test, public LoggingEventLoop {
  protected:
   static constexpr uint32_t kDeviceId = 1111;
 

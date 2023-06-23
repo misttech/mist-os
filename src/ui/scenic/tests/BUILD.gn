@@ -42,6 +42,8 @@ source_set("common_deps") {
 source_set("common_deps_cts") {
   testonly = true
   sources = [
+    "utils/logging_event_loop.cc",
+    "utils/logging_event_loop.h",
     "utils/utils.cc",
     "utils/utils.h",
   ]

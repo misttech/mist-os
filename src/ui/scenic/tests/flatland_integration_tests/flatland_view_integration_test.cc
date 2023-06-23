@@ -5,7 +5,6 @@
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/display/singleton/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
-#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/fidl/cpp/interface_ptr.h>
@@ -21,6 +20,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
 
@@ -37,7 +37,7 @@ constexpr fuc::TransformId kTransformId = {1};
 constexpr fuc::ContentId kContentId = {1};
 
 // Test fixture that sets up an environment with a Scenic we can connect to.
-class FlatlandViewIntegrationTest : public zxtest::Test, public loop_fixture::RealLoop {
+class FlatlandViewIntegrationTest : public zxtest::Test, public LoggingEventLoop {
  protected:
   void SetUp() override {
     // Build the realm topology and route the protocols required by this test fixture from the
