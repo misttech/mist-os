@@ -21,14 +21,10 @@
 
 void MapUart(page_table::AddressSpaceBuilder& builder, memalloc::Pool& pool) {
   // Meets the signature expected of uart::BasicIoProvider's constructor.
-  auto mapper = [&pool, &builder ](uint64_t uart_mmio_base) -> volatile void* {
-    const memalloc::Range* containing = pool.GetContainingRange(uart_mmio_base);
-    if (!containing) {
-      ZX_PANIC("UART registers not encoded among ZBI memory ranges");
-    }
-
-    uint64_t base = ktl::max(containing->addr, uart_mmio_base & ~(ZX_PAGE_SIZE - 1));
-    uint64_t size = ktl::min(containing->end() - base, uint64_t{ZX_PAGE_SIZE});
+  // TODO(fxbug.dev/129541): |mapper| callable should provide base and length.
+  auto mapper = [&builder](uint64_t uart_mmio_base) -> volatile void* {
+    uint64_t base = uart_mmio_base & ~(ZX_PAGE_SIZE - 1);
+    uint64_t size = ZX_PAGE_SIZE;
     zx_status_t status = builder.MapRegion(page_table::Vaddr(base), page_table::Paddr(base), size,
                                            page_table::CacheAttributes::kDevice);
     if (status != ZX_OK) {

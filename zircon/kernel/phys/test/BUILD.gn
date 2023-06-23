@@ -12,6 +12,7 @@ import("//build/zbi/zbi_input.gni")
 import("//src/bringup/lib/mexec/testing/zbi_test.gni")
 import("//zircon/kernel/kernel_package.gni")
 import("//zircon/kernel/lib/code-patching/code-patching.gni")
+import("//zircon/kernel/phys/devicetree_boot_test.gni")
 import("//zircon/kernel/phys/efi/efi_executable.gni")
 import("//zircon/kernel/phys/efi/efi_shell_test.gni")
 import("//zircon/kernel/phys/efi/efi_test.gni")
@@ -52,6 +53,33 @@ if (current_toolchain != default_toolchain) {
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/libc",
+      "//zircon/system/ulib/uart",
+    ]
+    public_deps = [
+      # This is public to propagate its public_deps so dependents
+      # of qemu-test-main can use #include "test-main.h".
+      ":test-main",
+    ]
+  }
+
+  # This provides an environment that is bootstrapped from an input devicetree. Appropriate for
+  # environments where devicetree is the boot protocol.
+  source_set("devicetree-test-main") {
+    testonly = true
+    sources = [ "devicetree-test-main.cc" ]
+    defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
+    deps = [
+      "..:address-space",
+      "..:exception",
+      "..:main",
+      "..:stdio",
+      "..:uart",
+      "//zircon/kernel/lib/arch",
+      "//zircon/kernel/lib/boot-options",
+      "//zircon/kernel/lib/libc",
+      "//zircon/kernel/phys:allocation",
+      "//zircon/kernel/phys:allocation-init",
+      "//zircon/kernel/phys/lib/boot-shim",
       "//zircon/system/ulib/uart",
     ]
     public_deps = [
@@ -126,6 +154,19 @@ if (current_toolchain != default_toolchain) {
                              ])
     }
 
+    # TODO(fxbug.dev/129401): Support RISC-V
+    if (current_cpu == "arm64") {
+      devicetree_boot_test("devicetree-$target_name") {
+        visibility = [ ":*" ]
+        forward_variables_from(invoker,
+                               "*",
+                               [
+                                 "target_name",
+                                 "disabled_for_efi",
+                               ])
+      }
+    }
+
     phys_zbi_test("zbi-$target_name") {
       forward_variables_from(invoker,
                              "*",
@@ -156,6 +197,11 @@ if (current_toolchain != default_toolchain) {
         ":qemu-$target_name",
         ":zbi-$target_name",
       ]
+
+      # TODO(fxbug.dev/129401): Support RISC-V
+      if (current_cpu == "arm64") {
+        deps += [ ":devicetree-$target_name" ]
+      }
       if (have_efi) {
         deps += [ ":efi-$target_name" ]
       }
@@ -235,6 +281,7 @@ if (current_toolchain != default_toolchain) {
       ":test-main",
       "..:allocation",
       "..:new",
+      "..:uart",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
     ]
@@ -551,6 +598,10 @@ if (current_toolchain != default_toolchain) {
         ":elf-physboot-core-tests",
         ":zbi-chain-load-core-tests",
       ]
+    }
+
+    if (current_cpu == "arm64") {
+      deps += [ ":devicetree-memory-test" ]
     }
 
     if (current_cpu == "x64") {

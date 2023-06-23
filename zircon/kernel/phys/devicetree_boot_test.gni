@@ -1,0 +1,72 @@
+# Copyright 2020 The Fuchsia Authors
+#
+# Use of this source code is governed by a MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT
+
+import("//build/testing/boot_test.gni")
+import("//zircon/kernel/phys/phys_executable.gni")
+
+# Defines a boot test comprised of a Linux kernel payload, where early
+# set-up is a function of the devicetree alone.
+#
+# Parameters:
+#
+#  * timeout
+#    - Optional: Amount in seconds to wait for success string to be printed.
+#    - Default: boot_test default value (600 = 10m)
+#
+# Apart from output_dir and output_extension, other parameters are propagated
+# to phys_executable(), which see.
+template("devicetree_boot_test") {
+  test_target = "$target_name"
+  public_visibility = []
+  if (defined(invoker.visibility)) {
+    public_visibility = invoker.visibility + [ ":$test_target" ]
+  } else {
+    public_visibility = [ "*" ]
+  }
+
+  if (toolchain_variant.base == phys_toolchain) {
+    executable_target = "_devicetree_phys_test.$test_target.executable"
+
+    phys_executable(executable_target) {
+      testonly = true
+      visibility = [ ":*" ]
+      output_name = test_target
+      deps = []
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "initrd",
+                               "output_dir",
+                               "output_extension",
+                               "output_name",
+                               "tags",
+                               "target_name",
+                               "testonly",
+                               "timeout",
+                               "visibility",
+                             ])
+      deps += [
+        "//zircon/kernel/arch/$current_cpu/phys:linuxboot",
+        "//zircon/kernel/phys/test:devicetree-test-main",
+      ]
+    }
+
+    boot_test(test_target) {
+      forward_variables_from(invoker, [ "timeout" ])
+      visibility = public_visibility
+
+      device_types = [ "QEMU" ]
+      qemu_kernel = ":$executable_target"
+    }
+  } else {
+    group(test_target) {
+      visibility = public_visibility
+      testonly = true
+      public_deps = [ ":$test_target(${phys_toolchain})" ]
+    }
+    not_needed(invoker, "*")
+  }
+}
