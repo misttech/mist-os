@@ -178,12 +178,12 @@ class System : public ClientObject, public SettingStoreObserver {
   std::vector<std::unique_ptr<Filter>> filters_;
   bool filter_sync_pending_ = false;  // Used to throttle consecutive OnFilterChanges.
 
+  fxl::ObserverList<SystemObserver> observers_;
+
   DownloadManager download_manager_;
   SystemSymbols symbols_;
 
   MapSettingStore settings_;
-
-  fxl::ObserverList<SystemObserver> observers_;
 
   fxl::WeakPtrFactory<System> weak_factory_;
 

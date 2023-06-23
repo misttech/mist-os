@@ -10,6 +10,7 @@
 #include <set>
 
 #include "src/developer/debug/zxdb/client/symbol_server.h"
+#include "src/developer/debug/zxdb/client/system_observer.h"
 #include "src/developer/debug/zxdb/symbols/debug_symbol_file_type.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
 
@@ -19,7 +20,7 @@ class Download;
 class System;
 
 // This class manages all downloads that are requested when they are not found locally.
-class DownloadManager {
+class DownloadManager : public SystemObserver {
  public:
   explicit DownloadManager(System* system);
   ~DownloadManager();
@@ -30,27 +31,41 @@ class DownloadManager {
   // binary information.
   void RequestDownload(const std::string& build_id, DebugSymbolFileType file_type);
 
-  // Adds |server| to the download object associated with any modules that are missing
-  // symbols in the current process.
-  void OnSymbolServerBecomesReady(SymbolServer* server);
-
   bool HasDownload(const std::string& build_id) const;
 
+  // SystemObserver implementation.
+  void DidCreateSymbolServer(SymbolServer* server) override;
+  void OnSymbolServerStatusChanged(SymbolServer* server) override;
+
   // Get a test download object.
-  std::shared_ptr<Download> InjectDownloadForTesting(const std::string& build_id);
+  Download* InjectDownloadForTesting(const std::string& build_id);
+
+  // Abandons a download injected with |InjectDownloadForTesting|.
+  void AbandonTestingDownload(const std::string& build_id);
 
  private:
   using DownloadIdentifier = std::pair<std::string, DebugSymbolFileType>;
 
-  // Get a download object corresponding to |build_id| and |file_type|. If no
-  // matching object is found, a new one is allocated and will request a
-  // download against all configured symbol servers. If this particular build_id
-  // and file_type have been attempted before and failed, this will return
-  // nullptr and do nothing.
-  std::shared_ptr<Download> GetDownload(std::string build_id, DebugSymbolFileType file_type);
+  // Get a download object corresponding to |build_id| and |file_type|. If no matching object is
+  // found, a new one is allocated and will request a download against all configured and ready
+  // symbol servers.
+  Download* GetDownload(std::string build_id, DebugSymbolFileType file_type);
+
+  // Creates a Download object with the given |build_id| and |file_type|, note the caller is
+  // responsible for adding the resulting pointer to |downloads_|.
+  std::unique_ptr<Download> MakeDownload(const std::string& build_id,
+                                         DebugSymbolFileType file_type);
+
+  // A download succeeded,
+  void OnDownloadSucceeded(const std::string& path, const std::string& build_id,
+                           DebugSymbolFileType file_type);
+
+  // Adds |server| to the download object associated with any modules that are missing
+  // symbols in the current process.
+  void OnSymbolServerBecomesReady(SymbolServer* server);
 
   // Called every time a new download starts.
-  void DownloadStarted(const std::shared_ptr<Download>& download);
+  void DownloadStarted(const DownloadIdentifier& dl_id, Download* download);
 
   // Called every time a download ends.
   void DownloadFinished();
@@ -61,13 +76,14 @@ class DownloadManager {
 
   size_t download_fail_count_ = 0;
 
-  // Keep track of the build_ids that have been attempted and failed. These will prevent spamming
-  // the console with download errors (particularly while running tests) which will spawn lots of
-  // processes that will likely have the same build_ids that will fail downloading.
-  std::set<DownloadIdentifier> failed_downloads_;
+  size_t servers_ready_ = 0;
 
-  // Downloads currently in progress.
-  std::map<DownloadIdentifier, std::weak_ptr<Download>> downloads_;
+  // These servers have failed to authenticate and will never become ready.
+  size_t servers_failed_auth_ = 0;
+
+  // Downloads currently in progress or pending server availability. This holds an owning pointer to
+  // the Download object so it can be persisted while we wait for servers to become ready.
+  std::map<DownloadIdentifier, std::unique_ptr<Download>> downloads_;
 
   System* system_;  // owns |this|.
 

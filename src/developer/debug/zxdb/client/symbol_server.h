@@ -25,11 +25,10 @@ class SymbolServer : public ClientObject {
   // error is only set in the event of a connection error. If the symbols are simply unavailable the
   // error will not be set.
   using FetchCallback = fit::callback<void(const Err&, const std::string&)>;
-  using CheckFetchCallback = fit::callback<void(const Err&, fit::callback<void(FetchCallback)>)>;
 
   enum class State {
-    kInitializing,  // The server just gets created. It will become kBusy or kAuth shortly.
-    kAuth,          // The authentication is missing or invalid.
+    kInitializing,  // The server just gets created. It will become kBusy or kReady shortly.
+    kAuth,          // The user's credentials have failed authentication.
     kBusy,          // The server is doing authentication.
     kReady,         // The authentication is done and the server is ready to use.
     kUnreachable,   // Too many failed downloads and the server is unusable.
@@ -47,12 +46,9 @@ class SymbolServer : public ClientObject {
     state_change_callback_ = std::move(cb);
   }
 
-  // Query to see whether the server has symbols for the given build ID, but don't actually download
-  // them. Callback receives a function which it can call to continue and actually download the
-  // symbols. If the callback == nullptr the symbol was not found. The error supplied is only set if
-  // there was a problem with the connection, not if the symbols were simply unavailable.
-  virtual void CheckFetch(const std::string& build_id, DebugSymbolFileType file_type,
-                          CheckFetchCallback cb) = 0;
+  // Attempt to download symbols for the given build ID.
+  virtual void Fetch(const std::string& build_id, DebugSymbolFileType file_type,
+                     FetchCallback cb) = 0;
 
   const std::string& access_token() const { return access_token_; }
   void set_access_token(const std::string& access_token) { access_token_ = access_token; }

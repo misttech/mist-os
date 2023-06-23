@@ -76,20 +76,18 @@ void SymbolServer::AuthRefresh() {
 }
 
 FILE* SymbolServer::GetGoogleApiAuthCache(const char* mode) {
-  static std::filesystem::path path;
+  if (auto home = std::getenv("HOME")) {
+    std::filesystem::path path =
+        std::filesystem::path(home) / ".fuchsia" / "debug" / "googleapi_auth";
 
-  if (path.empty()) {
-    path = std::filesystem::path(std::getenv("HOME")) / ".fuchsia" / "debug";
-    std::error_code ec;
-    std::filesystem::create_directories(path, ec);
-
-    if (ec) {
-      path.clear();
+    if (!std::filesystem::exists(path)) {
       return nullptr;
     }
+
+    return fopen(path.c_str(), mode);
   }
 
-  return fopen((path / "googleapi_auth").c_str(), mode);
+  return nullptr;
 }
 
 bool SymbolServer::LoadCachedAuth() {

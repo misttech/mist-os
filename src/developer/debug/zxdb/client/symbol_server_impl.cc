@@ -93,8 +93,6 @@ Err SymbolServerImpl::HandleRequestResult(Curl::Error result, uint64_t response_
   if (result) {
     out_err = Err("Could not contact server: " + result.ToString());
     // Fall through to retry.
-  } else if (response_code == 400) {
-    return Err(ErrType::kUnsupported);
   } else if (response_code == 401) {
     return Err(base_url_ + ": Authentication expired.");
   } else if (response_code == 404) {
@@ -209,8 +207,8 @@ fxl::RefPtr<Curl> SymbolServerImpl::PrepareCurl(const std::string& build_id,
   return curl;
 }
 
-void SymbolServerImpl::CheckFetch(const std::string& build_id, DebugSymbolFileType file_type,
-                                  SymbolServer::CheckFetchCallback cb) {
+void SymbolServerImpl::Fetch(const std::string& build_id, DebugSymbolFileType file_type,
+                             SymbolServer::FetchCallback cb) {
   auto curl = PrepareCurl(build_id, file_type);
 
   if (!curl) {
@@ -219,32 +217,7 @@ void SymbolServerImpl::CheckFetch(const std::string& build_id, DebugSymbolFileTy
     return;
   }
 
-  curl->get_body() = false;
-
-  size_t previous_ready_count = ready_count_;
-
-  curl->Perform([weak_this = weak_factory_.GetWeakPtr(), build_id, file_type, curl,
-                 cb = std::move(cb), previous_ready_count](Curl*, Curl::Error result) mutable {
-    if (!weak_this)
-      return;
-
-    auto code = curl->ResponseCode();
-
-    Err err = weak_this->HandleRequestResult(result, code, previous_ready_count);
-    // Some debuginfod servers do not support GETs without body, instead of retrying the check, just
-    // try to actually download the file. If the server really doesn't know about the file, it will
-    // return a 404.
-    if (err.ok() || err.type() == ErrType::kUnsupported) {
-      curl->get_body() = true;
-      cb(Err(), [weak_this, build_id, file_type, curl](SymbolServer::FetchCallback fcb) {
-        if (weak_this)
-          weak_this->FetchWithCurl(build_id, file_type, curl, std::move(fcb));
-      });
-      return;
-    }
-
-    cb(err, nullptr);
-  });
+  FetchWithCurl(build_id, file_type, curl, std::move(cb));
 }
 
 void SymbolServerImpl::FetchWithCurl(const std::string& build_id, DebugSymbolFileType file_type,

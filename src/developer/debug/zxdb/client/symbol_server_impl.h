@@ -26,8 +26,9 @@ class SymbolServerImpl : public SymbolServer {
   // SymbolServer implementation.
   void DoAuthenticate(const std::map<std::string, std::string>& data,
                       fit::callback<void(const Err&)> cb) override;
-  void CheckFetch(const std::string& build_id, DebugSymbolFileType file_type,
-                  SymbolServer::CheckFetchCallback cb) override;
+
+  void Fetch(const std::string& build_id, DebugSymbolFileType file_type,
+             SymbolServer::FetchCallback cb) override;
 
  private:
   // General dispatch from the result of a Curl transaction. Handles the error cases and converts

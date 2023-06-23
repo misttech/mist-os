@@ -85,9 +85,9 @@ TEST_F(SymbolServerTest, DownloadTypes) {
   bool saw_binary_request = false;
   bool saw_symbol_request = false;
 
-  server()->on_check_fetch = [this, &saw_weird_module, &saw_binary_request, &saw_symbol_request](
-                                 const std::string& build_id, DebugSymbolFileType file_type,
-                                 SymbolServer::CheckFetchCallback cb) {
+  server()->on_fetch = [this, &saw_weird_module, &saw_binary_request, &saw_symbol_request](
+                           const std::string& build_id, DebugSymbolFileType file_type,
+                           SymbolServer::FetchCallback cb) {
     saw_weird_module = build_id != "1234";
     saw_binary_request = saw_binary_request || file_type == DebugSymbolFileType::kBinary;
     saw_symbol_request = saw_symbol_request || file_type == DebugSymbolFileType::kDebugInfo;

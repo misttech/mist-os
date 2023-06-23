@@ -22,8 +22,8 @@ class MockSymbolServer : public SymbolServer {
   // The big IO methods are proxied to callbacks for the mock so tests can just intercept them.
   //
   // These are fit::function and not fit::callback because they can be called more than once.
-  fit::function<void(const std::string&, DebugSymbolFileType, SymbolServer::CheckFetchCallback)>
-      on_check_fetch = {};
+  fit::function<void(const std::string&, DebugSymbolFileType, SymbolServer::FetchCallback)>
+      on_fetch = {};
   fit::function<void(const std::map<std::string, std::string>&, fit::callback<void(const Err&)>)>
       on_do_authenticate = {};
 
@@ -31,15 +31,24 @@ class MockSymbolServer : public SymbolServer {
   void ForceReady() { ChangeState(SymbolServer::State::kReady); }
 
   // Implementation of Symbol server.
-  void CheckFetch(const std::string& build_id, DebugSymbolFileType file_type,
-                  SymbolServer::CheckFetchCallback cb) override {
-    on_check_fetch(build_id, file_type, std::move(cb));
+  void Fetch(const std::string& build_id, DebugSymbolFileType file_type,
+             SymbolServer::FetchCallback cb) override {
+    if (on_fetch) {
+      on_fetch(build_id, file_type, std::move(cb));
+    } else {
+      cb(Err(ErrType::kNotFound), "");
+    }
   }
 
  private:
   void DoAuthenticate(const std::map<std::string, std::string>& data,
                       fit::callback<void(const Err&)> cb) override {
-    on_do_authenticate(data, std::move(cb));
+    if (on_do_authenticate) {
+      on_do_authenticate(data, std::move(cb));
+    } else {
+      ForceReady();
+      cb(Err());
+    }
   }
 };
 
