@@ -95,17 +95,26 @@ pub(crate) fn parameter_sets_for_codec(
     in_band_sco: bool,
 ) -> Vec<bredr::ScoConnectionParameters> {
     use bredr::HfpParameterSet::*;
+    // Parameter sets from the HFP Spec, Section 5.7
+    // Core spec 5.3 requires the air coding and io coding formats both be transparent or neither
+    // should be.
+    // The parameter sets returned also meet this criteria.
     match codec_id {
         CodecId::MSBC => {
-            let (air_coding_format, io_bandwidth) = if in_band_sco {
-                (Some(bredr::CodingFormat::Transparent), Some(16000))
+            let (air_coding_format, io_bandwidth, io_coding_format) = if in_band_sco {
+                (
+                    Some(bredr::CodingFormat::Transparent),
+                    Some(16000),
+                    Some(bredr::CodingFormat::Transparent),
+                )
             } else {
                 // IO bandwidth to match an 16khz audio rate. (x2 for input + output)
-                (Some(bredr::CodingFormat::Msbc), Some(32000))
+                (Some(bredr::CodingFormat::Msbc), Some(32000), Some(bredr::CodingFormat::LinearPcm))
             };
             let params_fn = |set| bredr::ScoConnectionParameters {
                 parameter_set: Some(set),
                 air_coding_format,
+                io_coding_format,
                 io_bandwidth,
                 ..params_with_data_path(common_sco_params(), in_band_sco)
             };
@@ -292,6 +301,7 @@ pub(crate) mod tests {
                     parameter_set: Some(HfpParameterSet::T2),
                     air_coding_format: Some(bredr::CodingFormat::Transparent),
                     io_bandwidth: Some(16000),
+                    io_coding_format: Some(bredr::CodingFormat::Transparent),
                     path: Some(bredr::DataPath::Host),
                     ..common_sco_params()
                 },
