@@ -7,7 +7,9 @@
 
 #include <lib/zx/time.h>
 
+#include <algorithm>
 #include <memory>
+#include <queue>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -55,6 +57,50 @@ class InstanceRequestor : public MdnsAgent {
                                     const std::string& instance_name, bool from_proxy) override;
 
  private:
+  // Set of socket addresses associated with a target.
+  class TargetAddressSet {
+   public:
+    TargetAddressSet() = default;
+
+    ~TargetAddressSet() = default;
+
+    // Indicates whether the set is empty.
+    bool empty() const { return insert_times_by_address_.empty(); }
+
+    // Erases |address| from the set. Returns true if the address was in the set, false if not.
+    bool erase(inet::SocketAddress address) { return insert_times_by_address_.erase(address); }
+
+    // Inserts |address| into the set if it isn't already there. The age of the address is zeroed
+    // regardless. Returns true if the address was added, false if it was already there.
+    bool insert(inet::SocketAddress address) {
+      auto now = zx::clock::get_monotonic();
+
+      auto [iter, inserted] = insert_times_by_address_.emplace(address, now);
+      if (!inserted) {
+        iter->second = now;
+      }
+
+      return inserted;
+    }
+
+    // Replaces all addresses in the set with |from| and returns true, unless this set already
+    // contains exactly the addresses in |from|, in which case changes nothing and returns false.
+    // This is used only for local instances and does not assign meaningful insert times.
+    bool Replace(const std::vector<inet::SocketAddress>& from);
+
+    // Erases all IPv4 addresses that are older than one second.
+    void EraseV4AddressesOlderThanOneSecond();
+
+    // Erases all IPv6 addresses that are older than one second.
+    void EraseV6AddressesOlderThanOneSecond();
+
+    // Returns a list of the contained addresses each with its port number replaced with |port|.
+    std::vector<inet::SocketAddress> AddressesWithPort(inet::IpPort port);
+
+   private:
+    std::unordered_map<inet::SocketAddress, zx::time> insert_times_by_address_;
+  };
+
   // Describes a service instance.
   struct InstanceInfo {
     std::string service_name_;
@@ -75,7 +121,7 @@ class InstanceRequestor : public MdnsAgent {
   // Describes a target. We use |inet::SocketAddress| because it has scope_id. The port numbers
   // aren't used. |InstanceInfo| provides the service instance's port number.
   struct TargetInfo {
-    std::unordered_set<inet::SocketAddress> addresses_;
+    TargetAddressSet addresses_;
     bool keep_ = false;
     bool dirty_ = false;
     bool addresses_queried_ = false;
@@ -102,8 +148,6 @@ class InstanceRequestor : public MdnsAgent {
                            TargetInfo* target_info, uint32_t scope_id);
 
   void RemoveInstance(const std::string& instance_full_name);
-
-  std::vector<inet::SocketAddress> Addresses(const TargetInfo& target_info, inet::IpPort port);
 
   std::string service_name_;
   std::string service_full_name_;

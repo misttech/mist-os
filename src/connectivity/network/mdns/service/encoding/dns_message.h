@@ -104,7 +104,7 @@ struct DnsClassAndFlag {
 
 // Domain name.
 struct DnsName {
-  DnsName() {}
+  DnsName() = default;
   explicit DnsName(std::string dotted_string) : dotted_string_(std::move(dotted_string)) {}
 
   std::string dotted_string_;
@@ -154,19 +154,21 @@ struct DnsHeader {
   uint16_t authority_count_ = 0;
   uint16_t additional_count_ = 0;
 
-  bool response() { return (flags_ & kQueryResponseMask) != 0; }
+  bool response() const { return (flags_ & kQueryResponseMask) != 0; }
 
-  DnsOpCode op_code() { return static_cast<DnsOpCode>((flags_ & kOpCodeMask) >> kOpCodeShift); }
+  DnsOpCode op_code() const {
+    return static_cast<DnsOpCode>((flags_ & kOpCodeMask) >> kOpCodeShift);
+  }
 
-  bool authoritative_answer() { return (flags_ & kAuthoritativeAnswerMask) != 0; }
+  bool authoritative_answer() const { return (flags_ & kAuthoritativeAnswerMask) != 0; }
 
-  bool truncated() { return (flags_ & kTruncationMask) != 0; }
+  bool truncated() const { return (flags_ & kTruncationMask) != 0; }
 
-  bool recursion_desired() { return (flags_ & kRecursionDesiredMask) != 0; }
+  bool recursion_desired() const { return (flags_ & kRecursionDesiredMask) != 0; }
 
-  bool recursion_available() { return (flags_ & kRecursionAvailableMask) != 0; }
+  bool recursion_available() const { return (flags_ & kRecursionAvailableMask) != 0; }
 
-  DnsResponseCode response_code() {
+  DnsResponseCode response_code() const {
     return static_cast<DnsResponseCode>(flags_ & kResponseCodeMask);
   }
 

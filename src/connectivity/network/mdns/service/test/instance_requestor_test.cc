@@ -12,9 +12,10 @@
 #include "src/connectivity/network/mdns/service/common/service_instance.h"
 #include "src/connectivity/network/mdns/service/common/type_converters.h"
 #include "src/connectivity/network/mdns/service/test/agent_test.h"
+#include "src/connectivity/network/mdns/service/test/fake_clock.h"
+#include "src/lib/inet/socket_address.h"
 
-namespace mdns {
-namespace test {
+namespace mdns::test {
 
 class InstanceRequestorTest : public AgentTest {
  public:
@@ -34,7 +35,7 @@ class InstanceRequestorTest : public AgentTest {
     void InstanceDiscovered(const std::string& service, const std::string& instance,
                             const std::vector<inet::SocketAddress>& addresses,
                             const std::vector<std::vector<uint8_t>>& text, uint16_t srv_priority,
-                            uint16_t srv_weight, const std::string& target) {
+                            uint16_t srv_weight, const std::string& target) override {
       instance_discovered_params_ = std::make_unique<ServiceInstance>(
           service, instance, target, addresses, text, srv_priority, srv_weight);
     }
@@ -42,16 +43,16 @@ class InstanceRequestorTest : public AgentTest {
     void InstanceChanged(const std::string& service, const std::string& instance,
                          const std::vector<inet::SocketAddress>& addresses,
                          const std::vector<std::vector<uint8_t>>& text, uint16_t srv_priority,
-                         uint16_t srv_weight, const std::string& target) {
+                         uint16_t srv_weight, const std::string& target) override {
       instance_changed_params_ = std::make_unique<ServiceInstance>(
           service, instance, target, addresses, text, srv_priority, srv_weight);
     }
 
-    void InstanceLost(const std::string& service, const std::string& instance) {
+    void InstanceLost(const std::string& service, const std::string& instance) override {
       instance_lost_params_ = std::make_unique<InstanceId>(service, instance);
     }
 
-    void Query(DnsType type_queried) { query_param_ = type_queried; }
+    void Query(DnsType type_queried) override { query_param_ = type_queried; }
 
     std::unique_ptr<ServiceInstance> ExpectInstanceDiscoveredCalled() {
       EXPECT_TRUE(!!instance_discovered_params_);
@@ -317,6 +318,8 @@ TEST_F(InstanceRequestorTest, Change) {
 
 // Tests the behavior of the requestor an address record indicate addresses should be flushed.
 TEST_F(InstanceRequestorTest, AddressCacheFlush) {
+  FakeClock kayfabe;
+
   InstanceRequestor under_test(this, kServiceName, Media::kBoth, IpVersions::kBoth, kExcludeLocal,
                                kExcludeLocalProxies);
   SetAgent(under_test);
@@ -336,34 +339,83 @@ TEST_F(InstanceRequestorTest, AddressCacheFlush) {
   subscriber.ExpectQueryCalled(DnsType::kPtr);
   subscriber.ExpectNoOther();
 
-  // Respond.
-  ReplyAddress sender_address(
+  // Respond with an IPv4 address.
+  ReplyAddress sender_address_0(
       inet::SocketAddress(192, 168, 1, 1, inet::IpPort::From_uint16_t(5353)),
       inet::IpAddress(192, 168, 1, 100), 1, Media::kWireless, IpVersions::kV4);
   ReceivePublication(under_test, kHostFullName, kServiceName, kInstanceName, kPort, kText,
-                     sender_address);
+                     sender_address_0);
 
+  // Expect |sender_address_0|.
   auto params = subscriber.ExpectInstanceDiscoveredCalled();
-  EXPECT_EQ(ServiceInstance(kServiceName, kInstanceName, kHostName,
-                            {inet::SocketAddress(sender_address.socket_address().address(), kPort)},
-                            kText, 0, 0),
-            *params);
+  EXPECT_EQ(
+      ServiceInstance(kServiceName, kInstanceName, kHostName,
+                      {inet::SocketAddress(sender_address_0.socket_address().address(), kPort)},
+                      kText, 0, 0),
+      *params);
 
   subscriber.ExpectNoOther();
 
-  // Respond with different address with the cache flush bit set.
-  ReplyAddress different_sender_address(
+  // Respond with an IPv6 address.
+  ReplyAddress sender_address_v6(inet::SocketAddress(0xfe80, 1, inet::IpPort::From_uint16_t(5353)),
+                                 inet::IpAddress(192, 168, 1, 100), 1, Media::kWireless,
+                                 IpVersions::kV4);
+  ReceivePublication(under_test, kHostFullName, kServiceName, kInstanceName, kPort, kText,
+                     sender_address_v6);
+
+  // Expect |sender_address_0| and |sender_address_v6|.
+  params = subscriber.ExpectInstanceChangedCalled();
+  EXPECT_EQ(
+      ServiceInstance(kServiceName, kInstanceName, kHostName,
+                      {inet::SocketAddress(sender_address_v6.socket_address().address(), kPort, 1),
+                       inet::SocketAddress(sender_address_0.socket_address().address(), kPort)},
+                      kText, 0, 0),
+      *params);
+
+  // Make sure the above address is more than one second old.
+  FakeClock::Advance(zx::sec(2));
+
+  // Respond with a second IPv4 address.
+  ReplyAddress sender_address_2(
       inet::SocketAddress(192, 168, 1, 2, inet::IpPort::From_uint16_t(5353)),
       inet::IpAddress(192, 168, 1, 100), 1, Media::kWireless, IpVersions::kV4);
   ReceivePublication(under_test, kHostFullName, kServiceName, kInstanceName, kPort, kText,
-                     different_sender_address);
+                     sender_address_2);
 
+  // Expect |sender_address_0|, |sender_address_v6| and |sender_address_2|.
   params = subscriber.ExpectInstanceChangedCalled();
-  EXPECT_EQ(ServiceInstance(
-                kServiceName, kInstanceName, kHostName,
-                {inet::SocketAddress(different_sender_address.socket_address().address(), kPort)},
-                kText, 0, 0),
-            *params);
+  EXPECT_EQ(
+      ServiceInstance(kServiceName, kInstanceName, kHostName,
+                      {inet::SocketAddress(sender_address_2.socket_address().address(), kPort),
+                       inet::SocketAddress(sender_address_v6.socket_address().address(), kPort, 1),
+                       inet::SocketAddress(sender_address_0.socket_address().address(), kPort)},
+                      kText, 0, 0),
+      *params);
+
+  // Make sure the second IPv4 address is less than one second old.
+  FakeClock::Advance(zx::msec(500));
+
+  // Respond with a third IPv4 address with the cache flush bit set.
+  ReplyAddress sender_address_3(
+      inet::SocketAddress(192, 168, 1, 3, inet::IpPort::From_uint16_t(5353)),
+      inet::IpAddress(192, 168, 1, 100), 1, Media::kWireless, IpVersions::kV4);
+  ReceivePublication(under_test, kHostFullName, kServiceName, kInstanceName, kPort, kText,
+                     sender_address_3, true,  // include_txt
+                     true,                    // include_address
+                     true                     // address_cache_flush
+  );
+
+  // Expect that |sender_address_| has been flushed, |sender_address_v6| and |sender_address_2| have
+  // not (a V6 address and an address sent less than a second ago), and that the new
+  // |sender_address_3| appears.
+  params = subscriber.ExpectInstanceChangedCalled();
+  EXPECT_EQ(
+      ServiceInstance(kServiceName, kInstanceName, kHostName,
+                      {inet::SocketAddress(sender_address_2.socket_address().address(), kPort),
+                       inet::SocketAddress(sender_address_3.socket_address().address(), kPort),
+                       inet::SocketAddress(sender_address_v6.socket_address().address(), kPort, 1)},
+                      kText, 0, 0),
+      *params);
 
   subscriber.ExpectNoOther();
 }
@@ -988,5 +1040,4 @@ TEST_F(InstanceRequestorTest, ResponseSansAddressesV6) {
   subscriber.ExpectNoOther();
 }
 
-}  // namespace test
-}  // namespace mdns
+}  // namespace mdns::test

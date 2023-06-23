@@ -174,7 +174,7 @@ class MdnsUnitTests : public gtest::RealLoopFixture, public Mdns::Transceiver {
   std::shared_ptr<DnsResource> ExpectResource(DnsMessage& message, MdnsResourceSection section,
                                               const std::string& name, DnsType type,
                                               DnsClass dns_class = DnsClass::kIn,
-                                              bool cache_flush = true) {
+                                              bool cache_flush = false) {
     auto extracted = ExtractResources(1, message, section, name, type, dns_class, cache_flush);
 
     EXPECT_FALSE(extracted.empty()) << "No matching resource with name " << name << " and type "
@@ -188,7 +188,7 @@ class MdnsUnitTests : public gtest::RealLoopFixture, public Mdns::Transceiver {
                                                             MdnsResourceSection section,
                                                             const std::string& name, DnsType type,
                                                             DnsClass dns_class = DnsClass::kIn,
-                                                            bool cache_flush = true) {
+                                                            bool cache_flush = false) {
     auto extracted = ExtractResources(std::numeric_limits<size_t>::max(), message, section, name,
                                       type, dns_class, cache_flush);
     EXPECT_FALSE(extracted.empty()) << "No matching resource with name " << name << " and type "

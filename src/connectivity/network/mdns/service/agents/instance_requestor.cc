@@ -177,15 +177,15 @@ void InstanceRequestor::EndOfMessage() {
     if (instance_info.new_) {
       instance_info.new_ = false;
       for (auto subscriber : subscribers) {
-        subscriber->InstanceDiscovered(instance_info.service_name_, instance_info.instance_name_,
-                                       Addresses(target_info, instance_info.port_),
-                                       instance_info.text_, instance_info.srv_priority_,
-                                       instance_info.srv_weight_, instance_info.target_);
+        subscriber->InstanceDiscovered(
+            instance_info.service_name_, instance_info.instance_name_,
+            target_info.addresses_.AddressesWithPort(instance_info.port_), instance_info.text_,
+            instance_info.srv_priority_, instance_info.srv_weight_, instance_info.target_);
       }
     } else {
       for (auto subscriber : subscribers) {
         subscriber->InstanceChanged(instance_info.service_name_, instance_info.instance_name_,
-                                    Addresses(target_info, instance_info.port_),
+                                    target_info.addresses_.AddressesWithPort(instance_info.port_),
                                     instance_info.text_, instance_info.srv_priority_,
                                     instance_info.srv_weight_, instance_info.target_);
       }
@@ -224,9 +224,9 @@ void InstanceRequestor::ReportAllDiscoveries(Mdns::Subscriber* subscriber) {
     }
 
     subscriber->InstanceDiscovered(instance_info.service_name_, instance_info.instance_name_,
-                                   Addresses(target_info, instance_info.port_), instance_info.text_,
-                                   instance_info.srv_priority_, instance_info.srv_weight_,
-                                   instance_info.target_);
+                                   target_info.addresses_.AddressesWithPort(instance_info.port_),
+                                   instance_info.text_, instance_info.srv_priority_,
+                                   instance_info.srv_weight_, instance_info.target_);
   }
 }
 
@@ -352,10 +352,10 @@ void InstanceRequestor::ReceiveAResource(const DnsResource& resource, MdnsResour
   }
 
   if (resource.cache_flush_) {
-    target_info->addresses_.clear();
+    target_info->addresses_.EraseV4AddressesOlderThanOneSecond();
   }
 
-  if (target_info->addresses_.insert(address).second) {
+  if (target_info->addresses_.insert(address)) {
     target_info->dirty_ = true;
   }
 
@@ -376,10 +376,10 @@ void InstanceRequestor::ReceiveAaaaResource(const DnsResource& resource,
   }
 
   if (resource.cache_flush_) {
-    target_info->addresses_.clear();
+    target_info->addresses_.EraseV6AddressesOlderThanOneSecond();
   }
 
-  if (target_info->addresses_.insert(address).second) {
+  if (target_info->addresses_.insert(address)) {
     target_info->dirty_ = true;
   }
 
@@ -395,16 +395,6 @@ void InstanceRequestor::RemoveInstance(const std::string& instance_full_name) {
 
     instance_infos_by_full_name_.erase(iter);
   }
-}
-
-std::vector<inet::SocketAddress> InstanceRequestor::Addresses(const TargetInfo& target_info,
-                                                              inet::IpPort port) {
-  std::vector<inet::SocketAddress> result;
-  std::transform(target_info.addresses_.begin(), target_info.addresses_.end(),
-                 std::back_inserter(result), [port](const inet::SocketAddress& address) {
-                   return inet::SocketAddress(address.address(), port, address.scope_id());
-                 });
-  return result;
 }
 
 void InstanceRequestor::OnAddLocalServiceInstance(const Mdns::ServiceInstance& instance,
@@ -442,9 +432,9 @@ void InstanceRequestor::OnAddLocalServiceInstance(const Mdns::ServiceInstance& i
       std::make_pair(instance_info.target_full_name_, TargetInfo()));
   auto& target_info = target_iter->second;
 
-  std::copy(instance.addresses_.begin(), instance.addresses_.end(),
-            std::inserter(target_info.addresses_, target_info.addresses_.end()));
-  target_info.dirty_ = true;
+  if (target_info.addresses_.Replace(instance.addresses_)) {
+    target_info.dirty_ = true;
+  }
 
   EndOfMessage();
 }
@@ -502,11 +492,7 @@ void InstanceRequestor::OnChangeLocalServiceInstance(const Mdns::ServiceInstance
       target_infos_by_full_name_.insert(std::make_pair(target_full_name, TargetInfo()));
   auto& target_info = target_iter->second;
 
-  std::unordered_set<inet::SocketAddress> addresses;
-  std::copy(instance.addresses_.begin(), instance.addresses_.end(),
-            std::inserter(addresses, addresses.end()));
-  if (target_info.addresses_ != addresses) {
-    target_info.addresses_ = addresses;
+  if (target_info.addresses_.Replace(instance.addresses_)) {
     target_info.dirty_ = true;
   }
 
@@ -529,6 +515,71 @@ void InstanceRequestor::OnRemoveLocalServiceInstance(const std::string& service_
   RemoveInstance(MdnsNames::InstanceFullName(instance_name, service_name));
 
   EndOfMessage();
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// TargetAddressSet implementation.
+
+bool InstanceRequestor::TargetAddressSet::Replace(const std::vector<inet::SocketAddress>& from) {
+  bool result = false;
+
+  if (from.size() != insert_times_by_address_.size()) {
+    result = true;
+  } else {
+    for (auto& address : from) {
+      if (insert_times_by_address_.find(address) == insert_times_by_address_.end()) {
+        result = true;
+        break;
+      }
+    }
+  }
+
+  // Note that |Replace| is used only for local instances, which are updated wholesale and to which
+  // cache_flush does not apply. We use a bogus time value |zx::time()| and don't bother updating
+  // times when the addresses don't change.
+  if (result) {
+    insert_times_by_address_.clear();
+    std::transform(from.begin(), from.end(),
+                   std::inserter(insert_times_by_address_, insert_times_by_address_.begin()),
+                   [](auto& address) { return std::pair(address, zx::time()); });
+  }
+
+  return result;
+}
+
+void InstanceRequestor::TargetAddressSet::EraseV4AddressesOlderThanOneSecond() {
+  auto one_second_ago = zx::clock::get_monotonic() - zx::sec(1);
+
+  for (auto iter = insert_times_by_address_.begin(); iter != insert_times_by_address_.end();) {
+    if (iter->first.is_v4() && iter->second < one_second_ago) {
+      iter = insert_times_by_address_.erase(iter);
+    } else {
+      ++iter;
+    }
+  }
+}
+
+// Erases all IPv6 addresses that are older than one second.
+void InstanceRequestor::TargetAddressSet::EraseV6AddressesOlderThanOneSecond() {
+  auto one_second_ago = zx::clock::get_monotonic() - zx::sec(1);
+
+  for (auto iter = insert_times_by_address_.begin(); iter != insert_times_by_address_.end();) {
+    if (iter->first.is_v6() && iter->second < one_second_ago) {
+      iter = insert_times_by_address_.erase(iter);
+    } else {
+      ++iter;
+    }
+  }
+}
+
+std::vector<inet::SocketAddress> InstanceRequestor::TargetAddressSet::AddressesWithPort(
+    inet::IpPort port) {
+  std::vector<inet::SocketAddress> result;
+  std::transform(insert_times_by_address_.begin(), insert_times_by_address_.end(),
+                 std::back_inserter(result), [port](auto& pair) {
+                   return inet::SocketAddress(pair.first.address(), port, pair.first.scope_id());
+                 });
+  return result;
 }
 
 }  // namespace mdns
