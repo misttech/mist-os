@@ -22,14 +22,15 @@
 
 namespace pager_tests {
 
-bool Vmo::CheckVmar(uint64_t offset, uint64_t len, const void* expected) {
+bool Vmo::CheckVmar(uint64_t offset, uint64_t len, const void* expected) const {
   ZX_ASSERT((offset + len) <= (size_ / zx_system_get_page_size()));
 
   len *= zx_system_get_page_size();
   offset *= zx_system_get_page_size();
 
   for (uint64_t i = offset / sizeof(uint64_t); i < (offset + len) / sizeof(uint64_t); i++) {
-    uint64_t actual_val = base_[i];
+    const auto* base = reinterpret_cast<const uint64_t*>(base_addr_);
+    uint64_t actual_val = base[i];
     // Make sure we deterministically read from the vmar before reading the
     // expected value, in case things get remapped.
     std::atomic_thread_fence(std::memory_order_seq_cst);
@@ -43,7 +44,7 @@ bool Vmo::CheckVmar(uint64_t offset, uint64_t len, const void* expected) {
   return true;
 }
 
-bool Vmo::CheckVmo(uint64_t offset, uint64_t len, const void* expected) {
+bool Vmo::CheckVmo(uint64_t offset, uint64_t len, const void* expected) const {
   len *= zx_system_get_page_size();
   offset *= zx_system_get_page_size();
 
@@ -108,7 +109,6 @@ bool Vmo::Resize(uint64_t new_page_count) {
       }
     }
 
-    base_ = reinterpret_cast<uint64_t*>(addr);
     base_addr_ = addr;
   }
   size_ = new_size;
@@ -147,8 +147,8 @@ std::unique_ptr<Vmo> Vmo::Clone(uint64_t offset, uint64_t size) {
     return nullptr;
   }
 
-  return std::unique_ptr<Vmo>(new Vmo(std::move(clone), size, reinterpret_cast<uint64_t*>(addr),
-                                      addr, key_ + (offset / sizeof(uint64_t))));
+  return std::unique_ptr<Vmo>(
+      new Vmo(std::move(clone), size, addr, key_ + (offset / sizeof(uint64_t))));
 }
 
 UserPager::UserPager()
@@ -208,8 +208,7 @@ bool UserPager::CreateVmoWithOptions(uint64_t size, uint32_t options, Vmo** vmo_
     return false;
   }
 
-  auto paged_vmo =
-      Vmo::Create(std::move(vmo), size, reinterpret_cast<uint64_t*>(addr), addr, next_key_);
+  auto paged_vmo = Vmo::Create(std::move(vmo), size, addr, next_key_);
 
   next_key_ += (size / sizeof(uint64_t));
 
@@ -258,11 +257,9 @@ bool UserPager::ReplaceVmo(Vmo* vmo, zx::vmo* old_vmo) {
   }
   std::atomic_thread_fence(std::memory_order_seq_cst);
 
-  vmo->set_key(next_key_);
-  next_key_ += (vmo->size() / sizeof(uint64_t));
+  *old_vmo = vmo->Replace(std::move(new_vmo), next_key_);
 
-  *old_vmo = std::move(vmo->vmo());
-  vmo->vmo() = std::move(new_vmo);
+  next_key_ += (vmo->size() / sizeof(uint64_t));
 
   return true;
 }

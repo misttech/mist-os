@@ -30,9 +30,8 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
  public:
   ~Vmo() = default;
 
-  static std::unique_ptr<Vmo> Create(zx::vmo vmo, uint64_t size, uint64_t* base, uint64_t base_addr,
-                                     uint64_t key) {
-    return std::unique_ptr<Vmo>(new Vmo(std::move(vmo), size, base, base_addr, key));
+  static std::unique_ptr<Vmo> Create(zx::vmo vmo, uint64_t size, uint64_t base_addr, uint64_t key) {
+    return std::unique_ptr<Vmo>(new Vmo(std::move(vmo), size, base_addr, key));
   }
 
   // Generates this vmo contents at the specified offset.
@@ -40,9 +39,9 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
                               uint64_t paged_vmo_page_offset);
 
   // Validates this vmo's content in the specified pages using a mapped vmar.
-  bool CheckVmar(uint64_t page_offset, uint64_t page_count, const void* expected = nullptr);
+  bool CheckVmar(uint64_t page_offset, uint64_t page_count, const void* expected = nullptr) const;
   // Validates this vmo's content in the specified pages using vmo_read.
-  bool CheckVmo(uint64_t page_offset, uint64_t page_count, const void* expected = nullptr);
+  bool CheckVmo(uint64_t page_offset, uint64_t page_count, const void* expected = nullptr) const;
 
   // Resizes the vmo. This changes the |Vmo| internal state, so another thread should not be trying
   // to access it or perform operations on it concurrently.
@@ -53,27 +52,31 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
     return OpRange(ZX_VMO_OP_COMMIT, page_offset, page_count);
   }
 
-  const zx::vmo& vmo() const { return vmo_; }
-  zx::vmo& vmo() { return vmo_; }
+  // Sets the new key, replaces the current VMO with `new_vmo` and returns the old one.
+  zx::vmo Replace(zx::vmo new_vmo, uint64_t new_key) {
+    key_ = new_key;
+    zx::vmo old_vmo = std::move(vmo_);
+    vmo_ = std::move(new_vmo);
+    return old_vmo;
+  }
+
   std::unique_ptr<Vmo> Clone();
 
   std::unique_ptr<Vmo> Clone(uint64_t offset, uint64_t size);
 
+  const zx::vmo& vmo() const { return vmo_; }
   uint64_t size() const { return size_; }
   uintptr_t base_addr() const { return base_addr_; }
-
   uint64_t key() const { return key_; }
-  void set_key(uint64_t key) { key_ = key; }
 
  private:
-  Vmo(zx::vmo vmo, uint64_t size, uint64_t* base, uint64_t base_addr, uint64_t key)
-      : size_(size), base_(base), base_addr_(base_addr), vmo_(std::move(vmo)), key_(key) {}
+  Vmo(zx::vmo vmo, uint64_t size, uint64_t base_addr, uint64_t key)
+      : size_(size), base_addr_(base_addr), vmo_(std::move(vmo)), key_(key) {}
 
   bool OpRange(uint32_t op, uint64_t page_offset, uint64_t page_count);
 
   // These are set in the ctor, but can be changed by Vmo::Resize.
   uint64_t size_;
-  uint64_t* base_;
   uintptr_t base_addr_;
 
   // These are set in the ctor, but can be changed by UserPager::ReplaceVmo.
