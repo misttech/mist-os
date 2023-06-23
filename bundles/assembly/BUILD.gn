@@ -406,6 +406,7 @@ assembly_input_bundle("core_realm_development_access") {
     # The developer snapshot tool.
     "//src/developer/forensics/snapshot:pkg",
   ]
+  config_data_labels = [ "//src/developer/sshd-host:config" ]
   compiled_packages = [
     {
       name = "core"
