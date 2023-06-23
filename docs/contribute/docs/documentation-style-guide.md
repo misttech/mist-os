@@ -81,7 +81,7 @@ In the Fuchsia documentation you can link to three types of contents:
   example, `/docs/concepts/README.md`.
 * Source code - Link to source code files that exist within the Fuchsia source
   tree. These links can link to any file extension, but these files must exist
-  in the source tree. For example, `/src/sys/sysmgr/main.cc`.
+  in the source tree. For example, `/sdk/lib/fdio/fdio.cc`.
 * Reference documentation - Links to auto-generated Fuchsia reference
   documentation.
   * Most of the Fuchsia reference documentation doesn't exist in

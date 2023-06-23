@@ -310,7 +310,6 @@ hlcpp_visibility = [
   "//src/sys/fuzzing/realmfuzzer/tests:*",
   "//src/sys/fuzzing/registry/tests:*",
   "//src/sys/run_test_component:*",
-  "//src/sys/sysmgr:*",
   "//src/sys/test_manager/debug_data_processor:*",
   "//src/sys/test_manager/fidl/fuchsia.test.debug:*",
   "//src/sys/test_runners/gtest/test_data:*",

@@ -131,12 +131,6 @@ writes these values into the image, so they will survive a restart. For more
 detail on driver logging, see
 [Zircon driver logging](/docs/concepts/drivers/driver-development.md#logging)
 
-#### `core/bt-gap`
-
-The Bluetooth system service is invoked by sysmgr to resolve service requests.
-The mapping between environment service names and their handlers is defined in
-[//src/sys/sysmgr/config/services.config](/src/sys/sysmgr/config/services.config).
-
 ### Inspecting Component State
 
 The Bluetooth system supports inspection through the

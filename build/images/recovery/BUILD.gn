@@ -281,7 +281,6 @@ if (is_fuchsia) {
                       "//src/sys/appmgr",
                       "//src/sys/appmgr:appmgr_scheme_config",
                       "//src/sys/core:component_id_index_no_restrict_storage",
-                      "//src/sys/sysmgr",
                       "//src/firmware/fastboot-tcp",
                       "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",
                       "//src/firmware/fastboot-usb",

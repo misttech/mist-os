@@ -29,7 +29,6 @@ The input provided to this tool is expected to be the config-data package
 manifest, formatted like this::
 
   meta/data/some_package/foo=../../src/somewhere/foo
-  meta/data/sysmgr/services.config=../../src/sys/sysmgr/config/services.config
   meta/data/sysmgr/file1.config=../../src/bar/file1.config
   meta/data/other_package/baz=../../some/other/path/baz
 
@@ -79,8 +78,9 @@ def main():
     destination_conflicts = False
     for dest_file, source_files in destination_source_files.items():
         if len(source_files) > 1:
-            print('Different sysmgr config files map to the same destination {}.  Source files: {}'.
-                  format(dest_file, ', '.join(source_files)))
+            print(
+                'Different sysmgr config files map to the same destination {}.  Source files: {}'
+                .format(dest_file, ', '.join(source_files)))
             destination_conflicts = True
 
     # De-dup the list.

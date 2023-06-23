@@ -108,7 +108,6 @@ sdk_source_set("cpp") {
     "//src/sys/appmgr:*",
     "//src/sys/early_boot_instrumentation:*",
     "//src/sys/early_boot_instrumentation/test:*",
-    "//src/sys/sysmgr:*",
     "//src/tests/fidl/compatibility/cpp:*",
     "//src/tests/fidl/compatibility/llcpp:*",
     "//src/ui/a11y/bin/a11y_manager/tests/util:*",
