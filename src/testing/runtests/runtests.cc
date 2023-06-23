@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
       return -1;
     }
     if (zx_status_t status = loop.StartThread(); status != ZX_OK) {
-      printf("Error: Failed to start log exporter: %d (%s).\n", status,
+      printf("Error: Failed to start log exporter: %d (%s).\n", static_cast<int>(status),
              zx_status_get_string(status));
       return -1;
     }

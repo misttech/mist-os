@@ -50,7 +50,8 @@ void ControllerClientApp::SendCommand(std::vector<fuchsia::camera::gym::Command>
                               fuchsia::camera::gym::Controller_SendCommand_Result result) mutable {
         if (result.is_err()) {
           auto str = CommandErrorString(result.err());
-          fprintf(stderr, "Command error: %s (%u)\n", str.c_str(), result.err());
+          fprintf(stderr, "Command error: %s (%u)\n", str.c_str(),
+                  static_cast<unsigned int>(result.err()));
           loop_.Quit();
           return;
         }
