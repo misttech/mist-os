@@ -1621,6 +1621,11 @@ TEST(Pager, InvalidPagerDetachVmo) {
   ASSERT_EQ(zx_pager_detach_vmo(vmo.get(), vmo.get()), ZX_ERR_WRONG_TYPE);
   ASSERT_EQ(zx_pager_detach_vmo(pager.get(), pager.get()), ZX_ERR_WRONG_TYPE);
 
+  // missing rights
+  zx::vmo ro_vmo;
+  ASSERT_EQ(vmo.duplicate(ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHT_WRITE, &ro_vmo), ZX_OK);
+  ASSERT_EQ(zx_pager_detach_vmo(pager.get(), ro_vmo.get()), ZX_ERR_ACCESS_DENIED);
+
   // detaching a non-paged vmo
   zx::vmo tmp_vmo;
   ASSERT_EQ(zx::vmo::create(zx_system_get_page_size(), 0, &tmp_vmo), ZX_OK);
@@ -1674,12 +1679,14 @@ TEST(Pager, InvalidPagerSupplyPages) {
 
   // missing permissions on the aux vmo
   zx::vmo ro_vmo;
-  ASSERT_EQ(vmo.duplicate(ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHT_WRITE, &ro_vmo), ZX_OK);
+  ASSERT_EQ(aux_vmo.duplicate(ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHT_WRITE, &ro_vmo), ZX_OK);
   ASSERT_EQ(zx_pager_supply_pages(pager.get(), vmo.get(), 0, 0, ro_vmo.get(), 0),
             ZX_ERR_ACCESS_DENIED);
-  zx::vmo wo_vmo;
-  ASSERT_EQ(vmo.duplicate(ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHT_READ, &wo_vmo), ZX_OK);
-  ASSERT_EQ(zx_pager_supply_pages(pager.get(), vmo.get(), 0, 0, wo_vmo.get(), 0),
+
+  // missing permissions on the pager vmo
+  zx::vmo ro_pager_vmo;
+  ASSERT_EQ(vmo.duplicate(ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHT_WRITE, &ro_pager_vmo), ZX_OK);
+  ASSERT_EQ(zx_pager_supply_pages(pager.get(), ro_pager_vmo.get(), 0, 0, aux_vmo.get(), 0),
             ZX_ERR_ACCESS_DENIED);
 
   // misaligned offset, size, or aux alignment
