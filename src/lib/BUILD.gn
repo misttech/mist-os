@@ -138,6 +138,7 @@ group("tests") {
     "mpmc:tests",
     "mundane:tests",
     "network:tests",
+    "process:tests",
     "process_builder:tests",
     "product_description:tests($host_toolchain)",
     "pty:tests",

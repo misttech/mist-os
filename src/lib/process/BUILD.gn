@@ -46,3 +46,8 @@ fuchsia_unittest_package("process_unittests") {
     "//zircon/third_party/uapp/dash",
   ]
 }
+
+group("tests") {
+  testonly = true
+  public_deps = [ ":process_unittests" ]
+}
