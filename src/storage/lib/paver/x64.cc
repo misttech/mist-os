@@ -38,7 +38,8 @@ zx::result<std::unique_ptr<DevicePartitioner>> EfiDevicePartitioner::Initialize(
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  auto status = GptDevicePartitioner::InitializeGpt(std::move(devfs_root), svc_root, block_device);
+  auto status =
+      GptDevicePartitioner::InitializeGptWithFd(std::move(devfs_root), svc_root, block_device);
   if (status.is_error()) {
     return status.take_error();
   }

@@ -65,7 +65,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> CrosDevicePartitioner::Initialize
   }
 
   auto status_or_gpt =
-      GptDevicePartitioner::InitializeGpt(std::move(devfs_root), svc_root, block_device);
+      GptDevicePartitioner::InitializeGptWithFd(std::move(devfs_root), svc_root, block_device);
   if (status_or_gpt.is_error()) {
     return status_or_gpt.take_error();
   }

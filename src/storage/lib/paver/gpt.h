@@ -32,13 +32,15 @@ class GptDevicePartitioner {
     bool initialize_partition_tables;
   };
 
+  // TODO(https://fxbug.dev/127870): Replace this function with one that uses channels.
+  //
   // Find and initialize a GPT based device.
   //
   // If block_device is provided, then search is skipped, and block_device is used
   // directly. If it is not provided, we search for a device with a valid GPT,
   // with an entry for an FVM. If multiple devices with valid GPT containing
   // FVM entries are found, an error is returned.
-  static zx::result<InitializeGptResult> InitializeGpt(
+  static zx::result<InitializeGptResult> InitializeGptWithFd(
       fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       const fbl::unique_fd& block_device);
 

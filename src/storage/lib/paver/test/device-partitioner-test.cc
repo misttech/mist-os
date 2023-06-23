@@ -516,8 +516,8 @@ TEST_F(GptDevicePartitionerTests, AddPartitionAtLargeOffset) {
   ASSERT_OK(owned.status_value());
   fbl::unique_fd gpt_fd;
   ASSERT_OK(fdio_fd_create(owned.value().TakeChannel().release(), gpt_fd.reset_and_get_address()));
-  auto status = paver::GptDevicePartitioner::InitializeGpt(devmgr_.devfs_root().duplicate(),
-                                                           GetSvcRoot(), gpt_fd);
+  auto status = paver::GptDevicePartitioner::InitializeGptWithFd(devmgr_.devfs_root().duplicate(),
+                                                                 GetSvcRoot(), gpt_fd);
   ASSERT_OK(status);
 
   // Check if a partition can be added after the "dummy-partition"

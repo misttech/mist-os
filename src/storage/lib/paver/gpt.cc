@@ -288,7 +288,7 @@ zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::Initiali
   return zx::ok(new GptDevicePartitioner(std::move(devfs_root), svc_root, std::move(gpt), info));
 }
 
-zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::InitializeGpt(
+zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::InitializeGptWithFd(
     fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     const fbl::unique_fd& block_device) {
   if (block_device) {
