@@ -511,10 +511,27 @@ func infraToolLogChecks() []FailureModeCheck {
 			// connect after all retries and returns a fatal error.
 			SkipPassedTask: true,
 		},
-		// For fxbug.dev/56651.
-		// This error usually happens due to an SSH failure, so that error should take precedence.
+		// For fxbug.dev/128608.
 		&stringInLogCheck{
-			String: fmt.Sprintf("botanist ERROR: %s", testrunnerconstants.FailedToRunSnapshotMsg),
+			String:         "No daemon was running.",
+			Type:           swarmingOutputType,
+			SkipPassedTask: true,
+		},
+		// For fxbug.dev/127372.
+		&stringInLogCheck{
+			String: "FFX Daemon was told not to autostart",
+			Type:   swarmingOutputType,
+		},
+		// This error happens when `botanist run` exceeds its timeout, e.g.
+		// because many tests are taking too long. If botanist exceeds its timeout,
+		// it will terminate subprocesses which can lead to the errors below.
+		&stringInLogCheck{
+			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.CommandExceededTimeoutMsg),
+			Type:   swarmingOutputType,
+		},
+		// For fxbug.dev/94343.
+		&stringInLogCheck{
+			String: "There was an internal error running tests: Fidl(ClientChannelClosed { status: Status(PEER_CLOSED)",
 			Type:   swarmingOutputType,
 		},
 		// General ffx error check.
@@ -526,31 +543,11 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: fmt.Sprintf("botanist ERROR: %s", ffxutilconstants.CommandFailedMsg),
 			Type:   swarmingOutputType,
 		},
+		// For fxbug.dev/56651.
+		// This error usually happens due to an SSH failure, so that error should take precedence.
 		&stringInLogCheck{
-			String: fmt.Sprintf("botanist ERROR: %s", ffxutilconstants.CommandFailedMsg),
+			String: fmt.Sprintf("botanist ERROR: %s", testrunnerconstants.FailedToRunSnapshotMsg),
 			Type:   swarmingOutputType,
-		},
-		// This error happens when `botanist run` exceeds its timeout, e.g.
-		// because many tests are taking too long.
-		&stringInLogCheck{
-			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.CommandExceededTimeoutMsg),
-			Type:   swarmingOutputType,
-		},
-		// For fxbug.dev/94343.
-		&stringInLogCheck{
-			String: "There was an internal error running tests: Fidl(ClientChannelClosed { status: Status(PEER_CLOSED)",
-			Type:   swarmingOutputType,
-		},
-		// For fxbug.dev/127372.
-		&stringInLogCheck{
-			String: "FFX Daemon was told not to autostart",
-			Type:   swarmingOutputType,
-		},
-		// For fxbug.dev/128608.
-		&stringInLogCheck{
-			String:         "No daemon was running.",
-			Type:           swarmingOutputType,
-			SkipPassedTask: true,
 		},
 	}
 }
