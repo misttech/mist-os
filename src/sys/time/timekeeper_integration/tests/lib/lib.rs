@@ -572,33 +572,95 @@ pub fn create_cobalt_event_stream(
     .boxed()
 }
 
+/// Repeatedly evaluates `condition` until it returns `Some(v)`. Returns `v`.
+#[macro_export]
+macro_rules! poll_until_some {
+    ($condition:expr) => {
+        $crate::poll_until_some_impl(
+            $condition,
+            &$crate::SourceLocation::new(file!(), line!(), column!()),
+        )
+    };
+}
+
+/// Repeatedly evaluates `condition` to create a `Future`, and then awaits the `Future`.
+/// Returns `()` when the (most recently created) `Future` resolves to `true`.
+#[macro_export]
+macro_rules! poll_until_async {
+    ($condition:expr) => {
+        $crate::poll_until_async_impl(
+            $condition,
+            &$crate::SourceLocation::new(file!(), line!(), column!()),
+        )
+    };
+}
+
+/// Repeatedly evaluates `condition` until it returns `true`. Returns `()`.
+#[macro_export]
+macro_rules! poll_until {
+    ($condition:expr) => {
+        $crate::poll_until_impl(
+            $condition,
+            &$crate::SourceLocation::new(file!(), line!(), column!()),
+        )
+    };
+}
+
 const RETRY_WAIT_DURATION: zx::Duration = zx::Duration::from_millis(10);
 
-/// Poll `poll_fn` until it returns Some() and return the returned value.
-pub async fn poll_until_some<T, F>(poll_fn: F) -> T
+pub struct SourceLocation {
+    file: &'static str,
+    line: u32,
+    column: u32,
+}
+
+impl std::fmt::Display for SourceLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "(file: {}, line: {}, column: {})", self.file, self.line, self.column)
+    }
+}
+
+impl SourceLocation {
+    pub fn new(file: &'static str, line: u32, column: u32) -> Self {
+        Self { file, line, column }
+    }
+}
+
+/// Use `poll_until_some!()` instead.
+pub async fn poll_until_some_impl<T, F>(poll_fn: F, loc: &SourceLocation) -> T
 where
     F: Fn() -> Option<T>,
 {
+    tracing::info!("=> poll_until_some() for {}", loc);
     loop {
         match poll_fn() {
-            Some(value) => return value,
+            Some(value) => {
+                tracing::info!("<= poll_until_some() for {}", loc);
+                return value;
+            }
             None => fasync::Timer::new(fasync::Time::after(RETRY_WAIT_DURATION)).await,
         }
     }
 }
 
-/// Poll `poll_fn` until it returns true.
-pub async fn poll_until_async<F, Fut>(poll_fn: F)
+/// Use `poll_until_async!()` instead.
+pub async fn poll_until_async_impl<F, Fut>(poll_fn: F, loc: &SourceLocation)
 where
     F: Fn() -> Fut,
     Fut: Future<Output = bool>,
 {
+    tracing::info!("=> poll_until_async() for {}", loc);
     while !poll_fn().await {
         fasync::Timer::new(fasync::Time::after(RETRY_WAIT_DURATION)).await
     }
+    tracing::info!("<= poll_until_async() for {}", loc);
 }
 
-/// Poll `poll_fn` until it returns true.
-pub async fn poll_until<F: Fn() -> bool>(poll_fn: F) {
-    poll_until_async(|| futures::future::ready(poll_fn())).await
+/// Use `poll_until!()` instead.
+pub async fn poll_until_impl<F: Fn() -> bool>(poll_fn: F, loc: &SourceLocation) {
+    tracing::info!("=> poll_until() for {}", loc);
+    while !poll_fn() {
+        fasync::Timer::new(fasync::Time::after(RETRY_WAIT_DURATION)).await
+    }
+    tracing::info!("<= poll_until() for {}", loc);
 }

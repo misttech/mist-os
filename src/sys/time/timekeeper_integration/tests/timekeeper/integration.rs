@@ -151,7 +151,7 @@ fn test_invalid_rtc_start_clock_from_time_source() {
             assert_geq!(reported_utc, *VALID_TIME);
             assert_leq!(reported_utc, *VALID_TIME + (monotonic_after - sample_monotonic));
             // RTC should also be set.
-            let rtc_update = poll_until_some(|| rtc_updates.to_vec().pop()).await;
+            let rtc_update = poll_until_some!(|| rtc_updates.to_vec().pop()).await;
             let monotonic_after_rtc_set = zx::Time::get_monotonic();
             let rtc_reported_utc = rtc_time_to_zx_time(rtc_update);
             assert_geq!(rtc_reported_utc, *VALID_TIME);
@@ -231,7 +231,7 @@ fn test_start_clock_from_rtc() {
                     ..Default::default()
                 })
                 .await;
-            poll_until(|| {
+            poll_until!(|| {
                 clock.get_details().unwrap().last_value_update_ticks != clock_last_set_ticks
             })
             .await;
@@ -240,7 +240,7 @@ fn test_start_clock_from_rtc() {
             assert_geq!(clock_utc, *VALID_TIME);
             assert_leq!(clock_utc, *VALID_TIME + (monotonic_after_read - sample_monotonic));
             // RTC should be set too.
-            let rtc_update = poll_until_some(|| rtc_updates.to_vec().pop()).await;
+            let rtc_update = poll_until_some!(|| rtc_updates.to_vec().pop()).await;
             let monotonic_after_rtc_set = zx::Time::get_monotonic();
             let rtc_reported_utc = rtc_time_to_zx_time(rtc_update);
             assert_geq!(rtc_reported_utc, *VALID_TIME);
@@ -375,7 +375,7 @@ fn test_slew_clock() {
             .await;
 
         // After the second sample, the clock is running slightly slower than the reference.
-        poll_until(|| clock.get_details().unwrap().generation_counter != last_generation_counter)
+        poll_until!(|| clock.get_details().unwrap().generation_counter != last_generation_counter)
             .await;
         let slew_rate = clock.get_details().unwrap().mono_to_synthetic.rate;
         assert_lt!(slew_rate.synthetic_ticks, slew_rate.reference_ticks);
@@ -422,7 +422,7 @@ fn test_step_clock() {
                 ..Default::default()
             })
             .await;
-        poll_until(|| clock.get_details().unwrap().last_value_update_ticks != clock_last_set_ticks)
+        poll_until!(|| clock.get_details().unwrap().last_value_update_ticks != clock_last_set_ticks)
             .await;
         let utc_now_2 = clock.read().unwrap();
         let monotonic_after_2 = zx::Time::get_monotonic();
@@ -480,7 +480,7 @@ fn test_restart_crashed_time_source() {
                 ..Default::default()
             })
             .await;
-        poll_until(|| clock.get_details().unwrap().generation_counter != last_generation_counter)
+        poll_until!(|| clock.get_details().unwrap().generation_counter != last_generation_counter)
             .await;
         // Time from clock should incorporate the second sample.
         let result_utc = clock.read().unwrap();

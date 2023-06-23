@@ -94,7 +94,7 @@ fn test_restart_inactive_time_source_that_claims_healthy() {
 
         // Wait for Timekeeper to restart the time source. This is visible to the test as a second
         // connection to the fake time source.
-        poll_until(|| push_source_controller.lifetime_served_connections() > 1).await;
+        poll_until!(|| push_source_controller.lifetime_served_connections() > 1).await;
 
         // At least an hour should've passed.
         let mono_after =
@@ -144,7 +144,7 @@ fn test_dont_restart_inactive_time_source_with_unhealthy_dependency() {
         // Wait longer than the usual restart duration.
         let mono_before =
             zx::Time::from_nanos(fake_time.get_monotonic().await.expect("Failed to get time"));
-        poll_until_async(|| async {
+        poll_until_async!(|| async {
             let mono_now =
                 zx::Time::from_nanos(fake_time.get_monotonic().await.expect("Failed to get time"));
             mono_now - mono_before > INACTIVE_SOURCE_RESTART_DURATION * 4
