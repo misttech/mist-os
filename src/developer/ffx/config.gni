@@ -30,6 +30,7 @@ required_ffx_plugins = [
   "//src/developer/ffx/plugins/schema:ffx_schema",
   "//src/developer/ffx/plugins/target:ffx_target",
   "//src/developer/ffx/plugins/version:ffx_version",
+  "//src/developer/ffx/plugins/platform:ffx_platform",
 ]
 
 # The list of ffx plugins that we currently build as part of the 'main' ffx
@@ -65,7 +66,6 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/log:ffx_log",
   "//src/developer/ffx/plugins/overnet:ffx_overnet_plugin",
   "//src/developer/ffx/plugins/package:ffx_package",
-  "//src/developer/ffx/plugins/platform:ffx_platform",
   "//src/developer/ffx/plugins/power:ffx_power",
   "//src/developer/ffx/plugins/process_explorer:ffx_process_explorer",
   "//src/developer/ffx/plugins/product:ffx_product",
