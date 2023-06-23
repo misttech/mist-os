@@ -16,7 +16,7 @@ use ffx_emulator_common::{
 };
 use ffx_emulator_config::convert_bundle_to_configs;
 use ffx_emulator_start_args::StartCommand;
-use pbms::{load_product_bundle, ListingMode};
+use pbms::{load_product_bundle, ListingMode, ProductBundle};
 use std::{
     collections::hash_map::DefaultHasher, env, hash::Hasher, path::PathBuf, str::FromStr,
     time::Duration,
@@ -27,8 +27,8 @@ pub(crate) async fn list_virtual_devices(
     cmd: &StartCommand,
     sdk: &ffx_config::Sdk,
 ) -> Result<Vec<String>> {
-    let bundle =
-        load_product_bundle(&sdk, &cmd.product_bundle, ListingMode::ReadyBundlesOnly).await?;
+    let bundle: ProductBundle =
+        load_product_bundle(&sdk, &cmd.product_bundle, ListingMode::ReadyBundlesOnly).await?.into();
     bundle.device_refs()
 }
 

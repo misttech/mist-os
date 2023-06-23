@@ -38,7 +38,6 @@ use hyper::{Body, Method, Request};
 use itertools::Itertools as _;
 #[cfg(feature = "build_pb_v1")]
 use sdk;
-use sdk_metadata::ProductBundle;
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
@@ -50,6 +49,7 @@ pub use crate::{
     pbms::{fetch_data_for_product_bundle_v1, get_product_dir, get_storage_dir},
     transfer_manifest::transfer_download,
 };
+pub use sdk_metadata::{LoadedProductBundle, ProductBundle};
 
 mod gcs;
 mod pbms;
@@ -131,14 +131,14 @@ pub async fn load_product_bundle(
     _sdk: &ffx_config::Sdk,
     product_bundle: &Option<String>,
     _mode: ListingMode,
-) -> Result<ProductBundle> {
+) -> Result<LoadedProductBundle> {
     tracing::debug!("Loading a product bundle: {:?}", product_bundle);
     let env = ffx_config::global_env_context().expect("cannot get global_env_context");
     let build_dir = env.build_dir().map(Utf8Path::from_path).flatten().unwrap_or(Utf8Path::new(""));
 
     //  If `product_bundle` is a local path, load it directly.
     if let Some(path) = local_product_bundle_path(product_bundle, build_dir).await {
-        return ProductBundle::try_load_from(path);
+        return LoadedProductBundle::try_load_from(path);
     }
 
     #[cfg(feature = "build_pb_v1")]
@@ -148,15 +148,27 @@ pub async fn load_product_bundle(
         let product_url = select_product_bundle(_sdk, product_bundle, _mode, should_print)
             .await
             .context("Selecting product bundle")?;
+
         let name = product_url.fragment().expect("Product name is required.");
 
         let fms_entries = fms_entries_from(&product_url, &_sdk.get_path_prefix())
             .await
             .context("get fms entries")?;
+
         let product = fms::find_product_bundle(&fms_entries, &Some(name.to_string()))
             .context("problem with product_bundle")?
             .to_owned();
-        Ok(ProductBundle::V1(product))
+        // The metadata glob has the form /path/to/*.json and we want to remove
+        // the last path part.
+        let mut path = get_metadata_glob(&product_url, &_sdk.get_path_prefix())
+            .await
+            .expect("unable to get metadata glob");
+        path.pop();
+
+        Ok(LoadedProductBundle::new(
+            ProductBundle::V1(product),
+            Utf8PathBuf::from_path_buf(path).unwrap(),
+        ))
     }
     #[cfg(not(feature = "build_pb_v1"))]
     bail!("A path to a product bundle v2 is required because `build_pb_v1` was false");
@@ -802,5 +814,103 @@ mod tests {
         let test_dir = tempfile::TempDir::new().expect("temp dir");
         std::fs::create_dir(&test_dir.path().join("foo")).expect("make_dir foo");
         assert!(make_way_for_output(&test_dir.path(), /*force=*/ false).await.is_err());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_load_product_bundle_v1() {
+        let env = ffx_config::test_init().await.expect("create test config");
+
+        let sdk_root_dir = create_test_intree_sdk();
+        let sdk_root = sdk_root_dir.path().to_str().expect("path to str");
+        ffx_config::query("sdk.root")
+            .level(Some(ConfigLevel::User))
+            .set(sdk_root.into())
+            .await
+            .expect("set sdk root path");
+        ffx_config::query("sdk.type")
+            .level(Some(ConfigLevel::User))
+            .set("in-tree".into())
+            .await
+            .expect("set sdk type");
+        ffx_config::query(CONFIG_METADATA)
+            .level(Some(ConfigLevel::User))
+            .set(serde_json::json!(["{sdk.root}/*.json"]))
+            .await
+            .expect("set pbms metadata");
+
+        let sdk = env.context.get_sdk().await.expect("Loading configured sdk");
+
+        let pb = load_product_bundle(&sdk, &None, ListingMode::ReadyBundlesOnly)
+            .await
+            .expect("could not load product bundle");
+        assert_eq!(pb.loaded_from_path(), Utf8Path::new(sdk_root));
+    }
+
+    macro_rules! make_pb_v2_in {
+        ($dir:expr,$name:expr)=>{
+            {
+                let pb_dir = Utf8Path::from_path($dir.path()).unwrap();
+                let pb_file = File::create(pb_dir.join("product_bundle.json")).unwrap();
+                serde_json::to_writer(
+                    &pb_file,
+                    &serde_json::json!({
+                        "version": "2",
+                        "product_name": $name,
+                        "product_version": "version",
+                        "sdk_version": "sdk-version",
+                        "partitions": {
+                            "hardware_revision": "board",
+                            "bootstrap_partitions": [],
+                            "bootloader_partitions": [],
+                            "partitions": [],
+                            "unlock_credentials": [],
+                        },
+                    }),
+                )
+                .unwrap();
+                pb_dir
+            }
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_load_product_bundle_v2_valid() {
+        let tmp = TempDir::new().unwrap();
+        let pb_dir = make_pb_v2_in!(tmp, "fake.x64");
+
+        let env = ffx_config::test_init().await.expect("create test config");
+        let sdk = env.context.get_sdk().await.expect("Loading configured sdk");
+
+        // Load with passing a path directly
+        let pb =
+            load_product_bundle(&sdk, &Some(pb_dir.to_string()), ListingMode::ReadyBundlesOnly)
+                .await
+                .expect("could not load product bundle");
+        assert_eq!(pb.loaded_from_path(), pb_dir);
+
+        // Load with the config set with absolute path
+        ffx_config::query(PRODUCT_BUNDLE_PATH_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(serde_json::Value::String(pb_dir.to_string()))
+            .await
+            .expect("set product.path path");
+        let pb = load_product_bundle(&sdk, &None, ListingMode::ReadyBundlesOnly)
+            .await
+            .expect("could not load product bundle");
+        assert_eq!(pb.loaded_from_path(), pb_dir);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_load_product_bundle_v2_invalid() {
+        let tmp = TempDir::new().unwrap();
+        let pb_dir = Utf8Path::from_path(tmp.path()).unwrap();
+        let env = ffx_config::test_init().await.expect("create test config");
+        let sdk = env.context.get_sdk().await.expect("Loading configured sdk");
+
+        // Load with passing a path directly
+        let pb =
+            load_product_bundle(&sdk, &Some(pb_dir.to_string()), ListingMode::ReadyBundlesOnly)
+                .await;
+        assert!(pb.is_err());
     }
 }

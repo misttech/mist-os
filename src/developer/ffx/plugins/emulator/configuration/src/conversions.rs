@@ -34,7 +34,9 @@ pub async fn convert_bundle_to_configs(
         .get_sdk()
         .await?;
     let product_bundle =
-        load_product_bundle(&sdk, &product_bundle_name, ListingMode::ReadyBundlesOnly).await?;
+        load_product_bundle(&sdk, &product_bundle_name, ListingMode::ReadyBundlesOnly)
+            .await?
+            .into();
     match &product_bundle {
         ProductBundle::V1(_product_bundle) => {
             #[cfg(feature = "build_pb_v1")]
