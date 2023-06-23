@@ -413,8 +413,7 @@ impl Ip for Ipv4 {
     /// The IPv4 Multicast subnet, defined in [RFC 1112 Section 4].
     ///
     /// [RFC 1112 Section 4]: https://www.rfc-editor.org/rfc/rfc1112.html#section-4
-    const MULTICAST_SUBNET: Subnet<Ipv4Addr> =
-        Subnet { network: Ipv4Addr::new([224, 0, 0, 0]), prefix: 4 };
+    const MULTICAST_SUBNET: Subnet<Ipv4Addr> = Self::CLASS_D_SUBNET;
     /// The subnet of link-local unicast IPv4 addresses, outlined in [RFC 3927
     /// Section 2.1].
     ///
@@ -455,6 +454,40 @@ impl Ipv4 {
     /// [IANA IPv4 Special-Purpose Address Registry]: https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml
     pub const LIMITED_BROADCAST_ADDRESS: SpecifiedAddr<Ipv4Addr> =
         unsafe { SpecifiedAddr::new_unchecked(Ipv4Addr::new([255, 255, 255, 255])) };
+
+    /// The Class A subnet.
+    ///
+    /// The Class A subnet is defined in [RFC 1812 section 2.2.5.1].
+    ///
+    /// [RFC 1812 section 2.2.5.1]: https://datatracker.ietf.org/doc/html/rfc1812#section-2.2.5.1
+    pub const CLASS_A_SUBNET: Subnet<Ipv4Addr> =
+        Subnet { network: Ipv4Addr::new([0, 0, 0, 0]), prefix: 1 };
+
+    /// The Class B subnet.
+    ///
+    /// The Class B subnet is defined in [RFC 1812 section 2.2.5.1].
+    ///
+    /// [RFC 1812 section 2.2.5.1]: https://datatracker.ietf.org/doc/html/rfc1812#section-2.2.5.1
+    pub const CLASS_B_SUBNET: Subnet<Ipv4Addr> =
+        Subnet { network: Ipv4Addr::new([128, 0, 0, 0]), prefix: 2 };
+
+    /// The Class C subnet.
+    ///
+    /// The Class C subnet is defined in [RFC 1812 section 2.2.5.1].
+    ///
+    /// [RFC 1812 section 2.2.5.1]: https://datatracker.ietf.org/doc/html/rfc1812#section-2.2.5.1
+    pub const CLASS_C_SUBNET: Subnet<Ipv4Addr> =
+        Subnet { network: Ipv4Addr::new([192, 0, 0, 0]), prefix: 3 };
+
+    /// The Class D subnet.
+    ///
+    /// This subnet is also known as the multicast subnet.
+    ///
+    /// The Class D subnet is defined in [RFC 1812 section 2.2.5.1].
+    ///
+    /// [RFC 1812 section 2.2.5.1]: https://datatracker.ietf.org/doc/html/rfc1812#section-2.2.5.1
+    pub const CLASS_D_SUBNET: Subnet<Ipv4Addr> =
+        Subnet { network: Ipv4Addr::new([224, 0, 0, 0]), prefix: 4 };
 
     /// The Class E subnet.
     ///
@@ -1284,6 +1317,84 @@ impl_from_witness!(LinkLocalMulticastAddr);
 impl_from_witness!(UnicastAddr, Ipv6Addr, UnicastAddr::new_unchecked);
 impl_from_witness!(LinkLocalUnicastAddr, Ipv6Addr, |addr| LinkLocalAddr(UnicastAddr(addr)));
 
+/// The class of an IPv4 address.
+///
+/// The classful addressing scheme is obsoloted in favour of [CIDR] but is still
+/// used on some systems. For more information, see [RFC 791 section 2.3] and
+/// [RFC 1812 section 2.2.5.1].
+///
+/// [CIDR]: https://datatracker.ietf.org/doc/html/rfc1518
+/// [RFC 791 section 2.3]: https://datatracker.ietf.org/doc/html/rfc791#section-2.3
+/// [RFC 1812 section 2.2.5.1]: https://datatracker.ietf.org/doc/html/rfc1812#section-2.2.5.1
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Ipv4AddressClass {
+    /// A Class A IPv4 address.
+    A,
+    /// A Class B IPv4 address.
+    B,
+    /// A Class C IPv4 address.
+    C,
+    /// A Class D IPv4 address.
+    ///
+    /// Class D addresses are also known as multicast.
+    D,
+    /// A Class E IPv4 address.
+    ///
+    /// Class E addresses are also known as experimental.
+    E,
+}
+
+impl Ipv4AddressClass {
+    /// Returns the default prefix length for an IPv4 address class if the
+    /// prefix is well-defined.
+    pub const fn default_prefix_len(self) -> Option<u8> {
+        // Per RFC 943 https://datatracker.ietf.org/doc/html/rfc943
+        //
+        //   The first type of address, or class A, has a 7-bit network number
+        //   and a 24-bit local address.  The highest-order bit is set to 0.
+        //   This allows 128 class A networks.
+        //
+        //                        1                   2                   3
+        //    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //   |0|   NETWORK   |                Local Address                  |
+        //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //
+        //                          Class A Address
+        //
+        //   The second type of address, class B, has a 14-bit network number
+        //   and a 16-bit local address.  The two highest-order bits are set to
+        //   1-0.  This allows 16,384 class B networks.
+        //
+        //                        1                   2                   3
+        //    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //   |1 0|           NETWORK         |          Local Address        |
+        //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //
+        //                          Class B Address
+        //
+        //   The third type of address, class C, has a 21-bit network number
+        //   and a 8-bit local address.  The three highest-order bits are set
+        //   to 1-1-0.  This allows 2,097,152 class C networks.
+        //
+        //                        1                   2                   3
+        //    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //   |1 1 0|                    NETWORK              | Local Address |
+        //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //
+        //                          Class C Address
+        match self {
+            Ipv4AddressClass::A => Some(8),
+            Ipv4AddressClass::B => Some(16),
+            Ipv4AddressClass::C => Some(24),
+            Ipv4AddressClass::D => None,
+            Ipv4AddressClass::E => None,
+        }
+    }
+}
+
 /// An IPv4 address.
 ///
 /// # Layout
@@ -1395,6 +1506,24 @@ impl Ipv4Addr {
     pub fn to_ipv6_mapped(self) -> Ipv6Addr {
         let Self([a, b, c, d]) = self;
         Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, a, b, c, d])
+    }
+
+    /// Returns the address's class according to the obsoleted classful
+    /// addressing architecture.
+    pub fn class(&self) -> Ipv4AddressClass {
+        for (subnet, class) in [
+            (Ipv4::CLASS_A_SUBNET, Ipv4AddressClass::A),
+            (Ipv4::CLASS_B_SUBNET, Ipv4AddressClass::B),
+            (Ipv4::CLASS_C_SUBNET, Ipv4AddressClass::C),
+            (Ipv4::CLASS_D_SUBNET, Ipv4AddressClass::D),
+            (Ipv4::CLASS_E_SUBNET, Ipv4AddressClass::E),
+        ] {
+            if subnet.contains(self) {
+                return class;
+            }
+        }
+
+        unreachable!("{} should fit into a class", self)
     }
 }
 
@@ -3585,6 +3714,20 @@ mod tests {
                 None,
             );
         }
+    }
+
+    #[test_case(Ipv4::UNSPECIFIED_ADDRESS, Ipv4AddressClass::A; "first_class_a")]
+    #[test_case(Ipv4Addr::new([127, 255, 255, 255]), Ipv4AddressClass::A; "last_class_a")]
+    #[test_case(Ipv4Addr::new([128, 0, 0, 0]), Ipv4AddressClass::B; "first_class_b")]
+    #[test_case(Ipv4Addr::new([191, 255, 255, 255]), Ipv4AddressClass::B; "last_class_b")]
+    #[test_case(Ipv4Addr::new([192, 0, 0, 0]), Ipv4AddressClass::C; "first_class_c")]
+    #[test_case(Ipv4Addr::new([223, 255, 255, 255]), Ipv4AddressClass::C; "last_class_c")]
+    #[test_case(Ipv4Addr::new([224, 0, 0, 0]), Ipv4AddressClass::D; "first_class_d")]
+    #[test_case(Ipv4Addr::new([239, 255, 255, 255]), Ipv4AddressClass::D; "last_class_d")]
+    #[test_case(Ipv4Addr::new([240, 0, 0, 0]), Ipv4AddressClass::E; "first_class_e")]
+    #[test_case(Ipv4Addr::new([255, 255, 255, 255]), Ipv4AddressClass::E; "last_class_e")]
+    fn ipv4addr_class(addr: Ipv4Addr, class: Ipv4AddressClass) {
+        assert_eq!(addr.class(), class)
     }
 
     #[cfg(feature = "std")]
