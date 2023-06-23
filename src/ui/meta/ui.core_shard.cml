@@ -10,9 +10,6 @@
             environment: "#core-env",
         },
     ],
-
-    // Protocols used from a child are routed to the v1 sys realm.
-    // See also //src/sys/appmgr/meta/appmgr.core_shard.cml
     use: [
         {
             protocol: [ "fuchsia.session.scene.Manager" ],

@@ -42,8 +42,6 @@ template("assemble_network_conformance_system") {
       "//src/connectivity/network/testing/network-test-realm/service:network-test-realm",
       "//src/security/policy:appmgr_policy_eng",
       "//src/security/bin/root_ssl_certificates",
-      "//src/sys/appmgr:appmgr_scheme_config",
-      "//src/sys/appmgr",
       "//src/sys/full-resolver",
     ]
     base_packages += invoker.additional_base_packages

@@ -144,6 +144,9 @@ something accessing a capability provided by the component. Components may also
 be marked as "eager", which causes the component to start at the same point its
 parent starts.
 
+TODO(https://fxbug.dev/102390): The below is no longer true as of
+https://cs.opensource.google/fuchsia/fuchsia/+/124f955ae0d1db1c7e991684c7e8a9b4528d6806.
+
 In order to get the system running, appmgr is [marked as an eager
 component][appmgr-is-eager]. Since appmgr is stored in a package this causes
 component manager to attempt to load appmgr, and thus access the `/pkgfs` handle
@@ -175,20 +178,20 @@ appmgr.
 [glossary.fvm]: /docs/glossary#README.md#fuchsia-volume-manager
 [glossary.realm]: /docs/glossary#README.md#realm
 [glossary.outgoing-directory]: /docs/glossary/README.md#outgoing-directory
-[appmgr-exposes]: https://fuchsia.googlesource.com/fuchsia/+/7cf46e0c7a8e5e4c78dba846f867ab96bcce5c5b/src/sys/appmgr/meta/appmgr.cml#168
-[appmgr-is-eager]: https://fuchsia.googlesource.com/fuchsia/+/5a6fe7db58d2869ccfbb22caf53343d40e57c6ba/src/sys/root/meta/root.cml#14
-[appmgr-pkg]: https://fuchsia.googlesource.com/fuchsia/+/5a6fe7db58d2869ccfbb22caf53343d40e57c6ba/src/sys/appmgr/BUILD.gn#159
-[appmgr-uses]: https://fuchsia.googlesource.com/fuchsia/+/7cf46e0c7a8e5e4c78dba846f867ab96bcce5c5b/src/sys/appmgr/meta/appmgr.cml#40
+[appmgr-exposes]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/appmgr/meta/appmgr.common.cml?l=34-44&drc=1fa739bc41a4be3edbbfbb7ba5b93664a744a84a
+[appmgr-is-eager]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/root/meta/root.cml?l=14&drc=5a6fe7db58d2869ccfbb22caf53343d40e57c6ba
+[appmgr-pkg]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/appmgr/BUILD.gn?l=159&drc=5a6fe7db58d2869ccfbb22caf53343d40e57c6ba
+[appmgr-uses]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/appmgr/meta/appmgr.cml?l=40&drc=7cf46e0c7a8e5e4c78dba846f867ab96bcce5c5b
 [blobfs]: /docs/concepts/filesystems/blobfs.md
 [bootloader-and-kernel]: /docs/concepts/process/userboot.md#boot_loader_and_kernel_startup
 [component-manager]: /docs/concepts/components/v2/introduction.md#component-manager
 [critical-processes]: /docs/reference/syscalls/job_set_critical.md
 [devfs]: /docs/development/drivers/concepts/device_driver_model/device-model.md
-[driver-manager-exposes]: https://fuchsia.googlesource.com/fuchsia/+/5a6fe7db58d2869ccfbb22caf53343d40e57c6ba/src/sys/root/meta/driver_manager.cml#91
+[driver-manager-exposes]: /src/devices/bin/driver_manager/meta/driver-manager-base.shard.cml?l=83&drc=2deafe53a4a1626b5be2263c13e3dd57024be7db
 [dynamic-linking]: https://en.wikipedia.org/wiki/Dynamic_linker
 [fs-mount]: /docs/concepts/filesystems/filesystems.md#mounting
-[fshost-exposes]: https://fuchsia.googlesource.com/fuchsia/+/5a6fe7db58d2869ccfbb22caf53343d40e57c6ba/src/sys/root/meta/fshost.cml#17
-[fshost-magic-headers]: https://fuchsia.googlesource.com/fuchsia/+/514f9474502cf6cafcd1d5edadfc7164566d4453/zircon/system/ulib/fs-management/mount.cc#155
+[fshost-exposes]: /src/storage/fshost/meta/base_fshost.cml?l=73&drc=fe4110848aaad498a65278ac05d65fd8201f5ca2
+[fshost-magic-headers]: /src/lib/storage/fs_management/cpp/format.cc?l=60-61&drc=de246ad54cb9d6aab36ab29b48fdae69820c814e
 [fuchsia-io]: https://fuchsia.dev/reference/fidl/fuchsia.io
 [job]: /docs/reference/kernel_objects/job.md
 [kernel-command-line]: /docs/reference/kernel/kernel_cmdline.md
@@ -199,5 +202,5 @@ appmgr.
 [userboot-loading]: /docs/concepts/process/userboot.md#kernel_loads_userboot
 [userboot]: /docs/concepts/process/userboot.md
 [userspace]: https://en.wikipedia.org/wiki/User_space
-[wait-for-system]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/bin/driver_manager/driver_loader.cc;l=123;drc=62174108e02c85feb7a18df5cc03dcf8ec7d8625
+[wait-for-system]: /src/devices/bin/driver_manager/driver_loader.cc?l=123&drc=62174108e02c85feb7a18df5cc03dcf8ec7d8625
 [zxcrypt]: /docs/concepts/filesystems/zxcrypt.md

@@ -11,7 +11,6 @@ import("//build/images/zedboot/zedboot_args.gni")
 import("//build/info/info.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
-import("//src/sys/appmgr/core_shards.gni")
 import("//src/sys/core/build/core.gni")
 
 if (is_host) {
@@ -162,8 +161,6 @@ if (is_fuchsia) {
                         "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-legacy-privacy",
                         "//src/recovery/factory_reset",
                         "//src/recovery/system:system_recovery",
-                        "//src/sys/appmgr",
-                        "//src/sys/appmgr:appmgr_scheme_config",
                         "//src/sys/core:component_id_index_no_restrict_storage",
                         "//src/ui/bin/brightness_manager:auto-brightness",
 
@@ -278,8 +275,6 @@ if (is_fuchsia) {
                     [
                       "//build/info:build-info",
                       "//src/connectivity/network/netcfg:config-default",
-                      "//src/sys/appmgr",
-                      "//src/sys/appmgr:appmgr_scheme_config",
                       "//src/sys/core:component_id_index_no_restrict_storage",
                       "//src/firmware/fastboot-tcp",
                       "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",

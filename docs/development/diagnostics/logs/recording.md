@@ -9,7 +9,7 @@ There are a few ways you might see a Fuchsia program generate log messages:
 ## `LogSink`/syslog
 
 Components that want to generate log messages call [`fuchsia.logger/LogSink.Connect`]. The
-[`fuchsia.logger.LogSink`] service must be [allowlisted in the component manifest][logsink-cmx].
+[`fuchsia.logger.LogSink`] service must be [`use`d in the component manifest][syslog-use-shard].
 
 `Connect` takes a socket, into which the actual log messages are [written] by the syslog library.
 
@@ -19,8 +19,9 @@ reset. `log_listener` [prints a warning] when it's aware of dropped messages.
 
 The `LogSink` service must drain all of the sockets it receives quickly enough to prevent messages
 being dropped on the writer-side. `LogSink` is responsible for draining those sockets to fill
-[internal buffers]. This can result in high CPU usage in both the writing component and the
-`LogSink` when logging heavily.
+internal buffers (TODO(https://fxbug.dev/47661): No longer true since https://fxrev.dev/490158).
+This can result in high CPU usage in both the writing component and the `LogSink` when logging
+heavily.
 
 Different languages use different mechanisms to talk to `LogSink`. See the relevant pages for more
 information:
@@ -77,27 +78,23 @@ lack a way to express the severity of a message.
 
 [`fuchsia.logger/LogSink.Connect`]: https://fuchsia.dev/reference/fidl/fuchsia.logger#Connect
 [`fuchsia.logger.LogSink`]: https://fuchsia.dev/reference/fidl/fuchsia.logger#LogSink
-[logsink-cmx]: https://fuchsia.googlesource.com/fuchsia/+/1bdbf8a4e6f758c3b1782dee352071cc592ca3ab/src/lib/ui/carnelian/meta/example.cmx#15
-[written]: https://fuchsia.googlesource.com/fuchsia/+/1bdbf8a4e6f758c3b1782dee352071cc592ca3ab/zircon/system/ulib/syslog/fx_logger.cc#72
-[writing thread will drop logs]: https://fuchsia.googlesource.com/fuchsia/+/1bdbf8a4e6f758c3b1782dee352071cc592ca3ab/zircon/system/ulib/syslog/fx_logger.cc#130
-[prints a warning]: https://fuchsia.googlesource.com/fuchsia/+/1bdbf8a4e6f758c3b1782dee352071cc592ca3ab/garnet/bin/log_listener/src/main.rs#708
-[internal buffers]: https://fuchsia.googlesource.com/fuchsia/+/1bdbf8a4e6f758c3b1782dee352071cc592ca3ab/src/diagnostics/archivist/src/logs.rs#47
+[syslog-use-shard]: /sdk/lib/syslog/use.shard.cml
+[written]: /zircon/system/ulib/syslog/fx_logger.cc?l=72&drc=1bdbf8a4e6f758c3b1782dee352071cc592ca3ab
+[writing thread will drop logs]: /zircon/system/ulib/syslog/fx_logger.cc?l=130&drc=1bdbf8a4e6f758c3b1782dee352071cc592ca3ab
+[prints a warning]: /src/diagnostics/log_listener/src/main.rs?l=918&drc=3a02d1922c0519b4c7d639879ec0503de9c79f0c
 [C++ logging]: /docs/development/languages/c-cpp/logging.md
 [Dart logging]: /docs/development/languages/dart/logging.md
 [Go logging]: /docs/development/languages/go/logging.md
 [Rust logging]: /docs/development/languages/rust/logging.md
-[kernel's shared ring buffer]: https://fuchsia.googlesource.com/fuchsia/+/1bdbf8a4e6f758c3b1782dee352071cc592ca3ab/zircon/kernel/lib/debuglog/debuglog.cc#37
-[bindable to file descriptors]: https://fuchsia.googlesource.com/fuchsia/+/1bdbf8a4e6f758c3b1782dee352071cc592ca3ab/sdk/lib/fdio/include/lib/fdio/fdio.h#36
+[kernel's shared ring buffer]: /zircon/kernel/lib/debuglog/debuglog.cc?l=37&drc=1bdbf8a4e6f758c3b1782dee352071cc592ca3ab
+[bindable to file descriptors]: /sdk/lib/fdio/include/lib/fdio/fdio.h?l=36&drc=1bdbf8a4e6f758c3b1782dee352071cc592ca3ab
 [`debuglog_write`]: /docs/reference/syscalls/debuglog_write.md
 [`debuglog_read`]: /docs/reference/syscalls/debuglog_read.md
-[`zxlogf`]: https://fuchsia.googlesource.com/fuchsia/+/1bdbf8a4e6f758c3b1782dee352071cc592ca3ab/src/lib/ddk/include/ddk/debug.h#103
+[`zxlogf`]: /sdk/lib/driver/compat/cpp/logging.h?l=59&drc=7cf6769e0971693fc1307c6059826596452c75b2
 [kernel params]: /docs/reference/kernel/kernel_cmdline.md#drivernamelogflags
-[populated in procargs]: https://fuchsia.googlesource.com/fuchsia/+/1bdbf8a4e6f758c3b1782dee352071cc592ca3ab/src/sys/appmgr/realm.cc#140
 [`fuchsia.sys/LaunchInfo`]: https://fuchsia.dev/reference/fidl/fuchsia.sys#LaunchInfo
-[cloned]: https://fuchsia.googlesource.com/fuchsia/+/1bdbf8a4e6f758c3b1782dee352071cc592ca3ab/src/sys/appmgr/realm.cc#69
 [`stdout-to-debuglog`]: /src/sys/lib/stdout-to-debuglog
 [`fuchsia.boot.WriteOnlyLog`]: https://fuchsia.dev/reference/fidl/fuchsia.boot#WriteOnlyLog
-[appmgr]: /src/sys/appmgr/README.md
 [`ddk/debug.h`]: /src/lib/ddk/include/ddk/debug.h
 [components]: /docs/concepts/components/v2/introduction.md
 [ELF]: /docs/concepts/components/v2/elf_runner.md

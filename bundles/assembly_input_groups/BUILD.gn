@@ -44,8 +44,6 @@ assembly_input_groups("bootstrap") {
 assembly_input_groups("legacy") {
   visibility = [ "*" ]
   base_packages = [
-    "//src/sys/appmgr",
-    "//src/sys/appmgr:appmgr_scheme_config",
     "//src/sys/core:component_id_index_no_restrict_storage",
     "//src/security/policy:appmgr_policy_eng",
   ]

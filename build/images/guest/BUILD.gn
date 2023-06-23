@@ -84,10 +84,8 @@ if (labels.images == "//build/images/bringup") {
 
     base_packages = [
       "//src/performance/trace",
-      "//src/sys/appmgr:appmgr_scheme_config",
       "//src/sys/core:component_id_index_no_restrict_storage",
-      "//src/sys/appmgr:core_component_id_index",
-      "//src/sys/appmgr",
+      "//src/sys/core:core_component_id_index",
       "//src/virtualization/tests:virtualization_test_utils_pkg",
       "//src/cobalt/bin/app:cobalt_registry",
       "//src/cobalt/bin/app:config",

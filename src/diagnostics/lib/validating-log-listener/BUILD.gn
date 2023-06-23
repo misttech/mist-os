@@ -13,7 +13,6 @@ rustc_library("validating-log-listener") {
     ":*",
     "//src/diagnostics/archivist/*",
     "//src/lib/syslog/rust/tests/*",
-    "//src/sys/appmgr/integration_tests/*",
   ]
 
   deps = [

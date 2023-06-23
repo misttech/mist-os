@@ -7,8 +7,6 @@
 // such products. It should also contain routes from #ui to appmgr to
 // satisfy remaining v1 dependencies.
 {
-    // Protocols used from a child are routed to the v1 sys realm.
-    // See also //src/sys/appmgr/meta/appmgr.core_shard.cml
     use: [
         {
             // Expose FlatlandDisplay to the V1 realm for the benefit of

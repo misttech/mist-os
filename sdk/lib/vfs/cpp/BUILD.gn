@@ -105,7 +105,6 @@ sdk_source_set("cpp") {
     "//src/modular/bin/sessionmgr:*",
     "//src/modular/lib/pseudo_dir:*",
     "//src/storage/conformance/conformance_harness/sdkcpp:*",
-    "//src/sys/appmgr:*",
     "//src/sys/early_boot_instrumentation:*",
     "//src/sys/early_boot_instrumentation/test:*",
     "//src/tests/fidl/compatibility/cpp:*",

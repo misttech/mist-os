@@ -182,7 +182,7 @@ Reach out for questions or for status updates:
 *   <shayba@google.com>
 *   <component-framework-dev@fuchsia.dev>
 
-[appmgr]: /src/sys/appmgr
+[appmgr]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/appmgr?drc=2fb023b6271659e2e26105fdb4f598f072b63e87
 [glossary.components-v2]: /docs/glossary/README.md#components-v2
 [cmc]: /tools/cmc/
 [cml]: /docs/concepts/components/v2/component_manifests.md
