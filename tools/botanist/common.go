@@ -9,7 +9,6 @@ import (
 	"context"
 	"io"
 	"math"
-	"sync"
 
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/streams"
@@ -18,22 +17,47 @@ import (
 // LockedWriter is a wrapper around a writer that locks around each write so
 // that multiple writes won't interleave with each other.
 type LockedWriter struct {
-	mu     sync.Mutex
+	locks  chan *writeLock
 	writer io.Writer
+}
+
+type writeLock struct {
+	start chan struct{}
+	end   chan struct{}
 }
 
 // NewLockedWriter returns a LockedWriter that associates a new lock with the
 // provided writer.
-func NewLockedWriter(writer io.Writer) *LockedWriter {
-	return &LockedWriter{
-		mu:     sync.Mutex{},
+func NewLockedWriter(ctx context.Context, writer io.Writer) *LockedWriter {
+	w := &LockedWriter{
+		locks:  make(chan *writeLock),
 		writer: writer,
 	}
+
+	go func() {
+		for lock := range w.locks {
+			// Signal write to start.
+			lock.start <- struct{}{}
+			// Wait for write to finish.
+			<-lock.end
+		}
+	}()
+	go func() {
+		<-ctx.Done()
+		close(w.locks)
+	}()
+	return w
 }
 
 func (w *LockedWriter) Write(data []byte) (int, error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	start := make(chan struct{})
+	end := make(chan struct{})
+	// Queue write.
+	w.locks <- &writeLock{start, end}
+	// Wait for turn to start write.
+	<-start
+	// Defer sending struct on chan to signal end of write.
+	defer func() { end <- struct{}{} }()
 	return w.writer.Write(data)
 }
 

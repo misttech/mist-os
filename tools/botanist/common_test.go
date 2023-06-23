@@ -44,7 +44,9 @@ func TestLockedWriter(t *testing.T) {
 		finishWrite: make(chan struct{}, 1),
 		done:        make(chan struct{}, 1),
 	}
-	writer := NewLockedWriter(mock)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	writer := NewLockedWriter(ctx, mock)
 	go writer.Write([]byte("hello"))
 	// Wait for the lock to be acquired.
 	<-mock.gotLock
@@ -82,7 +84,9 @@ func write(t *testing.T, w io.Writer, data []string) {
 
 func TestStdioWriters(t *testing.T) {
 	var w strings.Builder
-	ctx := streams.ContextWithStdout(context.Background(), NewLockedWriter(&w))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx = streams.ContextWithStdout(ctx, NewLockedWriter(ctx, &w))
 
 	stdout1, _, flush1 := NewStdioWriters(ctx)
 	stdout2, _, flush2 := NewStdioWriters(ctx)

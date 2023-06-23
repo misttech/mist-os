@@ -39,8 +39,8 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
-	ctx = streams.ContextWithStdout(ctx, botanist.NewLockedWriter(os.Stdout))
-	ctx = streams.ContextWithStderr(ctx, botanist.NewLockedWriter(os.Stderr))
+	ctx = streams.ContextWithStdout(ctx, botanist.NewLockedWriter(ctx, os.Stdout))
+	ctx = streams.ContextWithStderr(ctx, botanist.NewLockedWriter(ctx, os.Stderr))
 	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
 	defer flush()
 	l := logger.NewLogger(level, color.NewColor(colors), stdout, stderr, "botanist ")
