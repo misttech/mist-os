@@ -69,7 +69,10 @@ per-file .gitmodules = file:/third_party/OWNERS
 # Add owners to source related files
 per-file .gitignore,.gitmodules = file:/infra/OWNERS
 
-# All  in-tree README.md for correcting usage comments during LSCs
+# For the LSC to migrate platform components into Software Assembly, add the
+# following special-cased ownership.  This should be re-evaluated for removal
+# quarterly, the next review at the start of 2023Q4: 2023-10-01
 per-file **/README.md = aaronwood@google.com
+per-file **.cml = aaronwood@google.com
 
 per-file .ignore = *
