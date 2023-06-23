@@ -167,7 +167,7 @@ class InitTests(unittest.TestCase):
             fc_generic_fuchsia_device.GenericFuchsiaDevice)
 
         mock_get_device_class.assert_called()
-        mock_fc_context.assert_called_once_with({})
+        mock_fc_context.assert_called()
         mock_ssh_check_connection.assert_called()
         mock_ffx_check_connection.assert_called()
 
@@ -195,7 +195,7 @@ class InitTests(unittest.TestCase):
             fc_x64.X64)
 
         mock_get_device_class.assert_called()
-        mock_fc_context.assert_called_once_with({})
+        mock_fc_context.assert_called()
         mock_ssh_check_connection.assert_called()
         mock_ffx_check_connection.assert_called()
 

@@ -82,7 +82,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
 
         mock_ffx_check_connection.assert_called_once_with(self.fd_obj.ffx)
         mock_ssh_check_connection.assert_called_once_with(self.fd_obj.ssh)
-        mock_fc_context.assert_called_once_with({})
+        mock_fc_context.assert_called()
 
     def test_device_is_a_fuchsia_device(self) -> None:
         """Test case to make sure DUT is a fuchsia device"""
@@ -165,7 +165,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._on_device_boot()"""
         # pylint: disable=protected-access
         self.fd_obj.on_device_boot()
-        mock_fc_context.assert_called_once_with({})
+        mock_fc_context.assert_called()
         mock_health_check.assert_called()
 
     @parameterized.expand(

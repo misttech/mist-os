@@ -230,7 +230,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             fuchsia_controller.ZxStatus: On FIDL communication failure.
         """
         try:
-            self._ctx = fuchsia_controller.Context({})
+            self._ctx = fuchsia_controller.Context(target=self.device_name)
 
             # TODO(fxb/128575): Make connect_remote_control_proxy() work, or
             # remove it.
