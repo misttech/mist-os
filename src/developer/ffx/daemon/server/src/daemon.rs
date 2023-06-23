@@ -40,6 +40,10 @@ use hoist::{Hoist, OvernetInstance};
 use notify::{RecursiveMode, Watcher};
 use protocols::{DaemonProtocolProvider, ProtocolError, ProtocolRegister};
 use rcs::RcsConnection;
+use signal_hook::{
+    consts::signal::{SIGHUP, SIGINT, SIGTERM},
+    iterator::Signals,
+};
 use std::{
     cell::Cell,
     collections::HashSet,
@@ -363,6 +367,7 @@ impl Daemon {
         self.start_ascendd(hoist).await?;
         let _socket_file_watcher =
             self.start_socket_watch(quit_tx.clone()).await.context("Starting socket watcher")?;
+        self.start_signal_monitoring(quit_tx.clone());
         let should_start_expiry = ffx_config::get(DISCOVERY_EXPIRE_TARGETS).await.unwrap_or(true);
         if should_start_expiry == true {
             self.start_target_expiry(Duration::from_secs(1));
@@ -517,6 +522,25 @@ impl Daemon {
         );
 
         Ok(watcher)
+    }
+
+    #[tracing::instrument(skip(self, quit_tx))]
+    fn start_signal_monitoring(&self, mut quit_tx: mpsc::Sender<()>) {
+        tracing::debug!("Starting monitoring for SIGHUP, SIGINT, SIGTERM");
+        let mut signals = Signals::new(&[SIGHUP, SIGINT, SIGTERM]).unwrap();
+        // signals.forever() is blocking, so we need to spawn a thread rather than use async.
+        let _signal_handle_thread = std::thread::spawn(move || {
+            for signal in signals.forever() {
+                match signal {
+                    SIGHUP | SIGINT | SIGTERM => {
+                        tracing::info!("Received signal {signal}, quitting");
+                        let _ = block_on(quit_tx.send(())).ok();
+                        break;
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        });
     }
 
     fn start_target_expiry(&mut self, frequency: Duration) {

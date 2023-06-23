@@ -6,11 +6,27 @@ use crate::{assert_eq, test::new_isolate};
 use anyhow::*;
 use ffx_daemon::SocketDetails;
 use fuchsia_async::Duration;
+use nix::{sys::signal, unistd::Pid};
 use std::{
     io::{BufRead, BufReader, Write},
+    process::Child,
     thread::sleep,
     time::Duration as StdDuration,
 };
+
+async fn run_daemon(isolate: &ffx_isolate::Isolate) -> Result<Child> {
+    let mut daemon = ffx_daemon::run_daemon(isolate.env_context()).await?;
+
+    #[cfg(target_os = "macos")]
+    let daemon_wait_time = 500;
+    #[cfg(not(target_os = "macos"))]
+    let daemon_wait_time = 100;
+    // wait a bit to make sure the daemon has had a chance to start up, then check that it's
+    // still running
+    fuchsia_async::Timer::new(Duration::from_millis(daemon_wait_time)).await;
+    assert_eq!(None, daemon.try_wait()?, "Daemon exited quickly after starting");
+    Ok(daemon)
+}
 
 pub(crate) async fn test_echo() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("daemon-echo").await?;
@@ -61,12 +77,7 @@ pub(crate) async fn test_isolate_cleanup() -> Result<Option<ffx_isolate::Isolate
 
 pub(crate) async fn test_config_flag() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("daemon-config-flag").await?;
-    let mut daemon = ffx_daemon::run_daemon(isolate.env_context()).await?;
-
-    // wait a bit to make sure the daemon has had a chance to start up, then check that it's
-    // still running
-    fuchsia_async::Timer::new(Duration::from_millis(100)).await;
-    assert_eq!(None, daemon.try_wait()?, "Daemon didn't stay up for at least 100ms after starting");
+    let mut daemon = run_daemon(&isolate).await?;
 
     // This should not terminate the daemon just started, as it won't
     // share an overnet socket with it.
@@ -130,17 +141,7 @@ pub(crate) async fn test_no_autostart() -> Result<Option<ffx_isolate::Isolate>> 
     assert!(out.stderr.contains(
         "FFX Daemon was told not to autostart and no existing Daemon instance was found"
     ));
-    // Build the actual daemon command
-    let mut daemon = ffx_daemon::run_daemon(isolate.env_context()).await?;
-
-    #[cfg(target_os = "macos")]
-    let daemon_wait_time = 500;
-    #[cfg(not(target_os = "macos"))]
-    let daemon_wait_time = 100;
-    // wait a bit to make sure the daemon has had a chance to start up, then check that it's
-    // still running
-    fuchsia_async::Timer::new(Duration::from_millis(daemon_wait_time)).await;
-    assert_eq!(None, daemon.try_wait()?, "Daemon exited quickly after starting");
+    let mut daemon = run_daemon(&isolate).await?;
 
     let out = isolate.ffx(&["daemon", "echo"]).await?;
     // Don't assert here -- it if fails, we still want to kill the daemon
@@ -154,4 +155,26 @@ pub(crate) async fn test_no_autostart() -> Result<Option<ffx_isolate::Isolate>> 
     assert!(echo_succeeded);
 
     Ok(Some(isolate))
+}
+
+pub(crate) async fn test_cleanup_on_signal() -> Result<Option<ffx_isolate::Isolate>> {
+    let isolate = new_isolate("daemon-cleanup-on-signal").await?;
+    let mut daemon = run_daemon(&isolate).await?;
+    let socket_out = isolate.ffx(&["--machine", "json", "daemon", "socket"]).await?.stdout;
+    let socket_details: serde_json::Value = serde_json::from_str(&socket_out)?;
+    let path: std::path::PathBuf = socket_details
+        .get("socket")
+        .expect("socket should exist")
+        .get("path")
+        .expect("socket.path should exist")
+        .as_str()
+        .expect("socket.path should be a string")
+        .into();
+    assert!(path.exists());
+    let pid = Pid::from_raw(daemon.id() as i32);
+    signal::kill(pid, Some(signal::Signal::SIGTERM))?;
+    fuchsia_async::unblock(move || daemon.wait()).await?;
+    assert!(!path.exists());
+    // We don't need to return the isolate, since we've already killed the daemon
+    Ok(None)
 }
