@@ -44,17 +44,17 @@ class ProcessBuilder {
 
   // Append arguments to the argument list for the process.
   //
-  // Safe to call mutliple times.
-  void AddArgs(const std::vector<std::string>& argv);
+  // Safe to call multiple times.
+  zx_status_t AddArgs(const std::vector<std::string>& argv);
 
   // Adds the given handle to the handle list for the process.
   //
-  // Safe to call mutliple times.
+  // Safe to call multiple times.
   void AddHandle(uint32_t id, zx::handle handle);
 
   // Adds the given handles to the handle list for the process.
   //
-  // Safe to call mutliple times.
+  // Safe to call multiple times.
   void AddHandles(std::vector<fuchsia::process::HandleInfo> handles);
 
   // Provide |job| to the process as PA_JOB_DEFAULT.
@@ -83,11 +83,11 @@ class ProcessBuilder {
   //
   // Defaults to zx_job_default() unless you passed a job explicitly when
   // constructing this object.
-  void CloneJob();
+  zx_status_t CloneJob();
 
   // Clone the FDIO namespace for this process as the namespace for the created
   // process.
-  void CloneNamespace();
+  zx_status_t CloneNamespace();
 
   // Clone the STDIO for this process as the namespace for the created process.
   //
@@ -96,11 +96,11 @@ class ProcessBuilder {
   void CloneStdio();
 
   // Clone the environ for this process as the environ for the created process.
-  void CloneEnvironment();
+  zx_status_t CloneEnvironment();
 
   // Calls |CloneJob|, |CloneLdsvc|, |CloneNamespace|, |CloneStdio|, and
   // |CloneEnvironment|.
-  void CloneAll();
+  zx_status_t CloneAll();
 
   // Clone the local file descriptor |local_fd| as the file descriptor
   // |target_fd| in the created process.

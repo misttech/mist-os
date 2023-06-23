@@ -9,13 +9,15 @@
 #include <lib/fdio/io.h>
 #include <zircon/processargs.h>
 
+#include <utility>
+
 #include "src/developer/debug/debug_agent/zircon_process_handle.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace debug_agent {
 
 ZirconBinaryLauncher::ZirconBinaryLauncher(std::shared_ptr<sys::ServiceDirectory> env_services)
-    : builder_(env_services) {}
+    : builder_(std::move(env_services)) {}
 ZirconBinaryLauncher::~ZirconBinaryLauncher() = default;
 
 debug::Status ZirconBinaryLauncher::Setup(const std::vector<std::string>& argv) {
@@ -28,10 +30,18 @@ debug::Status ZirconBinaryLauncher::Setup(const std::vector<std::string>& argv) 
     return debug::ZxStatus(status);
   }
 
-  builder_.AddArgs(argv);
-  builder_.CloneJob();
-  builder_.CloneNamespace();
-  builder_.CloneEnvironment();
+  if (zx_status_t status = builder_.AddArgs(argv); status != ZX_OK) {
+    return debug::ZxStatus(status);
+  }
+  if (zx_status_t status = builder_.CloneJob(); status != ZX_OK) {
+    return debug::ZxStatus(status);
+  }
+  if (zx_status_t status = builder_.CloneNamespace(); status != ZX_OK) {
+    return debug::ZxStatus(status);
+  }
+  if (zx_status_t status = builder_.CloneEnvironment(); status != ZX_OK) {
+    return debug::ZxStatus(status);
+  }
 
   stdio_handles_.out = AddStdioEndpoint(STDOUT_FILENO);
   stdio_handles_.err = AddStdioEndpoint(STDERR_FILENO);

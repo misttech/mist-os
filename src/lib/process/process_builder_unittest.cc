@@ -4,20 +4,20 @@
 
 #include "src/lib/process/process_builder.h"
 
-#include <gtest/gtest.h>
+#include <lib/sys/cpp/service_directory.h>
 
-#include "lib/sys/cpp/service_directory.h"
+#include <gtest/gtest.h>
 
 namespace process {
 namespace {
 
-static constexpr char kShell[] = "/pkg/bin/sh";
+constexpr char kShell[] = "/pkg/bin/sh";
 
 TEST(ProcessBuilder, Control) {
   ProcessBuilder builder(sys::ServiceDirectory::CreateFromNamespace());
   ASSERT_EQ(ZX_OK, builder.LoadPath(kShell));
-  builder.AddArgs({kShell});
-  builder.CloneAll();
+  ASSERT_EQ(ZX_OK, builder.AddArgs({kShell}));
+  ASSERT_EQ(ZX_OK, builder.CloneAll());
   ASSERT_EQ(ZX_OK, builder.Prepare(nullptr));
   EXPECT_TRUE(builder.data().process.is_valid());
   EXPECT_TRUE(builder.data().root_vmar.is_valid());
