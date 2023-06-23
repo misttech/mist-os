@@ -52,16 +52,16 @@ tmandry@google.com
 per-file .gn,BUILD.gn = file:/build/OWNERS
 
 # Build system files throughout the tree
-per-file **.gn,**.gni,**.bazel,**.bzl = file:/build/OWNERS
+per-file **.gn,**.gni,**.bazel,**.bzl,fuchsia.code-workspace = file:/build/OWNERS
 
 # Go-language support files
-per-file go.mod,go.sum = file:/build/go/OWNERS
+per-file go.mod,go.sum,fuchsia.code-workspace = file:/build/go/OWNERS
 
 # Rust-language support files
-per-file rustfmt.toml = file:/build/rust/OWNERS
+per-file rustfmt.toml,fuchsia.code-workspace = file:/build/rust/OWNERS
 
 # Python-language support files
-per-file pyrightconfig.json = file:/build/python/OWNERS
+per-file pyrightconfig.json,fuchsia.code-workspace = file:/build/python/OWNERS
 
 # Add owners to .gitmodules for submodule update tool
 per-file .gitmodules = file:/third_party/OWNERS
