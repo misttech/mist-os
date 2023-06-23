@@ -33,6 +33,7 @@ group("fonts") {
 group("tests") {
   testonly = true
   public_deps = [
+    ":font_provider_hermetic_for_test",
     ":font_provider_unit_tests",
     "char_set:tests",
     "fake:tests",
@@ -214,7 +215,10 @@ fuchsia_component("font_provider_hermetic_for_test") {
 # testing.
 fuchsia_package("fonts_hermetic_for_test") {
   testonly = true
-  deps = [ ":font_provider_hermetic_for_test" ]
+  deps = [
+    ":font_provider_hermetic_for_test",
+    ":font_provider_hermetic_for_test_config_values",
+  ]
 }
 
 fuchsia_test_package("font_provider_unit_tests") {
