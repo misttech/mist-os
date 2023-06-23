@@ -26,7 +26,6 @@ icu_rustc_binary("scene_manager_bin") {
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.factory:fuchsia.factory_rust",
     "//sdk/fidl/fuchsia.input.injection:fuchsia.input.injection_rust",
-    "//sdk/fidl/fuchsia.input.wayland:fuchsia.input.wayland_rust",
     "//sdk/fidl/fuchsia.lightsensor:fuchsia.lightsensor_rust",
     "//sdk/fidl/fuchsia.recovery.policy:fuchsia.recovery.policy_rust",
     "//sdk/fidl/fuchsia.recovery.ui:fuchsia.recovery.ui_rust",

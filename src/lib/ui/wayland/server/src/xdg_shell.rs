@@ -10,13 +10,12 @@ use {
     crate::scenic::{Flatland, FlatlandPtr},
     anyhow::{format_err, Error, Result},
     async_utils::hanging_get::client::HangingGetStream,
-    fidl::endpoints::{create_endpoints, create_proxy, create_request_stream, ServerEnd},
+    fidl::endpoints::{create_endpoints, create_proxy, ServerEnd},
     fidl::prelude::*,
     fidl_fuchsia_element::{
         Annotation, AnnotationKey, AnnotationValue, ViewControllerMarker, ViewControllerProxy,
         ViewSpec,
     },
-    fidl_fuchsia_input_wayland::{KeymapMarker, KeymapProxy},
     fidl_fuchsia_math::{Rect, Size, SizeF},
     fidl_fuchsia_math::{SizeU, Vec_},
     fidl_fuchsia_ui_app::{ViewProviderControlHandle, ViewProviderMarker, ViewProviderRequest},
@@ -29,7 +28,6 @@ use {
         MousePointerSample, MouseSourceMarker, MouseSourceProxy, TouchPointerSample,
         TouchSourceMarker, TouchSourceProxy,
     },
-    fidl_fuchsia_ui_views::ViewRef,
     fidl_fuchsia_ui_views::{
         ViewIdentityOnCreation, ViewRefFocusedMarker, ViewRefFocusedProxy, ViewportCreationToken,
     },
@@ -39,10 +37,8 @@ use {
     fuchsia_scenic::ViewRefPair,
     fuchsia_trace as ftrace, fuchsia_wayland_core as wl,
     fuchsia_wayland_core::Enum,
-    fuchsia_zircon::{self as zx, HandleBased},
     futures::prelude::*,
     parking_lot::Mutex,
-    std::collections::VecDeque,
     std::sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -258,8 +254,6 @@ impl RequestReceiver<xdg_shell::XdgPositioner> for XdgPositioner {
     }
 }
 
-const ESCAPE_DELAY_NS: i64 = 1_000_000_000;
-
 /// An `XdgSurface` is the common base to the different surfaces in the
 /// `XdgShell` (ex: `XdgToplevel`, `XdgPopup`).
 pub struct XdgSurface {
@@ -402,127 +396,6 @@ impl XdgSurface {
         }
     }
 
-    /// Spawns a task that forwards notifications about keymap changes to all
-    /// attached keyboards.
-    fn spawn_keymap_listener(task_queue: TaskQueue) -> Result<()> {
-        let maybe_keymap_proxy = connect_to_protocol::<KeymapMarker>();
-
-        if let Ok(keymap_proxy) = maybe_keymap_proxy {
-            let mut hanging_get_stream = HangingGetStream::new(keymap_proxy, KeymapProxy::watch);
-
-            fasync::Task::local(async move {
-                loop {
-                    match hanging_get_stream.next().await {
-                        Some(Ok(keymap_vmo)) => {
-                            // Forward keymap information as a Wayland event.
-                            task_queue.post(move |client| {
-                                client.input_dispatcher.send_keymap_event(
-                                    keymap_vmo
-                                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                                        .expect("handle can be duplicated"),
-                                )
-                            });
-                        }
-
-                        Some(Err(e)) => {
-                            // Not fatal, but will cause the Wayland bridge to attempt to read
-                            // keymap updates no longer.
-                            eprintln!(
-                                "could not read keymap information, giving up on keymap: {:?}",
-                                &e
-                            );
-                            break;
-                        }
-
-                        // Should never happen since this stream will yield
-                        // indefinitely.
-                        None => unreachable!(),
-                    }
-                }
-            })
-            .detach();
-        } else {
-            // This is not fatal, but there will be no other keymap supported but the default.
-            eprintln!(
-                "no connection to fuchsia.input.wayland.Keymap, not listening to keymap changes"
-            );
-        }
-
-        Ok(())
-    }
-
-    fn spawn_keyboard_listener(
-        surface_ref: ObjectRef<Surface>,
-        view_ref: ViewRef,
-        task_queue: TaskQueue,
-    ) -> Result<(), Error> {
-        let keyboard = connect_to_protocol::<fidl_fuchsia_ui_input3::KeyboardMarker>()?;
-        let (listener_client_end, mut listener_stream) =
-            create_request_stream::<fidl_fuchsia_ui_input3::KeyboardListenerMarker>()?;
-
-        fasync::Task::local(async move {
-            keyboard.add_listener(view_ref, listener_client_end).await.unwrap();
-
-            // Track the event time of the last three Escape key presses.
-            let mut escapes: VecDeque<_> = vec![0; 3].into_iter().collect();
-
-            while let Some(event) = listener_stream.try_next().await.unwrap() {
-                match event {
-                    fidl_fuchsia_ui_input3::KeyboardListenerRequest::OnKeyEvent {
-                        event,
-                        responder,
-                        ..
-                    } => {
-                        responder
-                            .send(fidl_fuchsia_ui_input3::KeyEventStatus::Handled)
-                            .expect("send");
-                        // Store the event time of the last three Escape key presses
-                        // and attempt to close `XdgSurface` if the elapsed time
-                        // between the first and the last press is less than
-                        // ESCAPE_DELAY_NS.
-                        let close = if event.type_
-                            == Some(fidl_fuchsia_ui_input3::KeyEventType::Pressed)
-                            && event.key == Some(fidl_fuchsia_input::Key::Escape)
-                        {
-                            let timestamp = event.timestamp.expect("missing timestamp");
-                            escapes.pop_front();
-                            escapes.push_back(timestamp);
-                            // Same to unwrap as there is always three elements.
-                            let elapsed = escapes.back().unwrap() - escapes.front().unwrap();
-                            if elapsed < ESCAPE_DELAY_NS {
-                                escapes = vec![0; 3].into_iter().collect();
-                                true
-                            } else {
-                                false
-                            }
-                        } else {
-                            false
-                        };
-
-                        task_queue.post(move |client| {
-                            if close {
-                                // Close focused XDG surface.
-                                for xdg_surface_ref in &client.xdg_surfaces {
-                                    let xdg_surface = xdg_surface_ref.get(client)?;
-                                    let surface_ref = xdg_surface.surface_ref;
-                                    if client.input_dispatcher.has_focus(surface_ref) {
-                                        XdgSurface::close(*xdg_surface_ref, client)?;
-                                        break;
-                                    }
-                                }
-                            } else {
-                                client.input_dispatcher.handle_key_event(surface_ref, &event)?;
-                            }
-                            Ok(())
-                        });
-                    }
-                }
-            }
-        })
-        .detach();
-        Ok(())
-    }
-
     fn get_event_target(
         root_surface_ref: ObjectRef<Surface>,
         client: &Client,
@@ -535,14 +408,6 @@ impl XdgSurface {
             }
         }
         None
-    }
-
-    fn close(this: ObjectRef<Self>, client: &mut Client) -> Result<(), Error> {
-        match this.get(client)?.xdg_role {
-            Some(XdgSurfaceRole::Popup(popup)) => XdgPopup::close(popup, client),
-            Some(XdgSurfaceRole::Toplevel(toplevel)) => XdgToplevel::close(toplevel, client),
-            _ => Ok(()),
-        }
     }
 
     /// Adds a child view to this `XdgSurface`.
@@ -1086,11 +951,6 @@ impl XdgPopup {
         self.geometry
     }
 
-    fn close(this: ObjectRef<Self>, client: &mut Client) -> Result<(), Error> {
-        ftrace::duration!("wayland", "XdgPopup::close");
-        client.event_queue().post(this.id(), XdgPopupEvent::PopupDone)
-    }
-
     /// Creates a new `XdgPopup` surface.
     pub fn new(
         xdg_surface_ref: ObjectRef<XdgSurface>,
@@ -1313,8 +1173,6 @@ impl XdgToplevel {
                         ViewProviderRequest::CreateView2 { args, .. } => {
                             let view_creation_token = args.view_creation_token.unwrap();
                             let viewref_pair = ViewRefPair::new()?;
-                            let view_ref =
-                                fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
                             let view_identity = ViewIdentityOnCreation::from(viewref_pair);
                             let (parent_viewport_watcher, parent_viewport_watcher_request) =
                                 create_proxy::<ParentViewportWatcherMarker>()
@@ -1344,12 +1202,6 @@ impl XdgToplevel {
                                     parent_viewport_watcher_request,
                                 )
                                 .expect("fidl error");
-                            XdgSurface::spawn_keymap_listener(task_queue.clone())?;
-                            XdgSurface::spawn_keyboard_listener(
-                                surface_ref,
-                                view_ref,
-                                task_queue.clone(),
-                            )?;
                             XdgSurface::spawn_view_ref_focused_listener(
                                 xdg_surface_ref,
                                 surface_ref,
@@ -1422,7 +1274,6 @@ impl XdgToplevel {
         let creation_tokens = ViewCreationTokenPair::new().expect("failed to create token pair");
         let viewref_pair = ViewRefPair::new()?;
         let view_ref_dup = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
-        let view_ref_dup2 = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
         let view_identity = ViewIdentityOnCreation::from(viewref_pair);
         let toplevel = this.get(client)?;
         let annotations = toplevel.title.as_ref().map(|title| {
@@ -1467,8 +1318,6 @@ impl XdgToplevel {
         let surface_ref = toplevel.surface_ref;
         let max_size = toplevel.max_size;
         let task_queue = client.task_queue();
-        XdgSurface::spawn_keymap_listener(task_queue.clone())?;
-        XdgSurface::spawn_keyboard_listener(surface_ref, view_ref_dup2, task_queue.clone())?;
         XdgSurface::spawn_view_ref_focused_listener(
             xdg_surface_ref,
             surface_ref,

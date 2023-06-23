@@ -34,9 +34,6 @@ pub mod pointer_sensor_scale_handler;
 pub mod text_settings_handler;
 pub mod touch_injector_handler;
 
-/// Forwards the information about the input pipeline into Wayland bridge.
-pub mod wayland_handler;
-
 pub mod focus_listener;
 pub mod gestures;
 pub mod input_pipeline;

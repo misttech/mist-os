@@ -18,7 +18,6 @@ use {
         GraphicalPresenterRequest, GraphicalPresenterRequestStream, PresentViewError, ViewSpec,
     },
     fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream,
-    fidl_fuchsia_input_wayland::KeymapRequestStream,
     fidl_fuchsia_lightsensor::SensorRequestStream as LightSensorRequestStream,
     fidl_fuchsia_recovery_policy::DeviceRequestStream as FactoryResetDeviceRequestStream,
     fidl_fuchsia_recovery_ui::FactoryResetCountdownRequestStream,
@@ -75,7 +74,6 @@ enum ExposedServices {
     InputDeviceRegistry(InputDeviceRegistryRequestStream),
     LightSensor(LightSensorRequestStream),
     SceneManager(SceneManagerRequestStream),
-    Wayland(KeymapRequestStream),
 }
 
 #[fuchsia::main(logging_tags = [ "scene_manager" ])]
@@ -130,8 +128,7 @@ async fn inner_main() -> Result<(), Error> {
         .add_fidl_service(ExposedServices::GraphicalPresenter)
         .add_fidl_service(ExposedServices::InputConfigFeatures)
         .add_fidl_service(ExposedServices::InputDeviceRegistry)
-        .add_fidl_service(ExposedServices::SceneManager)
-        .add_fidl_service(ExposedServices::Wayland);
+        .add_fidl_service(ExposedServices::SceneManager);
 
     let light_sensor_configuration: Option<LightSensorConfiguration> =
         match File::open(LIGHT_SENSOR_CONFIGURATION) {
@@ -274,10 +271,6 @@ async fn inner_main() -> Result<(), Error> {
     let (focus_chain_publisher, focus_chain_stream_handler) =
         focus_chain_provider::make_publisher_and_stream_handler();
 
-    // Wayland keymap plumbing.
-    let (keymap_sender, keymap_receiver) =
-        futures::channel::mpsc::unbounded::<KeymapRequestStream>();
-
     // Create a node under root to hang all input pipeline inspect data off of.
     let inspect_node = inspector.root().create_child("input_pipeline");
 
@@ -293,7 +286,6 @@ async fn inner_main() -> Result<(), Error> {
         media_buttons_listener_registry_request_stream_receiver,
         factory_reset_countdown_request_stream_receiver,
         factory_reset_device_request_stream_receiver,
-        keymap_receiver,
         icu_data_loader,
         inspect_node,
         display_ownership,
@@ -442,21 +434,6 @@ async fn inner_main() -> Result<(), Error> {
                         warn!("failed to forward fuchsia.recovery.policy.Device: {:?}", e)
                     }
                 }
-            }
-            ExposedServices::Wayland(stream) => {
-                let keymap_sender_clone = keymap_sender.clone();
-                // Spawning a local task allows us to handle multiple keymap clients concurrently.
-                fasync::Task::local(async move {
-                    let result =
-                        keymap_sender_clone.unbounded_send(stream).map_err(anyhow::Error::from);
-                    match result {
-                        Ok(_) => (),
-                        Err(e) => {
-                            warn!("failure while serving fuchsia.input.wayland.Keymap: {:?}", e);
-                        }
-                    }
-                })
-                .detach();
             }
             ExposedServices::GraphicalPresenter(stream) => {
                 fasync::Task::local(handle_graphical_presenter_request_stream(

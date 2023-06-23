@@ -11,13 +11,11 @@ icu_rustc_library("input_pipeline") {
 
   icu_deps = [ "//src/lib/icu_data/rust/icu_data" ]
   deps = [
-    ":assets",
     ":input_pipeline_includes",
     "//sdk/fidl/fuchsia.factory:fuchsia.factory_rust",
     "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
     "//sdk/fidl/fuchsia.input.injection:fuchsia.input.injection_rust",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_rust",
-    "//sdk/fidl/fuchsia.input.wayland:fuchsia.input.wayland_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.lightsensor:fuchsia.lightsensor_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
@@ -148,7 +146,6 @@ icu_rustc_library("input_pipeline") {
     "src/touch_binding.rs",
     "src/touch_injector_handler.rs",
     "src/utils.rs",
-    "src/wayland_handler.rs",
   ]
 }
 
@@ -157,20 +154,12 @@ expect_includes("input_pipeline_includes") {
 }
 
 fuchsia_unittest_package("input_pipeline_lib_tests") {
-  deps = [
-    ":assets",
-    ":input_pipeline_test",
-  ]
+  deps = [ ":input_pipeline_test" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
   }
-}
-
-group("assets") {
-  # Ends up in /pkg/data/...
-  public_deps = [ "//src/lib/ui/wayland/server:keymap" ]
 }
 
 group("tests") {
