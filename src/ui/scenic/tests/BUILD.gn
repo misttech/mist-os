@@ -23,15 +23,17 @@ config("vulkan_no_nodiscard") {
 source_set("common_deps") {
   testonly = true
   sources = [
+    "utils/logging_event_loop.cc",
+    "utils/logging_event_loop.h",
     "utils/utils.cc",
     "utils/utils.h",
   ]
   public_deps = [
     ":scenic_realm_builder",
+    "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
     "//src/ui/testing/util:screenshot_helper",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",

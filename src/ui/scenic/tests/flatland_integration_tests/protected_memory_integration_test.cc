@@ -13,9 +13,9 @@
 
 #include <gtest/gtest.h>
 
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
 #include "src/ui/testing/util/screenshot_helper.h"
@@ -29,7 +29,7 @@ using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::composition::TransformId;
 using ui_testing::Screenshot;
 
-class ProtectedMemoryIntegrationTest : public gtest::RealLoopFixture {
+class ProtectedMemoryIntegrationTest : public LoggingEventLoop, public ::testing::Test {
  public:
   ProtectedMemoryIntegrationTest()
       : realm_(ScenicRealmBuilder()

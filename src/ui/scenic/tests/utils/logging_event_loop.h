@@ -30,6 +30,9 @@ class LoggingEventLoop {
   void RunLoopUntil(fit::function<bool()> condition,
                     cpp20::source_location caller = cpp20::source_location::current());
 
+  bool RunLoopWithTimeoutOrUntil(fit::function<bool()> condition, zx::duration timeout,
+                                 cpp20::source_location caller = cpp20::source_location::current());
+
   void RunLoopUntilIdle(cpp20::source_location caller = cpp20::source_location::current());
 
  private:

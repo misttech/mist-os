@@ -19,13 +19,13 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/lib/escher/geometry/types.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/screen_capture2/screen_capture2.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/screen_capture_utils.h"
 #include "src/ui/scenic/tests/utils/utils.h"
@@ -52,7 +52,7 @@ using fuchsia::ui::composition::internal::ScreenCapture;
 using fuchsia::ui::composition::internal::ScreenCaptureConfig;
 using fuchsia::ui::composition::internal::ScreenCaptureError;
 
-class ScreenCapture2IntegrationTest : public gtest::RealLoopFixture {
+class ScreenCapture2IntegrationTest : public LoggingEventLoop, public ::testing::Test {
  public:
   ScreenCapture2IntegrationTest()
       : realm_(ScenicRealmBuilder()

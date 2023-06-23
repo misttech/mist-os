@@ -13,10 +13,10 @@
 
 #include <gtest/gtest.h>
 
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/lib/escher/test/common/gtest_escher.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
 #include "src/ui/testing/util/screenshot_helper.h"
@@ -46,7 +46,7 @@ void CompareColor(ui_testing::Pixel actual, ui_testing::Pixel expected) {
 }
 
 // Test fixture that sets up an environment with a Scenic we can connect to.
-class FlatlandPixelTestBase : public gtest::RealLoopFixture {
+class FlatlandPixelTestBase : public LoggingEventLoop, public ::testing::Test {
  public:
   void SetUp() override {
     // Build the realm topology and route the protocols required by this test fixture from the
@@ -106,7 +106,7 @@ class FlatlandPixelTestBase : public gtest::RealLoopFixture {
     realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
     RunLoopUntil([&]() { return complete; });
 
-    gtest::RealLoopFixture::TearDown();
+    ::testing::Test::TearDown();
   }
 
   // Draws a rectangle of size |width|*|height|, color |color|, opacity |opacity| and origin
