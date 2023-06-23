@@ -22,8 +22,8 @@ int main() {
   zx::result result = outgoing.AddUnmanagedProtocol<fuchsia_cpu_profiler::Session>(
       [dispatcher](fidl::ServerEnd<fuchsia_cpu_profiler::Session> server_end) {
         fidl::BindServer(dispatcher, std::move(server_end),
-                         std::make_unique<ProfilerControllerImpl>(dispatcher),
-                         std::mem_fn(&ProfilerControllerImpl::OnUnbound));
+                         std::make_unique<profiler::ProfilerControllerImpl>(dispatcher),
+                         std::mem_fn(&profiler::ProfilerControllerImpl::OnUnbound));
       });
   FX_CHECK(result.is_ok()) << "Failed to expose ProfilingController protocol: "
                            << result.status_string();

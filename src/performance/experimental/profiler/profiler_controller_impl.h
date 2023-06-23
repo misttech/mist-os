@@ -14,6 +14,7 @@
 
 #include "sampler.h"
 
+namespace profiler {
 class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session> {
  public:
   explicit ProfilerControllerImpl(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
@@ -40,7 +41,8 @@ class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session
   std::unique_ptr<Sampler> sampler_ __TA_GUARDED(state_lock_);
   ProfilingState state_ __TA_GUARDED(state_lock_) = ProfilingState::Unconfigured;
 
-  std::vector<SamplingInfo> targets_;
+  std::vector<JobTarget> targets_;
 };
+}  // namespace profiler
 
 #endif  // SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_PROFILER_CONTROLLER_IMPL_H_

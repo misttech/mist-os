@@ -24,26 +24,9 @@
 
 #include "process_watcher.h"
 #include "symbolization_context.h"
+#include "targets.h"
 
-struct SamplingInfo {
-  SamplingInfo(zx::process process, zx_koid_t pid,
-               std::vector<std::pair<zx_koid_t, zx::thread>> threads,
-               unwinder::CfiUnwinder unwinder)
-      : process(std::move(process)),
-        pid(pid),
-        threads(std::move(threads)),
-        cfi_unwinder(std::move(unwinder)),
-        fp_unwinder(&cfi_unwinder) {}
-  SamplingInfo(SamplingInfo&&) = default;
-  SamplingInfo& operator=(SamplingInfo&&) = default;
-
-  zx::process process;
-  zx_koid_t pid;
-  std::vector<std::pair<zx_koid_t, zx::thread>> threads;
-  unwinder::CfiUnwinder cfi_unwinder;
-  unwinder::FramePointerUnwinder fp_unwinder;
-};
-
+namespace profiler {
 struct Sample {
   zx_koid_t pid;
   zx_koid_t tid;
@@ -52,7 +35,7 @@ struct Sample {
 
 class Sampler {
  public:
-  explicit Sampler(async_dispatcher_t* dispatcher, std::vector<SamplingInfo> targets)
+  explicit Sampler(async_dispatcher_t* dispatcher, std::vector<JobTarget> targets)
       : dispatcher_(dispatcher), targets_(std::move(targets)) {}
 
   zx::result<> Start();
@@ -79,9 +62,10 @@ class Sampler {
   std::atomic<State> state_ = State::Stopped;
   std::condition_variable state_cv_;
 
-  std::vector<SamplingInfo> targets_;
+  std::vector<JobTarget> targets_;
   std::vector<zx::ticks> inspecting_durations_;
   std::vector<Sample> samples_;
   std::vector<std::unique_ptr<ProcessWatcher>> watchers_;
 };
+}  // namespace profiler
 #endif  // SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_SAMPLER_H_

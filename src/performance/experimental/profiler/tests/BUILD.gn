@@ -33,7 +33,10 @@ fuchsia_test_package("profiler_integration_test") {
 }
 
 executable("profiler_unittest_bin") {
-  sources = [ "process_watcher_test.cc" ]
+  sources = [
+    "process_watcher_test.cc",
+    "targets_test.cc",
+  ]
   deps = [
     "//src/lib/fxl/test:gtest_main",
     "//src/performance/experimental/profiler:lib",

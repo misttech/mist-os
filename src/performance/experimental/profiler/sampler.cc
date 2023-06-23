@@ -8,14 +8,14 @@
 
 #include "lib/async/cpp/task.h"
 
-std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::process& process,
-                                                         const zx::thread& thread,
+std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::unowned_process& process,
+                                                         const zx::unowned_thread& thread,
                                                          unwinder::FramePointerUnwinder& unwinder) {
   zx_info_thread_t thread_info;
   zx_status_t status =
-      thread.get_info(ZX_INFO_THREAD, &thread_info, sizeof(thread_info), nullptr, nullptr);
+      thread->get_info(ZX_INFO_THREAD, &thread_info, sizeof(thread_info), nullptr, nullptr);
   if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "unable to get thread info for thread " << thread.get()
+    FX_PLOGS(ERROR, status) << "unable to get thread info for thread " << thread->get()
                             << ", skipping";
     return {zx::ticks(), std::vector<uint64_t>()};  // Skip this thread.
   }
@@ -27,9 +27,9 @@ std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::process& proc
 
   zx::ticks before = zx::ticks::now();
   zx::suspend_token suspend_token;
-  status = thread.suspend(&suspend_token);
+  status = thread->suspend(&suspend_token);
   if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to suspend thread: " << thread.get();
+    FX_PLOGS(ERROR, status) << "Failed to suspend thread: " << thread->get();
     return {zx::ticks(), std::vector<uint64_t>()};  // Skip this thread.
   }
 
@@ -39,22 +39,22 @@ std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::process& proc
   zx_signals_t signals = ZX_THREAD_SUSPENDED | ZX_THREAD_TERMINATED;
   zx_signals_t observed = 0;
   zx::time deadline = zx::deadline_after(zx::msec(100));
-  status = thread.wait_one(signals, deadline, &observed);
+  status = thread->wait_one(signals, deadline, &observed);
 
   if (status != ZX_OK) {
     FX_PLOGS(WARNING, status) << "failure waiting for thread to suspend, skipping thread: "
-                              << thread.get();
+                              << thread->get();
     return {zx::ticks(), std::vector<uint64_t>()};  // Skip this thread.
   }
 
   if (observed & ZX_THREAD_TERMINATED) {
     return {zx::ticks(), std::vector<uint64_t>()};  // Skip this thread.
   }
-  unwinder::FuchsiaMemory memory(process.get());
+  unwinder::FuchsiaMemory memory(process->get());
 
   // Setup registers.
   zx_thread_state_general_regs_t regs;
-  if (thread.read_state(ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)) != ZX_OK) {
+  if (thread->read_state(ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)) != ZX_OK) {
     return {zx::ticks(), std::vector<uint64_t>()};
   }
   auto registers = unwinder::FromFuchsiaRegisters(regs);
@@ -83,7 +83,7 @@ std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::process& proc
   return {duration, pcs};
 }
 
-zx::result<> Sampler::Start() {
+zx::result<> profiler::Sampler::Start() {
   {
     if (state_ != State::Stopped) {
       return zx::error(ZX_ERR_BAD_STATE);
@@ -91,20 +91,26 @@ zx::result<> Sampler::Start() {
     state_ = State::Running;
   }
 
-  for (SamplingInfo& target : targets_) {
-    // If a target launches a new thread, we want to add it to the set of monitored threads.
-    zx::result watch_result = watchers_
-                                  .emplace_back(std::make_unique<ProcessWatcher>(
-                                      target.process.borrow(),
-                                      [&target](zx_koid_t, zx_koid_t tid, zx::thread t) {
-                                        target.threads.emplace_back(tid, std::move(t));
-                                      }))
-                                  ->Watch(dispatcher_);
-    if (watch_result.is_error()) {
-      FX_PLOGS(ERROR, watch_result.status_value())
-          << "Failed to watch process: " << target.process.get();
-      watchers_.clear();
-      return watch_result.take_error();
+  for (JobTarget& target : targets_) {
+    zx::result res = target.ForEachProcess([this](ProcessTarget& p) -> zx::result<> {
+      // If a target launches a new thread, we want to add it to the set of monitored threads.
+      zx::result watch_result = watchers_
+                                    .emplace_back(std::make_unique<ProcessWatcher>(
+                                        p.handle.borrow(),
+                                        [&p](zx_koid_t, zx_koid_t tid, zx::thread t) {
+                                          p.threads.push_back(ThreadTarget{std::move(t), tid});
+                                        }))
+                                    ->Watch(dispatcher_);
+
+      if (watch_result.is_error()) {
+        FX_PLOGS(ERROR, watch_result.status_value()) << "Failed to watch process: " << p.pid;
+        watchers_.clear();
+        return watch_result.take_error();
+      }
+      return zx::ok();
+    });
+    if (res.is_error()) {
+      return res;
     }
   }
 
@@ -114,7 +120,7 @@ zx::result<> Sampler::Start() {
   return zx::ok();
 }
 
-zx::result<> Sampler::Stop() {
+zx::result<> profiler::Sampler::Stop() {
   {
     if (state_ == State::Stopped) {
       return zx::ok();
@@ -125,18 +131,26 @@ zx::result<> Sampler::Stop() {
   return zx::ok();
 }
 
-void Sampler::CollectSamples() {
+void profiler::Sampler::CollectSamples() {
   if (state_.load() != State::Running) {
     FX_LOGS(INFO) << "Done profiling";
     return;
   }
-  for (SamplingInfo& target : targets_) {
-    for (const auto& [tid, thread] : target.threads) {
-      auto [time_sampling, pcs] = SampleThread(target.process, thread, target.fp_unwinder);
-      if (time_sampling != zx::ticks()) {
-        samples_.push_back({target.pid, tid, pcs});
-        inspecting_durations_.push_back(time_sampling);
+  for (JobTarget& target : targets_) {
+    zx::result res = target.ForEachProcess([this](const ProcessTarget& target) {
+      for (const ThreadTarget& thread : target.threads) {
+        auto [time_sampling, pcs] = SampleThread(target.handle.borrow(), thread.handle.borrow(),
+                                                 target.unwinder_data->fp_unwinder);
+        if (time_sampling != zx::ticks()) {
+          samples_.push_back({target.pid, thread.tid, pcs});
+          inspecting_durations_.push_back(time_sampling);
+        }
       }
+      return zx::ok();
+    });
+    if (res.is_error()) {
+      FX_PLOGS(ERROR, res.status_value()) << "Sampling Failed";
+      return;
     }
   }
 
@@ -144,15 +158,22 @@ void Sampler::CollectSamples() {
       dispatcher_, [this]() mutable { CollectSamples(); }, zx::msec(10));
 }
 
-zx::result<profiler::SymbolizationContext> Sampler::GetContexts() {
+zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
   std::map<zx_koid_t, std::vector<profiler::Module>> contexts;
-  for (const SamplingInfo& target : targets_) {
-    zx::result<std::vector<profiler::Module>> modules =
-        profiler::GetProcessModules(target.process.borrow());
-    if (modules.is_error()) {
-      return modules.take_error();
+  for (JobTarget& target : targets_) {
+    zx::result<> res =
+        target.ForEachProcess([&contexts](const ProcessTarget& target) mutable -> zx::result<> {
+          zx::result<std::vector<profiler::Module>> modules =
+              profiler::GetProcessModules(target.handle.borrow());
+          if (modules.is_error()) {
+            return modules.take_error();
+          }
+          contexts[target.pid] = *modules;
+          return zx::ok();
+        });
+    if (res.is_error()) {
+      return res.take_error();
     }
-    contexts[target.pid] = *modules;
   }
   return zx::ok(profiler::SymbolizationContext{contexts});
 }
