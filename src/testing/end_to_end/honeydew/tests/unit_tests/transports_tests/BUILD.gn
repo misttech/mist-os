@@ -13,7 +13,6 @@ if (is_host) {
     ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
-    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
   }
 
   python_host_test("ffx_test") {
@@ -24,7 +23,6 @@ if (is_host) {
     ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
-    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
   }
 
   python_host_test("ssh_test") {
@@ -32,7 +30,6 @@ if (is_host) {
     libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
-    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
   }
 
   python_host_test("sl4f_test") {
@@ -43,7 +40,6 @@ if (is_host) {
     ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
-    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
   }
 }
 
