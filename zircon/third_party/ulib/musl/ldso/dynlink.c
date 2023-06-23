@@ -1555,7 +1555,7 @@ __attribute__((__visibility__("hidden"))) void* __tls_get_new(size_t offset, siz
   pthread_t self = __pthread_self();
 
   if (modid <= (size_t)self->head.dtv[0]) {
-    return (char*)self->head.dtv[modid] + offset + DTP_OFFSET;
+    return (char*)self->head.dtv[modid] + (ptrdiff_t)offset + (ptrdiff_t)DTP_OFFSET;
   }
 
   /* This is safe without any locks held because, if the caller
