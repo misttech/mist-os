@@ -69,6 +69,7 @@ rustc_binary("starnix_kernel_bin") {
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_rust",
     "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+    "//src/connectivity/lib/net-types",
     "//src/connectivity/network/netlink",
     "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/debug/rust",

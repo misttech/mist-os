@@ -64,6 +64,7 @@ test("syscalls_test_bin") {
     "fs_test.cc",
     "fuse_test.cc",
     "input_test.cc",
+    "ioctl_test.cc",
     "mmap_test.cc",
     "mount_test.cc",
     "pipe_test.cc",

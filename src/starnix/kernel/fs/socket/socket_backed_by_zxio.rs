@@ -6,6 +6,7 @@ use super::*;
 
 use crate::{
     fs::{buffers::*, fuchsia::*, *},
+    logging::log_warn,
     mm::MemoryAccessorExt,
     syscalls::*,
     task::*,
@@ -18,9 +19,20 @@ use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
-use static_assertions::const_assert_eq;
-use std::{ffi::CStr, sync::Arc, sync::OnceLock};
+use net_types::ip::IpAddress as _;
+use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NetlinkPayload};
+use netlink_packet_route::{rtnl::address::nlas::Nla as AddressNla, AddressMessage, RtnlMessage};
+use static_assertions::{const_assert, const_assert_eq};
+use std::{
+    ffi::CStr,
+    mem::size_of,
+    sync::{Arc, OnceLock},
+};
 use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio};
+use zerocopy::{AsBytes as _, ByteOrder as _, FromBytes as _, NetworkEndian};
+
+/// The size of a buffer suitable to carry netlink route messages.
+const NETLINK_ROUTE_BUF_SIZE: usize = 1024;
 
 /// Connects to the appropriate `fuchsia_posix_socket_*::Provider` protocol.
 struct SocketProviderServiceConnector;
@@ -299,27 +311,128 @@ impl SocketOps for ZxioBackedSocket {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         let user_addr = UserAddress::from(arg);
+
         // TODO(https://fxbug.dev/129059): Share this implementation with `fdio`
         // by moving things to `zxio`.
         match request {
+            SIOCGIFADDR => {
+                let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
+                let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
+                let (_socket, address_msgs, _if_index) =
+                    get_ipv4_addresses_with_netlink_for_ifaddr_req(
+                        current_task,
+                        &in_ifreq,
+                        &mut read_buf,
+                    )?;
+
+                let ifru_addr = {
+                    let mut addr = sockaddr::default();
+                    sockaddr_in {
+                        sin_family: AF_INET,
+                        sin_port: 0,
+                        sin_addr: in_addr {
+                            s_addr: address_msgs
+                                .into_iter()
+                                .next()
+                                .and_then(|msg| {
+                                    msg.nlas.into_iter().find_map(|nla| {
+                                        if let AddressNla::Address(bytes) = nla {
+                                            Some(NetworkEndian::read_u32(&bytes[..]))
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                })
+                                .unwrap_or(0),
+                        },
+                        __pad: Default::default(),
+                    }
+                    .write_to_prefix(addr.as_bytes_mut());
+                    addr
+                };
+
+                let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
+                    ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
+                    ifr_ifru.ifru_addr: ifru_addr,
+                });
+                current_task.mm.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                Ok(SUCCESS)
+            }
+            SIOCSIFADDR => {
+                let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
+                let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
+                let (socket, address_msgs, if_index) =
+                    get_ipv4_addresses_with_netlink_for_ifaddr_req(
+                        current_task,
+                        &in_ifreq,
+                        &mut read_buf,
+                    )?;
+
+                let request_header = {
+                    let mut header = NetlinkHeader::default();
+                    // Always request the ACK response so that we know the
+                    // request has been handled before we return from this
+                    // operation.
+                    header.flags =
+                        netlink_packet_core::NLM_F_REQUEST | netlink_packet_core::NLM_F_ACK;
+                    header
+                };
+
+                // First remove all IPv4 addresses for the requested interface.
+                for addr in address_msgs.into_iter() {
+                    send_netlink_msg_and_wait_response(
+                        current_task,
+                        &socket,
+                        NetlinkMessage::new(
+                            request_header,
+                            NetlinkPayload::InnerMessage(RtnlMessage::DelAddress(addr)),
+                        ),
+                        &mut read_buf,
+                        SIOCSIFADDR,
+                    )?;
+                }
+
+                // Next, add the requested address.
+                const_assert!(size_of::<sockaddr_in>() <= size_of::<sockaddr>());
+                let addr = sockaddr_in::read_from_prefix(
+                    unsafe { in_ifreq.ifr_ifru.ifru_addr }.as_bytes(),
+                )
+                .expect("sockaddr_in is smaller than sockaddr")
+                .sin_addr
+                .s_addr;
+                if addr != 0 {
+                    send_netlink_msg_and_wait_response(
+                        current_task,
+                        &socket,
+                        NetlinkMessage::new(
+                            request_header,
+                            NetlinkPayload::InnerMessage(RtnlMessage::NewAddress({
+                                let mut msg = AddressMessage::default();
+                                msg.header.family =
+                                    AF_INET.try_into().expect("AF_INET should fit in u8");
+                                msg.header.index = if_index;
+                                let addr = addr.to_be_bytes();
+                                // The request does not include the prefix
+                                // length so we use the default prefix for the
+                                // address's class.
+                                msg.header.prefix_len = net_types::ip::Ipv4Addr::new(addr)
+                                    .class()
+                                    .default_prefix_len()
+                                    .unwrap_or(net_types::ip::Ipv4Addr::BYTES * 8);
+                                msg.nlas = vec![AddressNla::Address(addr.to_vec())];
+                                msg
+                            })),
+                        ),
+                        &mut read_buf,
+                        SIOCSIFADDR,
+                    )?;
+                }
+
+                Ok(SUCCESS)
+            }
             SIOCGIFINDEX => {
                 let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
-                let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
-                    .to_str()
-                    .map_err(|std::str::Utf8Error { .. }| errno!(EINVAL))?;
-                let (provider, server_end) = zx::Channel::create();
-                connect_channel_to_protocol::<fposix_socket::ProviderMarker>(server_end)
-                    .expect("should always have access to `fuchsia.posix.socket/Provider`");
-                let provider = fposix_socket::ProviderSynchronousProxy::new(provider);
-                let index = provider
-                    .interface_name_to_index(iface_name, zx::Time::INFINITE)
-                    .expect("netstack should never close its end of the channel");
-                let index: u64 = index.map_err(|zx_err| {
-                    let zx_err = zx::Status::from_raw(zx_err);
-                    from_status_like_fdio!(zx_err)
-                })?;
-                // TODO(https://fxbug.dev/129172): Avoid this panic opportunity.
-                let index = i32::try_from(index).expect("interface ID should fit in an i32");
+                let index = extract_if_index(&in_ifreq)?;
                 let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
                     ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
                     ifr_ifru.ifru_ivalue: index,
@@ -341,6 +454,119 @@ impl SocketOps for ZxioBackedSocket {
             _ => default_ioctl(file, current_task, request, arg),
         }
     }
+}
+
+fn extract_if_index(in_ifreq: &ifreq) -> Result<i32, Errno> {
+    let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
+        .to_str()
+        .map_err(|std::str::Utf8Error { .. }| errno!(EINVAL))?;
+    let (provider, server_end) = zx::Channel::create();
+    connect_channel_to_protocol::<fposix_socket::ProviderMarker>(server_end)
+        .expect("should always have access to `fuchsia.posix.socket/Provider`");
+    let provider = fposix_socket::ProviderSynchronousProxy::new(provider);
+    let index = provider
+        .interface_name_to_index(iface_name, zx::Time::INFINITE)
+        .expect("netstack should never close its end of the channel");
+    let index: u64 = index.map_err(|zx_err| {
+        let zx_err = zx::Status::from_raw(zx_err);
+        from_status_like_fdio!(zx_err)
+    })?;
+    // TODO(https://fxbug.dev/129172): Avoid this panic opportunity.
+    Ok(i32::try_from(index).expect("interface ID should fit in an i32"))
+}
+
+fn get_ipv4_addresses_with_netlink_for_ifaddr_req(
+    current_task: &CurrentTask,
+    in_ifreq: &ifreq,
+    read_buf: &mut VecOutputBuffer,
+) -> Result<(FileHandle, Vec<AddressMessage>, u32), Errno> {
+    let sockaddr { sa_family, sa_data: _ } = unsafe { in_ifreq.ifr_ifru.ifru_addr };
+    if sa_family != AF_INET {
+        return error!(EINVAL);
+    }
+
+    let if_index = u32::try_from(extract_if_index(in_ifreq)?).unwrap();
+    let socket = new_socket_file(
+        current_task,
+        SocketDomain::Netlink,
+        SocketType::Datagram,
+        OpenFlags::RDWR,
+        SocketProtocol::from_raw(NetlinkFamily::Route.as_raw()),
+    )?;
+
+    // Send the request to dump all IPv4 addresses.
+    {
+        let mut msg = NetlinkMessage::new(
+            {
+                let mut header = NetlinkHeader::default();
+                header.flags = netlink_packet_core::NLM_F_DUMP | netlink_packet_core::NLM_F_REQUEST;
+                header
+            },
+            NetlinkPayload::InnerMessage(RtnlMessage::GetAddress({
+                let mut msg = AddressMessage::default();
+                msg.header.family = AF_INET.try_into().expect("AF_INET should fit in u8");
+                msg
+            })),
+        );
+        msg.finalize();
+        let mut buf = vec![0; msg.buffer_len()];
+        msg.serialize(&mut buf[..]);
+        assert_eq!(socket.write(current_task, &mut VecInputBuffer::from(buf))?, msg.buffer_len());
+    }
+
+    // Collect all the addresses.
+    let mut addrs = Vec::new();
+    loop {
+        read_buf.reset();
+        let n = socket.read(current_task, read_buf)?;
+
+        let msg = NetlinkMessage::<RtnlMessage>::deserialize(&read_buf.data()[..n])
+            .expect("netlink should always send well-formed messages");
+        match msg.payload {
+            NetlinkPayload::Done => break,
+            NetlinkPayload::InnerMessage(RtnlMessage::NewAddress(msg)) => {
+                if msg.header.index == if_index {
+                    addrs.push(msg);
+                }
+            }
+            payload => panic!("unexpected message = {:?}", payload),
+        }
+    }
+
+    Ok((socket, addrs, if_index))
+}
+
+fn send_netlink_msg_and_wait_response(
+    current_task: &CurrentTask,
+    socket: &FileHandle,
+    mut msg: NetlinkMessage<RtnlMessage>,
+    read_buf: &mut VecOutputBuffer,
+    req: u32,
+) -> Result<(), Errno> {
+    msg.finalize();
+    let mut buf = vec![0; msg.buffer_len()];
+    msg.serialize(&mut buf[..]);
+    assert_eq!(socket.write(current_task, &mut VecInputBuffer::from(buf))?, msg.buffer_len());
+
+    read_buf.reset();
+    let n = socket.read(current_task, read_buf)?;
+    let msg = NetlinkMessage::<RtnlMessage>::deserialize(&read_buf.data()[..n])
+        .expect("netlink should always send well-formed messages");
+    match msg.payload {
+        NetlinkPayload::Ack(_) => {}
+        NetlinkPayload::Error(msg) => {
+            // Don't propagate the error up because its not the fault of the
+            // caller - the stack state can change underneath the caller.
+            log_warn!(
+                "got NACK netlink route response when handling ioctl(_, {:#x}, _): {}",
+                req,
+                msg.code
+            );
+        }
+        payload => panic!("unexpected message = {:?}", payload),
+    }
+
+    Ok(())
 }
 
 // Check that values that are passed to and from ZXIO have the same meaning.

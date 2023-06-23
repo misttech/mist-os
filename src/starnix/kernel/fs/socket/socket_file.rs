@@ -11,6 +11,20 @@ use crate::{
     types::*,
 };
 
+pub fn new_socket_file(
+    current_task: &CurrentTask,
+    domain: SocketDomain,
+    socket_type: SocketType,
+    open_flags: OpenFlags,
+    protocol: SocketProtocol,
+) -> Result<FileHandle, Errno> {
+    Ok(Socket::new_file(
+        current_task,
+        Socket::new(current_task, domain, socket_type, protocol)?,
+        open_flags,
+    ))
+}
+
 pub struct SocketFile {
     socket: SocketHandle,
 }
