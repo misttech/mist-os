@@ -4803,7 +4803,7 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackDirtyPagesAfterDetach, 0) {
 
   // Detach the VMO.
   ASSERT_TRUE(pager.DetachVmo(vmo));
-  ASSERT_TRUE(pager.WaitForPageComplete(vmo->GetKey(), ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.WaitForPageComplete(vmo->key(), ZX_TIME_INFINITE));
 
   // Verify that the page is still dirty.
   ASSERT_OK(vmo->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
@@ -4866,7 +4866,7 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackResizedRangeAfterDetach, ZX_VMO_RESIZA
 
   // Detach the VMO.
   ASSERT_TRUE(pager.DetachVmo(vmo));
-  ASSERT_TRUE(pager.WaitForPageComplete(vmo->GetKey(), ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.WaitForPageComplete(vmo->key(), ZX_TIME_INFINITE));
 
   // Everything beyond the original size is dirty so should remain intact.
   ASSERT_OK(vmo->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
@@ -4912,7 +4912,7 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(DecommitCleanOnDetach, 0) {
 
   // Detach the VMO.
   ASSERT_TRUE(pager.DetachVmo(vmo));
-  ASSERT_TRUE(pager.WaitForPageComplete(vmo->GetKey(), ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.WaitForPageComplete(vmo->key(), ZX_TIME_INFINITE));
 
   // No dirty ranges.
   ASSERT_TRUE(pager.VerifyDirtyRanges(vmo, nullptr, 0));
@@ -4941,18 +4941,18 @@ VMO_VMAR_TEST(PagerWriteback, NoDirtyRequestsAfterDetach) {
 
   // Detach the VMO.
   ASSERT_TRUE(pager.DetachVmo(vmo1));
-  ASSERT_TRUE(pager.WaitForPageComplete(vmo1->GetKey(), ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.WaitForPageComplete(vmo1->key(), ZX_TIME_INFINITE));
 
   // Try to write to the VMO. As we are starting with a clean page, this would have generated a
   // DIRTY request pre-detach, but will now fail.
   if (check_vmar) {
     TestThread t1([vmo1]() -> bool {
-      auto ptr = reinterpret_cast<uint8_t*>(vmo1->GetBaseAddr());
+      auto ptr = reinterpret_cast<uint8_t*>(vmo1->base_addr());
       *ptr = 0xaa;
       return true;
     });
     ASSERT_TRUE(t1.Start());
-    ASSERT_TRUE(t1.WaitForCrash(vmo1->GetBaseAddr(), ZX_ERR_BAD_STATE));
+    ASSERT_TRUE(t1.WaitForCrash(vmo1->base_addr(), ZX_ERR_BAD_STATE));
   } else {
     uint8_t data = 0xaa;
     ASSERT_EQ(ZX_ERR_BAD_STATE, vmo1->vmo().write(&data, 0, sizeof(data)));
@@ -4982,17 +4982,17 @@ VMO_VMAR_TEST(PagerWriteback, NoDirtyRequestsAfterDetach) {
 
   // Detach the VMO.
   ASSERT_TRUE(pager.DetachVmo(vmo2));
-  ASSERT_TRUE(pager.WaitForPageComplete(vmo2->GetKey(), ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.WaitForPageComplete(vmo2->key(), ZX_TIME_INFINITE));
 
   // Try to write to the VMO. This will fail.
   if (check_vmar) {
     TestThread t2([vmo2]() -> bool {
-      auto ptr = reinterpret_cast<uint8_t*>(vmo2->GetBaseAddr());
+      auto ptr = reinterpret_cast<uint8_t*>(vmo2->base_addr());
       *ptr = 0xaa;
       return true;
     });
     ASSERT_TRUE(t2.Start());
-    ASSERT_TRUE(t2.WaitForCrash(vmo2->GetBaseAddr(), ZX_ERR_BAD_STATE));
+    ASSERT_TRUE(t2.WaitForCrash(vmo2->base_addr(), ZX_ERR_BAD_STATE));
   } else {
     uint8_t data = 0xaa;
     ASSERT_EQ(ZX_ERR_BAD_STATE, vmo2->vmo().write(&data, 0, sizeof(data)));
@@ -5030,7 +5030,7 @@ VMO_VMAR_TEST(PagerWriteback, DetachWithPendingDirtyRequest) {
   TestThread t([vmo, check_vmar]() -> bool {
     uint8_t data = 0xaa;
     if (check_vmar) {
-      auto ptr = reinterpret_cast<uint8_t*>(vmo->GetBaseAddr());
+      auto ptr = reinterpret_cast<uint8_t*>(vmo->base_addr());
       *ptr = data;
       return true;
     }
@@ -5043,11 +5043,11 @@ VMO_VMAR_TEST(PagerWriteback, DetachWithPendingDirtyRequest) {
 
   // Detach the VMO.
   ASSERT_TRUE(pager.DetachVmo(vmo));
-  ASSERT_TRUE(pager.WaitForPageComplete(vmo->GetKey(), ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.WaitForPageComplete(vmo->key(), ZX_TIME_INFINITE));
 
   // The thread should terminate.
   if (check_vmar) {
-    ASSERT_TRUE(t.WaitForCrash(vmo->GetBaseAddr(), ZX_ERR_BAD_STATE));
+    ASSERT_TRUE(t.WaitForCrash(vmo->base_addr(), ZX_ERR_BAD_STATE));
   } else {
     ASSERT_TRUE(t.Wait());
   }
@@ -5084,7 +5084,7 @@ TEST(PagerWriteback, FailDirtyRequestAfterDetach) {
 
   // Detach the VMO.
   ASSERT_TRUE(pager.DetachVmo(vmo));
-  ASSERT_TRUE(pager.WaitForPageComplete(vmo->GetKey(), ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.WaitForPageComplete(vmo->key(), ZX_TIME_INFINITE));
 
   // The write should fail.
   ASSERT_TRUE(t.Wait());

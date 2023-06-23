@@ -30,6 +30,11 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
  public:
   ~Vmo() = default;
 
+  static std::unique_ptr<Vmo> Create(zx::vmo vmo, uint64_t size, uint64_t* base, uint64_t base_addr,
+                                     uint64_t key) {
+    return std::unique_ptr<Vmo>(new Vmo(std::move(vmo), size, base, base_addr, key));
+  }
+
   // Generates this vmo contents at the specified offset.
   void GenerateBufferContents(void* dest_buffer, uint64_t page_count,
                               uint64_t paged_vmo_page_offset);
@@ -48,21 +53,21 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
     return OpRange(ZX_VMO_OP_COMMIT, page_offset, page_count);
   }
 
-  uint64_t GetKey() const { return base_val_; }
-  uintptr_t GetBaseAddr() const { return base_addr_; }
   const zx::vmo& vmo() const { return vmo_; }
-
+  zx::vmo& vmo() { return vmo_; }
   std::unique_ptr<Vmo> Clone();
 
   std::unique_ptr<Vmo> Clone(uint64_t offset, uint64_t size);
 
+  uint64_t size() const { return size_; }
+  uintptr_t base_addr() const { return base_addr_; }
+
+  uint64_t key() const { return key_; }
+  void set_key(uint64_t key) { key_ = key; }
+
  private:
-  Vmo(zx::vmo vmo, uint64_t size, uint64_t* base, uint64_t base_addr, uint64_t base_val)
-      : size_(size),
-        base_(base),
-        base_addr_(base_addr),
-        vmo_(std::move(vmo)),
-        base_val_(base_val) {}
+  Vmo(zx::vmo vmo, uint64_t size, uint64_t* base, uint64_t base_addr, uint64_t key)
+      : size_(size), base_(base), base_addr_(base_addr), vmo_(std::move(vmo)), key_(key) {}
 
   bool OpRange(uint32_t op, uint64_t page_offset, uint64_t page_count);
 
@@ -73,9 +78,8 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
 
   // These are set in the ctor, but can be changed by UserPager::ReplaceVmo.
   zx::vmo vmo_;
-  uint64_t base_val_;  // == packet key
-
-  friend UserPager;
+  // This value is used for both the port packet key and to populate the contents of supplied pages.
+  uint64_t key_;
 };
 
 class UserPager {
@@ -171,7 +175,7 @@ class UserPager {
   zx::pager pager_;
   zx::port port_;
   static constexpr uint64_t kShutdownKey = 1;
-  uint64_t next_base_ = kShutdownKey + 1;
+  uint64_t next_key_ = kShutdownKey + 1;
 
   fbl::DoublyLinkedList<std::unique_ptr<Vmo>> vmos_;
 

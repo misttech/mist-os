@@ -407,7 +407,7 @@ TEST(Pager, VmarUnmapTest) {
   ASSERT_TRUE(pager.UnmapVmo(vmo));
   ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
 
-  ASSERT_TRUE(t.WaitForCrash(vmo->GetBaseAddr(), ZX_ERR_NOT_FOUND));
+  ASSERT_TRUE(t.WaitForCrash(vmo->base_addr(), ZX_ERR_NOT_FOUND));
 }
 
 // Tests that replacing a vmar mapping while threads are blocked on a
@@ -518,7 +518,7 @@ VMO_VMAR_TEST(Pager, ReadResizeTest) {
   ASSERT_TRUE(vmo->Resize(0));
 
   if (check_vmar) {
-    ASSERT_TRUE(t.WaitForCrash(vmo->GetBaseAddr(), ZX_ERR_OUT_OF_RANGE));
+    ASSERT_TRUE(t.WaitForCrash(vmo->base_addr(), ZX_ERR_OUT_OF_RANGE));
   } else {
     ASSERT_TRUE(t.WaitForFailure());
   }
@@ -583,7 +583,7 @@ TEST(Pager, DetachPageCompleteTest) {
 
   ASSERT_TRUE(pager.DetachVmo(vmo));
 
-  ASSERT_TRUE(pager.WaitForPageComplete(vmo->GetKey(), ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.WaitForPageComplete(vmo->key(), ZX_TIME_INFINITE));
 }
 
 // Tests that pages are decommitted on a detach, and accessing pages (via the parent VMO or the
@@ -617,7 +617,7 @@ VMO_VMAR_TEST(Pager, DecommitOnDetachTest) {
 
   // Detach the VMO.
   pager.DetachVmo(vmo);
-  ASSERT_TRUE(pager.WaitForPageComplete(vmo->GetKey(), ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.WaitForPageComplete(vmo->key(), ZX_TIME_INFINITE));
 
   // Verify that no committed pages remain in the parent VMO.
   ASSERT_EQ(ZX_OK, vmo->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
@@ -628,7 +628,7 @@ VMO_VMAR_TEST(Pager, DecommitOnDetachTest) {
   TestThread t2([vmo, check_vmar]() -> bool { return check_buffer(vmo, 0, 1, check_vmar); });
   ASSERT_TRUE(t2.Start());
   if (check_vmar) {
-    ASSERT_TRUE(t2.WaitForCrash(vmo->GetBaseAddr(), ZX_ERR_BAD_STATE));
+    ASSERT_TRUE(t2.WaitForCrash(vmo->base_addr(), ZX_ERR_BAD_STATE));
   } else {
     ASSERT_TRUE(t2.WaitForFailure());
   }
@@ -639,7 +639,7 @@ VMO_VMAR_TEST(Pager, DecommitOnDetachTest) {
   });
   ASSERT_TRUE(t3.Start());
   if (check_vmar) {
-    ASSERT_TRUE(t3.WaitForCrash(clone->GetBaseAddr(), ZX_ERR_BAD_STATE));
+    ASSERT_TRUE(t3.WaitForCrash(clone->base_addr(), ZX_ERR_BAD_STATE));
   } else {
     ASSERT_TRUE(t3.WaitForFailure());
   }
@@ -649,7 +649,7 @@ VMO_VMAR_TEST(Pager, DecommitOnDetachTest) {
   TestThread t4([vmo, check_vmar]() -> bool { return check_buffer(vmo, 0, 1, check_vmar); });
   ASSERT_TRUE(t4.Start());
   if (check_vmar) {
-    ASSERT_TRUE(t4.WaitForCrash(vmo->GetBaseAddr(), ZX_ERR_BAD_STATE));
+    ASSERT_TRUE(t4.WaitForCrash(vmo->base_addr(), ZX_ERR_BAD_STATE));
   } else {
     ASSERT_TRUE(t4.WaitForFailure());
   }
@@ -660,7 +660,7 @@ VMO_VMAR_TEST(Pager, DecommitOnDetachTest) {
   });
   ASSERT_TRUE(t5.Start());
   if (check_vmar) {
-    ASSERT_TRUE(t5.WaitForCrash(clone->GetBaseAddr(), ZX_ERR_BAD_STATE));
+    ASSERT_TRUE(t5.WaitForCrash(clone->base_addr(), ZX_ERR_BAD_STATE));
   } else {
     ASSERT_TRUE(t5.WaitForFailure());
   }
@@ -675,7 +675,7 @@ TEST(Pager, ClosePageCompleteTest) {
   Vmo* vmo;
   ASSERT_TRUE(pager.CreateVmo(1, &vmo));
 
-  uint64_t key = vmo->GetKey();
+  uint64_t key = vmo->key();
   pager.ReleaseVmo(vmo);
 
   ASSERT_TRUE(pager.WaitForPageComplete(key, ZX_TIME_INFINITE));
@@ -732,13 +732,13 @@ void ReadInterruptLateTest(bool check_vmar, bool detach) {
   }
 
   if (check_vmar) {
-    ASSERT_TRUE(t.WaitForCrash(vmo->GetBaseAddr(), ZX_ERR_BAD_STATE));
+    ASSERT_TRUE(t.WaitForCrash(vmo->base_addr(), ZX_ERR_BAD_STATE));
   } else {
     ASSERT_TRUE(t.WaitForFailure());
   }
 
   if (detach) {
-    ASSERT_TRUE(pager.WaitForPageComplete(vmo->GetKey(), ZX_TIME_INFINITE));
+    ASSERT_TRUE(pager.WaitForPageComplete(vmo->key(), ZX_TIME_INFINITE));
   }
 }
 
@@ -767,13 +767,13 @@ void ReadInterruptEarlyTest(bool check_vmar, bool detach) {
   }
 
   if (check_vmar) {
-    ASSERT_TRUE(t.WaitForCrash(vmo->GetBaseAddr(), ZX_ERR_BAD_STATE));
+    ASSERT_TRUE(t.WaitForCrash(vmo->base_addr(), ZX_ERR_BAD_STATE));
   } else {
     ASSERT_TRUE(t.WaitForFailure());
   }
 
   if (detach) {
-    ASSERT_TRUE(pager.WaitForPageComplete(vmo->GetKey(), ZX_TIME_INFINITE));
+    ASSERT_TRUE(pager.WaitForPageComplete(vmo->key(), ZX_TIME_INFINITE));
   }
 }
 
@@ -799,7 +799,7 @@ TEST(Pager, ClosePagerTest) {
 
   pager.ClosePagerHandle();
 
-  ASSERT_TRUE(t.WaitForCrash(vmo->GetBaseAddr(), ZX_ERR_BAD_STATE));
+  ASSERT_TRUE(t.WaitForCrash(vmo->base_addr(), ZX_ERR_BAD_STATE));
   ASSERT_TRUE(check_buffer(vmo, 1, 1, true));
 }
 
@@ -838,7 +838,7 @@ TEST(Pager, ClosePortTest) {
   ASSERT_TRUE(check_buffer(vmo, 1, 1, true));
 
   ASSERT_TRUE(pager.DetachVmo(vmo));
-  ASSERT_TRUE(t.WaitForCrash(vmo->GetBaseAddr(), ZX_ERR_BAD_STATE));
+  ASSERT_TRUE(t.WaitForCrash(vmo->base_addr(), ZX_ERR_BAD_STATE));
 }
 
 // Tests that reading from a clone populates the vmo.
@@ -981,7 +981,7 @@ VMO_VMAR_TEST(Pager, CloneWriteToCloneTest) {
   ASSERT_NOT_NULL(clone);
 
   TestThread t([clone = clone.get()]() -> bool {
-    *reinterpret_cast<uint64_t*>(clone->GetBaseAddr()) = 0xdeadbeef;
+    *reinterpret_cast<uint64_t*>(clone->base_addr()) = 0xdeadbeef;
     return true;
   });
 
@@ -994,8 +994,8 @@ VMO_VMAR_TEST(Pager, CloneWriteToCloneTest) {
   ASSERT_TRUE(t.Wait());
 
   ASSERT_TRUE(vmo->CheckVmar(0, 1));
-  ASSERT_EQ(*reinterpret_cast<uint64_t*>(clone->GetBaseAddr()), 0xdeadbeef);
-  *reinterpret_cast<uint64_t*>(clone->GetBaseAddr()) = clone->GetKey();
+  ASSERT_EQ(*reinterpret_cast<uint64_t*>(clone->base_addr()), 0xdeadbeef);
+  *reinterpret_cast<uint64_t*>(clone->base_addr()) = clone->key();
   ASSERT_TRUE(clone->CheckVmar(0, 1));
 }
 
@@ -1019,7 +1019,7 @@ TEST(Pager, CloneDetachTest) {
   // Write to the first page, forking it.
   TestThread t2([clone = clone.get()]() -> bool {
     // Fork a page in the clone.
-    *reinterpret_cast<uint64_t*>(clone->GetBaseAddr()) = 0xdeadbeef;
+    *reinterpret_cast<uint64_t*>(clone->base_addr()) = 0xdeadbeef;
     return true;
   });
   ASSERT_TRUE(t2.Start());
@@ -1033,7 +1033,7 @@ TEST(Pager, CloneDetachTest) {
 
   // Detach the parent vmo.
   ASSERT_TRUE(pager.DetachVmo(vmo));
-  ASSERT_TRUE(pager.WaitForPageComplete(vmo->GetKey(), ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.WaitForPageComplete(vmo->key(), ZX_TIME_INFINITE));
 
   // Declare read buffer outside threads so we can free them as the threads themselves will fault.
   std::vector<uint8_t> data(zx_system_get_page_size(), 0);
@@ -1045,7 +1045,7 @@ TEST(Pager, CloneDetachTest) {
   });
   ASSERT_TRUE(t3.Start());
   ASSERT_TRUE(
-      t3.WaitForCrash(clone->GetBaseAddr() + 2 * zx_system_get_page_size(), ZX_ERR_BAD_STATE));
+      t3.WaitForCrash(clone->base_addr() + 2 * zx_system_get_page_size(), ZX_ERR_BAD_STATE));
 
   // Read the second page. This page was previously paged in but not forked, and should now have
   // been decomitted. Should result in a fatal page fault.
@@ -1053,12 +1053,12 @@ TEST(Pager, CloneDetachTest) {
     return check_buffer_data(clone, 1, 1, data.data(), true);
   });
   ASSERT_TRUE(t4.Start());
-  ASSERT_TRUE(t4.WaitForCrash(clone->GetBaseAddr() + zx_system_get_page_size(), ZX_ERR_BAD_STATE));
+  ASSERT_TRUE(t4.WaitForCrash(clone->base_addr() + zx_system_get_page_size(), ZX_ERR_BAD_STATE));
 
   // Read the first page and verify its contents. This page was forked in the clone and should still
   // be valid.
   TestThread t5([clone = clone.get()]() -> bool {
-    return (*reinterpret_cast<uint64_t*>(clone->GetBaseAddr()) == 0xdeadbeef);
+    return (*reinterpret_cast<uint64_t*>(clone->base_addr()) == 0xdeadbeef);
   });
   ASSERT_TRUE(t5.Start());
   ASSERT_TRUE(t5.Wait());
@@ -1977,7 +1977,7 @@ VMO_VMAR_TEST(Pager, FailSinglePage) {
 
   if (check_vmar) {
     // Verify that the thread crashes if the page was accessed via a vmar.
-    ASSERT_TRUE(t.WaitForCrash(vmo->GetBaseAddr(), ZX_ERR_IO));
+    ASSERT_TRUE(t.WaitForCrash(vmo->base_addr(), ZX_ERR_IO));
   } else {
     // Verify that the vmo read fails if the thread directly accessed the vmo.
     ASSERT_TRUE(t.WaitForFailure());
