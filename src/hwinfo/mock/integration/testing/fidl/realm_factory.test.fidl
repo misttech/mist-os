@@ -1,0 +1,22 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library test.mock;
+
+using fuchsia.testing.harness;
+
+/// RealmOptions tells the RealmFactory protocol how to create the test realm.
+type RealmOptions = resource table {};
+
+@discoverable
+closed protocol RealmFactory {
+    compose fuchsia.testing.harness.RealmFactory;
+
+    /// Specifies the options to use when creating the realm.
+    ///
+    /// Returns OperationError.INVALID if called more than once.
+    strict SetRealmOptions(resource struct {
+        options RealmOptions;
+    }) -> () error fuchsia.testing.harness.OperationError;
+};

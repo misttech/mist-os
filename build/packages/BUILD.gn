@@ -70,6 +70,7 @@ group("allowed_to_use_subpackages") {
     "//src/developer/debug/e2e_tests/inferiors:*",
     "//src/developer/ffx/tools/target-package/tests:verify_ffx_target_package_explore_subpackage",
     "//src/developer/ffx/tools/target-package/tests:verify_ffx_target_package_explore_superpackage",
+    "//src/hwinfo/mock/integration/testing/realm-factory",
     "//src/performance/trace_manager:trace_manager",
     "//src/sys/pkg/lib/fuchsia-pkg:package_for_archive",
     "//src/sys/test_manager:pkg",

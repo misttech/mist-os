@@ -219,5 +219,6 @@ group("tests") {
     ":hwinfo_negative_tests",
     ":hwinfo_positive_tests",
     ":hwinfo_retail_tests",
+    "mock:tests",
   ]
 }
