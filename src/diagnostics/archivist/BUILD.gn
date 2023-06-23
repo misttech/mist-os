@@ -220,7 +220,9 @@ fuchsia_package("package") {
 fuchsia_package("archivist-for-embedding") {
   visibility = [
     "//bundles/buildbot/*",
-    "//sdk/bundles:core-tools",
+
+    # TODO(crbug.com/1408597): Remove once the Chromium tests package the fakes.
+    "//src/chromium:chromium_test_base_deps",
   ]
   deps = [ ":archivist-for-embedding-v2" ]
 }

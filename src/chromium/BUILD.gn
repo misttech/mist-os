@@ -97,9 +97,14 @@ group("chromium_test_base_deps") {
 
   # Fake services needed by Chromium tests until subpackages are supported OOT
   # and fakes are provided with the SDK. See crbug.com/1326674.
-  # TODO(crbug.com/1408597): Remove once the Chromium tests package the fake.
+  # TODO(crbug.com/1408597): Remove once the Chromium tests package the fakes.
   deps = [
     "//src/developer/build_info/testing:fake-build-info",
+
+    # archivist-for-embedding is needed by
+    # WebEngineIntegrationLoggingTest.SetJavaScriptLogLevel_DEBUG.
+    # TODO(crbug.com/1451376): Move it to a peer group as appropriate.
+    "//src/diagnostics/archivist:archivist-for-embedding",
     "//src/testing/fidl/intl_property_manager",
   ]
 }
