@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
   uint32_t last_seqno = 0;
 
   // Make stdout line buffered.
-  setlinebuf(stdout);
+  setvbuf(stdout, NULL, _IOLBF, 0);
 
   appname = argv[0];
 
