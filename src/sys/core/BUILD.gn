@@ -49,26 +49,6 @@ fuchsia_component("fake_core") {
   deps = [ ":core_proxy" ]
 }
 
-fuchsia_component("fake_appmgr") {
-  testonly = true
-  manifest = "meta/fake_appmgr.cml"
-  deps = [ ":fake_appmgr_bin" ]
-}
-
-rustc_binary("fake_appmgr_bin") {
-  name = "fake_appmgr"
-  edition = "2021"
-  source_root = "test/fake_appmgr.rs"
-  sources = [ "test/fake_appmgr.rs" ]
-  deps = [
-    "//examples/components/routing/fidl:echo_rust",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-component",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
-  ]
-}
-
 rustc_test("core_proxy_integration_test_bin") {
   name = "core_proxy_integration_test"
   edition = "2021"
@@ -77,7 +57,9 @@ rustc_test("core_proxy_integration_test_bin") {
   deps = [
     "//examples/components/routing/fidl:echo_rust",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
+    "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:tracing",
   ]
 }
@@ -86,7 +68,6 @@ fuchsia_unittest_package("core_proxy_integration_test") {
   manifest = "meta/core_proxy_integration_test.cml"
   deps = [
     ":core_proxy_integration_test_bin",
-    ":fake_appmgr",
     ":fake_core",
     "//src/sys/component_manager/testing/echo_server",
   ]

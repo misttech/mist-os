@@ -47,16 +47,7 @@
             availability: "optional",
         },
 
-        // Needed for legacy shell /svc when appmgr exists
-        {
-            directory: "svc_from_sys",
-            from: "#appmgr",
-            to: "#sshd-host",
-            rights: [ "r*" ],
-            source_availability: "unknown",
-        },
-
-        // Needed for legacy shell /svc when appmgr doesn't exist
+        // Needed for legacy shell /svc.
         {
             directory: "svc_for_sys",
             from: "self",

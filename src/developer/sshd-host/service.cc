@@ -242,23 +242,13 @@ void Service::Launch(int conn, const std::string& peer_name) {
       {.action = FDIO_SPAWN_ACTION_CLONE_FD,
        .fd = {.local_fd = STDERR_FILENO, .target_fd = STDERR_FILENO}};
 
-  const char* forward_as_svc;
-  // Forward either /svc_from_sys or /svc_for_sys as /svc to the child
-  DIR* dir = opendir("/svc_from_sys");
-  if (dir) {
-    closedir(dir);
-    forward_as_svc = "/svc_from_sys";
-  } else {
-    forward_as_svc = "/svc_for_sys";
-  }
-
   for (size_t i = 0; i < flat_ns->count; ++i) {
     const char* path = flat_ns->path[i];
-    if (strcmp(path, "/svc") == 0) {
+    if (std::string_view{path} == "/svc") {
       // Don't forward our /svc to the child
       continue;
     }
-    if (strcmp(path, forward_as_svc) == 0) {
+    if (std::string_view{path} == "/svc_for_sys") {
       path = "/svc";
     }
     actions[action++] = {

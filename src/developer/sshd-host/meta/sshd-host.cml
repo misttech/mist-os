@@ -32,12 +32,6 @@
         // Needed to create the shell environment
         // for the ssh child process and its children.
         {
-            directory: "svc_from_sys",
-            rights: [ "r*" ],
-            path: "/svc_from_sys",
-            availability: "optional",
-        },
-        {
             directory: "svc_for_sys",
             rights: [ "r*" ],
             path: "/svc_for_sys",

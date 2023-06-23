@@ -1,13 +1,6 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-// A separate `Echo` protocol is routed in both directions:
-// - From `appmgr` to the parent through `core_proxy`
-// - From `echo_server` to `appmgr` through `core_proxy`
-//
-// `appmgr` waits for a response from the protocol served by `echo_server` before serving its
-// protocol.
 {
     include: [
         "//src/sys/core/meta/core_proxy.core_shard.cml",
@@ -15,20 +8,8 @@
     ],
     children: [
         {
-            name: "appmgr",
-            url: "#meta/fake_appmgr.cm",
-        },
-        {
             name: "echo_server",
             url: "#meta/echo_server.cm",
-        },
-    ],
-    capabilities: [
-        { protocol: "fidl.examples.routing.echo.Echo" },
-        {
-            directory: "svc_from_sys",
-            rights: [ "r*" ],
-            path: "/svc_from_sys",
         },
     ],
     use: [
@@ -36,25 +17,12 @@
             protocol: "fidl.examples.routing.echo.Echo",
             from: "#echo_server",
         },
-        {
-            directory: "svc_from_sys",
-            from: "#appmgr",
-            rights: [ "r*" ],
-            path: "/svc_from_sys",
-            dependency: "weak_for_migration",
-        },
-    ],
-    offer: [
-        {
-            directory: "svc_for_sys",
-            from: "self",
-            to: "#appmgr",
-        },
     ],
     expose: [
         {
-            protocol: "fidl.examples.routing.echo.Echo",
+            directory: "svc_for_sys",
             from: "self",
+            rights: [ "r*" ],
         },
     ],
 }

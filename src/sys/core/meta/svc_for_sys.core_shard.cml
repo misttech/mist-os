@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        // Add core_proxy to bridge v1-v2
-        "//src/sys/core/meta/core_proxy.core_shard.cml",
-    ],
+    include: [ "//src/sys/core/meta/core_proxy.core_shard.cml" ],
 
     // Protocols used by core are added by core_proxy to svc_for_sys.
-    // The svc_for_sys directory is used by appmgr to add v2 protocols to the
-    // legacy sys realm, and by sshd-host to create the legacy `fx shell` that
-    // mimics the legacy sys realm.
+    // The svc_for_sys directory is used by sshd-host to create the legacy
+    // `fx shell` that mimics the legacy sys realm.
     use: [
         {
             protocol: [

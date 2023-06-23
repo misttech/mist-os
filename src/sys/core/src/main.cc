@@ -47,7 +47,6 @@ int main() {
   fs::SynchronousVfs out_vfs(loop.dispatcher());
   fbl::RefPtr<fs::PseudoDir> out_dir(fbl::MakeRefCounted<fs::PseudoDir>());
   ServeFromNamespace(out_dir.get(), "/svc", "svc_for_sys");
-  ServeFromNamespace(out_dir.get(), "/svc_from_sys", "svc");
 
   auto pa_directory_request = zx_take_startup_handle(PA_DIRECTORY_REQUEST);
   zx_status_t status = out_vfs.ServeDirectory(
