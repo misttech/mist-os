@@ -239,7 +239,7 @@ expect_includes("name_provider_includes") {
   ]
 }
 
-all_test_component_names = []
+ns2_test_component_names = []
 netstack2_syncudp_tests = [
   {
     label = streamsocket_label
@@ -286,7 +286,7 @@ foreach(test, netstack2_syncudp_tests) {
       manifest = "meta/netstack2/${test.label}.cml"
     }
   }
-  all_test_component_names += [ _component_name ]
+  ns2_test_component_names += [ _component_name ]
 }
 
 netstack2_fastudp_tests = [
@@ -316,10 +316,8 @@ foreach(test, netstack2_fastudp_tests) {
     }
     manifest = "meta/netstack2/fastudp/${test.label}.cml"
   }
-  all_test_component_names += [ _component_name ]
+  ns2_test_component_names += [ _component_name ]
 }
-
-test_components_with_err_logs = []
 
 netstack3_tests = [
   {
@@ -350,6 +348,24 @@ netstack3_tests = [
   },
 ]
 
+ns3_test_component_names = []
+
+socket_test_package_deps = [
+  # dns_resolver is under test.
+  "//src/connectivity/network/dns:component",
+
+  # cat is used to test FD passing in :fuchsia_test.
+  "//third_party/sbase:cat_bin",
+
+  # used to run tests with expectations.
+  "//src/lib/testing/expectation:expectation_comparer",
+]
+
+ns3_socket_test_package_deps =
+    socket_test_package_deps +
+    [ "//src/connectivity/network/netstack3:component-debug" ]
+ns3_packages = []
+
 foreach(test, netstack3_tests) {
   _component_name = "netstack3_${test.label}_test"
   _expects_path = "expects/netstack3/${test.label}.json5"
@@ -361,75 +377,83 @@ foreach(test, netstack3_tests) {
     manifest = "meta/netstack3/${test.label}.cml"
   }
   if (defined(test.with_err_logs) && test.with_err_logs) {
-    test_components_with_err_logs += [
-      {
-        label = test.label
-        name = _component_name
-        expects_path = _expects_path
-      },
-    ]
-  } else {
-    all_test_component_names += [ _component_name ]
-  }
-}
+    no_err_logs_package_name = "${_component_name}_no_err_logs"
+    _test_components = []
+    _test_components = [ ":${_component_name}_component" ]
+    fuchsia_test_with_expectations_package(no_err_logs_package_name) {
+      test_components = _test_components
+      expectations = _expects_path
+      deps = ns3_socket_test_package_deps
+      treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
+    }
 
-socket_test_package_deps = [
-  # dns_resolver is under test.
-  "//src/connectivity/network/dns:component",
+    ns3_packages += [ ":${no_err_logs_package_name}" ]
 
-  # netstack is under test.
-  "//src/connectivity/network/netstack:component-with-fast-udp-debug",
-  "//src/connectivity/network/netstack:component-with-sync-udp-debug",
-  "//src/connectivity/network/netstack3:component-debug",
-
-  # cat is used to test FD passing in :fuchsia_test.
-  "//third_party/sbase:cat_bin",
-
-  # used to run tests with expectations.
-  "//src/lib/testing/expectation:expectation_comparer",
-]
-
-fuchsia_test_package("netstack-c-api-tests") {
-  test_components = []
-  foreach(test, all_test_component_names) {
-    test_components += [ ":${test}_component" ]
-  }
-  deps = socket_test_package_deps
-}
-all_package_names = [ ":netstack-c-api-tests" ]
-
-foreach(test_component, test_components_with_err_logs) {
-  no_err_logs_package_name = "${test_component.name}_no_err_logs"
-  _test_components = []
-  _test_components = [ ":${test_component.name}_component" ]
-  fuchsia_test_with_expectations_package(no_err_logs_package_name) {
-    test_components = _test_components
-    expectations = test_component.expects_path
-    deps = socket_test_package_deps
-    treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
-  }
-
-  all_package_names += [ ":${no_err_logs_package_name}" ]
-
-  err_logs_package_name = "${test_component.name}_with_err_logs"
-  fuchsia_test_with_expectations_package(err_logs_package_name) {
-    test_components = _test_components
-    expectations = test_component.expects_path
-    deps = socket_test_package_deps
-    treatment_of_cases_with_error_logs = "RUN_ONLY_CASES_WITH_ERROR_LOGS"
-    test_specs = {
-      log_settings = {
-        max_severity = "ERROR"
+    err_logs_package_name = "${_component_name}_with_err_logs"
+    fuchsia_test_with_expectations_package(err_logs_package_name) {
+      test_components = _test_components
+      expectations = _expects_path
+      deps = ns3_socket_test_package_deps
+      treatment_of_cases_with_error_logs = "RUN_ONLY_CASES_WITH_ERROR_LOGS"
+      test_specs = {
+        log_settings = {
+          max_severity = "ERROR"
+        }
       }
     }
-  }
 
-  all_package_names += [ ":${err_logs_package_name}" ]
+    ns3_packages += [ ":${no_err_logs_package_name}" ]
+  } else {
+    ns3_test_component_names += [ _component_name ]
+  }
+}
+
+netstack3_stack_name = "netstack3"
+stacks = [
+  {
+    name = "netstack2"
+    tests = ns2_test_component_names
+    package_deps =
+        socket_test_package_deps + [
+          "//src/connectivity/network/netstack:component-with-fast-udp-debug",
+          "//src/connectivity/network/netstack:component-with-sync-udp-debug",
+        ]
+  },
+  {
+    name = netstack3_stack_name
+    tests = ns3_test_component_names
+    package_deps = ns3_socket_test_package_deps
+  },
+]
+
+ns2_packages = []
+
+foreach(stack, stacks) {
+  package_name = "${stack.name}-c-api-tests"
+  fuchsia_test_package("${stack.name}-c-api-tests") {
+    test_components = []
+    foreach(test, stack.tests) {
+      test_components += [ ":${test}_component" ]
+    }
+    deps = socket_test_package_deps + stack.package_deps
+  }
+  if (stack.name == netstack3_stack_name) {
+    ns3_packages += [ ":${package_name}" ]
+  } else {
+    ns2_packages += [ ":${package_name}" ]
+  }
+}
+
+all_packages = ns3_packages
+
+# RISC-V on Fuchsia does not support Golang.
+if (target_cpu != "riscv64") {
+  all_packages += ns2_packages
 }
 
 group("tests") {
   testonly = true
-  public_deps = all_package_names
+  public_deps = all_packages
   if (host_os == "linux") {
     public_deps += [
       ":netstack_${bsdsocket_label}_test($host_toolchain)",
