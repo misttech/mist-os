@@ -25,7 +25,7 @@ node "gpio-wifi-power-on" {
 }
 
 node "sdio-clk-gate" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.A1_CLK_ID.CLK_SD_EMMC;
 }
 

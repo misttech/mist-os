@@ -25,6 +25,6 @@ node "pdev" {
 }
 
 node "clock-cpu-scaler-01" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.A5_CLK_ID.CLK_SYS_CPU_CLK;
 }

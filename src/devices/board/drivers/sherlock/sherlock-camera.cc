@@ -333,7 +333,7 @@ zx_status_t Sherlock::CameraInit() {
       .bind_rules =
           {
               fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                      bind_fuchsia_hardware_clock::BIND_FIDL_PROTOCOL_DEVICE),
+                                      bind_fuchsia_hardware_clock::BIND_FIDL_PROTOCOL_SERVICE),
               fdf::MakeAcceptBindRule(
                   bind_fuchsia::CLOCK_ID,
                   bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_CAM_INCK_24M),
@@ -341,7 +341,7 @@ zx_status_t Sherlock::CameraInit() {
       .properties =
           {
               fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_hardware_clock::BIND_FIDL_PROTOCOL_DEVICE),
+                                bind_fuchsia_hardware_clock::BIND_FIDL_PROTOCOL_SERVICE),
               fdf::MakeProperty(bind_fuchsia_hardware_clock::FUNCTION,
                                 bind_fuchsia_hardware_clock::FUNCTION_CAMERA_SENSOR),
           },

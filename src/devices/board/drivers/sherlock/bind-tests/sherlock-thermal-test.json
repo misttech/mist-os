@@ -48,7 +48,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.SERVICE",
                     "fuchsia.BIND_CLOCK_ID": "fuchsia.amlogic.platform.meson.G12B_CLK_ID.CLK_SYS_PLL_DIV16"
                 }
             }
@@ -61,7 +61,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.SERVICE",
                     "fuchsia.BIND_CLOCK_ID": "fuchsia.amlogic.platform.meson.G12B_CLK_ID.CLK_SYS_CPU_CLK_DIV16"
                 }
             }
@@ -74,7 +74,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.SERVICE",
                     "fuchsia.BIND_CLOCK_ID": "fuchsia.amlogic.platform.meson.G12B_CLK_ID.CLK_SYS_PLLB_DIV16"
                 }
             }
@@ -87,7 +87,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.SERVICE",
                     "fuchsia.BIND_CLOCK_ID": "fuchsia.amlogic.platform.meson.G12B_CLK_ID.CLK_SYS_CPUB_CLK_DIV16"
                 }
             }

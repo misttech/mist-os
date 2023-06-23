@@ -4,14 +4,8 @@
 
 library fuchsia.hardware.clock;
 
-
-// TODO(fxbug.dev/126069): Remove when no longer referenced
-extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 90,
-};
-
 extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  DEVICE = 22,
+  SERVICE = 22,
 };
 
 enum FUNCTION {
