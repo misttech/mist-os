@@ -239,7 +239,10 @@ func (f *FFXInstance) BootloaderBoot(ctx context.Context, serialNum, zbi, vbmeta
 	if slot != "" {
 		args = append(args, "--slot", slot)
 	}
-	return f.Run(ctx, append([]string{"--target", serialNum, "target", "bootloader", "boot"}, args...)...)
+	return f.Run(ctx, append([]string{
+		"--target", serialNum,
+		"--config", "{\"ffx\": {\"fastboot\": {\"inline_target\": true}}}",
+		"target", "bootloader", "boot"}, args...)...)
 }
 
 // List lists all available targets.

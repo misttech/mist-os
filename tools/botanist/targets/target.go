@@ -609,26 +609,6 @@ func StartTargets(ctx context.Context, opts StartOptions, targets []FuchsiaTarge
 		bootMode = bootserver.ModeNetboot
 	}
 
-	// Check the first target to see if ffx is enabled. All targets share the same ffx daemon,
-	// so we can use the ffx associated with the first target to set config values.
-	if len(targets) > 0 && targets[0].UseFFX() {
-		ffx := targets[0].GetFFX()
-		if err := ffx.ConfigSet(ctx, "fastboot.flash.timeout_rate", "4"); err != nil {
-			return err
-		}
-		if err := ffx.ConfigSet(ctx, "ffx.fastboot.inline_target", "true"); err != nil {
-			return err
-		}
-		// Setting the `ffx.fastboot.inline_target` field causes ffx to assume the target
-		// it's trying to reach is in fastboot mode. We need to reset it to false after
-		// we're done flashing.
-		defer func() {
-			if err := ffx.ConfigSet(ctx, "ffx.fastboot.inline_target", "false"); err != nil {
-				logger.Errorf(ctx, "failed to reset ffx.fastboot.inline_target to false")
-			}
-		}()
-	}
-
 	// We wait until targets have started before running testrunner against the zeroth one.
 	eg, startCtx := errgroup.WithContext(ctx)
 	for _, t := range targets {

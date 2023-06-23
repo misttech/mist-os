@@ -71,5 +71,12 @@ func GetFlashDeps(sdkRoot, productName string) ([]string, error) {
 
 // Flash flashes the target.
 func (f *FFXInstance) Flash(ctx context.Context, serialNum, manifest, sshKey string) error {
-	return f.Run(ctx, "--target", serialNum, "target", "flash", "--authorized-keys", sshKey, "--manifest", manifest)
+	if err := f.ConfigSet(ctx, "fastboot.flash.timeout_rate", "4"); err != nil {
+		return err
+	}
+	return f.Run(ctx, "--target", serialNum,
+		"--config", "{\"ffx\": {\"fastboot\": {\"inline_target\": true}}}",
+		"target", "flash",
+		"--authorized-keys", sshKey,
+		"--manifest", manifest)
 }
