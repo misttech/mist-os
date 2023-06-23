@@ -56,7 +56,7 @@ class FakeDisplayStack {
   // be torn down on `SyncShutdown()`.
   fake_display::FakeDisplay* display_;
   Controller* coordinator_controller_;
-  sysmem_driver::Device* sysmem_device_;
+  zx_device_t* sysmem_device_;
 
   bool shutdown_ = false;
 

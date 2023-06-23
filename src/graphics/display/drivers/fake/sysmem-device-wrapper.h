@@ -5,8 +5,11 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_SYSMEM_DEVICE_WRAPPER_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_SYSMEM_DEVICE_WRAPPER_H_
 
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/sysmem/c/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
+
+#include <type_traits>
 
 #include <ddktl/device.h>
 
@@ -21,6 +24,9 @@ namespace display {
 //   - system integration tests may want to use the "global" sysmem so that multiple components
 //     can use it to coordinate memory allocation, for example tests which involve Scenic, Magma,
 //     and the display driver.
+//
+// The wrapped sysmem device must provide a wire server of FIDL fuchsia.sysmem2.
+// DriverConnector protocol for clients to connect to the sysmem device.
 class SysmemDeviceWrapper {
  public:
   virtual ~SysmemDeviceWrapper() = default;
@@ -28,14 +34,19 @@ class SysmemDeviceWrapper {
   virtual const sysmem_protocol_t* proto() const = 0;
   virtual const zx_device_t* device() const = 0;
   virtual zx_status_t Bind() = 0;
+  virtual fidl::WireServer<fuchsia_sysmem2::DriverConnector>* DriverConnectorServer() = 0;
 };
 
 // Convenient implementation of SysmemDeviceWrapper which can be used to wrap both
 // sysmem_device::Driver and display::SysmemProxyDevice (the initial two usages of
 // SysmemDeviceWrapper).
+//
+// The wrapped sysmem device type must be a `fidl::WireServer` of
+// fuchsia.sysmem2.DriverConnector FIDL protocol.
 template <typename T>
 class GenericSysmemDeviceWrapper : public SysmemDeviceWrapper {
  public:
+  static_assert(std::is_base_of_v<fidl::WireServer<fuchsia_sysmem2::DriverConnector>, T>);
   explicit GenericSysmemDeviceWrapper(zx_device_t* parent)
       : sysmem_ctx_(std::make_unique<sysmem_driver::Driver>()),
         owned_sysmem_(std::make_unique<T>(parent, sysmem_ctx_.get())) {
@@ -44,6 +55,9 @@ class GenericSysmemDeviceWrapper : public SysmemDeviceWrapper {
 
   const sysmem_protocol_t* proto() const override { return sysmem_->proto(); }
   const zx_device_t* device() const override { return sysmem_->device(); }
+  fidl::WireServer<fuchsia_sysmem2::DriverConnector>* DriverConnectorServer() override {
+    return sysmem_;
+  }
   zx_status_t Bind() override {
     zx_status_t status = sysmem_->Bind();
     if (status == ZX_OK) {

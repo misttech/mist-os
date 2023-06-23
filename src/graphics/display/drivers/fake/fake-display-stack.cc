@@ -32,9 +32,11 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
     ZX_PANIC("sysmem_.Bind() return status was not ZX_OK. Error: %s.",
              zx_status_get_string(result));
   }
-  sysmem_device_ = mock_root_->GetLatestChild()->GetDeviceContext<sysmem_driver::Device>();
+
+  sysmem_device_ = mock_root_->GetLatestChild();
   auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::DriverConnector>();
-  fidl::BindServer(sysmem_loop_.dispatcher(), std::move(sysmem_endpoints->server), sysmem_device_);
+  fidl::BindServer(sysmem_loop_.dispatcher(), std::move(sysmem_endpoints->server),
+                   sysmem_->DriverConnectorServer());
   sysmem_loop_.StartThread("sysmem-server-thread");
   sysmem_client_ =
       fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>(std::move(sysmem_endpoints->client));
@@ -132,7 +134,7 @@ void FakeDisplayStack::SyncShutdown() {
   display_->DdkChildPreRelease(coordinator_controller_);
   coordinator_controller_->DdkAsyncRemove();
   display_->DdkAsyncRemove();
-  sysmem_device_->DdkAsyncRemove();
+  device_async_remove(sysmem_device_);
   mock_ddk::ReleaseFlaggedDevices(mock_root_.get());
 
   // All the fake devices are expected to be deleted by `ReleaseFlaggedDevices`.

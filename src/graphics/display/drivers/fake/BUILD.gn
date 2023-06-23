@@ -79,6 +79,7 @@ static_library("fake-display-stack") {
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_wire",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//src/devices/testing/mock-ddk",
