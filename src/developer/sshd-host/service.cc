@@ -30,7 +30,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 
 #include <memory>
 #include <vector>
@@ -48,22 +47,20 @@ const char* kSshdArgv[] = {kSshdPath, "-ie", "-f", "/config/data/sshd_config", n
 namespace sshd_host {
 zx_status_t provision_authorized_keys_from_bootloader_file(
     std::shared_ptr<sys::ServiceDirectory> service_directory) {
-  zx_status_t status;
   fuchsia::boot::ItemsSyncPtr boot_items;
-  status = service_directory->Connect(boot_items.NewRequest());
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Provisioning keys from boot item: failed to connect to boot items service: "
-                   << zx_status_get_string(status);
+  if (zx_status_t status = service_directory->Connect(boot_items.NewRequest()); status != ZX_OK) {
+    FX_PLOGS(ERROR, status)
+        << "Provisioning keys from boot item: failed to connect to boot items service";
     return status;
   }
 
   zx::vmo vmo;
-  status = boot_items->GetBootloaderFile(std::string(kAuthorizedKeysBootloaderFileName.data(),
-                                                     kAuthorizedKeysBootloaderFileName.size()),
-                                         &vmo);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Provisioning keys from boot item: GetBootloaderFile failed with: "
-                   << zx_status_get_string(status);
+  if (zx_status_t status =
+          boot_items->GetBootloaderFile(std::string(kAuthorizedKeysBootloaderFileName.data(),
+                                                    kAuthorizedKeysBootloaderFileName.size()),
+                                        &vmo);
+      status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Provisioning keys from boot item: GetBootloaderFile failed";
     return status;
   }
 
@@ -74,19 +71,16 @@ zx_status_t provision_authorized_keys_from_bootloader_file(
   }
 
   uint64_t size;
-  status = vmo.get_property(ZX_PROP_VMO_CONTENT_SIZE, &size, sizeof(size));
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Provisioning keys from boot item: unable to get file size: "
-                   << zx_status_get_string(status);
+  if (zx_status_t status = vmo.get_property(ZX_PROP_VMO_CONTENT_SIZE, &size, sizeof(size));
+      status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Provisioning keys from boot item: unable to get file size";
     return status;
   }
 
   auto buffer = std::make_unique<uint8_t[]>(size);
 
-  status = vmo.read(buffer.get(), 0, size);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Provisioning keys from boot item: failed to read file: "
-                   << zx_status_get_string(status);
+  if (zx_status_t status = vmo.read(buffer.get(), 0, size); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Provisioning keys from boot item: failed to read file";
     return status;
   }
 
@@ -120,19 +114,19 @@ zx_status_t provision_authorized_keys_from_bootloader_file(
 }
 
 zx_status_t make_child_job(const zx::job& parent, std::string name, zx::job* job) {
-  zx_status_t s;
-  if ((s = zx::job::create(parent, 0, job)) != ZX_OK) {
-    FX_PLOGS(ERROR, s) << "Failed to create child job; parent = " << parent.get();
-    return s;
+  if (zx_status_t status = zx::job::create(parent, 0, job); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to create child job; parent = " << parent.get();
+    return status;
   }
 
-  if ((s = job->set_property(ZX_PROP_NAME, name.data(), name.size())) != ZX_OK) {
-    FX_PLOGS(ERROR, s) << "Failed to set name of child job; job = " << job->get();
-    return s;
+  if (zx_status_t status = job->set_property(ZX_PROP_NAME, name.data(), name.size());
+      status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to set name of child job; job = " << job->get();
+    return status;
   }
-  if ((s = job->replace(kChildJobRights, job)) != ZX_OK) {
-    FX_PLOGS(ERROR, s) << "Failed to set rights on child job; job = " << job->get();
-    return s;
+  if (zx_status_t status = job->replace(kChildJobRights, job); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to set rights on child job; job = " << job->get();
+    return status;
   }
 
   return ZX_OK;
@@ -169,12 +163,11 @@ Service::Service(uint16_t port) : port_(port) {
 
 Service::~Service() {
   for (auto& waiter : process_waiters_) {
-    zx_status_t s;
-    if ((s = zx_task_kill(waiter->object())) != ZX_OK) {
-      FX_PLOGS(ERROR, s) << "Failed kill child task";
+    if (zx_status_t status = zx_task_kill(waiter->object()); status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed kill child task";
     }
-    if ((s = zx_handle_close(waiter->object())) != ZX_OK) {
-      FX_PLOGS(ERROR, s) << "Failed close child handle";
+    if (zx_status_t status = zx_handle_close(waiter->object()); status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed close child handle";
     }
   }
 }
@@ -229,9 +222,8 @@ void Service::Launch(int conn, const std::string& peer_name) {
   }
 
   fdio_flat_namespace_t* flat_ns = nullptr;
-  zx_status_t status = fdio_ns_export_root(&flat_ns);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "fdio_ns_export_root failed: " << status;
+  if (zx_status_t status = fdio_ns_export_root(&flat_ns); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "fdio_ns_export_root failed";
     return;
   }
   auto cleanup = fit::defer([&flat_ns]() { fdio_ns_free_flat_ns(flat_ns); });
@@ -265,7 +257,8 @@ void Service::Launch(int conn, const std::string& peer_name) {
     if (strcmp(path, "/svc") == 0) {
       // Don't forward our /svc to the child
       continue;
-    } else if (strcmp(path, forward_as_svc) == 0) {
+    }
+    if (strcmp(path, forward_as_svc) == 0) {
       path = "/svc";
     }
     actions[action++] = {
@@ -282,12 +275,13 @@ void Service::Launch(int conn, const std::string& peer_name) {
       FDIO_SPAWN_CLONE_JOB | FDIO_SPAWN_DEFAULT_LDSVC | FDIO_SPAWN_CLONE_UTC_CLOCK;
   zx::process process;
   char error[FDIO_SPAWN_ERR_MSG_MAX_LENGTH];
-  status = fdio_spawn_etc(child_job.get(), kSpawnFlags, kSshdPath, kSshdArgv, nullptr, action,
-                          actions, process.reset_and_get_address(), error);
-  if (status < 0) {
+  if (zx_status_t status =
+          fdio_spawn_etc(child_job.get(), kSpawnFlags, kSshdPath, kSshdArgv, nullptr, action,
+                         actions, process.reset_and_get_address(), error);
+      status != ZX_OK) {
     shutdown(conn, SHUT_RDWR);
     close(conn);
-    FX_LOGS(ERROR) << "Error from fdio_spawn_etc: " << error;
+    FX_PLOGS(ERROR, status) << "Error from fdio_spawn_etc: " << error;
     return;
   }
 
@@ -305,9 +299,10 @@ void Service::Launch(int conn, const std::string& peer_name) {
 void Service::ProcessTerminated(zx::process process, zx::job job) {
   {
     zx_info_process_t info;
-    if (zx_status_t s = process.get_info(ZX_INFO_PROCESS, &info, sizeof(info), nullptr, nullptr);
-        s != ZX_OK) {
-      FX_PLOGS(ERROR, s) << "Failed to get proces info";
+    if (zx_status_t status =
+            process.get_info(ZX_INFO_PROCESS, &info, sizeof(info), nullptr, nullptr);
+        status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed to get proces info";
     }
     if (info.return_code != 0) {
       FX_LOGS(WARNING) << "Process finished with nonzero status: " << info.return_code;
@@ -315,11 +310,11 @@ void Service::ProcessTerminated(zx::process process, zx::job job) {
   }
 
   // Kill the process and the job.
-  if (zx_status_t s = process.kill(); s != ZX_OK) {
-    FX_PLOGS(ERROR, s) << "Failed to kill child process";
+  if (zx_status_t status = process.kill(); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to kill child process";
   }
-  if (zx_status_t s = job.kill(); s != ZX_OK) {
-    FX_PLOGS(ERROR, s) << "Failed to kill child job";
+  if (zx_status_t status = job.kill(); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to kill child job";
   }
 
   // Find the waiter.
