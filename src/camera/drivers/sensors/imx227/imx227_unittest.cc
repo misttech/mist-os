@@ -7,7 +7,7 @@
 
 #include <endian.h>
 #include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/mipicsi/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -21,6 +21,7 @@
 #include "src/camera/drivers/sensors/imx227/imx227_id.h"
 #include "src/camera/drivers/sensors/imx227/imx227_seq.h"
 #include "src/camera/drivers/sensors/imx227/mipi_ccs_regs.h"
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 // The following equality operators are necessary for mocks.
@@ -86,37 +87,19 @@ class FakeClockServer final : public fidl::testing::WireTestBase<fuchsia_hardwar
 
 class FakeImx227Device : public Imx227Device {
  public:
-  FakeImx227Device(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_clock::Clock> clk24)
-      : Imx227Device(parent, std::move(clk24)), proto_({&camera_sensor2_protocol_ops_, this}) {
+  FakeImx227Device(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_clock::Clock> clk24,
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio_vana_enable,
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio_vdig_enable,
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio_cam_rst)
+      : Imx227Device(parent, std::move(clk24), std::move(gpio_vana_enable),
+                     std::move(gpio_vdig_enable), std::move(gpio_cam_rst)),
+        proto_({&camera_sensor2_protocol_ops_, this}) {
     SetProtocols();
-    ExpectInitPdev();
     ASSERT_OK(InitPdev());
     ASSERT_NO_FATAL_FAILURE(VerifyAll());
   }
 
-  void ExpectInitPdev() {
-    mock_gpio_cam_rst_.ExpectConfigOut(ZX_OK, 1);
-    mock_gpio_vana_enable_.ExpectConfigOut(ZX_OK, 0);
-    mock_gpio_vdig_enable_.ExpectConfigOut(ZX_OK, 0);
-  }
-
-  void ExpectInit() {
-    mock_gpio_vana_enable_.ExpectWrite(ZX_OK, true);
-    mock_gpio_vdig_enable_.ExpectWrite(ZX_OK, true);
-    mock_gpio_cam_rst_.ExpectWrite(ZX_OK, false);
-  }
-
-  void ExpectDeInit() {
-    mock_mipi_.ExpectDeInit(ZX_OK);
-    mock_gpio_cam_rst_.ExpectWrite(ZX_OK, true);
-    mock_gpio_vdig_enable_.ExpectWrite(ZX_OK, false);
-    mock_gpio_vana_enable_.ExpectWrite(ZX_OK, false);
-  }
-
-  void ExpectCycleResetOnAndOff() {
-    mock_gpio_cam_rst_.ExpectWrite(ZX_OK, 1);
-    mock_gpio_cam_rst_.ExpectWrite(ZX_OK, 0);
-  }
+  void ExpectDeInit() { mock_mipi_.ExpectDeInit(ZX_OK); }
 
   void ExpectGetSensorId() {
     const auto kSensorModelIdHiRegByteVec = SplitBytes(htobe16(kSensorModelIdReg));
@@ -195,9 +178,6 @@ class FakeImx227Device : public Imx227Device {
     fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
 
     i2c_ = ddk::I2cChannel(std::move(endpoints->client));
-    gpio_vana_enable_ = ddk::GpioProtocolClient(mock_gpio_vana_enable_.GetProto());
-    gpio_vdig_enable_ = ddk::GpioProtocolClient(mock_gpio_vdig_enable_.GetProto());
-    gpio_cam_rst_ = ddk::GpioProtocolClient(mock_gpio_cam_rst_.GetProto());
     mipi_ = ddk::MipiCsiProtocolClient(mock_mipi_.GetProto());
 
     EXPECT_OK(loop_.StartThread());
@@ -205,9 +185,6 @@ class FakeImx227Device : public Imx227Device {
 
   void VerifyAll() {
     mock_i2c_.VerifyAndClear();
-    mock_gpio_vana_enable_.VerifyAndClear();
-    mock_gpio_vdig_enable_.VerifyAndClear();
-    mock_gpio_cam_rst_.VerifyAndClear();
     mock_mipi_.VerifyAndClear();
   }
 
@@ -224,9 +201,6 @@ class FakeImx227Device : public Imx227Device {
  private:
   camera_sensor2_protocol_t proto_;
   mock_i2c::MockI2c mock_i2c_;
-  ddk::MockGpio mock_gpio_vana_enable_;
-  ddk::MockGpio mock_gpio_vdig_enable_;
-  ddk::MockGpio mock_gpio_cam_rst_;
   ddk::MockMipiCsi mock_mipi_;
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
@@ -235,20 +209,39 @@ class Imx227DeviceTest : public zxtest::Test {
  public:
   void SetUp() override {
     ASSERT_OK(mock_fidl_servers_loop_.StartThread("mock-fidl-servers"));
+
     ASSERT_FALSE(mock_clk24_.SyncCall(&FakeClockServer::enabled));
     zx::result clk24_client = mock_clk24_.SyncCall(&FakeClockServer::BindServer);
     ASSERT_OK(clk24_client);
-    dut_.emplace(fake_parent_.get(), std::move(clk24_client.value()));
+
+    fidl::ClientEnd gpio_vana_enable_client =
+        mock_gpio_vana_enable_.SyncCall(&fake_gpio::FakeGpio::Connect);
+    fidl::ClientEnd gpio_vdig_enable_client =
+        mock_gpio_vdig_enable_.SyncCall(&fake_gpio::FakeGpio::Connect);
+    fidl::ClientEnd gpio_cam_rst_client =
+        mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::Connect);
+
+    dut_.emplace(fake_parent_.get(), std::move(clk24_client.value()),
+                 std::move(gpio_vana_enable_client), std::move(gpio_vdig_enable_client),
+                 std::move(gpio_cam_rst_client));
+    ASSERT_EQ(0, mock_gpio_vana_enable_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
+    ASSERT_EQ(0, mock_gpio_vdig_enable_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
+    ASSERT_EQ(1, mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
     fake_parent_->AddProtocol(ZX_PROTOCOL_CAMERA_SENSOR2, dut().proto()->ops, &dut_);
-    dut().ExpectInit();
     dut().ExpectCameraSensor2Init();
     ASSERT_OK(dut().CameraSensor2Init());
     ASSERT_TRUE(mock_clk24_.SyncCall(&FakeClockServer::enabled));
+    ASSERT_EQ(1, mock_gpio_vana_enable_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
+    ASSERT_EQ(1, mock_gpio_vdig_enable_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
+    ASSERT_EQ(0, mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
   }
 
   void TearDown() override {
     dut().ExpectDeInit();
     ASSERT_OK(dut().CameraSensor2DeInit());
+    ASSERT_EQ(0, mock_gpio_vana_enable_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
+    ASSERT_EQ(0, mock_gpio_vdig_enable_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
+    ASSERT_EQ(1, mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
     ASSERT_FALSE(mock_clk24_.SyncCall(&FakeClockServer::enabled));
     ASSERT_NO_FATAL_FAILURE(dut().VerifyAll());
   }
@@ -257,10 +250,15 @@ class Imx227DeviceTest : public zxtest::Test {
 
   std::optional<FakeImx227Device> dut_;
 
- private:
   async::Loop mock_fidl_servers_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<FakeClockServer> mock_clk24_{
       mock_fidl_servers_loop_.dispatcher(), std::in_place, false};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> mock_gpio_vana_enable_{
+      mock_fidl_servers_loop_.dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> mock_gpio_vdig_enable_{
+      mock_fidl_servers_loop_.dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> mock_gpio_cam_rst_{
+      mock_fidl_servers_loop_.dispatcher(), std::in_place};
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
 };
 
@@ -283,8 +281,11 @@ static uint32_t GetCoarseMaxIntegrationTime(const frame_rate_info_t* lut, uint32
 TEST_F(Imx227DeviceTest, Sanity) {}
 
 TEST_F(Imx227DeviceTest, ResetCycleOnAndOff) {
-  dut().ExpectCycleResetOnAndOff();
   dut().CycleReset();
+  auto write_values = mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::GetWriteValues);
+  ASSERT_TRUE(write_values.size() >= 2);
+  ASSERT_EQ(1, write_values[write_values.size() - 2]);
+  ASSERT_EQ(0, write_values[write_values.size() - 1]);
 }
 
 TEST_F(Imx227DeviceTest, GetSensorId) {

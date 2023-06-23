@@ -17,5 +17,6 @@
     use: [
         { service: "fuchsia.hardware.i2c.Service" },
         { service: "fuchsia.hardware.clock.Service" },
+        { service: "fuchsia.hardware.gpio.Service" },
     ],
 }

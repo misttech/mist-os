@@ -27,17 +27,17 @@ node "i2c" {
 }
 
 node "gpio-reset" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.CAM_RESET;
 }
 
 node "gpio-vana" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.VANA_ENABLE;
 }
 
 node "gpio-vdig" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.VDIG_ENABLE;
 }
 

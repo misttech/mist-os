@@ -50,9 +50,9 @@ source_set("lib") {
 
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.camera.sensor:fuchsia.hardware.camera.sensor_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.mipicsi:fuchsia.hardware.mipicsi_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//sdk/lib/fit-promise",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
@@ -91,10 +91,10 @@ executable("imx227_unittest_bin") {
   sources = [ "imx227_unittest.cc" ]
   deps = [
     ":lib",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp_mock",
     "//sdk/banjo/fuchsia.hardware.mipicsi:fuchsia.hardware.mipicsi_banjo_cpp_mock",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
     "//sdk/lib/async_patterns/testing/cpp",
+    "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/i2c/testing/mock-i2c",
     "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/async:async-cpp",

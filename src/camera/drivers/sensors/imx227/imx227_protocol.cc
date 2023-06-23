@@ -122,7 +122,11 @@ zx_status_t Imx227Device::CameraSensor2SetMode(uint32_t mode) {
 
     // The sensor is not yet alive. Try to reset it.
     zxlogf(INFO, "Sensor is not responding to I2C register reads. Attempting reset.");
-    CycleResetOnAndOff();
+    zx_status_t status = CycleResetOnAndOff();
+    if (status != ZX_OK) {
+      zxlogf(INFO, "Failed to cycle reset on and off: %s", zx_status_get_string(status));
+      return status;
+    }
   }
 
   // Last check before erroring out.

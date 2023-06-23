@@ -84,27 +84,43 @@ zx_status_t Imx227Device::InitPdev() {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  // GPIOs
-  if (!gpio_vana_enable_.is_valid()) {
-    zxlogf(ERROR, "%s; gpio_vana_enable_ not available", __func__);
-    return ZX_ERR_NO_RESOURCES;
-  }
-
-  if (!gpio_vdig_enable_.is_valid()) {
-    zxlogf(ERROR, "%s; gpio_vdig_enable_ not available", __func__);
-    return ZX_ERR_NO_RESOURCES;
-  }
-
-  if (!gpio_cam_rst_.is_valid()) {
-    zxlogf(ERROR, "%s; gpio_cam_rst_ not available", __func__);
-    return ZX_ERR_NO_RESOURCES;
-  }
-
   // Set the GPIO to output and set them to their initial values
   // before the power up sequence.
-  gpio_cam_rst_.ConfigOut(1);
-  gpio_vana_enable_.ConfigOut(0);
-  gpio_vdig_enable_.ConfigOut(0);
+  fidl::WireResult cam_rst_result = gpio_cam_rst_->ConfigOut(1);
+  if (!cam_rst_result.ok()) {
+    zxlogf(ERROR, "Failed to send ConfigOut request to gpio_cam_rst: %s",
+           cam_rst_result.status_string());
+    return cam_rst_result.status();
+  }
+  if (cam_rst_result->is_error()) {
+    zxlogf(ERROR, "Failed to configure gpio_cam_rst as output: %s",
+           zx_status_get_string(cam_rst_result->error_value()));
+    return cam_rst_result->error_value();
+  }
+
+  fidl::WireResult vana_enable_result = gpio_vana_enable_->ConfigOut(0);
+  if (!vana_enable_result.ok()) {
+    zxlogf(ERROR, "Failed to send ConfigOut request to gpio_vana_enable: %s",
+           vana_enable_result.status_string());
+    return vana_enable_result.status();
+  }
+  if (vana_enable_result->is_error()) {
+    zxlogf(ERROR, "Failed to configure gpio_vana_enable as output: %s",
+           zx_status_get_string(vana_enable_result->error_value()));
+    return vana_enable_result->error_value();
+  }
+
+  fidl::WireResult vdig_enable_result = gpio_vdig_enable_->ConfigOut(0);
+  if (!vdig_enable_result.ok()) {
+    zxlogf(ERROR, "Failed to send ConfigOut request to gpio_vdig_enable: %s",
+           vdig_enable_result.status_string());
+    return vdig_enable_result.status();
+  }
+  if (vdig_enable_result->is_error()) {
+    zxlogf(ERROR, "Failed to configure gpio_vdig_enable as output: %s",
+           zx_status_get_string(vdig_enable_result->error_value()));
+    return vdig_enable_result->error_value();
+  }
   return ZX_OK;
 }
 
@@ -226,10 +242,30 @@ zx_status_t Imx227Device::HwInit() {
   TRACE_DURATION("camera", "Imx227Device::HwInit");
 
   // Power up sequence. Reference: Page 51- IMX227-0AQH5-C datasheet.
-  gpio_vana_enable_.Write(1);
+  fidl::WireResult vana_enable_result = gpio_vana_enable_->Write(1);
+  if (!vana_enable_result.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to gpio_vana_enable: %s",
+           vana_enable_result.status_string());
+    return vana_enable_result.status();
+  }
+  if (vana_enable_result->is_error()) {
+    zxlogf(ERROR, "Failed to write to gpio_vana_enable: %s",
+           zx_status_get_string(vana_enable_result->error_value()));
+    return vana_enable_result->error_value();
+  }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 
-  gpio_vdig_enable_.Write(1);
+  fidl::WireResult vdig_enable_result = gpio_vdig_enable_->Write(1);
+  if (!vdig_enable_result.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to gpio_vdig_enable: %s",
+           vdig_enable_result.status_string());
+    return vdig_enable_result.status();
+  }
+  if (vdig_enable_result->is_error()) {
+    zxlogf(ERROR, "Failed to write to gpio_vdig_enable: %s",
+           zx_status_get_string(vdig_enable_result->error_value()));
+    return vdig_enable_result->error_value();
+  }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 
   // Enable 24M clock for sensor.
@@ -244,7 +280,17 @@ zx_status_t Imx227Device::HwInit() {
   }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
 
-  gpio_cam_rst_.Write(0);
+  fidl::WireResult cam_rst_result = gpio_cam_rst_->Write(0);
+  if (!cam_rst_result.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to gpio_cam_rst: %s",
+           cam_rst_result.status_string());
+    return cam_rst_result.status();
+  }
+  if (cam_rst_result->is_error()) {
+    zxlogf(ERROR, "Failed to write to gpio_cam_rst: %s",
+           zx_status_get_string(cam_rst_result->error_value()));
+    return cam_rst_result->error_value();
+  }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 
   RefreshCachedExposureParams();
@@ -255,7 +301,17 @@ zx_status_t Imx227Device::HwInit() {
 zx_status_t Imx227Device::HwDeInit() {
   TRACE_DURATION("camera", "Imx227Device::HwDeInit");
 
-  gpio_cam_rst_.Write(1);
+  fidl::WireResult cam_rst_result = gpio_cam_rst_->Write(1);
+  if (!cam_rst_result.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to gpio_cam_rst: %s",
+           cam_rst_result.status_string());
+    return cam_rst_result.status();
+  }
+  if (cam_rst_result->is_error()) {
+    zxlogf(ERROR, "Failed to write to gpio_cam_rst: %s",
+           zx_status_get_string(cam_rst_result->error_value()));
+    return cam_rst_result->error_value();
+  }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 
   fidl::WireResult result = clk24_->Disable();
@@ -269,20 +325,62 @@ zx_status_t Imx227Device::HwDeInit() {
   }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
 
-  gpio_vdig_enable_.Write(0);
+  fidl::WireResult vdig_enable_result = gpio_vdig_enable_->Write(0);
+  if (!vdig_enable_result.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to gpio_vdig_enable: %s",
+           vdig_enable_result.status_string());
+    return vdig_enable_result.status();
+  }
+  if (vdig_enable_result->is_error()) {
+    zxlogf(ERROR, "Failed to write to gpio_vdig_enable: %s",
+           zx_status_get_string(vdig_enable_result->error_value()));
+    return vdig_enable_result->error_value();
+  }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 
-  gpio_vana_enable_.Write(0);
+  fidl::WireResult vana_enable_result = gpio_vana_enable_->Write(0);
+  if (!vana_enable_result.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to gpio_vana_enable: %s",
+           vana_enable_result.status_string());
+    return vana_enable_result.status();
+  }
+  if (vana_enable_result->is_error()) {
+    zxlogf(ERROR, "Failed to write to gpio_vana_enable: %s",
+           zx_status_get_string(vana_enable_result->error_value()));
+    return vana_enable_result->error_value();
+  }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 
   return ZX_OK;
 }
 
-void Imx227Device::CycleResetOnAndOff() {
-  gpio_cam_rst_.Write(1);
+zx_status_t Imx227Device::CycleResetOnAndOff() {
+  fidl::WireResult cam_rst_result1 = gpio_cam_rst_->Write(1);
+  if (!cam_rst_result1.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to gpio_cam_rst: %s",
+           cam_rst_result1.status_string());
+    return cam_rst_result1.status();
+  }
+  if (cam_rst_result1->is_error()) {
+    zxlogf(ERROR, "Failed to write to gpio_cam_rst: %s",
+           zx_status_get_string(cam_rst_result1->error_value()));
+    return cam_rst_result1->error_value();
+  }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
-  gpio_cam_rst_.Write(0);
+  fidl::WireResult cam_rst_result2 = gpio_cam_rst_->Write(0);
+  if (!cam_rst_result2.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to gpio_cam_rst: %s",
+           cam_rst_result2.status_string());
+    return cam_rst_result2.status();
+  }
+  if (cam_rst_result2->is_error()) {
+    zxlogf(ERROR, "Failed to write to gpio_cam_rst: %s",
+           zx_status_get_string(cam_rst_result2->error_value()));
+    return cam_rst_result2->error_value();
+  }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
+
+  return ZX_OK;
 }
 
 zx_status_t Imx227Device::InitMipiCsi(uint32_t mode) {
@@ -485,16 +583,49 @@ void Imx227Device::RefreshCachedExposureParams() {
 }
 
 zx_status_t Imx227Device::Create(zx_device_t* parent, std::unique_ptr<Imx227Device>* device_out) {
-  const char* CLOCK_FRAGMENT_NAME = "clock-sensor";
+  const char* kClockFragmentName = "clock-sensor";
   zx::result clock_client =
       ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
-          parent, CLOCK_FRAGMENT_NAME);
+          parent, kClockFragmentName);
   if (clock_client.is_error()) {
-    zxlogf(ERROR, "Failed to connect to clock protocol from fragment %s: %s", CLOCK_FRAGMENT_NAME,
+    zxlogf(ERROR, "Failed to connect to clock protocol from fragment %s: %s", kClockFragmentName,
            clock_client.status_string());
     return clock_client.error_value();
   }
-  auto sensor_device = std::make_unique<Imx227Device>(parent, std::move(clock_client.value()));
+
+  const char* kGpioVanaEnableFragmentName = "gpio-vana";
+  zx::result gpio_vana_enable =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+          parent, kGpioVanaEnableFragmentName);
+  if (gpio_vana_enable.is_error()) {
+    zxlogf(ERROR, "Failed to connect to gpio protocol from fragment %s: %s",
+           kGpioVanaEnableFragmentName, gpio_vana_enable.status_string());
+    return gpio_vana_enable.error_value();
+  }
+
+  const char* kGpioVdigEnableFragmentName = "gpio-vdig";
+  zx::result gpio_vdig_enable =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+          parent, kGpioVdigEnableFragmentName);
+  if (gpio_vdig_enable.is_error()) {
+    zxlogf(ERROR, "Failed to connect to gpio protocol from fragment %s: %s",
+           kGpioVdigEnableFragmentName, gpio_vdig_enable.status_string());
+    return gpio_vdig_enable.error_value();
+  }
+
+  const char* kGpioCamRstFragmentName = "gpio-reset";
+  zx::result gpio_cam_rst =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+          parent, kGpioCamRstFragmentName);
+  if (gpio_cam_rst.is_error()) {
+    zxlogf(ERROR, "Failed to connect to gpio protocol from fragment %s: %s",
+           kGpioCamRstFragmentName, gpio_cam_rst.status_string());
+    return gpio_cam_rst.error_value();
+  }
+
+  auto sensor_device = std::make_unique<Imx227Device>(
+      parent, std::move(clock_client.value()), std::move(gpio_vana_enable.value()),
+      std::move(gpio_vdig_enable.value()), std::move(gpio_cam_rst.value()));
 
   zx_status_t status = sensor_device->InitPdev();
   if (status != ZX_OK) {

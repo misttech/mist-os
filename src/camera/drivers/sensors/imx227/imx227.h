@@ -6,8 +6,8 @@
 #define SRC_CAMERA_DRIVERS_SENSORS_IMX227_IMX227_H_
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/camera/sensor/cpp/banjo.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/mipicsi/cpp/banjo.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/i2c-channel.h>
@@ -65,12 +65,15 @@ using DeviceType = ddk::Device<Imx227Device>;
 class Imx227Device : public DeviceType,
                      public ddk::CameraSensor2Protocol<Imx227Device, ddk::base_protocol> {
  public:
-  Imx227Device(zx_device_t* device, fidl::ClientEnd<fuchsia_hardware_clock::Clock> clk24)
+  Imx227Device(zx_device_t* device, fidl::ClientEnd<fuchsia_hardware_clock::Clock> clk24,
+               fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio_vana_enable,
+               fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio_vdig_enable,
+               fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio_cam_rst)
       : DeviceType(device),
         i2c_(device, "i2c"),
-        gpio_vana_enable_(device, "gpio-vana"),
-        gpio_vdig_enable_(device, "gpio-vdig"),
-        gpio_cam_rst_(device, "gpio-reset"),
+        gpio_vana_enable_(std::move(gpio_vana_enable)),
+        gpio_vdig_enable_(std::move(gpio_vdig_enable)),
+        gpio_cam_rst_(std::move(gpio_cam_rst)),
         clk24_(std::move(clk24)),
         mipi_(device, "mipicsi") {}
 
@@ -144,9 +147,9 @@ class Imx227Device : public DeviceType,
  protected:
   // Protocols
   ddk::I2cChannel i2c_;
-  ddk::GpioProtocolClient gpio_vana_enable_;
-  ddk::GpioProtocolClient gpio_vdig_enable_;
-  ddk::GpioProtocolClient gpio_cam_rst_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_vana_enable_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_vdig_enable_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_cam_rst_;
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clk24_;
   ddk::MipiCsiProtocolClient mipi_;
 
@@ -183,7 +186,7 @@ class Imx227Device : public DeviceType,
   zx_status_t InitSensor(uint8_t idx) __TA_REQUIRES(lock_);
   zx_status_t HwInit() __TA_REQUIRES(lock_);
   zx_status_t HwDeInit() __TA_REQUIRES(lock_);
-  void CycleResetOnAndOff() __TA_REQUIRES(lock_);
+  zx_status_t CycleResetOnAndOff() __TA_REQUIRES(lock_);
   void ShutDown();
   bool ValidateSensorID() __TA_REQUIRES(lock_);
 
