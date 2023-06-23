@@ -146,6 +146,7 @@ func WaitForCmd(ctx context.Context, cmd *exec.Cmd) error {
 		// Process is done so no need to worry about cleanup. Just exit.
 		return err
 	case <-ctx.Done():
+		logger.Debugf(ctx, "sending SIGTERM to process %d", cmd.Process.Pid)
 		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
 			logger.Debugf(ctx, "exited cmd %v with error: %s", cmd.Args, err)
 		}

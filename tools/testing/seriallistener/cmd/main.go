@@ -16,7 +16,9 @@ import (
 	"math"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
@@ -111,9 +113,11 @@ func execute(ctx context.Context, socketPath string, stdout io.Writer) error {
 func main() {
 	flag.Parse()
 
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer cancel()
 	log := logger.NewLogger(logger.DebugLevel, color.NewColor(color.ColorAuto),
 		os.Stdout, os.Stderr, "seriallistener ")
-	ctx := logger.WithLogger(context.Background(), log)
+	ctx = logger.WithLogger(ctx, log)
 
 	// Emulator serial is already wired up to stdout
 	// TODO(fxbug.dev/116559): Temporarily write serial output
