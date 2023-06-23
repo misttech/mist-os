@@ -35,7 +35,7 @@ void riscv64_thread_fpu_save(Thread* thread, Riscv64FpuStatus fpu_status) {
       // If lazy FPU load is implemented, this will be a valid state if the thread has
       // never trapped.
       panic("riscv context switch: FPU was disabled during context switch: sstatus.fs %#lx\n",
-            fpu_status);
+            static_cast<unsigned long>(fpu_status));
   }
 }
 

@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
     // available in core and above.
     if (!log_exporter_ptr &&
         exporter_error != runtests::ExporterLaunchError::CONNECT_TO_LOGGER_SERVICE) {
-      printf("Error: Failed to launch log listener: %d\n", exporter_error);
+      printf("Error: Failed to launch log listener: %d\n", static_cast<int>(exporter_error));
       return -1;
     }
     if (zx_status_t status = loop.StartThread(); status != ZX_OK) {

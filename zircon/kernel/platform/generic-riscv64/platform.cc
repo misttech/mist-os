@@ -143,7 +143,7 @@ void platform_halt_cpu() {
   arch::RiscvSbiRet result = sbi_hart_stop();
 
   // Should not have returned
-  panic("sbi_hart_stop returned %ld\n", result.error);
+  panic("sbi_hart_stop returned %ld\n", static_cast<long>(result.error));
 }
 
 static void topology_cpu_init() {
@@ -590,8 +590,8 @@ zx_status_t display_get_info(struct display_info* info) { return ZX_ERR_NOT_FOUN
 
 void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_reason_t reason,
                             bool halt_on_panic) {
-  TRACEF("suggested_action %u, reason %u, halt_on_panic %d\n", suggested_action, reason,
-         halt_on_panic);
+  TRACEF("suggested_action %u, reason %u, halt_on_panic %d\n", suggested_action,
+         static_cast<unsigned int>(reason), halt_on_panic);
   if (suggested_action == HALT_ACTION_REBOOT) {
     power_reboot(REBOOT_NORMAL);
     printf("reboot failed\n");

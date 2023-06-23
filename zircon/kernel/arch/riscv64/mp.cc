@@ -277,7 +277,7 @@ zx_status_t riscv64_start_cpu(cpu_num_t cpu_num, uint32_t hart_id) {
   arch::RiscvSbiError ret = sbi_hart_start(hart_id, kernel_secondary_entry_paddr, sp).error;
   if (ret != arch::RiscvSbiError::kSuccess) {
     // start failed, free the stack
-    KERNEL_OOPS("RISCV: failed to start secondary cpu, SBI error %ld\n", ret);
+    KERNEL_OOPS("RISCV: failed to start secondary cpu, SBI error %ld\n", static_cast<long>(ret));
     status = riscv64_free_secondary_stack(cpu_num);
     DEBUG_ASSERT(status == ZX_OK);
     return ZX_ERR_INTERNAL;
