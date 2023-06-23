@@ -147,51 +147,56 @@ legacy_bringup_fastboot_image_metadata_overrides = {
 
 # For //build/images/zedboot:zedboot_assembly.
 legacy_zedboot_image_metadata_overrides = {
-  _zedboot_metadata_slot = "zedboot"
-  if (recovery_is_zedboot) {
-    _zedboot_metadata_slot = "zircon-r"
-  }
+}
 
-  zbi = {
-    name = _zedboot_metadata_slot
-    if (!sign_zbi) {
-      archive = true
-      if (recovery_is_zedboot) {
-        bootserver_pave = [ "--zirconr" ]
-        if (zircon_r_partition != "") {
-          fastboot_flash = [ zircon_r_partition ]
-        }
-      }
-      bootserver_pave_zedboot = [ "--zircona" ]
+if (!use_bazel_images_only) {
+  legacy_zedboot_image_metadata_overrides = {
+    _zedboot_metadata_slot = "zedboot"
+    if (recovery_is_zedboot) {
+      _zedboot_metadata_slot = "zircon-r"
     }
-  }
 
-  if (sign_zbi) {
-    zbi_signed = {
-      name = "${_zedboot_metadata_slot}.signed"
-      archive = true
-      if (recovery_is_zedboot) {
-        mkzedboot_mode = [ "vboot" ]
-        bootserver_pave = [ "--zirconr" ]
-        if (zircon_r_partition != "") {
-          fastboot_flash = [ zircon_r_partition ]
-        }
-      }
-      bootserver_pave_zedboot = [ "--zircona" ]
-    }
-  }
-
-  if (use_vbmeta) {
-    vbmeta = {
+    zbi = {
       name = _zedboot_metadata_slot
-      archive = true
-      if (recovery_is_zedboot) {
-        bootserver_pave = [ "--vbmetar" ]
-        if (vbmeta_r_partition != "") {
-          fastboot_flash = [ vbmeta_r_partition ]
+      if (!sign_zbi) {
+        archive = true
+        if (recovery_is_zedboot) {
+          bootserver_pave = [ "--zirconr" ]
+          if (zircon_r_partition != "") {
+            fastboot_flash = [ zircon_r_partition ]
+          }
         }
+        bootserver_pave_zedboot = [ "--zircona" ]
       }
-      bootserver_pave_zedboot = [ "--vbmetaa" ]
+    }
+
+    if (sign_zbi) {
+      zbi_signed = {
+        name = "${_zedboot_metadata_slot}.signed"
+        archive = true
+        if (recovery_is_zedboot) {
+          mkzedboot_mode = [ "vboot" ]
+          bootserver_pave = [ "--zirconr" ]
+          if (zircon_r_partition != "") {
+            fastboot_flash = [ zircon_r_partition ]
+          }
+        }
+        bootserver_pave_zedboot = [ "--zircona" ]
+      }
+    }
+
+    if (use_vbmeta) {
+      vbmeta = {
+        name = _zedboot_metadata_slot
+        archive = true
+        if (recovery_is_zedboot) {
+          bootserver_pave = [ "--vbmetar" ]
+          if (vbmeta_r_partition != "") {
+            fastboot_flash = [ vbmeta_r_partition ]
+          }
+        }
+        bootserver_pave_zedboot = [ "--vbmetaa" ]
+      }
     }
   }
 }
