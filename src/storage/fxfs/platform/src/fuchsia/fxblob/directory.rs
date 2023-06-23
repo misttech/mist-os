@@ -22,8 +22,8 @@ use {
     delivery_blob::DELIVERY_PATH_PREFIX,
     fidl::endpoints::{create_proxy, ClientEnd, Proxy as _, ServerEnd},
     fidl_fuchsia_fxfs::{
-        BlobWriterMarker, BlobWriterRequest, CreateBlobError, WriteBlobRequest,
-        WriteBlobRequestStream,
+        BlobCreatorRequest, BlobCreatorRequestStream, BlobWriterMarker, BlobWriterRequest,
+        CreateBlobError,
     },
     fidl_fuchsia_io::{
         self as fio, FilesystemInfo, NodeAttributeFlags, NodeAttributes, NodeMarker, WatchMask,
@@ -82,13 +82,13 @@ impl RootDir for BlobDirectory {
     /// TODO(fxbug.dev/127530): Support delivery blobs ([`FxDeliveryBlob`]) using this protocol.
     async fn handle_blob_requests(
         self: Arc<Self>,
-        mut requests: WriteBlobRequestStream,
+        mut requests: BlobCreatorRequestStream,
     ) -> Result<(), Error> {
         let blob_state: AsyncMutex<HashMap<Hash, fasync::Task<()>>> =
             AsyncMutex::new(HashMap::default());
         while let Some(request) = requests.try_next().await? {
             match request {
-                WriteBlobRequest::Create { responder, hash, .. } => {
+                BlobCreatorRequest::Create { responder, hash, .. } => {
                     let mut blob_state = blob_state.lock().await;
                     let hash = Hash::from(hash);
                     let res = if blob_state.contains_key(&hash) {

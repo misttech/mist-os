@@ -17,8 +17,8 @@ use {
     anyhow::{bail, ensure, Error},
     async_trait::async_trait,
     fidl_fuchsia_fxfs::{
-        BytesAndNodes, ProjectIdRequest, ProjectIdRequestStream, ProjectIterToken,
-        WriteBlobRequestStream,
+        BlobCreatorRequestStream, BytesAndNodes, ProjectIdRequest, ProjectIdRequestStream,
+        ProjectIterToken,
     },
     fidl_fuchsia_io as fio,
     fs_inspect::{FsInspectVolume, VolumeData},
@@ -389,7 +389,7 @@ pub trait RootDir: FxNode + DirectoryEntry {
 
     async fn handle_blob_requests(
         self: Arc<Self>,
-        requests: WriteBlobRequestStream,
+        requests: BlobCreatorRequestStream,
     ) -> Result<(), Error>;
 }
 

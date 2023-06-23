@@ -15,7 +15,7 @@ use {
     async_trait::async_trait,
     either::{Left, Right},
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_fxfs::WriteBlobRequestStream,
+    fidl_fuchsia_fxfs::BlobCreatorRequestStream,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::FutureExt,
     fxfs::{
@@ -72,7 +72,7 @@ impl RootDir for FxDirectory {
 
     async fn handle_blob_requests(
         self: Arc<Self>,
-        _requests: WriteBlobRequestStream,
+        _requests: BlobCreatorRequestStream,
     ) -> Result<(), Error> {
         return Err(fuchsia_zircon::Status::NOT_SUPPORTED.into());
     }

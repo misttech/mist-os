@@ -5,7 +5,7 @@
 use {
     async_trait::async_trait,
     blob_writer::BlobWriter,
-    fidl_fuchsia_fxfs::WriteBlobProxy,
+    fidl_fuchsia_fxfs::BlobCreatorProxy,
     fidl_fuchsia_io as fio,
     fuchsia_component::client::connect_to_protocol_at_dir_svc,
     fuchsia_merkle::MerkleTree,
@@ -328,11 +328,15 @@ async fn write_blob_with_fidl(blob_root: &fio::DirectoryProxy, data: &[u8], merk
 }
 
 /// Creates, truncates, and writes a new blob using a BlobWriter.
-async fn write_blob_with_blob_writer(blob_proxy: &WriteBlobProxy, data: &[u8], merkle: &[u8; 32]) {
+async fn write_blob_with_blob_writer(
+    blob_proxy: &BlobCreatorProxy,
+    data: &[u8],
+    merkle: &[u8; 32],
+) {
     let writer_client_end = blob_proxy
         .create(merkle, false)
         .await
-        .expect("transport error on WriteBlob.Create")
+        .expect("transport error on BlobCreator.Create")
         .expect("failed to create blob");
     let writer = writer_client_end.into_proxy().unwrap();
     let mut blob_writer =
@@ -365,8 +369,8 @@ async fn write_blobs_with_blob_writer_benchmark(
 ) -> Vec<OperationDuration> {
     let mut durations = Vec::new();
     let blob_proxy =
-        connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(fs.exposed_dir())
-            .expect("failed to connect to the WriteBlob service");
+        connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(fs.exposed_dir())
+            .expect("failed to connect to the BlobCreator service");
     for blob in blobs {
         let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
         let timer = OperationTimer::start();
@@ -408,8 +412,8 @@ async fn write_realistic_blobs_with_blob_writer_benchmark(
 ) -> Vec<OperationDuration> {
     let mut futures = Vec::new();
     let blob_proxy =
-        connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(fs.exposed_dir())
-            .expect("failed to connect to the WriteBlob service");
+        connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(fs.exposed_dir())
+            .expect("failed to connect to the BlobCreator service");
     for blob in blobs {
         let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
         let blob_proxy_clone = blob_proxy.clone();

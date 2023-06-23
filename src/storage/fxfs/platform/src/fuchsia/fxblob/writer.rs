@@ -507,10 +507,11 @@ mod tests {
                 .serve_volume(fixture.volume(), server_end, true, true)
                 .await
                 .expect("failed to create_and_serve the blob volume");
-            let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(
-                &blob_volume_outgoing_dir,
-            )
-            .expect("failed to connect to the Blob service");
+            let blob_proxy =
+                connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+                    &blob_volume_outgoing_dir,
+                )
+                .expect("failed to connect to the Blob service");
             let blob_writer_client_end = blob_proxy
                 .create(&hash.into(), false)
                 .await
@@ -549,10 +550,11 @@ mod tests {
                 .serve_volume(fixture.volume(), server_end, true, true)
                 .await
                 .expect("failed to create_and_serve the blob volume");
-            let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(
-                &blob_volume_outgoing_dir,
-            )
-            .expect("failed to connect to the Blob service");
+            let blob_proxy =
+                connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+                    &blob_volume_outgoing_dir,
+                )
+                .expect("failed to connect to the Blob service");
 
             let blob_writer_client_end = blob_proxy
                 .create(&hash.into(), false)
@@ -609,10 +611,11 @@ mod tests {
                 .serve_volume(fixture.volume(), server_end, true, true)
                 .await
                 .expect("failed to create_and_serve the blob volume");
-            let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(
-                &blob_volume_outgoing_dir,
-            )
-            .expect("failed to connect to the Blob service");
+            let blob_proxy =
+                connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+                    &blob_volume_outgoing_dir,
+                )
+                .expect("failed to connect to the Blob service");
 
             let blob_writer_client_end = blob_proxy
                 .create(&hash.into(), false)

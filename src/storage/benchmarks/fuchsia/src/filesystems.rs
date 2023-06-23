@@ -496,13 +496,14 @@ mod tests {
         let ramdisk_factory = RamdiskFactory::new(BLOCK_SIZE, BLOCK_COUNT).await;
         let mut fs = filesystem.start_filesystem(&ramdisk_factory).await;
 
-        let blob_proxy =
-            connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(fs.exposed_dir())
-                .expect("failed to connect to the WriteBlob service");
+        let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+            fs.exposed_dir(),
+        )
+        .expect("failed to connect to the BlobCreator service");
         let writer_client_end = blob_proxy
             .create(&merkle.into(), false)
             .await
-            .expect("transport error on WriteBlob.Create")
+            .expect("transport error on BlobCreator.Create")
             .expect("failed to create blob");
         let writer = writer_client_end.into_proxy().unwrap();
         let mut blob_writer = BlobWriter::create(writer, BLOB_CONTENTS.len() as u64)

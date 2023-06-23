@@ -15,8 +15,8 @@ use {
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream},
     fidl_fuchsia_fxfs::{
-        CheckOptions, CryptProxy, MountOptions, ProjectIdMarker, VolumeRequest,
-        VolumeRequestStream, WriteBlobMarker,
+        BlobCreatorMarker, CheckOptions, CryptProxy, MountOptions, ProjectIdMarker, VolumeRequest,
+        VolumeRequestStream,
     },
     fidl_fuchsia_io as fio,
     fs_inspect::{FsInspectTree, FsInspectVolume},
@@ -305,7 +305,7 @@ impl VolumesDirectory {
         let blob_handler = volume.clone();
         if as_blob {
             svc_dir.add_entry(
-                WriteBlobMarker::PROTOCOL_NAME,
+                BlobCreatorMarker::PROTOCOL_NAME,
                 vfs::service::host(move |requests| {
                     let blob_handler = blob_handler.clone();
                     async move {

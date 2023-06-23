@@ -30,9 +30,10 @@ mod tests {
             .create_volume("blob", MountOptions { crypt: None, as_blob: true })
             .await
             .expect("Failed to create volume");
-        let blob_proxy =
-            connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(vol.exposed_dir())
-                .expect("failed to connect to the Blob service");
+        let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+            vol.exposed_dir(),
+        )
+        .expect("failed to connect to the Blob service");
 
         let mut data = vec![1; 196608];
         thread_rng().fill(&mut data[..]);
@@ -93,9 +94,10 @@ mod tests {
             .create_volume("blob", MountOptions { crypt: None, as_blob: true })
             .await
             .expect("Failed to create volume");
-        let blob_proxy =
-            connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(vol.exposed_dir())
-                .expect("failed to connect to the Blob service");
+        let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+            vol.exposed_dir(),
+        )
+        .expect("failed to connect to the Blob service");
 
         let mut data = vec![1; 499712];
         thread_rng().fill(&mut data[..]);

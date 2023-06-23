@@ -225,7 +225,7 @@ closed protocol Volumes {
     }) -> () error zx.Status;
 };
 
-/// Error type for [`WriteBlob.Create`].
+/// Error type for [`BlobCreator.Create`].
 type CreateBlobError = strict enum {
     /// This blob is currently readable in fxblob.
     ALREADY_EXISTS = 1;
@@ -235,8 +235,8 @@ type CreateBlobError = strict enum {
 };
 
 @discoverable
-closed protocol WriteBlob {
-    /// Creates an blob with the merkle root `hash`. If `allow_existing` is true, the server will
+closed protocol BlobCreator {
+    /// Creates a blob with the merkle root `hash`. If `allow_existing` is true, the server will
     /// overwrite the existing blob if there is one. The client will truncate the blob with
     /// [BlobWriter.GetVmo] and get a handle to a vmo in return. The client will then write blob
     /// contents into the vmo and call [BlobWriter.BytesReady] on the 'writer` to signal to the
