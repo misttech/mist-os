@@ -10,12 +10,13 @@ package, and a decompressor sandbox component in the test realm.
 ### BUILD.gn
 
 In each `fuchsia_test_package` that utilizes this crate, add dependencies on the
-blobfs binary, decompressor sandbox and storage driver test realm. Add the
-`blobfs-corrupt` binary if tests will want to corrupt blobs.
+fxfs component and storage driver test realm. Add the `blobfs-corrupt` binary if
+tests will want to corrupt blobs.
 
 ```
 fuchsia_test_package("example-test-package") {
   deps = [
+    "//src/storage/fxfs:fxfs_component",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/storage/tools/blobfs-corrupt",
     ...

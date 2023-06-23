@@ -464,7 +464,7 @@ async fn corrupt_blob() {
     // unmount blobfs, corrupt the first blob, and restart blobfs
     let ramdisk = blobfs.unmount().await.unwrap();
     ramdisk.corrupt_blob(&first.merkle).await;
-    let blobfs = BlobfsRamdisk::builder().ramdisk(ramdisk).start().await.unwrap();
+    let blobfs = BlobfsRamdisk::builder().formatted_ramdisk(ramdisk).start().await.unwrap();
 
     // verify the first blob is now corrupt and the second is still not
     assert_eq!(blobfs.verify_blob(&first).await, Err(Status::IO_DATA_INTEGRITY));
@@ -509,7 +509,7 @@ async fn corrupt_blob_with_many_blobs() {
     // unmount blobfs, corrupt the blob, and restart blobfs
     let ramdisk = blobfs.unmount().await.unwrap();
     ramdisk.corrupt_blob(&corrupt.merkle).await;
-    let blobfs = BlobfsRamdisk::builder().ramdisk(ramdisk).start().await.unwrap();
+    let blobfs = BlobfsRamdisk::builder().formatted_ramdisk(ramdisk).start().await.unwrap();
 
     // verify all the blobs are still considered present
     assert_eq!(blobfs.list_blobs().unwrap(), ls);

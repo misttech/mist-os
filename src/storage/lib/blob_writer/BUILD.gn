@@ -29,7 +29,10 @@ rustc_library("blob-writer") {
     "src/lib.rs",
   ]
 
-  visibility = [ "//src/storage/*" ]
+  visibility = [
+    "//src/storage/*",
+    "//src/sys/pkg/*",
+  ]
 }
 
 fuchsia_unittest_package("blob-writer-unittests") {

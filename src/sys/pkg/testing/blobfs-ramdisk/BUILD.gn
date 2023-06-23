@@ -22,6 +22,7 @@ rustc_library("blobfs-ramdisk") {
     "//src/lib/storage/ramdevice_client",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/bin/blobfs:blobfs-component",
+    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/sys/pkg/lib/blobfs",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:anyhow",
@@ -31,6 +32,7 @@ rustc_library("blobfs-ramdisk") {
 
   test_deps = [
     "//src/lib/storage/ramdevice_client",
+    "//src/storage/lib/blob_writer:blob-writer",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:maplit",
   ]
@@ -46,6 +48,7 @@ fuchsia_component("test-component") {
   manifest = "meta/test_driver.cml"
   deps = [
     ":blobfs-ramdisk_test",
+    "//src/storage/fxfs:fxfs_component",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/storage/tools/blobfs-corrupt",
   ]

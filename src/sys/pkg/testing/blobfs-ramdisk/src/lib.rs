@@ -9,24 +9,19 @@
 //! Test utilities for starting a blobfs server.
 
 use {
-    anyhow::{format_err, Context as _, Error},
+    anyhow::{anyhow, Context as _, Error},
     fdio::{SpawnAction, SpawnOptions},
     fidl::endpoints::{ClientEnd, Proxy, ServerEnd},
-    fidl_fuchsia_io as fio,
-    fs_management::{
-        filesystem::{Filesystem, ServingSingleVolumeFilesystem},
-        Blobfs,
-    },
-    fuchsia_async as fasync,
+    fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_merkle::{Hash, MerkleTreeBuilder},
     fuchsia_zircon::{self as zx, prelude::*},
     futures::prelude::*,
-    ramdevice_client::RamdiskClient,
     std::{borrow::Cow, collections::BTreeSet, ffi::CString},
 };
 
 const RAMDISK_BLOCK_SIZE: u64 = 512;
+static FXFS_BLOB_VOLUME_NAME: &str = "blob";
 
 #[cfg(test)]
 mod test;
@@ -52,19 +47,38 @@ where
 
 /// A helper to construct [`BlobfsRamdisk`] instances.
 pub struct BlobfsRamdiskBuilder {
-    ramdisk: Option<FormattedRamdisk>,
+    ramdisk: Option<SuppliedRamdisk>,
     blobs: Vec<BlobInfo>,
+    implementation: Implementation,
+}
+
+enum SuppliedRamdisk {
+    Formatted(FormattedRamdisk),
+    Unformatted(Ramdisk),
+}
+
+#[derive(Debug)]
+/// The blob filesystem implementation to use.
+enum Implementation {
+    /// The older C++ implementation.
+    Blobfs,
+    /// The newer Rust implementation that uses FxFs.
+    FxBlob,
 }
 
 impl BlobfsRamdiskBuilder {
     fn new() -> Self {
-        Self { ramdisk: None, blobs: vec![] }
+        Self { ramdisk: None, blobs: vec![], implementation: Implementation::Blobfs }
     }
 
     /// Configures this blobfs to use the already formatted given backing ramdisk.
-    pub fn ramdisk(mut self, ramdisk: FormattedRamdisk) -> Self {
-        self.ramdisk = Some(ramdisk);
-        self
+    pub fn formatted_ramdisk(self, ramdisk: FormattedRamdisk) -> Self {
+        Self { ramdisk: Some(SuppliedRamdisk::Formatted(ramdisk)), ..self }
+    }
+
+    /// Configures this blobfs to use the supplied unformatted ramdisk.
+    pub fn ramdisk(self, ramdisk: Ramdisk) -> Self {
+        Self { ramdisk: Some(SuppliedRamdisk::Unformatted(ramdisk)), ..self }
     }
 
     /// Write the provided blob after mounting blobfs if the blob does not already exist.
@@ -73,27 +87,88 @@ impl BlobfsRamdiskBuilder {
         self
     }
 
+    /// Use the blobfs implementation of the blob file system (the older C++ implementation that
+    /// provides a fuchsia.io interface).
+    pub fn blobfs(self) -> Self {
+        Self { implementation: Implementation::Blobfs, ..self }
+    }
+
+    /// Use the fxblob implementation of the blob file system (the newer Rust implementation built
+    /// on fxfs that has a custom FIDL interface).
+    pub fn fxblob(self) -> Self {
+        Self { implementation: Implementation::FxBlob, ..self }
+    }
+
+    fn implementation(self, implementation: Implementation) -> Self {
+        Self { implementation, ..self }
+    }
+
     /// Starts a blobfs server with the current configuration options.
     pub async fn start(self) -> Result<BlobfsRamdisk, Error> {
-        // Use the provided ramdisk or format a fresh one with blobfs.
-        let ramdisk = if let Some(ramdisk) = self.ramdisk {
-            ramdisk
-        } else {
-            Ramdisk::start().await.context("creating backing ramdisk for blobfs")?.format().await?
+        let Self { ramdisk, blobs, implementation } = self;
+        let (ramdisk, needs_format) = match ramdisk {
+            Some(SuppliedRamdisk::Formatted(FormattedRamdisk(ramdisk))) => (ramdisk, false),
+            Some(SuppliedRamdisk::Unformatted(ramdisk)) => (ramdisk, true),
+            None => (Ramdisk::start().await.context("creating backing ramdisk for blobfs")?, true),
         };
 
+        let ramdisk_controller = Proxy::from_channel(fasync::Channel::from_channel(
+            ramdisk.clone_channel().context("cloning ramdisk channel")?,
+        )?);
+
         // Spawn blobfs on top of the ramdisk.
-        let block_handle = ramdisk.clone_channel().context("cloning ramdisk channel")?;
+        let mut fs = match implementation {
+            Implementation::Blobfs => fs_management::filesystem::Filesystem::new(
+                ramdisk_controller,
+                fs_management::Blobfs {
+                    allow_delivery_blobs: true,
+                    ..fs_management::Blobfs::dynamic_child()
+                },
+            ),
+            Implementation::FxBlob => fs_management::filesystem::Filesystem::new(
+                ramdisk_controller,
+                fs_management::Fxfs::default(),
+            ),
+        };
+        if needs_format {
+            let () = fs.format().await.context("formatting ramdisk")?;
+        }
 
-        let fs = blobfs(block_handle)?.serve().await?;
+        let fs = match implementation {
+            Implementation::Blobfs => ServingFilesystem::SingleVolume(
+                fs.serve().await.context("serving single volume filesystem")?,
+            ),
+            Implementation::FxBlob => {
+                let mut fs =
+                    fs.serve_multi_volume().await.context("serving multi volume filesystem")?;
+                if needs_format {
+                    let _: &mut fs_management::filesystem::ServingVolume = fs
+                        .create_volume(
+                            FXFS_BLOB_VOLUME_NAME,
+                            ffxfs::MountOptions { crypt: None, as_blob: true },
+                        )
+                        .await
+                        .context("creating blob volume")?;
+                } else {
+                    let _: &mut fs_management::filesystem::ServingVolume = fs
+                        .open_volume(
+                            FXFS_BLOB_VOLUME_NAME,
+                            ffxfs::MountOptions { crypt: None, as_blob: true },
+                        )
+                        .await
+                        .context("opening blob volume")?;
+                }
+                ServingFilesystem::MultiVolume(fs)
+            }
+        };
 
-        let blobfs = BlobfsRamdisk { backing_ramdisk: ramdisk, fs };
+        let blobfs = BlobfsRamdisk { backing_ramdisk: FormattedRamdisk(ramdisk), fs };
 
         // Write all the requested missing blobs to the mounted filesystem.
-        if !self.blobs.is_empty() {
+        if !blobs.is_empty() {
             let mut present_blobs = blobfs.list_blobs()?;
 
-            for blob in self.blobs {
+            for blob in blobs {
                 if present_blobs.contains(&blob.merkle) {
                     continue;
                 }
@@ -111,7 +186,62 @@ impl BlobfsRamdiskBuilder {
 /// A ramdisk-backed blobfs instance
 pub struct BlobfsRamdisk {
     backing_ramdisk: FormattedRamdisk,
-    fs: ServingSingleVolumeFilesystem,
+    fs: ServingFilesystem,
+}
+
+/// The old blobfs can only be served out of a single volume filesystem, but the new fxblob can
+/// only be served out of a multi volume filesystem (which we create with just a single volume
+/// with the name coming from `FXFS_BLOB_VOLUME_NAME`). This enum allows `BlobfsRamdisk` to
+/// wrap either blobfs or fxblob.
+enum ServingFilesystem {
+    SingleVolume(fs_management::filesystem::ServingSingleVolumeFilesystem),
+    MultiVolume(fs_management::filesystem::ServingMultiVolumeFilesystem),
+}
+
+impl ServingFilesystem {
+    async fn shutdown(self) -> Result<(), Error> {
+        match self {
+            Self::SingleVolume(fs) => fs.shutdown().await.context("shutting down single volume"),
+            Self::MultiVolume(fs) => fs.shutdown().await.context("shutting down multi volume"),
+        }
+    }
+
+    fn exposed_dir(&self) -> Result<&fio::DirectoryProxy, Error> {
+        match self {
+            Self::SingleVolume(fs) => Ok(fs.exposed_dir()),
+            Self::MultiVolume(fs) => Ok(fs
+                .volume(FXFS_BLOB_VOLUME_NAME)
+                .ok_or(anyhow!("missing blob volume"))?
+                .exposed_dir()),
+        }
+    }
+
+    /// The name of the blob root directory in the exposed directory.
+    fn blob_dir_name(&self) -> &'static str {
+        match self {
+            Self::SingleVolume(_) => "blob-exec",
+            Self::MultiVolume(_) => "root",
+        }
+    }
+
+    /// None if the filesystem does not support the API.
+    fn blob_creator_proxy(&self) -> Result<Option<ffxfs::BlobCreatorProxy>, Error> {
+        match self {
+            Self::SingleVolume(_) => Ok(None),
+            Self::MultiVolume(_) => fuchsia_component::client::connect_to_protocol_at_dir_svc::<
+                ffxfs::BlobCreatorMarker,
+            >(self.exposed_dir()?)
+            .context("connecting to fuchsia.fxfs.BlobCreator")
+            .map(Some),
+        }
+    }
+
+    fn implementation(&self) -> Implementation {
+        match self {
+            Self::SingleVolume(_) => Implementation::Blobfs,
+            Self::MultiVolume(_) => Implementation::FxBlob,
+        }
+    }
 }
 
 impl BlobfsRamdisk {
@@ -137,12 +267,12 @@ impl BlobfsRamdisk {
     /// Returns a new connection to blobfs's root directory as a raw zircon channel.
     pub fn root_dir_handle(&self) -> Result<ClientEnd<fio::DirectoryMarker>, Error> {
         let (root_clone, server_end) = zx::Channel::create();
-        self.fs.exposed_dir().open(
+        self.fs.exposed_dir()?.open(
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::POSIX_WRITABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE,
             fio::ModeType::empty(),
-            "blob-exec",
+            self.fs.blob_dir_name(),
             server_end.into(),
         )?;
         Ok(root_clone.into())
@@ -161,8 +291,9 @@ impl BlobfsRamdisk {
     /// Signals blobfs to unmount and waits for it to exit cleanly, returning a new
     /// [`BlobfsRamdiskBuilder`] initialized with the ramdisk.
     pub async fn into_builder(self) -> Result<BlobfsRamdiskBuilder, Error> {
+        let implementation = self.fs.implementation();
         let ramdisk = self.unmount().await?;
-        Ok(Self::builder().ramdisk(ramdisk))
+        Ok(Self::builder().formatted_ramdisk(ramdisk).implementation(implementation))
     }
 
     /// Signals blobfs to unmount and waits for it to exit cleanly, returning the backing Ramdisk.
@@ -184,7 +315,7 @@ impl BlobfsRamdisk {
                 Ok(entry?
                     .file_name()
                     .to_str()
-                    .ok_or_else(|| anyhow::format_err!("expected valid utf-8"))?
+                    .ok_or_else(|| anyhow!("expected valid utf-8"))?
                     .parse()?)
             })
             .collect()
@@ -202,12 +333,17 @@ impl BlobfsRamdisk {
     }
 
     fn write_blob_sync(&self, merkle: &Hash, bytes: &[u8]) -> Result<(), Error> {
-        use std::io::Write;
-
-        let mut file = self.root_dir().unwrap().write_file(merkle.to_string(), 0o777)?;
+        use std::io::Write as _;
+        let mut file = self.root_dir().unwrap().new_file(merkle.to_string(), 0o600)?;
         file.set_len(bytes.len().try_into().unwrap())?;
         file.write_all(bytes)?;
         Ok(())
+    }
+
+    /// Returns a new connection to blobfs's fuchsia.fxfs/BlobCreator API, or None if the
+    /// implementation does not support it.
+    pub fn blob_creator_proxy(&self) -> Result<Option<ffxfs::BlobCreatorProxy>, Error> {
+        self.fs.blob_creator_proxy()
     }
 }
 
@@ -229,7 +365,7 @@ impl RamdiskBuilder {
 
     /// Starts a new ramdisk.
     pub async fn start(self) -> Result<Ramdisk, Error> {
-        let client = RamdiskClient::builder(RAMDISK_BLOCK_SIZE, self.block_count);
+        let client = ramdevice_client::RamdiskClient::builder(RAMDISK_BLOCK_SIZE, self.block_count);
         let client = client.build().await?;
         let block = client.open().await?;
         let client_end = ClientEnd::<fio::NodeMarker>::new(block.into_channel());
@@ -239,14 +375,14 @@ impl RamdiskBuilder {
 
     /// Create a [`BlobfsRamdiskBuilder`] that uses this as its backing ramdisk.
     pub async fn into_blobfs_builder(self) -> Result<BlobfsRamdiskBuilder, Error> {
-        Ok(BlobfsRamdiskBuilder::new().ramdisk(self.start().await?.format().await?))
+        Ok(BlobfsRamdiskBuilder::new().ramdisk(self.start().await?))
     }
 }
 
 /// A virtual memory-backed block device.
 pub struct Ramdisk {
     proxy: fio::NodeProxy,
-    client: RamdiskClient,
+    client: ramdevice_client::RamdiskClient,
 }
 
 // FormattedRamdisk Derefs to Ramdisk, which is only safe if all of the &self Ramdisk methods
@@ -267,11 +403,6 @@ impl Ramdisk {
         let (result, server_end) = zx::Channel::create();
         self.proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end))?;
         Ok(result)
-    }
-
-    async fn format(self) -> Result<FormattedRamdisk, Error> {
-        blobfs(self.clone_channel()?)?.format().await?;
-        Ok(FormattedRamdisk(self))
     }
 
     /// Shuts down this ramdisk.
@@ -355,16 +486,9 @@ async fn wait_for_process_async(proc: fuchsia_zircon::Process) -> Result<(), Err
 
     let ret = proc.info().context("getting tool process info")?.return_code;
     if ret != 0 {
-        return Err(format_err!("tool returned nonzero exit code {}", ret));
+        return Err(anyhow!("tool returned nonzero exit code {}", ret));
     }
     Ok(())
-}
-
-fn blobfs(block_channel: zx::Channel) -> Result<Filesystem, Error> {
-    Ok(Filesystem::new(
-        Proxy::from_channel(fasync::Channel::from_channel(block_channel)?),
-        Blobfs { allow_delivery_blobs: true, ..Blobfs::dynamic_child() },
-    ))
 }
 
 #[cfg(test)]
@@ -446,8 +570,22 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn remount() {
-        let blobfs = BlobfsRamdisk::builder().with_blob(&b"test"[..]).start().await.unwrap();
+    async fn blobfs_remount() {
+        let blobfs =
+            BlobfsRamdisk::builder().blobfs().with_blob(&b"test"[..]).start().await.unwrap();
+        let blobs = blobfs.list_blobs().unwrap();
+
+        let blobfs = blobfs.into_builder().await.unwrap().start().await.unwrap();
+
+        assert_eq!(blobs, blobfs.list_blobs().unwrap());
+
+        blobfs.stop().await.unwrap();
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn fxblob_remount() {
+        let blobfs =
+            BlobfsRamdisk::builder().fxblob().with_blob(&b"test"[..]).start().await.unwrap();
         let blobs = blobfs.list_blobs().unwrap();
 
         let blobfs = blobfs.into_builder().await.unwrap().start().await.unwrap();
@@ -504,5 +642,51 @@ mod tests {
     async fn ramdisk_into_blobfs_formats_ramdisk() {
         let _: BlobfsRamdisk =
             Ramdisk::builder().into_blobfs_builder().await.unwrap().start().await.unwrap();
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn blobfs_does_not_support_blob_creator_api() {
+        let blobfs = BlobfsRamdisk::builder().blobfs().start().await.unwrap();
+
+        assert!(blobfs.blob_creator_proxy().unwrap().is_none());
+
+        blobfs.stop().await.unwrap();
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn fxblob_read_and_write() {
+        let blobfs = BlobfsRamdisk::builder().fxblob().start().await.unwrap();
+        let root = blobfs.root_dir().unwrap();
+
+        assert_eq!(list_blobs(&root), Vec::<String>::new());
+
+        let hello_merkle = write_blob(&root, "Hello blobfs!".as_bytes());
+        assert_eq!(list_blobs(&root), vec![hello_merkle]);
+
+        drop(root);
+        blobfs.stop().await.unwrap();
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn fxblob_blob_creator_api() {
+        let blobfs = BlobfsRamdisk::builder().fxblob().start().await.unwrap();
+        let root = blobfs.root_dir().unwrap();
+        assert_eq!(list_blobs(&root), Vec::<String>::new());
+
+        let bytes = [1u8; 40];
+        let hash = fuchsia_merkle::MerkleTree::from_reader(&bytes[..]).unwrap().root();
+
+        let blob_creator = blobfs.blob_creator_proxy().unwrap().unwrap();
+        let blob_writer = blob_creator.create(&hash, false).await.unwrap().unwrap();
+        let mut blob_writer =
+            blob_writer::BlobWriter::create(blob_writer.into_proxy().unwrap(), bytes.len() as u64)
+                .await
+                .unwrap();
+        let () = blob_writer.write(&bytes).await.unwrap();
+
+        assert_eq!(list_blobs(&root), vec![hash.to_string()]);
+
+        drop(root);
+        blobfs.stop().await.unwrap();
     }
 }
