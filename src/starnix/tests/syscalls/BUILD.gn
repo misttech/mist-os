@@ -162,6 +162,7 @@ starnix_linux_test_component("crash_test") {
 
 group("container_resources") {
   deps = [
+    "//src/connectivity/network/netstack:component",
     "//src/starnix/containers:data_tmp_target",
     "//src/starnix/containers:default_init",
     "//src/starnix/containers/debian:system_image",

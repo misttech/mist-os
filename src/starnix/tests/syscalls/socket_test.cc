@@ -12,6 +12,7 @@
 #include <thread>
 
 #include <asm-generic/socket.h>
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
 #if !defined(__NR_memfd_create)
@@ -261,13 +262,14 @@ TEST(Socket, ConcurrentCreate) {
     child_ready.store(1);
     while (barrier.load() == 0) {
     }
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
-    EXPECT_EQ(-1, fd);
+    fbl::unique_fd fd;
+    EXPECT_TRUE(fd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0))) << strerror(errno);
   });
   while (child_ready.load() == 0) {
   }
   barrier.store(1);
-  int fd = socket(AF_INET, SOCK_STREAM, 0);
-  EXPECT_EQ(-1, fd);
+
+  fbl::unique_fd fd;
+  EXPECT_TRUE(fd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0))) << strerror(errno);
   child.join();
 }
