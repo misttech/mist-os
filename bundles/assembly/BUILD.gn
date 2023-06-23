@@ -1227,6 +1227,21 @@ assembly_input_bundle("audio_dev_support") {
       driver_components = [ "meta/virtual_audio_driver.cm" ]
     },
   ]
+
+  base_packages = [ "//src/media/audio/services/ffxdaemon:audio_ffx_daemon" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/media/audio/services/ffxdaemon/meta/audio_ffx_daemon.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 assembly_input_bundle("audio_device_registry") {

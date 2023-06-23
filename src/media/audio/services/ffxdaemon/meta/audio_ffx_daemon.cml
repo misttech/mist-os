@@ -16,7 +16,10 @@
         },
     ],
     use: [
-        { protocol: "fuchsia.media.Audio" },
+        {
+            protocol: "fuchsia.media.Audio",
+            availability: "optional",
+        },
         {
             protocol: "fuchsia.ultrasound.Factory",
             availability: "optional",

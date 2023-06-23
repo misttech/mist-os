@@ -76,8 +76,5 @@ Audio data is transferred between host and target via `fidl::Socket` as bytestre
 any logging information from the ffxdaemon is sent back to the client via socket, which ffx then
 copies it to the host device stderr.
 
-Except for the gen subtool, all audio subtools interact with the ffxdaemon. In order to use these
-subtools, add the following to `args.gn`.
-
-`universe_package_labels += [ "//src/media/audio/services/ffxdaemon:audio_ffx_daemon" ]`
-`core_realm_shards += [ "//src/media/audio/services/ffxdaemon:core_shard" ]`
+Except for the gen subtool, all audio subtools interact with the ffxdaemon. The `audio_dev_support`
+assembly input bundle contains the daemon and is enabled only for `eng` build types.

@@ -8,7 +8,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_library("format-utils") {
   name = "format-utils"
@@ -77,10 +76,6 @@ fuchsia_component("component") {
 }
 
 fuchsia_package("audio_ffx_daemon") {
-  package_name = "audio_ffx_daemon"
+  visibility = [ "//bundles/assembly/*" ]
   deps = [ ":component" ]
-}
-
-core_shard("core_shard") {
-  shard_file = "meta/audio_ffx_daemon.core_shard.cml"
 }

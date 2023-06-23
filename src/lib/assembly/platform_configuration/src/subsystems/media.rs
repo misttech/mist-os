@@ -16,8 +16,6 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
             && *context.build_type == BuildType::Eng
         {
             builder.platform_bundle("audio_dev_support");
-
-            // TODO(fxbug.dev/126943): Enable 'ffx audio' support here.
         }
 
         if media_config.audio_device_registry_enabled {

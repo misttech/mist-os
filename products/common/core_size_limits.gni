@@ -242,12 +242,21 @@ size_checker_input = {
       limit = 1271398  # 1.212 MiB
       creep_limit = 81920  # 80.0 KiB
     },
+    {
+      component = "Development Support - Audio"
+      src = [
+        "packages/base/audio_ffx_daemon",
+        "packages/base/virtual_audio/",
+      ]
+      limit = 476053  # 0.454 MiB
+      creep_limit = 24576  # 24.0 KiB
+    },
 
     # This component corresponds to the blobfs storage that is not used.
     {
       component = "Unallocated"
       src = []
-      limit = 5101381382
+      limit = 5100905329
       creep_limit = 0
     },
   ]
