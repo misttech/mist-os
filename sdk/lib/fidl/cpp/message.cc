@@ -5,7 +5,6 @@
 #include <lib/fidl/coding.h>
 #include <lib/fidl/cpp/message.h>
 #include <lib/fidl/internal.h>
-#include <lib/fidl/trace.h>
 #include <string.h>
 
 #include "zircon/fidl.h"
@@ -84,10 +83,8 @@ zx_status_t HLCPPIncomingBody::Decode(const WireFormatMetadata& metadata, const 
   if (status != ZX_OK) {
     return status;
   }
-  fidl_trace(WillHLCPPDecode, type, bytes_.data(), bytes_.actual(), handles_.actual());
   status = internal__fidl_decode_etc_hlcpp__v2__may_break(
       type, bytes_.data(), bytes_.actual(), handles_.data(), handles_.actual(), error_msg_out);
-  fidl_trace(DidHLCPPDecode);
 
   ClearHandlesUnsafe();
   return status;
@@ -121,14 +118,12 @@ zx_status_t HLCPPIncomingMessage::Decode(const fidl_type_t* type, const char** e
 zx_status_t HLCPPIncomingMessage::Read(zx_handle_t channel, uint32_t flags) {
   uint32_t actual_bytes = 0u;
   uint32_t actual_handles = 0u;
-  fidl_trace(WillHLCPPChannelRead);
   zx_status_t status =
       zx_channel_read_etc(channel, flags, bytes_.data(), handles().data(), bytes_.capacity(),
                           handles().capacity(), &actual_bytes, &actual_handles);
   if (status != ZX_OK) {
     return status;
   }
-  fidl_trace(DidHLCPPChannelRead, nullptr /* type */, bytes_.data(), actual_bytes, actual_handles);
 
   // Ensure we received enough bytes for the FIDL header.
   if (actual_bytes < sizeof(fidl_message_header_t)) {
@@ -172,10 +167,8 @@ zx_status_t HLCPPOutgoingBody::Validate(const internal::WireFormatVersion& wire_
   if (status != ZX_OK) {
     return status;
   }
-  fidl_trace(WillHLCPPValidate, type, bytes_.data(), bytes_.actual(), handles().actual());
   status = internal__fidl_validate__v2__may_break(type, bytes_.data(), bytes_.actual(),
                                                   handles().actual(), error_msg_out);
-  fidl_trace(DidHLCPPValidate);
   return status;
 }
 
@@ -209,11 +202,8 @@ zx_status_t HLCPPOutgoingMessage::Validate(const fidl_type_t* type,
 
 #ifdef __Fuchsia__
 zx_status_t HLCPPOutgoingMessage::Write(zx_handle_t channel, uint32_t flags) {
-  fidl_trace(WillHLCPPChannelWrite, nullptr /* type */, bytes_.data(), bytes_.actual(),
-             handles().actual());
   zx_status_t status = zx_channel_write_etc(channel, flags, bytes_.data(), bytes_.actual(),
                                             handles().data(), handles().actual());
-  fidl_trace(DidHLCPPChannelWrite);
 
   // Handles are cleared by the kernel on either success or failure.
   ClearHandlesUnsafe();

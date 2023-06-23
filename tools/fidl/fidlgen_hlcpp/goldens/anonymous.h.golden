@@ -981,13 +981,10 @@ __LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodReques
 class SomeProtocol_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage SomeMethod(::fidl::MessageEncoder* _encoder, ::test::anonymous::UnionMember* union_member, ::test::anonymous::TableMember* table_member) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(32);
     ::fidl::Encode(_encoder, union_member, 0 + sizeof(fidl_message_header_t));
 
     ::fidl::Encode(_encoder, table_member, 16 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::anonymous::_internal::test_anonymous_SomeProtocolSomeMethodRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -1000,12 +997,8 @@ __LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodTopRes
 class SomeProtocol_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage SomeMethod(::fidl::MessageEncoder* _encoder, ::test::anonymous::SomeProtocol_SomeMethod_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::anonymous::_internal::test_anonymous_SomeProtocolSomeMethodTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

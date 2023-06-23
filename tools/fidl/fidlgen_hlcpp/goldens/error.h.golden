@@ -220,11 +220,8 @@ __LOCAL extern "C" const fidl_type_t test_error_ExampleFooRequestTable;
 class Example_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage foo(::fidl::MessageEncoder* _encoder, ::std::string* s) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, s, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::error::_internal::test_error_ExampleFooRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -237,12 +234,8 @@ __LOCAL extern "C" const fidl_type_t test_error_ExampleFooTopResponseTable;
 class Example_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage foo(::fidl::MessageEncoder* _encoder, ::test::error::Example_foo_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::error::_internal::test_error_ExampleFooTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

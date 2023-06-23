@@ -1391,62 +1391,44 @@ __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_UnionPayloa
 class ComposedProtocol_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage OneWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest* ComposedProtocolOneWayAnonComposedRequest) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolOneWayAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest* ComposedProtocolTwoWayAnonComposedRequest) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest* ComposedProtocolTwoWayAnonComposedWithErrorRequest) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedWithErrorRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::UnionPayload* UnionPayload) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnionPayload, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_UnionPayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -1473,90 +1455,58 @@ __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedPro
 class ComposedProtocol_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse* ComposedProtocolTwoWayAnonComposedResponse) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedResponse, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest* ComposedProtocolOnAnonComposedRequest) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolOnAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnAnonComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::UnionPayload* UnionPayload) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnionPayload, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_UnionPayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnNamedComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -2722,122 +2672,86 @@ __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtoco
 class MainProtocol_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage OneWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest* ComposedProtocolOneWayAnonComposedRequest) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolOneWayAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest* ComposedProtocolTwoWayAnonComposedRequest) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest* ComposedProtocolTwoWayAnonComposedWithErrorRequest) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedWithErrorRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::UnionPayload* UnionPayload) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnionPayload, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_UnionPayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayLocal(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayLocal(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::UnionPayload* UnionPayload) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnionPayload, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_UnionPayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayLocalWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayAnon(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocolOneWayAnonRequest* MainProtocolOneWayAnonRequest) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolOneWayAnonRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnon(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest* MainProtocolTwoWayAnonRequest) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolTwoWayAnonRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest* MainProtocolTwoWayAnonWithErrorRequest) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolTwoWayAnonWithErrorRequest, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -2874,178 +2788,114 @@ __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtoco
 class MainProtocol_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse* ComposedProtocolTwoWayAnonComposedResponse) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedResponse, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest* ComposedProtocolOnAnonComposedRequest) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolOnAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnAnonComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::UnionPayload* UnionPayload) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnionPayload, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_UnionPayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnNamedComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayLocal(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayLocalWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnLocal(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::UnionPayload* UnionPayload) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnionPayload, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_UnionPayloadTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnLocalWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocol_OnLocalWithError_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnon(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse* MainProtocolTwoWayAnonResponse) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolTwoWayAnonResponse, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnAnon(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest* MainProtocolOnAnonRequest) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolOnAnonRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnAnonWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

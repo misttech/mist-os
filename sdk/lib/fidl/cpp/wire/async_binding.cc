@@ -10,7 +10,6 @@
 #include <lib/fidl/cpp/wire/client_base.h>
 #include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/fidl/epitaph.h>
-#include <lib/fidl/trace.h>
 #include <zircon/assert.h>
 #include <zircon/syscalls.h>
 

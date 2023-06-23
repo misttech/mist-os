@@ -87,11 +87,8 @@ __LOCAL extern "C" const fidl_type_t test_inheritance_SuperFooRequestTable;
 class super_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage foo(::fidl::MessageEncoder* _encoder, ::std::string* s) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, s, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::inheritance::_internal::test_inheritance_SuperFooRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -104,12 +101,8 @@ __LOCAL extern "C" const fidl_type_t test_inheritance_SuperFooResponseTable;
 class super_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage foo(::fidl::MessageEncoder* _encoder, int64_t* y) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(8);
     ::fidl::Encode(_encoder, y, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::inheritance::_internal::test_inheritance_SuperFooResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -122,11 +115,8 @@ class super_ResponseEncoder {
 class sub_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage foo(::fidl::MessageEncoder* _encoder, ::std::string* s) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, s, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::inheritance::_internal::test_inheritance_SuperFooRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -135,12 +125,8 @@ class sub_RequestEncoder {
 class sub_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage foo(::fidl::MessageEncoder* _encoder, int64_t* y) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(8);
     ::fidl::Encode(_encoder, y, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::inheritance::_internal::test_inheritance_SuperFooResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

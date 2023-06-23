@@ -2318,7 +2318,6 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
 class Protocol_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage OneWayBasic(::fidl::MessageEncoder* _encoder, uint8_t* uint8, uint16_t* uint16, uint32_t* uint32, uint64_t* uint64, int8_t* int8, int16_t* int16, int32_t* int32, int64_t* int64, float* float32, double* float64, ::std::string* string, ::fidl::StringPtr* opt_string) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(80);
     ::fidl::Encode(_encoder, uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -2344,13 +2343,10 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, opt_string, 64 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_BasicTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayBasic(::fidl::MessageEncoder* _encoder, uint8_t* uint8, uint16_t* uint16, uint32_t* uint32, uint64_t* uint64, int8_t* int8, int16_t* int16, int32_t* int32, int64_t* int64, float* float32, double* float64, ::std::string* string, ::fidl::StringPtr* opt_string) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(80);
     ::fidl::Encode(_encoder, uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -2376,8 +2372,6 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, opt_string, 64 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_BasicTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -2386,7 +2380,6 @@ class Protocol_RequestEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayCompound(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Bits* bits, ::test::typesinprotocols::Enum* enum_, ::test::typesinprotocols::Struct* struct_, ::test::typesinprotocols::Table* table, ::test::typesinprotocols::Union* union_, ::std::unique_ptr<::test::typesinprotocols::Struct>* opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union>* opt_union) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(72);
     ::fidl::Encode(_encoder, bits, 0 + sizeof(fidl_message_header_t));
     
@@ -2402,13 +2395,10 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, opt_union, 56 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_CompoundTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayCompound(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Bits* bits, ::test::typesinprotocols::Enum* enum_, ::test::typesinprotocols::Struct* struct_, ::test::typesinprotocols::Table* table, ::test::typesinprotocols::Union* union_, ::std::unique_ptr<::test::typesinprotocols::Struct>* opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union>* opt_union) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(72);
     ::fidl::Encode(_encoder, bits, 0 + sizeof(fidl_message_header_t));
     
@@ -2424,8 +2414,6 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, opt_union, 56 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_CompoundTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -2434,7 +2422,6 @@ class Protocol_RequestEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayArrayBasic(::fidl::MessageEncoder* _encoder, ::std::array<uint8_t, 5>* array_uint8, ::std::array<uint16_t, 5>* array_uint16, ::std::array<uint32_t, 5>* array_uint32, ::std::array<uint64_t, 5>* array_uint64, ::std::array<int8_t, 5>* array_int8, ::std::array<int16_t, 5>* array_int16, ::std::array<int32_t, 5>* array_int32, ::std::array<int64_t, 5>* array_int64, ::std::array<float, 5>* array_float32, ::std::array<double, 5>* array_float64, ::std::array<::std::string, 5>* array_string, ::std::array<::fidl::StringPtr, 5>* array_opt_string) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(384);
     ::fidl::Encode(_encoder, array_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -2460,13 +2447,10 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, array_opt_string, 304 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayBasicTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayArrayBasic(::fidl::MessageEncoder* _encoder, ::std::array<uint8_t, 5>* array_uint8, ::std::array<uint16_t, 5>* array_uint16, ::std::array<uint32_t, 5>* array_uint32, ::std::array<uint64_t, 5>* array_uint64, ::std::array<int8_t, 5>* array_int8, ::std::array<int16_t, 5>* array_int16, ::std::array<int32_t, 5>* array_int32, ::std::array<int64_t, 5>* array_int64, ::std::array<float, 5>* array_float32, ::std::array<double, 5>* array_float64, ::std::array<::std::string, 5>* array_string, ::std::array<::fidl::StringPtr, 5>* array_opt_string) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(384);
     ::fidl::Encode(_encoder, array_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -2492,8 +2476,6 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, array_opt_string, 304 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayBasicTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -2502,7 +2484,6 @@ class Protocol_RequestEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayArrayCompound(::fidl::MessageEncoder* _encoder, ::std::array<::test::typesinprotocols::Bits, 5>* array_bits, ::std::array<::test::typesinprotocols::Enum, 5>* array_enum, ::std::array<::test::typesinprotocols::Struct, 5>* array_struct, ::std::array<::test::typesinprotocols::Table, 5>* array_table, ::std::array<::test::typesinprotocols::Union, 5>* array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>* array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>* array_opt_union) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(328);
     ::fidl::Encode(_encoder, array_bits, 0 + sizeof(fidl_message_header_t));
     
@@ -2518,13 +2499,10 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, array_opt_union, 248 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayCompoundTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayArrayCompound(::fidl::MessageEncoder* _encoder, ::std::array<::test::typesinprotocols::Bits, 5>* array_bits, ::std::array<::test::typesinprotocols::Enum, 5>* array_enum, ::std::array<::test::typesinprotocols::Struct, 5>* array_struct, ::std::array<::test::typesinprotocols::Table, 5>* array_table, ::std::array<::test::typesinprotocols::Union, 5>* array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>* array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>* array_opt_union) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(328);
     ::fidl::Encode(_encoder, array_bits, 0 + sizeof(fidl_message_header_t));
     
@@ -2540,8 +2518,6 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, array_opt_union, 248 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayCompoundTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -2550,7 +2526,6 @@ class Protocol_RequestEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayVectorBasic(::fidl::MessageEncoder* _encoder, ::std::vector<uint8_t>* vector_uint8, ::std::vector<uint16_t>* vector_uint16, ::std::vector<uint32_t>* vector_uint32, ::std::vector<uint64_t>* vector_uint64, ::std::vector<int8_t>* vector_int8, ::std::vector<int16_t>* vector_int16, ::std::vector<int32_t>* vector_int32, ::std::vector<int64_t>* vector_int64, ::std::vector<float>* vector_float32, ::std::vector<double>* vector_float64, ::std::vector<::std::string>* vector_string, ::std::vector<::fidl::StringPtr>* vector_opt_string) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(192);
     ::fidl::Encode(_encoder, vector_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -2576,13 +2551,10 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, vector_opt_string, 176 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_VectorBasicTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayVectorBasic(::fidl::MessageEncoder* _encoder, ::std::vector<uint8_t>* vector_uint8, ::std::vector<uint16_t>* vector_uint16, ::std::vector<uint32_t>* vector_uint32, ::std::vector<uint64_t>* vector_uint64, ::std::vector<int8_t>* vector_int8, ::std::vector<int16_t>* vector_int16, ::std::vector<int32_t>* vector_int32, ::std::vector<int64_t>* vector_int64, ::std::vector<float>* vector_float32, ::std::vector<double>* vector_float64, ::std::vector<::std::string>* vector_string, ::std::vector<::fidl::StringPtr>* vector_opt_string) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(192);
     ::fidl::Encode(_encoder, vector_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -2608,8 +2580,6 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, vector_opt_string, 176 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_VectorBasicTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -2618,7 +2588,6 @@ class Protocol_RequestEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayVectorCompound(::fidl::MessageEncoder* _encoder, ::std::vector<::test::typesinprotocols::Bits>* vector_bits, ::std::vector<::test::typesinprotocols::Enum>* vector_enum, ::std::vector<::test::typesinprotocols::Struct>* vector_struct, ::std::vector<::test::typesinprotocols::Table>* vector_table, ::std::vector<::test::typesinprotocols::Union>* vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>* vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>* vector_opt_union) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(112);
     ::fidl::Encode(_encoder, vector_bits, 0 + sizeof(fidl_message_header_t));
     
@@ -2634,13 +2603,10 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, vector_opt_union, 96 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_VectorCompoundTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayVectorCompound(::fidl::MessageEncoder* _encoder, ::std::vector<::test::typesinprotocols::Bits>* vector_bits, ::std::vector<::test::typesinprotocols::Enum>* vector_enum, ::std::vector<::test::typesinprotocols::Struct>* vector_struct, ::std::vector<::test::typesinprotocols::Table>* vector_table, ::std::vector<::test::typesinprotocols::Union>* vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>* vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>* vector_opt_union) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(112);
     ::fidl::Encode(_encoder, vector_bits, 0 + sizeof(fidl_message_header_t));
     
@@ -2656,8 +2622,6 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, vector_opt_union, 96 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_VectorCompoundTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -2666,7 +2630,6 @@ class Protocol_RequestEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayVectorOptional(::fidl::MessageEncoder* _encoder, ::fidl::VectorPtr<uint8_t>* opt_vector_uint8, ::fidl::VectorPtr<::std::string>* opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* opt_vector_opt_struct) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(64);
     ::fidl::Encode(_encoder, opt_vector_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -2674,13 +2637,10 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, opt_vector_opt_struct, 48 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayVectorOptional(::fidl::MessageEncoder* _encoder, ::fidl::VectorPtr<uint8_t>* opt_vector_uint8, ::fidl::VectorPtr<::std::string>* opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* opt_vector_opt_struct) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(64);
     ::fidl::Encode(_encoder, opt_vector_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -2688,8 +2648,6 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, opt_vector_opt_struct, 48 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -2698,7 +2656,6 @@ class Protocol_RequestEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayArrayVectorNested(::fidl::MessageEncoder* _encoder, ::std::array<::std::array<uint8_t, 5>, 5>* array_array_uint8, ::std::array<::std::vector<uint8_t>, 5>* array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>>* vector_array_uint8, ::std::vector<::std::vector<uint8_t>>* vector_vector_uint8) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(144);
     ::fidl::Encode(_encoder, array_array_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -2708,13 +2665,10 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, vector_vector_uint8, 128 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayArrayVectorNested(::fidl::MessageEncoder* _encoder, ::std::array<::std::array<uint8_t, 5>, 5>* array_array_uint8, ::std::array<::std::vector<uint8_t>, 5>* array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>>* vector_array_uint8, ::std::vector<::std::vector<uint8_t>>* vector_vector_uint8) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(144);
     ::fidl::Encode(_encoder, array_array_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -2724,8 +2678,6 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, vector_vector_uint8, 128 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -2734,7 +2686,6 @@ class Protocol_RequestEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayResource(::fidl::MessageEncoder* _encoder, ::zx::handle* handle, ::zx::vmo* vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* server_end, ::test::typesinprotocols::ResourceStruct* struct_, ::test::typesinprotocols::ResourceTable* table, ::test::typesinprotocols::ResourceUnion* union_, ::zx::handle* opt_handle, ::zx::vmo* opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct>* opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion>* opt_union, ::std::array<::zx::handle, 5>* array_handle, ::std::array<::zx::vmo, 5>* array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>* array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>* array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5>* array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5>* array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5>* array_union, ::std::vector<::zx::handle>* vector_handle, ::std::vector<::zx::vmo>* vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>* vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>* vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct>* vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable>* vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion>* vector_union) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(456);
     ::fidl::Encode(_encoder, handle, 0 + sizeof(fidl_message_header_t), ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_NONE,
@@ -2838,13 +2789,10 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, vector_union, 440 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayResource(::fidl::MessageEncoder* _encoder, ::zx::handle* handle, ::zx::vmo* vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* server_end, ::test::typesinprotocols::ResourceStruct* struct_, ::test::typesinprotocols::ResourceTable* table, ::test::typesinprotocols::ResourceUnion* union_, ::zx::handle* opt_handle, ::zx::vmo* opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct>* opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion>* opt_union, ::std::array<::zx::handle, 5>* array_handle, ::std::array<::zx::vmo, 5>* array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>* array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>* array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5>* array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5>* array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5>* array_union, ::std::vector<::zx::handle>* vector_handle, ::std::vector<::zx::vmo>* vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>* vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>* vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct>* vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable>* vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion>* vector_union) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(456);
     ::fidl::Encode(_encoder, handle, 0 + sizeof(fidl_message_header_t), ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_NONE,
@@ -2948,8 +2896,6 @@ class Protocol_RequestEncoder {
     
     ::fidl::Encode(_encoder, vector_union, 440 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -3009,8 +2955,6 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorResource
 class Protocol_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage TwoWayBasic(::fidl::MessageEncoder* _encoder, uint8_t* uint8, uint16_t* uint16, uint32_t* uint32, uint64_t* uint64, int8_t* int8, int16_t* int16, int32_t* int32, int64_t* int64, float* float32, double* float64, ::std::string* string, ::fidl::StringPtr* opt_string) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(80);
     ::fidl::Encode(_encoder, uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -3036,25 +2980,17 @@ class Protocol_ResponseEncoder {
     
     ::fidl::Encode(_encoder, opt_string, 64 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_BasicTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage ErrorBasic(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorBasic_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorBasicTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage EventBasic(::fidl::MessageEncoder* _encoder, uint8_t* uint8, uint16_t* uint16, uint32_t* uint32, uint64_t* uint64, int8_t* int8, int16_t* int16, int32_t* int32, int64_t* int64, float* float32, double* float64, ::std::string* string, ::fidl::StringPtr* opt_string) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(80);
     ::fidl::Encode(_encoder, uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -3081,13 +3017,9 @@ class Protocol_ResponseEncoder {
     ::fidl::Encode(_encoder, opt_string, 64 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_BasicTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayCompound(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Bits* bits, ::test::typesinprotocols::Enum* enum_, ::test::typesinprotocols::Struct* struct_, ::test::typesinprotocols::Table* table, ::test::typesinprotocols::Union* union_, ::std::unique_ptr<::test::typesinprotocols::Struct>* opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union>* opt_union) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(72);
     ::fidl::Encode(_encoder, bits, 0 + sizeof(fidl_message_header_t));
     
@@ -3103,25 +3035,17 @@ class Protocol_ResponseEncoder {
     
     ::fidl::Encode(_encoder, opt_union, 56 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_CompoundTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage ErrorCompound(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorCompound_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorCompoundTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage EventCompound(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Bits* bits, ::test::typesinprotocols::Enum* enum_, ::test::typesinprotocols::Struct* struct_, ::test::typesinprotocols::Table* table, ::test::typesinprotocols::Union* union_, ::std::unique_ptr<::test::typesinprotocols::Struct>* opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union>* opt_union) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(72);
     ::fidl::Encode(_encoder, bits, 0 + sizeof(fidl_message_header_t));
     
@@ -3138,13 +3062,9 @@ class Protocol_ResponseEncoder {
     ::fidl::Encode(_encoder, opt_union, 56 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_CompoundTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayArrayBasic(::fidl::MessageEncoder* _encoder, ::std::array<uint8_t, 5>* array_uint8, ::std::array<uint16_t, 5>* array_uint16, ::std::array<uint32_t, 5>* array_uint32, ::std::array<uint64_t, 5>* array_uint64, ::std::array<int8_t, 5>* array_int8, ::std::array<int16_t, 5>* array_int16, ::std::array<int32_t, 5>* array_int32, ::std::array<int64_t, 5>* array_int64, ::std::array<float, 5>* array_float32, ::std::array<double, 5>* array_float64, ::std::array<::std::string, 5>* array_string, ::std::array<::fidl::StringPtr, 5>* array_opt_string) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(384);
     ::fidl::Encode(_encoder, array_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -3170,25 +3090,17 @@ class Protocol_ResponseEncoder {
     
     ::fidl::Encode(_encoder, array_opt_string, 304 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayBasicTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage ErrorArrayBasic(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage EventArrayBasic(::fidl::MessageEncoder* _encoder, ::std::array<uint8_t, 5>* array_uint8, ::std::array<uint16_t, 5>* array_uint16, ::std::array<uint32_t, 5>* array_uint32, ::std::array<uint64_t, 5>* array_uint64, ::std::array<int8_t, 5>* array_int8, ::std::array<int16_t, 5>* array_int16, ::std::array<int32_t, 5>* array_int32, ::std::array<int64_t, 5>* array_int64, ::std::array<float, 5>* array_float32, ::std::array<double, 5>* array_float64, ::std::array<::std::string, 5>* array_string, ::std::array<::fidl::StringPtr, 5>* array_opt_string) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(384);
     ::fidl::Encode(_encoder, array_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -3215,13 +3127,9 @@ class Protocol_ResponseEncoder {
     ::fidl::Encode(_encoder, array_opt_string, 304 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayBasicTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayArrayCompound(::fidl::MessageEncoder* _encoder, ::std::array<::test::typesinprotocols::Bits, 5>* array_bits, ::std::array<::test::typesinprotocols::Enum, 5>* array_enum, ::std::array<::test::typesinprotocols::Struct, 5>* array_struct, ::std::array<::test::typesinprotocols::Table, 5>* array_table, ::std::array<::test::typesinprotocols::Union, 5>* array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>* array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>* array_opt_union) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(328);
     ::fidl::Encode(_encoder, array_bits, 0 + sizeof(fidl_message_header_t));
     
@@ -3237,25 +3145,17 @@ class Protocol_ResponseEncoder {
     
     ::fidl::Encode(_encoder, array_opt_union, 248 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayCompoundTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage ErrorArrayCompound(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage EventArrayCompound(::fidl::MessageEncoder* _encoder, ::std::array<::test::typesinprotocols::Bits, 5>* array_bits, ::std::array<::test::typesinprotocols::Enum, 5>* array_enum, ::std::array<::test::typesinprotocols::Struct, 5>* array_struct, ::std::array<::test::typesinprotocols::Table, 5>* array_table, ::std::array<::test::typesinprotocols::Union, 5>* array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>* array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>* array_opt_union) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(328);
     ::fidl::Encode(_encoder, array_bits, 0 + sizeof(fidl_message_header_t));
     
@@ -3272,13 +3172,9 @@ class Protocol_ResponseEncoder {
     ::fidl::Encode(_encoder, array_opt_union, 248 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayCompoundTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayVectorBasic(::fidl::MessageEncoder* _encoder, ::std::vector<uint8_t>* vector_uint8, ::std::vector<uint16_t>* vector_uint16, ::std::vector<uint32_t>* vector_uint32, ::std::vector<uint64_t>* vector_uint64, ::std::vector<int8_t>* vector_int8, ::std::vector<int16_t>* vector_int16, ::std::vector<int32_t>* vector_int32, ::std::vector<int64_t>* vector_int64, ::std::vector<float>* vector_float32, ::std::vector<double>* vector_float64, ::std::vector<::std::string>* vector_string, ::std::vector<::fidl::StringPtr>* vector_opt_string) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(192);
     ::fidl::Encode(_encoder, vector_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -3304,25 +3200,17 @@ class Protocol_ResponseEncoder {
     
     ::fidl::Encode(_encoder, vector_opt_string, 176 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_VectorBasicTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage ErrorVectorBasic(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage EventVectorBasic(::fidl::MessageEncoder* _encoder, ::std::vector<uint8_t>* vector_uint8, ::std::vector<uint16_t>* vector_uint16, ::std::vector<uint32_t>* vector_uint32, ::std::vector<uint64_t>* vector_uint64, ::std::vector<int8_t>* vector_int8, ::std::vector<int16_t>* vector_int16, ::std::vector<int32_t>* vector_int32, ::std::vector<int64_t>* vector_int64, ::std::vector<float>* vector_float32, ::std::vector<double>* vector_float64, ::std::vector<::std::string>* vector_string, ::std::vector<::fidl::StringPtr>* vector_opt_string) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(192);
     ::fidl::Encode(_encoder, vector_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -3349,13 +3237,9 @@ class Protocol_ResponseEncoder {
     ::fidl::Encode(_encoder, vector_opt_string, 176 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_VectorBasicTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayVectorCompound(::fidl::MessageEncoder* _encoder, ::std::vector<::test::typesinprotocols::Bits>* vector_bits, ::std::vector<::test::typesinprotocols::Enum>* vector_enum, ::std::vector<::test::typesinprotocols::Struct>* vector_struct, ::std::vector<::test::typesinprotocols::Table>* vector_table, ::std::vector<::test::typesinprotocols::Union>* vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>* vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>* vector_opt_union) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(112);
     ::fidl::Encode(_encoder, vector_bits, 0 + sizeof(fidl_message_header_t));
     
@@ -3371,25 +3255,17 @@ class Protocol_ResponseEncoder {
     
     ::fidl::Encode(_encoder, vector_opt_union, 96 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_VectorCompoundTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage ErrorVectorCompound(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage EventVectorCompound(::fidl::MessageEncoder* _encoder, ::std::vector<::test::typesinprotocols::Bits>* vector_bits, ::std::vector<::test::typesinprotocols::Enum>* vector_enum, ::std::vector<::test::typesinprotocols::Struct>* vector_struct, ::std::vector<::test::typesinprotocols::Table>* vector_table, ::std::vector<::test::typesinprotocols::Union>* vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>* vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>* vector_opt_union) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(112);
     ::fidl::Encode(_encoder, vector_bits, 0 + sizeof(fidl_message_header_t));
     
@@ -3406,13 +3282,9 @@ class Protocol_ResponseEncoder {
     ::fidl::Encode(_encoder, vector_opt_union, 96 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_VectorCompoundTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayVectorOptional(::fidl::MessageEncoder* _encoder, ::fidl::VectorPtr<uint8_t>* opt_vector_uint8, ::fidl::VectorPtr<::std::string>* opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* opt_vector_opt_struct) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(64);
     ::fidl::Encode(_encoder, opt_vector_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -3420,25 +3292,17 @@ class Protocol_ResponseEncoder {
     
     ::fidl::Encode(_encoder, opt_vector_opt_struct, 48 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage ErrorVectorOptional(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage EventVectorOptional(::fidl::MessageEncoder* _encoder, ::fidl::VectorPtr<uint8_t>* opt_vector_uint8, ::fidl::VectorPtr<::std::string>* opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* opt_vector_opt_struct) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(64);
     ::fidl::Encode(_encoder, opt_vector_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -3447,13 +3311,9 @@ class Protocol_ResponseEncoder {
     ::fidl::Encode(_encoder, opt_vector_opt_struct, 48 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayArrayVectorNested(::fidl::MessageEncoder* _encoder, ::std::array<::std::array<uint8_t, 5>, 5>* array_array_uint8, ::std::array<::std::vector<uint8_t>, 5>* array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>>* vector_array_uint8, ::std::vector<::std::vector<uint8_t>>* vector_vector_uint8) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(144);
     ::fidl::Encode(_encoder, array_array_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -3463,25 +3323,17 @@ class Protocol_ResponseEncoder {
     
     ::fidl::Encode(_encoder, vector_vector_uint8, 128 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage ErrorArrayVectorNested(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage EventArrayVectorNested(::fidl::MessageEncoder* _encoder, ::std::array<::std::array<uint8_t, 5>, 5>* array_array_uint8, ::std::array<::std::vector<uint8_t>, 5>* array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>>* vector_array_uint8, ::std::vector<::std::vector<uint8_t>>* vector_vector_uint8) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(144);
     ::fidl::Encode(_encoder, array_array_uint8, 0 + sizeof(fidl_message_header_t));
     
@@ -3492,13 +3344,9 @@ class Protocol_ResponseEncoder {
     ::fidl::Encode(_encoder, vector_vector_uint8, 128 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayResource(::fidl::MessageEncoder* _encoder, ::zx::handle* handle, ::zx::vmo* vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* server_end, ::test::typesinprotocols::ResourceStruct* struct_, ::test::typesinprotocols::ResourceTable* table, ::test::typesinprotocols::ResourceUnion* union_, ::zx::handle* opt_handle, ::zx::vmo* opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct>* opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion>* opt_union, ::std::array<::zx::handle, 5>* array_handle, ::std::array<::zx::vmo, 5>* array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>* array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>* array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5>* array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5>* array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5>* array_union, ::std::vector<::zx::handle>* vector_handle, ::std::vector<::zx::vmo>* vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>* vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>* vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct>* vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable>* vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion>* vector_union) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(456);
     ::fidl::Encode(_encoder, handle, 0 + sizeof(fidl_message_header_t), ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_NONE,
@@ -3602,25 +3450,17 @@ class Protocol_ResponseEncoder {
     
     ::fidl::Encode(_encoder, vector_union, 440 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage ErrorResource(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorResource_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorResourceTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage EventResource(::fidl::MessageEncoder* _encoder, ::zx::handle* handle, ::zx::vmo* vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* server_end, ::test::typesinprotocols::ResourceStruct* struct_, ::test::typesinprotocols::ResourceTable* table, ::test::typesinprotocols::ResourceUnion* union_, ::zx::handle* opt_handle, ::zx::vmo* opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct>* opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion>* opt_union, ::std::array<::zx::handle, 5>* array_handle, ::std::array<::zx::vmo, 5>* array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>* array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>* array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5>* array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5>* array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5>* array_union, ::std::vector<::zx::handle>* vector_handle, ::std::vector<::zx::vmo>* vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>* vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>* vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct>* vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable>* vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion>* vector_union) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(456);
     ::fidl::Encode(_encoder, handle, 0 + sizeof(fidl_message_header_t), ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_NONE,
@@ -3724,8 +3564,6 @@ class Protocol_ResponseEncoder {
     
     ::fidl::Encode(_encoder, vector_union, 440 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

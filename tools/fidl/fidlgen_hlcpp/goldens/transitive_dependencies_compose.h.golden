@@ -42,12 +42,8 @@ __LOCAL extern "C" const fidl_type_t test_bottom_BottomGetFooResponseTable;
 class Top_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage GetFoo(::fidl::MessageEncoder* _encoder, ::test::bottom::Foo* foo) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, foo, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::transitivedependenciescompose::_internal::test_bottom_BottomGetFooResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

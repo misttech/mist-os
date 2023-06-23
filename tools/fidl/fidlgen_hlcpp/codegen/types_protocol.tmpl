@@ -35,7 +35,6 @@ class {{ .RequestEncoder.Name }} {
   {{- if .HasRequest }}
   static ::fidl::HLCPPOutgoingMessage {{ .Name }}(::fidl::MessageEncoder* _encoder{{ template "PointerParams" .RequestArgs }}) {
     {{- if .HasRequestPayload }}
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc({{ .Request.TypeShapeV2.InlineSize }});
 
     {{- range .RequestArgs }}
@@ -48,8 +47,6 @@ class {{ .RequestEncoder.Name }} {
     ::fidl::Encode(_encoder, {{ .Name }}, {{ .OffsetV2 }} + sizeof(fidl_message_header_t));
     {{ end -}}
     {{- end }}
-
-    fidl_trace(DidHLCPPEncode, &{{ .Request.HlCodingTable }}, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
     {{- end }}
 
     return _encoder->GetMessage();
@@ -71,8 +68,6 @@ class {{ .ResponseEncoder.Name }} {
   {{- if .HasResponse }}
   static ::fidl::HLCPPOutgoingMessage {{ .Name }}(::fidl::MessageEncoder* _encoder{{ template "PointerParams" .ResponseArgs }}) {
     {{- if .HasResponsePayload }}
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc({{ .Response.TypeShapeV2.InlineSize }});
 
     {{- range .ResponseArgs }}
@@ -85,8 +80,6 @@ class {{ .ResponseEncoder.Name }} {
     ::fidl::Encode(_encoder, {{ .Name }}, {{ .OffsetV2 }} + sizeof(fidl_message_header_t));
     {{ end -}}
     {{- end }}
-
-    fidl_trace(DidHLCPPEncode, &{{ .Response.HlCodingTable }}, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
     {{- end }}
 
     return _encoder->GetMessage();

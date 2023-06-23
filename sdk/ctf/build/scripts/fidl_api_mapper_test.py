@@ -225,7 +225,7 @@ class FidlApiResolverTest(unittest.TestCase):
             '0x1':
                 {
                     'DW_AT_decl_file': '"%s"' % testdata_path,
-                    'DW_AT_decl_line': '671',
+                    'DW_AT_decl_line': '652',
                     'DW_AT_linkage_name': '"mangled_name"'
                 }
         }

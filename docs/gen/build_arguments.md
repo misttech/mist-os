@@ -3195,15 +3195,6 @@ removed: fxb/117339
 
 From //src/developer/ffx/config.gni:19
 
-### fidl_trace_level
-
-0 = Disable FIDL userspace tracing (default).
-1 = Enable FIDL userspace tracing.
-
-**Current value (from the default):** `0`
-
-From //build/fidl/args.gni:8
-
 ### firmware_prebuilts
 
 List of prebuilt firmware blobs to include in update packages.

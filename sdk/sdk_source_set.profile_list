@@ -142,7 +142,6 @@ src:../../zircon/system/ulib/fidl/include/lib/fidl/coding_unstable.h
 src:../../zircon/system/ulib/fidl/include/lib/fidl/txn_header.h
 src:../../zircon/system/ulib/fidl/include/lib/fidl/internal.h
 src:../../zircon/system/ulib/fidl/include/lib/fidl/internal_callable_traits.h
-src:../../zircon/system/ulib/fidl/include/lib/fidl/trace.h
 src:../../zircon/system/ulib/fidl/include/lib/fidl/visitor.h
 src:../../zircon/system/ulib/fidl/include/lib/fidl/walker.h
 src:../../zircon/system/ulib/fidl/epitaph.c

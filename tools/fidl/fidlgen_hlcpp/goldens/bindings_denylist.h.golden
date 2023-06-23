@@ -1036,47 +1036,32 @@ __LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDe
 class DenyEachBinding_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage OnlyDenyDart(::fidl::MessageEncoder* _encoder, bool* a) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(1);
     ::fidl::Encode(_encoder, a, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnlyDenyGo(::fidl::MessageEncoder* _encoder, bool* a) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(1);
     ::fidl::Encode(_encoder, a, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnlyDenyLibfuzzer(::fidl::MessageEncoder* _encoder, bool* a) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(1);
     ::fidl::Encode(_encoder, a, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnlyDenyRust(::fidl::MessageEncoder* _encoder, bool* a) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(1);
     ::fidl::Encode(_encoder, a, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnlyDenySyzkaller(::fidl::MessageEncoder* _encoder, bool* a) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(1);
     ::fidl::Encode(_encoder, a, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -1097,52 +1082,32 @@ __LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDe
 class DenyEachBinding_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage OnlyDenyDart(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenyDartTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnlyDenyGo(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenyGoTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnlyDenyLibfuzzer(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnlyDenyRust(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenyRustTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnlyDenySyzkaller(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

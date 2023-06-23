@@ -130,11 +130,8 @@ __LOCAL extern "C" const fidl_type_t test_placementofattributes_ExampleProtocolM
 class ExampleProtocol_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage Method(::fidl::MessageEncoder* _encoder, ::test::exampleusing::Empty* arg) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(1);
     ::fidl::Encode(_encoder, arg, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::placementofattributes::_internal::test_placementofattributes_ExampleProtocolMethodRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

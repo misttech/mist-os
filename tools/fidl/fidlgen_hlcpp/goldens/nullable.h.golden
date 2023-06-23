@@ -167,13 +167,10 @@ __LOCAL extern "C" const fidl_type_t test_nullable_SimpleProtocolAddRequestTable
 class SimpleProtocol_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage Add(::fidl::MessageEncoder* _encoder, int32_t* a, int32_t* b) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(8);
     ::fidl::Encode(_encoder, a, 0 + sizeof(fidl_message_header_t));
 
     ::fidl::Encode(_encoder, b, 4 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::nullable::_internal::test_nullable_SimpleProtocolAddRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -186,12 +183,8 @@ __LOCAL extern "C" const fidl_type_t test_nullable_SimpleProtocolAddResponseTabl
 class SimpleProtocol_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage Add(::fidl::MessageEncoder* _encoder, int32_t* sum) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, sum, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::nullable::_internal::test_nullable_SimpleProtocolAddResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

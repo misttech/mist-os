@@ -53,7 +53,6 @@
 #include "lib/fidl/cpp/enum.h"
 #include "lib/fidl/cpp/string.h"
 #include "lib/fidl/cpp/vector.h"
-#include "lib/fidl/trace.h"
 
 #ifdef __Fuchsia__
 #include "lib/fidl/cpp/interface_handle.h"

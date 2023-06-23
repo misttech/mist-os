@@ -4,8 +4,6 @@
 
 #include "lib/fidl/cpp/unknown_interactions_hlcpp.h"
 
-#include <lib/fidl/trace.h>
-
 namespace fidl {
 namespace internal {
 
@@ -14,8 +12,6 @@ static const fidl_xunion_tag_t kUnknownMethodTransportErrTag = 3;
 static const size_t kResponseOffset = sizeof(fidl_message_header_t);
 
 ::fidl::HLCPPOutgoingMessage EncodeUnknownMethodResponse(::fidl::MessageEncoder* encoder) {
-  fidl_trace(WillHLCPPEncode);
-
   encoder->Alloc(sizeof(fidl_xunion_v2_t));
 
   auto response_value = TransportErr::kUnknownMethod;
@@ -40,10 +36,6 @@ static const size_t kResponseOffset = sizeof(fidl_message_header_t);
     xunion->envelope.num_handles = 0;
     xunion->envelope.flags = 0;
   }
-
-  fidl_trace(DidHLCPPEncode, &kFidlInternalUnknownMethodResponseTable,
-             encoder->GetPtr<const char>(0), encoder->CurrentLength(),
-             encoder->CurrentHandleCount());
 
   return encoder->GetMessage();
 }

@@ -3,11 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/cpp/sdk_source_set.gni")
-import("//build/fidl/args.gni")
-
-config("fidl-tracing-config") {
-  defines = [ "FIDL_TRACE_LEVEL=$fidl_trace_level" ]
-}
 
 # Header-only library for transaction header utilities.
 #
@@ -45,7 +40,6 @@ sdk_source_set("fidl_base") {
     "include/lib/fidl/cpp/wire_format_metadata.h",
     "include/lib/fidl/internal.h",
     "include/lib/fidl/internal_callable_traits.h",
-    "include/lib/fidl/trace.h",
     "include/lib/fidl/txn_header.h",
     "include/lib/fidl/visitor.h",
     "include/lib/fidl/walker.h",
@@ -73,8 +67,6 @@ sdk_source_set("fidl_base") {
   }
 
   public_configs = [ ":fidl_base.headers" ]
-
-  all_dependent_configs = [ ":fidl-tracing-config" ]
 
   if (is_fuchsia) {
     configs += [ "//build/config/fuchsia:no_cpp_standard_library" ]

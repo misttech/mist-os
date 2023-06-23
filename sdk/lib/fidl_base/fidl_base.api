@@ -5,7 +5,6 @@
   "pkg/fidl_base/include/lib/fidl/cpp/wire_format_metadata.h": "8883ce53a48eb97e3b1d03ff96dfde14",
   "pkg/fidl_base/include/lib/fidl/internal.h": "bd618800df5ea1b22644e9727727fc28",
   "pkg/fidl_base/include/lib/fidl/internal_callable_traits.h": "a18e97bafa2f7e388422a7e721d6421d",
-  "pkg/fidl_base/include/lib/fidl/trace.h": "85da85ca3d983353d8acd8b02dd12506",
   "pkg/fidl_base/include/lib/fidl/txn_header.h": "19824338a2aecc5010cd9ec8e914f997",
   "pkg/fidl_base/include/lib/fidl/visitor.h": "f8c8fc3e5f854c3094ef1e43876a6183",
   "pkg/fidl_base/include/lib/fidl/walker.h": "06260dca7a59c6c9cf30b36d0fcaa2ae"

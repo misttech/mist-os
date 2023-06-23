@@ -1018,7 +1018,6 @@ pkg/fidl_base/include/lib/fidl/cpp/transport_err.h
 pkg/fidl_base/include/lib/fidl/cpp/wire_format_metadata.h
 pkg/fidl_base/include/lib/fidl/internal.h
 pkg/fidl_base/include/lib/fidl/internal_callable_traits.h
-pkg/fidl_base/include/lib/fidl/trace.h
 pkg/fidl_base/include/lib/fidl/txn_header.h
 pkg/fidl_base/include/lib/fidl/visitor.h
 pkg/fidl_base/include/lib/fidl/walker.h

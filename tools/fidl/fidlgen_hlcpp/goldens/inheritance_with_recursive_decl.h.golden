@@ -70,14 +70,11 @@ __LOCAL extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ParentFir
 class Parent_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage First(::fidl::MessageEncoder* _encoder, ::fidl::InterfaceRequest<::test::inheritancewithrecursivedecl::Parent>* request) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, request, 0 + sizeof(fidl_message_header_t), ::fidl::HandleInformation{
                                                                              .object_type = ZX_OBJ_TYPE_CHANNEL,
                                                                              .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
                                                                          });
-
-    fidl_trace(DidHLCPPEncode, &::test::inheritancewithrecursivedecl::_internal::test_inheritancewithrecursivedecl_ParentFirstRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -124,26 +121,20 @@ __LOCAL extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ChildSeco
 class Child_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage First(::fidl::MessageEncoder* _encoder, ::fidl::InterfaceRequest<::test::inheritancewithrecursivedecl::Parent>* request) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, request, 0 + sizeof(fidl_message_header_t), ::fidl::HandleInformation{
                                                                              .object_type = ZX_OBJ_TYPE_CHANNEL,
                                                                              .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
                                                                          });
-
-    fidl_trace(DidHLCPPEncode, &::test::inheritancewithrecursivedecl::_internal::test_inheritancewithrecursivedecl_ParentFirstRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage Second(::fidl::MessageEncoder* _encoder, ::fidl::InterfaceRequest<::test::inheritancewithrecursivedecl::Parent>* request) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, request, 0 + sizeof(fidl_message_header_t), ::fidl::HandleInformation{
                                                                              .object_type = ZX_OBJ_TYPE_CHANNEL,
                                                                              .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
                                                                          });
-
-    fidl_trace(DidHLCPPEncode, &::test::inheritancewithrecursivedecl::_internal::test_inheritancewithrecursivedecl_ChildSecondRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

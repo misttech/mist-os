@@ -93,28 +93,14 @@ func TestReportGeneration(t *testing.T) {
 			args: args{
 				allowlistNameRegexp: []string{`^fidl_trigger_tag$`},
 			},
-			expectedOutput: `{
-            "items": [
-               {
-                    "name": "fidl_trigger_tag",
-                    "kind": "enum"
-               }
-            ]}
-            `,
+			expectedOutput: `{}`,
 		},
 		{
 			name: "enum member report",
 			args: args{
 				allowlistNameRegexp: []string{`^fidl_trigger_tag::kFidlTriggerWillCChannelRead$`},
 			},
-			expectedOutput: `{
-            "items": [
-               {
-                    "name": "fidl_trigger_tag::kFidlTriggerWillCChannelRead",
-                    "kind": "enum/member"
-               }
-            ]}
-            `,
+			expectedOutput: `{}`,
 		},
 		{
 			name: "method report",

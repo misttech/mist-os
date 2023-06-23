@@ -2180,24 +2180,16 @@ __LOCAL extern "C" const fidl_type_t test_union_TestProtocolFlexibleUnionHenceRe
 class TestProtocol_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage StrictUnionHenceResponseMayBeStackAllocated(::fidl::MessageEncoder* _encoder, ::test::union_::StrictBoundedUnion* xu) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, xu, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::union_::_internal::test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleUnionHenceResponseMustBeHeapAllocated(::fidl::MessageEncoder* _encoder, ::test::union_::OlderSimpleUnion* xu) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, xu, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::union_::_internal::test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

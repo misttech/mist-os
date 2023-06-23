@@ -4,7 +4,6 @@
 
 #include <lib/fidl/cpp/wire/message.h>
 #include <lib/fidl/internal.h>
-#include <lib/fidl/trace.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 

@@ -322,20 +322,14 @@ __LOCAL extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolReques
 class Protocol_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage RequestStrictResponseFlexible(::fidl::MessageEncoder* _encoder, ::test::requestflexibleenvelope::StrictFoo* s) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, s, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::requestflexibleenvelope::_internal::test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage RequestFlexibleResponseStrict(::fidl::MessageEncoder* _encoder, ::test::requestflexibleenvelope::FlexibleFoo* s) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, s, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::requestflexibleenvelope::_internal::test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -350,22 +344,14 @@ __LOCAL extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolReques
 class Protocol_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage RequestStrictResponseFlexible(::fidl::MessageEncoder* _encoder, ::test::requestflexibleenvelope::FlexibleFoo* f) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, f, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::requestflexibleenvelope::_internal::test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage RequestFlexibleResponseStrict(::fidl::MessageEncoder* _encoder, ::test::requestflexibleenvelope::StrictFoo* f) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, f, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::requestflexibleenvelope::_internal::test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

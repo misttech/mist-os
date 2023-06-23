@@ -62,7 +62,6 @@ __LOCAL extern "C" const fidl_type_t fuchsia_diagnostics_stream_SourceRetireBuff
 class Source_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage RetireBuffer(::fidl::Encoder* _encoder, uint64_t* buffer) {
-    fidl_trace(WillHLCPPEncode);
     switch (_encoder->wire_format()) {
       case ::fidl::internal::WireFormatVersion::kV1:
         _encoder->Alloc(24 - sizeof(fidl_message_header_t));
@@ -78,12 +77,6 @@ class Source_RequestEncoder {
     } else {
       ::fidl::Encode(_encoder, buffer, 16);
     }
-
-    fidl_trace(DidHLCPPEncode,
-               &::fuchsia::diagnostics::stream::_internal::
-                   fuchsia_diagnostics_stream_SourceRetireBufferRequestTable,
-               _encoder->GetPtr<const char>(0), _encoder->CurrentLength(),
-               _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -97,7 +90,6 @@ __LOCAL extern "C" const fidl_type_t fuchsia_diagnostics_stream_SourceOnBufferDo
 class Source_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage OnBufferInit(::fidl::Encoder* _encoder, ::zx::vmo* latest) {
-    fidl_trace(WillHLCPPEncode);
     switch (_encoder->wire_format()) {
       case ::fidl::internal::WireFormatVersion::kV1:
         _encoder->Alloc(24 - sizeof(fidl_message_header_t));
@@ -122,15 +114,9 @@ class Source_ResponseEncoder {
                      });
     }
 
-    fidl_trace(DidHLCPPEncode,
-               &::fuchsia::diagnostics::stream::_internal::
-                   fuchsia_diagnostics_stream_SourceOnBufferInitEventTable,
-               _encoder->GetPtr<const char>(0), _encoder->CurrentLength(),
-               _encoder->CurrentHandleCount());
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnBufferDone(::fidl::Encoder* _encoder, uint64_t* buffer) {
-    fidl_trace(WillHLCPPEncode);
     switch (_encoder->wire_format()) {
       case ::fidl::internal::WireFormatVersion::kV1:
         _encoder->Alloc(24 - sizeof(fidl_message_header_t));
@@ -147,11 +133,6 @@ class Source_ResponseEncoder {
       ::fidl::Encode(_encoder, buffer, 16);
     }
 
-    fidl_trace(DidHLCPPEncode,
-               &::fuchsia::diagnostics::stream::_internal::
-                   fuchsia_diagnostics_stream_SourceOnBufferDoneEventTable,
-               _encoder->GetPtr<const char>(0), _encoder->CurrentLength(),
-               _encoder->CurrentHandleCount());
     return _encoder->GetMessage();
   }
 };

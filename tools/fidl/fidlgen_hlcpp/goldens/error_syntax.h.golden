@@ -223,20 +223,14 @@ __LOCAL extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCal
 class ExampleUseOfErrorSyntax_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage ComposedCallWhichMayFail(::fidl::MessageEncoder* _encoder, ::std::string* s) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, s, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::errorsyntax::_internal::test_errorsyntax_parent_ParentUsesErrorSyntaxComposedCallWhichMayFailRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage CallWhichMayFail(::fidl::MessageEncoder* _encoder, ::std::string* s) {
-    fidl_trace(WillHLCPPEncode);
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, s, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::errorsyntax::_internal::test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -251,22 +245,14 @@ __LOCAL extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCal
 class ExampleUseOfErrorSyntax_ResponseEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage ComposedCallWhichMayFail(::fidl::MessageEncoder* _encoder, ::test::errorsyntax::parent::ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::errorsyntax::_internal::test_errorsyntax_parent_ParentUsesErrorSyntaxComposedCallWhichMayFailTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage CallWhichMayFail(::fidl::MessageEncoder* _encoder, ::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
-
-    fidl_trace(DidHLCPPEncode, &::test::errorsyntax::_internal::test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

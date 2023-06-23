@@ -7,7 +7,6 @@
 #include <lib/fidl/cpp/wire/message.h>
 #include <lib/fidl/cpp/wire/message_storage.h>
 #include <lib/fidl/internal.h>
-#include <lib/fidl/trace.h>
 #include <zircon/syscalls.h>
 
 #include <cstring>
@@ -203,14 +202,11 @@ void ChannelWaiter::HandleWaitFinished(async_dispatcher_t* dispatcher, zx_status
       .handle_metadata = handle_metadata,
       .handle_capacity = ZX_CHANNEL_MAX_MSG_HANDLES,
   };
-  fidl_trace(WillLLCPPAsyncChannelRead);
   IncomingHeaderAndMessage msg =
       fidl::MessageRead(zx::unowned_channel(async_wait_t::object), storage_view);
   if (!msg.ok()) {
     return failure_handler_(fidl::UnbindInfo{msg});
   }
-  fidl_trace(DidLLCPPAsyncChannelRead, nullptr /* type */, bytes.data(), msg.byte_actual(),
-             msg.handle_actual());
   return success_handler_(msg, &storage_view);
 }
 

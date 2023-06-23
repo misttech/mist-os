@@ -5422,167 +5422,107 @@ class UnknownInteractionsProtocol_ResponseEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayFields(::fidl::MessageEncoder* _encoder, int32_t* some_field) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, some_field, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayUnion(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse* UnknownInteractionsProtocolStrictTwoWayUnionResponse) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsProtocolStrictTwoWayUnionResponse, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayUnionResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayTable(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse* UnknownInteractionsProtocolStrictTwoWayTableResponse) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsProtocolStrictTwoWayTableResponse, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayTableResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayFieldsErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayUnionErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayTableErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayTableErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayTableErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleTwoWay(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleTwoWayFields(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleTwoWayUnion(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleTwoWayTable(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayTableTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleTwoWayErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleTwoWayFieldsErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleTwoWayUnionErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleTwoWayTableErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -5591,79 +5531,51 @@ class UnknownInteractionsProtocol_ResponseEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventFields(::fidl::MessageEncoder* _encoder, int32_t* some_field) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, some_field, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventUnion(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest* UnknownInteractionsProtocolStrictEventUnionRequest) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsProtocolStrictEventUnionRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictEventUnionRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventTable(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest* UnknownInteractionsProtocolStrictEventTableRequest) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsProtocolStrictEventTableRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictEventTableRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictEventErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventFieldsErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventUnionErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictEventUnionErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventTableErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolStrictEventTableErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -5672,79 +5584,51 @@ class UnknownInteractionsProtocol_ResponseEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventFields(::fidl::MessageEncoder* _encoder, int32_t* some_field) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, some_field, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventUnion(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest* UnknownInteractionsProtocolFlexibleEventUnionRequest) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsProtocolFlexibleEventUnionRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventUnionRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventTable(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest* UnknownInteractionsProtocolFlexibleEventTableRequest) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsProtocolFlexibleEventTableRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventTableRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventFieldsErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventUnionErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventUnionErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventTableErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventTableErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -8774,79 +8658,51 @@ class UnknownInteractionsAjarProtocol_ResponseEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayFields(::fidl::MessageEncoder* _encoder, int32_t* some_field) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, some_field, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayUnion(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse* UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayTable(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse* UnknownInteractionsAjarProtocolStrictTwoWayTableResponse) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsAjarProtocolStrictTwoWayTableResponse, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayTableResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayFieldsErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayUnionErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayTableErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -8855,79 +8711,51 @@ class UnknownInteractionsAjarProtocol_ResponseEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventFields(::fidl::MessageEncoder* _encoder, int32_t* some_field) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, some_field, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventUnion(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest* UnknownInteractionsAjarProtocolStrictEventUnionRequest) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsAjarProtocolStrictEventUnionRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventUnionRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventTable(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest* UnknownInteractionsAjarProtocolStrictEventTableRequest) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsAjarProtocolStrictEventTableRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventTableRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventFieldsErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventUnionErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventUnionErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventTableErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventTableErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -8936,79 +8764,51 @@ class UnknownInteractionsAjarProtocol_ResponseEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventFields(::fidl::MessageEncoder* _encoder, int32_t* some_field) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, some_field, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventUnion(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest* UnknownInteractionsAjarProtocolFlexibleEventUnionRequest) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsAjarProtocolFlexibleEventUnionRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventUnionRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventTable(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest* UnknownInteractionsAjarProtocolFlexibleEventTableRequest) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsAjarProtocolFlexibleEventTableRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventTableRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventFieldsErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventUnionErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEventTableErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventTableErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -11046,79 +10846,51 @@ class UnknownInteractionsClosedProtocol_ResponseEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayFields(::fidl::MessageEncoder* _encoder, int32_t* some_field) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, some_field, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayUnion(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse* UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayTable(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse* UnknownInteractionsClosedProtocolStrictTwoWayTableResponse) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsClosedProtocolStrictTwoWayTableResponse, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayTableResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayFieldsErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayUnionErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayTableErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -11127,79 +10899,51 @@ class UnknownInteractionsClosedProtocol_ResponseEncoder {
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventFields(::fidl::MessageEncoder* _encoder, int32_t* some_field) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, some_field, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventUnion(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest* UnknownInteractionsClosedProtocolStrictEventUnionRequest) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsClosedProtocolStrictEventUnionRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventUnionRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventTable(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest* UnknownInteractionsClosedProtocolStrictEventTableRequest) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnknownInteractionsClosedProtocolStrictEventTableRequest, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventTableRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
-
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventFieldsErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventUnionErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventUnionErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEventTableErr(::fidl::MessageEncoder* _encoder, ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result* result) {
-    fidl_trace(WillHLCPPEncode);
-
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
     
-
-    fidl_trace(DidHLCPPEncode, &::test::unknowninteractions::_internal::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventTableErrRequestTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }

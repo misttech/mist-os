@@ -206,10 +206,6 @@ ChildRecords:
     USR:             'A064164D9051ADFF60BBD89E22AC0ABD15428203'
     Path:            'GlobalNamespace'
   - Type:            Record
-    Name:            'fidl_trace_tag'
-    USR:             '7DED4D1F2B70C264E6C1D77D6C0DF9344D6E89E8'
-    Path:            'GlobalNamespace'
-  - Type:            Record
     Name:            'fdio_namespace'
     USR:             '40B01ACEAA36C2ED596AFBF23B00651334A7CB66'
     Path:            'GlobalNamespace'
@@ -2990,39 +2986,4 @@ ChildFunctions:
     ReturnType:
       Type:
         Name:            'void'
-ChildEnums:
-  - USR:             '6B818A9B022C5A7FEB6658FB3DD7DD8D5793327B'
-    Name:            'fidl_trigger_tag'
-    DefLocation:
-      LineNumber:      17
-      Filename:        '../../zircon/system/ulib/fidl/include/lib/fidl/trace.h'
-    Members:
-      - 'kFidlTriggerWillLLCPPInPlaceEncode'
-      - 'kFidlTriggerDidLLCPPInPlaceEncode'
-      - 'kFidlTriggerWillLLCPPLinearizeAndEncode'
-      - 'kFidlTriggerDidLLCPPLinearizeAndEncode'
-      - 'kFidlTriggerWillLLCPPDecode'
-      - 'kFidlTriggerDidLLCPPDecode'
-      - 'kFidlTriggerWillLLCPPChannelWrite'
-      - 'kFidlTriggerDidLLCPPChannelWrite'
-      - 'kFidlTriggerWillLLCPPChannelCall'
-      - 'kFidlTriggerDidLLCPPChannelCall'
-      - 'kFidlTriggerWillLLCPPAsyncChannelRead'
-      - 'kFidlTriggerDidLLCPPAsyncChannelRead'
-      - 'kFidlTriggerWillHLCPPEncode'
-      - 'kFidlTriggerDidHLCPPEncode'
-      - 'kFidlTriggerWillHLCPPDecode'
-      - 'kFidlTriggerDidHLCPPDecode'
-      - 'kFidlTriggerWillHLCPPValidate'
-      - 'kFidlTriggerDidHLCPPValidate'
-      - 'kFidlTriggerWillHLCPPChannelWrite'
-      - 'kFidlTriggerDidHLCPPChannelWrite'
-      - 'kFidlTriggerWillHLCPPChannelRead'
-      - 'kFidlTriggerDidHLCPPChannelRead'
-      - 'kFidlTriggerWillHLCPPChannelCall'
-      - 'kFidlTriggerDidHLCPPChannelCall'
-      - 'kFidlTriggerWillCChannelRead'
-      - 'kFidlTriggerDidCChannelRead'
-      - 'kFidlTriggerWillCChannelWrite'
-      - 'kFidlTriggerDidCChannelWrite'
 ...

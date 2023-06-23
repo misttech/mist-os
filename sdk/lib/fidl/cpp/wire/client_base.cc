@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/fidl/cpp/wire/client_base.h>
-#include <lib/fidl/trace.h>
 #include <lib/fidl/txn_header.h>
 #include <lib/fit/function.h>
 
