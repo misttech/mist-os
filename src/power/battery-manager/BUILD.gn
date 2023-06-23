@@ -14,7 +14,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_rust",
     "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery.test_rust",
     "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_rust",
-    "//src/lib/fdio/rust:fdio",
+    "//sdk/lib/device-watcher/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",

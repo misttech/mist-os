@@ -3,16 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use fdio::{self, clone_channel};
 use fidl_fuchsia_hardware_powersource as hpower;
 use fuchsia_async as fasync;
-use fuchsia_fs::directory as vfs_watcher;
 use fuchsia_fs::OpenFlags;
 use fuchsia_zircon::{self as zx, Signals};
 use futures::prelude::*;
 use std::convert::From;
-use std::fs::File;
-use std::io::{self, Result as ioResult};
 use std::marker::Send;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -35,9 +31,10 @@ enum WatchSuccess {
     AdapterAlreadyFound,
 }
 
-fn get_power_source_proxy(file: &File) -> ioResult<hpower::SourceProxy> {
-    let channel = clone_channel(file)?;
-    Ok(hpower::SourceProxy::new(fasync::Channel::from_channel(channel)?))
+fn get_power_source_proxy(file: &PathBuf) -> Result<hpower::SourceProxy, Error> {
+    fuchsia_component::client::connect_to_protocol_at_path::<hpower::SourceMarker>(
+        file.as_path().to_str().unwrap(),
+    )
 }
 
 // Get the power info from file descriptor/hardware.power FIDL service
@@ -47,7 +44,7 @@ fn get_power_source_proxy(file: &File) -> ioResult<hpower::SourceProxy> {
 // to bind the FIDL service, at least until fxbug.dev/33183 is complete, which
 // will componentize drivers and allow them to provide discoverable FIDL
 // services like everyone else.
-pub async fn get_power_info(file: &File) -> ioResult<hpower::SourceInfo> {
+pub async fn get_power_info(file: &PathBuf) -> Result<hpower::SourceInfo, Error> {
     let power_source = get_power_source_proxy(&file)?;
     match power_source.get_power_info().map_err(|_| zx::Status::IO).await? {
         result => {
@@ -65,7 +62,7 @@ pub async fn get_power_info(file: &File) -> ioResult<hpower::SourceInfo> {
 // to bind the FIDL service, at least until fxbug.dev/33183 is complete, which
 // will componentize drivers and allow them to provide discoverable FIDL
 // services like everyone else.
-pub async fn get_battery_info(file: &File) -> ioResult<hpower::BatteryInfo> {
+pub async fn get_battery_info(file: &PathBuf) -> Result<hpower::BatteryInfo, Error> {
     let power_source = get_power_source_proxy(&file)?;
     match power_source.get_battery_info().map_err(|_| zx::Status::IO).await? {
         result => {
@@ -76,14 +73,12 @@ pub async fn get_battery_info(file: &File) -> ioResult<hpower::BatteryInfo> {
     }
 }
 
-fn add_listener<F>(file: &File, callback: F) -> ioResult<()>
+fn add_listener<F>(file: &PathBuf, callback: F) -> Result<(), Error>
 where
     F: 'static + Send + Fn(hpower::SourceInfo, Option<hpower::BatteryInfo>) + Sync,
 {
     let power_source = get_power_source_proxy(&file)?;
-    let file_copy = file
-        .try_clone()
-        .map_err(|e| io::Error::new(e.kind(), format!("error copying power device file: {}", e)))?;
+    let file_copy = file.clone();
 
     debug!("::power:: spawn device state change event listener");
     fasync::Task::spawn(
@@ -125,7 +120,7 @@ async fn process_watch_event(
 ) -> Result<WatchSuccess, anyhow::Error> {
     debug!("::power:: process_watch_event for {:#?}", &filepath);
 
-    let file = File::open(&filepath)?;
+    let file = filepath.clone();
     let power_info = get_power_info(&file).await?;
 
     let mut battery_info = None;
@@ -193,16 +188,22 @@ async fn process_watch_event(
 pub async fn watch_power_device(battery_manager: Arc<BatteryManager>) -> Result<(), Error> {
     let dir_proxy =
         fuchsia_fs::directory::open_in_namespace(POWER_DEVICE, OpenFlags::RIGHT_READABLE)?;
-    let mut watcher = vfs_watcher::Watcher::new(&dir_proxy).await?;
+    let mut stream = device_watcher::watch_for_files(&dir_proxy)
+        .await
+        .with_context(|| format!("Watching for files in {}", POWER_DEVICE))?;
+
     let mut adapter_device_found = false;
     let mut battery_device_found = false;
-    while let Some(msg) = (watcher.try_next()).await? {
-        debug!("::power:: watch_power_device trying next: {:#?}", &msg);
+
+    while let Some(entry) =
+        stream.try_next().await.with_context(|| format!("Getting a file from {}", POWER_DEVICE))?
+    {
+        debug!("::power:: watch_power_device trying next: {:#?}", &entry);
         if battery_device_found && adapter_device_found {
             continue;
         }
         let mut filepath = PathBuf::from(POWER_DEVICE);
-        filepath.push(msg.filename);
+        filepath.push(entry);
         info!("watch_power_device event for file: {:?}", &filepath);
         match process_watch_event(
             &filepath,
