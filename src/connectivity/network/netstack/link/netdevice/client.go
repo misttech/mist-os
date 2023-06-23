@@ -467,6 +467,8 @@ func (*Port) ARPHardwareType() header.ARPHardwareType {
 
 func (*Port) AddHeader(stack.PacketBufferPtr) {}
 
+func (*Port) ParseHeader(stack.PacketBufferPtr) bool { return true }
+
 // GSOMaxSize implements stack.GSOEndpoint.
 func (*Port) GSOMaxSize() uint32 {
 	// There's no limit on how much data we can take in a single software GSO write.

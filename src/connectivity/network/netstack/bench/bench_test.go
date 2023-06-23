@@ -44,6 +44,7 @@ func (*nullEndpoint) IsAttached() bool                          { return false }
 func (*nullEndpoint) Wait()                                     {}
 func (*nullEndpoint) ARPHardwareType() header.ARPHardwareType   { return header.ARPHardwareNone }
 func (*nullEndpoint) AddHeader(stack.PacketBufferPtr)           {}
+func (*nullEndpoint) ParseHeader(stack.PacketBufferPtr) bool    { return true }
 
 type nullChecksumOffloadEndpoint struct {
 	nullEndpoint

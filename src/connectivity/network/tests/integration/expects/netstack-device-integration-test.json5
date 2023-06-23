@@ -16,13 +16,5 @@
                 "ping_succeeds_with_expected_payload_ns3::fully_used_mtu",
             ],
         },
-        {
-            type: "expect_failure_with_err_logs",
-            matchers: [
-                // TODO(https://fxbug.dev/126192): Remove this once Netstack2
-                // correctly sends link-layer frames.
-                "device_minimum_tx_frame_size_ns2::link*",
-            ],
-        },
     ],
 }

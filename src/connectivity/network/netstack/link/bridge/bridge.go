@@ -313,3 +313,11 @@ func (e *Endpoint) AddHeader(pkt stack.PacketBufferPtr) {
 		return
 	}
 }
+
+func (e *Endpoint) ParseHeader(pkt stack.PacketBufferPtr) bool {
+	// Use the first bridged endpoint.
+	for _, link := range e.links {
+		return link.ParseHeader(pkt)
+	}
+	return true
+}

@@ -174,6 +174,8 @@ func (*stubEndpoint) ARPHardwareType() header.ARPHardwareType {
 
 func (*stubEndpoint) AddHeader(stack.PacketBufferPtr) {}
 
+func (*stubEndpoint) ParseHeader(stack.PacketBufferPtr) bool { return true }
+
 func (e *stubEndpoint) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) {
 	i := 0
 	for _, pkt := range pkts.AsSlice() {

@@ -25,9 +25,6 @@ tests_with_err_logs = [
     label = "dhcp-client"
   },
   {
-    label = "device"
-  },
-  {
     label = "dns"
   },
   {
