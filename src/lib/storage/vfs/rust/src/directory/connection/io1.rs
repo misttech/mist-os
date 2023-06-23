@@ -245,16 +245,8 @@ where
                 fuchsia_trace::duration!("storage", "Directory::SetFlags");
                 responder.send(zx::Status::NOT_SUPPORTED.into_raw())?;
             }
-            fio::DirectoryRequest::Open { flags, mode, path, object, control_handle: _ } => {
+            fio::DirectoryRequest::Open { flags, mode: _, path, object, control_handle: _ } => {
                 fuchsia_trace::duration!("storage", "Directory::Open");
-                // Temporarily allow clients that send POSIX modes when creating directories to succeed.
-                //
-                // TODO(https://fxbug.dev/120673): Remove this when all downstream consumers contain this commit.
-                let flags = if mode.bits() & fio::MODE_TYPE_MASK == fio::MODE_TYPE_DIRECTORY {
-                    flags | fio::OpenFlags::DIRECTORY
-                } else {
-                    flags
-                };
                 self.handle_open(flags, path, object);
             }
             fio::DirectoryRequest::Open2 {

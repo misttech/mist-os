@@ -97,7 +97,9 @@ const OPEN_RIGHTS OpenFlags
 const OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE OpenFlags
         = OpenFlags.DIRECTORY | OpenFlags.NOT_DIRECTORY | OpenFlags.DESCRIBE | OpenFlags.NODE_REFERENCE;
 
-type ModeType = flexible bits : uint32 {};
+type ModeType = strict bits : uint32 {
+    DO_NOT_USE = 0x80000000;
+};
 
 /// The maximal buffer size which can be transmitted for buffered operations.
 /// This capacity is currently set somewhat arbitrarily.

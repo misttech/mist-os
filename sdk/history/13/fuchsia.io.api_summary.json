@@ -1173,9 +1173,14 @@
         "value": "65536"
     },
     {
+        "kind": "bits/member",
+        "name": "fuchsia.io/ModeType.DO_NOT_USE",
+        "value": "2147483648"
+    },
+    {
         "kind": "bits",
         "name": "fuchsia.io/ModeType",
-        "strictness": "flexible",
+        "strictness": "strict",
         "type": "uint32"
     },
     {

@@ -110,10 +110,8 @@ TEST_F(ServiceTest, CanOpenAsAService) {
       fuchsia::io::OpenFlags::RIGHT_READABLE, fuchsia::io::OpenFlags::RIGHT_WRITABLE,
       fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::NOT_DIRECTORY};
 
-  fuchsia::io::ModeType mode;
   for (fuchsia::io::OpenFlags flag : flags) {
-    SCOPED_TRACE("flag: " + std::to_string(static_cast<uint32_t>(flag)) +
-                 ", mode: " + std::to_string(static_cast<uint32_t>(mode)));
+    SCOPED_TRACE("flag: " + std::to_string(static_cast<uint32_t>(flag)));
     test::placeholders::EchoSyncPtr ptr;
     dir_ptr()->Open(flag, {}, service_name(),
                     fidl::InterfaceRequest<fuchsia::io::Node>(ptr.NewRequest().TakeChannel()));

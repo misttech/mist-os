@@ -250,30 +250,6 @@ void main() {
       });
     });
 
-    test('open passes with any mode', () async {
-      PseudoDir dir = PseudoDir();
-      final modes = [
-        modeProtectionMask,
-        modeTypeBlockDevice,
-        modeTypeDirectory,
-        modeTypeFile,
-        modeTypeService,
-      ];
-
-      for (final entry in modes.asMap().entries) {
-        DirectoryProxy proxy = DirectoryProxy();
-        final status = dir.connect(OpenFlags.describe, ModeType(entry.value),
-            InterfaceRequest(proxy.ctrl.request().passChannel()));
-        expect(status, ZX.OK, reason: 'modeIndex: ${entry.key}');
-        await proxy.onOpen.first.then((response) {
-          expect(response.s, ZX.OK);
-          expect(response.info, isNotNull);
-        }).catchError((err) async {
-          fail(err.toString());
-        });
-      }
-    });
-
     test('open passes with valid flags', () async {
       PseudoDir dir = PseudoDir();
       final validFlags = [

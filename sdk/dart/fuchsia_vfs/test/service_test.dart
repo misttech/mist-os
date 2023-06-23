@@ -102,31 +102,6 @@ void main() {
         expect(got, str);
       }
     });
-
-    test('connect to service passes with any mode', () async {
-      var modes = [
-        io_fidl.modeProtectionMask,
-        io_fidl.modeTypeBlockDevice,
-        io_fidl.modeTypeDirectory,
-        io_fidl.modeTypeFile,
-        io_fidl.modeTypeMask,
-        io_fidl.modeTypeService,
-      ];
-      for (final mode in modes) {
-        var fs = _FsWithEchoService();
-        // connect to service
-        var echoProxy = EchoProxy();
-
-        await fs.dirProxy.open(
-            io_fidl.OpenFlags.rightReadable,
-            io_fidl.ModeType(mode),
-            Echo.$serviceName,
-            InterfaceRequest(echoProxy.ctrl.request().passChannel()));
-        String str = 'my message';
-        var got = await echoProxy.echoString(str);
-        expect(got, str);
-      }
-    });
   });
 }
 

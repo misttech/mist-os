@@ -203,13 +203,6 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
     return write_error(std::move(request->object), ZX_ERR_INVALID_ARGS);
   }
 
-  // Temporarily allow clients that send POSIX modes when creating directories to succeed.
-  //
-  // TODO(https://fxbug.dev/120673): Remove this when all downstream consumers contain this commit.
-  if (S_ISDIR(static_cast<uint32_t>(request->mode))) {
-    open_options.set_directory();
-  }
-
   FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] our options: ", options(),
                         ", incoming options: ", open_options, ", path: ", request->path);
   if (options().flags.node_reference) {
