@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/backtrace-request/backtrace-request-utils.h>
-#include <lib/backtrace-request/backtrace-request.h>
+#include "src/lib/debug/backtrace-request.h"
+
 #include <lib/zx/channel.h>
 #include <lib/zx/event.h>
 #include <lib/zx/exception.h>
@@ -15,6 +15,8 @@
 #include <thread>
 
 #include <zxtest/zxtest.h>
+
+#include "src/lib/debug/backtrace-request-utils.h"
 
 namespace {
 

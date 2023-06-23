@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/async/cpp/task.h>
-#include <lib/backtrace-request/backtrace-request-utils.h>
-#include <lib/backtrace-request/backtrace-request.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/exception.h>
 #include <lib/zx/handle.h>
@@ -22,6 +20,7 @@
 #include <crashsvc/logging.h>
 #include <inspector/inspector.h>
 
+#include "src/lib/debug/backtrace-request-utils.h"
 #include "src/lib/fsl/handles/object_info.h"
 
 namespace {

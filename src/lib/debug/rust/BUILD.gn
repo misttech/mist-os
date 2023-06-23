@@ -4,21 +4,24 @@
 
 import("//build/rust/rustc_library.gni")
 
-static_library("backtrace_sym") {
+static_library("debug_sym_for_rust") {
   visibility = [ ":*" ]
-  sources = [ "backtrace_sym.c" ]
-  deps = [ "//zircon/system/ulib/backtrace-request" ]
+  sources = [ "debug_sym_for_rust.cc" ]
+  deps = [
+    "//src/lib/debug",
+    "//src/lib/debug:backtrace-request",
+  ]
 }
 
 rustc_library("rust") {
-  name = "backtrace_request"
+  name = "debug"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
 
   sources = [ "src/lib.rs" ]
 
-  non_rust_deps = [ ":backtrace_sym" ]
+  non_rust_deps = [ ":debug_sym_for_rust" ]
 }
 
 group("tests") {

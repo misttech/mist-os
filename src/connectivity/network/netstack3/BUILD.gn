@@ -27,6 +27,7 @@ common_deps = [
   "//src/lib/async-utils",
   "//src/lib/const-unwrap",
   "//src/lib/cstr",
+  "//src/lib/debug/rust",
   "//src/lib/diagnostics/inspect/runtime/rust",
   "//src/lib/diagnostics/inspect/rust",
   "//src/lib/fidl/rust/fidl",
@@ -53,7 +54,6 @@ common_deps = [
   "//third_party/rust_crates:rand",
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:tracing",
-  "//zircon/system/ulib/backtrace-request/rust",
 ]
 
 common_test_deps = [

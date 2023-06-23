@@ -4,7 +4,6 @@
 
 #include <assert.h>
 #include <inttypes.h>
-#include <lib/backtrace-request/backtrace-request.h>
 #include <lib/zx/exception.h>
 #include <lib/zx/thread.h>
 #include <link.h>
@@ -28,6 +27,7 @@
 #include "debugger.h"
 #include "inferior-control.h"
 #include "inferior.h"
+#include "src/lib/debug/backtrace-request.h"
 #include "utils.h"
 
 namespace {

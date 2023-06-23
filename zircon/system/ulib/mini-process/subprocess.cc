@@ -4,9 +4,9 @@
 
 #include "subprocess.h"
 
-#include <lib/backtrace-request/backtrace-request.h>
-
 #include <mini-process/mini-process.h>
+
+#include "src/lib/debug/backtrace-request.h"
 
 // This file is compiled into an hermetic code blob using minipr_thread_loop as
 // the entry-point symbol. It can have whatever other code it needs, and can

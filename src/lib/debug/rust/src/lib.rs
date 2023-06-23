@@ -13,11 +13,20 @@ pub fn backtrace_request_current_thread() {
     unsafe { ext::backtrace_request_current_thread_for_rust() };
 }
 
+pub fn is_debugger_attached() -> bool {
+    unsafe { ext::is_debugger_attached_for_rust() }
+}
+
+pub fn wait_for_debugger(seconds: u32) {
+    unsafe { ext::wait_for_debugger_for_rust(seconds) };
+}
+
 mod ext {
-    #[link(name = "backtrace-request", kind = "static")]
     extern "C" {
         pub(crate) fn backtrace_request_all_threads_for_rust();
         pub(crate) fn backtrace_request_current_thread_for_rust();
+        pub(crate) fn is_debugger_attached_for_rust() -> bool;
+        pub(crate) fn wait_for_debugger_for_rust(seconds: u32);
     }
 }
 

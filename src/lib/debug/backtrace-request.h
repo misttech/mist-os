@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BACKTRACE_REQUEST_BACKTRACE_REQUEST_H_
-#define BACKTRACE_REQUEST_BACKTRACE_REQUEST_H_
+#ifndef SRC_LIB_DEBUG_BACKTRACE_REQUEST_H_
+#define SRC_LIB_DEBUG_BACKTRACE_REQUEST_H_
 
 #include <stdint.h>
 #include <zircon/compiler.h>
@@ -51,4 +51,4 @@ __ALWAYS_INLINE static inline void backtrace_request_current_thread(void) {
 #endif
 }
 
-#endif  // BACKTRACE_REQUEST_BACKTRACE_REQUEST_H_
+#endif  // SRC_LIB_DEBUG_BACKTRACE_REQUEST_H_

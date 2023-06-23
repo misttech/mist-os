@@ -153,12 +153,20 @@ other critical system functions.
 
 You can debug running drivers by attaching to the driver hosts, which can be listed by
 `ffx driver list-hosts`. Initialization of the driver can be delayed by calling `WaitForDebugger()`,
-given the driver is not depended by the debugger.
+given the driver is not depended by the debugger. In C++, use
 
 ```cpp
+// Add //src/lib/debug to the dependency.
 #include "src/lib/debug/debug.h"
 
 debug::WaitForDebugger();
+```
+
+or in Rust:
+
+```rust
+// Add //src/lib/debug/rust to the dependency.
+debug::wait_for_debugger(60);
 ```
 
 Once the debugger is attached, `WaitForDebugger()` will trigger a software breakpoint.

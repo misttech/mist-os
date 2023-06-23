@@ -147,7 +147,7 @@ impl DiagnosticsHandler {
                         "Requesting stack trace to logs as requested by {}, this is not a crash.",
                         fnet_debug::DiagnosticsMarker::DEBUG_NAME
                     );
-                    backtrace_request::backtrace_request_all_threads();
+                    debug::backtrace_request_all_threads();
                     responder.send()
                 }
                 fnet_debug::DiagnosticsRequest::GetProcessHandleForInspection { responder } => {

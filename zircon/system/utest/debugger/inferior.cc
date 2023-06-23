@@ -7,7 +7,6 @@
 #include <assert.h>
 #include <dlfcn.h>
 #include <inttypes.h>
-#include <lib/backtrace-request/backtrace-request.h>
 #include <lib/zx/thread.h>
 #include <link.h>
 #include <stdlib.h>
@@ -29,6 +28,7 @@
 
 #include "crash-and-recover.h"
 #include "debugger.h"
+#include "src/lib/debug/backtrace-request.h"
 #include "utils.h"
 
 namespace {

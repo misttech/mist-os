@@ -99,7 +99,7 @@ source_set("src") {
     "//src/graphics/lib/magma/src/magma_util/platform:trace",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:interrupt",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:mmio",
-    "//zircon/system/ulib/backtrace-request",
+    "//src/lib/debug:backtrace-request",
   ]
 
   public_deps = [

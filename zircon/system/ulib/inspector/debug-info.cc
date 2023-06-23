@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <inttypes.h>
-#include <lib/backtrace-request/backtrace-request-utils.h>
 #include <lib/zx/process.h>
 #include <lib/zx/thread.h>
 #include <string.h>
@@ -20,6 +19,7 @@
 #include <inspector/inspector.h>
 
 #include "gwp-asan.h"
+#include "src/lib/debug/backtrace-request-utils.h"
 
 namespace {
 

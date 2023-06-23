@@ -55,7 +55,7 @@ request. It requires modifying your source, but in the absence of a
 debugger, or as a general builtin debug mechanism, this can be useful.
 
 ```
-#include <lib/backtrace-request/backtrace-request.h>
+#include "src/lib/debug/backtrace-request.h"
 
 void my_function() {
   backtrace_request_all_threads();

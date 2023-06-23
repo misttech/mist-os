@@ -253,7 +253,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/system/ulib/async-default:*",
     "//zircon/system/ulib/async-loop:*",
     "//zircon/system/ulib/async-testing:*",
-    "//zircon/system/ulib/backtrace-request:*",
     "//zircon/system/ulib/bitmap:*",
     "//zircon/system/ulib/closure-queue:*",
     "//zircon/system/ulib/cmdline:*",

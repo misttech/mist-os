@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/backtrace-request/backtrace-request.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "ftl_private.h"
 #include "kernel.h"
+#include "src/lib/debug/backtrace-request.h"
 
 SEM FileSysSem;         // Global File System Semaphore
 static int g_fs_error;  // File system error code (FsError enum).

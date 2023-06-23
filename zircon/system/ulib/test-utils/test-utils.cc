@@ -4,7 +4,6 @@
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.process/cpp/wire.h>
-#include <lib/backtrace-request/backtrace-request.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/io.h>
@@ -28,6 +27,8 @@
 
 #include <fbl/unique_fd.h>
 #include <test-utils/test-utils.h>
+
+#include "src/lib/debug/backtrace-request.h"
 
 #define TU_FAIL_ERRCODE 10
 

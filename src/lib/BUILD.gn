@@ -87,6 +87,7 @@ group("tests") {
     "cutex:tests",
     "ddk:tests",
     "ddktl:tests",
+    "debug:tests",
     "diagnostics:tests",
     "digest:tests",
     "directed_graph:tests",

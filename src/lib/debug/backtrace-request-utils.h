@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BACKTRACE_REQUEST_BACKTRACE_REQUEST_UTILS_H_
-#define BACKTRACE_REQUEST_BACKTRACE_REQUEST_UTILS_H_
+#ifndef SRC_LIB_DEBUG_BACKTRACE_REQUEST_UTILS_H_
+#define SRC_LIB_DEBUG_BACKTRACE_REQUEST_UTILS_H_
 
 #include <zircon/syscalls/debug.h>
 #include <zircon/syscalls/exception.h>
@@ -25,4 +25,4 @@ bool is_backtrace_request_current_thread(const zx_thread_state_general_regs_t* r
 // |regs| may be modified by this function.
 zx_status_t cleanup_backtrace_request(zx_handle_t thread, zx_thread_state_general_regs_t* regs);
 
-#endif  // BACKTRACE_REQUEST_BACKTRACE_REQUEST_UTILS_H_
+#endif  // SRC_LIB_DEBUG_BACKTRACE_REQUEST_UTILS_H_

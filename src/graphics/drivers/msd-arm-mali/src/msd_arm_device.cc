@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <lib/async/cpp/task.h>
-#include <lib/backtrace-request/backtrace-request.h>
 #include <lib/fit/defer.h>
 
 #include <bitset>
@@ -27,6 +26,7 @@
 #include "src/graphics/drivers/msd-arm-mali/include/magma_vendor_queries.h"
 #include "src/graphics/drivers/msd-arm-mali/src/job_scheduler.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
+#include "src/lib/debug/backtrace-request.h"
 #include "string_printf.h"
 
 using std::chrono_literals::operator""ms;

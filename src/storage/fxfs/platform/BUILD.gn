@@ -80,7 +80,7 @@ rustc_library("platform") {
       "//third_party/zstd",
     ]
     if (is_debug) {
-      deps += [ "//zircon/system/ulib/backtrace-request/rust" ]
+      deps += [ "//src/lib/debug/rust" ]
     }
     test_deps += [
       "//sdk/fidl/fuchsia.device:fuchsia.device_rust",

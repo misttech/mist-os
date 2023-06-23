@@ -16,7 +16,7 @@ macro_rules! debug_assert_not_too_long {
                         () = fuchsia_async::Timer::new(std::time::Duration::from_secs(60)).fuse() =>
                             {
                                 #[cfg(target_os = "fuchsia")]
-                                backtrace_request::backtrace_request_all_threads();
+                                debug::backtrace_request_all_threads();
                                 #[cfg(not(target_os = "fuchsia"))]
                                 panic!($($arg),*);
                             }

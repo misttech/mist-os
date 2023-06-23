@@ -34,8 +34,8 @@ source_set("no_hooks") {
   deps = [
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
+    "//src/lib/debug:backtrace-request",
     "//third_party/modp_b64",
-    "//zircon/system/ulib/backtrace-request",
   ]
 }
 

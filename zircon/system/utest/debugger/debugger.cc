@@ -6,7 +6,6 @@
 
 #include <assert.h>
 #include <inttypes.h>
-#include <lib/backtrace-request/backtrace-request.h>
 #include <lib/zx/exception.h>
 #include <lib/zx/thread.h>
 #include <link.h>
@@ -29,6 +28,7 @@
 #include "crash-and-recover.h"
 #include "inferior-control.h"
 #include "inferior.h"
+#include "src/lib/debug/backtrace-request.h"
 #include "utils.h"
 
 namespace {
@@ -52,7 +52,7 @@ void handle_expected_page_fault(zx_handle_t inferior, const zx_exception_info_t*
 
   fix_inferior_segv(thread.get(), "handle_expected_page_fault");
   // Useful for debugging, otherwise a bit too verbose.
-  //dump_inferior_regs(thread.get());
+  // dump_inferior_regs(thread.get());
 
   // Increment this before resuming the inferior in case the inferior
   // sends RESP_RECOVERED_FROM_CRASH and the testcase processes the message

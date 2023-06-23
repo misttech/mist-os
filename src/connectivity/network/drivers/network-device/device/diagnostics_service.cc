@@ -4,9 +4,8 @@
 
 #include "diagnostics_service.h"
 
-#include <lib/backtrace-request/backtrace-request.h>
-
 #include "log.h"
+#include "src/lib/debug/backtrace-request.h"
 
 namespace network {
 

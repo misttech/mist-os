@@ -57,10 +57,14 @@ hermetic_code_blob("subprocess.blob") {
   sources = [ "subprocess.cc" ]
   deps = [
     ":headers",
-    "///src/zircon/lib/zircon:headers",
-    "//zircon/system/ulib/backtrace-request",
+    "//src/lib/debug:backtrace-request",
+    "//src/zircon/lib/zircon:headers",
     "//zircon/system/ulib/c/string:hermetic",
   ]
+
+  # This target is built without `//` in the default include dirs but
+  # backtrace-request is included using an absolute path.
+  include_dirs = [ "//" ]
 
   # TODO(fxbug.dev/129545): subprocess crashes when built with thinlto on riscv
   if (current_cpu == "riscv64") {

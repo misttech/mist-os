@@ -20,7 +20,7 @@ bool IsDebuggerAttached() {
   return break_on_load;
 }
 
-void WaitForDebugger(int seconds) {
+void WaitForDebugger(uint32_t seconds) {
   while (seconds-- && !IsDebuggerAttached()) {
     sleep(1);
   }

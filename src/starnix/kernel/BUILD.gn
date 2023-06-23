@@ -71,6 +71,7 @@ rustc_binary("starnix_kernel_bin") {
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
     "//src/connectivity/network/netlink",
     "//src/graphics/lib/magma/src/libmagma",
+    "//src/lib/debug/rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fdio/rust:fdio",
@@ -129,7 +130,6 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:utf8parse",
     "//third_party/rust_crates:vk-sys",
     "//third_party/rust_crates:zerocopy",
-    "//zircon/system/ulib/backtrace-request/rust",
   ]
 
   # TODO(fxbug.dev/128554): Add VDSO for RISC-V.

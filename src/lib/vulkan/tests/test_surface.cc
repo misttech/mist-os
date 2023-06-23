@@ -4,7 +4,6 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
-#include <lib/backtrace-request/backtrace-request.h>
 #include <lib/zx/channel.h>
 
 #include <cstdio>
@@ -12,6 +11,8 @@
 
 #include <gtest/gtest.h>
 #include <vulkan/vulkan.h>
+
+#include "src/lib/debug/backtrace-request.h"
 
 class TestSurface {
  public:

@@ -5,10 +5,11 @@
 #include "src/lib/async-watchdog/watchdog.h"
 
 #include <lib/async/cpp/time.h>
-#include <lib/backtrace-request/backtrace-request.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <mutex>
+
+#include "src/lib/debug/backtrace-request.h"
 
 namespace async_watchdog {
 

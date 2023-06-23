@@ -115,7 +115,7 @@ if (is_fuchsia) {
     "//third_party/rust_crates:scopeguard",
   ]
   if (is_debug) {
-    fxfs_deps += [ "//zircon/system/ulib/backtrace-request/rust" ]
+    fxfs_deps += [ "//src/lib/debug/rust" ]
   }
   fxfs_test_deps += [
     "//src/storage/bin/blobfs:blobfs-component",

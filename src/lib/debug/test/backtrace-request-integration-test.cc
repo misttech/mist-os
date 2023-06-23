@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/backtrace-request/backtrace-request.h>
-
 #include <thread>
 
 #include <zxtest/zxtest.h>
+
+#include "src/lib/debug/backtrace-request.h"
 
 // We can't easily verify the backtrace contents, but this at least checks
 // that we properly resume after requesting a backtrace. If we either hang

@@ -4,7 +4,6 @@
 
 #include "src/sys/fuzzing/realmfuzzer/target/process.h"
 
-#include <lib/backtrace-request/backtrace-request.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -13,6 +12,7 @@
 #include <iomanip>
 #include <iostream>
 
+#include "src/lib/debug/backtrace-request.h"
 #include "src/sys/fuzzing/common/module.h"
 #include "src/sys/fuzzing/common/options.h"
 #include "src/sys/fuzzing/realmfuzzer/target/weak-symbols.h"

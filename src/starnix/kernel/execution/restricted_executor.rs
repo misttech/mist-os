@@ -344,7 +344,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                         // handlers to delegate to when using in-thread exceptions so we will request a backtrace
                         // for the thread and exit.
                         generate_cfi_directives!(state);
-                        backtrace_request::backtrace_request_current_thread();
+                        debug::backtrace_request_current_thread();
                         restore_cfi_directives!();
                         return Ok(current_task.task.read().exit_status.as_ref().unwrap().clone());
                     }
@@ -379,7 +379,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                 log_trace!("requesting backtrace");
                 // (Re)-generate CFI directives so that stack unwinders will trace into the Linux state.
                 generate_cfi_directives!(state);
-                backtrace_request::backtrace_request_current_thread();
+                debug::backtrace_request_current_thread();
                 restore_cfi_directives!();
             }
             return Ok(exit_status);

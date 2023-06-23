@@ -127,7 +127,7 @@ executable("backtrace_request") {
   sources = [ "backtrace_request.cc" ]
 
   deps = [
-    "//zircon/system/ulib/backtrace-request",
+    "//src/lib/debug:backtrace-request",
     "//zircon/system/ulib/zx",
   ]
 }

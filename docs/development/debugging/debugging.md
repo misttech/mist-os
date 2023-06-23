@@ -61,11 +61,11 @@ $ ffx log
 Akin to printf debugging, one can request crashsvc to print a backtrace at a
 particular point in your code.
 
-Include this header from zircon's backtrace-request library, which you must
+Include this header from `//src/lib/debug` library, which you must
 depend on in your target's BUILD.gn rules:
 
 ```
-#include <lib/backtrace-request/backtrace-request.h>
+#include "src/lib/debug/backtrace-request.h"
 ```
 
 and then add the following where you want the backtrace printed:

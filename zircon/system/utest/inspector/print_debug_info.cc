@@ -1,7 +1,6 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include <lib/backtrace-request/backtrace-request.h>
 #include <lib/zx/event.h>
 #include <lib/zx/exception.h>
 #include <lib/zx/process.h>
@@ -15,6 +14,8 @@
 
 #include <inspector/inspector.h>
 #include <zxtest/zxtest.h>
+
+#include "src/lib/debug/backtrace-request.h"
 
 namespace {
 

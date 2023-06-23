@@ -1,11 +1,12 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include <lib/backtrace-request/backtrace-request.h>
 #include <lib/zx/event.h>
 #include <stdio.h>
 
 #include <thread>
+
+#include "src/lib/debug/backtrace-request.h"
 
 // Program that sets up a number on thread at the cusp of some recursive calls and then calls a
 // backtrace request in order to get all of them printed.

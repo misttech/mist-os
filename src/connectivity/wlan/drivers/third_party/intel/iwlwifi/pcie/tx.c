@@ -36,7 +36,7 @@
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/tx.h"
 
-#include <lib/backtrace-request/backtrace-request.h>
+#include "src/lib/debug/backtrace-request.h"
 #include <zircon/status.h>
 #include <zircon/types.h>
 

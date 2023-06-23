@@ -3,6 +3,27 @@
 # found in the LICENSE file.
 
 static_library("debug") {
-  sources = [ "debug.cc" ]
   public = [ "debug.h" ]
+  sources = [ "debug.cc" ]
+}
+
+# Library to request a backtrace.
+source_set("backtrace-request") {
+  public = [ "backtrace-request.h" ]
+  public_deps = [ "//zircon/system/public" ]
+}
+
+# Internal library to request, detect, and clean up backtrace requests.
+static_library("backtrace-request-utils") {
+  public = [ "backtrace-request-utils.h" ]
+  sources = [ "backtrace-request-utils.cc" ]
+  deps = [ ":backtrace-request" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    "rust:tests",
+    "test:tests",
+  ]
 }

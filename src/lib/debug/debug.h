@@ -5,6 +5,8 @@
 #ifndef SRC_LIB_DEBUG_DEBUG_H_
 #define SRC_LIB_DEBUG_DEBUG_H_
 
+#include <cstdint>
+
 namespace debug {
 
 // Return whether there's a debugger attached to the current process.
@@ -15,7 +17,7 @@ bool IsDebuggerAttached();
 //
 // If there's no debugger attached within |seconds| seconds, the breakpoint will
 // still be issued and the process will crash.
-void WaitForDebugger(int seconds = 60);
+void WaitForDebugger(uint32_t seconds = 60);
 
 }  // namespace debug
 
