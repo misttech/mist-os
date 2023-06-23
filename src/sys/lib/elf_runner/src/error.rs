@@ -26,20 +26,22 @@ pub enum ElfRunnerError {
     ExceptionRegistrationFailed { url: String, status: zx::Status },
     #[error("failed to retrieve process koid for component with url \"{}\": {}", url, status)]
     ProcessIdRetrieveFailed { url: String, status: zx::Status },
-    #[error("failed to retrieve job koid for component with url \"{}\": {}", url, status)]
-    JobIdRetrieveFailed { url: String, status: zx::Status },
-    #[error("failed to set job policy for component with url \"{}\": {}", url, status)]
-    JobPolicySetFailed { url: String, status: zx::Status },
-    #[error("failed to create job for component with url \"{}\": {}", url, status)]
-    JobCreationFailed { url: String, status: zx::Status },
-    #[error("failed to duplicate job for component with url \"{}\": {}", url, status)]
-    JobDuplicationFailed { url: String, status: zx::Status },
     #[error(
         "failed to mark main process as critical for component with url \"{}\": {}",
         url,
         status
     )]
     ProcessCriticalMarkFailed { url: String, status: zx::Status },
+    #[error("could not create job for component with url \"{}\": {}", url, err)]
+    JobError {
+        url: String,
+        #[source]
+        err: JobError,
+    },
+    #[error("failed to duplicate job for component with url \"{}\": {}", url, status)]
+    JobDuplicationFailed { url: String, status: zx::Status },
+    #[error("failed to get job koid for component with url \"{}\": {}", url, status)]
+    JobGetKoidFailed { url: String, status: zx::Status },
     #[error("failed to use next vDSO for component with url \"{}\": {}", url, err)]
     NextVDSOError {
         url: String,
@@ -129,18 +131,6 @@ impl ElfRunnerError {
         ElfRunnerError::ProcessIdRetrieveFailed { url: url.into(), status }
     }
 
-    pub fn job_id_retrieve_failed(url: impl Into<String>, status: zx::Status) -> ElfRunnerError {
-        ElfRunnerError::JobIdRetrieveFailed { url: url.into(), status }
-    }
-
-    pub fn job_policy_set_failed(url: impl Into<String>, status: zx::Status) -> ElfRunnerError {
-        ElfRunnerError::JobPolicySetFailed { url: url.into(), status }
-    }
-
-    pub fn job_creation_failed(url: impl Into<String>, status: zx::Status) -> ElfRunnerError {
-        ElfRunnerError::JobCreationFailed { url: url.into(), status }
-    }
-
     pub fn job_duplication_failed(url: impl Into<String>, status: zx::Status) -> ElfRunnerError {
         ElfRunnerError::JobDuplicationFailed { url: url.into(), status }
     }
@@ -150,6 +140,10 @@ impl ElfRunnerError {
         status: zx::Status,
     ) -> ElfRunnerError {
         ElfRunnerError::ProcessCriticalMarkFailed { url: url.into(), status }
+    }
+
+    pub fn job_error(url: impl Into<String>, err: JobError) -> ElfRunnerError {
+        ElfRunnerError::JobError { url: url.into(), err }
     }
 
     pub fn next_vdso_error(url: impl Into<String>, err: VdsoError) -> ElfRunnerError {
@@ -191,4 +185,13 @@ pub enum ConfigError {
     VmoWrite(zx::Status),
     #[error("encountered an unrecognized variant of fuchsia.mem.Data")]
     UnrecognizedDataVariant,
+}
+
+/// Errors from creating and initializing a component's job.
+#[derive(Debug, Clone, Error)]
+pub enum JobError {
+    #[error("failed to set job policy: {}", status)]
+    SetPolicy { status: zx::Status },
+    #[error("failed to create child job: {}", status)]
+    CreateChild { status: zx::Status },
 }

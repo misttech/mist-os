@@ -17,7 +17,7 @@ use {
     self::{
         component::ElfComponent,
         config::ElfProgramConfig,
-        error::{ConfigError, ElfRunnerError},
+        error::{ConfigError, ElfRunnerError, JobError},
         launcher::ProcessLauncherConnector,
         runtime_dir::RuntimeDirBuilder,
         stdout::bind_streams_to_syslog,
@@ -40,8 +40,7 @@ use {
     fuchsia_async::{self as fasync, TimeoutExt},
     fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType},
     fuchsia_zircon::{
-        self as zx, AsHandleRef, Clock, Duration, HandleBased, Job, ProcessInfo, Signals, Status,
-        Time, Vmo,
+        self as zx, AsHandleRef, Duration, HandleBased, ProcessInfo, Signals, Status, Time,
     },
     futures::channel::oneshot,
     moniker::AbsoluteMoniker,
@@ -63,32 +62,36 @@ const MAX_WAIT_BREAK_ON_START: Duration = Duration::from_millis(300);
 // timers in Scenic and other system services.
 const TIMER_SLACK_DURATION: zx::Duration = zx::Duration::from_micros(50);
 
+// Rights used when duplicating the UTC clock handle.
+//
+// The bitwise `|` operator for `bitflags` is implemented through the `std::ops::BitOr` trait,
+// which cannot be used in a const context. The workaround is to bitwise OR the raw bits.
+const DUPLICATE_CLOCK_RIGHTS: zx::Rights = zx::Rights::from_bits_truncate(
+    zx::Rights::READ.bits()
+        | zx::Rights::WAIT.bits()
+        | zx::Rights::DUPLICATE.bits()
+        | zx::Rights::TRANSFER.bits(),
+);
+
 // Builds and serves the runtime directory
 /// Runs components with ELF binaries.
 pub struct ElfRunner {
     launcher_connector: ProcessLauncherConnector,
+
     /// If `utc_clock` is populated then that Clock's handle will
     /// be passed into the newly created process. Otherwise, the UTC
     /// clock will be duplicated from current process' process table.
     /// The latter is typically the case in unit tests and nested
     /// component managers.
-    utc_clock: Option<Arc<Clock>>,
+    utc_clock: Option<Arc<zx::Clock>>,
 
     crash_records: CrashRecords,
-}
-
-struct ConfigureLauncherResult {
-    /// Populated if a UTC clock is available and has started.
-    utc_clock_xform: Option<zx::ClockTransformation>,
-    launch_info: fidl_fuchsia_process::LaunchInfo,
-    runtime_dir_builder: RuntimeDirBuilder,
-    tasks: Vec<fasync::Task<()>>,
 }
 
 impl ElfRunner {
     pub fn new(
         config: &RuntimeConfig,
-        utc_clock: Option<Arc<Clock>>,
+        utc_clock: Option<Arc<zx::Clock>>,
         crash_records: CrashRecords,
     ) -> ElfRunner {
         ElfRunner {
@@ -98,77 +101,86 @@ impl ElfRunner {
         }
     }
 
-    async fn configure_launcher(
-        &self,
-        resolved_url: &String,
-        start_info: fcrunner::ComponentStartInfo,
-        elf_config: &ElfProgramConfig,
-        job: zx::Job,
-        launcher: &fidl_fuchsia_process::LauncherProxy,
+    /// Returns a UTC clock handle.
+    ///
+    /// Duplicates `self.utc_clock` if populated, or the UTC clock assigned to the current process.
+    async fn duplicate_utc_clock(&self) -> Result<zx::Clock, zx::Status> {
+        if let Some(utc_clock) = &self.utc_clock {
+            utc_clock.duplicate_handle(DUPLICATE_CLOCK_RIGHTS)
+        } else {
+            duplicate_utc_clock_handle(DUPLICATE_CLOCK_RIGHTS)
+        }
+    }
+
+    /// Creates a job for a component.
+    fn create_job(program_config: &ElfProgramConfig) -> Result<zx::Job, JobError> {
+        let job =
+            job_default().create_child_job().map_err(|status| JobError::CreateChild { status })?;
+
+        // Set timer slack.
+        //
+        // Why Late and not Center or Early? Timers firing a little later than requested is not
+        // uncommon in non-realtime systems. Programs are generally tolerant of some
+        // delays. However, timers firing before their deadline can be unexpected and lead to bugs.
+        job.set_policy(zx::JobPolicy::TimerSlack(
+            TIMER_SLACK_DURATION,
+            zx::JobDefaultTimerMode::Late,
+        ))
+        .map_err(|status| JobError::SetPolicy { status })?;
+
+        // Prevent direct creation of processes.
+        //
+        // The kernel-level mechanisms for creating processes are very low-level. We require that
+        // all processes be created via fuchsia.process.Launcher in order for the platform to
+        // maintain change-control over how processes are created.
+        if !program_config.can_create_raw_processes() {
+            job.set_policy(zx::JobPolicy::Basic(
+                zx::JobPolicyOption::Absolute,
+                vec![(zx::JobCondition::NewProcess, zx::JobAction::Deny)],
+            ))
+            .map_err(|status| JobError::SetPolicy { status })?;
+        }
+
+        // Default deny the job policy which allows ambiently marking VMOs executable, i.e. calling
+        // vmo_replace_as_executable without an appropriate resource handle.
+        if !program_config.has_ambient_mark_vmo_exec() {
+            job.set_policy(zx::JobPolicy::Basic(
+                zx::JobPolicyOption::Absolute,
+                vec![(zx::JobCondition::AmbientMarkVmoExec, zx::JobAction::Deny)],
+            ))
+            .map_err(|status| JobError::SetPolicy { status })?;
+        }
+
+        Ok(job)
+    }
+
+    fn encoded_config_into_vmo(encoded_config: fmem::Data) -> Result<zx::Vmo, ConfigError> {
+        match encoded_config {
+            fmem::Data::Buffer(fmem::Buffer {
+                vmo,
+                size: _, // we get this vmo from component manager which sets the content size
+            }) => Ok(vmo),
+            fmem::Data::Bytes(bytes) => {
+                let size = bytes.len() as u64;
+                let vmo = zx::Vmo::create(size).map_err(ConfigError::VmoCreate)?;
+                vmo.write(&bytes, 0).map_err(ConfigError::VmoWrite)?;
+                Ok(vmo)
+            }
+            _ => Err(ConfigError::UnrecognizedDataVariant.into()),
+        }
+    }
+
+    fn create_handle_infos(
+        outgoing_dir: Option<zx::Channel>,
         lifecycle_server: Option<zx::Channel>,
+        utc_clock: zx::Clock,
         custom_vdso: Option<zx::Vmo>,
         direct_vdso: Option<zx::Vmo>,
-    ) -> Result<Option<ConfigureLauncherResult>, ElfRunnerError> {
-        let bin_path = runner::get_program_binary(&start_info)
-            .map_err(|err| ElfRunnerError::ProgramBinaryError { url: resolved_url.clone(), err })?;
-
-        let args = runner::get_program_args(&start_info);
-
-        let stdout_sink = elf_config.get_stdout_sink();
-        let stderr_sink = elf_config.get_stderr_sink();
-
-        let clock_rights =
-            zx::Rights::READ | zx::Rights::WAIT | zx::Rights::DUPLICATE | zx::Rights::TRANSFER;
-        let utc_clock = if let Some(utc_clock) = &self.utc_clock {
-            utc_clock.duplicate_handle(clock_rights)
-        } else {
-            duplicate_utc_clock_handle(clock_rights)
-        }
-        .map_err(|s| ElfRunnerError::UtcClockDuplicateFailed {
-            url: resolved_url.clone(),
-            status: s,
-        })?;
-
-        // TODO(fxbug.dev/45586): runtime_dir may be unavailable in tests. We should fix tests so
-        // that we don't have to have this check here.
-        let runtime_dir_builder = match start_info.runtime_dir {
-            Some(dir) => RuntimeDirBuilder::new(dir).args(args.clone()),
-            None => return Ok(None),
-        };
-
-        let utc_clock_started = fasync::OnSignals::new(&utc_clock, Signals::CLOCK_STARTED)
-            .on_timeout(Time::after(Duration::default()), || Err(Status::TIMED_OUT))
-            .await
-            .is_ok();
-        let utc_clock_xform = if utc_clock_started {
-            utc_clock.get_details().map(|details| details.mono_to_synthetic).ok()
-        } else {
-            None
-        };
-
-        let name = Path::new(&resolved_url)
-            .file_name()
-            .ok_or(ElfRunnerError::BadResolvedUrl(resolved_url.clone()))?
-            .to_str()
-            .ok_or(ElfRunnerError::BadResolvedUrl(resolved_url.clone()))?;
-
-        // Convert the directories into proxies, so we can find "/pkg" and open "lib" and bin_path
-        let ns = runner::component::ComponentNamespace::try_from(
-            start_info.ns.unwrap_or_else(|| vec![]),
-        )
-        .map_err(|err| ElfRunnerError::ComponentNamespaceError {
-            url: resolved_url.clone(),
-            err,
-        })?;
-
-        let (stdout_and_stderr_tasks, stdout_and_stderr_handles) =
-            bind_streams_to_syslog(&ns, stdout_sink, stderr_sink);
-
+        config_vmo: Option<zx::Vmo>,
+    ) -> Vec<fproc::HandleInfo> {
         let mut handle_infos = vec![];
 
-        handle_infos.extend(stdout_and_stderr_handles);
-
-        if let Some(outgoing_dir) = start_info.outgoing_dir {
+        if let Some(outgoing_dir) = outgoing_dir {
             handle_infos.push(fproc::HandleInfo {
                 handle: outgoing_dir.into_handle(),
                 id: HandleInfo::new(HandleType::DirectoryRequest, 0).as_raw(),
@@ -201,58 +213,14 @@ impl ElfRunner {
             });
         }
 
-        if let Some(encoded) = start_info.encoded_config {
-            let handle = match encoded {
-                fmem::Data::Buffer(fmem::Buffer {
-                    vmo,
-                    size: _, // we get this vmo from component manager which sets the content size
-                }) => vmo.into_handle(),
-                fmem::Data::Bytes(bytes) => {
-                    let size = bytes.len() as u64;
-                    let vmo = Vmo::create(size).map_err(ConfigError::VmoCreate)?;
-                    vmo.write(&bytes, 0).map_err(ConfigError::VmoWrite)?;
-                    vmo.into_handle()
-                }
-                _ => return Err(ConfigError::UnrecognizedDataVariant.into()),
-            };
+        if let Some(config_vmo) = config_vmo {
             handle_infos.push(fproc::HandleInfo {
-                handle,
+                handle: config_vmo.into_handle(),
                 id: HandleInfo::new(HandleType::ComponentConfigVmo, 0).as_raw(),
             });
         }
 
-        if let Some(handles) = start_info.numbered_handles {
-            handle_infos.extend(handles);
-        }
-
-        // Load the component
-        let launch_info =
-            runner::component::configure_launcher(runner::component::LauncherConfigArgs {
-                bin_path: &bin_path,
-                name: &name,
-                options: elf_config.process_options(),
-                args: Some(args),
-                ns: ns,
-                job: Some(job),
-                handle_infos: Some(handle_infos),
-                name_infos: None,
-                environs: elf_config.get_environ(),
-                launcher: &launcher,
-                loader_proxy_chan: None,
-                executable_vmo: None,
-            })
-            .await
-            .map_err(|err| ElfRunnerError::ConfigureLauncherError {
-                url: resolved_url.clone(),
-                err,
-            })?;
-
-        Ok(Some(ConfigureLauncherResult {
-            utc_clock_xform,
-            launch_info,
-            runtime_dir_builder,
-            tasks: stdout_and_stderr_tasks,
-        }))
+        handle_infos
     }
 
     pub async fn start_component(
@@ -297,6 +265,7 @@ impl ElfRunner {
         resolved_url: String,
         program_config: ElfProgramConfig,
     ) -> Result<Option<ElfComponent>, ElfRunnerError> {
+        // Connect to `fuchsia.process.Launcher`.
         let launcher = self.launcher_connector.connect().map_err(|err| {
             ElfRunnerError::ProcessLauncherConnectError {
                 url: resolved_url.clone(),
@@ -304,116 +273,142 @@ impl ElfRunner {
             }
         })?;
 
-        let component_job = job_default()
-            .create_child_job()
-            .map_err(|e| ElfRunnerError::job_creation_failed(resolved_url.clone(), e))?;
+        // Create a job for this component that will contain its process.
+        let job = ElfRunner::create_job(&program_config)
+            .map_err(|err| ElfRunnerError::job_error(resolved_url.clone(), err))?;
 
         crash_handler::run_exceptions_server(
-            &component_job,
+            &job,
             moniker.clone(),
             resolved_url.clone(),
             self.crash_records.clone(),
         )
         .map_err(|e| ElfRunnerError::exception_registration_failed(resolved_url.clone(), e))?;
 
-        // Set timer slack.
-        //
-        // Why Late and not Center or Early? Timers firing a little later than requested is not
-        // uncommon in non-realtime systems. Programs are generally tolerant of some
-        // delays. However, timers firing before their deadline can be unexpected and lead to bugs.
-        component_job
-            .set_policy(zx::JobPolicy::TimerSlack(
-                TIMER_SLACK_DURATION,
-                zx::JobDefaultTimerMode::Late,
-            ))
-            .map_err(|e| ElfRunnerError::job_policy_set_failed(resolved_url.clone(), e))?;
+        // Convert the directories into proxies, so we can find "/pkg" and open "lib" and bin_path
+        let ns = runner::component::ComponentNamespace::try_from(
+            start_info.ns.take().unwrap_or_else(|| vec![]),
+        )
+        .map_err(|err| ElfRunnerError::ComponentNamespaceError {
+            url: resolved_url.clone(),
+            err,
+        })?;
 
-        // Prevent direct creation of processes.
-        //
-        // The kernel-level mechanisms for creating processes are very low-level. We require that
-        // all processes be created via fuchsia.process.Launcher in order for the platform to
-        // maintain change-control over how processes are created.
-        if !program_config.can_create_raw_processes() {
-            component_job
-                .set_policy(zx::JobPolicy::Basic(
-                    zx::JobPolicyOption::Absolute,
-                    vec![(zx::JobCondition::NewProcess, zx::JobAction::Deny)],
-                ))
-                .map_err(|e| ElfRunnerError::job_policy_set_failed(resolved_url.clone(), e))?;
-        }
+        let config_vmo =
+            start_info.encoded_config.take().map(ElfRunner::encoded_config_into_vmo).transpose()?;
 
-        // Default deny the job policy which allows ambiently marking VMOs executable, i.e. calling
-        // vmo_replace_as_executable without an appropriate resource handle.
-        if !program_config.has_ambient_mark_vmo_exec() {
-            component_job
-                .set_policy(zx::JobPolicy::Basic(
-                    zx::JobPolicyOption::Absolute,
-                    vec![(zx::JobCondition::AmbientMarkVmoExec, zx::JobAction::Deny)],
-                ))
-                .map_err(|e| ElfRunnerError::job_policy_set_failed(resolved_url.clone(), e))?;
-        }
+        let custom_vdso = program_config
+            .should_use_next_vdso()
+            .then(get_next_vdso_vmo)
+            .transpose()
+            .map_err(|e| ElfRunnerError::next_vdso_error(resolved_url.clone(), e))?;
 
-        let mut custom_vdso = None;
-        if program_config.should_use_next_vdso() {
-            let next_vdso = get_next_vdso_vmo()
-                .map_err(|e| ElfRunnerError::next_vdso_error(resolved_url.clone(), e))?;
-            custom_vdso = Some(next_vdso);
-        }
-
-        let mut direct_vdso = None;
-        if program_config.should_use_direct_vdso() {
-            let vdso = get_direct_vdso_vmo()
-                .map_err(|e| ElfRunnerError::direct_vdso_error(resolved_url.clone(), e))?;
-            direct_vdso = Some(vdso);
-        }
+        let direct_vdso = program_config
+            .should_use_direct_vdso()
+            .then(get_direct_vdso_vmo)
+            .transpose()
+            .map_err(|e| ElfRunnerError::direct_vdso_error(resolved_url.clone(), e))?;
 
         let (lifecycle_client, lifecycle_server) = match program_config.notify_when_stopped() {
             true => {
                 // Creating a channel is not expected to fail.
                 let (client, server) = fidl::endpoints::create_proxy::<LifecycleMarker>().unwrap();
-                (Some(client), Some(server))
+                (Some(client), Some(server.into_channel()))
             }
             false => (None, None),
         };
-        let lifecycle_server = lifecycle_server.map(|s| s.into_channel());
 
-        let job_dup = component_job
-            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-            .map_err(|e| ElfRunnerError::job_duplication_failed(resolved_url.clone(), e))?;
+        let utc_clock = self.duplicate_utc_clock().await.map_err(|status| {
+            ElfRunnerError::UtcClockDuplicateFailed { url: resolved_url.clone(), status }
+        })?;
 
-        let break_on_start = start_info.break_on_start.take();
+        // Duplicate the clock handle again, used later to wait for the clock to start, while
+        // the original handle is passed to the process.
+        let utc_clock_dup =
+            utc_clock.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(|status| {
+                ElfRunnerError::UtcClockDuplicateFailed { url: resolved_url.clone(), status }
+            })?;
 
-        let (utc_clock_xform, launch_info, runtime_dir_builder, tasks) = match self
-            .configure_launcher(
-                &resolved_url,
-                start_info,
-                &program_config,
-                job_dup,
-                &launcher,
-                lifecycle_server,
-                custom_vdso,
-                direct_vdso,
-            )
-            .await?
-        {
-            Some(result) => (
-                result.utc_clock_xform,
-                result.launch_info,
-                result.runtime_dir_builder,
-                result.tasks,
-            ),
+        // Get program information out of `start_info`.
+        let bin_path = runner::get_program_binary(&start_info)
+            .map_err(|err| ElfRunnerError::ProgramBinaryError { url: resolved_url.clone(), err })?;
+        let args = runner::get_program_args(&start_info);
+
+        // TODO(fxbug.dev/45586): runtime_dir may be unavailable in tests. We should fix tests so
+        // that we don't have to have this check here.
+        let runtime_dir_builder = match start_info.runtime_dir {
+            Some(dir) => RuntimeDirBuilder::new(dir).args(args.clone()),
             None => return Ok(None),
         };
 
-        let job_koid = component_job
+        // Add job koid to the runtime dir.
+        let job_koid = job
             .get_koid()
-            .map_err(|e| ElfRunnerError::job_id_retrieve_failed(resolved_url.clone(), e))?
+            .map_err(|status| ElfRunnerError::JobGetKoidFailed {
+                url: resolved_url.clone(),
+                status,
+            })?
             .raw_koid();
+        let runtime_dir_builder = runtime_dir_builder.job_id(job_koid);
 
-        let runtime_dir = runtime_dir_builder.job_id(job_koid).serve();
+        let runtime_dir = runtime_dir_builder.serve();
+
+        // Create procarg handles.
+        let mut handle_infos = ElfRunner::create_handle_infos(
+            start_info.outgoing_dir.map(|dir| dir.into_channel()),
+            lifecycle_server,
+            utc_clock,
+            custom_vdso,
+            direct_vdso,
+            config_vmo,
+        );
+
+        // Add stdout and stderr handles that forward to syslog.
+        let stdout_sink = program_config.get_stdout_sink();
+        let stderr_sink = program_config.get_stderr_sink();
+        let (stdout_and_stderr_tasks, stdout_and_stderr_handles) =
+            bind_streams_to_syslog(&ns, stdout_sink, stderr_sink);
+        handle_infos.extend(stdout_and_stderr_handles);
+
+        // Add any external numbered handles.
+        if let Some(handles) = start_info.numbered_handles {
+            handle_infos.extend(handles);
+        }
+
+        // Configure the process launcher.
+        let job_dup = job.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(|status| {
+            ElfRunnerError::job_duplication_failed(resolved_url.clone(), status)
+        })?;
+
+        let name = Path::new(&resolved_url)
+            .file_name()
+            .ok_or_else(|| ElfRunnerError::BadResolvedUrl(resolved_url.clone()))?
+            .to_str()
+            .ok_or_else(|| ElfRunnerError::BadResolvedUrl(resolved_url.clone()))?;
+
+        let launch_info =
+            runner::component::configure_launcher(runner::component::LauncherConfigArgs {
+                bin_path: &bin_path,
+                name,
+                options: program_config.process_options(),
+                args: Some(args),
+                ns,
+                job: Some(job_dup),
+                handle_infos: Some(handle_infos),
+                name_infos: None,
+                environs: program_config.get_environ(),
+                launcher: &launcher,
+                loader_proxy_chan: None,
+                executable_vmo: None,
+            })
+            .await
+            .map_err(|err| ElfRunnerError::ConfigureLauncherError {
+                url: resolved_url.clone(),
+                err,
+            })?;
 
         // Wait on break_on_start with a timeout and don't fail.
-        if let Some(break_on_start) = break_on_start {
+        if let Some(break_on_start) = start_info.break_on_start {
             fasync::OnSignals::new(&break_on_start, Signals::OBJECT_PEER_CLOSED)
                 .on_timeout(MAX_WAIT_BREAK_ON_START, || Err(Status::TIMED_OUT))
                 .await
@@ -421,7 +416,7 @@ impl ElfRunner {
                 .map(|error| warn!(%moniker, %error, "Failed to wait break_on_start"));
         }
 
-        // Launch the component
+        // Launch the process.
         let (status, process) = launcher.launch(launch_info).await.map_err(|err| {
             ElfRunnerError::ProcessLauncherFidlError { url: resolved_url.clone(), err }
         })?;
@@ -437,6 +432,7 @@ impl ElfRunner {
                 .expect("failed to set process as critical");
         }
 
+        // Add process ID to the runtime dir.
         runtime_dir.add_process_id(
             process
                 .get_koid()
@@ -444,15 +440,24 @@ impl ElfRunner {
                 .raw_koid(),
         );
 
+        // Add process start time to the runtime dir.
         let process_start_time = process
             .info()
             .map_err(|e| ElfRunnerError::process_id_retrieve_failed(resolved_url.clone(), e))?
             .start_time;
         runtime_dir.add_process_start_time(process_start_time);
 
-        if let Some(utc_clock_xform) = utc_clock_xform {
+        // Add UTC estimate of the process start time to the runtime dir.
+        let utc_clock_started = fasync::OnSignals::new(&utc_clock_dup, Signals::CLOCK_STARTED)
+            .on_timeout(Time::after(Duration::default()), || Err(Status::TIMED_OUT))
+            .await
+            .is_ok();
+        let clock_transformation = utc_clock_started
+            .then(|| utc_clock_dup.get_details().map(|details| details.mono_to_synthetic).ok())
+            .flatten();
+        if let Some(clock_transformation) = clock_transformation {
             let utc_timestamp =
-                utc_clock_xform.apply(Time::from_nanos(process_start_time)).into_nanos();
+                clock_transformation.apply(Time::from_nanos(process_start_time)).into_nanos();
             let seconds = (utc_timestamp / 1_000_000_000) as i64;
             let nanos = (utc_timestamp % 1_000_000_000) as u32;
             let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(seconds, nanos), Utc);
@@ -461,11 +466,11 @@ impl ElfRunner {
 
         Ok(Some(ElfComponent::new(
             runtime_dir,
-            Job::from(component_job),
+            job,
             process,
             lifecycle_client,
             program_config.has_critical_main_process(),
-            tasks,
+            stdout_and_stderr_tasks,
             resolved_url.clone(),
         )))
     }
