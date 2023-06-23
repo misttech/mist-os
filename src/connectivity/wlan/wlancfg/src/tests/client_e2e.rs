@@ -1606,21 +1606,33 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
         // start at 90%, meaning this has a 0.1^6 chance of flaking (one in a million).
         for _i in 1..=7 {
             // First, pop any pending timers to make sure the idle interface scanning mechanism
-            // activates now. Do it twice in case one catches the timeout for sending scan results
-            // to the location sensor, and then an extra time for good measure.
-            for _j in 1..=3 {
+            // activates now. Do it enough times to also catch any built up timers for sending
+            // location sensor results.
+            let mut scan_req = None;
+            for _j in 1..=10 {
                 assert_variant!(
                     exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
                     Poll::Pending
                 );
+
+                // Check for scan requests before waking timers, since scanning has a timeout.
+                if let Poll::Ready(req) = exec.run_until_stalled(&mut iface_sme_stream.next()) {
+                    scan_req = req;
+                    break;
+                }
+
                 let _woken_timer = exec.wake_next_timer();
             }
 
-            let next_sme_stream_req = run_while(
-                &mut exec,
-                &mut test_values.internal_objects.internal_futures,
-                iface_sme_stream.next(),
-            );
+            // If a scan request came from the above loop, use it. If not, run the wlancfg future
+            // until a scan request comes in.
+            let next_sme_stream_req = scan_req.or_else(|| {
+                run_while(
+                    &mut exec,
+                    &mut test_values.internal_objects.internal_futures,
+                    iface_sme_stream.next(),
+                )
+            });
             debug!("This is scan number {}", _i);
             assert_variant!(
                 next_sme_stream_req,
