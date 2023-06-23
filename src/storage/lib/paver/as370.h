@@ -46,7 +46,8 @@ class As370PartitionerFactory : public DevicePartitionerFactory {
  public:
   zx::result<std::unique_ptr<DevicePartitioner>> New(
       fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      std::shared_ptr<Context> context, const fbl::unique_fd& block_device) final;
+      std::shared_ptr<Context> context,
+      fidl::ClientEnd<fuchsia_device::Controller> block_device) final;
 };
 
 }  // namespace paver

@@ -698,14 +698,15 @@ void DataSink::Bind(async_dispatcher_t* dispatcher, fbl::unique_fd devfs_root,
                     fidl::ClientEnd<fuchsia_io::Directory> svc_root,
                     fidl::ServerEnd<fuchsia_paver::DataSink> server,
                     std::shared_ptr<Context> context) {
-  auto partitioner = DevicePartitionerFactory::Create(devfs_root.duplicate(), svc_root,
-                                                      GetCurrentArch(), std::move(context));
-  if (!partitioner) {
-    ERROR("Unable to initialize a partitioner.\n");
+  zx::result partitioner = DevicePartitionerFactory::Create(devfs_root.duplicate(), svc_root,
+                                                            GetCurrentArch(), std::move(context));
+  if (partitioner.is_error()) {
+    ERROR("Unable to initialize a partitioner: %s.\n", partitioner.status_string());
     fidl_epitaph_write(server.channel().get(), ZX_ERR_BAD_STATE);
     return;
   }
-  auto data_sink = std::make_unique<DataSink>(std::move(devfs_root), std::move(partitioner));
+  std::unique_ptr data_sink =
+      std::make_unique<DataSink>(std::move(devfs_root), std::move(partitioner.value()));
   fidl::BindServer(dispatcher, std::move(server), std::move(data_sink));
 }
 
@@ -714,15 +715,16 @@ void DynamicDataSink::Bind(async_dispatcher_t* dispatcher, fbl::unique_fd devfs_
                            BlockAndController block_device,
                            fidl::ServerEnd<fuchsia_paver::DynamicDataSink> server,
                            std::shared_ptr<Context> context) {
-  auto partitioner =
+  zx::result partitioner =
       DevicePartitionerFactory::Create(devfs_root.duplicate(), svc_root, GetCurrentArch(),
                                        std::move(context), std::move(block_device));
-  if (!partitioner) {
-    ERROR("Unable to initialize a partitioner.\n");
+  if (partitioner.is_error()) {
+    ERROR("Unable to initialize a partitioner: %s.\n", partitioner.status_string());
     fidl_epitaph_write(server.channel().get(), ZX_ERR_BAD_STATE);
     return;
   }
-  auto data_sink = std::make_unique<DynamicDataSink>(std::move(devfs_root), std::move(partitioner));
+  std::unique_ptr data_sink =
+      std::make_unique<DynamicDataSink>(std::move(devfs_root), std::move(partitioner.value()));
   fidl::BindServer(dispatcher, std::move(server), std::move(data_sink));
 }
 

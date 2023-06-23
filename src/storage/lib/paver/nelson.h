@@ -17,7 +17,7 @@ class NelsonPartitioner : public DevicePartitioner {
  public:
   static zx::result<std::unique_ptr<DevicePartitioner>> Initialize(
       fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-      const fbl::unique_fd& block_device);
+      fidl::ClientEnd<fuchsia_device::Controller> block_device);
 
   bool IsFvmWithinFtl() const override { return false; }
 
@@ -57,7 +57,8 @@ class NelsonPartitionerFactory : public DevicePartitionerFactory {
  public:
   zx::result<std::unique_ptr<DevicePartitioner>> New(
       fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      std::shared_ptr<Context> context, const fbl::unique_fd& block_device) final;
+      std::shared_ptr<Context> context,
+      fidl::ClientEnd<fuchsia_device::Controller> block_device) final;
 };
 
 class NelsonAbrClientFactory : public abr::ClientFactory {

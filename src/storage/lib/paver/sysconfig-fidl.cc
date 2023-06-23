@@ -17,22 +17,22 @@ void Sysconfig::Bind(async_dispatcher_t* dispatcher, fbl::unique_fd devfs_root,
                      fidl::ClientEnd<fuchsia_io::Directory> svc_root,
                      std::shared_ptr<Context> context,
                      fidl::ServerEnd<fuchsia_paver::Sysconfig> server) {
-  auto device_partitioner = DevicePartitionerFactory::Create(devfs_root.duplicate(), svc_root,
-                                                             GetCurrentArch(), std::move(context));
-  if (!device_partitioner) {
-    ERROR("Unable to initialize a partitioner.\n");
+  zx::result device_partitioner = DevicePartitionerFactory::Create(
+      devfs_root.duplicate(), svc_root, GetCurrentArch(), std::move(context));
+  if (device_partitioner.is_error()) {
+    ERROR("Unable to initialize a partitioner: %s.\n", device_partitioner.status_string());
     fidl_epitaph_write(server.channel().get(), ZX_ERR_BAD_STATE);
     return;
   }
 
-  auto res = device_partitioner->FindPartition(PartitionSpec(Partition::kSysconfig));
+  zx::result res = device_partitioner.value()->FindPartition(PartitionSpec(Partition::kSysconfig));
   if (res.is_error()) {
     ERROR("Unable to find sysconfig-data partition. %s\n", res.status_string());
     fidl_epitaph_write(server.channel().get(), ZX_ERR_NOT_SUPPORTED);
     return;
   }
 
-  auto sysconfig = std::make_unique<Sysconfig>(std::move(res.value()));
+  std::unique_ptr sysconfig = std::make_unique<Sysconfig>(std::move(res.value()));
   fidl::BindServer(dispatcher, std::move(server), std::move(sysconfig));
 }
 

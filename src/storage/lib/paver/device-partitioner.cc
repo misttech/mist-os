@@ -153,31 +153,32 @@ DevicePartitionerFactory::registered_factory_list() {
   return registered_factory_list;
 }
 
-std::unique_ptr<DevicePartitioner> DevicePartitionerFactory::Create(
+zx::result<std::unique_ptr<DevicePartitioner>> DevicePartitionerFactory::Create(
     fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
     std::shared_ptr<Context> context, BlockAndController block_device) {
-  // TODO(fxbug.dev/127870): Continue using BlockAndController instead of an fd.
-  fbl::unique_fd block_dev;
-  if (block_device.device) {
-    int fd;
-    zx_status_t status = fdio_fd_create(block_device.device.TakeChannel().release(), &fd);
-    if (status != ZX_OK) {
-      ERROR(
-          "Unable to create fd from block_device channel. Does it implement fuchsia.io.Node?: %s\n",
-          zx_status_get_string(status));
-      return nullptr;
-    }
-    block_dev.reset(fd);
-  }
-
   for (auto& factory : *registered_factory_list()) {
-    if (auto status =
-            factory->New(devfs_root.duplicate(), svc_root, arch, std::move(context), block_dev);
+    fidl::ClientEnd<fuchsia_device::Controller> controller;
+    if (block_device.controller) {
+      zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+      if (controller_endpoints.is_error()) {
+        return controller_endpoints.take_error();
+      }
+      auto& [controller_client, controller_server] = controller_endpoints.value();
+      if (zx_status_t status = fidl::WireCall(block_device.controller)
+                                   ->ConnectToController(std::move(controller_server))
+                                   .status();
+          status != ZX_OK) {
+        return zx::error(status);
+      }
+      controller = std::move(controller_client);
+    }
+    if (auto status = factory->New(devfs_root.duplicate(), svc_root, arch, std::move(context),
+                                   std::move(controller));
         status.is_ok()) {
-      return std::move(status.value());
+      return zx::ok(std::move(status.value()));
     }
   }
-  return nullptr;
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 void DevicePartitionerFactory::Register(std::unique_ptr<DevicePartitionerFactory> factory) {
@@ -272,7 +273,7 @@ zx::result<> FixedDevicePartitioner::ValidatePayload(const PartitionSpec& spec,
 
 zx::result<std::unique_ptr<DevicePartitioner>> DefaultPartitionerFactory::New(
     fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-    std::shared_ptr<Context> context, const fbl::unique_fd& block_device) {
+    std::shared_ptr<Context> context, fidl::ClientEnd<fuchsia_device::Controller> block_device) {
   return FixedDevicePartitioner::Initialize(std::move(devfs_root));
 }
 

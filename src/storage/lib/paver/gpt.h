@@ -32,17 +32,15 @@ class GptDevicePartitioner {
     bool initialize_partition_tables;
   };
 
-  // TODO(https://fxbug.dev/127870): Replace this function with one that uses channels.
-  //
   // Find and initialize a GPT based device.
   //
-  // If block_device is provided, then search is skipped, and block_device is used
+  // If block_controller is provided, then search is skipped, and block_controller is used
   // directly. If it is not provided, we search for a device with a valid GPT,
   // with an entry for an FVM. If multiple devices with valid GPT containing
   // FVM entries are found, an error is returned.
-  static zx::result<InitializeGptResult> InitializeGptWithFd(
+  static zx::result<InitializeGptResult> InitializeGpt(
       fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-      const fbl::unique_fd& block_device);
+      fidl::ClientEnd<fuchsia_device::Controller> block_controller);
 
   // Returns block info for a specified block device.
   const fuchsia_hardware_block::wire::BlockInfo& GetBlockInfo() const { return block_info_; }
@@ -102,16 +100,11 @@ class GptDevicePartitioner {
   static zx::result<std::vector<GptClients>> FindGptDevices(const fbl::unique_fd& devfs_root);
 
  private:
-  using GptFds = std::vector<std::pair<std::string, fbl::unique_fd>>;
-  // Find all block devices which could contain a GPT.
-  // TODO(fxbug.dev/127870): Replace usages of this with FindGptDevices.
-  static bool FindGptFds(const fbl::unique_fd& devfs_root, GptFds* out);
-
   // Initializes GPT for a device which was explicitly provided. If |gpt_device| doesn't have a
   // valid GPT, it will initialize it with a valid one.
   static zx::result<std::unique_ptr<GptDevicePartitioner>> InitializeProvidedGptDevice(
       fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-      fbl::unique_fd gpt_device);
+      fidl::UnownedClientEnd<fuchsia_device::Controller> gpt_device);
 
   GptDevicePartitioner(fbl::unique_fd devfs_root,
                        fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,

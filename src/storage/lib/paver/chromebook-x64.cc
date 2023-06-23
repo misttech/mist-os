@@ -54,7 +54,7 @@ zx::result<Uuid> CrosPartitionType(Partition type) {
 
 zx::result<std::unique_ptr<DevicePartitioner>> CrosDevicePartitioner::Initialize(
     fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-    const fbl::unique_fd& block_device) {
+    fidl::ClientEnd<fuchsia_device::Controller> block_device) {
   if (arch != Arch::kX64) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
@@ -65,7 +65,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> CrosDevicePartitioner::Initialize
   }
 
   auto status_or_gpt =
-      GptDevicePartitioner::InitializeGptWithFd(std::move(devfs_root), svc_root, block_device);
+      GptDevicePartitioner::InitializeGpt(std::move(devfs_root), svc_root, std::move(block_device));
   if (status_or_gpt.is_error()) {
     return status_or_gpt.take_error();
   }
@@ -436,16 +436,16 @@ zx::result<bool> CrosDevicePartitioner::ShrinkCrosState() const {
 
 zx::result<std::unique_ptr<DevicePartitioner>> ChromebookX64PartitionerFactory::New(
     fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-    std::shared_ptr<Context> context, const fbl::unique_fd& block_device) {
-  return CrosDevicePartitioner::Initialize(std::move(devfs_root), svc_root, arch, block_device);
+    std::shared_ptr<Context> context, fidl::ClientEnd<fuchsia_device::Controller> block_device) {
+  return CrosDevicePartitioner::Initialize(std::move(devfs_root), svc_root, arch,
+                                           std::move(block_device));
 }
 
 zx::result<std::unique_ptr<abr::Client>> ChromebookX64AbrClientFactory::New(
     fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<paver::Context> context) {
-  fbl::unique_fd none;
   auto partitioner =
-      CrosDevicePartitioner::Initialize(std::move(devfs_root), svc_root, paver::Arch::kX64, none);
+      CrosDevicePartitioner::Initialize(std::move(devfs_root), svc_root, paver::Arch::kX64, {});
 
   if (partitioner.is_error()) {
     return partitioner.take_error();

@@ -57,14 +57,14 @@ zx::result<AbrSlotIndex> QueryFirmwareSlot(fidl::UnownedClientEnd<fuchsia_io::Di
 
 zx::result<std::unique_ptr<DevicePartitioner>> PinecrestPartitioner::Initialize(
     fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-    const fbl::unique_fd& block_device) {
+    fidl::ClientEnd<fuchsia_device::Controller> block_device) {
   auto status = IsBoard(devfs_root, "pinecrest");
   if (status.is_error()) {
     return status.take_error();
   }
 
   auto status_or_gpt =
-      GptDevicePartitioner::InitializeGptWithFd(std::move(devfs_root), svc_root, block_device);
+      GptDevicePartitioner::InitializeGpt(std::move(devfs_root), svc_root, std::move(block_device));
   if (status_or_gpt.is_error()) {
     return status_or_gpt.take_error();
   }
@@ -162,8 +162,8 @@ zx::result<> PinecrestPartitioner::ValidatePayload(const PartitionSpec& spec,
 
 zx::result<std::unique_ptr<DevicePartitioner>> PinecrestPartitionerFactory::New(
     fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-    std::shared_ptr<Context> context, const fbl::unique_fd& block_device) {
-  return PinecrestPartitioner::Initialize(std::move(devfs_root), svc_root, block_device);
+    std::shared_ptr<Context> context, fidl::ClientEnd<fuchsia_device::Controller> block_device) {
+  return PinecrestPartitioner::Initialize(std::move(devfs_root), svc_root, std::move(block_device));
 }
 
 zx::result<> PinecrestAbrClient::Read(const zx::vmo& vmo, size_t size) {
@@ -213,9 +213,8 @@ zx::result<> PinecrestAbrClient::Write(const zx::vmo& vmo, size_t vmo_size) {
 zx::result<std::unique_ptr<abr::Client>> PinecrestAbrClientFactory::New(
     fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<paver::Context> context) {
-  fbl::unique_fd none;
   auto partitioner =
-      PinecrestPartitioner::Initialize(std::move(devfs_root), std::move(svc_root), none);
+      PinecrestPartitioner::Initialize(std::move(devfs_root), std::move(svc_root), {});
   if (partitioner.is_error()) {
     return partitioner.take_error();
   }

@@ -304,7 +304,7 @@ zx::result<> AstroPartitioner::ValidatePayload(const PartitionSpec& spec,
 
 zx::result<std::unique_ptr<DevicePartitioner>> AstroPartitionerFactory::New(
     fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-    std::shared_ptr<Context> context, const fbl::unique_fd& block_device) {
+    std::shared_ptr<Context> context, fidl::ClientEnd<fuchsia_device::Controller> block_device) {
   return AstroPartitioner::Initialize(std::move(devfs_root), svc_root, context);
 }
 

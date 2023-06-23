@@ -147,10 +147,10 @@ struct BlockAndController {
 class DevicePartitionerFactory {
  public:
   // Factory method which automatically returns the correct DevicePartitioner
-  // implementation based factories registered with it. Returns nullptr on failure.
-  // |block_device| is root block device whichs contains the logical partitions we wish to operate
+  // implementation based factories registered with it.
+  // |block_device| is root block device which contains the logical partitions we wish to operate
   // against. It's only meaningful for EFI and CROS devices which may have multiple storage devices.
-  static std::unique_ptr<DevicePartitioner> Create(
+  static zx::result<std::unique_ptr<DevicePartitioner>> Create(
       fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
       std::shared_ptr<Context> context, BlockAndController block_device = {});
 
@@ -163,7 +163,8 @@ class DevicePartitionerFactory {
   // of DevicePartitioners.
   virtual zx::result<std::unique_ptr<DevicePartitioner>> New(
       fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      std::shared_ptr<Context> context, const fbl::unique_fd& block_device) = 0;
+      std::shared_ptr<Context> context,
+      fidl::ClientEnd<fuchsia_device::Controller> block_device) = 0;
 
   static std::vector<std::unique_ptr<DevicePartitionerFactory>>* registered_factory_list();
 };
@@ -209,7 +210,8 @@ class DefaultPartitionerFactory : public DevicePartitionerFactory {
  public:
   zx::result<std::unique_ptr<DevicePartitioner>> New(
       fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      std::shared_ptr<Context> context, const fbl::unique_fd& block_device) final;
+      std::shared_ptr<Context> context,
+      fidl::ClientEnd<fuchsia_device::Controller> block_device) final;
 };
 
 // Get the architecture of the currently running platform.
