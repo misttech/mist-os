@@ -13,7 +13,7 @@ regeneration instructions.
 
 ## Summary
 
-Supply pages into a pager owned vmo.
+Supply pages into a pager owned VMO.
 
 ## Declaration
 
@@ -42,9 +42,9 @@ decommitted.
 
 *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
 
-*pager_vmo* must be of type **ZX_OBJ_TYPE_VMO**.
+*pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
 
-*aux_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_READ** and have **ZX_RIGHT_WRITE**.
+*aux_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
 
 ## Return value
 
@@ -57,17 +57,18 @@ populated.
 
 **ZX_ERR_BAD_HANDLE** *pager*, *pager_vmo*, or *aux_vmo* is not a valid handle.
 
-**ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, *pager_vmo* is not a vmo handle, or
-*aux_vmo* is not a vmo handle.
+**ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, *pager_vmo* is not a VMO handle, or
+*aux_vmo* is not a VMO handle.
 
-**ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a vmo created from *pager*, or *offset*, *size*,
+**ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*, or *offset*, *size*,
 or *aux_offset* is not page aligned.
 
-**ZX_ERR_ACCESS_DENIED** *aux_vmo* is does not have **ZX_RIGHT_WRITE** or **ZX_RIGHT_READ**.
+**ZX_ERR_ACCESS_DENIED** *aux_vmo* is does not have **ZX_RIGHT_WRITE**,
+or *pager_vmo* does not have **ZX_RIGHT_WRITE**.
 
 **ZX_ERR_BAD_STATE** *aux_vmo* is not in a state where it can supply the required pages.
 
-**ZX_ERR_NOT_SUPPORTED** *aux_vmo* is a physical vmo or a contiguous vmo.
+**ZX_ERR_NOT_SUPPORTED** *aux_vmo* is a physical VMO or a contiguous VMO.
 
 **ZX_ERR_OUT_OF_RANGE** The specified range in *pager_vmo* or *aux_vmo* is invalid.
 

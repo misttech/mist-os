@@ -27,7 +27,7 @@ zx_status_t zx_pager_create(uint32_t options, zx_handle_t* out);
 
 `zx_pager_create()` creates a new pager object.
 
-When a pager object is destroyed, any accesses to its vmos that would have required communicating
+When a pager object is destroyed, any accesses to its VMOs that would have required communicating
 with the pager will fail as if [`zx_pager_detach_vmo()`] had been called. Furthermore, the kernel
 will make an effort to ensure that the faults happen as quickly as possible (e.g. by evicting
 present pages), but the precise behavior is implementation dependent.

@@ -13,7 +13,7 @@ regeneration instructions.
 
 ## Summary
 
-Perform an operation on a range of a pager owned vmo.
+Perform an operation on a range of a pager owned VMO.
 
 ## Declaration
 
@@ -94,7 +94,7 @@ this.
 
 *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
 
-*pager_vmo* must be of type **ZX_OBJ_TYPE_VMO**.
+*pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
 
 ## Return value
 
@@ -104,10 +104,12 @@ this.
 
 **ZX_ERR_BAD_HANDLE** *pager* or *pager_vmo* is not a valid handle.
 
-**ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a vmo handle.
+**ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a VMO handle.
+
+**ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_WRITE**.
 
 **ZX_ERR_INVALID_ARGS** under any of these conditions:
-- *pager_vmo* is not a vmo created from *pager*.
+- *pager_vmo* is not a VMO created from *pager*.
 - *offset* or *length* is not page aligned.
 - *op* is **ZX_PAGER_OP_FAIL** and *data* is not one of **ZX_ERR_IO**, **ZX_ERR_IO_DATA_INTEGRITY**
   or **ZX_ERR_BAD_STATE**.

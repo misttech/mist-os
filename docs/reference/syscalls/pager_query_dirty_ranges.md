@@ -13,7 +13,7 @@ regeneration instructions.
 
 ## Summary
 
-Query contiguous ranges of dirty pages in a pager owned vmo.
+Query contiguous ranges of dirty pages in a pager owned VMO.
 
 ## Declaration
 
@@ -101,7 +101,7 @@ Sample user code that wants to query all dirty ranges in a VMO might look like t
 
 *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
 
-*pager_vmo* must be of type **ZX_OBJ_TYPE_VMO**.
+*pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_READ**.
 
 ## Return value
 
@@ -112,9 +112,11 @@ error value is returned.
 
 **ZX_ERR_BAD_HANDLE** *pager* or *pager_vmo* is not a valid handle.
 
-**ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a vmo handle.
+**ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a VMO handle.
 
-**ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a vmo created from *pager*.
+**ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_READ**.
+
+**ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*.
 
 **ZX_ERR_OUT_OF_RANGE** The specified range in *pager_vmo* is invalid.
 

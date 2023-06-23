@@ -13,27 +13,27 @@ regeneration instructions.
 
 ## Summary
 
-Detaches a vmo from a pager.
+Detaches a VMO from a pager.
 
 ## Declaration
 
 ```c
 #include <zircon/syscalls.h>
 
-zx_status_t zx_pager_detach_vmo(zx_handle_t pager, zx_handle_t vmo);
+zx_status_t zx_pager_detach_vmo(zx_handle_t pager, zx_handle_t pager_vmo);
 ```
 
 ## Description
 
-Detaching *vmo* from *pager* causes the kernel to stop queuing page requests for the vmo. Subsequent
-accesses that would have generated page requests will instead fail.
+Detaching *pager_vmo* from *pager* causes the kernel to stop queuing page requests for the VMO.
+Subsequent accesses that would have generated page requests will instead fail.
 
 No new **ZX_PAGER_VMO_READ** and **ZX_PAGER_VMO_DIRTY** requests will be generated after detaching,
 but some requests may still be in flight. The pager service is free to ignore these requests, as the
 kernel will resume and fault the threads that generated these requests. The final request the pager
 service will receive is a **ZX_PAGER_VMO_COMPLETE** request.
 
-The kernel is free to evict clean pages from detached vmos, but will retain any dirty pages. Upon
+The kernel is free to evict clean pages from detached VMOs, but will retain any dirty pages. Upon
 receiving the **ZX_PAGER_VMO_COMPLETE** request, the pager service is expected to query these ranges
 with [`zx_pager_query_dirty_ranges()`] and write them back with [`zx_pager_op_range()`]
 **ZX_PAGER_OP_WRITEBACK_BEGIN** and **ZX_PAGER_OP_WRITEBACK_END**. Once they have been written back,
@@ -43,7 +43,7 @@ these pages will become clean again, so the kernel is free to evict them.
 
 *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
 
-*vmo* must be of type **ZX_OBJ_TYPE_VMO**.
+*pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
 
 ## Return value
 
@@ -51,11 +51,13 @@ these pages will become clean again, so the kernel is free to evict them.
 
 ## Errors
 
-**ZX_ERR_BAD_HANDLE** *pager* or *vmo* is not a valid handle.
+**ZX_ERR_BAD_HANDLE** *pager* or *pager_vmo* is not a valid handle.
 
-**ZX_ERR_WRONG_TYPE** *pager* is not a pager handle or *vmo* is not a vmo handle.
+**ZX_ERR_WRONG_TYPE** *pager* is not a pager handle or *pager_vmo* is not a VMO handle.
 
-**ZX_ERR_INVALID_ARGS**  *vmo* is not a vmo created from *pager*.
+**ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_WRITE**.
+
+**ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*.
 
 ## See also
 

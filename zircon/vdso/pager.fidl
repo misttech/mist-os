@@ -21,7 +21,7 @@ closed protocol Pager {
     ///
     /// `zx_pager_create()` creates a new pager object.
     ///
-    /// When a pager object is destroyed, any accesses to its vmos that would have required communicating
+    /// When a pager object is destroyed, any accesses to its VMOs that would have required communicating
     /// with the pager will fail as if [`zx_pager_detach_vmo()`] had been called. Furthermore, the kernel
     /// will make an effort to ensure that the faults happen as quickly as possible (e.g. by evicting
     /// present pages), but the precise behavior is implementation dependent.
@@ -58,7 +58,7 @@ closed protocol Pager {
 
     /// ## Summary
     ///
-    /// Create a pager owned vmo.
+    /// Create a pager owned VMO.
     ///
     /// ## Declaration
     ///
@@ -83,7 +83,7 @@ closed protocol Pager {
     /// **ZX_VMO_TRAP_DIRTY** - if writes to clean pages in the VMO should be trapped by the kernel and
     /// forwarded to the pager service for acknowledgement before proceeding with the write.
     ///
-    /// On success, the returned vmo has the same rights as a vmo created with [`zx_vmo_create()`], as well
+    /// On success, the returned VMO has the same rights as a VMO created with [`zx_vmo_create()`], as well
     /// as having the same behavior with respect to **ZX_VMO_ZERO_CHILDREN**. Syscalls that operate on VMOs
     /// require an explicit flag to allow blocking IPC to the userspace pager service; beyond this, whether
     /// or not a VMO is owned by a pager does not affect the semantics of syscalls.
@@ -110,7 +110,7 @@ closed protocol Pager {
     /// the packet depends on *command*, which can take one of the following values:
     ///
     /// **ZX_PAGER_VMO_READ**: Sent when an application accesses a non-resident page in a pager's VMO. The
-    /// pager service should populate the range [offset, offset + length) in the registered vmo with
+    /// pager service should populate the range [offset, offset + length) in the registered VMO with
     /// [`zx_pager_supply_pages()`]. Supplying pages is an implicit positive acknowledgement of the request.
     ///
     /// **ZX_PAGER_VMO_DIRTY**: Sent when an application writes to a resident clean page in a pager's VMO
@@ -146,7 +146,7 @@ closed protocol Pager {
     ///
     /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle or *port* is not a port handle.
     ///
-    /// **ZX_ERR_OUT_OF_RANGE** The requested size is larger than the maximum vmo size.
+    /// **ZX_ERR_OUT_OF_RANGE** The requested size is larger than the maximum VMO size.
     ///
     /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
     ///
@@ -174,27 +174,27 @@ closed protocol Pager {
 
     /// ## Summary
     ///
-    /// Detaches a vmo from a pager.
+    /// Detaches a VMO from a pager.
     ///
     /// ## Declaration
     ///
     /// ```c
     /// #include <zircon/syscalls.h>
     ///
-    /// zx_status_t zx_pager_detach_vmo(zx_handle_t pager, zx_handle_t vmo);
+    /// zx_status_t zx_pager_detach_vmo(zx_handle_t pager, zx_handle_t pager_vmo);
     /// ```
     ///
     /// ## Description
     ///
-    /// Detaching *vmo* from *pager* causes the kernel to stop queuing page requests for the vmo. Subsequent
-    /// accesses that would have generated page requests will instead fail.
+    /// Detaching *pager_vmo* from *pager* causes the kernel to stop queuing page requests for the VMO.
+    /// Subsequent accesses that would have generated page requests will instead fail.
     ///
     /// No new **ZX_PAGER_VMO_READ** and **ZX_PAGER_VMO_DIRTY** requests will be generated after detaching,
     /// but some requests may still be in flight. The pager service is free to ignore these requests, as the
     /// kernel will resume and fault the threads that generated these requests. The final request the pager
     /// service will receive is a **ZX_PAGER_VMO_COMPLETE** request.
     ///
-    /// The kernel is free to evict clean pages from detached vmos, but will retain any dirty pages. Upon
+    /// The kernel is free to evict clean pages from detached VMOs, but will retain any dirty pages. Upon
     /// receiving the **ZX_PAGER_VMO_COMPLETE** request, the pager service is expected to query these ranges
     /// with [`zx_pager_query_dirty_ranges()`] and write them back with [`zx_pager_op_range()`]
     /// **ZX_PAGER_OP_WRITEBACK_BEGIN** and **ZX_PAGER_OP_WRITEBACK_END**. Once they have been written back,
@@ -204,7 +204,7 @@ closed protocol Pager {
     ///
     /// *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
     ///
-    /// *vmo* must be of type **ZX_OBJ_TYPE_VMO**.
+    /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
     ///
     /// ## Return value
     ///
@@ -212,11 +212,13 @@ closed protocol Pager {
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE** *pager* or *vmo* is not a valid handle.
+    /// **ZX_ERR_BAD_HANDLE** *pager* or *pager_vmo* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle or *vmo* is not a vmo handle.
+    /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle or *pager_vmo* is not a VMO handle.
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *vmo* is not a vmo created from *pager*.
+    /// **ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_WRITE**.
+    ///
+    /// **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*.
     ///
     /// ## See also
     ///
@@ -234,7 +236,7 @@ closed protocol Pager {
 
     /// ## Summary
     ///
-    /// Supply pages into a pager owned vmo.
+    /// Supply pages into a pager owned VMO.
     ///
     /// ## Declaration
     ///
@@ -263,9 +265,9 @@ closed protocol Pager {
     ///
     /// *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
     ///
-    /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO**.
+    /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
     ///
-    /// *aux_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_READ** and have **ZX_RIGHT_WRITE**.
+    /// *aux_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
     ///
     /// ## Return value
     ///
@@ -278,17 +280,18 @@ closed protocol Pager {
     ///
     /// **ZX_ERR_BAD_HANDLE** *pager*, *pager_vmo*, or *aux_vmo* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, *pager_vmo* is not a vmo handle, or
-    /// *aux_vmo* is not a vmo handle.
+    /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, *pager_vmo* is not a VMO handle, or
+    /// *aux_vmo* is not a VMO handle.
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a vmo created from *pager*, or *offset*, *size*,
+    /// **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*, or *offset*, *size*,
     /// or *aux_offset* is not page aligned.
     ///
-    /// **ZX_ERR_ACCESS_DENIED** *aux_vmo* is does not have **ZX_RIGHT_WRITE** or **ZX_RIGHT_READ**.
+    /// **ZX_ERR_ACCESS_DENIED** *aux_vmo* is does not have **ZX_RIGHT_WRITE**,
+    /// or *pager_vmo* does not have **ZX_RIGHT_WRITE**.
     ///
     /// **ZX_ERR_BAD_STATE** *aux_vmo* is not in a state where it can supply the required pages.
     ///
-    /// **ZX_ERR_NOT_SUPPORTED** *aux_vmo* is a physical vmo or a contiguous vmo.
+    /// **ZX_ERR_NOT_SUPPORTED** *aux_vmo* is a physical VMO or a contiguous VMO.
     ///
     /// **ZX_ERR_OUT_OF_RANGE** The specified range in *pager_vmo* or *aux_vmo* is invalid.
     ///
@@ -315,7 +318,7 @@ closed protocol Pager {
 
     /// ## Summary
     ///
-    /// Perform an operation on a range of a pager owned vmo.
+    /// Perform an operation on a range of a pager owned VMO.
     ///
     /// ## Declaration
     ///
@@ -396,7 +399,7 @@ closed protocol Pager {
     ///
     /// *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
     ///
-    /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO**.
+    /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
     ///
     /// ## Return value
     ///
@@ -406,10 +409,12 @@ closed protocol Pager {
     ///
     /// **ZX_ERR_BAD_HANDLE** *pager* or *pager_vmo* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a vmo handle.
+    /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a VMO handle.
+    ///
+    /// **ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_WRITE**.
     ///
     /// **ZX_ERR_INVALID_ARGS** under any of these conditions:
-    /// - *pager_vmo* is not a vmo created from *pager*.
+    /// - *pager_vmo* is not a VMO created from *pager*.
     /// - *offset* or *length* is not page aligned.
     /// - *op* is **ZX_PAGER_OP_FAIL** and *data* is not one of **ZX_ERR_IO**, **ZX_ERR_IO_DATA_INTEGRITY**
     ///   or **ZX_ERR_BAD_STATE**.
@@ -447,7 +452,7 @@ closed protocol Pager {
 
     /// ## Summary
     ///
-    /// Query contiguous ranges of dirty pages in a pager owned vmo.
+    /// Query contiguous ranges of dirty pages in a pager owned VMO.
     ///
     /// ## Declaration
     ///
@@ -535,7 +540,7 @@ closed protocol Pager {
     ///
     /// *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
     ///
-    /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO**.
+    /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_READ**.
     ///
     /// ## Return value
     ///
@@ -546,9 +551,11 @@ closed protocol Pager {
     ///
     /// **ZX_ERR_BAD_HANDLE** *pager* or *pager_vmo* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a vmo handle.
+    /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a VMO handle.
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a vmo created from *pager*.
+    /// **ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_READ**.
+    ///
+    /// **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*.
     ///
     /// **ZX_ERR_OUT_OF_RANGE** The specified range in *pager_vmo* is invalid.
     ///
@@ -625,7 +632,8 @@ closed protocol Pager {
     ///
     /// *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
     ///
-    /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO**.
+    /// <!-- TODO(fxbug.dev/129527): ZX_PAGER_RESET_VMO_STATS does more than a pure query. -->
+    /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_READ**.
     ///
     /// ## Return value
     ///
@@ -636,9 +644,11 @@ closed protocol Pager {
     ///
     /// **ZX_ERR_BAD_HANDLE** *pager* or *pager_vmo* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a vmo handle.
+    /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a VMO handle.
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a vmo created from *pager*, or *options* is neither 0 or
+    /// **ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_READ**.
+    ///
+    /// **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*, or *options* is neither 0 or
     /// **ZX_PAGER_RESET_VMO_STATS**.
     ///
     /// ## See also

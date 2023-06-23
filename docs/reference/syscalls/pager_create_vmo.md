@@ -13,7 +13,7 @@ regeneration instructions.
 
 ## Summary
 
-Create a pager owned vmo.
+Create a pager owned VMO.
 
 ## Declaration
 
@@ -38,7 +38,7 @@ boundary, and *options* must be zero or any combination of the following flags:
 **ZX_VMO_TRAP_DIRTY** - if writes to clean pages in the VMO should be trapped by the kernel and
 forwarded to the pager service for acknowledgement before proceeding with the write.
 
-On success, the returned vmo has the same rights as a vmo created with [`zx_vmo_create()`], as well
+On success, the returned VMO has the same rights as a VMO created with [`zx_vmo_create()`], as well
 as having the same behavior with respect to **ZX_VMO_ZERO_CHILDREN**. Syscalls that operate on VMOs
 require an explicit flag to allow blocking IPC to the userspace pager service; beyond this, whether
 or not a VMO is owned by a pager does not affect the semantics of syscalls.
@@ -65,7 +65,7 @@ are not defined is unspecified - currently no flags are defined. The trigger and
 the packet depends on *command*, which can take one of the following values:
 
 **ZX_PAGER_VMO_READ**: Sent when an application accesses a non-resident page in a pager's VMO. The
-pager service should populate the range [offset, offset + length) in the registered vmo with
+pager service should populate the range [offset, offset + length) in the registered VMO with
 [`zx_pager_supply_pages()`]. Supplying pages is an implicit positive acknowledgement of the request.
 
 **ZX_PAGER_VMO_DIRTY**: Sent when an application writes to a resident clean page in a pager's VMO
@@ -101,7 +101,7 @@ If *pager* is closed, then no more packets will be delivered to *port* (includin
 
 **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle or *port* is not a port handle.
 
-**ZX_ERR_OUT_OF_RANGE** The requested size is larger than the maximum vmo size.
+**ZX_ERR_OUT_OF_RANGE** The requested size is larger than the maximum VMO size.
 
 **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
 
