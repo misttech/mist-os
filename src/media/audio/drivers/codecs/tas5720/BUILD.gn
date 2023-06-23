@@ -24,7 +24,6 @@ fuchsia_driver("tas5720-driver") {
   ]
   deps = [
     ":ti_tas5720-bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/lib/sys/inspect/cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
@@ -58,8 +57,6 @@ test("tas5720-test-bin") {
   deps = [
     ":tas5720",
     ":ti_tas5720-bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp_mock",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//sdk/lib/sys/inspect/cpp",

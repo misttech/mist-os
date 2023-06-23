@@ -4,9 +4,9 @@
 
 #include "tas27xx.h"
 
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mock-i2c/mock-i2c.h>
@@ -17,6 +17,7 @@
 #include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <zxtest/zxtest.h>
 
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace audio {
@@ -34,7 +35,8 @@ audio::DaiFormat GetDefaultDaiFormat() {
 }
 
 struct Tas27xxCodec : public Tas27xx {
-  explicit Tas27xxCodec(zx_device_t* parent, ddk::I2cChannel i2c, ddk::GpioProtocolClient fault)
+  explicit Tas27xxCodec(zx_device_t* parent, ddk::I2cChannel i2c,
+                        fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> fault)
       : Tas27xx(parent, std::move(i2c), std::move(fault), true, true) {}
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> GetClient() {
     zx::channel channel_remote;
@@ -55,65 +57,55 @@ struct Tas27xxCodec : public Tas27xx {
 class Tas27xxTest : public inspect::InspectTestHelper, public zxtest::Test {
  public:
   void SetUp() override {
+    EXPECT_OK(fidl_servers_loop_.StartThread("fidl-servers"));
+
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
     ASSERT_TRUE(endpoints.is_ok());
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
+    fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
 
     mock_i2c_client_ = std::move(endpoints->client);
-    EXPECT_OK(loop_.StartThread());
+    fault_gpio_client_ = fault_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
   }
+
+ private:
+  async::Loop fidl_servers_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 
  protected:
   mock_i2c::MockI2c mock_i2c_;
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> fault_gpio_{
+      fidl_servers_loop_.dispatcher(), std::in_place};
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> mock_i2c_client_;
-
- private:
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> fault_gpio_client_;
 };
 
 TEST_F(Tas27xxTest, CodecInitGood) {
   auto fake_parent = MockDevice::FakeRootParent();
-  zx::interrupt irq;
-  ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
-
-  ddk::MockGpio mock_fault;
-  mock_fault.ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(irq));
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
-      fake_parent.get(), std::move(mock_i2c_client_), mock_fault.GetProto()));
+      fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
 
   mock_i2c_.VerifyAndClear();
-  mock_fault.VerifyAndClear();
 }
 
 TEST_F(Tas27xxTest, CodecInitBad) {
   auto fake_parent = MockDevice::FakeRootParent();
-  zx::interrupt irq;
-  ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
 
-  ddk::MockGpio mock_fault;
   // Error when getting the interrupt.
-  mock_fault.ExpectGetInterrupt(ZX_ERR_INTERNAL, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(irq));
+  fault_gpio_.SyncCall(&fake_gpio::FakeGpio::SetInterrupt, zx::error(ZX_ERR_INTERNAL));
 
   ASSERT_EQ(ZX_ERR_INTERNAL,
             SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
-                fake_parent.get(), std::move(mock_i2c_client_), mock_fault.GetProto()));
+                fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
 
   mock_i2c_.VerifyAndClear();
-  mock_fault.VerifyAndClear();
 }
 
 TEST_F(Tas27xxTest, CodecGetInfo) {
   auto fake_parent = MockDevice::FakeRootParent();
-  zx::interrupt irq;
-  ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
-
-  ddk::MockGpio mock_fault;
-  mock_fault.ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(irq));
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
-      fake_parent.get(), std::move(mock_i2c_client_), mock_fault.GetProto()));
+      fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
@@ -127,13 +119,10 @@ TEST_F(Tas27xxTest, CodecGetInfo) {
   ASSERT_EQ(info->product_name.compare("TAS2770"), 0);
 
   mock_i2c_.VerifyAndClear();
-  mock_fault.VerifyAndClear();
 }
 
 TEST_F(Tas27xxTest, CodecReset) {
   auto fake_parent = MockDevice::FakeRootParent();
-  zx::interrupt irq;
-  ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
 
   // Reset by the call to Reset.
   mock_i2c_
@@ -158,11 +147,8 @@ TEST_F(Tas27xxTest, CodecReset) {
       .ExpectWriteStop({0x05, 0x00})   // 0dB.
       .ExpectWriteStop({0x02, 0x0e});  // PWR_CTL stopped.
 
-  ddk::MockGpio mock_fault;
-  mock_fault.ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(irq));
-
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
-      fake_parent.get(), std::move(mock_i2c_client_), mock_fault.GetProto()));
+      fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
@@ -173,14 +159,11 @@ TEST_F(Tas27xxTest, CodecReset) {
   ASSERT_OK(client.Reset());
 
   mock_i2c_.VerifyAndClear();
-  mock_fault.VerifyAndClear();
 }
 
 // This test is disabled because it relies on a timeout expectation that would create flakes.
 TEST_F(Tas27xxTest, DISABLED_CodecResetDueToErrorState) {
   auto fake_parent = MockDevice::FakeRootParent();
-  zx::interrupt irq;
-  ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
 
   // Set gain state.
   mock_i2c_
@@ -249,11 +232,8 @@ TEST_F(Tas27xxTest, DISABLED_CodecResetDueToErrorState) {
   // Start.
   mock_i2c_.ExpectWriteStop({0x02, 0x00});  // PWR_CTL started.
 
-  ddk::MockGpio mock_fault;
-  mock_fault.ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(irq));
-
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
-      fake_parent.get(), std::move(mock_i2c_client_), mock_fault.GetProto()));
+      fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
@@ -283,13 +263,10 @@ TEST_F(Tas27xxTest, DISABLED_CodecResetDueToErrorState) {
   ASSERT_OK(client.GetInfo());
 
   mock_i2c_.VerifyAndClear();
-  mock_fault.VerifyAndClear();
 }
 
 TEST_F(Tas27xxTest, ExternalConfig) {
   auto fake_parent = MockDevice::FakeRootParent();
-  zx::interrupt irq;
-  ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
 
   metadata::ti::TasConfig metadata = {};
   metadata.number_of_writes1 = 2;
@@ -334,11 +311,8 @@ TEST_F(Tas27xxTest, ExternalConfig) {
       .ExpectWriteStop({0x05, 0x00})   // 0dB.
       .ExpectWriteStop({0x02, 0x0e});  // PWR_CTL stopped.
 
-  ddk::MockGpio mock_fault;
-  mock_fault.ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(irq));
-
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
-      fake_parent.get(), std::move(mock_i2c_client_), mock_fault.GetProto()));
+      fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
@@ -349,19 +323,13 @@ TEST_F(Tas27xxTest, ExternalConfig) {
   ASSERT_OK(client.Reset());
 
   mock_i2c_.VerifyAndClear();
-  mock_fault.VerifyAndClear();
 }
 
 TEST_F(Tas27xxTest, CodecBridgedMode) {
   auto fake_parent = MockDevice::FakeRootParent();
-  zx::interrupt irq;
-  ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
-
-  ddk::MockGpio mock_fault;
-  mock_fault.ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(irq));
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
-      fake_parent.get(), std::move(mock_i2c_client_), mock_fault.GetProto()));
+      fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
@@ -375,19 +343,13 @@ TEST_F(Tas27xxTest, CodecBridgedMode) {
   client.SetBridgedMode(false);
 
   mock_i2c_.VerifyAndClear();
-  mock_fault.VerifyAndClear();
 }
 
 TEST_F(Tas27xxTest, CodecDaiFormat) {
   auto fake_parent = MockDevice::FakeRootParent();
-  zx::interrupt irq;
-  ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
-
-  ddk::MockGpio mock_fault;
-  mock_fault.ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(irq));
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
-      fake_parent.get(), std::move(mock_i2c_client_), mock_fault.GetProto()));
+      fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
@@ -467,19 +429,13 @@ TEST_F(Tas27xxTest, CodecDaiFormat) {
   }
 
   mock_i2c_.VerifyAndClear();
-  mock_fault.VerifyAndClear();
 }
 
 TEST_F(Tas27xxTest, CodecGain) {
   auto fake_parent = MockDevice::FakeRootParent();
-  zx::interrupt irq;
-  ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
-
-  ddk::MockGpio mock_fault;
-  mock_fault.ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(irq));
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
-      fake_parent.get(), std::move(mock_i2c_client_), mock_fault.GetProto()));
+      fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
@@ -567,7 +523,6 @@ TEST_F(Tas27xxTest, CodecGain) {
   ASSERT_OK(client.GetInfo());
 
   mock_i2c_.VerifyAndClear();
-  mock_fault.VerifyAndClear();
 }
 
 }  // namespace audio

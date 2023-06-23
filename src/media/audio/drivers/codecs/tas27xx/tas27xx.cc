@@ -43,11 +43,11 @@ bool Tas27xx::InErrorState() {
   return started_ && status == ZX_OK && (pwr_ctl & kPwrCtlModeMask) == kPwrCtlModeShutdown;
 }
 
-Tas27xx::Tas27xx(zx_device_t* device, ddk::I2cChannel i2c, ddk::GpioProtocolClient fault_gpio,
-                 bool vsense, bool isense)
+Tas27xx::Tas27xx(zx_device_t* device, ddk::I2cChannel i2c,
+                 fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> fault_gpio, bool vsense, bool isense)
     : SimpleCodecServer(device),
       i2c_(std::move(i2c)),
-      fault_gpio_(fault_gpio),
+      fault_gpio_(std::move(fault_gpio)),
       ena_vsens_(vsense),
       ena_isens_(isense) {
   size_t actual = 0;
@@ -266,12 +266,17 @@ void Tas27xx::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_
 }
 
 zx::result<DriverIds> Tas27xx::Initialize() {
-  zx_status_t status = fault_gpio_.GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW, &irq_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "tas27xx: Could not get codec interrupt %d", status);
-    return zx::error(status);
+  fidl::WireResult result = fault_gpio_->GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW);
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send GetInterrupt request to fault gpio: %s", result.status_string());
+    return zx::error(result.status());
   }
-
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt from fault gpio: %s",
+           zx_status_get_string(result->error_value()));
+    return result->take_error();
+  }
+  irq_ = std::move(result.value()->irq);
   irq_handler_.set_object(irq_.get());
   irq_handler_.Begin(dispatcher());
 
@@ -477,13 +482,16 @@ zx_status_t tas27xx_bind(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  ddk::GpioProtocolClient gpio(parent, "gpio");
-  if (!gpio.is_valid()) {
-    zxlogf(ERROR, "tas27xx: Could not get gpio protocol");
+  zx::result gpio =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+          parent, "gpio");
+  if (gpio.is_error()) {
+    zxlogf(ERROR, "tas27xx: Failed to get gpio protocol: %s", gpio.status_string());
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  return SimpleCodecServer::CreateAndAddToDdk<Tas27xx>(parent, std::move(i2c), gpio, false, false);
+  return SimpleCodecServer::CreateAndAddToDdk<Tas27xx>(parent, std::move(i2c),
+                                                       std::move(gpio.value()), false, false);
 }
 
 static zx_driver_ops_t driver_ops = []() {

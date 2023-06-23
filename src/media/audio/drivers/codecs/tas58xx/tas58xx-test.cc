@@ -4,9 +4,9 @@
 
 #include "tas58xx.h"
 
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -20,6 +20,7 @@
 #include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <zxtest/zxtest.h>
 
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace audio {
@@ -34,7 +35,7 @@ static constexpr uint64_t kEqualizerPeIndex = 3;
 
 struct Tas58xxCodec : public Tas58xx {
   explicit Tas58xxCodec(zx_device_t* parent, ddk::I2cChannel i2c,
-                        ddk::GpioProtocolClient gpio_fault)
+                        fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio_fault)
       : Tas58xx(parent, std::move(i2c), std::move(gpio_fault)) {}
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> GetClient() {
     zx::channel channel_remote;
@@ -64,22 +65,24 @@ struct Tas58xxCodec : public Tas58xx {
 
 class Tas58xxTest : public inspect::InspectTestHelper, public zxtest::Test {
  public:
-  Tas58xxTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
   void SetUp() override {
     fake_parent_ = MockDevice::FakeRootParent();
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
     ASSERT_TRUE(endpoints.is_ok());
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
+    fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
 
-    loop_.StartThread();
+    fidl_servers_loop_.StartThread("fidl-servers");
     mock_i2c_.ExpectWrite({0x67}).ExpectReadStop({0x00}, ZX_ERR_INTERNAL);  // Error will retry.
     mock_i2c_.ExpectWrite({0x67}).ExpectReadStop({0x00}, ZX_ERR_INTERNAL);  // Error will retry.
     mock_i2c_.ExpectWrite({0x67}).ExpectReadStop({0x00}, ZX_OK);  // Check DIE ID, no error now.
 
+    auto fault_gpio_client = fault_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
+    fault_gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState, fake_gpio::ReadState());
+
     ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas58xxCodec>(
-        fake_parent_.get(), std::move(endpoints->client), mock_fault_.GetProto()));
+        fake_parent_.get(), std::move(endpoints->client), std::move(fault_gpio_client)));
 
     auto* child_dev = fake_parent_->GetLatestChild();
     ASSERT_NOT_NULL(child_dev);
@@ -90,15 +93,21 @@ class Tas58xxTest : public inspect::InspectTestHelper, public zxtest::Test {
   }
   void TearDown() override { mock_i2c_.VerifyAndClear(); }
 
- protected:
-  mock_i2c::MockI2c mock_i2c_;
-  ddk::MockGpio mock_fault_;
-  SimpleCodecClient client_;
-  Tas58xxCodec* codec_;
-
  private:
   std::shared_ptr<zx_device> fake_parent_;
-  async::Loop loop_;
+  async::Loop fidl_servers_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+
+ protected:
+  void SetFaultGpioReadResponse(zx::result<uint8_t> response) {
+    fault_gpio_.SyncCall(&fake_gpio::FakeGpio::SetReadCallback,
+                         [response](fake_gpio::FakeGpio& gpio) { return response; });
+  }
+
+  mock_i2c::MockI2c mock_i2c_;
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> fault_gpio_{
+      fidl_servers_loop_.dispatcher(), std::in_place};
+  SimpleCodecClient client_;
+  Tas58xxCodec* codec_;
 };
 
 TEST_F(Tas58xxTest, GoodSetDai) {
@@ -328,7 +337,6 @@ TEST_F(Tas58xxTest, SetGainDeprecated) {
 // Tests that don't use SimpleCodec and make signal processing calls on their own.
 class Tas58xxSignalProcessingTest : public inspect::InspectTestHelper, public zxtest::Test {
  public:
-  Tas58xxSignalProcessingTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
   void SetUp() override {
     fake_parent_ = MockDevice::FakeRootParent();
 
@@ -339,15 +347,15 @@ class Tas58xxSignalProcessingTest : public inspect::InspectTestHelper, public zx
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
     ASSERT_TRUE(endpoints.is_ok());
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
+    fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
 
-    loop_.StartThread();
+    fidl_servers_loop_.StartThread("fidl-servers");
     mock_i2c_.ExpectWrite({0x67}).ExpectReadStop({0x00}, ZX_OK);  // Check DIE ID.
 
-    ddk::MockGpio mock_fault;
+    auto fault_gpio_client = fault_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
 
     ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas58xxCodec>(
-        fake_parent_.get(), std::move(endpoints->client), mock_fault.GetProto()));
+        fake_parent_.get(), std::move(endpoints->client), std::move(fault_gpio_client)));
 
     auto* child_dev = fake_parent_->GetLatestChild();
     ASSERT_NOT_NULL(child_dev);
@@ -367,15 +375,17 @@ class Tas58xxSignalProcessingTest : public inspect::InspectTestHelper, public zx
   }
   void TearDown() override { mock_i2c_.VerifyAndClear(); }
 
+ private:
+  async::Loop fidl_servers_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  std::shared_ptr<zx_device> fake_parent_;
+
  protected:
   fidl::SynchronousInterfacePtr<audio_fidl::Codec> codec_client_;
   fidl::SynchronousInterfacePtr<signal_fidl::SignalProcessing> signal_processing_client_;
   mock_i2c::MockI2c mock_i2c_;
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> fault_gpio_{
+      fidl_servers_loop_.dispatcher(), std::in_place};
   Tas58xxCodec* codec_;
-
- private:
-  async::Loop loop_;
-  std::shared_ptr<zx_device> fake_parent_;
 };
 
 TEST_F(Tas58xxSignalProcessingTest, GetTopologySignalProcessing) {
@@ -424,20 +434,22 @@ TEST_F(Tas58xxSignalProcessingTest, GetTopologySignalProcessing) {
 TEST(Tas58xxSignalProcessingTest, SignalProcessingConnectTooManyConnections) {
   auto fake_parent = MockDevice::FakeRootParent();
   mock_i2c::MockI2c mock_i2c;
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  async::Loop fidl_servers_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   mock_i2c.ExpectWrite({0x67}).ExpectReadStop({0x95});  // Check DIE ID.
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
   ASSERT_TRUE(endpoints.is_ok());
 
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
-  loop.StartThread();
+  fidl::BindServer(fidl_servers_loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
+  fidl_servers_loop.StartThread("fidl-servers");
 
-  ddk::MockGpio mock_fault;
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> fault_gpio{
+      fidl_servers_loop.dispatcher(), std::in_place};
+  auto fault_gpio_client = fault_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas58xxCodec>(
-      fake_parent.get(), std::move(endpoints->client), mock_fault.GetProto()));
+      fake_parent.get(), std::move(endpoints->client), std::move(fault_gpio_client)));
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
@@ -1405,20 +1417,22 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerElementDisabled) {
 TEST(Tas58xxTest, Reset) {
   auto fake_parent = MockDevice::FakeRootParent();
   mock_i2c::MockI2c mock_i2c;
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  async::Loop fidl_servers_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   mock_i2c.ExpectWrite({0x67}).ExpectReadStop({0x95});  // Check DIE ID.
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
   ASSERT_TRUE(endpoints.is_ok());
 
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
-  loop.StartThread();
+  fidl::BindServer(fidl_servers_loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
+  fidl_servers_loop.StartThread("fidl-servers");
 
-  ddk::MockGpio mock_fault;
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> fault_gpio{
+      fidl_servers_loop.dispatcher(), std::in_place};
+  auto fault_gpio_client = fault_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas58xxCodec>(
-      fake_parent.get(), std::move(endpoints->client), mock_fault.GetProto()));
+      fake_parent.get(), std::move(endpoints->client), std::move(fault_gpio_client)));
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
@@ -1453,20 +1467,19 @@ TEST(Tas58xxTest, Reset) {
 TEST(Tas58xxTest, BadFaultGpio) {
   auto fake_parent = MockDevice::FakeRootParent();
   mock_i2c::MockI2c mock_i2c;
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  async::Loop fidl_servers_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   mock_i2c.ExpectWrite({0x67}).ExpectReadStop({0x95});  // Check DIE ID.
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
   ASSERT_TRUE(endpoints.is_ok());
 
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
-  loop.StartThread();
-
-  gpio_protocol bad_protocol = {};
+  fidl::BindServer(fidl_servers_loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
+  fidl_servers_loop.StartThread("fidl-servers");
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas58xxCodec>(
-      fake_parent.get(), std::move(endpoints->client), &bad_protocol));
+      fake_parent.get(), std::move(endpoints->client),
+      fidl::ClientEnd<fuchsia_hardware_gpio::Gpio>()));
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
@@ -1485,7 +1498,7 @@ TEST(Tas58xxTest, BadFaultGpio) {
 TEST(Tas58xxTest, Bridged) {
   auto fake_parent = MockDevice::FakeRootParent();
   mock_i2c::MockI2c mock_i2c;
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  async::Loop fidl_servers_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   mock_i2c.ExpectWrite({0x67}).ExpectReadStop({0x95});  // Check DIE ID.
 
@@ -1496,13 +1509,15 @@ TEST(Tas58xxTest, Bridged) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
   ASSERT_TRUE(endpoints.is_ok());
 
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
-  loop.StartThread();
+  fidl::BindServer(fidl_servers_loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
+  fidl_servers_loop.StartThread("fidl-servers");
 
-  ddk::MockGpio mock_fault;
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> fault_gpio{
+      fidl_servers_loop.dispatcher(), std::in_place};
+  auto fault_gpio_client = fault_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas58xxCodec>(
-      fake_parent.get(), std::move(endpoints->client), mock_fault.GetProto()));
+      fake_parent.get(), std::move(endpoints->client), std::move(fault_gpio_client)));
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
@@ -1587,7 +1602,7 @@ TEST_F(Tas58xxTest, StopStart) {
 TEST(Tas58xxTest, ExternalConfig) {
   auto fake_parent = MockDevice::FakeRootParent();
   mock_i2c::MockI2c mock_i2c;
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  async::Loop fidl_servers_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   mock_i2c.ExpectWrite({0x67}).ExpectReadStop({0x95});  // Check DIE ID.
 
@@ -1609,13 +1624,15 @@ TEST(Tas58xxTest, ExternalConfig) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
   ASSERT_TRUE(endpoints.is_ok());
 
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
-  loop.StartThread();
+  fidl::BindServer(fidl_servers_loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
+  fidl_servers_loop.StartThread("fidl-servers");
 
-  ddk::MockGpio mock_fault;
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> fault_gpio{
+      fidl_servers_loop.dispatcher(), std::in_place};
+  auto fault_gpio_client = fault_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas58xxCodec>(
-      fake_parent.get(), std::move(endpoints->client), mock_fault.GetProto()));
+      fake_parent.get(), std::move(endpoints->client), std::move(fault_gpio_client)));
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
@@ -1675,9 +1692,8 @@ TEST(Tas58xxTest, ExternalConfig) {
 }
 
 TEST_F(Tas58xxTest, FaultNotSeen) {
-  mock_fault_.ExpectRead(ZX_OK, 1);  // 1 means FAULT inactive
+  SetFaultGpioReadResponse(zx::ok<uint8_t>(1));  // 1 means FAULT inactive
   codec_->PeriodicPollFaults();
-  mock_fault_.VerifyAndClear();  // FAULT should have been polled
 
   ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
   auto* fault_root = hierarchy().GetByPath({"tas58xx"});
@@ -1689,9 +1705,8 @@ TEST_F(Tas58xxTest, FaultNotSeen) {
 }
 
 TEST_F(Tas58xxTest, FaultPollGpioError) {
-  mock_fault_.ExpectRead(ZX_ERR_INTERNAL, 0);  // Gpio Error
+  SetFaultGpioReadResponse(zx::error(ZX_ERR_INTERNAL));  // Gpio Error
   codec_->PeriodicPollFaults();
-  mock_fault_.VerifyAndClear();  // FAULT should have been polled
 
   ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
   auto* fault_root = hierarchy().GetByPath({"tas58xx"});
@@ -1703,14 +1718,13 @@ TEST_F(Tas58xxTest, FaultPollGpioError) {
 }
 
 TEST_F(Tas58xxTest, FaultPollI2CError) {
-  mock_fault_.ExpectRead(ZX_OK, 0);  // 0 means FAULT active
+  SetFaultGpioReadResponse(zx::ok<uint8_t>(0));  // 0 means FAULT active
   // Repeat I2C timeout 3 times.
   mock_i2c_.ExpectWrite({0x70}).ExpectReadStop({0xFF}, ZX_ERR_TIMED_OUT);
   mock_i2c_.ExpectWrite({0x70}).ExpectReadStop({0xFF}, ZX_ERR_TIMED_OUT);
   mock_i2c_.ExpectWrite({0x70}).ExpectReadStop({0xFF}, ZX_ERR_TIMED_OUT);
   mock_i2c_.ExpectWriteStop({0x78, 0x80});
   codec_->PeriodicPollFaults();
-  mock_fault_.VerifyAndClear();  // FAULT should have been polled
 
   ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
   auto* fault_root = hierarchy().GetByPath({"tas58xx"});
@@ -1722,14 +1736,13 @@ TEST_F(Tas58xxTest, FaultPollI2CError) {
 }
 
 TEST_F(Tas58xxTest, FaultPollClockFault) {
-  mock_fault_.ExpectRead(ZX_OK, 0);  // 0 means FAULT active
+  SetFaultGpioReadResponse(zx::ok<uint8_t>(0));  // 0 means FAULT active
   mock_i2c_.ExpectWrite({0x70}).ExpectReadStop({0x00});
   mock_i2c_.ExpectWrite({0x71}).ExpectReadStop({0x04});
   mock_i2c_.ExpectWrite({0x72}).ExpectReadStop({0x00});
   mock_i2c_.ExpectWrite({0x73}).ExpectReadStop({0x00});
   mock_i2c_.ExpectWriteStop({0x78, 0x80});
   codec_->PeriodicPollFaults();
-  mock_fault_.VerifyAndClear();  // FAULT should have been polled
 
   ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
   auto* fault_root = hierarchy().GetByPath({"tas58xx"});
@@ -1753,19 +1766,17 @@ TEST_F(Tas58xxTest, FaultsAgeOut) {
       time_threshold = zx_clock_get_monotonic();
 
     // Detect fault
-    mock_fault_.ExpectRead(ZX_OK, 0);  // 0 means FAULT active
+    SetFaultGpioReadResponse(zx::ok<uint8_t>(0));  // 0 means FAULT active
     mock_i2c_.ExpectWrite({0x70}).ExpectReadStop({0x00});
     mock_i2c_.ExpectWrite({0x71}).ExpectReadStop({0x04});
     mock_i2c_.ExpectWrite({0x72}).ExpectReadStop({0x00});
     mock_i2c_.ExpectWrite({0x73}).ExpectReadStop({0x00});
     mock_i2c_.ExpectWriteStop({0x78, 0x80});
     codec_->PeriodicPollFaults();
-    mock_fault_.VerifyAndClear();  // FAULT should have been polled
 
     // Fault goes away
-    mock_fault_.ExpectRead(ZX_OK, 1);  // 1 means FAULT inactive
+    SetFaultGpioReadResponse(zx::ok<uint8_t>(1));  // 1 means FAULT inactive
     codec_->PeriodicPollFaults();
-    mock_fault_.VerifyAndClear();  // FAULT should have been polled
   }
 
   // We should have ten events seen, and all of them should be

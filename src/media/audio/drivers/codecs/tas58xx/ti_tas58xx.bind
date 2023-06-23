@@ -15,6 +15,6 @@ primary node "i2c" {
 }
 
 node "gpio-fault" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.SOC_AUDIO_FAULT;
 }

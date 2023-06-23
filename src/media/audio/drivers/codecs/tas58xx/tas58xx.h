@@ -5,7 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_CODECS_TAS58XX_TAS58XX_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_CODECS_TAS58XX_TAS58XX_H_
 
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -32,7 +32,8 @@ class Tas58xx : public SimpleCodecServer,
  public:
   static zx_status_t Create(zx_device_t* parent);
 
-  explicit Tas58xx(zx_device_t* device, ddk::I2cChannel i2c, ddk::GpioProtocolClient gpio_fault);
+  explicit Tas58xx(zx_device_t* device, ddk::I2cChannel i2c,
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio_fault);
 
   // Implementation for SimpleCodecServer.
   zx_status_t Shutdown() override;
@@ -134,7 +135,7 @@ class Tas58xx : public SimpleCodecServer,
   // relatively timely basis.
   static constexpr zx::duration poll_interval_ = zx::sec(20);
   void ScheduleFaultPolling();
-  ddk::GpioProtocolClient fault_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> fault_gpio_;
   struct {
     bool i2c_error;         // True if saw an I2C error while reading fault
     uint8_t chan_fault;     // Channel fault bits

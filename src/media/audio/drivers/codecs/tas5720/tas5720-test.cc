@@ -4,7 +4,6 @@
 
 #include "tas5720.h"
 
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/metadata.h>

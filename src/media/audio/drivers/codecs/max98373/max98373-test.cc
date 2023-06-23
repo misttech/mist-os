@@ -4,21 +4,23 @@
 
 #include "max98373.h"
 
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/mock-i2c/mock-i2c.h>
 #include <lib/simple-codec/simple-codec-client.h>
 #include <lib/simple-codec/simple-codec-helper.h>
 
 #include <zxtest/zxtest.h>
 
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace audio {
 
 struct Max98373Codec : public Max98373 {
-  explicit Max98373Codec(ddk::I2cChannel i2c, ddk::GpioProtocolClient codec_reset,
+  explicit Max98373Codec(ddk::I2cChannel i2c,
+                         fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> codec_reset,
                          zx_device_t* parent)
       : Max98373(parent, std::move(i2c), std::move(codec_reset)) {}
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> GetClient() {
@@ -52,13 +54,15 @@ class Max98373Test : public zxtest::Test {
         .ExpectWriteStop({0x20, 0x3e, 0x05})   // Set analog gain to +13dB.
         .ExpectWriteStop({0x20, 0x2b, 0x01});  // Data in enable.
 
-    loop_.StartThread();
+    fidl_servers_loop_.StartThread("fidl-servers");
 
     fake_root_ = MockDevice::FakeRootParent();
-    mock_gpio_.ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);  // Reset, set to 0 and then to 1.
-    ddk::GpioProtocolClient gpio(mock_gpio_.GetProto());
-    ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Max98373Codec>(GetI2cClient(), std::move(gpio),
-                                                                  fake_root_.get()));
+    fidl::ClientEnd codec_reset = fake_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
+    ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Max98373Codec>(
+        GetI2cClient(), std::move(codec_reset), fake_root_.get()));
+    ASSERT_EQ(1,
+              fake_gpio_.SyncCall(
+                  &fake_gpio::FakeGpio::GetCurrentWriteValue));  // Reset, set to 0 and then to 1.
     auto* child_dev = fake_root_->GetLatestChild();
     auto codec = child_dev->GetDeviceContext<Max98373Codec>();
     zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
@@ -70,7 +74,6 @@ class Max98373Test : public zxtest::Test {
     auto* child_dev = fake_root_->GetLatestChild();
     child_dev->UnbindOp();
     mock_i2c_.VerifyAndClear();
-    mock_gpio_.VerifyAndClear();
   }
 
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> GetI2cClient() {
@@ -79,14 +82,15 @@ class Max98373Test : public zxtest::Test {
       return {};
     }
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
+    fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
     return std::move(endpoints->client);
   }
 
  protected:
+  async::Loop fidl_servers_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   mock_i2c::MockI2c mock_i2c_;
-  ddk::MockGpio mock_gpio_;
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> fake_gpio_{
+      fidl_servers_loop_.dispatcher(), std::in_place};
   SimpleCodecClient client_;
   std::shared_ptr<MockDevice> fake_root_;
 };

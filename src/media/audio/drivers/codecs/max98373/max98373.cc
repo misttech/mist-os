@@ -60,9 +60,29 @@ static const audio::DaiSupportedFormats kSupportedDaiFormats = {
 
 zx_status_t Max98373::HardwareReset() {
   if (codec_reset_.is_valid()) {
-    codec_reset_.Write(0);
+    fidl::WireResult write1_result = codec_reset_->Write(0);
+    if (!write1_result.ok()) {
+      zxlogf(ERROR, "Failed to send Write request to codec reset gpio: %s",
+             write1_result.status_string());
+      return write1_result.status();
+    }
+    if (write1_result->is_error()) {
+      zxlogf(ERROR, "Failed to write 0 to codec reset gpio: %s",
+             zx_status_get_string(write1_result->error_value()));
+      return write1_result->error_value();
+    }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
-    codec_reset_.Write(1);
+    fidl::WireResult write2_result = codec_reset_->Write(1);
+    if (!write2_result.ok()) {
+      zxlogf(ERROR, "Failed to send Write request to codec reset gpio: %s",
+             write2_result.status_string());
+      return write2_result.status();
+    }
+    if (write2_result->is_error()) {
+      zxlogf(ERROR, "Failed to write 1 to codec reset gpio: %s",
+             zx_status_get_string(write2_result->error_value()));
+      return write2_result->error_value();
+    }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(3)));
     return ZX_OK;
   }
@@ -137,8 +157,8 @@ zx_status_t Max98373::Create(zx_device_t* parent) {
     }
 
     // No GPIO control.
-    return SimpleCodecServer::CreateAndAddToDdk<Max98373>(parent, std::move(i2c),
-                                                          ddk::GpioProtocolClient{});
+    return SimpleCodecServer::CreateAndAddToDdk<Max98373>(
+        parent, std::move(i2c), fidl::ClientEnd<fuchsia_hardware_gpio::Gpio>());
   }
 
   ddk::I2cChannel i2c(parent, "i2c");
@@ -147,13 +167,15 @@ zx_status_t Max98373::Create(zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  ddk::GpioProtocolClient gpio(parent, "gpio-enable");
-  if (!gpio.is_valid()) {
-    zxlogf(ERROR, "Could not get gpio protocol");
-    return ZX_ERR_NO_RESOURCES;
+  zx::result gpio =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(parent, "gpio-enable");
+  if (gpio.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol: %s", gpio.status_string());
+    return gpio.error_value();
   }
 
-  return SimpleCodecServer::CreateAndAddToDdk<Max98373>(parent, std::move(i2c), std::move(gpio));
+  return SimpleCodecServer::CreateAndAddToDdk<Max98373>(parent, std::move(i2c),
+                                                        std::move(gpio.value()));
 }
 
 Info Max98373::GetInfo() {

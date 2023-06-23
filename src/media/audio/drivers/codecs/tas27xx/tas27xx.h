@@ -5,7 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_CODECS_TAS27XX_TAS27XX_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_CODECS_TAS27XX_TAS27XX_H_
 
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -66,8 +66,9 @@ static constexpr GainState kDefaultGainState = {.gain = 0.f, .muted = true};
 
 class Tas27xx : public SimpleCodecServer {
  public:
-  explicit Tas27xx(zx_device_t* device, ddk::I2cChannel i2c, ddk::GpioProtocolClient fault_gpio,
-                   bool vsense, bool isense);
+  explicit Tas27xx(zx_device_t* device, ddk::I2cChannel i2c,
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> fault_gpio, bool vsense,
+                   bool isense);
 
   virtual ~Tas27xx() = default;
 
@@ -91,7 +92,7 @@ class Tas27xx : public SimpleCodecServer {
 
   zx::interrupt irq_;
   ddk::I2cChannel i2c_;
-  const ddk::GpioProtocolClient fault_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> fault_gpio_;
   bool ena_vsens_ = false;
   bool ena_isens_ = false;
 

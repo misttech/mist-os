@@ -94,7 +94,8 @@ const ddk::BindRule kFaultGpioRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_AUDIO_SOC_FAULT_L)),
 };
 const device_bind_prop_t kFaultGpioProps[] = {
-    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                      bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
     ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                       bind_fuchsia_hardware_gpio::FUNCTION_SOC_AUDIO_FAULT),
 };

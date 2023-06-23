@@ -25,8 +25,8 @@ fuchsia_driver("max98373-driver") {
   sources = [ "max98373.cc" ]
   deps = [
     ":max98373-bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/acpi",
     "//src/devices/lib/driver",
@@ -55,10 +55,11 @@ test("max98373-test") {
   ]
   deps = [
     ":max98373-bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp_mock",
     "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/i2c/testing/mock-i2c",
     "//src/devices/lib/acpi",

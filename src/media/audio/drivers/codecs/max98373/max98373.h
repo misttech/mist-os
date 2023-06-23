@@ -5,7 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_CODECS_MAX98373_MAX98373_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_CODECS_MAX98373_MAX98373_H_
 
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
@@ -27,7 +27,8 @@ class Max98373 : public SimpleCodecServer {
  public:
   static zx_status_t Create(zx_device_t* parent);
 
-  explicit Max98373(zx_device_t* device, ddk::I2cChannel i2c, ddk::GpioProtocolClient codec_reset)
+  explicit Max98373(zx_device_t* device, ddk::I2cChannel i2c,
+                    fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> codec_reset)
       : SimpleCodecServer(device), i2c_(std::move(i2c)), codec_reset_(std::move(codec_reset)) {}
   // Implementation for SimpleCodecServer.
   zx_status_t Shutdown() override;
@@ -60,7 +61,7 @@ class Max98373 : public SimpleCodecServer {
 
   GainState gain_state_ = {};
   ddk::I2cChannel i2c_;
-  ddk::GpioProtocolClient codec_reset_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> codec_reset_;
 };
 }  // namespace audio
 

@@ -78,11 +78,14 @@ static const audio::DaiSupportedFormats kSupportedDaiDaiFormats = {
     .bits_per_sample = kSupportedDaiBitsPerSample,
 };
 
-Tas58xx::Tas58xx(zx_device_t* device, ddk::I2cChannel i2c, ddk::GpioProtocolClient fault_gpio)
+Tas58xx::Tas58xx(zx_device_t* device, ddk::I2cChannel i2c,
+                 fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> fault_gpio)
     : SimpleCodecServer(device),
       i2c_(std::move(i2c)),
-      fault_gpio_(std::move(fault_gpio)),
       inspect_reporter_(Tas58xxInspect(inspect(), "tas58xx")) {
+  if (fault_gpio.is_valid()) {
+    fault_gpio_.Bind(std::move(fault_gpio));
+  }
   size_t actual = 0;
   auto status = device_get_metadata(parent(), DEVICE_METADATA_PRIVATE, &metadata_,
                                     sizeof(metadata_), &actual);
@@ -201,15 +204,18 @@ void Tas58xx::ScheduleFaultPolling() {
 
 void Tas58xx::PeriodicPollFaults() {
   zx::time time_now = zx::clock::get_monotonic();
-  uint8_t fault_state;
   if (!fault_gpio_.is_valid()) {
     return;  // Only check for periodic faults when the FAULT GPIO is setup.
   }
-  auto status = fault_gpio_.Read(&fault_state);
-  if (status != ZX_OK) {
-    zxlogf(WARNING, "GPIO error while polling fault data");
+  fidl::WireResult read_result = fault_gpio_->Read();
+  if (!read_result.ok()) {
+    zxlogf(WARNING, "Failed to send Read request to fault gpio: %s", read_result.status_string());
     inspect_reporter_.ReportGpioError(time_now);
-  } else if (fault_state == 0) {  // Active low; 0 means the pin is active!
+  } else if (read_result->is_error()) {
+    zxlogf(WARNING, "Failed to read fault gpio: %s",
+           zx_status_get_string(read_result->error_value()));
+    inspect_reporter_.ReportGpioError(time_now);
+  } else if (read_result.value()->value == 0) {  // Active low; 0 means the pin is active!
     // Codec is driving fault pin active.  Read the fault registers.
     fault_info_.i2c_error = (ReadReg(kRegChanFault, &fault_info_.chan_fault) != ZX_OK) ||
                             (ReadReg(kRegGlobalFault1, &fault_info_.global_fault1) != ZX_OK) ||
@@ -260,14 +266,15 @@ zx_status_t Tas58xx::Create(zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  ddk::GpioProtocolClient fault_gpio(parent, "gpio-fault");
-  if (!fault_gpio.is_valid()) {
+  zx::result fault_gpio =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(parent, "gpio-fault");
+  if (fault_gpio.is_error()) {
     // It is ok to not have a valid GPIO for fault.
     zxlogf(INFO, "No gpio-fault available");
   }
 
   return SimpleCodecServer::CreateAndAddToDdk<Tas58xx>(parent, std::move(i2c),
-                                                       std::move(fault_gpio));
+                                                       std::move(fault_gpio.value()));
 }
 
 Info Tas58xx::GetInfo() {
