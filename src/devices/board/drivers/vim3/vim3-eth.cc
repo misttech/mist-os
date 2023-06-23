@@ -123,7 +123,7 @@ static const fpbus::Node dwmac_dev = []() {
 
 // Composite binding rules for ethernet board driver.
 static const zx_bind_inst_t gpio_int_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_GPIO),
+    BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_GPIO),
     BI_MATCH_IF(EQ, BIND_GPIO_PIN, VIM3_ETH_MAC_INTR),
 };
 

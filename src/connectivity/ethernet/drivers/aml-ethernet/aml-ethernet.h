@@ -6,7 +6,7 @@
 #define SRC_CONNECTIVITY_ETHERNET_DRIVERS_AML_ETHERNET_AML_ETHERNET_H_
 
 #include <fidl/fuchsia.hardware.ethernet.board/cpp/wire.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
@@ -58,7 +58,7 @@ class AmlEthernet : public DeviceType,
 
   ddk::PDevFidl pdev_;
   ddk::I2cChannel i2c_;
-  ddk::GpioProtocolClient gpios_[GPIO_COUNT];
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpios_[GPIO_COUNT];
   std::optional<component::OutgoingDirectory> outgoing_;
   fidl::ServerEnd<fuchsia_io::Directory> outgoing_server_end_;
   fidl::ServerBindingGroup<fuchsia_hardware_ethernet_board::EthBoard> bindings_;

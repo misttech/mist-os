@@ -30,10 +30,37 @@ namespace eth {
 #define MCU_I2C_REG_BOOT_EN_WOL_RESET_ENABLE 0x03
 
 void AmlEthernet::ResetPhy(ResetPhyCompleter::Sync& completer) {
-  if (gpios_[PHY_RESET].is_valid()) {
-    gpios_[PHY_RESET].Write(0);
+  const auto& gpio_reset = gpios_[PHY_RESET];
+  if (gpio_reset.is_valid()) {
+    {
+      fidl::WireResult result = gpio_reset->Write(0);
+      if (!result.ok()) {
+        zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+        completer.ReplyError(result.status());
+        return;
+      }
+      if (result->is_error()) {
+        zxlogf(ERROR, "Failed to write 0 to reset gpio: %s",
+               zx_status_get_string(result->error_value()));
+        completer.ReplyError(result->error_value());
+        return;
+      }
+    }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(100)));
-    gpios_[PHY_RESET].Write(1);
+    {
+      fidl::WireResult result = gpio_reset->Write(1);
+      if (!result.ok()) {
+        zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+        completer.ReplyError(result.status());
+        return;
+      }
+      if (result->is_error()) {
+        zxlogf(ERROR, "Failed to write 1 to reset gpio: %s",
+               zx_status_get_string(result->error_value()));
+        completer.ReplyError(result->error_value());
+        return;
+      }
+    }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(100)));
   }
   completer.ReplySuccess();
@@ -50,17 +77,24 @@ zx_status_t AmlEthernet::InitPdev() {
   i2c_ = ddk::I2cChannel(parent(), "i2c");
 
   // Reset is optional.
-  gpios_[PHY_RESET] = ddk::GpioProtocolClient(parent(), "gpio-reset");
-
-  zx_status_t status =
-      ddk::GpioProtocolClient::CreateFromDevice(parent(), "gpio-int", &gpios_[PHY_INTR]);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not get GPIO protocol: %s", zx_status_get_string(status));
-    return ZX_ERR_NO_RESOURCES;
+  zx::result gpio_reset = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      parent(), "gpio-reset");
+  if (gpio_reset.is_ok()) {
+    gpios_[PHY_RESET].Bind(std::move(gpio_reset.value()));
   }
 
+  const char* kInterruptGpioFragmentName = "gpio-int";
+  zx::result gpio_int = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      parent(), kInterruptGpioFragmentName);
+  if (gpio_int.is_error()) {
+    zxlogf(ERROR, "Failed to get GPIO protocol from fragment %s: %s", kInterruptGpioFragmentName,
+           gpio_int.status_string());
+    return ZX_ERR_NO_RESOURCES;
+  }
+  gpios_[PHY_INTR].Bind(std::move(gpio_int.value()));
+
   // Map amlogic peripheral control registers.
-  status = pdev_.MapMmio(MMIO_PERIPH, &periph_mmio_);
+  zx_status_t status = pdev_.MapMmio(MMIO_PERIPH, &periph_mmio_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-dwmac: could not map periph mmio: %d", status);
     return status;
@@ -78,8 +112,18 @@ zx_status_t AmlEthernet::InitPdev() {
 
 zx_status_t AmlEthernet::Bind() {
   // Set reset line to output if implemented
-  if (gpios_[PHY_RESET].is_valid()) {
-    gpios_[PHY_RESET].ConfigOut(0);
+  const auto& gpio_reset = gpios_[PHY_RESET];
+  if (gpio_reset.is_valid()) {
+    fidl::WireResult result = gpio_reset->ConfigOut(0);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigOut request to reset gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure reset gpio to output: %s",
+             _zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
   pdev_board_info_t board;

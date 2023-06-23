@@ -11,16 +11,14 @@
         runner: "driver",
         bind: "meta/bind/aml_eth_bind.bindbc",
         compat: "driver/aml-ethernet.so",
-
-        // TODO(fxbug.dev/98522): No longer colocate once aml-ethernet does not
-        // depend on the GPIO banjo protocol.
-        colocate: "true",
+        colocate: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     capabilities: [
         { service: "fuchsia.hardware.ethernet.board.Service" },
     ],
     use: [
+        { service: "fuchsia.hardware.gpio.Service" },
         { service: "fuchsia.hardware.i2c.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
     ],
