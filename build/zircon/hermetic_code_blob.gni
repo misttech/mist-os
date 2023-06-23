@@ -73,6 +73,7 @@ template("hermetic_code_blob") {
 
     deps = []
     ldflags = []
+    exclude_toolchain_tags = []
     forward_variables_from(invoker,
                            "*",
                            [
@@ -103,7 +104,7 @@ template("hermetic_code_blob") {
 
     # This code should use the normal toolchain for its containing environment,
     # kernel vs kernel.phys, etc.  But it cannot use any fancy variants.
-    exclude_toolchain_tags = [ "instrumented" ]
+    exclude_toolchain_tags += [ "instrumented" ]
   }
 
   image_binary(image_target) {

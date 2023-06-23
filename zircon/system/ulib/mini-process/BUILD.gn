@@ -61,4 +61,9 @@ hermetic_code_blob("subprocess.blob") {
     "//zircon/system/ulib/backtrace-request",
     "//zircon/system/ulib/c/string:hermetic",
   ]
+
+  # TODO(fxbug.dev/129545): subprocess crashes when built with thinlto on riscv
+  if (current_cpu == "riscv64") {
+    exclude_toolchain_tags = [ "lto" ]
+  }
 }
