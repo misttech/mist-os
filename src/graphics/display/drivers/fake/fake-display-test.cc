@@ -44,7 +44,7 @@ class FakeDisplayTest : public testing::Test {
   }
 
   void TearDown() override {
-    tree_->AsyncShutdown();
+    tree_->SyncShutdown();
     tree_.reset();
   }
 

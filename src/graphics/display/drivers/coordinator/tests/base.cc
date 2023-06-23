@@ -30,7 +30,7 @@ void TestBase::SetUp() {
 }
 
 void TestBase::TearDown() {
-  tree_->AsyncShutdown();
+  tree_->SyncShutdown();
   async::PostTask(loop_.dispatcher(), [this]() { loop_.Quit(); });
 
   // Wait for loop_.Quit() to execute.

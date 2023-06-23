@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_DEVICE_TREE_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_DEVICE_TREE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_STACK_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_STACK_H_
 
 #include <fuchsia/sysmem/c/banjo.h>
 #include <lib/async-loop/loop.h>
@@ -35,12 +35,12 @@ class FakeDisplayStack {
   Controller* coordinator_controller() { return coordinator_controller_; }
   fake_display::FakeDisplay* display() { return display_; }
 
-  const zx_device_t* sysmem_device() { return sysmem_->device(); }
-
   const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_client();
   const fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>& sysmem_client();
 
-  void AsyncShutdown();
+  // Join all threads providing display and sysmem protocols, and remove all
+  // the devices bound to the mock root device.
+  void SyncShutdown();
 
  private:
   fidl::ClientEnd<fuchsia_io::Directory> SetUpPDevFidlServer();
@@ -51,10 +51,12 @@ class FakeDisplayStack {
 
   std::unique_ptr<SysmemDeviceWrapper> sysmem_;
 
-  // Not owned, FakeDisplay will delete itself on shutdown.
+  // Fake devices created as descendents of the root MockDevice.
+  // All the devices have transferred their ownership to `mock_root_` and will
+  // be torn down on `SyncShutdown()`.
   fake_display::FakeDisplay* display_;
-
   Controller* coordinator_controller_;
+  sysmem_driver::Device* sysmem_device_;
 
   bool shutdown_ = false;
 
@@ -65,8 +67,15 @@ class FakeDisplayStack {
       .contiguous_memory_size = 0,
   };
 
+  // Runs services provided by the fake display and display coordinator driver.
+  // Must be torn down before `display_` and `coordinator_controller_` is
+  // removed.
   async::Loop display_loop_{&kAsyncLoopConfigNeverAttachToThread};
+  // Runs services provided by the sysmem driver. Must be torn down before
+  // `sysmem_device_` is removed.
   async::Loop sysmem_loop_{&kAsyncLoopConfigNeverAttachToThread};
+  // Runs services provided by the fake platform device (pdev). Must be torn
+  // down before `pdev_fidl_`.
   async::Loop pdev_loop_{&kAsyncLoopConfigNeverAttachToThread};
   std::optional<component::OutgoingDirectory> outgoing_;
 
@@ -76,4 +85,4 @@ class FakeDisplayStack {
 
 }  // namespace display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_DEVICE_TREE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_STACK_H_

@@ -34,7 +34,7 @@ ProviderService::ProviderService(std::shared_ptr<zx_device> mock_root,
                                         std::move(mock_root), std::move(sysmem), kDeviceConfig)});
 }
 
-ProviderService::~ProviderService() { state_->tree->AsyncShutdown(); }
+ProviderService::~ProviderService() { state_->tree->SyncShutdown(); }
 
 void ProviderService::OpenCoordinatorForPrimary(
     ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> coordinator_request,

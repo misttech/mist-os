@@ -32,10 +32,9 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
     ZX_PANIC("sysmem_.Bind() return status was not ZX_OK. Error: %s.",
              zx_status_get_string(result));
   }
-  sysmem_driver::Device* sysmem_device =
-      mock_root_->GetLatestChild()->GetDeviceContext<sysmem_driver::Device>();
+  sysmem_device_ = mock_root_->GetLatestChild()->GetDeviceContext<sysmem_driver::Device>();
   auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::DriverConnector>();
-  fidl::BindServer(sysmem_loop_.dispatcher(), std::move(sysmem_endpoints->server), sysmem_device);
+  fidl::BindServer(sysmem_loop_.dispatcher(), std::move(sysmem_endpoints->server), sysmem_device_);
   sysmem_loop_.StartThread("sysmem-server-thread");
   sysmem_client_ =
       fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>(std::move(sysmem_endpoints->client));
@@ -78,7 +77,7 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
 }
 
 FakeDisplayStack::~FakeDisplayStack() {
-  // AsyncShutdown() must be called before ~FakeDisplayStack().
+  // SyncShutdown() must be called before ~FakeDisplayStack().
   ZX_ASSERT(shutdown_);
 }
 
@@ -116,18 +115,34 @@ const fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>& FakeDisplayStack::
   return sysmem_client_;
 }
 
-void FakeDisplayStack::AsyncShutdown() {
+void FakeDisplayStack::SyncShutdown() {
   if (shutdown_) {
-    // AsyncShutdown() was already called.
+    // SyncShutdown() was already called.
     return;
   }
   shutdown_ = true;
 
+  // Stop serving display and sysmem async loops so that the devices can be
+  // safely torn down.
+  display_loop_.Shutdown();
+  sysmem_loop_.Shutdown();
+  display_loop_.JoinThreads();
+  sysmem_loop_.JoinThreads();
+
   display_->DdkChildPreRelease(coordinator_controller_);
   coordinator_controller_->DdkAsyncRemove();
   display_->DdkAsyncRemove();
+  sysmem_device_->DdkAsyncRemove();
   mock_ddk::ReleaseFlaggedDevices(mock_root_.get());
 
+  // All the fake devices are expected to be deleted by `ReleaseFlaggedDevices`.
+  display_ = nullptr;
+  coordinator_controller_ = nullptr;
+  sysmem_device_ = nullptr;
+
+  // Sysmem device is torn down, so there's no driver depending on the pdev
+  // server. It's now safe to tear down the pdev loop and stop serving pdev
+  // Device protocol.
   libsync::Completion shutdown_complete;
   async::TaskClosure shutdown_task([&] {
     outgoing_.reset();
@@ -136,9 +151,8 @@ void FakeDisplayStack::AsyncShutdown() {
   ZX_ASSERT(shutdown_task.Post(pdev_loop_.dispatcher()) == ZX_OK);
   shutdown_complete.Wait();
 
-  display_loop_.Shutdown();
-  sysmem_loop_.Shutdown();
   pdev_loop_.Shutdown();
+  pdev_loop_.JoinThreads();
 }
 
 }  // namespace display
