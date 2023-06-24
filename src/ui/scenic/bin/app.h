@@ -93,7 +93,7 @@ struct ConfigValues {
 class App {
  public:
   App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspect_node,
-      fpromise::promise<ui_display::DisplayCoordinatorHandles> dc_handles_promise,
+      fpromise::promise<ui_display::DisplayCoordinatorHandles, zx_status_t> dc_handles_promise,
       fit::closure quit_callback);
 
   ~App();

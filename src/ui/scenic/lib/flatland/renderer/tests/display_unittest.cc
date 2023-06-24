@@ -48,8 +48,8 @@ class DisplayTest : public gtest::RealLoopFixture {
     // in a dirty state. Tests should request a reset of display coordinator
     // here.
     auto hdc_promise = ui_display::GetHardwareDisplayCoordinator();
-    executor_->schedule_task(
-        hdc_promise.then([this](fpromise::result<ui_display::DisplayCoordinatorHandles>& handles) {
+    executor_->schedule_task(hdc_promise.then(
+        [this](fpromise::result<ui_display::DisplayCoordinatorHandles, zx_status_t>& handles) {
           display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value().coordinator));
         }));
 

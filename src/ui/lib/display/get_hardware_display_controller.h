@@ -14,7 +14,7 @@ namespace ui_display {
 
 using DisplayCoordinatorHandles = display::CoordinatorHandlesHlcpp;
 
-inline fpromise::promise<DisplayCoordinatorHandles> GetHardwareDisplayCoordinator() {
+inline fpromise::promise<DisplayCoordinatorHandles, zx_status_t> GetHardwareDisplayCoordinator() {
   return display::GetCoordinatorHlcpp();
 }
 

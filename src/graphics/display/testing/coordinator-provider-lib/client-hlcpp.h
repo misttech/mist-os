@@ -19,7 +19,7 @@ struct CoordinatorHandlesHlcpp {
 // Returns a promise which will be resolved when the display coordinator is
 // obtained on success, if the display provider service is available and can
 // be connected; otherwise returns a fpromise::error.
-fpromise::promise<CoordinatorHandlesHlcpp> GetCoordinatorHlcpp();
+fpromise::promise<CoordinatorHandlesHlcpp, zx_status_t> GetCoordinatorHlcpp();
 
 }  // namespace display
 

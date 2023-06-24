@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/async/cpp/executor.h>
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/single_threaded_executor.h>
 #include <lib/sys/cpp/component_context.h>
@@ -15,17 +16,23 @@ namespace display {
 
 namespace {
 
-struct fake_context : fpromise::context {
-  fpromise::executor* executor() const override { return nullptr; }
-  fpromise::suspended_task suspend_task() override { return fpromise::suspended_task(); }
+class GetHardwareDisplayCoordinatorWithoutProviderServiceTest : public gtest::RealLoopFixture {
+ protected:
+  async::Executor& executor() { return executor_; }
+
+ private:
+  async::Executor executor_{dispatcher()};
 };
 
-class GetHardwareDisplayCoordinatorWithoutProviderServiceTest : public gtest::RealLoopFixture {};
-
 TEST_F(GetHardwareDisplayCoordinatorWithoutProviderServiceTest, FailedOnNoProviderService) {
-  auto promise = GetCoordinatorHlcpp();
-  fake_context context;
-  EXPECT_TRUE(promise(context).is_error());
+  std::optional<fpromise::result<CoordinatorHandlesHlcpp, zx_status_t>> coordinator;
+  executor().schedule_task(GetCoordinatorHlcpp().then(
+      [&coordinator](fpromise::result<CoordinatorHandlesHlcpp, zx_status_t>& result) {
+        coordinator = std::move(result);
+      }));
+  RunLoopUntil([&coordinator] { return coordinator.has_value(); });
+  ASSERT_TRUE(coordinator.value().is_error());
+  EXPECT_EQ(coordinator.value().error(), ZX_ERR_NOT_FOUND);
 }
 
 }  // namespace

@@ -41,6 +41,7 @@ source_set("client_hlcpp") {
     "//sdk/lib/fit-promise",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
     "//src/lib/files",

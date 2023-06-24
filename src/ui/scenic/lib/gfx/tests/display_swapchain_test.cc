@@ -63,8 +63,8 @@ class DisplaySwapchainTest : public Fixture {
     display_manager_ = std::make_unique<display::DisplayManager>([]() {});
 
     auto hdc_promise = ui_display::GetHardwareDisplayCoordinator();
-    executor_->schedule_task(
-        hdc_promise.then([this](fpromise::result<ui_display::DisplayCoordinatorHandles>& handles) {
+    executor_->schedule_task(hdc_promise.then(
+        [this](fpromise::result<ui_display::DisplayCoordinatorHandles, zx_status_t>& handles) {
           display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value().coordinator));
         }));
 

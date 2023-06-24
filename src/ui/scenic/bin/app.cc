@@ -240,7 +240,7 @@ void DisplayInfoDelegate::GetDisplayOwnershipEvent(
 }
 
 App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspect_node,
-         fpromise::promise<ui_display::DisplayCoordinatorHandles> dc_handles_promise,
+         fpromise::promise<ui_display::DisplayCoordinatorHandles, zx_status_t> dc_handles_promise,
          fit::closure quit_callback)
     : executor_(async_get_default_dispatcher()),
       app_context_(std::move(app_context)),
@@ -369,7 +369,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
                              completer.complete_ok(display_manager_->default_display_shared());
                            });
   executor_.schedule_task(dc_handles_promise.then(
-      [this](fpromise::result<ui_display::DisplayCoordinatorHandles>& handles) {
+      [this](fpromise::result<ui_display::DisplayCoordinatorHandles, zx_status_t>& handles) {
         display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value().coordinator));
       }));
 
