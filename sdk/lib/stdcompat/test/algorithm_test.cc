@@ -233,6 +233,49 @@ TEST(LowerBoundTest, CheckReturnValue) {
                 kValues.end());
 }
 
+TEST(FindTest, CheckReturnValue) {
+  constexpr std::array kValues{1, 2, 1, 3, 10};
+
+  // Value not in container.
+  static_assert(cpp20::find(kValues.begin(), kValues.end(), 0) == kValues.end());
+
+  // Despite duplicates, only the iterator to the first should be returned.
+  static_assert(cpp20::find(kValues.begin(), kValues.end(), 1) == kValues.begin());
+
+  static_assert(cpp20::find(kValues.begin(), kValues.end(), 2) == kValues.begin() + 1);
+  static_assert(cpp20::find(kValues.begin(), kValues.end(), 3) == kValues.begin() + 3);
+  static_assert(cpp20::find(kValues.begin(), kValues.end(), 10) == kValues.begin() + 4);
+}
+
+TEST(FindIfTest, CheckReturnValue) {
+  constexpr std::array kValues{1, 2, 1, 3, 10};
+  static_assert(cpp20::find_if(kValues.begin(), kValues.end(), [](int) { return true; }) ==
+                kValues.begin());
+  static_assert(cpp20::find_if(kValues.begin(), kValues.end(), [](int) { return false; }) ==
+                kValues.end());
+  static_assert(cpp20::find_if(kValues.begin(), kValues.end(), [](int n) { return n < 3; }) ==
+                kValues.begin());
+  static_assert(cpp20::find_if(kValues.begin(), kValues.end(), [](int n) { return n == 3; }) ==
+                kValues.begin() + 3);
+  static_assert(cpp20::find_if(kValues.begin(), kValues.end(), [](int n) { return n > 3; }) ==
+                kValues.begin() + 4);
+}
+
+TEST(FindIfNotTest, CheckReturnValue) {
+  constexpr std::array kValues{1, 2, 1, 3, 10};
+
+  static_assert(cpp20::find_if_not(kValues.begin(), kValues.end(), [](int) { return true; }) ==
+                kValues.end());
+  static_assert(cpp20::find_if_not(kValues.begin(), kValues.end(), [](int) { return false; }) ==
+                kValues.begin());
+  static_assert(cpp20::find_if_not(kValues.begin(), kValues.end(), [](int n) { return n < 3; }) ==
+                kValues.begin() + 3);
+  static_assert(cpp20::find_if_not(kValues.begin(), kValues.end(), [](int n) { return n == 3; }) ==
+                kValues.begin());
+  static_assert(cpp20::find_if_not(kValues.begin(), kValues.end(), [](int n) { return n > 3; }) ==
+                kValues.begin());
+}
+
 #if defined(__cpp_lib_constexpr_algorithms) && __cpp_lib_constexpr_algorithms >= 201806L && \
     !defined(LIB_STDCOMPAT_USE_POLYFILLS)
 
@@ -301,6 +344,37 @@ TEST(LowerBoundTest, IsAliasWhenStdIsAvailable) {
     static_assert(lower_bound_cpp20 == lower_bound_std,
                   "cpp20::lower_bound should be an alias of std::lower_bound.");
   }
+}
+
+TEST(FindTest, IsAliasWhenStdIsAvailable) {
+  using iterator_type = decltype(std::declval<std::vector<int>>().begin());
+  constexpr iterator_type (*find_cpp20)(iterator_type, iterator_type, const int&) = cpp20::find;
+  constexpr iterator_type (*find_std)(iterator_type, iterator_type, const int&) = std::find;
+
+  static_assert(find_cpp20 == find_std, "cpp20::find should be an alias of std::find.");
+}
+
+TEST(FindIfTest, IsAliasWhenStdIsAvailable) {
+  using iterator_type = decltype(std::declval<std::vector<int>>().begin());
+  using unary_predicate_type = decltype([](int) -> bool { return false; });
+  constexpr iterator_type (*find_if_cpp20)(iterator_type, iterator_type, unary_predicate_type) =
+      cpp20::find_if;
+  constexpr iterator_type (*find_if_std)(iterator_type, iterator_type, unary_predicate_type) =
+      std::find_if;
+
+  static_assert(find_if_cpp20 == find_if_std, "cpp20::find_if should be an alias of std::find_if.");
+}
+
+TEST(FindIfNotTest, IsAliasWhenStdIsAvailable) {
+  using iterator_type = decltype(std::declval<std::vector<int>>().begin());
+  using unary_predicate_type = decltype([](int) -> bool { return false; });
+  constexpr iterator_type (*find_if_not_cpp20)(iterator_type, iterator_type, unary_predicate_type) =
+      cpp20::find_if_not;
+  constexpr iterator_type (*find_if_not_std)(iterator_type, iterator_type, unary_predicate_type) =
+      std::find_if_not;
+
+  static_assert(find_if_not_cpp20 == find_if_not_std,
+                "cpp20::find_if_not should be an alias of std::find_if_not.");
 }
 
 #endif  // __cpp_lib_constexpr_algorithms >= 201806L && !defined(LIB_STDCOMPAT_USE_POLYFILLS)

@@ -23,11 +23,14 @@ using std::remove_if;
 
 using std::lower_bound;
 
+using std::find;
+using std::find_if;
+using std::find_if_not;
+
 #else
 
 template <typename RandomIterator, typename Comparator = std::less<>>
 constexpr void sort(RandomIterator first, RandomIterator end, Comparator comp = Comparator{}) {
-
 #if LIB_STDCOMPAT_CONSTEVAL_SUPPORT
 
   if (!cpp20::is_constant_evaluated()) {
@@ -40,7 +43,6 @@ constexpr void sort(RandomIterator first, RandomIterator end, Comparator comp = 
 
 template <typename ForwardIt, typename Comparator = std::less<>>
 constexpr bool is_sorted(ForwardIt first, ForwardIt end, Comparator comp = Comparator{}) {
-
 #if LIB_STDCOMPAT_CONSTEVAL_SUPPORT
 
   if (!cpp20::is_constant_evaluated()) {
@@ -77,6 +79,36 @@ constexpr ForwardIt lower_bound(ForwardIt first, ForwardIt last, const T& value,
 template <typename ForwardIt, typename T>
 constexpr ForwardIt lower_bound(ForwardIt first, ForwardIt last, const T& value) {
   return ::cpp20::lower_bound(first, last, value, std::less<>{});
+}
+
+template <class InputIt, class T>
+constexpr InputIt find(InputIt first, InputIt last, const T& value) {
+  for (; first != last; ++first) {
+    if (*first == value) {
+      return first;
+    }
+  }
+  return last;
+}
+
+template <class InputIt, class UnaryPredicate>
+constexpr InputIt find_if(InputIt first, InputIt last, UnaryPredicate p) {
+  for (; first != last; ++first) {
+    if (p(*first)) {
+      return first;
+    }
+  }
+  return last;
+}
+
+template <class InputIt, class UnaryPredicate>
+constexpr InputIt find_if_not(InputIt first, InputIt last, UnaryPredicate q) {
+  for (; first != last; ++first) {
+    if (!q(*first)) {
+      return first;
+    }
+  }
+  return last;
 }
 
 #endif

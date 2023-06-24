@@ -1,5 +1,5 @@
 {
-  "pkg/stdcompat/include/lib/stdcompat/algorithm.h": "d727ad78b5f49e2f6ce5c6c2200c6745",
+  "pkg/stdcompat/include/lib/stdcompat/algorithm.h": "0b35350b791b06d1a38fd1e6ef880dc0",
   "pkg/stdcompat/include/lib/stdcompat/array.h": "0f3ef7e0f0f753b9649908442a27a2f8",
   "pkg/stdcompat/include/lib/stdcompat/atomic.h": "f4d8e5ab2a019d0e6e3774cd13f08cf6",
   "pkg/stdcompat/include/lib/stdcompat/bit.h": "78fca85380213f18debfe02ad9946b69",
