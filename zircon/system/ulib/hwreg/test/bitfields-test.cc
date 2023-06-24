@@ -10,6 +10,7 @@
 #include <limits>
 
 #include <hwreg/bitfields.h>
+#include <hwreg/mmio.h>
 #include <hwreg/mock.h>
 #include <hwreg/pio.h>
 #include <zxtest/zxtest.h>
@@ -426,7 +427,7 @@ class RsvdZPartialTestReg64 : public hwreg::RegisterBase<RsvdZPartialTestReg64, 
 
 TEST(RegisterTestCase, RsvdzPartial) {
   volatile uint64_t fake_reg;
-  hwreg::RegisterPio mmio(&fake_reg);
+  hwreg::RegisterMmio mmio(&fake_reg);
 
   // Ensure we mask off the RsvdZ bits when we write them back, regardless of
   // what we read them as.
@@ -492,7 +493,7 @@ class RsvdZFullTestReg64 : public hwreg::RegisterBase<RsvdZFullTestReg64, uint64
 
 TEST(RegisterTestCase, RsvdzFull) {
   volatile uint64_t fake_reg;
-  hwreg::RegisterPio mmio(&fake_reg);
+  hwreg::RegisterMmio mmio(&fake_reg);
 
   // Ensure we mask off the RsvdZ bits when we write them back, regardless of
   // what we read them as.
@@ -563,7 +564,7 @@ class FieldTestReg64 : public hwreg::RegisterBase<FieldTestReg64, uint64_t> {
 
 TEST(RegisterTestCase, Field) {
   volatile uint64_t fake_reg;
-  hwreg::RegisterPio mmio(&fake_reg);
+  hwreg::RegisterMmio mmio(&fake_reg);
 
   // Ensure modified fields go to the right place, and unspecified bits are
   // preserved.
@@ -952,7 +953,7 @@ class PrintableTestReg2
 
 TEST(RegisterTestCase, Print) {
   volatile uint64_t fake_reg;
-  hwreg::RegisterPio mmio(&fake_reg);
+  hwreg::RegisterMmio mmio(&fake_reg);
 
   constexpr uint32_t kInitVal = 0xe987'2fffu;
   fake_reg = kInitVal;
@@ -1039,7 +1040,7 @@ class ChainingTestReg : public hwreg::RegisterBase<ChainingTestReg, uint32_t> {
 // ChainingTestReg::Get().ReadFrom(&mmio).set_field1(0x234).set_field2(0x123).WriteTo(&mmio);
 TEST(RegisterTestCase, SetChaining) {
   volatile uint32_t fake_reg;
-  hwreg::RegisterPio mmio(&fake_reg);
+  hwreg::RegisterMmio mmio(&fake_reg);
 
   // With ReadFrom from a RegAddr
   fake_reg = ~0u;

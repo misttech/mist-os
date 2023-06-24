@@ -17,7 +17,7 @@ namespace hwreg {
 
 // This is used for PIO via MMIO, where a 1-byte port offset is scaled
 // to correspond to a 4-byte MMIO address.
-using RegisterMmioPio = RegisterMmioScaled<4>;
+using RegisterMmioPio = RegisterMmioScaled<uint32_t>;
 
 #if defined(__x86_64__) || defined(__i386__)
 
