@@ -448,7 +448,8 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                                     nxt: iss + 1,
                                     max: iss + 1,
                                     una: seg_ack,
-                                    wnd: seg_wnd << snd_wnd_scale,
+                                    // This segment has a SYN, do not scale.
+                                    wnd: seg_wnd << WindowScale::default(),
                                     wl1: seg_seq,
                                     wl2: seg_ack,
                                     buffer: snd_buffer,
@@ -5575,6 +5576,9 @@ mod test {
     #[test_case(
         u16::MAX as usize + 1, WindowScale::new(1).unwrap(), None
     => (WindowScale::default(), WindowScale::default()))]
+    #[test_case(
+        u16::MAX as usize, WindowScale::default(), Some(WindowScale::new(1).unwrap())
+    => (WindowScale::default(), WindowScale::new(1).unwrap()))]
     fn window_scale(
         buffer_size: usize,
         syn_window_scale: WindowScale,
@@ -5621,6 +5625,8 @@ mod test {
 
         let established: Established<FakeInstant, RingBuffer, NullBuffer> =
             assert_matches!(active, State::Established(established) => established);
+
+        assert_eq!(established.snd.wnd, WindowSize::DEFAULT);
 
         (established.rcv.wnd_scale, established.snd.wnd_scale)
     }
