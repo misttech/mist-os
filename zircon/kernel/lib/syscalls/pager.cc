@@ -201,7 +201,8 @@ zx_status_t sys_pager_op_range(zx_handle_t pager, uint32_t op, zx_handle_t pager
   }
 
   fbl::RefPtr<VmObjectDispatcher> pager_vmo_dispatcher;
-  status = up->handle_table().GetDispatcher(*up, pager_vmo, &pager_vmo_dispatcher);
+  status = up->handle_table().GetDispatcherWithRights(*up, pager_vmo, ZX_RIGHT_WRITE,
+                                                      &pager_vmo_dispatcher);
   if (status != ZX_OK) {
     return status;
   }

@@ -7408,4 +7408,101 @@ TEST(PagerWriteback, ChildAttributedCounts) {
   EXPECT_EQ(val, data);
 }
 
+// Tests API violations for zx_pager_op_range.
+TEST(PagerWriteback, InvalidPagerOpRange) {
+  constexpr uint32_t kNumValidOpCodes = 4;
+  const uint32_t opcodes[kNumValidOpCodes] = {
+      ZX_PAGER_OP_FAIL, ZX_PAGER_OP_DIRTY, ZX_PAGER_OP_WRITEBACK_BEGIN, ZX_PAGER_OP_WRITEBACK_END};
+
+  zx::pager pager;
+  ASSERT_OK(zx::pager::create(0, &pager));
+
+  zx::port port;
+  ASSERT_OK(zx::port::create(0, &port));
+
+  // Test common failure conditions for all ops.
+  for (uint32_t i = 0; i < kNumValidOpCodes; i++) {
+    zx::vmo vmo;
+    ASSERT_OK(zx_pager_create_vmo(pager.get(), ZX_VMO_TRAP_DIRTY, port.get(), 0,
+                                  zx_system_get_page_size(), vmo.reset_and_get_address()));
+
+    // bad handles
+    ASSERT_EQ(ZX_ERR_BAD_HANDLE,
+              zx_pager_op_range(ZX_HANDLE_INVALID, opcodes[i], vmo.get(), 0, 0, 0));
+    ASSERT_EQ(ZX_ERR_BAD_HANDLE,
+              zx_pager_op_range(pager.get(), opcodes[i], ZX_HANDLE_INVALID, 0, 0, 0));
+
+    // wrong handle types
+    ASSERT_EQ(ZX_ERR_WRONG_TYPE, zx_pager_op_range(vmo.get(), opcodes[i], vmo.get(), 0, 0, 0));
+    ASSERT_EQ(ZX_ERR_WRONG_TYPE, zx_pager_op_range(pager.get(), opcodes[i], pager.get(), 0, 0, 0));
+
+    // missing rights
+    zx::vmo ro_vmo;
+    ASSERT_OK(vmo.duplicate(ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHT_WRITE, &ro_vmo));
+    ASSERT_EQ(ZX_ERR_ACCESS_DENIED,
+              zx_pager_op_range(pager.get(), opcodes[i], ro_vmo.get(), 0, 0, 0));
+
+    // using a non-pager-backed vmo
+    zx::vmo vmo2;
+    ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo2));
+    ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx_pager_op_range(pager.get(), opcodes[i], vmo2.get(), 0, 0, 0));
+
+    // using a pager vmo from another pager
+    zx::pager pager2;
+    ASSERT_EQ(zx::pager::create(0, &pager2), ZX_OK);
+    ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx_pager_op_range(pager2.get(), opcodes[i], vmo.get(), 0, 0, 0));
+
+    // misaligned offset or length
+    ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx_pager_op_range(pager.get(), opcodes[i], vmo.get(), 1, 0, 0));
+    ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx_pager_op_range(pager.get(), opcodes[i], vmo.get(), 0, 1, 0));
+
+    // out of range
+    ASSERT_EQ(ZX_ERR_OUT_OF_RANGE,
+              zx_pager_op_range(pager.get(), opcodes[i], vmo.get(), zx_system_get_page_size(),
+                                zx_system_get_page_size(),
+                                opcodes[i] == ZX_PAGER_OP_FAIL ? ZX_ERR_BAD_STATE : 0));
+  }
+
+  // Test op-specific failure conditions
+  zx::vmo vmo;
+  ASSERT_OK(zx_pager_create_vmo(pager.get(), 0, port.get(), 0, zx_system_get_page_size(),
+                                vmo.reset_and_get_address()));
+
+  // invalid opcode
+  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_pager_op_range(pager.get(), 0, vmo.get(), 0, 0, 0));
+
+  // ZX_PAGER_OP_FAIL: invalid error codes
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_pager_op_range(pager.get(), ZX_PAGER_OP_FAIL, vmo.get(), 0, 0, 0x11ffffffff));
+
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_pager_op_range(pager.get(), ZX_PAGER_OP_FAIL, vmo.get(), 0, 0, ZX_ERR_INTERNAL));
+
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_pager_op_range(pager.get(), ZX_PAGER_OP_FAIL, vmo.get(), 0, 0, 100));
+
+  // ZX_PAGER_OP_DIRTY: VMO created without TRAP_DIRTY
+  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED,
+            zx_pager_op_range(pager.get(), ZX_PAGER_OP_DIRTY, vmo.get(), 0, 0, 0));
+
+  ASSERT_OK(zx_pager_create_vmo(pager.get(), ZX_VMO_TRAP_DIRTY, port.get(), 0,
+                                zx_system_get_page_size(), vmo.reset_and_get_address()));
+
+  // ZX_PAGER_OP_DIRTY: dirty an unsupplied page
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, zx_pager_op_range(pager.get(), ZX_PAGER_OP_DIRTY, vmo.get(), 0,
+                                                zx_system_get_page_size(), 0));
+
+  // ZX_PAGER_OP_DIRTY: invalid data
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_pager_op_range(pager.get(), ZX_PAGER_OP_DIRTY, vmo.get(), 0, 0, 100));
+
+  // ZX_PAGER_OP_WRITEBACK_BEGIN: invalid data
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_pager_op_range(pager.get(), ZX_PAGER_OP_WRITEBACK_BEGIN, vmo.get(), 0, 0, 100));
+
+  // ZX_PAGER_OP_WRITEBACK_END: invalid data
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_pager_op_range(pager.get(), ZX_PAGER_OP_WRITEBACK_END, vmo.get(), 0, 0, 100));
+}
+
 }  // namespace pager_tests
