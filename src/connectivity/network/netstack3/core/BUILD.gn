@@ -148,7 +148,10 @@ rustc_library("netstack3-core-instrumented") {
   # TODO(https://fxbug.dev/129383): re-enable RBE unconditionally once the cause
   # for the failure to build in coverage mode is determined.
   if (is_coverage) {
-    disable_rbe = true
+    test_disable_rbe = true
+
+    # This is known to take over 17GB memory locally.
+    pool = "//build/config:highmem($default_toolchain)"
   }
 
   deps = lib_deps + lib_instrumented_deps
