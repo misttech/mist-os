@@ -245,8 +245,6 @@ pub(crate) struct EventLoop<H, S: Sender<<NetlinkRoute as ProtocolFamily>::Inner
     state_proxy: fnet_interfaces::StateProxy,
     /// The current set of clients of NETLINK_ROUTE protocol family.
     route_clients: ClientTable<NetlinkRoute, S>,
-    /// A stream of [`Request`]s for the event loop to handle.
-    request_stream: mpsc::Receiver<Request<S>>,
 }
 
 /// FIDL errors from the interfaces worker.
@@ -338,7 +336,6 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     pub(crate) fn new(
         interfaces_handler: H,
         route_clients: ClientTable<NetlinkRoute, S>,
-        request_stream: mpsc::Receiver<Request<S>>,
     ) -> Result<Self, EventLoopError<InterfacesFidlError, InterfacesNetstackError>> {
         use fuchsia_component::client::connect_to_protocol;
         let interfaces_proxy = connect_to_protocol::<fnet_root::InterfacesMarker>()
@@ -346,13 +343,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         let state_proxy = connect_to_protocol::<fnet_interfaces::StateMarker>()
             .map_err(|e| EventLoopError::Fidl(InterfacesFidlError::State(e)))?;
 
-        Ok(EventLoop {
-            interfaces_handler,
-            interfaces_proxy,
-            state_proxy,
-            route_clients,
-            request_stream,
-        })
+        Ok(EventLoop { interfaces_handler, interfaces_proxy, state_proxy, route_clients })
     }
 
     /// Run the asynchronous work related to RTM_LINK and RTM_ADDR messages.
@@ -362,17 +353,16 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     /// Returns: `InterfacesEventLoopError` that requires restarting the
     /// event loop task, for example, if the watcher stream ends or if
     /// the FIDL protocol cannot be connected.
-    pub(crate) async fn run(self) -> EventLoopError<InterfacesFidlError, InterfacesNetstackError> {
-        let EventLoop {
-            mut interfaces_handler,
-            interfaces_proxy,
-            state_proxy,
-            route_clients,
-            request_stream,
-        } = self;
+    ///
+    /// `request_stream` is a stream of [`Request`]s for the event loop to
+    /// handle.
+    pub(crate) async fn run(
+        mut self,
+        request_stream: mpsc::Receiver<Request<S>>,
+    ) -> EventLoopError<InterfacesFidlError, InterfacesNetstackError> {
         let if_event_stream = {
             let stream_res = fnet_interfaces_ext::event_stream_from_state(
-                &state_proxy,
+                &self.state_proxy,
                 fnet_interfaces_ext::IncludedAddresses::All,
             );
 
@@ -420,7 +410,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 state: InterfaceState { addresses, link_address },
             } in interface_properties.values_mut()
             {
-                set_link_address(&interfaces_proxy, properties.id, link_address).await;
+                set_link_address(&self.interfaces_proxy, properties.id, link_address).await;
 
                 if let Some(interface_addresses) =
                     addresses_optionally_from_interface_properties(properties)
@@ -428,7 +418,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     *addresses = interface_addresses;
                 }
 
-                interfaces_handler.handle_new_link(&properties.name);
+                self.interfaces_handler.handle_new_link(&properties.name);
             }
 
             interface_properties
@@ -472,11 +462,8 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         }
                     };
 
-                    match handle_interface_watcher_event(
-                        &mut interfaces_handler,
-                        &interfaces_proxy,
+                    match self.handle_interface_watcher_event(
                         &mut interface_properties,
-                        &route_clients,
                         event,
                     ).await {
                         Ok(()) => {}
@@ -497,8 +484,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     assert_matches!(
                         core::mem::replace(
                             &mut pending_address_request,
-                            Self::handle_request(
-                                &interfaces_proxy,
+                            self.handle_request(
                                 &interface_properties,
                                 req.expect(
                                     "request stream should never end because of chained `pending`",
@@ -555,13 +541,159 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         }
     }
 
+    /// Handles events observed from the interface watcher by updating interfaces
+    /// from the underlying interface properties BTreeMap.
+    ///
+    /// Returns an `InterfaceEventLoopError` when unexpected events occur, or an
+    /// `UpdateError` when updates are not consistent with the current state.
+    async fn handle_interface_watcher_event(
+        &mut self,
+        interface_properties: &mut BTreeMap<
+            u64,
+            fnet_interfaces_ext::PropertiesAndState<InterfaceState>,
+        >,
+        event: fnet_interfaces::Event,
+    ) -> Result<(), InterfaceEventHandlerError> {
+        let update = match interface_properties.update(event) {
+            Ok(update) => update,
+            Err(e) => return Err(InterfaceEventHandlerError::Update(e.into())),
+        };
+
+        match update {
+            fnet_interfaces_ext::UpdateResult::Added {
+                properties,
+                state: InterfaceState { addresses, link_address },
+            } => {
+                set_link_address(&self.interfaces_proxy, properties.id, link_address).await;
+
+                if let Some(message) = NetlinkLinkMessage::optionally_from(properties, link_address)
+                {
+                    self.route_clients.send_message_to_group(
+                        message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
+                        ModernGroup(RTNLGRP_LINK),
+                    )
+                }
+
+                // Send address messages after the link message for newly added links
+                // so that netlink clients are aware of the interface before sending
+                // address messages for an interface.
+                if let Some(updated_addresses) =
+                    addresses_optionally_from_interface_properties(properties)
+                {
+                    update_addresses(addresses, updated_addresses, &self.route_clients);
+                }
+
+                self.interfaces_handler.handle_new_link(&properties.name);
+
+                debug!(
+                    tag = NETLINK_LOG_TAG,
+                    "processed add/existing event for id {}", properties.id
+                );
+            }
+            fnet_interfaces_ext::UpdateResult::Changed {
+                previous:
+                    fnet_interfaces::Properties {
+                        online,
+                        addresses,
+                        id: _,
+                        name: _,
+                        device_class: _,
+                        has_default_ipv4_route: _,
+                        has_default_ipv6_route: _,
+                        ..
+                    },
+                current:
+                    current @ fnet_interfaces_ext::Properties {
+                        id,
+                        addresses: _,
+                        name: _,
+                        device_class: _,
+                        online: _,
+                        has_default_ipv4_route: _,
+                        has_default_ipv6_route: _,
+                    },
+                state: InterfaceState { addresses: interface_addresses, link_address },
+            } => {
+                if online.is_some() {
+                    if let Some(message) =
+                        NetlinkLinkMessage::optionally_from(current, link_address)
+                    {
+                        self.route_clients.send_message_to_group(
+                            message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
+                            ModernGroup(RTNLGRP_LINK),
+                        )
+                    }
+
+                    debug!(
+                        tag = NETLINK_LOG_TAG,
+                        "processed interface link change event for id {}", id
+                    );
+                };
+
+                // The `is_some` check is not strictly necessary because
+                // `update_addresses` will calculate the delta before sending
+                // updates but is useful as an optimization when addresses don't
+                // change (<avoid allocations and message comparisons that will net
+                // no updates).
+                if addresses.is_some() {
+                    if let Some(updated_addresses) =
+                        addresses_optionally_from_interface_properties(current)
+                    {
+                        update_addresses(
+                            interface_addresses,
+                            updated_addresses,
+                            &self.route_clients,
+                        );
+                    }
+
+                    debug!(
+                        tag = NETLINK_LOG_TAG,
+                        "processed interface address change event for id {}", id
+                    );
+                }
+            }
+            fnet_interfaces_ext::UpdateResult::Removed(
+                fnet_interfaces_ext::PropertiesAndState {
+                    properties,
+                    state: InterfaceState { mut addresses, link_address },
+                },
+            ) => {
+                update_addresses(&mut addresses, BTreeMap::new(), &self.route_clients);
+
+                // Send link messages after the address message for removed links
+                // so that netlink clients are aware of the interface throughout the
+                // address messages.
+                if let Some(message) =
+                    NetlinkLinkMessage::optionally_from(&properties, &link_address)
+                {
+                    self.route_clients.send_message_to_group(
+                        message.into_rtnl_del_link(UNSPECIFIED_SEQUENCE_NUMBER),
+                        ModernGroup(RTNLGRP_LINK),
+                    )
+                }
+
+                self.interfaces_handler.handle_deleted_link(&properties.name);
+
+                debug!(
+                    tag = NETLINK_LOG_TAG,
+                    "processed interface remove event for id {}", properties.id
+                );
+            }
+            fnet_interfaces_ext::UpdateResult::Existing { properties, state: _ } => {
+                return Err(InterfaceEventHandlerError::ExistingEventReceived(properties.clone()));
+            }
+            fnet_interfaces_ext::UpdateResult::NoChange => {}
+        }
+        Ok(())
+    }
+
     fn get_interface_control(
-        interfaces_proxy: &fnet_root::InterfacesProxy,
+        &self,
         interface_id: NonZeroU32,
     ) -> fnet_interfaces_ext::admin::Control {
         let (control, server_end) = fnet_interfaces_ext::admin::Control::create_endpoints()
             .expect("create Control endpoints");
-        interfaces_proxy
+        self.interfaces_proxy
             .get_admin(interface_id.get().into(), server_end)
             .expect("send get admin request");
         control
@@ -573,14 +705,14 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     /// added so that the caller can make sure their local state (from the
     /// interfaces watcher) has sent an event holding the added address.
     async fn handle_new_address_request(
-        interfaces_proxy: &fnet_root::InterfacesProxy,
+        &self,
         NewAddressArgs {
             address_and_interface_id:
                 address_and_interface_id @ AddressAndInterfaceArgs { address, interface_id },
             add_subnet_route,
         }: NewAddressArgs,
     ) -> Result<AddressAndInterfaceArgs, RequestError> {
-        let control = Self::get_interface_control(interfaces_proxy, interface_id);
+        let control = self.get_interface_control(interface_id);
 
         let (asp, asp_server_end) =
             fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
@@ -687,13 +819,13 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     /// removed so that the caller can make sure their local state (from the
     /// interfaces watcher) has sent an event without the removed address.
     async fn handle_del_address_request(
-        interfaces_proxy: &fnet_root::InterfacesProxy,
+        &self,
         DelAddressArgs {
             address_and_interface_id:
                 address_and_interface_id @ AddressAndInterfaceArgs { address, interface_id },
         }: DelAddressArgs,
     ) -> Result<AddressAndInterfaceArgs, RequestError> {
-        let control = Self::get_interface_control(interfaces_proxy, interface_id);
+        let control = self.get_interface_control(interface_id);
 
         match control.remove_address(&mut address.into_ext()).await.map_err(|e| {
             warn!("error removing {address} from interface ({interface_id}): {e:?}");
@@ -730,7 +862,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     /// caller needs to make sure the update has been propagated to the local
     /// state (the interfaces watcher has sent an event for our update).
     async fn handle_request(
-        interfaces_proxy: &fnet_root::InterfacesProxy,
+        &self,
         interface_properties: &BTreeMap<
             u64,
             fnet_interfaces_ext::PropertiesAndState<InterfaceState>,
@@ -784,7 +916,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     }
                 },
                 AddressRequestArgs::New(args) => {
-                    match Self::handle_new_address_request(interfaces_proxy, args).await {
+                    match self.handle_new_address_request(args).await {
                         Ok(address_and_interface_id) => {
                             return Some(PendingAddressRequest {
                                 kind: PendingAddressRequestKind::Add,
@@ -797,7 +929,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     }
                 }
                 AddressRequestArgs::Del(args) => {
-                    match Self::handle_del_address_request(interfaces_proxy, args).await {
+                    match self.handle_del_address_request(args).await {
                         Ok(address_and_interface_id) => {
                             return Some(PendingAddressRequest {
                                 kind: PendingAddressRequestKind::Del,
@@ -881,143 +1013,6 @@ fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
     // Update our set of existing addresses with the latest set known to be
     // assigned to the interface.
     existing_addresses.extend(updated_addresses);
-}
-
-/// Handles events observed from the interface watcher by updating interfaces
-/// from the underlying interface properties BTreeMap.
-///
-/// Returns an `InterfaceEventLoopError` when unexpected events occur, or an
-/// `UpdateError` when updates are not consistent with the current state.
-async fn handle_interface_watcher_event<
-    H: InterfacesHandler,
-    S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
->(
-    interfaces_handler: &mut H,
-    interfaces_proxy: &fnet_root::InterfacesProxy,
-    interface_properties: &mut BTreeMap<
-        u64,
-        fnet_interfaces_ext::PropertiesAndState<InterfaceState>,
-    >,
-    route_clients: &ClientTable<NetlinkRoute, S>,
-    event: fnet_interfaces::Event,
-) -> Result<(), InterfaceEventHandlerError> {
-    let update = match interface_properties.update(event) {
-        Ok(update) => update,
-        Err(e) => return Err(InterfaceEventHandlerError::Update(e.into())),
-    };
-
-    match update {
-        fnet_interfaces_ext::UpdateResult::Added {
-            properties,
-            state: InterfaceState { addresses, link_address },
-        } => {
-            set_link_address(interfaces_proxy, properties.id, link_address).await;
-
-            if let Some(message) = NetlinkLinkMessage::optionally_from(properties, link_address) {
-                route_clients.send_message_to_group(
-                    message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
-                    ModernGroup(RTNLGRP_LINK),
-                )
-            }
-
-            // Send address messages after the link message for newly added links
-            // so that netlink clients are aware of the interface before sending
-            // address messages for an interface.
-            if let Some(updated_addresses) =
-                addresses_optionally_from_interface_properties(properties)
-            {
-                update_addresses(addresses, updated_addresses, route_clients);
-            }
-
-            interfaces_handler.handle_new_link(&properties.name);
-
-            debug!(tag = NETLINK_LOG_TAG, "processed add/existing event for id {}", properties.id);
-        }
-        fnet_interfaces_ext::UpdateResult::Changed {
-            previous:
-                fnet_interfaces::Properties {
-                    online,
-                    addresses,
-                    id: _,
-                    name: _,
-                    device_class: _,
-                    has_default_ipv4_route: _,
-                    has_default_ipv6_route: _,
-                    ..
-                },
-            current:
-                current @ fnet_interfaces_ext::Properties {
-                    id,
-                    addresses: _,
-                    name: _,
-                    device_class: _,
-                    online: _,
-                    has_default_ipv4_route: _,
-                    has_default_ipv6_route: _,
-                },
-            state: InterfaceState { addresses: interface_addresses, link_address },
-        } => {
-            if online.is_some() {
-                if let Some(message) = NetlinkLinkMessage::optionally_from(current, link_address) {
-                    route_clients.send_message_to_group(
-                        message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
-                        ModernGroup(RTNLGRP_LINK),
-                    )
-                }
-
-                debug!(
-                    tag = NETLINK_LOG_TAG,
-                    "processed interface link change event for id {}", id
-                );
-            };
-
-            // The `is_some` check is not strictly necessary because
-            // `update_addresses` will calculate the delta before sending
-            // updates but is useful as an optimization when addresses don't
-            // change (<avoid allocations and message comparisons that will net
-            // no updates).
-            if addresses.is_some() {
-                if let Some(updated_addresses) =
-                    addresses_optionally_from_interface_properties(current)
-                {
-                    update_addresses(interface_addresses, updated_addresses, route_clients);
-                }
-
-                debug!(
-                    tag = NETLINK_LOG_TAG,
-                    "processed interface address change event for id {}", id
-                );
-            }
-        }
-        fnet_interfaces_ext::UpdateResult::Removed(fnet_interfaces_ext::PropertiesAndState {
-            properties,
-            state: InterfaceState { mut addresses, link_address },
-        }) => {
-            update_addresses(&mut addresses, BTreeMap::new(), route_clients);
-
-            // Send link messages after the address message for removed links
-            // so that netlink clients are aware of the interface throughout the
-            // address messages.
-            if let Some(message) = NetlinkLinkMessage::optionally_from(&properties, &link_address) {
-                route_clients.send_message_to_group(
-                    message.into_rtnl_del_link(UNSPECIFIED_SEQUENCE_NUMBER),
-                    ModernGroup(RTNLGRP_LINK),
-                )
-            }
-
-            interfaces_handler.handle_deleted_link(&properties.name);
-
-            debug!(
-                tag = NETLINK_LOG_TAG,
-                "processed interface remove event for id {}", properties.id
-            );
-        }
-        fnet_interfaces_ext::UpdateResult::Existing { properties, state: _ } => {
-            return Err(InterfaceEventHandlerError::ExistingEventReceived(properties.clone()));
-        }
-        fnet_interfaces_ext::UpdateResult::NoChange => {}
-    }
-    Ok(())
 }
 
 /// A wrapper type for the netlink_packet_route `LinkMessage` to enable conversions
@@ -1348,7 +1343,7 @@ pub(crate) mod testutil {
     use std::sync::{Arc, Mutex};
 
     use fuchsia_zircon as zx;
-    use futures::stream::Stream;
+    use futures::{future::Future, stream::Stream};
     use net_declare::{fidl_subnet, net_addr_subnet};
 
     use crate::messaging::testutil::FakeSender;
@@ -1441,8 +1436,8 @@ pub(crate) mod testutil {
         }
     }
 
-    pub(crate) struct Setup<W> {
-        pub event_loop: EventLoop<FakeInterfacesHandler, FakeSender<RtnlMessage>>,
+    pub(crate) struct Setup<E, W> {
+        pub event_loop_fut: E,
         pub watcher_stream: W,
         pub request_sink: mpsc::Sender<Request<FakeSender<RtnlMessage>>>,
         pub interfaces_request_stream: fnet_root::InterfacesRequestStream,
@@ -1451,7 +1446,10 @@ pub(crate) mod testutil {
 
     pub(crate) fn setup_with_route_clients(
         route_clients: ClientTable<NetlinkRoute, FakeSender<RtnlMessage>>,
-    ) -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
+    ) -> Setup<
+        impl Future<Output = EventLoopError<InterfacesFidlError, InterfacesNetstackError>>,
+        impl Stream<Item = fnet_interfaces::WatcherRequest>,
+    > {
         let (interfaces_proxy, interfaces_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fnet_root::InterfacesMarker>().unwrap();
         let (state_proxy, if_stream) =
@@ -1463,7 +1461,6 @@ pub(crate) mod testutil {
             interfaces_proxy,
             state_proxy,
             route_clients,
-            request_stream,
         };
 
         let watcher_stream = if_stream
@@ -1478,7 +1475,7 @@ pub(crate) mod testutil {
             .map(|res| res.expect("watcher stream error"));
 
         Setup {
-            event_loop,
+            event_loop_fut: event_loop.run(request_stream),
             watcher_stream,
             request_sink,
             interfaces_request_stream,
@@ -1486,7 +1483,10 @@ pub(crate) mod testutil {
         }
     }
 
-    pub(crate) fn setup() -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
+    pub(crate) fn setup() -> Setup<
+        impl Future<Output = EventLoopError<InterfacesFidlError, InterfacesNetstackError>>,
+        impl Stream<Item = fnet_interfaces::WatcherRequest>,
+    > {
         setup_with_route_clients(ClientTable::default())
     }
 
@@ -1754,13 +1754,12 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_stream_ended() {
         let Setup {
-            event_loop,
+            event_loop_fut,
             watcher_stream,
             request_sink: _,
             interfaces_request_stream,
             interfaces_handler_sink: _,
         } = setup();
-        let event_loop_fut = event_loop.run();
         let interfaces = vec![get_fake_interface(1, "lo", LOOPBACK)];
         let watcher_fut =
             respond_to_watcher_with_interfaces(watcher_stream, interfaces, None::<(Option<_>, _)>);
@@ -1778,13 +1777,12 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_duplicate_events() {
         let Setup {
-            event_loop,
+            event_loop_fut,
             watcher_stream,
             request_sink: _,
             interfaces_request_stream: _,
             interfaces_handler_sink: _,
         } = setup();
-        let event_loop_fut = event_loop.run();
         let interfaces =
             vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(1, "lo", LOOPBACK)];
         let watcher_fut =
@@ -1804,13 +1802,12 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_duplicate_adds() {
         let Setup {
-            event_loop,
+            event_loop_fut,
             watcher_stream,
             request_sink: _,
             interfaces_request_stream,
             interfaces_handler_sink: _,
         } = setup();
-        let event_loop_fut = event_loop.run();
         let interfaces_existing = vec![get_fake_interface(1, "lo", LOOPBACK)];
         let interfaces_new = vec![get_fake_interface(1, "lo", LOOPBACK)];
         let watcher_fut = respond_to_watcher_with_interfaces(
@@ -1834,13 +1831,12 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_existing_after_add() {
         let Setup {
-            event_loop,
+            event_loop_fut,
             watcher_stream,
             request_sink: _,
             interfaces_request_stream,
             interfaces_handler_sink: _,
         } = setup();
-        let event_loop_fut = event_loop.run();
         let interfaces_existing =
             vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(2, "eth001", ETHERNET)];
         let interfaces_new = vec![get_fake_interface(3, "eth002", ETHERNET)];
@@ -1968,7 +1964,7 @@ mod tests {
             ],
         );
         let Setup {
-            event_loop,
+            event_loop_fut,
             mut watcher_stream,
             request_sink: _,
             interfaces_request_stream,
@@ -1982,7 +1978,7 @@ mod tests {
             route_clients.add_client(other_client);
             route_clients
         });
-        let event_loop_fut = event_loop.run().fuse();
+        let event_loop_fut = event_loop_fut.fuse();
         futures::pin_mut!(event_loop_fut);
         let root_interfaces_fut =
             expect_only_get_mac_root_requests_fut(interfaces_request_stream).fuse();
@@ -2334,7 +2330,7 @@ mod tests {
             &[],
         );
         let Setup {
-            event_loop,
+            event_loop_fut,
             mut watcher_stream,
             mut request_sink,
             interfaces_request_stream,
@@ -2345,7 +2341,7 @@ mod tests {
             route_clients.add_client(other_client);
             route_clients
         });
-        let event_loop_fut = event_loop.run().fuse();
+        let event_loop_fut = event_loop_fut.fuse();
         futures::pin_mut!(event_loop_fut);
 
         let watcher_stream_fut = respond_to_watcher(

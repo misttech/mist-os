@@ -207,11 +207,7 @@ async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverP
         // Interfaces Worker.
         {
             fasync::Task::spawn(async move {
-                let worker = match interfaces::EventLoop::new(
-                    interfaces_handler,
-                    route_clients,
-                    interfaces_request_stream,
-                ) {
+                let worker = match interfaces::EventLoop::new(interfaces_handler, route_clients) {
                     Ok(worker) => worker,
                     Err(EventLoopError::Fidl(e)) => {
                         panic!("Interfaces event loop creation error: {:?}", e)
@@ -222,7 +218,10 @@ async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverP
                         );
                     }
                 };
-                panic!("Interfaces event loop error: {:?}", worker.run().await);
+                panic!(
+                    "Interfaces event loop error: {:?}",
+                    worker.run(interfaces_request_stream).await
+                );
             })
         },
     ])
