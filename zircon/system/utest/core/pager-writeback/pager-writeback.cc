@@ -7505,4 +7505,66 @@ TEST(PagerWriteback, InvalidPagerOpRange) {
             zx_pager_op_range(pager.get(), ZX_PAGER_OP_WRITEBACK_END, vmo.get(), 0, 0, 100));
 }
 
+// Tests API violations for zx_pager_query_vmo_stats and zx_pager_query_dirty_ranges.
+TEST(PagerWriteback, InvalidQuery) {
+  zx::pager pager;
+  ASSERT_OK(zx::pager::create(0, &pager));
+
+  zx::port port;
+  ASSERT_OK(zx::port::create(0, &port));
+
+  zx::vmo vmo;
+  ASSERT_OK(zx_pager_create_vmo(pager.get(), 0, port.get(), 0, zx_system_get_page_size(),
+                                vmo.reset_and_get_address()));
+
+  // bad handles
+  ASSERT_EQ(ZX_ERR_BAD_HANDLE, zx_pager_query_dirty_ranges(ZX_HANDLE_INVALID, vmo.get(), 0, 0,
+                                                           nullptr, 0, nullptr, nullptr));
+  ASSERT_EQ(ZX_ERR_BAD_HANDLE, zx_pager_query_dirty_ranges(pager.get(), ZX_HANDLE_INVALID, 0, 0,
+                                                           nullptr, 0, nullptr, nullptr));
+  ASSERT_EQ(ZX_ERR_BAD_HANDLE,
+            zx_pager_query_vmo_stats(ZX_HANDLE_INVALID, vmo.get(), 0, nullptr, 0));
+  ASSERT_EQ(ZX_ERR_BAD_HANDLE,
+            zx_pager_query_vmo_stats(pager.get(), ZX_HANDLE_INVALID, 0, nullptr, 0));
+
+  // wrong handle types
+  ASSERT_EQ(ZX_ERR_WRONG_TYPE,
+            zx_pager_query_dirty_ranges(vmo.get(), vmo.get(), 0, 0, nullptr, 0, nullptr, nullptr));
+  ASSERT_EQ(ZX_ERR_WRONG_TYPE, zx_pager_query_dirty_ranges(pager.get(), pager.get(), 0, 0, nullptr,
+                                                           0, nullptr, nullptr));
+  ASSERT_EQ(ZX_ERR_WRONG_TYPE, zx_pager_query_vmo_stats(vmo.get(), vmo.get(), 0, nullptr, 0));
+  ASSERT_EQ(ZX_ERR_WRONG_TYPE, zx_pager_query_vmo_stats(pager.get(), pager.get(), 0, nullptr, 0));
+
+  // missing rights
+  zx::vmo dup;
+  ASSERT_OK(vmo.duplicate(ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHT_READ, &dup));
+  ASSERT_EQ(ZX_ERR_ACCESS_DENIED, zx_pager_query_dirty_ranges(pager.get(), dup.get(), 0, 0, nullptr,
+                                                              0, nullptr, nullptr));
+  ASSERT_EQ(ZX_ERR_ACCESS_DENIED, zx_pager_query_vmo_stats(pager.get(), dup.get(), 0, nullptr, 0));
+
+  // using a non-pager-backed vmo
+  zx::vmo vmo2;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo2));
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx_pager_query_dirty_ranges(pager.get(), vmo2.get(), 0, 0, nullptr,
+                                                             0, nullptr, nullptr));
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx_pager_query_vmo_stats(pager.get(), vmo2.get(), 0, nullptr, 0));
+
+  // using a pager vmo from another pager
+  zx::pager pager2;
+  ASSERT_EQ(zx::pager::create(0, &pager2), ZX_OK);
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx_pager_query_dirty_ranges(pager2.get(), vmo.get(), 0, 0, nullptr,
+                                                             0, nullptr, nullptr));
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx_pager_query_vmo_stats(pager2.get(), vmo.get(), 0, nullptr, 0));
+
+  // out of range
+  ASSERT_EQ(ZX_ERR_OUT_OF_RANGE,
+            zx_pager_query_dirty_ranges(pager.get(), vmo.get(), zx_system_get_page_size(),
+                                        zx_system_get_page_size(), nullptr, 0, nullptr, nullptr));
+
+  // invalid option
+  zx_pager_vmo_stats_t stats = {};
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_pager_query_vmo_stats(pager.get(), vmo.get(), 100, &stats, sizeof(stats)));
+}
+
 }  // namespace pager_tests

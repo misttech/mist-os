@@ -227,7 +227,8 @@ zx_status_t sys_pager_query_dirty_ranges(zx_handle_t pager, zx_handle_t pager_vm
   }
 
   fbl::RefPtr<VmObjectDispatcher> pager_vmo_dispatcher;
-  status = up->handle_table().GetDispatcher(*up, pager_vmo, &pager_vmo_dispatcher);
+  status = up->handle_table().GetDispatcherWithRights(*up, pager_vmo, ZX_RIGHT_READ,
+                                                      &pager_vmo_dispatcher);
   if (status != ZX_OK) {
     return status;
   }
@@ -252,7 +253,8 @@ zx_status_t sys_pager_query_vmo_stats(zx_handle_t pager, zx_handle_t pager_vmo, 
   }
 
   fbl::RefPtr<VmObjectDispatcher> pager_vmo_dispatcher;
-  status = up->handle_table().GetDispatcher(*up, pager_vmo, &pager_vmo_dispatcher);
+  status = up->handle_table().GetDispatcherWithRights(*up, pager_vmo, ZX_RIGHT_READ,
+                                                      &pager_vmo_dispatcher);
   if (status != ZX_OK) {
     return status;
   }
