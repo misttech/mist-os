@@ -245,6 +245,9 @@ pub(crate) struct EventLoop<H, S: Sender<<NetlinkRoute as ProtocolFamily>::Inner
     state_proxy: fnet_interfaces::StateProxy,
     /// The current set of clients of NETLINK_ROUTE protocol family.
     route_clients: ClientTable<NetlinkRoute, S>,
+    /// The table of interfaces and associated state discovered through the
+    /// interfaces watcher.
+    interface_properties: BTreeMap<u64, fnet_interfaces_ext::PropertiesAndState<InterfaceState>>,
 }
 
 /// FIDL errors from the interfaces worker.
@@ -343,7 +346,13 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         let state_proxy = connect_to_protocol::<fnet_interfaces::StateMarker>()
             .map_err(|e| EventLoopError::Fidl(InterfacesFidlError::State(e)))?;
 
-        Ok(EventLoop { interfaces_handler, interfaces_proxy, state_proxy, route_clients })
+        Ok(EventLoop {
+            interfaces_handler,
+            interfaces_proxy,
+            state_proxy,
+            route_clients,
+            interface_properties: BTreeMap::default(),
+        })
     }
 
     /// Run the asynchronous work related to RTM_LINK and RTM_ADDR messages.
@@ -381,7 +390,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         // interfaces/addresses that already existed. Sending messages in
         // response to existing (`fnet_interfaces::Event::Existing`) events will
         // violate that expectation.
-        let mut interface_properties = {
+        self.interface_properties = {
             let mut interface_properties = match fnet_interfaces_ext::existing(
                 if_event_stream.by_ref(),
                 BTreeMap::<u64, fnet_interfaces_ext::PropertiesAndState<InterfaceState>>::new(),
@@ -463,7 +472,6 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     };
 
                     match self.handle_interface_watcher_event(
-                        &mut interface_properties,
                         event,
                     ).await {
                         Ok(()) => {}
@@ -485,7 +493,6 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         core::mem::replace(
                             &mut pending_address_request,
                             self.handle_request(
-                                &interface_properties,
                                 req.expect(
                                     "request stream should never end because of chained `pending`",
                                 ),
@@ -504,16 +511,17 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     completer: _,
                 } = &pending_address_request_some;
 
-                let contains_addr = interface_properties.get(&interface_id.get().into()).map_or(
-                    false,
-                    |fnet_interfaces_ext::PropertiesAndState {
-                         properties: _,
-                         state: InterfaceState { addresses, link_address: _ },
-                     }| {
-                        let fnet::Subnet { addr, prefix_len: _ } = address.clone().into_ext();
-                        addresses.contains_key(&addr)
-                    },
-                );
+                let contains_addr =
+                    self.interface_properties.get(&interface_id.get().into()).map_or(
+                        false,
+                        |fnet_interfaces_ext::PropertiesAndState {
+                             properties: _,
+                             state: InterfaceState { addresses, link_address: _ },
+                         }| {
+                            let fnet::Subnet { addr, prefix_len: _ } = address.clone().into_ext();
+                            addresses.contains_key(&addr)
+                        },
+                    );
 
                 let done = match kind {
                     PendingAddressRequestKind::Add => contains_addr,
@@ -541,20 +549,16 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         }
     }
 
-    /// Handles events observed from the interface watcher by updating interfaces
-    /// from the underlying interface properties BTreeMap.
+    /// Handles events observed from the interface watcher by updating the
+    /// table of discovered interfaces.
     ///
     /// Returns an `InterfaceEventLoopError` when unexpected events occur, or an
     /// `UpdateError` when updates are not consistent with the current state.
     async fn handle_interface_watcher_event(
         &mut self,
-        interface_properties: &mut BTreeMap<
-            u64,
-            fnet_interfaces_ext::PropertiesAndState<InterfaceState>,
-        >,
         event: fnet_interfaces::Event,
     ) -> Result<(), InterfaceEventHandlerError> {
-        let update = match interface_properties.update(event) {
+        let update = match self.interface_properties.update(event) {
             Ok(update) => update,
             Err(e) => return Err(InterfaceEventHandlerError::Update(e.into())),
         };
@@ -863,10 +867,6 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     /// state (the interfaces watcher has sent an event for our update).
     async fn handle_request(
         &self,
-        interface_properties: &BTreeMap<
-            u64,
-            fnet_interfaces_ext::PropertiesAndState<InterfaceState>,
-        >,
         Request { args, sequence_number, mut client, completer }: Request<S>,
     ) -> Option<PendingAddressRequest<S>> {
         debug!("handling request {args:?} from {client}");
@@ -874,7 +874,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         let result = match args {
             RequestArgs::Link(LinkRequestArgs::Get(args)) => match args {
                 GetLinkArgs::Dump => {
-                    interface_properties
+                    self.interface_properties
                         .values()
                         .filter_map(
                             |fnet_interfaces_ext::PropertiesAndState {
@@ -893,7 +893,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             RequestArgs::Address(args) => match args {
                 AddressRequestArgs::Get(args) => match args {
                     GetAddressArgs::Dump { ip_version_filter } => {
-                        interface_properties
+                        self.interface_properties
                             .values()
                             .map(|iface| iface.state.addresses.values())
                             .flatten()
@@ -1461,6 +1461,7 @@ pub(crate) mod testutil {
             interfaces_proxy,
             state_proxy,
             route_clients,
+            interface_properties: BTreeMap::default(),
         };
 
         let watcher_stream = if_stream
