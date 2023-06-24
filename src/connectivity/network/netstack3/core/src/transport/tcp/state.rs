@@ -932,7 +932,6 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         // First calculate the open window, note that if our peer has shrank
         // their window (it is strongly discouraged), the following conversion
         // will fail and we return early.
-        // TODO(https://fxbug.dev/93868): Implement zero window probing.
         let cwnd = congestion_control.cwnd();
         let swnd = WindowSize::min(*snd_wnd, cwnd);
         let open_window =
