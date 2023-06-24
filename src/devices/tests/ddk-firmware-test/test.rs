@@ -118,7 +118,7 @@ impl FakeBaseComponentResolver {
                         }))
                         .expect("error sending response");
                 }
-                req => panic!("unexpected fuchsia.pkg/PackageResolver request {req:?}"),
+                req => panic!("unexpected fuchsia.component.resolution/Resolver request {req:?}"),
             }
         }
     }
