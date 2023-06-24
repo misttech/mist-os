@@ -286,7 +286,6 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   const bool is_vc_;
   const uint32_t id_;
   bool running_;
-  uint64_t next_image_id_ = 1;         // Only INVALID_ID == 0 is invalid
   uint64_t next_capture_image_id = 1;  // Only INVALID_ID == 0 is invalid
   Image::Map images_;
   CaptureImage::Map capture_images_;
