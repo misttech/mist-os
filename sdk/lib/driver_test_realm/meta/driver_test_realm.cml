@@ -45,8 +45,6 @@
                 "fuchsia.component.resolution.Resolver-full",
                 "fuchsia.driver.index.DriverIndex",
                 "fuchsia.kernel.RootJob",
-                "fuchsia.pkg.PackageResolver-base",
-                "fuchsia.pkg.PackageResolver-full",
             ],
         },
         {
@@ -79,8 +77,6 @@
                 "fuchsia.component.resolution.Resolver-full",
                 "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.kernel.RootJob",
-                "fuchsia.pkg.PackageResolver-base",
-                "fuchsia.pkg.PackageResolver-full",
             ],
             from: "self",
             to: "#realm_builder",

@@ -28,7 +28,6 @@
             protocol: [
                 "fuchsia.component.resolution.Resolver-base",
                 "fuchsia.component.resolution.Resolver-boot",
-                "fuchsia.pkg.PackageResolver-base",
             ],
         },
         {
@@ -37,7 +36,6 @@
                 // is set, which enables loading drivers ephemerally. This is intended for
                 // eng builds only.
                 "fuchsia.component.resolution.Resolver-full",
-                "fuchsia.pkg.PackageResolver-full",
             ],
             availability: "optional",
         },

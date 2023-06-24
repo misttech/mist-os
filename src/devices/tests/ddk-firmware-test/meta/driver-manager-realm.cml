@@ -62,14 +62,6 @@
             to: "#driver-index",
         },
         {
-            protocol: "fuchsia.pkg.PackageResolver-base",
-            from: "parent",
-            to: [
-                "#driver-index",
-                "#driver-manager",
-            ],
-        },
-        {
             protocol: "fuchsia.component.resolution.Resolver-base",
             from: "parent",
             to: [
