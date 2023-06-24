@@ -186,7 +186,12 @@ pub async fn try_to_kill_pid(pid: u32) -> Result<()> {
         // The kill() worked, i.e. the process was still around
         _ => (),
     }
-    Timer::new(STOP_WAIT_POLL_TIME).await;
+    // This had been just 50ms, but that sometimes wasn't enough time for
+    // systemd (ppid 1) to swap in and reap the zombie child, so let's increase
+    // it.
+    // This code is only invoked in tests and will only happen when the daemon
+    // didn't exit cleanly, so a sizeable delay isn't a terrible thing.
+    Timer::new(STOP_WAIT_POLL_TIME * 5).await;
     // Check to see if it actually died
     let res = signal::kill(nix_pid, None);
     match res {
