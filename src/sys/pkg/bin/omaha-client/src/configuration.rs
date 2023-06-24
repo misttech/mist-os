@@ -263,12 +263,8 @@ pub fn get_config(
     let service_url: Option<String> = vbmeta_service_url
         .or_else(|| eager_package_configs.map(|epc| epc.server.service_url.clone()));
 
-    // This file does not exist in production, it is only used in integration/e2e testing.
-    let service_url = service_url.unwrap_or_else(|| {
-        fs::read_to_string("/config/data/omaha_url").unwrap_or_else(|_| {
-            "https://clients2.google.com/service/update2/fuchsia/json".to_string()
-        })
-    });
+    let service_url = service_url
+        .unwrap_or_else(|| "https://clients2.google.com/service/update2/fuchsia/json".to_string());
     Config {
         updater: Updater { name: "Fuchsia".to_string(), version: Version::from([0, 0, 1, 0]) },
 

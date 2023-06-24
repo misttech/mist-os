@@ -87,11 +87,6 @@ impl Mounts {
         Self { _test_dir: test_dir, config_data, build_info }
     }
 
-    fn write_url(&self, url: impl AsRef<[u8]>) {
-        let url_path = self.config_data.join("omaha_url");
-        fs::write(url_path, url).expect("write omaha_url");
-    }
-
     fn write_version(&self, version: impl AsRef<[u8]>) {
         let version_path = self.build_info.join("version");
         fs::write(version_path, version).expect("write version");
@@ -247,7 +242,6 @@ impl TestEnvBuilder {
             b.etag_override(self.etag_override).build().unwrap()
         }));
         let url = OmahaServer::start(server.clone()).expect("start server");
-        mounts.write_url(&url);
         mounts.write_version(self.version);
         if let Some(eager_package_config_builder) = self.eager_package_config_builder {
             let json = eager_package_config_builder(&url);
@@ -335,10 +329,10 @@ impl TestEnvBuilder {
                 .detach()
         });
 
-        let boot_arguments_service = Arc::new(MockBootArgumentsService::new(HashMap::from([(
-            "omaha_app_id".into(),
-            Some(APP_ID.into()),
-        )])));
+        let boot_arguments_service = Arc::new(MockBootArgumentsService::new(HashMap::from([
+            ("omaha_app_id".into(), Some(APP_ID.into())),
+            ("omaha_url".into(), Some(url)),
+        ])));
         svc.add_fidl_service(move |stream| {
             fasync::Task::spawn(Arc::clone(&boot_arguments_service).handle_request_stream(stream))
                 .detach()
