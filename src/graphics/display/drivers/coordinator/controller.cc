@@ -635,13 +635,19 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
 void Controller::ReleaseImage(Image* image) { dc_.ReleaseImage(&image->info()); }
 
 void Controller::ReleaseCaptureImage(uint64_t handle) {
-  if (supports_capture_ && handle != 0) {
-    if (dc_.ReleaseCapture(handle) == ZX_ERR_SHOULD_WAIT) {
-      ZX_DEBUG_ASSERT_MSG(pending_capture_image_release_ == 0,
-                          "multiple pending releases for capture images");
-      // Delay the image release until the hardware is done.
-      pending_capture_image_release_ = handle;
-    }
+  if (!supports_capture_) {
+    return;
+  }
+  if (handle == 0) {
+    return;
+  }
+
+  const zx_status_t release_status = dc_.ReleaseCapture(handle);
+  if (release_status == ZX_ERR_SHOULD_WAIT) {
+    ZX_DEBUG_ASSERT_MSG(pending_capture_image_release_ == 0,
+                        "multiple pending releases for capture images");
+    // Delay the image release until the hardware is done.
+    pending_capture_image_release_ = handle;
   }
 }
 
