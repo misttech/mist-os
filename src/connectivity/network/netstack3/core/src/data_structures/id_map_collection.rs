@@ -105,6 +105,11 @@ impl<'a, K: EntryKey, T> OccupiedEntry<'a, K, T> {
         self.entry.key()
     }
 
+    /// Leaves the value in the map and produces the key.
+    pub fn into_key(self) -> K {
+        self.entry.into_key()
+    }
+
     /// Gets a reference to the value in the entry.
     pub fn get(&self) -> &T {
         self.entry.get()

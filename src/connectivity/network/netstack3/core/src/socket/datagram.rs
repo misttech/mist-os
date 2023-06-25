@@ -6,10 +6,11 @@
 
 use alloc::collections::HashSet;
 use assert_matches::assert_matches;
+use const_unwrap::const_unwrap_option;
 use core::{
     fmt::Debug,
     hash::Hash,
-    num::{NonZeroU16, NonZeroU8},
+    num::{NonZeroU16, NonZeroU8, NonZeroUsize},
 };
 
 use derivative::Derivative;
@@ -25,8 +26,8 @@ use thiserror::Error;
 use crate::{
     algorithm::ProtocolFlowId,
     data_structures::{
-        id_map::{Entry as IdMapEntry, EntryKey, IdMap},
-        id_map_collection::IdMapCollection,
+        id_map::EntryKey,
+        id_map_collection::{Entry as IdMapCollectionEntry, IdMapCollection, IdMapCollectionKey},
         socketmap::Tagged,
     },
     device::{AnyDevice, DeviceIdContext, WeakId},
@@ -42,10 +43,9 @@ use crate::{
     socket::{
         self,
         address::{AddrVecIter, ConnAddr, ConnIpAddr, ListenerIpAddr},
-        AddrVec, Bound, BoundSocketMap, Connection, ConvertSocketTypeState, ExistsError,
-        InsertError, Listener, ListenerAddr, SocketId as BoundSocketId, SocketMapAddrSpec,
-        SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
-        SocketState as BoundSocketState,
+        AddrVec, Bound, BoundSocketMap, ExistsError, InsertError, ListenerAddr,
+        SocketId as BoundSocketId, SocketMapAddrSpec, SocketMapAddrStateSpec,
+        SocketMapConflictPolicy, SocketMapStateSpec, SocketState as BoundSocketState,
     },
 };
 
@@ -57,9 +57,14 @@ where
     Bound<S>: Tagged<AddrVec<A>>,
 {
     pub(crate) bound: BoundSocketMap<A, S>,
-    pub(crate) unbound:
-        IdMap<UnboundSocketState<A::IpAddr, A::WeakDeviceId, S::UnboundSharingState>>,
-    pub(crate) bound_state: IdMapCollection<BoundSocketId<S>, BoundSocketState<A, S>>,
+    pub(crate) state: IdMapCollection<SocketId<S>, SocketState<A, S>>,
+}
+
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
+pub(crate) enum SocketState<A: SocketMapAddrSpec, S: DatagramSocketStateSpec> {
+    Unbound(UnboundSocketState<A::IpAddr, A::WeakDeviceId, S::UnboundSharingState>),
+    Bound(BoundSocketState<A, S>),
 }
 
 impl<A: SocketMapAddrSpec, S: DatagramSocketStateSpec> Sockets<A, S>
@@ -82,7 +87,7 @@ where
         device: A::WeakDeviceId,
     ) -> Option<FoundSockets<AddrEntry<'_, A, S>, impl Iterator<Item = AddrEntry<'_, A, S>> + '_>>
     {
-        let Self { bound, unbound: _, bound_state: _ } = self;
+        let Self { bound, state: _ } = self;
         bound.lookup((src_ip, src_port), (dst_ip, dst_port), device)
     }
 }
@@ -449,7 +454,7 @@ where
 
 pub(crate) trait DatagramSocketStateSpec: SocketMapStateSpec {
     type UnboundId: Clone + From<usize> + EntryKey + Debug;
-    type UnboundSharingState: Clone + Default;
+    type UnboundSharingState: Clone + Debug + Default;
 }
 
 pub(crate) trait DatagramSocketSpec<A: SocketMapAddrSpec>:
@@ -486,11 +491,15 @@ pub(crate) fn create<
 where
     Bound<S>: Tagged<AddrVec<A>>,
 {
-    sync_ctx.with_sockets_mut(
-        |_sync_ctx, Sockets { bound_state: _, unbound, bound: _ }, _allocator| {
-            SocketId::Unbound(unbound.push(UnboundSocketState::default()).into())
-        },
-    )
+    sync_ctx.with_sockets_mut(|_sync_ctx, Sockets { state, bound: _ }, _allocator| {
+        state
+            .push_entry(
+                |index| SocketId::Unbound(index.into()),
+                SocketState::Unbound(UnboundSocketState::default()),
+            )
+            .key()
+            .clone()
+    })
 }
 
 pub(crate) enum SocketInfo<A: SocketMapAddrSpec> {
@@ -517,35 +526,31 @@ where
     A::IpVersion: IpExt,
 {
     sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
-        let Sockets { bound_state, unbound, bound } = state;
-        let (ip_options, info) = match id.into() {
-            SocketId::Unbound(id) => {
-                let UnboundSocketState { device: _, sharing: _, ip_options } =
-                    unbound.remove(id.get_key_index()).expect("invalid UDP unbound ID");
-
+        let Sockets { state, bound } = state;
+        let id = id.into();
+        let (ip_options, info) = match state.remove(&id).expect("invalid socket ID") {
+            SocketState::Unbound(UnboundSocketState { device: _, sharing: _, ip_options }) => {
                 (ip_options, SocketInfo::Unbound)
             }
-            SocketId::Bound(DatagramBoundId::Listener(id)) => {
-                let (state, _sharing, addr) = Listener::from_socket_state(
-                    bound_state
-                        .remove(&Listener::to_socket_id(id.clone()))
-                        .expect("invalid UDP listener ID"),
-                );
-                bound.listeners_mut().remove(&id, &addr).expect("Invalid UDP listener ID");
+            SocketState::Bound(state) => match state {
+                BoundSocketState::Listener(state) => {
+                    let id =
+                        assert_matches!(id, SocketId::Bound(BoundSocketId::Listener(id)) => id);
+                    let (state, _sharing, addr) = state;
+                    bound.listeners_mut().remove(&id, &addr).expect("Invalid UDP listener ID");
 
-                let ListenerState { ip_options } = state;
-                (ip_options, SocketInfo::Listener(addr))
-            }
-            SocketId::Bound(DatagramBoundId::Connection(id)) => {
-                let (state, _sharing, addr) = Connection::from_socket_state(
-                    bound_state
-                        .remove(&Connection::to_socket_id(id.clone()))
-                        .expect("invalid UDP connection ID"),
-                );
-                bound.conns_mut().remove(&id, &addr).expect("UDP connection not found");
-                let ConnState { socket, clear_device_on_disconnect: _, shutdown: _ } = state;
-                (socket.into_options(), SocketInfo::Connected(addr))
-            }
+                    let ListenerState { ip_options } = state;
+                    (ip_options, SocketInfo::Listener(addr))
+                }
+                BoundSocketState::Connected(state) => {
+                    let id =
+                        assert_matches!(id, SocketId::Bound(BoundSocketId::Connection(id)) => id);
+                    let (state, _sharing, addr) = state;
+                    bound.conns_mut().remove(&id, &addr).expect("UDP connection not found");
+                    let ConnState { socket, clear_device_on_disconnect: _, shutdown: _ } = state;
+                    (socket.into_options(), SocketInfo::Connected(addr))
+                }
+            },
         };
 
         let IpOptions { multicast_memberships, hop_limits: _ } = ip_options;
@@ -568,23 +573,15 @@ where
     Bound<S>: Tagged<AddrVec<A>>,
 {
     sync_ctx.with_sockets(|_sync_ctx, state| {
-        let Sockets { bound_state, unbound: _, bound: _ } = state;
-        match id.into() {
-            SocketId::Unbound(_) => SocketInfo::Unbound,
-            SocketId::Bound(DatagramBoundId::Listener(id)) => {
-                let (_state, _sharing, addr) = Listener::from_socket_state_ref(
-                    bound_state
-                        .get(&Listener::to_socket_id(id.clone()))
-                        .expect("invalid UDP listener ID"),
-                );
+        let Sockets { state, bound: _ } = state;
+        match state.get(&id.into()).expect("invalid socket ID") {
+            SocketState::Unbound(_) => SocketInfo::Unbound,
+            SocketState::Bound(BoundSocketState::Listener(state)) => {
+                let (_state, _sharing, addr) = state;
                 SocketInfo::Listener(addr.clone())
             }
-            SocketId::Bound(DatagramBoundId::Connection(id)) => {
-                let (_state, _sharing, addr) = Connection::from_socket_state_ref(
-                    bound_state
-                        .get(&Connection::to_socket_id(id.clone()))
-                        .expect("invalid UDP connection ID"),
-                );
+            SocketState::Bound(BoundSocketState::Connected(state)) => {
+                let (_state, _sharing, addr) = state;
                 SocketInfo::Connected(addr.clone())
             }
         }
@@ -648,7 +645,7 @@ where
     S::UnboundSharingState: Clone + Into<S::ListenerSharingState>,
     S::ListenerSharingState: Default,
 {
-    let Sockets { bound_state, bound, unbound } = sockets;
+    let Sockets { state, bound } = sockets;
     let identifier = match local_id {
         Some(local_id) => Ok(local_id),
         None => {
@@ -668,8 +665,13 @@ where
         .ok_or(LocalAddressError::FailedToAllocateLocalPort),
     }?;
 
-    let UnboundSocketState { device, sharing: _, ip_options: _ } =
-        unbound.get(id.get_key_index()).unwrap_or_else(|| panic!("unbound ID {:?} is invalid", id));
+    let unbound_entry = match state.entry(SocketId::Unbound(id.clone())) {
+        IdMapCollectionEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
+        IdMapCollectionEntry::Occupied(o) => o,
+    };
+
+    let UnboundSocketState { device, sharing, ip_options: _ } = assert_matches!(
+        unbound_entry.get(), SocketState::Unbound(state) => state);
     let (addr, device, identifier) = match addr {
         Some(addr) => {
             // Extract the specified address and the device. The device
@@ -697,12 +699,6 @@ where
         None => (None, device.clone().map(EitherDeviceId::Weak), identifier),
     };
 
-    let unbound_entry = match unbound.entry(id.get_key_index()) {
-        IdMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
-        IdMapEntry::Occupied(o) => o,
-    };
-
-    let UnboundSocketState { device: _, sharing, ip_options: _ } = unbound_entry.get();
     let sharing = sharing.clone();
     match bound.listeners_mut().try_insert(
         ListenerAddr {
@@ -713,12 +709,17 @@ where
         |addr, sharing| {
             // Remove the unbound state only after we're sure the
             // insertion is going to succeed.
-            let UnboundSocketState { device: _, sharing: _, ip_options } = unbound_entry.remove();
-            let entry = bound_state.push_entry(
-                |index| Listener::to_socket_id(S::ListenerId::from(index)),
-                Listener::to_socket_state(({ ListenerState { ip_options } }, sharing, addr)),
+            let UnboundSocketState { device: _, sharing: _, ip_options } = assert_matches!(
+                state.remove(&SocketId::Unbound(id)), Some(SocketState::Unbound(state)) => state);
+            let entry = state.push_entry(
+                |index| SocketId::Bound(BoundSocketId::Listener(S::ListenerId::from(index))),
+                SocketState::Bound(BoundSocketState::Listener((
+                    { ListenerState { ip_options } },
+                    sharing,
+                    addr,
+                ))),
             );
-            Listener::from_socket_id_ref(entry.key()).clone()
+            assert_matches!(entry.key(), SocketId::Bound(BoundSocketId::Listener(id)) => id.clone())
         },
     ) {
         Ok(entry) => Ok(entry.id()),
@@ -788,16 +789,16 @@ where
                 S::ConnId,
             ),
         }
-        let Sockets { bound_state, bound, unbound } = state;
-        let (local_ip, local_id, sharing, device, bound_map_socket_state) = match &id {
-            SocketId::Unbound(id) => {
-                let state = unbound
-                    .get(id.get_key_index())
-                    .unwrap_or_else(|| panic!("unbound socket {:?} not found", id));
+        let Sockets { state, bound } = state;
+        let (local_ip, local_id, sharing, device, bound_map_socket_state) = match state
+            .get(&id)
+            .expect("invalid socket ID")
+        {
+            SocketState::Unbound(state) => {
                 let UnboundSocketState { device, sharing: unbound_sharing, ip_options: _ } = state;
                 (None, None, unbound_sharing.clone().into(), device.as_ref(), None)
             }
-            SocketId::Bound(id) => match bound_state.get(&id).expect("invalid socket ID") {
+            SocketState::Bound(state) => match state {
                 BoundSocketState::Listener(state) => {
                     let (
                         _,
@@ -815,7 +816,8 @@ where
                         Some(BoundMapSocketState::<A, S>::Listener(
                             listener_addr.clone(),
                             listener_sharing.clone(),
-                            assert_matches!(id, BoundSocketId::Listener(id) => id.clone()),
+                            assert_matches!(&id,
+                                SocketId::Bound(BoundSocketId::Listener(id)) => id.clone()),
                         )),
                     )
                 }
@@ -836,7 +838,9 @@ where
                         Some(BoundMapSocketState::Connected(
                             original_addr.clone(),
                             conn_sharing.clone(),
-                            assert_matches!(id, BoundSocketId::Connection(id) => id.clone()),
+                            assert_matches!(&id,
+                                SocketId::Bound(BoundSocketId::Connection(id)) => id)
+                            .clone(),
                         )),
                     )
                 }
@@ -888,13 +892,12 @@ where
         };
 
         match bound.conns_mut().try_insert(c, sharing, |addr, sharing| {
-            let ip_options = match id {
-                SocketId::Unbound(id) => {
-                    let UnboundSocketState { ip_options, device: _, sharing: _ } =
-                        unbound.remove(id.get_key_index()).expect("invalid unbound ID");
+            let ip_options = match state.remove(&id).expect("invalid socket ID") {
+                SocketState::Unbound(state) => {
+                    let UnboundSocketState { ip_options, device: _, sharing: _ } = state;
                     ip_options
                 }
-                SocketId::Bound(id) => match bound_state.remove(&id).expect("invalid bound ID") {
+                SocketState::Bound(state) => match state {
                     BoundSocketState::Listener(state) => {
                         let (ListenerState { ip_options }, _sharing, _addr) = state;
                         ip_options
@@ -910,9 +913,9 @@ where
                 },
             };
             *ip_sock.options_mut() = ip_options;
-            let entry = bound_state.push_entry(
-                |index| Connection::to_socket_id(index.into()),
-                Connection::to_socket_state((
+            let entry = state.push_entry(
+                |index| SocketId::Bound(BoundSocketId::Connection(index.into())),
+                SocketState::Bound(BoundSocketState::Connected((
                     ConnState {
                         socket: ip_sock,
                         clear_device_on_disconnect,
@@ -920,9 +923,10 @@ where
                     },
                     sharing,
                     addr,
-                )),
+                ))),
             );
-            Connection::from_socket_id_ref(entry.key()).clone()
+            assert_matches!(entry.key(), SocketId::Bound(BoundSocketId::Connection(id)) => id)
+                .clone()
         }) {
             Ok(entry) => Ok(SocketId::Bound(BoundSocketId::Connection(entry.id()))),
             Err((
@@ -979,22 +983,29 @@ where
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
     S::ConnSharingState: Into<S::ListenerSharingState>,
 {
-    let id = match id {
-        SocketId::Unbound(_) | SocketId::Bound(BoundSocketId::Listener(_)) => {
-            return Err(ExpectedConnError)
-        }
-        SocketId::Bound(BoundSocketId::Connection(id)) => id,
-    };
-    Ok(sync_ctx.with_sockets_mut(|_sync_ctx, state, _allocator| {
-        let Sockets { bound_state, bound, unbound: _ } = state;
-        let (state, sharing, addr): (_, S::ConnSharingState, _) = Connection::from_socket_state(
-            bound_state
-                .remove(&Connection::to_socket_id(id.clone()))
-                .expect("no state for connection"),
-        );
+    sync_ctx.with_sockets_mut(|_sync_ctx, state, _allocator| {
+        let Sockets { state, bound } = state;
+        let entry = match state.entry(id.clone()) {
+            IdMapCollectionEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
+            IdMapCollectionEntry::Occupied(o) => o,
+        };
+        match entry.get() {
+            SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
+                return Err(ExpectedConnError)
+            }
+            SocketState::Bound(BoundSocketState::Connected(_)) => (),
+        };
+        let id = assert_matches!(id, SocketId::Bound(BoundSocketId::Connection(id)) => id);
+
+        let (conn_state, sharing, addr): (_, S::ConnSharingState, _) = match entry.remove() {
+            SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
+                unreachable!("already checked the state")
+            }
+            SocketState::Bound(BoundSocketState::Connected(state)) => state,
+        };
         let _bound_addr = bound.conns_mut().remove(&id, &addr).expect("connection not found");
 
-        let ConnState { socket, clear_device_on_disconnect, shutdown: _ } = state;
+        let ConnState { socket, clear_device_on_disconnect, shutdown: _ } = conn_state;
         let ip_options = socket.into_options();
 
         let ConnAddr { ip: ConnIpAddr { local: (local_ip, identifier), remote: _ }, mut device } =
@@ -1008,17 +1019,22 @@ where
         let id = bound
             .listeners_mut()
             .try_insert(addr, sharing.into(), |addr, sharing| {
-                let entry = bound_state.push_entry(
-                    |index| Listener::to_socket_id(index.into()),
-                    Listener::to_socket_state((ListenerState { ip_options }, sharing, addr)),
+                let entry = state.push_entry(
+                    |index| SocketId::Bound(BoundSocketId::Listener(index.into())),
+                    SocketState::Bound(BoundSocketState::Listener((
+                        ListenerState { ip_options },
+                        sharing,
+                        addr,
+                    ))),
                 );
-                Listener::from_socket_id_ref(entry.key()).clone()
+                assert_matches!(entry.key(), SocketId::Bound(BoundSocketId::Listener(id)) => id)
+                    .clone()
             })
             .expect("inserting listener for disconnected socket failed")
             .id();
 
-        SocketId::Bound(BoundSocketId::Listener(id))
-    }))
+        Ok(SocketId::Bound(BoundSocketId::Listener(id)))
+    })
 }
 
 /// Which direction(s) to shut down for a socket.
@@ -1046,18 +1062,17 @@ pub(crate) fn shutdown_connected<
 where
     Bound<S>: Tagged<AddrVec<A>>,
 {
-    let id = match id {
-        SocketId::Unbound(_) | SocketId::Bound(BoundSocketId::Listener(_)) => {
-            return Err(ExpectedConnError)
-        }
-        SocketId::Bound(BoundSocketId::Connection(id)) => id,
-    };
-    Ok(sync_ctx.with_sockets_mut(|_sync_ctx, state, _allocator| {
-        let Sockets { bound_state, bound: _, unbound: _ } = state;
+    sync_ctx.with_sockets_mut(|_sync_ctx, state, _allocator| {
+        let Sockets { state, bound: _ } = state;
+        let state = match state.get_mut(&id).expect("invalid socket ID") {
+            SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
+                return Err(ExpectedConnError)
+            }
+            SocketState::Bound(BoundSocketState::Connected(state)) => state,
+        };
+
         let (ConnState { socket: _, clear_device_on_disconnect: _, shutdown }, _sharing, _addr) =
-            Connection::from_socket_state_mut(
-                bound_state.get_mut(&Connection::to_socket_id(id)).expect("no such connection"),
-            );
+            state;
         let (shutdown_send, shutdown_receive) = match which {
             ShutdownType::Send => (true, false),
             ShutdownType::Receive => (false, true),
@@ -1066,7 +1081,8 @@ where
         let Shutdown { send, receive } = shutdown;
         *send |= shutdown_send;
         *receive |= shutdown_receive;
-    }))
+        Ok(())
+    })
 }
 
 pub(crate) fn get_shutdown_connected<
@@ -1082,16 +1098,17 @@ pub(crate) fn get_shutdown_connected<
 where
     Bound<S>: Tagged<AddrVec<A>>,
 {
-    let id = match id {
-        SocketId::Unbound(_) | SocketId::Bound(BoundSocketId::Listener(_)) => return None,
-        SocketId::Bound(BoundSocketId::Connection(id)) => id,
-    };
     sync_ctx.with_sockets(|_sync_ctx, state| {
-        let Sockets { bound_state, bound: _, unbound: _ } = state;
+        let Sockets { state, bound: _ } = state;
+        let state = match state.get(&id).expect("invalid socket ID") {
+            SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
+                return None
+            }
+            SocketState::Bound(BoundSocketState::Connected(state)) => state,
+        };
+
         let (ConnState { socket: _, clear_device_on_disconnect: _, shutdown }, _sharing, _addr) =
-            Connection::from_socket_state_ref(
-                bound_state.get(&Connection::to_socket_id(id)).expect("no such connection"),
-            );
+            state;
         let Shutdown { send, receive } = shutdown;
         Some(match (send, receive) {
             (false, false) => return None,
@@ -1127,14 +1144,15 @@ pub(crate) fn send_conn<
 where
     Bound<S>: Tagged<AddrVec<A>>,
 {
-    let id = match id {
-        SocketId::Unbound(_) | SocketId::Bound(BoundSocketId::Listener(_)) => {
-            return Err(SendError::NotConnected(body))
-        }
-        SocketId::Bound(BoundSocketId::Connection(id)) => id,
-    };
     sync_ctx.with_sockets_buf_mut(|sync_ctx, state, _allocator| {
-        let Sockets { bound: _, unbound: _, bound_state } = state;
+        let Sockets { bound: _, state } = state;
+        let state = match state.get(&id).expect("invalid socket ID") {
+            SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
+                return Err(SendError::NotConnected(body))
+            }
+            SocketState::Bound(BoundSocketState::Connected(state)) => state,
+        };
+
         let (
             ConnState {
                 socket,
@@ -1143,9 +1161,7 @@ where
             },
             _sharing,
             addr,
-        ) = Connection::from_socket_state_ref(
-            bound_state.get(&Connection::to_socket_id(id)).expect("no such connection"),
-        );
+        ) = state;
         if *shutdown_send {
             return Err(SendError::NotWriteable(body));
         }
@@ -1206,8 +1222,11 @@ where
         // TODO(https://github.com/rust-lang/rust/issues/31436): Replace this
         // closure with a try-block.
         let send_result = (|| {
-            let Sockets { bound_state, bound: _, unbound: _ } = state;
-            let state = bound_state.get(&id).expect("no such socket");
+            let Sockets { state, bound: _ } = state;
+            let state = match state.get(&SocketId::Bound(id)).expect("no such socket") {
+                SocketState::Unbound(_) => panic!("expected bound socket"),
+                SocketState::Bound(state) => state,
+            };
             match state {
                 BoundSocketState::Connected(state) => {
                     let (
@@ -1341,20 +1360,16 @@ where
     A::WeakDeviceId: PartialEq<<A::WeakDeviceId as WeakId>::Strong>,
 {
     sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
-        let Sockets { bound_state, unbound, bound } = state;
-        match id {
-            SocketId::Unbound(id) => {
-                let UnboundSocketState { ref mut device, sharing: _, ip_options: _ } =
-                    unbound.get_mut(id.get_key_index()).expect("unbound UDP socket not found");
+        let Sockets { state, bound } = state;
+        match state.get_mut(&id).expect("invalid socket ID") {
+            SocketState::Unbound(state) => {
+                let UnboundSocketState { ref mut device, sharing: _, ip_options: _ } = state;
                 *device = new_device.map(|d| sync_ctx.downgrade_device_id(d));
-                Ok(())
             }
-            SocketId::Bound(id) => match bound_state
-                .get_mut(&id)
-                .unwrap_or_else(|| panic!("invalid socket ID {:?}", id))
-            {
+            SocketState::Bound(state) => match state {
                 BoundSocketState::Listener(state) => {
-                    let id = assert_matches!(id, BoundSocketId::Listener(id) => id);
+                    let id =
+                        assert_matches!(id, SocketId::Bound(BoundSocketId::Listener(id)) => id);
                     // Don't allow changing the device if one of the IP addresses in the socket
                     // address vector requires a zone (scope ID).
                     let (_, _, addr): &(S::ListenerState, S::ListenerSharingState, _) = state;
@@ -1387,10 +1402,10 @@ where
 
                     let (_, _, addr): &mut (S::ListenerState, S::ListenerSharingState, _) = state;
                     *addr = new_entry.get_addr().clone();
-                    Ok(())
                 }
                 BoundSocketState::Connected(bound_state) => {
-                    let id = assert_matches!(id, BoundSocketId::Connection(id) => id);
+                    let id =
+                        assert_matches!(id, SocketId::Bound(BoundSocketId::Connection(id)) => id);
                     let (state, _, addr): &(_, S::ConnSharingState, _) = bound_state;
                     let ConnAddr {
                         device: old_device,
@@ -1447,10 +1462,10 @@ where
                     if new_device.is_some() {
                         *clear_device_on_disconnect = false;
                     }
-                    Ok(())
                 }
             },
-        }
+        };
+        Ok(())
     })
 }
 
@@ -1528,6 +1543,24 @@ fn pick_interface_for_addr<
 pub(crate) enum SocketId<S: DatagramSocketStateSpec> {
     Unbound(S::UnboundId),
     Bound(DatagramBoundId<S>),
+}
+
+impl<S: DatagramSocketStateSpec> IdMapCollectionKey for SocketId<S> {
+    const VARIANT_COUNT: NonZeroUsize = const_unwrap_option(
+        <DatagramBoundId<S> as IdMapCollectionKey>::VARIANT_COUNT.checked_add(1),
+    );
+    fn get_variant(&self) -> usize {
+        match self {
+            Self::Unbound(_) => 0,
+            Self::Bound(bound) => bound.get_variant() + 1,
+        }
+    }
+    fn get_id(&self) -> usize {
+        match self {
+            Self::Unbound(unbound) => unbound.get_key_index(),
+            Self::Bound(bound) => bound.get_id(),
+        }
+    }
 }
 
 /// Selector for the device to affect when changing multicast settings.
@@ -1645,7 +1678,7 @@ where
 }
 
 fn get_options_device<A: SocketMapAddrSpec, S: DatagramSocketSpec<A>>(
-    Sockets { bound_state, bound: _, unbound }: &Sockets<A, S>,
+    Sockets { state, bound: _ }: &Sockets<A, S>,
     id: SocketId<S>,
 ) -> (&IpOptions<A::IpAddr, A::WeakDeviceId>, &Option<A::WeakDeviceId>)
 where
@@ -1655,38 +1688,32 @@ where
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
     A::IpVersion: IpExt,
 {
-    match id {
-        SocketId::Unbound(id) => {
-            let UnboundSocketState { ip_options, device, sharing: _ } =
-                unbound.get(id.get_key_index()).expect("unbound UDP socket not found");
+    match state.get(&id).expect("socket not found") {
+        SocketState::Unbound(state) => {
+            let UnboundSocketState { ip_options, device, sharing: _ } = state;
             (ip_options, device)
         }
-        SocketId::Bound(DatagramBoundId::Listener(id)) => {
-            let state =
-                bound_state.get(&BoundSocketId::Listener(id)).expect("listening socket not found");
+        SocketState::Bound(BoundSocketState::Listener(state)) => {
             let (ListenerState { ip_options }, _, ListenerAddr { device, ip: _ }): &(
                 _,
                 S::ListenerSharingState,
                 _,
-            ) = Listener::from_socket_state_ref(state);
+            ) = state;
             (ip_options, device)
         }
-        SocketId::Bound(DatagramBoundId::Connection(id)) => {
-            let state = bound_state
-                .get(&BoundSocketId::Connection(id))
-                .expect("connected socket not found");
+        SocketState::Bound(BoundSocketState::Connected(state)) => {
             let (
                 ConnState { socket, clear_device_on_disconnect: _, shutdown: _ },
                 _,
                 ConnAddr { device, ip: _ },
-            ): &(_, S::ConnSharingState, _) = Connection::from_socket_state_ref(state);
+            ): &(_, S::ConnSharingState, _) = state;
             (socket.options(), device)
         }
     }
 }
 
 fn get_options_mut<A: SocketMapAddrSpec, S: DatagramSocketSpec<A>>(
-    Sockets { bound_state, bound: _, unbound }: &mut Sockets<A, S>,
+    Sockets { state, bound: _ }: &mut Sockets<A, S>,
     id: SocketId<S>,
 ) -> &mut IpOptions<A::IpAddr, A::WeakDeviceId>
 where
@@ -1696,32 +1723,25 @@ where
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
     A::IpVersion: IpExt,
 {
-    match id {
-        SocketId::Unbound(id) => {
-            let UnboundSocketState { ip_options, device: _, sharing: _ } =
-                unbound.get_mut(id.get_key_index()).expect("unbound UDP socket not found");
+    match state.get_mut(&id).expect("socket not found") {
+        SocketState::Unbound(state) => {
+            let UnboundSocketState { ip_options, device: _, sharing: _ } = state;
             ip_options
         }
-        SocketId::Bound(DatagramBoundId::Listener(id)) => {
-            let state = bound_state
-                .get_mut(&BoundSocketId::Listener(id))
-                .expect("listening socket not found");
+        SocketState::Bound(BoundSocketState::Listener(state)) => {
             let (ListenerState { ip_options }, _, _): &mut (
                 _,
                 S::ListenerSharingState,
                 ListenerAddr<_, _, _>,
-            ) = Listener::from_socket_state_mut(state);
+            ) = state;
             ip_options
         }
-        SocketId::Bound(DatagramBoundId::Connection(id)) => {
-            let state = bound_state
-                .get_mut(&BoundSocketId::Connection(id))
-                .expect("connected socket not found");
+        SocketState::Bound(BoundSocketState::Connected(state)) => {
             let (ConnState { socket, clear_device_on_disconnect: _, shutdown: _ }, _, _): &mut (
                 _,
                 S::ConnSharingState,
                 ConnAddr<_, _, _, _>,
-            ) = Connection::from_socket_state_mut(state);
+            ) = state;
             socket.options_mut()
         }
     }
@@ -1790,15 +1810,14 @@ pub(crate) fn update_sharing<
 where
     Bound<S>: Tagged<AddrVec<A>>,
 {
-    let id = match id {
-        SocketId::Unbound(id) => id,
-        SocketId::Bound(_) => return Err(ExpectedUnboundError),
-    };
     sync_ctx.with_sockets_mut(|_sync_ctx, sockets, _allocator| {
-        let Sockets { bound_state: _, unbound, bound: _ } = sockets;
+        let Sockets { state, bound: _ } = sockets;
+        let state = match state.get_mut(&id).expect("socket not found") {
+            SocketState::Bound(_) => return Err(ExpectedUnboundError),
+            SocketState::Unbound(state) => state,
+        };
 
-        let UnboundSocketState { device: _, sharing, ip_options: _ } =
-            unbound.get_mut(id.get_key_index()).expect("unbound datagram socket not found");
+        let UnboundSocketState { device: _, sharing, ip_options: _ } = state;
         *sharing = new_sharing;
         Ok(())
     })
@@ -1825,28 +1844,19 @@ where
     A::IpVersion: IpExt,
 {
     sync_ctx.with_sockets(|_sync_ctx, sockets| {
-        let Sockets { bound_state, bound: _, unbound } = &sockets;
-        match id.into() {
-            SocketId::Unbound(id) => {
-                let UnboundSocketState { device: _, sharing, ip_options: _ } =
-                    unbound.get(id.get_key_index()).expect("unbound UDP socket not found");
+        let Sockets { state, bound: _ } = &sockets;
+        match state.get(&id.into()).expect("socket not found") {
+            SocketState::Unbound(state) => {
+                let UnboundSocketState { device: _, sharing, ip_options: _ } = state;
                 sharing
             }
-            SocketId::Bound(id) => match id {
-                BoundSocketId::Listener(id) => {
-                    let state = bound_state
-                        .get(&Listener::to_socket_id(id))
-                        .expect("listener UDP socket not found");
-                    let (_, sharing, _): &(ListenerState<_, _>, _, ListenerAddr<_, _, _>) =
-                        Listener::from_socket_state_ref(state);
+            SocketState::Bound(state) => match state {
+                BoundSocketState::Listener(state) => {
+                    let (_, sharing, _): &(ListenerState<_, _>, _, ListenerAddr<_, _, _>) = state;
                     sharing
                 }
-                BoundSocketId::Connection(id) => {
-                    let state = bound_state
-                        .get(&Connection::to_socket_id(id))
-                        .expect("conneted UDP socket not found");
-                    let (_, sharing, _): &(ConnState<_, _>, _, ConnAddr<_, _, _, _>) =
-                        Connection::from_socket_state_ref(state);
+                BoundSocketState::Connected(state) => {
+                    let (_, sharing, _): &(ConnState<_, _>, _, ConnAddr<_, _, _, _>) = state;
                     sharing
                 }
             },
