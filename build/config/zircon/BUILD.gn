@@ -141,13 +141,17 @@ config("compiler") {
       }
     } else {
       # gcc defaults to enabling sized deallocation >= c++14; clang does not.
-      # Enable sized-deallocation for the kernel, so the heap implementation can
-      # optimize for or check generated sizes.
+      # Enable sized-deallocation for the kernel, so the heap implementation
+      # can optimize for or check generated sizes.
       cflags += [ "-fsized-deallocation" ]
     }
   } else if (current_os == "win") {
-    # This enables build ID-like PDB UUIDs without timestamp.
-    ldflags += [ "-Wl,/Brepro" ]
+    # This avoids timestamps in PE-COFF relocatable (.o) files.  When using
+    # clang-cl, it can also be spelled `/Brepro` as the linker option is.
+    # But for the normal clang(++) driver, stick to the `-` option syntax.
+    # The driver passes the corresponding option on to the linker as well,
+    # where it enables build ID-like PDB UUIDs without timestamp.
+    compiler_flags += [ "-mno-incremental-linker-compatible" ]
   }
 
   # The toolchain-supplied headers come after include_dirs from targets and
