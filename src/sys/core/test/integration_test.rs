@@ -12,17 +12,16 @@ async fn core_proxy() {
         ScopedInstance::new("realm_builder".into(), "#meta/fake_core.cm".into()).await.unwrap();
     info!("binding to Echo");
     let exposed = core.get_exposed_dir();
-    let svc_for_sys = fuchsia_fs::directory::open_directory(
+    let directory = fuchsia_fs::directory::open_directory(
         exposed,
-        "svc_for_sys",
+        "svc_for_legacy_shell",
         fuchsia_fs::OpenFlags::empty(),
     )
     .await
     .unwrap();
-    let echo = fuchsia_component::client::connect_to_protocol_at_dir_root::<fecho::EchoMarker>(
-        &svc_for_sys,
-    )
-    .unwrap();
+    let echo =
+        fuchsia_component::client::connect_to_protocol_at_dir_root::<fecho::EchoMarker>(&directory)
+            .unwrap();
     let out = echo.echo_string(Some("world")).await.unwrap();
     info!("received echo response");
     assert_eq!(out.unwrap(), "world");

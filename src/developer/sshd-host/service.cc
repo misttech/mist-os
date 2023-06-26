@@ -248,7 +248,7 @@ void Service::Launch(int conn, const std::string& peer_name) {
       // Don't forward our /svc to the child
       continue;
     }
-    if (std::string_view{path} == "/svc_for_sys") {
+    if (std::string_view{path} == "/svc_for_legacy_shell") {
       path = "/svc";
     }
     actions[action++] = {
