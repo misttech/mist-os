@@ -734,26 +734,28 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
   uint64_t capture_image_handle = INVALID_ID;
   zx_status_t status = controller_->dc()->ImportImageForCapture(
       banjo_driver_buffer_collection_id, request->index, &capture_image_handle);
-
-  if (status == ZX_OK) {
-    auto release_image = fit::defer([this, capture_image_handle]() {
-      controller_->dc()->ReleaseCapture(capture_image_handle);
-    });
-
-    fbl::AllocChecker alloc_checker;
-    auto capture_image = fbl::AdoptRef(
-        new (&alloc_checker) CaptureImage(controller_, capture_image_handle, &proxy_->node(), id_));
-    if (!alloc_checker.check()) {
-      completer.ReplyError(ZX_ERR_NO_MEMORY);
-      return;
-    }
-    capture_image->id = next_capture_image_id++;
-    completer.ReplySuccess(capture_image->id);
-    release_image.cancel();
-    capture_images_.insert(std::move(capture_image));
-  } else {
+  if (status != ZX_OK) {
     completer.ReplyError(status);
+    return;
   }
+
+  auto release_image = fit::defer(
+      [this, capture_image_handle]() { controller_->dc()->ReleaseCapture(capture_image_handle); });
+
+  fbl::AllocChecker alloc_checker;
+  fbl::RefPtr<CaptureImage> capture_image = fbl::AdoptRef(
+      new (&alloc_checker) CaptureImage(controller_, capture_image_handle, &proxy_->node(), id_));
+  if (!alloc_checker.check()) {
+    completer.ReplyError(ZX_ERR_NO_MEMORY);
+    return;
+  }
+  // `capture_image_handle` is now owned by the CaptureImage instance.
+  release_image.cancel();
+
+  const uint64_t capture_image_id = next_capture_image_id_++;
+  capture_image->id = capture_image_id;
+  capture_images_.insert(std::move(capture_image));
+  completer.ReplySuccess(capture_image_id);
 }
 
 void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter::Sync& completer) {
