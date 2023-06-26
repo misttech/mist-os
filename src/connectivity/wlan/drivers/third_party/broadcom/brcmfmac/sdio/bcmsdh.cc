@@ -115,7 +115,7 @@ zx_status_t brcmf_sdiod_get_bootloader_macaddr(struct brcmf_sdio_dev* sdiodev, u
   return ZX_OK;
 }
 
-zx_status_t brcmf_sdiod_intr_register(struct brcmf_sdio_dev* sdiodev) {
+zx_status_t brcmf_sdiod_intr_register(struct brcmf_sdio_dev* sdiodev, bool reloading) {
   struct brcmf_sdio_pd* pdata;
   zx_status_t ret = ZX_OK;
   uint8_t data;
@@ -140,25 +140,30 @@ zx_status_t brcmf_sdiod_intr_register(struct brcmf_sdio_dev* sdiodev) {
 
   // If there is metadata, OOB is supported.
   if (ret == ZX_OK) {
-    BRCMF_DBG(SDIO, "Enter, register OOB IRQ");
-    ret = brcmf_sdiod_configure_oob_interrupt(sdiodev, &config);
-    if (ret != ZX_OK) {
-      return ret;
+    // The interrupt thread only needs to be created on startup, not on fw reload
+    if (!reloading) {
+      BRCMF_DBG(SDIO, "Enter, register OOB IRQ");
+
+      // Configures gpios for interupt, which only needs to happen on startup
+      ret = brcmf_sdiod_configure_oob_interrupt(sdiodev, &config);
+      if (ret != ZX_OK) {
+        return ret;
+      }
+      pdata->oob_irq_supported = true;
+      int status = thrd_create_with_name(&sdiodev->isr_thread, &brcmf_sdio_oob_irqhandler, sdiodev,
+                                         "brcmf-sdio-isr");
+      if (status != thrd_success) {
+        BRCMF_ERR("thrd_create_with_name failed: %d", status);
+        return ZX_ERR_INTERNAL;
+      }
+      sdiodev->oob_irq_requested = true;
+      ret = enable_irq_wake(sdiodev->irq_handle);
+      if (ret != ZX_OK) {
+        BRCMF_ERR("enable_irq_wake failed %d", ret);
+        return ret;
+      }
+      sdiodev->irq_wake = true;
     }
-    pdata->oob_irq_supported = true;
-    int status = thrd_create_with_name(&sdiodev->isr_thread, &brcmf_sdio_oob_irqhandler, sdiodev,
-                                       "brcmf-sdio-isr");
-    if (status != thrd_success) {
-      BRCMF_ERR("thrd_create_with_name failed: %d", status);
-      return ZX_ERR_INTERNAL;
-    }
-    sdiodev->oob_irq_requested = true;
-    ret = enable_irq_wake(sdiodev->irq_handle);
-    if (ret != ZX_OK) {
-      BRCMF_ERR("enable_irq_wake failed %d", ret);
-      return ret;
-    }
-    sdiodev->irq_wake = true;
 
     sdio_claim_host(sdiodev->func1);
 
@@ -743,7 +748,7 @@ static zx_status_t brcmf_sdiod_set_block_size(sdio_protocol_t* proto, sdio_func*
   return ZX_OK;
 }
 
-static zx_status_t brcmf_sdiod_probe(struct brcmf_sdio_dev* sdiodev) {
+zx_status_t brcmf_sdiod_probe(struct brcmf_sdio_dev* sdiodev, bool reloading) {
   zx_status_t ret = ZX_OK;
 
   ret = brcmf_sdiod_set_block_size(&sdiodev->sdio_proto_fn1, sdiodev->func1, SDIO_FUNC1_BLOCKSIZE);
@@ -769,7 +774,7 @@ static zx_status_t brcmf_sdiod_probe(struct brcmf_sdio_dev* sdiodev) {
   }
 
   /* try to attach to the target device */
-  sdiodev->bus = brcmf_sdio_probe(sdiodev);
+  sdiodev->bus = brcmf_sdio_probe(sdiodev, reloading);
   if (!sdiodev->bus) {
     ret = ZX_ERR_IO_NOT_PRESENT;
     goto out;
@@ -932,7 +937,7 @@ zx_status_t brcmf_sdio_register(brcmf_pub* drvr, std::unique_ptr<brcmf_bus>* out
   sdiodev->state = BRCMF_SDIOD_DOWN;
 
   BRCMF_DBG(SDIO, "F2 found, calling brcmf_sdiod_probe...");
-  err = brcmf_sdiod_probe(sdiodev);
+  err = brcmf_sdiod_probe(sdiodev, false);
   if (err != ZX_OK) {
     BRCMF_ERR("F2 error, probe failed %d...", err);
     goto fail;
@@ -989,4 +994,35 @@ void brcmf_sdio_exit(brcmf_bus* bus) {
   brcmf_ops_sdio_remove(bus->bus_priv.sdio);
   delete bus->bus_priv.sdio;
   bus->bus_priv.sdio = nullptr;
+}
+
+zx_status_t brcmf_sdio_request_card_reset(struct brcmf_sdio_dev* sdiod) {
+  libsync::Completion completed;
+  zx_status_t status = ZX_ERR_INTERNAL;
+
+  struct Cookie {
+    libsync::Completion* completion;
+    zx_status_t* status;
+  } cookie{
+      .completion = &completed,
+      .status = &status,
+  };
+
+  auto callback = [](void* cookie, zx_status_t s) {
+    auto* c = static_cast<Cookie*>(cookie);
+    *c->status = s;
+    c->completion->Signal();
+  };
+
+  sdio_request_card_reset(&sdiod->sdio_proto_fn1, callback, &cookie);
+
+  // This timeout value was somewhat arbitrary but was empirically enough during testing to avoid
+  // any issues with timeouts during correct operation.
+  constexpr zx::duration kTimeout = zx::duration(500);
+  if (completed.Wait(kTimeout) != ZX_OK) {
+    BRCMF_ERR("Failed to reset sdio: waiting too long");
+    return ZX_ERR_TIMED_OUT;
+  }
+
+  return status;
 }

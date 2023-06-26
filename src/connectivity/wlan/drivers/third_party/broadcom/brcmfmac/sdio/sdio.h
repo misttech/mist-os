@@ -346,7 +346,7 @@ struct sdpcmd_regs {
 zx_status_t brcmf_sdiod_get_bootloader_macaddr(struct brcmf_sdio_dev* sdiodev, uint8_t* macaddr);
 
 /* Register/deregister interrupt handler. */
-zx_status_t brcmf_sdiod_intr_register(struct brcmf_sdio_dev* sdiodev);
+zx_status_t brcmf_sdiod_intr_register(struct brcmf_sdio_dev* sdiodev, bool reloading);
 void brcmf_sdiod_intr_unregister(struct brcmf_sdio_dev* sdiodev);
 
 /* SDIO device register access interface for func0 and func1.
@@ -422,7 +422,9 @@ int brcmf_sdiod_abort(struct brcmf_sdio_dev* sdiodev, uint32_t func);
 
 void brcmf_sdiod_change_state(struct brcmf_sdio_dev* sdiodev, enum brcmf_sdiod_state state);
 
-struct brcmf_sdio* brcmf_sdio_probe(struct brcmf_sdio_dev* sdiodev);
+struct brcmf_sdio* brcmf_sdio_probe(struct brcmf_sdio_dev* sdiodev, bool reloading);
+zx_status_t brcmf_sdiod_probe(struct brcmf_sdio_dev* sdiodev, bool reloading);
+
 zx_status_t brcmf_sdio_firmware_callback(brcmf_pub* drvr, const void* firmware,
                                          size_t firmware_size, const void* nvram,
                                          size_t nvram_size);
@@ -437,6 +439,8 @@ int brcmf_sdio_oob_irqhandler(void* cookie);
 
 zx_status_t brcmf_sdio_register(brcmf_pub* drvr, std::unique_ptr<brcmf_bus>* out_bus);
 void brcmf_sdio_exit(struct brcmf_bus* bus);
+
+zx_status_t brcmf_sdio_request_card_reset(struct brcmf_sdio_dev* sdiod);
 
 // The following definitions are made public for unit tests only. Note that sdio/BUILD.gn
 // keeps the scope of these definitions relatively limited by declaring test/* as the

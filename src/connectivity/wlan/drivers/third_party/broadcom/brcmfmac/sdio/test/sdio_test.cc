@@ -177,7 +177,7 @@ class FakeSdioBus {
   std::optional<zx_vaddr_t> mapped_vmo_addr_;
 };
 
-TEST(Sdio, IntrRegister) {
+TEST(Sdio, IntrRegisterStartup) {
   FakeSdioDevice device;
   brcmf_sdio_dev sdio_dev = {};
   sdio_func func1 = {};
@@ -208,7 +208,7 @@ TEST(Sdio, IntrRegister) {
       ZX_OK, true, SDIO_CCCR_BRCM_SEPINT, SDIO_CCCR_BRCM_SEPINT_MASK | SDIO_CCCR_BRCM_SEPINT_OE, 0);
   sdio2.ExpectEnableFnIntr(ZX_OK);
 
-  EXPECT_OK(brcmf_sdiod_intr_register(&sdio_dev));
+  EXPECT_OK(brcmf_sdiod_intr_register(&sdio_dev, false));
 
   gpio.VerifyAndClear();
   sdio1.VerifyAndClear();
@@ -218,6 +218,44 @@ TEST(Sdio, IntrRegister) {
   int retval = 0;
   zx_handle_close(sdio_dev.irq_handle);
   thrd_join(sdio_dev.isr_thread, &retval);
+}
+
+TEST(Sdio, IntrRegisterFwReload) {
+  FakeSdioDevice device;
+  brcmf_sdio_dev sdio_dev = {};
+  sdio_func func1 = {};
+  MockSdio sdio1;
+  MockSdio sdio2;
+  ddk::MockGpio gpio;
+  brcmf_bus bus_if = {};
+  brcmf_mp_device settings = {};
+  brcmf_sdio_pd sdio_settings = {};
+  const struct brcmf_bus_ops sdio_bus_ops = {
+      .get_wifi_metadata = get_wifi_metadata,
+  };
+
+  sdio_dev.func1 = &func1;
+  sdio_dev.gpios[WIFI_OOB_IRQ_GPIO_INDEX] = *gpio.GetProto();
+  sdio_dev.sdio_proto_fn1 = *sdio1.GetProto();
+  sdio_dev.sdio_proto_fn2 = *sdio2.GetProto();
+  sdio_dev.drvr = device.drvr();
+  bus_if.bus_priv.sdio = &sdio_dev;
+  bus_if.ops = &sdio_bus_ops;
+  sdio_dev.bus_if = &bus_if;
+  sdio_dev.settings = &settings;
+  sdio_dev.settings->bus.sdio = &sdio_settings;
+
+  sdio1.ExpectEnableFnIntr(ZX_OK).ExpectDoVendorControlRwByte(
+      ZX_OK, true, SDIO_CCCR_BRCM_SEPINT, SDIO_CCCR_BRCM_SEPINT_MASK | SDIO_CCCR_BRCM_SEPINT_OE, 0);
+  sdio2.ExpectEnableFnIntr(ZX_OK);
+
+  EXPECT_OK(brcmf_sdiod_intr_register(&sdio_dev, true));
+
+  gpio.VerifyAndClear();
+  sdio1.VerifyAndClear();
+  sdio2.VerifyAndClear();
+
+  zx_handle_close(sdio_dev.irq_handle);
 }
 
 TEST(Sdio, IntrDeregister) {

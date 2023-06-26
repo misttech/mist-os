@@ -3241,6 +3241,18 @@ zx_status_t brcmf_sdio_recovery(struct brcmf_bus* bus) TA_NO_THREAD_SAFETY_ANALY
   // Sdio clean-ups
   brcmf_sdio_reset(sdiod->bus);
 
+  if ((error = brcmf_sdio_request_card_reset(sdiod)) != ZX_OK) {
+    BRCMF_ERR("Failed to reset sdio - error: %s", zx_status_get_string(error));
+    brcmf_proto_bcdc_detach(drvr);
+    return error;
+  }
+
+  if ((error = brcmf_sdiod_probe(sdiod, true)) != ZX_OK) {
+    BRCMF_ERR("Failed to probe sdio - error: %s", zx_status_get_string(error));
+    brcmf_proto_bcdc_detach(drvr);
+    return error;
+  }
+
   if ((error = brcmf_sdio_load_files(drvr, true)) != ZX_OK) {
     BRCMF_ERR("Failed to reload images - error: %s", zx_status_get_string(error));
     brcmf_proto_bcdc_detach(drvr);
@@ -3487,7 +3499,7 @@ static const struct brcmf_buscore_ops brcmf_sdio_buscore_ops = {
     .activate = brcmf_sdio_buscore_activate,
 };
 
-static zx_status_t brcmf_sdio_probe_attach(struct brcmf_sdio* bus) {
+static zx_status_t brcmf_sdio_probe_attach(struct brcmf_sdio* bus, bool reloading) {
   struct brcmf_sdio_dev* sdiodev;
   uint8_t clkctl = 0;
   zx_status_t err = ZX_OK;
@@ -3497,6 +3509,7 @@ static zx_status_t brcmf_sdio_probe_attach(struct brcmf_sdio* bus) {
   uint32_t drivestrength;
   brcmf_mp_device* settings = nullptr;
   brcmf_sdio_pd* sdio_settings = nullptr;
+  size_t hdrbuf_size;
 
   sdiodev = bus->sdiodev;
   sdio_claim_host(sdiodev->func1);
@@ -3544,7 +3557,23 @@ static zx_status_t brcmf_sdio_probe_attach(struct brcmf_sdio* bus) {
     goto fail;
   }
 
-  settings = static_cast<decltype(settings)>(calloc(1, sizeof(*settings)));
+  if (!reloading) {
+    settings = static_cast<decltype(settings)>(calloc(1, sizeof(*settings)));
+    sdio_settings = static_cast<decltype(sdio_settings)>(calloc(1, sizeof(*sdio_settings)));
+  } else {
+    ZX_ASSERT(sdiodev->settings && sdiodev->settings->bus.sdio);
+
+    /* on reload, re-use and zero out the memory that was already allocated
+     * Note that sdio_settings must be set first here since it is part of sdiodev->settings which
+     * gets zerod out after
+     */
+    sdio_settings = sdiodev->settings->bus.sdio;
+    memset(sdio_settings, 0, sizeof(*sdio_settings));
+
+    settings = sdiodev->settings;
+    memset(settings, 0, sizeof(*settings));
+  }
+
   if (!settings) {
     BRCMF_ERR("failed to allocate device parameters");
     err = ZX_ERR_NO_MEMORY;
@@ -3553,7 +3582,6 @@ static zx_status_t brcmf_sdio_probe_attach(struct brcmf_sdio* bus) {
   brcmf_get_module_param(BRCMF_BUS_TYPE_SDIO, bus->ci->chip, bus->ci->chiprev, settings);
   sdiodev->settings = settings;
 
-  sdio_settings = static_cast<decltype(sdio_settings)>(calloc(1, sizeof(*sdio_settings)));
   if (!sdio_settings) {
     BRCMF_ERR("failed to allocate SDIO parameters");
     err = ZX_ERR_NO_MEMORY;
@@ -3651,8 +3679,14 @@ static zx_status_t brcmf_sdio_probe_attach(struct brcmf_sdio* bus) {
 
   sdio_release_host(sdiodev->func1);
 
-  /* allocate header buffer */
-  bus->hdrbuf = static_cast<decltype(bus->hdrbuf)>(calloc(1, MAX_HDR_READ + bus->head_align));
+  /* allocate header buffer on startup */
+  hdrbuf_size = MAX_HDR_READ + bus->head_align;
+  if (!reloading) {
+    bus->hdrbuf = static_cast<decltype(bus->hdrbuf)>(calloc(1, hdrbuf_size));
+  } else {
+    ZX_ASSERT(bus->hdrbuf);
+  }
+
   if (!bus->hdrbuf) {
     BRCMF_ERR("failed to allocate memory for SDIO hdrbuf");
     // Don't go to 'fail' here because we've already released the host
@@ -3850,7 +3884,7 @@ zx_status_t brcmf_sdio_firmware_callback(brcmf_pub* drvr, const void* firmware,
   }
 
   err = brcmf_sdio_shared_read(bus, &sh);
-  BRCMF_DBG(TEMP, "Read shared returned %d", err);
+  BRCMF_DBG(TEMP, "Read shared returned %s", zx_status_get_string(err));
 
 #ifdef BRCMF_CONSOLE_LOG
   bus->console_addr = sh.console_addr;
@@ -3871,11 +3905,13 @@ zx_status_t brcmf_sdio_firmware_callback(brcmf_pub* drvr, const void* firmware,
 
     // brcmf_sdiod_intr_register() creates the interrupt thread and enables the sdio interrupt
     // through sdio proto, so it can be skipped while doing crash recovery.
-    if (bus->sdiodev->drvr->fw_reloading.try_lock()) {
-      err = brcmf_sdiod_intr_register(sdiodev);
-      if (err != ZX_OK) {
-        BRCMF_ERR("intr register failed:%d", err);
-      }
+
+    auto reloading = !bus->sdiodev->drvr->fw_reloading.try_lock();
+    err = brcmf_sdiod_intr_register(sdiodev, reloading);
+    if (err != ZX_OK) {
+      BRCMF_ERR("intr register failed:%d", err);
+    }
+    if (!reloading) {
       bus->sdiodev->drvr->fw_reloading.unlock();
     }
   }
@@ -3955,7 +3991,7 @@ static zx_status_t brcmf_create_internal_rx_tx_space(struct brcmf_sdio* bus) {
   return ZX_OK;
 }
 
-struct brcmf_sdio* brcmf_sdio_probe(struct brcmf_sdio_dev* sdiodev) {
+struct brcmf_sdio* brcmf_sdio_probe(struct brcmf_sdio_dev* sdiodev, bool reloading) {
   zx_status_t ret;
   int thread_result;
   struct brcmf_sdio* bus;
@@ -3963,8 +3999,17 @@ struct brcmf_sdio* brcmf_sdio_probe(struct brcmf_sdio_dev* sdiodev) {
   std::optional<wlan::drivers::components::Frame> frame;
 
   BRCMF_DBG(TRACE, "Enter");
-  /* Allocate private bus interface state */
-  bus = new (std::nothrow) brcmf_sdio{};
+
+  if (!reloading) {
+    /* Allocate private bus interface state on startup */
+    bus = new (std::nothrow) brcmf_sdio{};
+    bus->tx_queue = new brcmf_tx_queue(TXQLEN);
+    bus->rx_glom = new brcmf_rx_glom();
+  } else {
+    /* on reload, just reuse the previously allocated bus */
+    bus = sdiodev->bus;
+  }
+
   if (!bus) {
     goto fail;
   }
@@ -3975,69 +4020,70 @@ struct brcmf_sdio* brcmf_sdio_probe(struct brcmf_sdio_dev* sdiodev) {
   bus->rxbound = BRCMF_RXBOUND;
   bus->txminmax = BRCMF_TXMINMAX;
   bus->tx_seq = SDPCM_SEQ_WRAP - 1;
+  bus->tx_max = 0;
 
-  bus->tx_queue = new brcmf_tx_queue(TXQLEN);
-
-  bus->rx_glom = new brcmf_rx_glom();
-
-  /* single-threaded workqueue */
-  char name[WorkQueue::kWorkqueueNameMaxlen];
-  static int queue_uniquify = 0;
-  snprintf(name, WorkQueue::kWorkqueueNameMaxlen, "brcmf_wq/%d", queue_uniquify++);
-  wq = new WorkQueue(name);
-  if (!wq) {
-    BRCMF_ERR("insufficient memory to create txworkqueue");
-    goto fail;
-  }
-
-  // Apply a scheduler role to the work queue threads.
-  {
-    constexpr char kRoleName[] = "fuchsia.devices.wlan.drivers.brcmf.workqueue.runner";
-    zx_device_t* zx_device = sdiodev->drvr->device->zxdev();
-    zx_status_t status = device_set_profile_by_role(zx_device, thrd_get_zx_handle(wq->thread()),
-                                                    kRoleName, strlen(kRoleName));
-    if (status != ZX_OK) {
-      BRCMF_WARN("Failed to apply role '%s' to wq thread: %s", kRoleName,
-                 zx_status_get_string(status));
-      // Keep going, this shouldn't stop the entire driver from working.
+  if (!reloading) {
+    /* single-threaded workqueue (only allocated on startup) */
+    char name[WorkQueue::kWorkqueueNameMaxlen];
+    static int queue_uniquify = 0;
+    snprintf(name, WorkQueue::kWorkqueueNameMaxlen, "brcmf_wq/%d", queue_uniquify++);
+    wq = new WorkQueue(name);
+    if (!wq) {
+      BRCMF_ERR("insufficient memory to create txworkqueue");
+      goto fail;
     }
 
-    status = device_set_profile_by_role(zx_device,
-                                        thrd_get_zx_handle(WorkQueue::DefaultInstance().thread()),
-                                        kRoleName, strlen(kRoleName));
-    if (status != ZX_OK) {
-      BRCMF_WARN("Failed to apply role '%s' to default wq thread: %s", kRoleName,
-                 zx_status_get_string(status));
-      // Keep going, this shouldn't stop the entire driver from working.
+    // Apply a scheduler role to the work queue threads.
+    {
+      constexpr char kRoleName[] = "fuchsia.devices.wlan.drivers.brcmf.workqueue.runner";
+      zx_device_t* zx_device = sdiodev->drvr->device->zxdev();
+      zx_status_t status = device_set_profile_by_role(zx_device, thrd_get_zx_handle(wq->thread()),
+                                                      kRoleName, strlen(kRoleName));
+      if (status != ZX_OK) {
+        BRCMF_WARN("Failed to apply role '%s' to wq thread: %s", kRoleName,
+                   zx_status_get_string(status));
+        // Keep going, this shouldn't stop the entire driver from working.
+      }
+
+      status = device_set_profile_by_role(zx_device,
+                                          thrd_get_zx_handle(WorkQueue::DefaultInstance().thread()),
+                                          kRoleName, strlen(kRoleName));
+      if (status != ZX_OK) {
+        BRCMF_WARN("Failed to apply role '%s' to default wq thread: %s", kRoleName,
+                   zx_status_get_string(status));
+        // Keep going, this shouldn't stop the entire driver from working.
+      }
     }
-  }
 
-  bus->datawork = WorkItem(brcmf_sdio_dataworker);
-  bus->brcmf_wq = wq;
+    bus->datawork = WorkItem(brcmf_sdio_dataworker);
+    bus->brcmf_wq = wq;
 
-  // Make sure we have RX/TX space before attaching so we can actually communicate over SDIO
-  ret = brcmf_create_internal_rx_tx_space(bus);
-  if (ret != ZX_OK) {
-    BRCMF_ERR("Failed to create internal RX/TX space: %s", zx_status_get_string(ret));
-    goto fail;
-  }
+    // Make sure we have RX/TX space before attaching so we can actually communicate over SDIO.
+    // We don't need to re-allocate these on reload either. We can just continue using the space
+    // allocated on startup.
+    ret = brcmf_create_internal_rx_tx_space(bus);
+    if (ret != ZX_OK) {
+      BRCMF_ERR("Failed to create internal RX/TX space: %s", zx_status_get_string(ret));
+      goto fail;
+    }
 
-  frame = brcmf_sdio_acquire_single_internal_rx_space(bus);
-  if (!frame) {
-    BRCMF_ERR("Failed to acquire RX frame");
-    goto fail;
-  }
-  bus->rx_tx_data.rx_frame = std::move(*frame);
+    frame = brcmf_sdio_acquire_single_internal_rx_space(bus);
+    if (!frame) {
+      BRCMF_ERR("Failed to acquire RX frame");
+      goto fail;
+    }
+    bus->rx_tx_data.rx_frame = std::move(*frame);
 
-  frame = brcmf_sdio_acquire_single_tx_space(bus);
-  if (!frame) {
-    BRCMF_ERR("Failed to acquire TX frame");
-    goto fail;
+    frame = brcmf_sdio_acquire_single_tx_space(bus);
+    if (!frame) {
+      BRCMF_ERR("Failed to acquire TX frame");
+      goto fail;
+    }
+    bus->rx_tx_data.tx_frame = std::move(*frame);
   }
-  bus->rx_tx_data.tx_frame = std::move(*frame);
 
   /* attempt to attach to the dongle */
-  ret = brcmf_sdio_probe_attach(bus);
+  ret = brcmf_sdio_probe_attach(bus, reloading);
   if (ret != ZX_OK) {
     BRCMF_ERR("brcmf_sdio_probe_attach failed: %s", zx_status_get_string(ret));
     goto fail;
@@ -4046,55 +4092,57 @@ struct brcmf_sdio* brcmf_sdio_probe(struct brcmf_sdio_dev* sdiodev) {
   bus->ctrl_wait = {};
   bus->dcmd_resp_wait = {};
 
-  /* Initialize watchdog thread */
-  bus->watchdog_wait = {};
-  bus->watchdog_should_stop.store(false);
-  thread_result =
-      thrd_create_with_name(&bus->watchdog_tsk, &brcmf_sdio_watchdog_thread, bus, "brcmf-watchdog");
+  if (!reloading) {
+    /* Initialize watchdog thread on startup */
+    bus->watchdog_wait = {};
+    bus->watchdog_should_stop.store(false);
+    thread_result = thrd_create_with_name(&bus->watchdog_tsk, &brcmf_sdio_watchdog_thread, bus,
+                                          "brcmf-watchdog");
 
-  if (thread_result != thrd_success) {
-    BRCMF_ERR("brcmf_watchdog thread failed to start: error %d", thread_result);
-    bus->watchdog_tsk = 0;
-  }
-  /* Initialize DPC thread */
-  bus->dpc_triggered.store(false);
-  bus->dpc_running = false;
+    if (thread_result != thrd_success) {
+      BRCMF_ERR("brcmf_watchdog thread failed to start: error %d", thread_result);
+      bus->watchdog_tsk = 0;
+    }
+    /* Initialize DPC thread */
+    bus->dpc_triggered.store(false);
+    bus->dpc_running = false;
 
-  /* Assign bus interface call back */
-  bus->sdiodev->bus_if->ops = &brcmf_sdio_bus_ops;
-  bus->sdiodev->bus_if->chip = bus->ci->chip;
-  bus->sdiodev->bus_if->chiprev = bus->ci->chiprev;
+    /* Assign bus interface call back */
+    bus->sdiodev->bus_if->ops = &brcmf_sdio_bus_ops;
+    bus->sdiodev->bus_if->chip = bus->ci->chip;
+    bus->sdiodev->bus_if->chiprev = bus->ci->chiprev;
 
-  /* default sdio bus header length for tx packet */
-  bus->tx_hdrlen = SDPCM_HWHDR_LEN + SDPCM_SWHDR_LEN;
+    /* default sdio bus header length for tx packet */
+    bus->tx_hdrlen = SDPCM_HWHDR_LEN + SDPCM_SWHDR_LEN;
 
-  /* Attach to the common layer, reserve hdr space */
-  bus->sdiodev->drvr->bus_if = bus->sdiodev->bus_if;
-  bus->sdiodev->drvr->settings = bus->sdiodev->settings;
+    /* Attach to the common layer, reserve hdr space */
+    bus->sdiodev->drvr->bus_if = bus->sdiodev->bus_if;
+    bus->sdiodev->drvr->settings = bus->sdiodev->settings;
 
-  /* Set up the watchdog timer */
-  bus->timer = new Timer(bus->sdiodev->drvr->device->GetDispatcher(),
-                         std::bind(brcmf_sdio_watchdog, bus), false);
+    /* Set up the watchdog timer */
+    bus->timer = new Timer(bus->sdiodev->drvr->device->GetDispatcher(),
+                           std::bind(brcmf_sdio_watchdog, bus), false);
 
-  ret = brcmf_attach(bus->sdiodev->drvr);
-  if (ret != ZX_OK) {
-    BRCMF_ERR("brcmf_attach failed");
-    goto fail;
-  }
+    ret = brcmf_attach(bus->sdiodev->drvr);
+    if (ret != ZX_OK) {
+      BRCMF_ERR("brcmf_attach failed");
+      goto fail;
+    }
 
-  /* Attach and link in the protocol */
-  ret = brcmf_proto_bcdc_attach(sdiodev->drvr);
-  if (ret != ZX_OK) {
-    BRCMF_ERR("brcmf_proto_bcdc_attach failed: %s", zx_status_get_string(ret));
-    goto fail;
-  }
+    /* Attach and link in the protocol */
+    ret = brcmf_proto_bcdc_attach(sdiodev->drvr);
+    if (ret != ZX_OK) {
+      BRCMF_ERR("brcmf_proto_bcdc_attach failed: %s", zx_status_get_string(ret));
+      goto fail;
+    }
 
-  /* Query the F2 block size, set roundup accordingly */
-  sdio_get_block_size(&sdiodev->sdio_proto_fn2, &bus->blocksize);
-  bus->roundup = std::min(max_roundup, bus->blocksize);
+    /* Query the F2 block size, set roundup accordingly */
+    sdio_get_block_size(&sdiodev->sdio_proto_fn2, &bus->blocksize);
+    bus->roundup = std::min(max_roundup, bus->blocksize);
 
-  if (bus->sdiodev->bus_if->maxctl) {
-    bus->sdiodev->bus_if->maxctl += bus->roundup;
+    if (bus->sdiodev->bus_if->maxctl) {
+      bus->sdiodev->bus_if->maxctl += bus->roundup;
+    }
   }
 
   sdio_claim_host(bus->sdiodev->func1);
