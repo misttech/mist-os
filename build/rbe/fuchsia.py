@@ -333,6 +333,15 @@ def c_sysroot_files(sysroot_dir: Path, sysroot_triple: str,
         for f in _SYSROOT_USR_LIB_FILES:
             yield sysroot_dir / 'usr/lib' / sysroot_triple / f
 
+        for f in [
+            sysroot_dir / 'lib' / sysroot_triple / 'libmvec.so.1',
+            sysroot_dir / 'usr/lib' / sysroot_triple / 'libmvec.a',
+            sysroot_dir / 'usr/lib' / sysroot_triple / 'libmvec.so',
+            sysroot_dir / 'usr/lib' / sysroot_triple / 'libmvec_nonshared.a',
+        ]:
+            if f.is_file():
+                yield f
+
         if with_libgcc:
             yield from [
                 sysroot_dir / 'usr/lib/gcc' / sysroot_triple / '4.9/libgcc.a',
