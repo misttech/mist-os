@@ -15,6 +15,7 @@
 
 #include <cstdint>
 #include <utility>
+#include <vector>
 #if defined(__cpp_lib_ranges) && __cpp_lib_ranges >= 201811L
 #include <ranges>
 #endif
