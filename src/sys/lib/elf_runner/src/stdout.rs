@@ -55,7 +55,8 @@ pub fn bind_streams_to_syslog(
         if matches!(sink, StreamSink::Log) {
             // create the handle before dealing with the logger so components still receive an inert
             // handle if connecting to LogSink fails
-            let (socket, handle_info) = new_socket_bound_to_fd(fd);
+            let (socket, handle_info) =
+                new_socket_bound_to_fd(fd).expect("failed to create socket");
             handles.push(handle_info);
 
             if let Some(l) = logger.get_or_init(|| create_namespace_logger(ns).map(Arc::new)) {
@@ -81,7 +82,7 @@ fn create_namespace_logger(ns: &ComponentNamespace) -> Option<ScopedLogger> {
 
 fn forward_socket_to_syslog(
     logger: Arc<ScopedLogger>,
-    socket: zx::Socket,
+    socket: fasync::Socket,
     level: OutputLevel,
 ) -> fasync::Task<()> {
     let mut writer = SyslogWriter::new(logger, level);
@@ -94,23 +95,23 @@ fn forward_socket_to_syslog(
     task
 }
 
-fn new_socket_bound_to_fd(fd: i32) -> (zx::Socket, fproc::HandleInfo) {
+fn new_socket_bound_to_fd(fd: i32) -> Result<(fasync::Socket, fproc::HandleInfo), zx::Status> {
     let (tx, rx) = zx::Socket::create_stream();
-
-    (
+    let rx = fasync::Socket::from_socket(rx)?;
+    Ok((
         rx,
         fproc::HandleInfo {
             handle: tx.into_handle(),
             id: HandleInfo::new(HandleType::FileDescriptor, fd as u16).as_raw(),
         },
-    )
+    ))
 }
 
 /// Drains all bytes from socket and writes messages to writer. Bytes read
 /// are split into lines and separated into chunks no greater than
 /// MAX_MESSAGE_SIZE.
-async fn drain_lines(socket: zx::Socket, writer: &mut dyn LogWriter) -> Result<(), Error> {
-    let chunker = NewlineChunker::new(socket, MAX_MESSAGE_SIZE)?;
+async fn drain_lines(socket: fasync::Socket, writer: &mut dyn LogWriter) -> Result<(), Error> {
+    let chunker = NewlineChunker::new(socket, MAX_MESSAGE_SIZE);
     futures::pin_mut!(chunker);
 
     while let Some(chunk_or_line) = chunker.next().await {
@@ -217,6 +218,7 @@ mod tests {
     #[fuchsia::test]
     async fn drain_lines_splits_into_max_size_chunks() -> Result<(), Error> {
         let (tx, rx) = zx::Socket::create_stream();
+        let rx = fasync::Socket::from_socket(rx).unwrap();
         let (mut sender, recv) = create_mock_logger();
         let msg = get_random_string(MAX_MESSAGE_SIZE * 4);
 
@@ -240,6 +242,7 @@ mod tests {
     #[fuchsia::test]
     async fn drain_lines_splits_at_newline() -> Result<(), Error> {
         let (tx, rx) = zx::Socket::create_stream();
+        let rx = fasync::Socket::from_socket(rx).unwrap();
         let (mut sender, recv) = create_mock_logger();
         let msg = std::iter::repeat_with(|| {
             Alphanumeric.sample_string(&mut thread_rng(), MAX_MESSAGE_SIZE - 1)
@@ -261,6 +264,7 @@ mod tests {
     #[fuchsia::test]
     async fn drain_lines_writes_when_message_is_received() -> Result<(), Error> {
         let (tx, rx) = zx::Socket::create_stream();
+        let rx = fasync::Socket::from_socket(rx).unwrap();
         let (mut sender, mut recv) = create_mock_logger();
         let messages: Vec<String> = vec!["Hello!\n".to_owned(), "World!\n".to_owned()];
 
@@ -283,6 +287,7 @@ mod tests {
     #[fuchsia::test]
     async fn drain_lines_waits_for_entire_lines() -> Result<(), Error> {
         let (tx, rx) = zx::Socket::create_stream();
+        let rx = fasync::Socket::from_socket(rx).unwrap();
         let (mut sender, mut recv) = create_mock_logger();
 
         let ((), ()) = try_join!(async move { drain_lines(rx, &mut sender).await }, async move {
@@ -307,6 +312,7 @@ mod tests {
     #[fuchsia::test]
     async fn drain_lines_collapses_repeated_newlines() {
         let (tx, rx) = zx::Socket::create_stream();
+        let rx = fasync::Socket::from_socket(rx).unwrap();
         let (mut sender, mut recv) = create_mock_logger();
 
         let drainer = Task::spawn(async move { drain_lines(rx, &mut sender).await });

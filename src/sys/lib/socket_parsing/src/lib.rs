@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Error},
     fuchsia_async::{self as fasync, ReadableHandle, ReadableState},
     fuchsia_zircon as zx,
     futures::Stream,
@@ -11,6 +10,7 @@ use {
         pin::Pin,
         task::{Context, Poll},
     },
+    thiserror::Error,
 };
 
 const NEWLINE: u8 = b'\n';
@@ -32,29 +32,19 @@ pub struct NewlineChunker {
 
 impl NewlineChunker {
     /// Creates a `NewlineChunker` that does not include the trailing `\n` in each line.
-    pub fn new(socket: zx::Socket, max_message_size: usize) -> Result<Self, Error> {
-        let socket = fasync::Socket::from_socket(socket)
-            .map_err(|s| anyhow!("Failed to create fasync::socket from zx::socket: {}", s))?;
-        Ok(Self {
-            socket,
-            buffer: vec![],
-            is_terminated: false,
-            max_message_size,
-            trim_newlines: true,
-        })
+    pub fn new(socket: fasync::Socket, max_message_size: usize) -> Self {
+        Self { socket, buffer: vec![], is_terminated: false, max_message_size, trim_newlines: true }
     }
 
     /// Creates a `NewlineChunker` that includes the trailing `\n` in each line.
-    pub fn new_with_newlines(socket: zx::Socket, max_message_size: usize) -> Result<Self, Error> {
-        let socket = fasync::Socket::from_socket(socket)
-            .map_err(|s| anyhow!("Failed to create fasync::socket from zx::socket: {}", s))?;
-        Ok(Self {
+    pub fn new_with_newlines(socket: fasync::Socket, max_message_size: usize) -> Self {
+        Self {
             socket,
             buffer: vec![],
             is_terminated: false,
             max_message_size,
             trim_newlines: false,
-        })
+        }
     }
 
     /// Removes and returns the next line or maximum-size chunk from the head of the buffer if
@@ -91,10 +81,10 @@ impl NewlineChunker {
         Some(next_chunk)
     }
 
-    fn end_of_stream(&mut self) -> Poll<Option<Result<Vec<u8>, Error>>> {
+    fn end_of_stream(&mut self) -> Poll<Option<Vec<u8>>> {
         if !self.buffer.is_empty() {
             // the buffer is under the forced chunk size because the first return didn't happen
-            Poll::Ready(Some(Ok(std::mem::replace(&mut self.buffer, vec![]))))
+            Poll::Ready(Some(std::mem::replace(&mut self.buffer, vec![])))
         } else {
             // end the stream
             self.is_terminated = true;
@@ -104,7 +94,8 @@ impl NewlineChunker {
 }
 
 impl Stream for NewlineChunker {
-    type Item = Result<Vec<u8>, Error>;
+    type Item = Result<Vec<u8>, NewlineChunkerError>;
+
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
 
@@ -118,16 +109,22 @@ impl Stream for NewlineChunker {
         }
 
         // we don't have a chunk to return, poll for reading the socket
-        match futures::ready!(this.socket.poll_readable(cx))? {
-            ReadableState::Closed => return this.end_of_stream(),
+        match futures::ready!(this.socket.poll_readable(cx))
+            .map_err(NewlineChunkerError::PollReadable)?
+        {
+            ReadableState::Closed => return this.end_of_stream().map(|buf| buf.map(Ok)),
             ReadableState::Readable | ReadableState::ReadableAndClosed => {}
         }
 
         // find out how much buffer we should make available
-        let bytes_in_socket = this.socket.as_ref().outstanding_read_bytes()?;
+        let bytes_in_socket = this
+            .socket
+            .as_ref()
+            .outstanding_read_bytes()
+            .map_err(NewlineChunkerError::OutstandingReadBytes)?;
         if bytes_in_socket == 0 {
             // if there are no bytes available this socket should not be considered readable
-            this.socket.need_readable(cx)?;
+            this.socket.need_readable(cx).map_err(NewlineChunkerError::NeedReadable)?;
             return Poll::Pending;
         }
 
@@ -141,18 +138,16 @@ impl Stream for NewlineChunker {
 
         let bytes_read = match this.socket.as_ref().read(&mut this.buffer[prev_len..]) {
             Ok(b) => b,
-            Err(zx::Status::PEER_CLOSED) => return this.end_of_stream(),
+            Err(zx::Status::PEER_CLOSED) => return this.end_of_stream().map(|buf| buf.map(Ok)),
             Err(zx::Status::SHOULD_WAIT) => {
                 // reset the size of the buffer to exclude the 0's we wrote above
                 this.buffer.truncate(prev_len);
-                return Poll::Ready(Some(Err(anyhow!(
-                    "Got SHOULD_WAIT from socket read after confirming outstanding_read_bytes > 0"
-                ))));
+                return Poll::Ready(Some(Err(NewlineChunkerError::ShouldWait)));
             }
-            Err(e) => {
+            Err(status) => {
                 // reset the size of the buffer to exclude the 0's we wrote above
                 this.buffer.truncate(prev_len);
-                return Poll::Ready(Some(Err(e.into())));
+                return Poll::Ready(Some(Err(NewlineChunkerError::ReadSocket(status))));
             }
         };
 
@@ -165,10 +160,28 @@ impl Stream for NewlineChunker {
             Poll::Ready(Some(Ok(chunk)))
         } else {
             // it is not enough for a chunk, request notification when there's more
-            this.socket.need_readable(cx)?;
+            this.socket.need_readable(cx).map_err(NewlineChunkerError::NeedReadable)?;
             Poll::Pending
         }
     }
+}
+
+#[derive(Debug, Error)]
+pub enum NewlineChunkerError {
+    #[error("got SHOULD_WAIT from socket read after confirming outstanding_read_bytes > 0")]
+    ShouldWait,
+
+    #[error("failed to read from socket")]
+    ReadSocket(#[source] zx::Status),
+
+    #[error("failed to get readable state for socket")]
+    PollReadable(#[source] zx::Status),
+
+    #[error("failed to register readable signal for socket")]
+    NeedReadable(#[source] zx::Status),
+
+    #[error("failed to get number of outstanding readable bytes in socket")]
+    OutstandingReadBytes(#[source] zx::Status),
 }
 
 #[cfg(test)]
@@ -179,7 +192,8 @@ mod tests {
     #[fuchsia::test]
     async fn parse_bytes_with_newline() {
         let (s1, s2) = zx::Socket::create_stream();
-        let mut chunker = NewlineChunker::new(s1, 100).unwrap();
+        let s1 = fasync::Socket::from_socket(s1).expect("failed to create async socket");
+        let mut chunker = NewlineChunker::new(s1, 100);
         s2.write(b"test\n").expect("Failed to write");
         assert_eq!(chunker.next().await.unwrap().unwrap(), b"test".to_vec());
     }
@@ -187,7 +201,8 @@ mod tests {
     #[fuchsia::test]
     async fn parse_bytes_with_many_newlines() {
         let (s1, s2) = zx::Socket::create_stream();
-        let mut chunker = NewlineChunker::new(s1, 100).unwrap();
+        let s1 = fasync::Socket::from_socket(s1).expect("failed to create async socket");
+        let mut chunker = NewlineChunker::new(s1, 100);
         s2.write(b"test1\ntest2\ntest3\n").expect("Failed to write");
         assert_eq!(chunker.next().await.unwrap().unwrap(), b"test1".to_vec());
         assert_eq!(chunker.next().await.unwrap().unwrap(), b"test2".to_vec());
@@ -199,7 +214,8 @@ mod tests {
     #[fuchsia::test]
     async fn parse_bytes_with_newlines_included() {
         let (s1, s2) = zx::Socket::create_stream();
-        let mut chunker = NewlineChunker::new_with_newlines(s1, 100).unwrap();
+        let s1 = fasync::Socket::from_socket(s1).expect("failed to create async socket");
+        let mut chunker = NewlineChunker::new_with_newlines(s1, 100);
         s2.write(b"test1\ntest2\ntest3\n").expect("Failed to write");
         assert_eq!(chunker.next().await.unwrap().unwrap(), b"test1\n".to_vec());
         assert_eq!(chunker.next().await.unwrap().unwrap(), b"test2\n".to_vec());
@@ -209,7 +225,8 @@ mod tests {
     #[fuchsia::test]
     async fn max_message_size() {
         let (s1, s2) = zx::Socket::create_stream();
-        let mut chunker = NewlineChunker::new(s1, 2).unwrap();
+        let s1 = fasync::Socket::from_socket(s1).expect("failed to create async socket");
+        let mut chunker = NewlineChunker::new(s1, 2);
         s2.write(b"test\n").expect("Failed to write");
         assert_eq!(chunker.next().await.unwrap().unwrap(), b"te".to_vec());
         assert_eq!(chunker.next().await.unwrap().unwrap(), b"st".to_vec());

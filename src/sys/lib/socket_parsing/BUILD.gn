@@ -13,8 +13,8 @@ rustc_library("socket_parsing") {
   deps = [
     "//src/lib/fuchsia-async",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:thiserror",
   ]
 
   sources = [ "src/lib.rs" ]

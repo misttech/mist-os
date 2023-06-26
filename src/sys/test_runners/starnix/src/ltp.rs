@@ -9,6 +9,7 @@ use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_test as ftest;
+use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::{AsyncReadExt, StreamExt};
 use socket_parsing::NewlineChunker;
@@ -182,9 +183,9 @@ pub async fn run_ltp_cases(
         // Read stderr from the test component and:
         //   - forward the logs to the run listener
         //   - parse the logs for test results
-        let mut stderr_lines =
-            NewlineChunker::new_with_newlines(component_std_handles.err.unwrap(), MAX_MESSAGE_SIZE)
-                .unwrap();
+        let socket = fasync::Socket::from_socket(component_std_handles.err.unwrap())
+            .expect("failed to create socket for stderr");
+        let mut stderr_lines = NewlineChunker::new_with_newlines(socket, MAX_MESSAGE_SIZE);
 
         let mut parsed_results = Results::default();
         while let Some(Ok(line)) = stderr_lines.next().await {
