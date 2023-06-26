@@ -4,43 +4,251 @@
 {
     actions: [
         {
-            type: "skip",
-            matchers: [
-                "*",
-            ],
-        },
-        {
             type: "expect_pass",
             matchers: [
                 // The Starnix test runner may emit one or more synthetic test cases matching this pattern to capture logs for batches.
                 // It will always pass, so we must mark it expect_pass or the blanket "skip" rule above will be incorrect.
                 "fuchsia-pkg://*bionic_unit_tests_static*",
-                "bionic_allocator.*",
-                "sys_*",
+                "*",
             ],
         },
         {
             type: "expect_failure",
             matchers: [
+                // TODO(https://fxbug.dev/119476): Implement pidfd
+                "pidfd_DeathTest.pidfd_send_signal",
+                "fdtrack.pidfd_open",
+                "fdtrack.pidfd_getfd",
+                "pidfd.pidfd_getfd",
+                "pidfd.pidfd_open",
+
+                // These tests expect /proc/version to exist
+                "dirent.scandir_filter",
+                "fcntl.fcntl_smoke",
+                "fcntl.open_open64",
+                "fcntl.openat_openat64",
+                "fcntl.f_getlk",
+                "fcntl.f_getlk64",
+                "fcntl.vmsplice",
+                "fcntl.tee",
+                "fcntl.readahead",
+                "fcntl.sync_file_range",
+                "fcntl.f_getlk_FOB64",
+                "glob.glob_GLOB_APPEND",
+                "glob.glob_GLOB_DOOFFS",
+
+                // Require PR_GET_TAGGED_ADDR_CTRL
+                "heap_tagging_level.tagged_pointer_dies",
+                "heap_tagging_level.sync_async_bad_accesses_die",
+                "heap_tagging_level.tagging_level_transitions",
+                "heap_tagging_level.tagging_level_transition_sync_none",
+
+                // Depends on /sys/class/net
+                "ifaddrs.getifaddrs_interfaces",
+
+                // arm64 specific
+                "MemtagNoteTest.*",
+                "MemtagStackTest.*",
+                "__cxa_demangle.DISABLED_cxa_demangle_fuzz_167977068",
+
+                // Ptrace
+                "PtraceResumptionTest.*",
+
+                // Timers
+                "time.timer_create",
+                "time.timer_create_EINVAL",
+                "time.timer_create_NULL",
+                "time.timer_create_SIGEV_SIGNAL",
+                "time.timer_create_multiple",
+                "time.timer_delete_from_timer_thread",
+                "time.timer_delete_terminates",
+                "time.timer_disarm_terminates",
+                "time.timer_settime_0",
+                "time.timer_settime_repeats",
+
+                // Our test runner doesn't understand DISABLED
+                "android_mallopt.DISABLED_multiple_enable_gwp_asan",
+                "malloc.DISABLED_alloc_after_fork",
+
+                // sigqueue(getpid(), (32 + 4), signal_value) fails
+                "android_mallopt.set_allocation_limit_multiple_threads",
+
+                // ioctl not supported
+                "ifaddrs.getifaddrs_INET",
+
+                // Requires MTE support
+                "malloc.disable_mte",
+
+                // TODO(fxbug.dev/103867): Implement membarrier
+                "membarrier.global_barrier",
+                "membarrier.global_expedited",
+                "membarrier.private_expedited",
+                "membarrier.private_expedited_sync_core",
+
+                // SIOCGIFNAME
+                "net_if.if_nameindex",
+                "net_if.if_nametoindex_if_indextoname",
+
+                // TODO(https://fxbug.dev/114813): CLONE_VM for child processes.
+                "sched.clone",
+
+                // Untriaged
+                "pthread.pthread_attr_getstack__main_thread",
+                "pthread.pthread_attr_getstack_in_signal_handler",
+                "pthread.pthread_attr_setinheritsched_PTHREAD_INHERIT_SCHED_takes_effect",
+                "pthread.pthread_attr_setinheritsched__takes_effect_despite_SCHED_RESET_ON_FORK",
+                "pthread.pthread_create__mmap_failures",
+                "pthread.pthread_getcpuclockid__clock_gettime",
+                "pthread.pthread_mutex_clocklock_pi",
+                "pthread.pthread_mutex_lock_null_32",
+                "pthread.pthread_mutex_owner_tid_limit",
+                "pthread.pthread_mutex_pi_count_limit",
+                "pthread.pthread_mutex_pi_wakeup",
+                "pthread.pthread_mutex_timedlock_monotonic_np_pi",
+                "pthread.pthread_mutex_timedlock_pi",
+                "pthread.pthread_mutex_unlock_null_32",
+                "pthread.pthread_setschedprio",
+                "pthread.pthread_sigmask",
+                "scs_test.stack_overflow",
+                "setjmp.setjmp_signal_mask",
+                "setjmp.sigsetjmp_1_signal_mask",
+                "signal.pthread_sigqueue_other",
+                "signal.rt_tgsigqueueinfo",
+                "signal.sigqueue",
+                "signal.sigsuspend64_sigpending64",
+                "signal.sigsuspend_sigpending",
+                "signal.sigtimedwait",
+                "signal.sigtimedwait64_SIGRTMIN",
+                "signal.sigwait64_SIGRTMIN",
+                "signal.sigwait_SIGALRM",
+                "signal.sigwaitinfo",
+                "signal.sigwaitinfo64_SIGRTMIN",
+                "spawn.posix_spawn_POSIX_SPAWN_SETSIGDEF",
+                "spawn.posix_spawn_POSIX_SPAWN_SETSIGMASK",
+                "spawn.posix_spawn_dup2_CLOEXEC",
+                "spawn.posix_spawn_file_actions",
+                "stack_unwinding.unwind_through_signal_frame",
+                "stack_unwinding.unwind_through_signal_frame_SA_SIGINFO",
+                "stdio.cantwrite_EBADF",
+                "stdio.fdopen_add_CLOEXEC",
+                "stdio.fdopen_failures",
+                "stdio.fdopen_remove_CLOEXEC",
+                "stdio.fopen64_freopen64",
+                "stdio.freopen_add_CLOEXEC",
+                "stdio.freopen_append_mode_and_ftell",
+                "stdio.freopen_invalid_mode",
+                "stdio.freopen_null_filename_add_CLOEXEC",
+                "stdio.freopen_null_filename_remove_CLOEXEC",
+                "stdio.freopen_remove_CLOEXEC",
+                "stdio.getc",
+                "stdio.popen_r",
+                "stdio.putc",
+                "stdio.snprintf_1$ju_UINTMAX_MAX",
+                "stdio.swprintf_1$ju_UINTMAX_MAX",
+                "stdio.tmpfile_TMPDIR",
+                "stdio_ext.__fbufsize",
+                "stdio_ext.__flbf",
+                "stdio_ext.__fsetlocking",
+                "stdio_nofortify.cantwrite_EBADF",
+                "stdio_nofortify.fdopen_add_CLOEXEC",
+                "stdio_nofortify.fdopen_failures",
+                "stdio_nofortify.fdopen_remove_CLOEXEC",
+                "stdio_nofortify.fopen64_freopen64",
+                "stdio_nofortify.freopen_add_CLOEXEC",
+                "stdio_nofortify.freopen_append_mode_and_ftell",
+                "stdio_nofortify.freopen_invalid_mode",
+                "stdio_nofortify.freopen_null_filename_add_CLOEXEC",
+                "stdio_nofortify.freopen_null_filename_remove_CLOEXEC",
+                "stdio_nofortify.freopen_remove_CLOEXEC",
+                "stdio_nofortify.getc",
+                "stdio_nofortify.popen_r",
+                "stdio_nofortify.putc",
+                "stdio_nofortify.snprintf_1$ju_UINTMAX_MAX",
+                "stdio_nofortify.swprintf_1$ju_UINTMAX_MAX",
+                "stdio_nofortify.tmpfile_TMPDIR",
+                "stdlib.getloadavg",
+                "stdlib.realpath__dot",
+                "stdlib.realpath__dot_dot",
                 "sys_msg.smoke",
                 "sys_personality.current_persona",
                 "sys_prctl.pr_cap_ambient",
+                "sys_ptrace.hardware_breakpoint",
                 "sys_ptrace.watchpoint_imprecise",
                 "sys_ptrace.watchpoint_stress",
-                "sys_ptrace.hardware_breakpoint",
                 "sys_sem.smoke",
                 "sys_sendfile.sendfile",
                 "sys_sendfile.sendfile64_smoke",
                 "sys_shm.smoke",
+                "sys_stat.fchmodat_AT_SYMLINK_NOFOLLOW_with_dangling_symlink",
+                "sys_stat.fchmodat_AT_SYMLINK_NOFOLLOW_with_symlink",
                 "sys_stat.stat64_lstat64_fstat64",
                 "sys_stat.statx",
-                "sys_stat.fchmodat_AT_SYMLINK_NOFOLLOW_with_symlink",
-                "sys_stat.fchmodat_AT_SYMLINK_NOFOLLOW_with_dangling_symlink",
-                "sys_timex.adjtimex_smoke",
                 "sys_timex.adjtimex_EFAULT",
-                "sys_timex.clock_adjtime_smoke",
+                "sys_timex.adjtimex_smoke",
                 "sys_timex.clock_adjtime_EFAULT",
+                "sys_timex.clock_adjtime_smoke",
                 "sys_uio.process_vm_writev",
+                "time.clock_getcpuclockid_ESRCH",
+                "time.clock_settime",
+                "unistd.close_range",
+                "unistd.copy_file_range",
+                "unistd.dup2_same",
+                "unistd.dup3",
+                "unistd.fdatasync",
+                "unistd.fsync",
+                "unistd.lockf_partial_with_child",
+                "unistd.read",
+                "unistd.sysconf_SC_ARG_MAX",
+                "unistd_nofortify.close_range",
+                "unistd_nofortify.copy_file_range",
+                "unistd_nofortify.dup2_same",
+                "unistd_nofortify.dup3",
+                "unistd_nofortify.fdatasync",
+                "unistd_nofortify.fsync",
+                "unistd_nofortify.lockf_partial_with_child",
+                "unistd_nofortify.read",
+                "unistd_nofortify.sysconf_SC_ARG_MAX",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // This test writes 2GB of zero bytes to /dev/null, which we currently try to log.
+                "*.fwrite_int_overflow",
+
+                // This test tries to determine if the system has >=4GB of total memory which is not true in all test environments.
+                "*.fread_int_overflow",
+
+                // These tests currently pass on arm64 and are SKIPPED on x86_64. Our test harness thinks skipped tests fail.
+                // Mark these skipped until we can figure out how to annotate them more precisely.
+                "scs_test.stack_overflow",
+                "stack_unwinding.unwind_through_signal_frame",
+                "stack_unwinding.unwind_through_signal_frame_SA_SIGINFO",
+
+                // These tests are arm32 specific
+                "aeabi.read_tp",
+                "getauxval.arm_has_AT_HWCAP2",
+
+                // These tests are 32 bit specific.
+                "libgen.basename_r",
+                "libgen.dirname_r",
+
+                // These tests currently hit the test harness's internal timeout (90 seconds).
+                "pthread.pthread_create__mmap_failures",
+                "pthread.pthread_sigmask64_SIGTRMIN",
+                "signal.pthread_sigqueue_other",
+
+                // Tests for deprecated functions not supported in our configuration.
+                "malloc.pvalloc_std",
+                "malloc.pvalloc_overflow",
+                "malloc.valloc_std",
+                "malloc.valloc_overflow",
+
+                // These tests only work when the test suite is dynamically linked so they can find icu.
+                "wctype.towlower",
+                "wctype.towlower_l",
+                "wctype.towupper",
+                "wctype.towupper_l",
             ],
         },
     ],
