@@ -6,6 +6,7 @@
 
 #include <lib/ddk/platform-defs.h>
 #include <lib/fake-bti/bti.h>
+#include <lib/fzl/vmo-mapper.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio-buffer.h>
@@ -26,7 +27,8 @@ namespace sdmmc {
 
 class TestAmlSdmmc : public AmlSdmmc {
  public:
-  TestAmlSdmmc(zx_device_t* parent, fdf::MmioBuffer mmio, zx::bti bti)
+  TestAmlSdmmc(zx_device_t* parent, fdf::MmioBuffer mmio, zx::bti bti, fdf::MmioView view,
+               ddk::IoBuffer descs_buffer)
       // Pass BTI ownership to AmlSdmmc, but keep a copy of the handle so we can get a list of VMOs
       // that are pinned when a request is made.
       : AmlSdmmc(parent, zx::bti(bti.get()), std::move(mmio),
@@ -36,8 +38,9 @@ class TestAmlSdmmc : public AmlSdmmc {
                      .version_3 = true,
                      .prefs = 0,
                  },
-                 zx::interrupt(ZX_HANDLE_INVALID), {}),
-        bti_(bti.release()) {}
+                 zx::interrupt(ZX_HANDLE_INVALID), {}, std::move(descs_buffer)),
+        bti_(bti.release()),
+        view_(view) {}
 
   using AmlSdmmc::Bind;
 
@@ -72,15 +75,15 @@ class TestAmlSdmmc : public AmlSdmmc {
 
     if (request_index_ < request_results_.size() && request_results_[request_index_] == 0) {
       // Indicate a receive CRC error.
-      mmio_.Write32(1, kAmlSdmmcStatusOffset);
+      view_.Write32(1, kAmlSdmmcStatusOffset);
 
       successful_transfers_ = 0;
       request_index_++;
     } else if (interrupt_status_.has_value()) {
-      mmio_.Write32(interrupt_status_.value(), kAmlSdmmcStatusOffset);
+      view_.Write32(interrupt_status_.value(), kAmlSdmmcStatusOffset);
     } else {
       // Indicate that the request completed successfully.
-      mmio_.Write32(1 << 13, kAmlSdmmcStatusOffset);
+      view_.Write32(1 << 13, kAmlSdmmcStatusOffset);
 
       // Each tuning transfer is attempted five times with a short-circuit if one fails.
       // Report every successful transfer five times to make the results arrays easier to
@@ -111,8 +114,6 @@ class TestAmlSdmmc : public AmlSdmmc {
 
   void SetRequestInterruptStatus(uint32_t status) { interrupt_status_ = status; }
 
-  aml_sdmmc_desc_t* descs() { return AmlSdmmc::descs(); }
-
  private:
   std::vector<uint8_t> request_results_;
   size_t request_index_ = 0;
@@ -121,6 +122,7 @@ class TestAmlSdmmc : public AmlSdmmc {
   std::optional<uint32_t> interrupt_status_;
   inspect::InspectTestHelper inspector_;
   zx::unowned_bti bti_;
+  fdf::MmioView view_;
 };
 
 class AmlSdmmcTest : public zxtest::Test {
@@ -141,7 +143,13 @@ class AmlSdmmcTest : public zxtest::Test {
     zx::bti bti;
     ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
 
-    dut_ = new TestAmlSdmmc(root_.get(), std::move(mmio_buffer), std::move(bti));
+    ddk::IoBuffer descs_buffer;
+    EXPECT_OK(descs_buffer.Init(bti.get(), AmlSdmmc::kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t),
+                                IO_BUFFER_RW | IO_BUFFER_CONTIG));
+    descs_ = descs_buffer.virt();
+
+    dut_ = new TestAmlSdmmc(root_.get(), std::move(mmio_buffer), std::move(bti), *mmio_,
+                            std::move(descs_buffer));
     ASSERT_OK(dut_->Bind());
     ASSERT_EQ(1, root_->child_count());
     mock_dev_ = root_->GetLatestChild();
@@ -220,12 +228,20 @@ class AmlSdmmcTest : public zxtest::Test {
     dut_->DdkAsyncRemove();
     mock_dev_->WaitUntilAsyncRemoveCalled();
     mock_ddk::ReleaseFlaggedDevices(dut_->zxdev());
+
+    ddk::IoBuffer descs_buffer;
+    EXPECT_OK(descs_buffer.Init(bti.get(), AmlSdmmc::kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t),
+                                IO_BUFFER_RW | IO_BUFFER_CONTIG));
+    descs_ = descs_buffer.virt();
+
     dut_ = new TestAmlSdmmc(root_.get(), CreateMmioBufferAndUpdateView(S912_SD_EMMC_B_LENGTH),
-                            std::move(bti));
+                            std::move(bti), *mmio_, std::move(descs_buffer));
     ASSERT_OK(dut_->Bind());
     ASSERT_EQ(1, root_->child_count());
     mock_dev_ = root_->GetLatestChild();
   }
+
+  aml_sdmmc_desc_t* descriptors() const { return reinterpret_cast<aml_sdmmc_desc_t*>(descs_); }
 
   zx_paddr_t bti_paddrs_[64] = {};
 
@@ -236,6 +252,7 @@ class AmlSdmmcTest : public zxtest::Test {
 
  private:
   std::unique_ptr<uint8_t[]> registers_;
+  void* descs_ = nullptr;
 };
 
 TEST_F(AmlSdmmcTest, DdkLifecycle) {
@@ -828,7 +845,7 @@ TEST_F(AmlSdmmcTest, UnownedVmosBlockMode) {
   EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
-  const aml_sdmmc_desc_t* descs = dut_->descs();
+  const aml_sdmmc_desc_t* descs = descriptors();
   auto expected_desc_cfg = AmlSdmmcCmdCfg::Get()
                                .FromValue(0)
                                .set_len(2)
@@ -928,7 +945,7 @@ TEST_F(AmlSdmmcTest, UnownedVmosByteMode) {
   EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
-  const aml_sdmmc_desc_t* descs = dut_->descs();
+  const aml_sdmmc_desc_t* descs = descriptors();
   auto expected_desc_cfg = AmlSdmmcCmdCfg::Get()
                                .FromValue(0)
                                .set_len(50)
@@ -989,7 +1006,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoByteModeMultiBlock) {
   EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
-  const aml_sdmmc_desc_t* descs = dut_->descs();
+  const aml_sdmmc_desc_t* descs = descriptors();
   auto expected_desc_cfg = AmlSdmmcCmdCfg::Get()
                                .FromValue(0)
                                .set_len(100)
@@ -1084,7 +1101,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferMultipleDescriptors) {
   EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
-  const aml_sdmmc_desc_t* descs = dut_->descs();
+  const aml_sdmmc_desc_t* descs = descriptors();
   auto expected_desc_cfg = AmlSdmmcCmdCfg::Get()
                                .FromValue(0)
                                .set_len(511)
@@ -1182,7 +1199,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferPageAligned) {
   EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
-  const aml_sdmmc_desc_t* descs = dut_->descs();
+  const aml_sdmmc_desc_t* descs = descriptors();
   auto expected_desc_cfg = AmlSdmmcCmdCfg::Get()
                                .FromValue(0)
                                .set_len(127)
@@ -1251,7 +1268,7 @@ TEST_F(AmlSdmmcTest, OwnedVmosBlockMode) {
   EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
-  const aml_sdmmc_desc_t* descs = dut_->descs();
+  const aml_sdmmc_desc_t* descs = descriptors();
   auto expected_desc_cfg = AmlSdmmcCmdCfg::Get()
                                .FromValue(0)
                                .set_len(2)
@@ -1362,7 +1379,7 @@ TEST_F(AmlSdmmcTest, OwnedVmosByteMode) {
   EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
-  const aml_sdmmc_desc_t* descs = dut_->descs();
+  const aml_sdmmc_desc_t* descs = descriptors();
   auto expected_desc_cfg = AmlSdmmcCmdCfg::Get()
                                .FromValue(0)
                                .set_len(50)
@@ -1424,7 +1441,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoByteModeMultiBlock) {
   EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
-  const aml_sdmmc_desc_t* descs = dut_->descs();
+  const aml_sdmmc_desc_t* descs = descriptors();
   auto expected_desc_cfg = AmlSdmmcCmdCfg::Get()
                                .FromValue(0)
                                .set_len(100)
@@ -1522,7 +1539,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferMultipleDescriptors) {
   EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
-  const aml_sdmmc_desc_t* descs = dut_->descs();
+  const aml_sdmmc_desc_t* descs = descriptors();
   auto expected_desc_cfg = AmlSdmmcCmdCfg::Get()
                                .FromValue(0)
                                .set_len(511)
@@ -1625,7 +1642,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferPageAligned) {
   EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
-  const aml_sdmmc_desc_t* descs = dut_->descs();
+  const aml_sdmmc_desc_t* descs = descriptors();
   auto expected_desc_cfg = AmlSdmmcCmdCfg::Get()
                                .FromValue(0)
                                .set_len(127)
@@ -1690,7 +1707,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoWritePastEnd) {
   EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
-  const aml_sdmmc_desc_t* descs = dut_->descs();
+  const aml_sdmmc_desc_t* descs = descriptors();
   auto expected_desc_cfg = AmlSdmmcCmdCfg::Get()
                                .FromValue(0)
                                .set_len(126)
@@ -1818,7 +1835,7 @@ TEST_F(AmlSdmmcTest, RequestWithOwnedAndUnownedVmos) {
   EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
-  const aml_sdmmc_desc_t* descs = dut_->descs();
+  const aml_sdmmc_desc_t* descs = descriptors();
   auto expected_desc_cfg = AmlSdmmcCmdCfg::Get()
                                .FromValue(0)
                                .set_len(2)
@@ -1897,9 +1914,9 @@ TEST_F(AmlSdmmcTest, ResetCmdInfoBits) {
   bti_paddrs_[3] = 0x1997'e000;
 
   // Make sure the appropriate cmd_info bits get cleared.
-  dut_->descs()[0].cmd_info = 0xffff'ffff;
-  dut_->descs()[1].cmd_info = 0xffff'ffff;
-  dut_->descs()[2].cmd_info = 0xffff'ffff;
+  descriptors()[0].cmd_info = 0xffff'ffff;
+  descriptors()[1].cmd_info = 0xffff'ffff;
+  descriptors()[2].cmd_info = 0xffff'ffff;
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size() * 3, 0, &vmo));
@@ -1928,7 +1945,7 @@ TEST_F(AmlSdmmcTest, ResetCmdInfoBits) {
   EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(AmlSdmmcCfg::Get().ReadFrom(&*mmio_).blk_len(), 9);
 
-  const aml_sdmmc_desc_t* descs = dut_->descs();
+  const aml_sdmmc_desc_t* descs = descriptors();
   auto expected_desc_cfg = AmlSdmmcCmdCfg::Get()
                                .FromValue(0)
                                .set_len(8)

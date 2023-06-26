@@ -17,13 +17,12 @@
 #include <lib/zx/result.h>
 #include <threads.h>
 
+#include <array>
 #include <limits>
-#include <optional>
 #include <vector>
 
 #include <ddktl/device.h>
 #include <fbl/auto_lock.h>
-#include <fbl/condition_variable.h>
 #include <soc/aml-common/aml-sdmmc.h>
 
 #include "src/lib/vmo_store/vmo_store.h"
@@ -35,8 +34,34 @@ using AmlSdmmcType = ddk::Device<AmlSdmmc, ddk::Suspendable>;
 
 class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::base_protocol> {
  public:
+  // Limit maximum number of descriptors to 512 for now
+  static constexpr size_t kMaxDmaDescriptors = 512;
+
   AmlSdmmc(zx_device_t* parent, zx::bti bti, fdf::MmioBuffer mmio, aml_sdmmc_config_t config,
-           zx::interrupt irq, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio);
+           zx::interrupt irq, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio,
+           ddk::IoBuffer descs_buffer)
+      : AmlSdmmcType(parent),
+        mmio_(std::move(mmio)),
+        bti_(std::move(bti)),
+        irq_(std::move(irq)),
+        board_config_(config),
+        descs_buffer_(std::move(descs_buffer)),
+        registered_vmos_{
+            // clang-format off
+            SdmmcVmoStore{vmo_store::Options{}},
+            SdmmcVmoStore{vmo_store::Options{}},
+            SdmmcVmoStore{vmo_store::Options{}},
+            SdmmcVmoStore{vmo_store::Options{}},
+            SdmmcVmoStore{vmo_store::Options{}},
+            SdmmcVmoStore{vmo_store::Options{}},
+            SdmmcVmoStore{vmo_store::Options{}},
+            SdmmcVmoStore{vmo_store::Options{}},
+            // clang-format on
+        } {
+    if (reset_gpio.is_valid()) {
+      reset_gpio_.Bind(std::move(reset_gpio));
+    }
+  }
 
   virtual ~AmlSdmmc() = default;
   static zx_status_t Create(void* ctx, zx_device_t* parent);
@@ -48,20 +73,21 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
   // Sdmmc Protocol implementation
   zx_status_t SdmmcHostInfo(sdmmc_host_info_t* out_info);
   zx_status_t SdmmcSetSignalVoltage(sdmmc_voltage_t voltage);
-  zx_status_t SdmmcSetBusWidth(sdmmc_bus_width_t bus_width);
-  zx_status_t SdmmcSetBusFreq(uint32_t bus_freq);
-  zx_status_t SdmmcSetTiming(sdmmc_timing_t timing);
-  zx_status_t SdmmcHwReset();
-  zx_status_t SdmmcPerformTuning(uint32_t cmd_idx);
+  zx_status_t SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) TA_EXCL(lock_);
+  zx_status_t SdmmcSetBusFreq(uint32_t bus_freq) TA_EXCL(lock_);
+  zx_status_t SdmmcSetTiming(sdmmc_timing_t timing) TA_EXCL(lock_);
+  zx_status_t SdmmcHwReset() TA_EXCL(lock_);
+  zx_status_t SdmmcPerformTuning(uint32_t cmd_idx) TA_EXCL(lock_);
   zx_status_t SdmmcRegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb);
   void SdmmcAckInBandInterrupt() {}
   zx_status_t SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo, uint64_t offset,
-                               uint64_t size, uint32_t vmo_rights);
-  zx_status_t SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo);
-  zx_status_t SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]);
+                               uint64_t size, uint32_t vmo_rights) TA_EXCL(lock_);
+  zx_status_t SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo)
+      TA_EXCL(lock_);
+  zx_status_t SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) TA_EXCL(lock_);
 
   // Visible for tests
-  zx_status_t Init(const pdev_device_info_t& device_info);
+  zx_status_t Init(const pdev_device_info_t& device_info) TA_EXCL(lock_);
   void set_board_config(const aml_sdmmc_config_t& board_config) { board_config_ = board_config; }
 
  protected:
@@ -71,11 +97,7 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
   virtual zx_status_t WaitForInterruptImpl();
   virtual void WaitForBus() const;
 
-  aml_sdmmc_desc_t* descs() { return static_cast<aml_sdmmc_desc_t*>(descs_buffer_.virt()); }
-
   zx::vmo GetInspectVmo() const { return inspect_.inspector.DuplicateVmo(); }
-
-  fdf::MmioBuffer mmio_;
 
  private:
   constexpr static size_t kResponseCount = 4;
@@ -131,44 +153,54 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
 
   using SdmmcVmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t, OwnedVmoInfo>>;
 
+  aml_sdmmc_desc_t* descs() const TA_REQ(lock_) {
+    return static_cast<aml_sdmmc_desc_t*>(descs_buffer_.virt());
+  }
+
+  zx_status_t SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_response[4]) TA_REQ(lock_);
+
   uint32_t DistanceToFailingPoint(TuneSettings point,
                                   cpp20::span<const TuneResults> adj_delay_results);
   zx::result<TuneSettings> PerformTuning(cpp20::span<const TuneResults> adj_delay_results);
   zx_status_t TuningDoTransfer(zx::unowned_vmo received_block, size_t blk_pattern_size,
-                               uint32_t tuning_cmd_idx);
+                               uint32_t tuning_cmd_idx) TA_REQ(lock_);
   bool TuningTestSettings(cpp20::span<const uint8_t> tuning_blk, uint32_t tuning_cmd_idx,
-                          zx::unowned_vmo received_block);
+                          zx::unowned_vmo received_block) TA_REQ(lock_);
   // Sweeps from zero to the max delay and creates a TuneWindow representing the largest span of
   // delay values that failed.
   TuneWindow GetFailingWindow(TuneResults results);
   TuneResults TuneDelayLines(cpp20::span<const uint8_t> tuning_blk, uint32_t tuning_cmd_idx,
-                             zx::unowned_vmo received_block);
+                             zx::unowned_vmo received_block) TA_REQ(lock_);
 
-  void SetAdjDelay(uint32_t adj_delay);
-  void SetDelayLines(uint32_t delay);
+  void SetAdjDelay(uint32_t adj_delay) TA_REQ(lock_);
+  void SetDelayLines(uint32_t delay) TA_REQ(lock_);
   uint32_t max_delay() const;
 
-  void ConfigureDefaultRegs();
-  aml_sdmmc_desc_t* SetupCmdDesc(const sdmmc_req_t& req);
+  void ConfigureDefaultRegs() TA_REQ(lock_);
+  aml_sdmmc_desc_t* SetupCmdDesc(const sdmmc_req_t& req) TA_REQ(lock_);
   // Returns a pointer to the LAST descriptor used.
   zx::result<std::pair<aml_sdmmc_desc_t*, std::vector<fzl::PinnedVmo>>> SetupDataDescs(
-      const sdmmc_req_t& req, aml_sdmmc_desc_t* cur_desc);
+      const sdmmc_req_t& req, aml_sdmmc_desc_t* cur_desc) TA_REQ(lock_);
   // These return pointers to the NEXT descriptor to use.
   zx::result<aml_sdmmc_desc_t*> SetupOwnedVmoDescs(const sdmmc_req_t& req,
                                                    const sdmmc_buffer_region_t& buffer,
                                                    vmo_store::StoredVmo<OwnedVmoInfo>& vmo,
-                                                   aml_sdmmc_desc_t* cur_desc);
+                                                   aml_sdmmc_desc_t* cur_desc) TA_REQ(lock_);
   zx::result<std::pair<aml_sdmmc_desc_t*, fzl::PinnedVmo>> SetupUnownedVmoDescs(
-      const sdmmc_req_t& req, const sdmmc_buffer_region_t& buffer, aml_sdmmc_desc_t* cur_desc);
+      const sdmmc_req_t& req, const sdmmc_buffer_region_t& buffer, aml_sdmmc_desc_t* cur_desc)
+      TA_REQ(lock_);
   zx::result<aml_sdmmc_desc_t*> PopulateDescriptors(const sdmmc_req_t& req,
                                                     aml_sdmmc_desc_t* cur_desc,
-                                                    fzl::PinnedVmo::Region region);
+                                                    fzl::PinnedVmo::Region region) TA_REQ(lock_);
   static zx_status_t FinishReq(const sdmmc_req_t& req);
 
-  void ClearStatus();
-  zx::result<std::array<uint32_t, kResponseCount>> WaitForInterrupt(const sdmmc_req_t& req);
+  void ClearStatus() TA_REQ(lock_);
+  zx::result<std::array<uint32_t, kResponseCount>> WaitForInterrupt(const sdmmc_req_t& req)
+      TA_REQ(lock_);
 
-  void ShutDown();
+  void ShutDown() TA_EXCL(lock_);
+
+  fdf::MmioBuffer mmio_ TA_GUARDED(lock_);
 
   zx::bti bti_;
 
@@ -177,14 +209,12 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
   aml_sdmmc_config_t board_config_;
 
   sdmmc_host_info_t dev_info_;
-  ddk::IoBuffer descs_buffer_;
+  ddk::IoBuffer descs_buffer_ TA_GUARDED(lock_);
   uint32_t max_freq_, min_freq_;
 
-  fbl::Mutex mtx_;
-  fbl::ConditionVariable txn_finished_ TA_GUARDED(mtx_);
-  std::atomic<bool> dead_ TA_GUARDED(mtx_);
-  std::atomic<bool> pending_txn_ TA_GUARDED(mtx_);
-  std::optional<SdmmcVmoStore> registered_vmos_[SDMMC_MAX_CLIENT_ID + 1];
+  fbl::Mutex lock_;
+  bool shutdown_ TA_GUARDED(lock_) = false;
+  std::array<SdmmcVmoStore, SDMMC_MAX_CLIENT_ID + 1> registered_vmos_ TA_GUARDED(lock_);
 
   uint64_t consecutive_cmd_errors_ = 0;
   uint64_t consecutive_data_errors_ = 0;

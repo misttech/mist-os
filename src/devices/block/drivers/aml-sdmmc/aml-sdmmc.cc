@@ -40,8 +40,6 @@
 
 #include "aml-sdmmc-regs.h"
 
-// Limit maximum number of descriptors to 512 for now
-#define AML_DMA_DESC_MAX_COUNT 512
 #define AML_SDMMC_TRACE(fmt, ...) zxlogf(DEBUG, "%s: " fmt, __func__, ##__VA_ARGS__)
 #define AML_SDMMC_INFO(fmt, ...) zxlogf(INFO, "%s: " fmt, __func__, ##__VA_ARGS__)
 #define AML_SDMMC_ERROR(fmt, ...) zxlogf(ERROR, "%s: " fmt, __func__, ##__VA_ARGS__)
@@ -64,24 +62,6 @@ zx_paddr_t PageMask() {
 }  // namespace
 
 namespace sdmmc {
-
-AmlSdmmc::AmlSdmmc(zx_device_t* parent, zx::bti bti, fdf::MmioBuffer mmio,
-                   aml_sdmmc_config_t config, zx::interrupt irq,
-                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio)
-    : AmlSdmmcType(parent),
-      mmio_(std::move(mmio)),
-      bti_(std::move(bti)),
-      irq_(std::move(irq)),
-      board_config_(config),
-      dead_(false),
-      pending_txn_(false) {
-  if (reset_gpio.is_valid()) {
-    reset_gpio_.Bind(std::move(reset_gpio));
-  }
-  for (auto& store : registered_vmos_) {
-    store.emplace(vmo_store::Options{});
-  }
-}
 
 zx_status_t AmlSdmmc::WaitForInterruptImpl() {
   zx::time timestamp;
@@ -130,8 +110,7 @@ zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInte
   }
 
   const auto status_irq = AmlSdmmcStatus::Get().ReadFrom(&mmio_);
-
-  auto complete = fit::defer([&]() { ClearStatus(); });
+  ClearStatus();
 
   auto on_bus_error =
       fit::defer([&]() { AmlSdmmcStart::Get().ReadFrom(&mmio_).set_desc_busy(0).WriteTo(&mmio_); });
@@ -237,7 +216,11 @@ zx_status_t AmlSdmmc::SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) {
       return ZX_ERR_OUT_OF_RANGE;
   }
 
-  AmlSdmmcCfg::Get().ReadFrom(&mmio_).set_bus_width(bus_width_val).WriteTo(&mmio_);
+  {
+    fbl::AutoLock lock(&lock_);
+    AmlSdmmcCfg::Get().ReadFrom(&mmio_).set_bus_width(bus_width_val).WriteTo(&mmio_);
+  }
+
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
   return ZX_OK;
 }
@@ -248,6 +231,8 @@ zx_status_t AmlSdmmc::SdmmcRegisterInBandInterrupt(
 }
 
 zx_status_t AmlSdmmc::SdmmcSetBusFreq(uint32_t freq) {
+  fbl::AutoLock lock(&lock_);
+
   uint32_t clk = 0, clk_src = 0, clk_div = 0;
   if (freq == 0) {
     AmlSdmmcClock::Get().ReadFrom(&mmio_).set_cfg_div(0).WriteTo(&mmio_);
@@ -325,6 +310,8 @@ void AmlSdmmc::ConfigureDefaultRegs() {
 }
 
 zx_status_t AmlSdmmc::SdmmcHwReset() {
+  fbl::AutoLock lock(&lock_);
+
   if (reset_gpio_.is_valid()) {
     fidl::WireResult result1 = reset_gpio_->ConfigOut(0);
     if (!result1.ok()) {
@@ -357,6 +344,8 @@ zx_status_t AmlSdmmc::SdmmcHwReset() {
 }
 
 zx_status_t AmlSdmmc::SdmmcSetTiming(sdmmc_timing_t timing) {
+  fbl::AutoLock lock(&lock_);
+
   auto config = AmlSdmmcCfg::Get().ReadFrom(&mmio_);
   if (timing == SDMMC_TIMING_HS400 || timing == SDMMC_TIMING_HSDDR ||
       timing == SDMMC_TIMING_DDR50) {
@@ -434,7 +423,7 @@ zx::result<std::pair<aml_sdmmc_desc_t*, std::vector<fzl::PinnedVmo>>> AmlSdmmc::
   pinned_vmos.reserve(req.buffers_count);
 
   aml_sdmmc_desc_t* desc = cur_desc;
-  SdmmcVmoStore& vmos = *registered_vmos_[req.client_id];
+  SdmmcVmoStore& vmos = registered_vmos_[req.client_id];
   for (size_t i = 0; i < req.buffers_count; i++) {
     if (req.buffers_list[i].type == SDMMC_BUFFER_TYPE_VMO_HANDLE) {
       auto status = SetupUnownedVmoDescs(req, req.buffers_list[i], desc);
@@ -597,7 +586,7 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::PopulateDescriptors(const sdmmc_req_t& r
     const size_t desc_size = std::min(region.size, max_desc_size);
 
     if (desc >= descs_end) {
-      AML_SDMMC_ERROR("request with more than %d chunks is unsupported\n", AML_DMA_DESC_MAX_COUNT);
+      AML_SDMMC_ERROR("request with more than %zu chunks is unsupported\n", kMaxDmaDescriptors);
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
     if (region.phys_addr % AmlSdmmcCmdCfg::kDataAddrAlignment != 0) {
@@ -693,7 +682,7 @@ zx_status_t AmlSdmmc::TuningDoTransfer(zx::unowned_vmo received_block, size_t bl
   };
 
   uint32_t unused_response[4];
-  return AmlSdmmc::SdmmcRequest(&tuning_req, unused_response);
+  return SdmmcRequestLocked(&tuning_req, unused_response);
 }
 
 bool AmlSdmmc::TuningTestSettings(cpp20::span<const uint8_t> tuning_blk, uint32_t tuning_cmd_idx,
@@ -826,6 +815,8 @@ uint32_t AmlSdmmc::DistanceToFailingPoint(TuneSettings point,
 }
 
 zx_status_t AmlSdmmc::SdmmcPerformTuning(uint32_t tuning_cmd_idx) {
+  fbl::AutoLock lock(&lock_);
+
   cpp20::span<const uint8_t> tuning_blk;
 
   uint32_t bw = AmlSdmmcCfg::Get().ReadFrom(&mmio_).bus_width();
@@ -931,7 +922,7 @@ zx::result<AmlSdmmc::TuneSettings> AmlSdmmc::PerformTuning(
 
 zx_status_t AmlSdmmc::SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo,
                                        uint64_t offset, uint64_t size, uint32_t vmo_rights) {
-  if (client_id >= std::size(registered_vmos_)) {
+  if (client_id > SDMMC_MAX_CLIENT_ID) {
     return ZX_ERR_OUT_OF_RANGE;
   }
   if (vmo_rights == 0) {
@@ -952,15 +943,18 @@ zx_status_t AmlSdmmc::SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::v
     return status;
   }
 
-  return registered_vmos_[client_id]->RegisterWithKey(vmo_id, std::move(stored_vmo));
+  fbl::AutoLock lock(&lock_);
+  return registered_vmos_[client_id].RegisterWithKey(vmo_id, std::move(stored_vmo));
 }
 
 zx_status_t AmlSdmmc::SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo) {
-  if (client_id >= std::size(registered_vmos_)) {
+  if (client_id > SDMMC_MAX_CLIENT_ID) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  vmo_store::StoredVmo<OwnedVmoInfo>* const vmo_info = registered_vmos_[client_id]->GetVmo(vmo_id);
+  fbl::AutoLock lock(&lock_);
+
+  vmo_store::StoredVmo<OwnedVmoInfo>* const vmo_info = registered_vmos_[client_id].GetVmo(vmo_id);
   if (!vmo_info) {
     return ZX_ERR_NOT_FOUND;
   }
@@ -970,21 +964,21 @@ zx_status_t AmlSdmmc::SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx:
     return status;
   }
 
-  return registered_vmos_[client_id]->Unregister(vmo_id).status_value();
+  return registered_vmos_[client_id].Unregister(vmo_id).status_value();
 }
 
 zx_status_t AmlSdmmc::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) {
-  if (req->client_id >= std::size(registered_vmos_)) {
+  if (req->client_id > SDMMC_MAX_CLIENT_ID) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  {
-    fbl::AutoLock lock(&mtx_);
-    if (dead_) {
-      return ZX_ERR_CANCELED;
-    }
+  fbl::AutoLock lock(&lock_);
+  return SdmmcRequestLocked(req, out_response);
+}
 
-    pending_txn_ = true;
+zx_status_t AmlSdmmc::SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_response[4]) {
+  if (shutdown_) {
+    return ZX_ERR_CANCELED;
   }
 
   // Wait for the bus to become idle before issuing the next request. This could be necessary if the
@@ -1002,11 +996,6 @@ zx_status_t AmlSdmmc::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response
     auto status = SetupDataDescs(*req, desc);
     if (status.is_error()) {
       AML_SDMMC_ERROR("Failed to setup data descriptors");
-
-      fbl::AutoLock lock(&mtx_);
-      pending_txn_ = false;
-      txn_finished_.Signal();
-
       return status.error_value();
     }
     last_desc = std::get<0>(status.value());
@@ -1040,36 +1029,29 @@ zx_status_t AmlSdmmc::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response
     return status;
   }
 
-  fbl::AutoLock lock(&mtx_);
-  pending_txn_ = false;
-  txn_finished_.Signal();
-
   return response.status_value();
 }
 
 zx_status_t AmlSdmmc::Init(const pdev_device_info_t& device_info) {
-  // The core clock must be enabled before attempting to access the start register.
-  ConfigureDefaultRegs();
+  {
+    fbl::AutoLock lock(&lock_);
 
-  // Stop processing DMA descriptors before releasing quarantine.
-  AmlSdmmcStart::Get().ReadFrom(&mmio_).set_desc_busy(0).WriteTo(&mmio_);
-  zx_status_t status = bti_.release_quarantine();
-  if (status != ZX_OK) {
-    AML_SDMMC_ERROR("Failed to release quarantined pages");
-    return status;
+    // The core clock must be enabled before attempting to access the start register.
+    ConfigureDefaultRegs();
+
+    // Stop processing DMA descriptors before releasing quarantine.
+    AmlSdmmcStart::Get().ReadFrom(&mmio_).set_desc_busy(0).WriteTo(&mmio_);
+    zx_status_t status = bti_.release_quarantine();
+    if (status != ZX_OK) {
+      AML_SDMMC_ERROR("Failed to release quarantined pages");
+      return status;
+    }
   }
 
   dev_info_.caps = SDMMC_HOST_CAP_BUS_WIDTH_8 | SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104 |
                    SDMMC_HOST_CAP_SDR50 | SDMMC_HOST_CAP_DDR50 | SDMMC_HOST_CAP_DMA;
 
-  status = descs_buffer_.Init(bti_.get(), AML_DMA_DESC_MAX_COUNT * sizeof(aml_sdmmc_desc_t),
-                              IO_BUFFER_RW | IO_BUFFER_CONTIG);
-  if (status != ZX_OK) {
-    AML_SDMMC_ERROR("Failed to allocate dma descriptors");
-    return status;
-  }
-
-  dev_info_.max_transfer_size = AML_DMA_DESC_MAX_COUNT * zx_system_get_page_size();
+  dev_info_.max_transfer_size = kMaxDmaDescriptors * zx_system_get_page_size();
   dev_info_.max_transfer_size_non_dma = AML_SDMMC_MAX_PIO_DATA_SIZE;
   max_freq_ = board_config_.max_freq;
   min_freq_ = board_config_.min_freq;
@@ -1214,8 +1196,17 @@ zx_status_t AmlSdmmc::Create(void* ctx, zx_device_t* parent) {
     }
   }
 
-  auto dev = std::make_unique<AmlSdmmc>(parent, std::move(bti), *std::move(mmio), config,
-                                        std::move(irq), std::move(reset_gpio));
+  ddk::IoBuffer descs_buffer;
+  status = descs_buffer.Init(bti.get(), kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t),
+                             IO_BUFFER_RW | IO_BUFFER_CONTIG);
+  if (status != ZX_OK) {
+    AML_SDMMC_ERROR("Failed to allocate dma descriptors");
+    return status;
+  }
+
+  auto dev =
+      std::make_unique<AmlSdmmc>(parent, std::move(bti), *std::move(mmio), config, std::move(irq),
+                                 std::move(reset_gpio), std::move(descs_buffer));
 
   if ((status = dev->Init(dev_info)) != ZX_OK) {
     return status;
@@ -1234,31 +1225,21 @@ void AmlSdmmc::ShutDown() {
   // If there's a pending request, wait for it to complete (and any pages to be unpinned) before
   // proceeding with suspend/unbind.
   {
-    fbl::AutoLock lock(&mtx_);
-    dead_ = true;
+    fbl::AutoLock lock(&lock_);
+    shutdown_ = true;
 
-    if (pending_txn_) {
-      AML_SDMMC_ERROR("A request was pending after suspend/release");
-    }
-
-    while (pending_txn_) {
-      txn_finished_.Wait(&mtx_);
-    }
+    // DdkRelease() is not always called after this, so manually unpin the DMA buffer.
+    descs_buffer_.release();
   }
 }
 
 void AmlSdmmc::DdkSuspend(ddk::SuspendTxn txn) {
   ShutDown();
-
-  // DdkRelease() is not always called after this, so manually unpin the DMA buffer.
-  descs_buffer_.release();
-
   txn.Reply(ZX_OK, txn.requested_state());
 }
 
 void AmlSdmmc::DdkRelease() {
   ShutDown();
-  irq_.destroy();
   delete this;
 }
 
