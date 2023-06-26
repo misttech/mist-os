@@ -10,6 +10,7 @@ import("//build/test.gni")
 # since that is included in the legacy bundle via //bundles:bootstrap-zedboot
 bootfs_files_for_assembly("bootfs") {
   deps = [
+    ":blobfs",
     ":blobfs-component-config-values",
     ":blobfs.cml",
   ]

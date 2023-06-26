@@ -129,7 +129,10 @@ bootfs_files_for_assembly("assembly_bundle_fshost_fxfs") {
 }
 
 bootfs_files_for_assembly("assembly_bundle_fshost_minfs") {
-  deps = [ "//src/storage/bin/minfs:minfs-component" ]
+  deps = [
+    "//src/storage/bin/minfs",
+    "//src/storage/bin/minfs:minfs-component",
+  ]
 }
 
 bootfs_files_for_assembly("assembly_bundle_fshost_f2fs") {

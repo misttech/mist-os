@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 
@@ -254,6 +255,7 @@ source_set("decompressor_impl") {
 }
 
 executable("decompressor") {
+  visibility = [ ":*" ]
   sources = [ "compression/decompressor_sandbox/main.cc" ]
   deps = [
     ":decompressor_impl",
@@ -274,11 +276,18 @@ executable("decompressor") {
 
 fuchsia_component("decompressor-sandbox") {
   visibility = [
-    "./*",
+    ":*",
     "//src/storage/bin/blobfs",
   ]
   manifest = "meta/decompressor_sandbox.cml"
   deps = [ ":decompressor" ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [
+    ":decompressor",
+    ":decompressor-sandbox",
+  ]
 }
 
 group("tests") {

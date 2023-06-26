@@ -44,8 +44,6 @@ assembled_system("zedboot_assembly") {
 
   bootfs_labels = [
     "//build/input:zedboot_bootfs",
-
-    "//bundles:bootstrap-zedboot",
     "//bundles/drivers:bootstrap",
     "//bundles/drivers:usb-host-stack",
     "//bundles/drivers:usb-peripheral-stack",
