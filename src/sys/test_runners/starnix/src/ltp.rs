@@ -12,6 +12,7 @@ use fidl_fuchsia_test as ftest;
 use fuchsia_zircon as zx;
 use futures::{AsyncReadExt, StreamExt};
 use socket_parsing::NewlineChunker;
+use std::collections::HashMap;
 
 /// `Results` represent the results of an LTP test run as reported by the test
 /// binary's `stderr`.
@@ -27,10 +28,45 @@ struct Results {
 impl Results {
     /// Returns whether or not these results should be reported as a "pass" to the test
     /// framework.
-    fn passed(&self) -> bool {
-        match self {
-            Self { failed: Some(0), broken: Some(0), warnings: Some(0), .. } => true,
-            _ => false,
+    ///
+    /// Returns `None` if the `Results` do not contain enough information to determine whether or
+    /// not the test passed.
+    fn passed(&self, expected_result: &str) -> Option<bool> {
+        match (expected_result, self) {
+            (
+                "PASSED",
+                Results {
+                    passed: Some(_),
+                    failed: Some(0),
+                    broken: Some(0),
+                    warnings: Some(0),
+                    skipped: Some(0),
+                },
+            )
+            | (
+                "IGNORED",
+                Results {
+                    passed: Some(_),
+                    failed: Some(0),
+                    broken: Some(0),
+                    skipped: Some(_),
+                    warnings: Some(0),
+                },
+            ) => {
+                // Test case results were parsed successfully, and the results matched
+                // expectations.
+                Some(true)
+            }
+            (
+                _,
+                Results { passed: None, failed: None, broken: None, skipped: None, warnings: None },
+            ) => {
+                // Results were not parsed successfully, so can't determine whether or not the test
+                // passed.
+                None
+            }
+            // Results were parsed successfully, but don't match expectations.
+            _ => Some(false),
         }
     }
 
@@ -113,8 +149,19 @@ pub async fn run_ltp_cases(
 ) -> Result<(), Error> {
     let program = start_info.program.as_ref().unwrap();
     let base_path = get_str_value_from_dict(program, "tests_dir")?;
+
+    // TODO(b/287506763): Parse the expected test results, if available. This is a temporary
+    // measure, eventually the LTP test package will always contain this file.
+    let expected_test_results: Option<HashMap<String, String>> = {
+        match read_file_from_component_ns(&mut start_info, "data/test_results.json").await {
+            Ok(results_string) => serde_json::from_str(&results_string).ok(),
+            _ => None,
+        }
+    };
+
     for test in tests {
-        let test_path = format!("{}/{}", base_path, test.name.as_ref().expect("No test name"));
+        let test_name = test.name.as_ref().expect("No test name");
+        let test_path = format!("{}/{}", base_path, test_name);
         let (component_controller, component_std_handles) =
             start_command(&mut start_info, component_runner, &base_path, &test_path, &[])?;
 
@@ -145,12 +192,28 @@ pub async fn run_ltp_cases(
             parsed_results.count_results(&line);
         }
 
-        let result = read_result(component_controller.take_event_stream()).await;
+        let exit_code_result = read_result(component_controller.take_event_stream()).await;
 
-        tracing::info!("Passed based on log parsing: {:?}", parsed_results.passed());
+        let result = if let Some(expected_test_results) = &expected_test_results {
+            // If a result file was present, we check the parsed results to determine whether or not
+            // the test passed. If the result file is not present, always default to just the exit
+            // code.
+            //
+            // Eventually the exit code result will only be used if the test result parsing failed,
+            // since the test expectations file will always be present.
+            if let Some(success) = parsed_results.passed(&expected_test_results[test_name]) {
+                if success {
+                    ftest::Result_ { status: Some(ftest::Status::Passed), ..Default::default() }
+                } else {
+                    ftest::Result_ { status: Some(ftest::Status::Failed), ..Default::default() }
+                }
+            } else {
+                exit_code_result
+            }
+        } else {
+            exit_code_result
+        };
 
-        // TODO(b/287506763): We should use the `Results` to determine whether or not the
-        // LTP test result matches expectations.
         case_listener_proxy.finished(&result)?;
     }
 
