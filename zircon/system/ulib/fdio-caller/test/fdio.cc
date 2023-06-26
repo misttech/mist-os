@@ -11,6 +11,7 @@
 #include <lib/sync/completion.h>
 #include <unistd.h>
 
+#include <future>
 #include <utility>
 
 #include <fbl/unique_fd.h>
@@ -86,11 +87,17 @@ class FdioCallerTest : public zxtest::Test {
     ASSERT_OK(fdio_fd_create(ch1.release(), fd_.reset_and_get_address()));
   }
 
+  void TearDown() override {
+    std::promise<zx_status_t> promise;
+    memfs_->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+    ASSERT_OK(promise.get_future().get());
+  }
+
   fbl::unique_fd& fd() { return fd_; }
 
  private:
   async::Loop loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  std::unique_ptr<memfs::Memfs> memfs_;  // Must be after the loop_ for proper tear-down.
+  std::unique_ptr<memfs::Memfs> memfs_;
   fbl::unique_fd fd_;
 };
 
