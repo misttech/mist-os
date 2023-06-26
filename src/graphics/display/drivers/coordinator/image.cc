@@ -4,9 +4,11 @@
 
 #include "src/graphics/display/drivers/coordinator/image.h"
 
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/zx/handle.h>
+#include <zircon/assert.h>
 
 #include <atomic>
 #include <utility>
@@ -21,6 +23,7 @@ namespace display {
 Image::Image(Controller* controller, const image_t& info, zx::vmo vmo, inspect::Node* parent_node,
              uint32_t client_id)
     : info_(info), controller_(controller), client_id_(client_id), vmo_(std::move(vmo)) {
+  ZX_DEBUG_ASSERT(info.type != IMAGE_TYPE_CAPTURE);
   InitializeInspect(parent_node);
 }
 Image::~Image() {
