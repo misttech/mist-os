@@ -132,32 +132,33 @@ class ChromebookX64AbrTests : public zxtest::Test {
     auto pauser = BlockWatcherPauser::Create(GetFshostSvcRoot());
     ASSERT_OK(pauser);
 
-    zx::result new_connection = GetNewConnections(disk_->block_controller_interface());
-    ASSERT_OK(new_connection);
+    zx::result new_connection_result = GetNewConnections(disk_->block_controller_interface());
+    ASSERT_OK(new_connection_result);
+    DeviceAndController& new_connection = new_connection_result.value();
 
-    fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(
-        std::move(new_connection->device));
-    zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(volume));
+    fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(std::move(new_connection.device));
+    zx::result remote_device = block_client::RemoteBlockDevice::Create(
+        std::move(volume), std::move(new_connection.controller));
     ASSERT_OK(remote_device);
 
-    std::unique_ptr<gpt::GptDevice> gpt;
-    ASSERT_OK(gpt::GptDevice::Create(std::move(*remote_device),
-                                     std::move(new_connection->controller),
-                                     /*blocksize=*/disk_->block_size(),
-                                     /*blocks=*/disk_->block_count(), &gpt));
-    ASSERT_OK(gpt->Sync());
+    zx::result gpt_result = gpt::GptDevice::Create(std::move(remote_device.value()),
+                                                   /*blocksize=*/disk_->block_size(),
+                                                   /*blocks=*/disk_->block_count());
+    ASSERT_OK(gpt_result);
+    gpt::GptDevice& gpt = *gpt_result.value();
+    ASSERT_OK(gpt.Sync());
     // 2 (GPT header and MBR header) blocks + number of blocks in entry array.
-    uint64_t cur_start = 2 + gpt->EntryArrayBlockCount();
-    ASSERT_OK(gpt->AddPartition(GPT_ZIRCON_A_NAME, kZirconType, kZirconType, cur_start,
-                                kZxPartBlocks, 0));
+    uint64_t cur_start = 2 + gpt.EntryArrayBlockCount();
+    ASSERT_OK(
+        gpt.AddPartition(GPT_ZIRCON_A_NAME, kZirconType, kZirconType, cur_start, kZxPartBlocks, 0));
     cur_start += kZxPartBlocks;
-    ASSERT_OK(gpt->AddPartition(GPT_ZIRCON_B_NAME, kZirconType, kZirconType, cur_start,
-                                kZxPartBlocks, 0));
+    ASSERT_OK(
+        gpt.AddPartition(GPT_ZIRCON_B_NAME, kZirconType, kZirconType, cur_start, kZxPartBlocks, 0));
     cur_start += kZxPartBlocks;
-    ASSERT_OK(gpt->AddPartition(GPT_ZIRCON_R_NAME, kZirconType, kZirconType, cur_start,
-                                kZxPartBlocks, 0));
+    ASSERT_OK(
+        gpt.AddPartition(GPT_ZIRCON_R_NAME, kZirconType, kZirconType, cur_start, kZxPartBlocks, 0));
     cur_start += kZxPartBlocks;
-    ASSERT_OK(gpt->AddPartition(GPT_FVM_NAME, kFvmType, kFvmType, cur_start, kMinFvmSize, 0));
+    ASSERT_OK(gpt.AddPartition(GPT_FVM_NAME, kFvmType, kFvmType, cur_start, kMinFvmSize, 0));
     cur_start += kMinFvmSize;
 
     int active_partition = -1;
@@ -177,18 +178,18 @@ class ChromebookX64AbrTests : public zxtest::Test {
         break;
     }
 
-    auto result = gpt->GetPartition(active_partition);
-    ASSERT_OK(result.status_value());
-    gpt_partition_t* part = *result;
+    zx::result partition = gpt.GetPartition(active_partition);
+    ASSERT_OK(partition);
+    gpt_partition_t* part = partition.value();
     gpt_cros_attr_set_priority(&part->flags, 15);
     gpt_cros_attr_set_successful(&part->flags, true);
     fake_svc_.fake_boot_args().GetArgumentsMap().emplace("zvb.current_slot", current_slot);
-    ASSERT_OK(gpt->Sync());
+    ASSERT_OK(gpt.Sync());
 
-    fidl::WireResult result2 =
+    fidl::WireResult result =
         fidl::WireCall(disk_->block_controller_interface())->Rebind(fidl::StringView("gpt.cm"));
-    ASSERT_TRUE(result2.ok(), "%s", result2.FormatDescription().c_str());
-    ASSERT_TRUE(result2->is_ok(), "%s", zx_status_get_string(result2->error_value()));
+    ASSERT_TRUE(result.ok(), "%s", result.FormatDescription().c_str());
+    ASSERT_TRUE(result->is_ok(), "%s", zx_status_get_string(result->error_value()));
   }
 
   zx::result<std::unique_ptr<abr::Client>> GetAbrClient() {
@@ -267,13 +268,15 @@ TEST_F(ChromebookX64AbrTests, AbrAlwaysMarksRSuccessful) {
   ASSERT_OK(new_connection);
 
   fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(std::move(new_connection->device));
-  zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(volume));
+  zx::result remote_device = block_client::RemoteBlockDevice::Create(
+      std::move(volume), std::move(new_connection->controller));
   ASSERT_OK(remote_device);
 
-  std::unique_ptr<gpt::GptDevice> gpt;
-  ASSERT_OK(gpt::GptDevice::Create(std::move(*remote_device), std::move(new_connection->controller),
-                                   /*blocksize=*/disk_->block_size(),
-                                   /*blocks=*/disk_->block_count(), &gpt));
+  zx::result gpt_result = gpt::GptDevice::Create(std::move(remote_device.value()),
+                                                 /*blocksize=*/disk_->block_size(),
+                                                 /*blocks=*/disk_->block_count());
+  ASSERT_OK(gpt_result);
+  std::unique_ptr<gpt::GptDevice>& gpt = gpt_result.value();
   gpt_partition_t* part = GetPartitionByName(gpt, GPT_ZIRCON_R_NAME);
   ASSERT_NE(part, nullptr);
   ASSERT_TRUE(gpt_cros_attr_get_successful(part->flags));
@@ -304,12 +307,14 @@ class CurrentSlotUuidTest : public zxtest::Test {
     ASSERT_OK(new_connection);
     fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(
         std::move(new_connection->device));
-    zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(volume));
+    zx::result remote_device = block_client::RemoteBlockDevice::Create(
+        std::move(volume), std::move(new_connection->controller));
     ASSERT_OK(remote_device);
-    ASSERT_OK(gpt::GptDevice::Create(std::move(*remote_device),
-                                     std::move(new_connection->controller),
-                                     /*blocksize=*/disk_->block_size(),
-                                     /*blocks=*/disk_->block_count(), &gpt_));
+    zx::result gpt_result = gpt::GptDevice::Create(std::move(remote_device.value()),
+                                                   /*blocksize=*/disk_->block_size(),
+                                                   /*blocks=*/disk_->block_count());
+    ASSERT_OK(gpt_result);
+    gpt_ = std::move(gpt_result.value());
     ASSERT_OK(gpt_->Sync());
     ASSERT_OK(gpt_->AddPartition(partition, kZirconType, kTestUuid,
                                  2 + gpt_->EntryArrayBlockCount(), 10, 0));

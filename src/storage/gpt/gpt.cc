@@ -658,29 +658,27 @@ zx_status_t GptDevice::GetDiffs(uint32_t idx, uint32_t* diffs) const {
   return ZX_OK;
 }
 
-zx_status_t GptDevice::Init(std::unique_ptr<block_client::BlockDevice> device,
-                            fidl::ClientEnd<fuchsia_device::Controller> controller,
-                            uint32_t blocksize, uint64_t block_count,
-                            std::unique_ptr<GptDevice>* out_dev) {
+zx::result<std::unique_ptr<GptDevice>> GptDevice::Init(
+    std::unique_ptr<block_client::BlockDevice> device, uint32_t blocksize, uint64_t block_count) {
   off_t offset;
 
   uint8_t block[blocksize];
 
   if (blocksize < kMinimumBlockSize) {
     G_PRINTF("blocksize < %u not supported\n", kMinimumBlockSize);
-    return ZX_ERR_INTERNAL;
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   if (blocksize > kMaximumBlockSize) {
     G_PRINTF("blocksize > %u not supported\n", kMaximumBlockSize);
-    return ZX_ERR_INTERNAL;
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   offset = 0;
   block_client::Reader reader(*device);
   if (zx_status_t status = reader.Read(offset, blocksize, block); status != ZX_OK) {
     G_PRINTF("Failed to read %u @ %lld: %s\n", blocksize, offset, zx_status_get_string(status));
-    return ZX_ERR_IO;
+    return zx::error(ZX_ERR_IO);
   }
 
   // read the gpt header (lba 1)
@@ -689,54 +687,46 @@ zx_status_t GptDevice::Init(std::unique_ptr<block_client::BlockDevice> device,
   std::unique_ptr<uint8_t[]> buffer(new uint8_t[size]);
   if (zx_status_t status = reader.Read(offset, size, buffer.get()); status != ZX_OK) {
     G_PRINTF("Failed to read %lu @ %lld: %s\n", size, offset, zx_status_get_string(status));
-    return ZX_ERR_IO;
+    return zx::error(ZX_ERR_IO);
   }
 
-  std::unique_ptr<GptDevice> dev;
-  zx_status_t status = Load(buffer.get(), size, blocksize, block_count, &dev);
-
-  if (status != ZX_OK) {
+  zx::result dev = Load(buffer.get(), size, blocksize, block_count);
+  if (dev.is_error()) {
     // We did not find valid gpt on the file. Initialize new gpt.
-    G_PRINTF("%s\n", HeaderStatusToCString(status));
-    dev.reset(new GptDevice());
+    G_PRINTF("%s\n", HeaderStatusToCString(dev.error_value()));
+    std::unique_ptr dev = std::unique_ptr<GptDevice>(new GptDevice());
     dev->blocksize_ = blocksize;
     dev->blocks_ = block_count;
+    dev->device_ = std::move(device);
+    return zx::ok(std::move(dev));
   }
-  dev->device_ = std::move(device);
-  *out_dev = std::move(dev);
-  return ZX_OK;
+
+  dev.value()->device_ = std::move(device);
+  return dev;
 }
 
-zx_status_t GptDevice::Create(std::unique_ptr<block_client::BlockDevice> device,
-                              fidl::ClientEnd<fuchsia_device::Controller> controller,
-                              uint32_t blocksize, uint64_t blocks,
-                              std::unique_ptr<GptDevice>* out) {
-  return Init(std::move(device), std::move(controller), blocksize, blocks, out);
+zx::result<std::unique_ptr<GptDevice>> GptDevice::Create(
+    std::unique_ptr<block_client::BlockDevice> device, uint32_t blocksize, uint64_t blocks) {
+  return Init(std::move(device), blocksize, blocks);
 }
 
-zx_status_t GptDevice::CreateNoController(std::unique_ptr<block_client::BlockDevice> device,
-                                          uint32_t blocksize, uint64_t blocks,
-                                          std::unique_ptr<GptDevice>* out_dev) {
-  return Create(std::move(device), {}, blocksize, blocks, out_dev);
-}
-
-zx_status_t GptDevice::Load(const uint8_t* buffer, uint64_t buffer_size, uint32_t blocksize,
-                            uint64_t blocks, std::unique_ptr<GptDevice>* out) {
-  if (buffer == nullptr || out == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
+zx::result<std::unique_ptr<GptDevice>> GptDevice::Load(const uint8_t* buffer, uint64_t buffer_size,
+                                                       uint32_t blocksize, uint64_t blocks) {
+  if (buffer == nullptr) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   if (blocksize < kHeaderSize) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   if (buffer_size < kHeaderSize) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   if (zx_status_t status = ValidateHeader(reinterpret_cast<const gpt_header_t*>(buffer), blocks);
       status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   std::unique_ptr<GptDevice> dev(new GptDevice());
@@ -744,16 +734,14 @@ zx_status_t GptDevice::Load(const uint8_t* buffer, uint64_t buffer_size, uint32_
 
   if (zx_status_t status = dev->LoadEntries(&buffer[blocksize], buffer_size - blocksize, blocks);
       status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   dev->blocksize_ = blocksize;
   dev->blocks_ = blocks;
 
   dev->valid_ = true;
-  *out = std::move(dev);
-
-  return ZX_OK;
+  return zx::ok(std::move(dev));
 }
 
 zx_status_t GptDevice::Finalize() { return FinalizeAndSync(false); }

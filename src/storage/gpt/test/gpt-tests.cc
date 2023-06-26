@@ -361,10 +361,13 @@ class LibGptTest {
     std::string controller_path = std::string(disk_path_).append("/device_controller");
     zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
     ASSERT_OK(controller);
-    zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(*device));
+    zx::result remote_device = block_client::RemoteBlockDevice::Create(
+        std::move(device.value()), std::move(controller.value()));
     ASSERT_OK(remote_device);
-    ASSERT_OK(GptDevice::Create(std::move(remote_device.value()), std::move(controller.value()),
-                                GetBlockSize(), GetBlockCount(), &gpt_));
+    zx::result gpt_result =
+        GptDevice::Create(std::move(remote_device.value()), GetBlockSize(), GetBlockCount());
+    ASSERT_OK(gpt_result);
+    gpt_ = std::move(gpt_result.value());
   }
 
   // Finalize uninitialized disk and verify.
@@ -500,11 +503,15 @@ class LibGptTest {
 
     std::string controller_path = std::string(disk_path_).append("/device_controller");
     zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
+    ASSERT_OK(controller);
 
-    zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(*device));
+    zx::result remote_device = block_client::RemoteBlockDevice::Create(
+        std::move(device.value()), std::move(controller.value()));
     ASSERT_OK(remote_device);
-    ASSERT_OK(GptDevice::Create(std::move(remote_device.value()), std::move(controller.value()),
-                                GetBlockSize(), GetBlockCount(), &gpt_));
+    zx::result gpt_result =
+        GptDevice::Create(std::move(remote_device.value()), GetBlockSize(), GetBlockCount());
+    ASSERT_OK(gpt_result);
+    gpt_ = std::move(gpt_result.value());
   }
 
   // Create and initialize and ramdisk.
@@ -1174,36 +1181,25 @@ TEST(GptDeviceLoad, ValidHeader) {
   UpdateHeaderCrcs(&header, &blocks[kBlockSize],
                    MinimumBytesPerCopy(kBlockSize).value() - kBlockSize);
   memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
-  ASSERT_OK(GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize,
-                            kBlockCount, &gpt));
+  ASSERT_OK(
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize, kBlockCount));
 }
 
 TEST(GptDeviceLoad, SmallBlockSize) {
   gpt_header_t header = InitializePrimaryHeader(kBlockSize, kBlockCount).value();
   uint8_t blocks[MinimumBytesPerCopy(kBlockSize).value()] = {};
   memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
-  ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
-                GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kHeaderSize - 1,
-                                kBlockCount, &gpt));
-}
-
-TEST(GptDeviceLoad, NullGpt) {
-  gpt_header_t header = InitializePrimaryHeader(kBlockSize, kBlockCount).value();
-  uint8_t blocks[MinimumBytesPerCopy(kBlockSize).value()] = {};
-  memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
-  ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
-                GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kHeaderSize,
-                                kBlockCount, nullptr));
+  ASSERT_STATUS(
+      ZX_ERR_INVALID_ARGS,
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kHeaderSize - 1, kBlockCount)
+          .status_value());
 }
 
 TEST(GptDeviceLoad, NullBuffer) {
-  std::unique_ptr<GptDevice> gpt;
-  ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
-                GptDevice::Load(nullptr, MinimumBytesPerCopy(kBlockSize).value(), kHeaderSize,
-                                kBlockCount, &gpt));
+  ASSERT_STATUS(
+      ZX_ERR_INVALID_ARGS,
+      GptDevice::Load(nullptr, MinimumBytesPerCopy(kBlockSize).value(), kHeaderSize, kBlockCount)
+          .status_value());
 }
 
 // It is ok to have gpt with no partitions.
@@ -1214,9 +1210,8 @@ TEST(GptDeviceLoadEntries, NoValidEntries) {
   UpdateHeaderCrcs(&header, &blocks[kBlockSize],
                    MinimumBytesPerCopy(kBlockSize).value() - kBlockSize);
   memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
-  ASSERT_OK(GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize,
-                            kBlockCount, &gpt));
+  ASSERT_OK(
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize, kBlockCount));
 }
 
 TEST(GptDeviceLoadEntries, SmallEntryArray) {
@@ -1226,10 +1221,10 @@ TEST(GptDeviceLoadEntries, SmallEntryArray) {
   UpdateHeaderCrcs(&header, &blocks[kBlockSize],
                    MinimumBytesPerCopy(kBlockSize).value() - kBlockSize);
   memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
-  ASSERT_STATUS(ZX_ERR_BUFFER_TOO_SMALL,
-                GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value() - 1, kBlockSize,
-                                kBlockCount, &gpt));
+  ASSERT_STATUS(
+      ZX_ERR_BUFFER_TOO_SMALL,
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value() - 1, kBlockSize, kBlockCount)
+          .status_value());
 }
 
 TEST(GptDeviceLoadEntries, EntryFirstSmallerThanFirstUsable) {
@@ -1247,11 +1242,11 @@ TEST(GptDeviceLoadEntries, EntryFirstSmallerThanFirstUsable) {
   UpdateHeaderCrcs(&header, &blocks[kBlockSize],
                    MinimumBytesPerCopy(kBlockSize).value() - kBlockSize);
   memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
 
-  ASSERT_STATUS(ZX_ERR_ALREADY_EXISTS,
-                GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize,
-                                kBlockCount, &gpt));
+  ASSERT_STATUS(
+      ZX_ERR_ALREADY_EXISTS,
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize, kBlockCount)
+          .status_value());
 }
 
 TEST(GptDeviceLoadEntries, EntryLastLargerThanLastUsable) {
@@ -1269,11 +1264,11 @@ TEST(GptDeviceLoadEntries, EntryLastLargerThanLastUsable) {
   UpdateHeaderCrcs(&header, &blocks[kBlockSize],
                    MinimumBytesPerCopy(kBlockSize).value() - kBlockSize);
   memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
 
-  ASSERT_STATUS(ZX_ERR_ALREADY_EXISTS,
-                GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize,
-                                kBlockCount, &gpt));
+  ASSERT_STATUS(
+      ZX_ERR_ALREADY_EXISTS,
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize, kBlockCount)
+          .status_value());
 }
 
 TEST(GptDeviceLoadEntries, EntryFirstLargerThanEntryLast) {
@@ -1291,11 +1286,11 @@ TEST(GptDeviceLoadEntries, EntryFirstLargerThanEntryLast) {
   UpdateHeaderCrcs(&header, &blocks[kBlockSize],
                    MinimumBytesPerCopy(kBlockSize).value() - kBlockSize);
   memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
 
-  ASSERT_STATUS(ZX_ERR_OUT_OF_RANGE,
-                GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize,
-                                kBlockCount, &gpt));
+  ASSERT_STATUS(
+      ZX_ERR_OUT_OF_RANGE,
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize, kBlockCount)
+          .status_value());
 }
 
 TEST(GptDeviceLoadEntries, EntriesOverlap) {
@@ -1327,10 +1322,10 @@ TEST(GptDeviceLoadEntries, EntriesOverlap) {
   UpdateHeaderCrcs(&header, &blocks[kBlockSize],
                    MinimumBytesPerCopy(kBlockSize).value() - kBlockSize);
   memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
-  ASSERT_STATUS(ZX_ERR_OUT_OF_RANGE,
-                GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize,
-                                kBlockCount, &gpt));
+  ASSERT_STATUS(
+      ZX_ERR_OUT_OF_RANGE,
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize, kBlockCount)
+          .status_value());
 }
 
 TEST(GptDeviceLoadEntries, EntryOverlapsWithLastEntry) {
@@ -1363,10 +1358,10 @@ TEST(GptDeviceLoadEntries, EntryOverlapsWithLastEntry) {
   UpdateHeaderCrcs(&header, &blocks[kBlockSize],
                    MinimumBytesPerCopy(kBlockSize).value() - kBlockSize);
   memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
-  ASSERT_STATUS(ZX_ERR_OUT_OF_RANGE,
-                GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize,
-                                kBlockCount, &gpt));
+  ASSERT_STATUS(
+      ZX_ERR_OUT_OF_RANGE,
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize, kBlockCount)
+          .status_value());
 }
 
 TEST(GptDeviceEntryCountTest, DefaultValue) {
@@ -1377,10 +1372,10 @@ TEST(GptDeviceEntryCountTest, DefaultValue) {
   UpdateHeaderCrcs(&header, &blocks[kBlockSize],
                    MinimumBytesPerCopy(kBlockSize).value() - kBlockSize);
   memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
-  EXPECT_OK(GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize,
-                            kBlockCount, &gpt));
-  ASSERT_EQ(gpt->EntryCount(), kPartitionCount);
+  zx::result gpt =
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize, kBlockCount);
+  ASSERT_OK(gpt);
+  ASSERT_EQ(gpt.value()->EntryCount(), kPartitionCount);
 }
 
 TEST(GptDeviceEntryCountTest, FewerEntries) {
@@ -1393,10 +1388,10 @@ TEST(GptDeviceEntryCountTest, FewerEntries) {
   UpdateHeaderCrcs(&header, &blocks[kBlockSize],
                    MinimumBytesPerCopy(kBlockSize).value() - kBlockSize);
   memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
-  EXPECT_OK(GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize,
-                            kBlockCount, &gpt));
-  ASSERT_EQ(gpt->EntryCount(), entry_count);
+  zx::result gpt =
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize, kBlockCount);
+  ASSERT_OK(gpt);
+  ASSERT_EQ(gpt.value()->EntryCount(), entry_count);
 }
 
 TEST(GptDeviceMbr, LargerSectorSizes) {
@@ -1843,13 +1838,15 @@ TEST(GptDeviceLoadEntries, FindFreeRange) {
 
   UpdateHeaderCrcs(&header, &blocks[kBlockSize], len - kBlockSize);
   memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
-  ASSERT_OK(GptDevice::Load(blocks, len, kBlockSize, kBlockCount, &gpt));
+  zx::result gpt_result = GptDevice::Load(blocks, len, kBlockSize, kBlockCount);
+  ASSERT_OK(gpt_result);
+  GptDevice& gpt = *gpt_result.value();
+
   uint64_t offset;
-  ASSERT_OK(gpt->FindFreeRange(10, &offset));
-  ASSERT_OK(gpt->FindFreeRange(100, &offset));
-  ASSERT_OK(gpt->FindFreeRange(300, &offset));
-  ASSERT_STATUS(ZX_ERR_NO_SPACE, gpt->FindFreeRange(301, &offset), "Found offset %lu", offset);
+  ASSERT_OK(gpt.FindFreeRange(10, &offset));
+  ASSERT_OK(gpt.FindFreeRange(100, &offset));
+  ASSERT_OK(gpt.FindFreeRange(300, &offset));
+  ASSERT_STATUS(ZX_ERR_NO_SPACE, gpt.FindFreeRange(301, &offset), "Found offset %lu", offset);
 }
 
 TEST(GptDeviceLoadEntries, FindFreeRangeEmptyGpt) {
@@ -1861,16 +1858,18 @@ TEST(GptDeviceLoadEntries, FindFreeRangeEmptyGpt) {
 
   UpdateHeaderCrcs(&header, &blocks[kBlockSize], len - kBlockSize);
   memcpy(blocks, &header, sizeof(header));
-  std::unique_ptr<GptDevice> gpt;
-  ASSERT_OK(GptDevice::Load(blocks, len, kBlockSize, kBlockCount, &gpt));
+  zx::result gpt_result = GptDevice::Load(blocks, len, kBlockSize, kBlockCount);
+  ASSERT_OK(gpt_result);
+  GptDevice& gpt = *gpt_result.value();
+
   uint64_t start = 0;
   uint64_t end = std::numeric_limits<uint64_t>::max();
-  ASSERT_OK(gpt->Range(&start, &end));
+  ASSERT_OK(gpt.Range(&start, &end));
 
   uint64_t offset;
-  ASSERT_OK(gpt->FindFreeRange(10, &offset));
-  ASSERT_OK(gpt->FindFreeRange(end - start + 1, &offset));
-  ASSERT_STATUS(ZX_ERR_NO_SPACE, gpt->FindFreeRange(end - start + 2, &offset), "Found offset %lu",
+  ASSERT_OK(gpt.FindFreeRange(10, &offset));
+  ASSERT_OK(gpt.FindFreeRange(end - start + 1, &offset));
+  ASSERT_STATUS(ZX_ERR_NO_SPACE, gpt.FindFreeRange(end - start + 2, &offset), "Found offset %lu",
                 offset);
 }
 

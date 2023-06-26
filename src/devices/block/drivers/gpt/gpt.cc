@@ -449,13 +449,13 @@ zx_status_t PartitionManager::Bind(void* ctx, zx_device_t* parent) {
   }
 
   auto client = std::make_unique<BlockClient>(block_protocol);
-  std::unique_ptr<GptDevice> gpt;
-  zx_status_t status = GptDevice::CreateNoController(std::move(client), block_info.block_size,
-                                                     block_info.block_count, &gpt);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "gpt: failed to load gpt- %s", HeaderStatusToCString(status));
-    return status;
+  zx::result gpt_result =
+      GptDevice::Create(std::move(client), block_info.block_size, block_info.block_count);
+  if (gpt_result.is_error()) {
+    zxlogf(ERROR, "gpt: failed to load gpt- %s", HeaderStatusToCString(gpt_result.error_value()));
+    return gpt_result.error_value();
   }
+  std::unique_ptr<GptDevice>& gpt = gpt_result.value();
 
   zxlogf(TRACE, "gpt: found gpt header");
 
@@ -465,14 +465,15 @@ zx_status_t PartitionManager::Bind(void* ctx, zx_device_t* parent) {
   }
   auto manager = std::make_unique<PartitionManager>(std::move(gpt), std::move(metadata_opt),
                                                     std::move(block_protocol), parent);
-  if (status = manager->DdkAdd(ddk::DeviceAddArgs("gpt").set_flags(DEVICE_ADD_NON_BINDABLE));
+  if (zx_status_t status =
+          manager->DdkAdd(ddk::DeviceAddArgs("gpt").set_flags(DEVICE_ADD_NON_BINDABLE));
       status != ZX_OK) {
     zxlogf(ERROR, "gpt: failed to DdkAdd: %s", zx_status_get_string(status));
     return status;
   }
   {
     std::lock_guard guard(manager->lock_);
-    if (status = manager->Load(); status != ZX_OK) {
+    if (zx_status_t status = manager->Load(); status != ZX_OK) {
       zxlogf(ERROR, "gpt: failed to load partition tables: %s", zx_status_get_string(status));
       return status;
     }

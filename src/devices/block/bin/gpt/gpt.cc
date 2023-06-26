@@ -115,51 +115,48 @@ char* FlagsToCString(char* dst, size_t dst_len, const uint8_t* guid, uint64_t fl
   return dst;
 }
 
-std::unique_ptr<GptDevice> Init(const char* dev) {
+zx::result<std::unique_ptr<GptDevice>> Init(const char* dev) {
   zx::result block = component::Connect<fuchsia_hardware_block_volume::Volume>(dev);
   if (block.is_error()) {
     fprintf(stderr, "gpt: error opening %s: %s\n", dev, block.status_string());
-    return nullptr;
+    return block.take_error();
   }
 
   const fidl::WireResult result = fidl::WireCall(block.value())->GetInfo();
   if (!result.ok()) {
     fprintf(stderr, "gpt: error getting block info from %s: %s\n", dev,
             result.FormatDescription().c_str());
-    return nullptr;
+    return zx::error(result.status());
   }
   const fit::result response = result.value();
   if (response.is_error()) {
     fprintf(stderr, "gpt: error getting block info from %s: %s\n", dev,
             zx_status_get_string(response.error_value()));
-    return nullptr;
+    return zx::error(response.error_value());
   }
 
   fuchsia_hardware_block::wire::BlockInfo info = response.value()->info;
   printf("blocksize=0x%X blocks=%" PRIu64 "\n", info.block_size, info.block_count);
 
   std::string controller_dev = std::string(dev) + "/device_controller";
-  zx::result controller = component::Connect<fuchsia_device::Controller>(controller_dev.c_str());
+  zx::result controller = component::Connect<fuchsia_device::Controller>(controller_dev);
   if (controller.is_error()) {
     fprintf(stderr, "gpt: error opening %s: %s\n", controller_dev.c_str(),
             controller.status_string());
-    return nullptr;
+    return controller.take_error();
   }
 
-  auto device = block_client::RemoteBlockDevice::Create(std::move(block.value()));
+  zx::result device = block_client::RemoteBlockDevice::Create(std::move(block.value()),
+                                                              std::move(controller.value()));
   if (device.is_error()) {
     fprintf(stderr, "Failed to create block client: %s\n", device.status_string());
-    return nullptr;
+    return device.take_error();
   }
-  std::unique_ptr<GptDevice> gpt;
-  if (zx_status_t status =
-          GptDevice::Create(std::move(device.value()), std::move(controller.value()),
-                            info.block_size, info.block_count, &gpt);
-      status != ZX_OK) {
-    fprintf(stderr, "gpt: error initializing GPT from %s: %s\n", dev, zx_status_get_string(status));
-    return nullptr;
+  zx::result gpt = GptDevice::Create(std::move(device.value()), info.block_size, info.block_count);
+  if (gpt.is_error()) {
+    fprintf(stderr, "gpt: error initializing GPT from %s: %s\n", dev, gpt.status_string());
+    return gpt.take_error();
   }
-
   return gpt;
 }
 
@@ -214,9 +211,11 @@ uint32_t Dump(const GptDevice* gpt) {
 }
 
 void DumpPartitions(const char* dev) {
-  std::unique_ptr<GptDevice> gpt = Init(dev);
-  if (!gpt)
+  zx::result gpt_result = Init(dev);
+  if (gpt_result.is_error()) {
     return;
+  }
+  GptDevice* gpt = gpt_result.value().get();
 
   if (!gpt->Valid()) {
     fprintf(stderr, "No valid GPT found\n");
@@ -232,7 +231,7 @@ void DumpPartitions(const char* dev) {
   }
 
   printf("GPT contains usable blocks from %" PRIu64 " to %" PRIu64 " (inclusive)\n", start, end);
-  size_t count = Dump(gpt.get());
+  size_t count = Dump(gpt);
   printf("Total: %zu partitions\n", count);
 }
 
@@ -280,31 +279,33 @@ zx_status_t Commit(GptDevice* gpt, const char* dev) {
 }
 
 zx_status_t InitGpt(const char* dev) {
-  std::unique_ptr<GptDevice> gpt = Init(dev);
-  if (!gpt) {
+  zx::result gpt_result = Init(dev);
+  if (gpt_result.is_error()) {
     return ZX_ERR_INTERNAL;
   }
+  GptDevice* gpt = gpt_result.value().get();
 
   // generate a default header
   if (zx_status_t status = gpt->RemoveAllPartitions(); status != ZX_OK) {
     fprintf(stderr, "Failed to remove partitions: %s\n", zx_status_get_string(status));
     return status;
   }
-  return Commit(gpt.get(), dev);
+  return Commit(gpt, dev);
 }
 
 zx_status_t AddPartition(const char* dev, uint64_t start, uint64_t end, const char* name) {
   uint8_t guid[GPT_GUID_LEN];
   zx_cprng_draw(guid, GPT_GUID_LEN);
 
-  std::unique_ptr<GptDevice> gpt = Init(dev);
-  if (!gpt) {
-    return ZX_ERR_INTERNAL;
+  zx::result gpt_result = Init(dev);
+  if (gpt_result.is_error()) {
+    return gpt_result.error_value();
   }
+  GptDevice* gpt = gpt_result.value().get();
 
   if (!gpt->Valid()) {
     // generate a default header
-    if (Commit(gpt.get(), dev)) {
+    if (Commit(gpt, dev)) {
       return ZX_ERR_INTERNAL;
     }
   }
@@ -317,14 +318,15 @@ zx_status_t AddPartition(const char* dev, uint64_t start, uint64_t end, const ch
     return rc;
   }
   printf("add partition: name=%s start=%" PRIu64 " end=%" PRIu64 "\n", name, start, end);
-  return Commit(gpt.get(), dev);
+  return Commit(gpt, dev);
 }
 
 zx_status_t RemovePartition(const char* dev, uint32_t n) {
-  std::unique_ptr<GptDevice> gpt = Init(dev);
-  if (!gpt) {
-    return ZX_ERR_INTERNAL;
+  zx::result gpt_result = Init(dev);
+  if (gpt_result.is_error()) {
+    return gpt_result.error_value();
   }
+  GptDevice* gpt = gpt_result.value().get();
 
   zx::result<const gpt_partition_t*> p = gpt->GetPartition(n);
   if (!p.is_ok()) {
@@ -339,14 +341,15 @@ zx_status_t RemovePartition(const char* dev, uint32_t n) {
     return status;
   }
   printf("remove partition: n=%u name=%s\n", n, name);
-  return Commit(gpt.get(), dev);
+  return Commit(gpt, dev);
 }
 
 zx_status_t AdjustPartition(const char* dev, uint32_t idx_part, uint64_t start, uint64_t end) {
-  std::unique_ptr<GptDevice> gpt = Init(dev);
-  if (!gpt) {
-    return ZX_ERR_INTERNAL;
+  zx::result gpt_result = Init(dev);
+  if (gpt_result.is_error()) {
+    return gpt_result.error_value();
   }
+  GptDevice* gpt = gpt_result.value().get();
 
   if (zx_status_t status = gpt->SetPartitionRange(idx_part, start, end); status != ZX_OK) {
     if (status == ZX_ERR_INVALID_ARGS) {
@@ -359,7 +362,7 @@ zx_status_t AdjustPartition(const char* dev, uint32_t idx_part, uint64_t start, 
     return status;
   }
 
-  return Commit(gpt.get(), dev);
+  return Commit(gpt, dev);
 }
 
 /*
@@ -372,10 +375,11 @@ zx_status_t AdjustPartition(const char* dev, uint32_t idx_part, uint64_t start, 
  */
 zx_status_t EditPartition(const char* dev, uint32_t idx_part, char* type_or_id,
                           const uint8_t* guid) {
-  std::unique_ptr<GptDevice> gpt = Init(dev);
-  if (!gpt) {
-    return ZX_ERR_INTERNAL;
+  zx::result gpt_result = Init(dev);
+  if (gpt_result.is_error()) {
+    return gpt_result.error_value();
   }
+  GptDevice* gpt = gpt_result.value().get();
 
   if (!guid) {
     return ZX_ERR_INVALID_ARGS;
@@ -397,7 +401,7 @@ zx_status_t EditPartition(const char* dev, uint32_t idx_part, char* type_or_id,
     return status;
   }
 
-  return Commit(gpt.get(), dev);
+  return Commit(gpt, dev);
 }
 
 struct cros_partition_args_t {
@@ -490,10 +494,11 @@ zx_status_t EditCrosPartition(char* const* argv, int argc) {
     return status;
   }
 
-  std::unique_ptr<GptDevice> gpt = Init(args.dev);
-  if (!gpt) {
-    return ZX_ERR_INTERNAL;
+  zx::result gpt_result = Init(args.dev);
+  if (gpt_result.is_error()) {
+    return gpt_result.error_value();
   }
+  GptDevice* gpt = gpt_result.value().get();
 
   zx::result<const gpt_partition_t*> part = gpt->GetPartition(args.idx_part);
   if (part.is_error()) {
@@ -532,7 +537,7 @@ zx_status_t EditCrosPartition(char* const* argv, int argc) {
     fprintf(stderr, "Failed to set partition flags: %s\n", zx_status_get_string(status));
     return status;
   }
-  return Commit(gpt.get(), args.dev);
+  return Commit(gpt, args.dev);
 }
 
 /*
@@ -541,17 +546,18 @@ zx_status_t EditCrosPartition(char* const* argv, int argc) {
  * partition.
  */
 zx_status_t SetVisibility(char* dev, uint32_t idx_part, bool visible) {
-  std::unique_ptr<GptDevice> gpt = Init(dev);
-  if (!gpt) {
-    return ZX_ERR_INTERNAL;
+  zx::result gpt_result = Init(dev);
+  if (gpt_result.is_error()) {
+    return gpt_result.error_value();
   }
+  GptDevice* gpt = gpt_result.value().get();
 
   if (zx_status_t status = gpt->SetPartitionVisibility(idx_part, visible); status != ZX_OK) {
     fprintf(stderr, "Partition visibility edit failed: %s\n", zx_status_get_string(status));
     return status;
   }
 
-  return Commit(gpt.get(), dev);
+  return Commit(gpt, dev);
 }
 
 // ParseSize parses long integers in base 10, expanding p, t, g, m, and k
@@ -633,10 +639,11 @@ uint64_t Align(uint64_t base, uint64_t logical, uint64_t physical) {
 zx_status_t Repartition(int argc, char** argv, std::optional<PartitionScheme> scheme) {
   const char* dev = argv[0];
   uint64_t logical, free_space;
-  std::unique_ptr<GptDevice> gpt = Init(dev);
-  if (gpt == nullptr) {
-    return ZX_ERR_INTERNAL;
+  zx::result gpt_result = Init(dev);
+  if (gpt_result.is_error()) {
+    return gpt_result.error_value();
   }
+  GptDevice* gpt = gpt_result.value().get();
 
   argc--;
   argv = &argv[1];
@@ -723,7 +730,7 @@ zx_status_t Repartition(int argc, char** argv, std::optional<PartitionScheme> sc
     }
   }
 
-  return Commit(gpt.get(), dev);
+  return Commit(gpt, dev);
 }
 
 }  // namespace

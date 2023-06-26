@@ -420,17 +420,20 @@ class GptDevicePartitionerTests : public zxtest::Test {
 
   // Create GPT from a device.
   static void CreateGptDevice(BlockDevice* device, std::unique_ptr<gpt::GptDevice>* gpt) {
-    zx::result new_connection = GetNewConnections(device->block_controller_interface());
-    ASSERT_OK(new_connection);
-    fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(
-        std::move(new_connection->device));
-    zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(volume));
+    zx::result new_connection_result = GetNewConnections(device->block_controller_interface());
+    ASSERT_OK(new_connection_result);
+    DeviceAndController& new_connection = new_connection_result.value();
+
+    fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(std::move(new_connection.device));
+    zx::result remote_device = block_client::RemoteBlockDevice::Create(
+        std::move(volume), std::move(new_connection.controller));
     ASSERT_OK(remote_device);
-    ASSERT_OK(gpt::GptDevice::Create(std::move(*remote_device),
-                                     std::move(new_connection->controller),
-                                     /*blocksize=*/device->block_size(),
-                                     /*blocks=*/device->block_count(), gpt));
-    ASSERT_OK((*gpt)->Sync());
+    zx::result gpt_result = gpt::GptDevice::Create(std::move(remote_device.value()),
+                                                   /*blocksize=*/device->block_size(),
+                                                   /*blocks=*/device->block_count());
+    ASSERT_OK(gpt_result);
+    ASSERT_OK(gpt_result.value()->Sync());
+    *gpt = std::move(gpt_result.value());
   }
 
   void InitializeStartingGPTPartitions(BlockDevice* gpt_dev,
@@ -572,12 +575,14 @@ TEST_F(EfiDevicePartitionerTests, InitializeWithoutFvmSucceeds) {
   zx::result new_connection = GetNewConnections(gpt_dev->block_controller_interface());
   ASSERT_OK(new_connection);
   fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(std::move(new_connection->device));
-  zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(volume));
+  zx::result remote_device = block_client::RemoteBlockDevice::Create(
+      std::move(volume), std::move(new_connection->controller));
   ASSERT_OK(remote_device);
-  std::unique_ptr<gpt::GptDevice> gpt;
-  ASSERT_OK(gpt::GptDevice::Create(std::move(*remote_device), std::move(new_connection->controller),
-                                   kBlockSize, kBlockCount, &gpt));
-  ASSERT_OK(gpt->Sync());
+  zx::result gpt_result =
+      gpt::GptDevice::Create(std::move(remote_device.value()), kBlockSize, kBlockCount);
+  ASSERT_OK(gpt_result);
+  gpt::GptDevice& gpt = *gpt_result.value();
+  ASSERT_OK(gpt.Sync());
 
   ASSERT_OK(CreatePartitioner({}));
 }
@@ -597,12 +602,14 @@ TEST_F(EfiDevicePartitionerTests, InitializeTwoCandidatesWithoutFvmFails) {
   zx::result new_connection = GetNewConnections(gpt_dev->block_controller_interface());
   ASSERT_OK(new_connection);
   fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(std::move(new_connection->device));
-  zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(volume));
+  zx::result remote_device = block_client::RemoteBlockDevice::Create(
+      std::move(volume), std::move(new_connection->controller));
   ASSERT_OK(remote_device);
-  std::unique_ptr<gpt::GptDevice> gpt2;
-  ASSERT_OK(gpt::GptDevice::Create(std::move(*remote_device), std::move(new_connection->controller),
-                                   kBlockSize, kBlockCount, &gpt2));
-  ASSERT_OK(gpt2->Sync());
+  zx::result gpt_result2 =
+      gpt::GptDevice::Create(std::move(remote_device.value()), kBlockSize, kBlockCount);
+  ASSERT_OK(gpt_result2);
+  gpt::GptDevice& gpt2 = *gpt_result2.value();
+  ASSERT_OK(gpt2.Sync());
 
   ASSERT_NOT_OK(CreatePartitioner({}));
 }

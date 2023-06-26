@@ -269,12 +269,13 @@ zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::Initiali
   if (!remote_device.is_ok()) {
     return remote_device.take_error();
   }
-  std::unique_ptr<GptDevice> gpt;
-  if (GptDevice::CreateNoController(std::move(remote_device.value()), info.block_size,
-                                    info.block_count, &gpt) != ZX_OK) {
-    ERROR("Failed to get GPT info\n");
+  zx::result gpt_result =
+      GptDevice::Create(std::move(remote_device.value()), info.block_size, info.block_count);
+  if (gpt_result.is_error()) {
+    ERROR("Failed to get GPT info: %s\n", gpt_result.status_string());
     return zx::error(ZX_ERR_BAD_STATE);
   }
+  std::unique_ptr<GptDevice>& gpt = gpt_result.value();
 
   if (!gpt->Valid()) {
     ERROR("Located GPT is invalid; Attempting to initialize\n");
@@ -349,16 +350,18 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
     }
 
     zx::result remote_device = block_client::RemoteBlockDevice::Create(
-        fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(gpt_device.block.TakeChannel()));
+        fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(gpt_device.block.TakeChannel()),
+        std::move(gpt_device.controller));
     if (!remote_device.is_ok()) {
       return remote_device.take_error();
     }
-    std::unique_ptr<GptDevice> gpt;
-    if (GptDevice::Create(std::move(remote_device.value()), std::move(gpt_device.controller),
-                          info.block_size, info.block_count, &gpt) != ZX_OK) {
-      ERROR("Failed to get GPT info\n");
+    zx::result gpt_result =
+        GptDevice::Create(std::move(remote_device.value()), info.block_size, info.block_count);
+    if (gpt_result.is_error()) {
+      ERROR("Failed to get GPT info: %s\n", gpt_result.status_string());
       return zx::error(ZX_ERR_BAD_STATE);
     }
+    std::unique_ptr<GptDevice>& gpt = gpt_result.value();
 
     if (!gpt->Valid()) {
       continue;

@@ -129,22 +129,15 @@ zx::result<> GetPartitionName(const gpt_entry_t& entry, char* name, size_t capac
 class GptDevice {
  public:
 #ifdef __Fuchsia__
-  static zx_status_t Create(std::unique_ptr<block_client::BlockDevice> device,
-                            fidl::ClientEnd<fuchsia_device::Controller> controller,
-                            uint32_t blocksize, uint64_t blocks,
-                            std::unique_ptr<GptDevice>* out_dev);
-  // TODO(fxbug.dev/127870): Remove this API to remove controller multiplexing.
-  static zx_status_t CreateNoController(std::unique_ptr<block_client::BlockDevice> device,
-                                        uint32_t blocksize, uint64_t blocks,
-                                        std::unique_ptr<GptDevice>* out_dev);
+  static zx::result<std::unique_ptr<GptDevice>> Create(
+      std::unique_ptr<block_client::BlockDevice> device, uint32_t blocksize, uint64_t blocks);
 #endif
 
   // Loads gpt header and gpt entries array from |buffer| of length |size|
   // belonging to "block device" with |blocks| number of blocks and each
-  // block of size |blocksize|. On finding valid header and entries, returns
-  // pointer to GptDevice in |oput_dev|.
-  static zx_status_t Load(const uint8_t* buffer, uint64_t size, uint32_t blocksize, uint64_t blocks,
-                          std::unique_ptr<GptDevice>* out_dev);
+  // block of size |blocksize|. On finding valid header and entries, returns a GptDevice.
+  static zx::result<std::unique_ptr<GptDevice>> Load(const uint8_t* buffer, uint64_t size,
+                                                     uint32_t blocksize, uint64_t blocks);
 
   // returns true if the partition table on the device is valid
   bool Valid() const { return valid_; }
@@ -260,10 +253,8 @@ class GptDevice {
 
 #ifdef __Fuchsia__
   // Reads the partition table from the device, or reformats the device if no valid GPT is found.
-  static zx_status_t Init(std::unique_ptr<block_client::BlockDevice> device,
-                          fidl::ClientEnd<fuchsia_device::Controller> controller,
-                          uint32_t blocksize, uint64_t block_count,
-                          std::unique_ptr<GptDevice>* out_dev);
+  static zx::result<std::unique_ptr<GptDevice>> Init(
+      std::unique_ptr<block_client::BlockDevice> device, uint32_t blocksize, uint64_t block_count);
 #endif
 
   zx_status_t LoadEntries(const uint8_t* buffer, uint64_t buffer_size, uint64_t block_count);

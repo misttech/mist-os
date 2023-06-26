@@ -2072,25 +2072,26 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
     auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
     ASSERT_OK(pauser);
 
-    zx::result new_connection = GetNewConnectionsMultiplexed(gpt_dev->block_interface());
-    ASSERT_OK(new_connection);
-    fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(
-        std::move(new_connection->device));
-    zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(volume));
+    zx::result new_connection_result = GetNewConnectionsMultiplexed(gpt_dev->block_interface());
+    ASSERT_OK(new_connection_result);
+    DeviceAndController& new_connection = new_connection_result.value();
+
+    fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(std::move(new_connection.device));
+    zx::result remote_device = block_client::RemoteBlockDevice::Create(
+        std::move(volume), std::move(new_connection.controller));
     ASSERT_OK(remote_device);
-    std::unique_ptr<gpt::GptDevice> gpt;
-    ASSERT_OK(gpt::GptDevice::Create(std::move(*remote_device),
-                                     std::move(new_connection->controller), gpt_dev->block_size(),
-                                     gpt_dev->block_count(), &gpt));
-    ASSERT_OK(gpt->Sync());
+    zx::result gpt_result = gpt::GptDevice::Create(std::move(remote_device.value()),
+                                                   gpt_dev->block_size(), gpt_dev->block_count());
+    ASSERT_OK(gpt_result);
+    gpt::GptDevice& gpt = *gpt_result.value();
+    ASSERT_OK(gpt.Sync());
 
     for (const auto& part : init_partitions) {
-      ASSERT_OK(
-          gpt->AddPartition(part.name, part.type, GetRandomGuid(), part.start, part.length, 0),
-          "%s", part.name);
+      ASSERT_OK(gpt.AddPartition(part.name, part.type, GetRandomGuid(), part.start, part.length, 0),
+                "%s", part.name);
     }
 
-    ASSERT_OK(gpt->Sync());
+    ASSERT_OK(gpt.Sync());
 
     fidl::WireResult result =
         fidl::WireCall(gpt_dev->block_controller_interface())->Rebind(fidl::StringView("gpt.cm"));
