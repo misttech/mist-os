@@ -59,9 +59,19 @@ class Incoming {
           'Attempting to connect to the /svc directory for [$componentName] failed. '
           'This is an indication that the system is not in a valid state.');
     }
-    final channel = Channel.fromFile(_serviceRootPath);
-    final directory = DirectoryProxy()
-      ..ctrl.bind(InterfaceHandle<Directory>(channel));
+    final directory = DirectoryProxy();
+    final channel = directory.ctrl.request().passChannel();
+    if (channel == null) {
+      throw ArgumentError.notNull('channel');
+    }
+    final handle = channel.passHandle();
+    if (handle == null) {
+      throw ArgumentError.notNull('handle');
+    }
+    final status = System.connectToService(_serviceRootPath, handle);
+    if (status != ZX.OK) {
+      throw ZxStatusException(status, getStringForStatus(status));
+    }
     return Incoming.withDirectory(directory);
   }
 
