@@ -22,7 +22,8 @@ rustc_library("bssl-sys") {
     # linking semantics for non_rust_deps to squeak through for the
     # static libcrypto from boringssl.
     crypto_out_dir = get_label_info(non_rust_deps[0], "target_out_dir")
-    static_libcrypto = rebase_path("$crypto_out_dir/libcrypto.a")
+    static_libcrypto =
+        rebase_path("$crypto_out_dir/libcrypto.a", root_build_dir)
     shlib_out_dir = get_label_info(":any($shlib_toolchain)", "root_out_dir")
     write_file("$shlib_out_dir/libcrypto.so", [ "INPUT($static_libcrypto)" ])
   }
