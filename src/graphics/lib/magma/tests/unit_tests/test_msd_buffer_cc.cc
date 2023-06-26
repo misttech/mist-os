@@ -7,7 +7,7 @@
 #include "helper/platform_msd_device_helper.h"
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "platform_buffer.h"
 
 namespace {

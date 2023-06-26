@@ -13,7 +13,7 @@
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
 #include "magma_util/status.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "platform_interrupt.h"
 #include "platform_mmio.h"
 

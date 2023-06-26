@@ -7,7 +7,7 @@
 
 #include <memory>
 
-#include "msd_cc.h"
+#include "msd.h"
 
 class MsdIntelDriver : public msd::Driver {
  public:

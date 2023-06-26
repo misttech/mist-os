@@ -19,7 +19,7 @@
 #include "magma_vsi_vip_devices.h"
 #include "magma_vsi_vip_types.h"
 #include "mapped_batch.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "msd_vsi_connection.h"
 #include "msd_vsi_platform_device.h"
 #include "page_table_arrays.h"

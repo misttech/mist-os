@@ -5,7 +5,7 @@
 #include "msd_vsi_driver.h"
 
 #include "magma_util/short_macros.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "msd_vsi_device.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/msd_vsi_semaphore.h"
 

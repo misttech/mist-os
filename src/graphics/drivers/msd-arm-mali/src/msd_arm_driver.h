@@ -10,7 +10,7 @@
 #include <memory>
 
 #include "magma_util/short_macros.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "parent_device.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_device.h"
 

@@ -14,7 +14,7 @@
 #include "magma_system_buffer.h"
 #include "magma_system_context.h"
 #include "magma_util/macros.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "primary_fidl_server.h"
 
 namespace msd {

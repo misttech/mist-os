@@ -171,8 +171,8 @@ source_set("msd_conformance_tests_cc") {
 
   sources = [
     "test_magma_system_multithread_cc.cc",
+    "test_msd.cc",
     "test_msd_buffer_cc.cc",
-    "test_msd_cc.cc",
     "test_msd_context_cc.cc",
     "test_msd_device_cc.cc",
     "test_msd_driver_cc.cc",
@@ -181,7 +181,7 @@ source_set("msd_conformance_tests_cc") {
 
   deps = [
     "$magma_build_root/include:msd",
-    "$magma_build_root/include:msd_cc",
+    "$magma_build_root/include:msd",
     "$magma_build_root/src/magma_util:short_macros",
     "$magma_build_root/src/magma_util/platform:buffer",
     "$magma_build_root/src/magma_util/platform:semaphore",

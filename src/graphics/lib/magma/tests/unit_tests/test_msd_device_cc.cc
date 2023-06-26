@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "helper/platform_msd_device_helper.h"
-#include "msd_cc.h"
+#include "msd.h"
 
 TEST(MsdDevice, CreateAndDestroy) {
   auto msd_driver = msd::Driver::Create();

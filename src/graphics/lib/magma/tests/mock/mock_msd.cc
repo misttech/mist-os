@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "mock_msd_cc.h"
+#include "mock_msd.h"
 
 #include <vector>
 
-#include "msd_cc.h"
+#include "msd.h"
 #include "platform_handle.h"
 #include "platform_semaphore.h"
 #include "src/graphics/lib/magma/tests/helper/platform_msd_device_helper.h"

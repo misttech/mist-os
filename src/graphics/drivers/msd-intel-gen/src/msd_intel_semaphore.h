@@ -5,7 +5,7 @@
 #ifndef MSD_INTEL_SEMAPHORE_H
 #define MSD_INTEL_SEMAPHORE_H
 
-#include "msd_cc.h"
+#include "msd.h"
 #include "platform_semaphore.h"
 
 class MsdIntelAbiSemaphore : public msd::Semaphore {

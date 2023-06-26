@@ -52,7 +52,7 @@ source_set("command_buffer_helper_cpp") {
 source_set("msd_stubs") {
   testonly = true
   sources = [ "msd_stubs.h" ]
-  public_deps = [ "//src/graphics/lib/magma/include:msd_cc" ]
+  public_deps = [ "//src/graphics/lib/magma/include:msd" ]
 }
 
 source_set("test_device_helper") {

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_MOCK_MOCK_MSD_CC_H_
-#define SRC_GRAPHICS_LIB_MAGMA_TESTS_MOCK_MOCK_MSD_CC_H_
+#ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_MOCK_MOCK_MSD_H_
+#define SRC_GRAPHICS_LIB_MAGMA_TESTS_MOCK_MOCK_MSD_H_
 
 #include <lib/sync/cpp/completion.h>
 
@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "magma_util/macros.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "msd_defs.h"
 #include "platform_buffer.h"
 #include "platform_semaphore.h"

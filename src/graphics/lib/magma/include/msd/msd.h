@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MSD_MSD_CC_H_
-#define SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MSD_MSD_CC_H_
+#ifndef SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MSD_MSD_H_
+#define SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MSD_MSD_H_
 
 #include <lib/async/dispatcher.h>
 #include <lib/inspect/cpp/inspector.h>
@@ -212,4 +212,4 @@ class Semaphore {
 
 }  // namespace msd
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MSD_MSD_CC_H_
+#endif  // SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MSD_MSD_H_

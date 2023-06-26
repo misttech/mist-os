@@ -6,7 +6,7 @@
 
 #include <cassert>
 
-#include "msd_cc.h"
+#include "msd.h"
 
 namespace msd::testing {
 

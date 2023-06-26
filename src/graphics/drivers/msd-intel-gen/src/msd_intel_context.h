@@ -14,7 +14,7 @@
 
 #include "command_buffer.h"
 #include "magma_util/status.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "msd_intel_buffer.h"
 #include "platform_logger.h"
 #include "ppgtt.h"

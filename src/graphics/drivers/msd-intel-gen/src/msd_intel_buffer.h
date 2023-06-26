@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "magma_util/short_macros.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "platform_buffer.h"
 #include "platform_event.h"
 #include "types.h"

@@ -12,7 +12,7 @@
 #include "address_space.h"
 #include "magma_util/short_macros.h"
 #include "mapped_batch.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "ringbuffer.h"
 
 class MsdVsiConnection {

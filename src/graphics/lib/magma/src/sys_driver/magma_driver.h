@@ -10,7 +10,7 @@
 #include "magma_system_device.h"
 #include "magma_util/dlog.h"
 #include "magma_util/macros.h"
-#include "msd_cc.h"
+#include "msd.h"
 
 namespace msd {
 

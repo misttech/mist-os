@@ -18,7 +18,7 @@
 #include "instructions.h"
 #include "magma_util/short_macros.h"
 #include "magma_vendor_queries.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "msd_vsi_context.h"
 #include "platform_barriers.h"
 #include "platform_logger.h"

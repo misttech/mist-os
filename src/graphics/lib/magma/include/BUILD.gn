@@ -26,16 +26,9 @@ source_set("msd_defs") {
 }
 
 source_set("msd") {
-  public_deps = [
-    ":magma_common",
-    ":msd_defs",
-  ]
-}
-
-source_set("msd_cc") {
   sources = [
-    "msd/msd_cc.cc",
-    "msd/msd_cc.h",
+    "msd/msd.cc",
+    "msd/msd.h",
   ]
 
   public_deps = [

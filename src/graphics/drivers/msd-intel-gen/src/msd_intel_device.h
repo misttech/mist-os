@@ -17,7 +17,7 @@
 #include "interrupt_manager.h"
 #include "magma_util/short_macros.h"
 #include "magma_util/thread.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "msd_intel_connection.h"
 #include "msd_intel_context.h"
 #include "msd_intel_pci_device.h"

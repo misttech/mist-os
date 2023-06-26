@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "magma_system_connection.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "primary_fidl_server.h"
 
 namespace msd {

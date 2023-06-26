@@ -18,8 +18,8 @@
 #include "fidl/fuchsia.gpu.magma/cpp/wire_types.h"
 #include "magma_util/dlog.h"
 #include "magma_util/status.h"
+#include "msd.h"
 #include "msd/msd_defs.h"
-#include "msd_cc.h"
 
 namespace msd {
 

@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "mapped_batch.h"
-#include "msd_cc.h"
+#include "msd.h"
 #include "msd_intel_buffer.h"
 #include "platform_semaphore.h"
 

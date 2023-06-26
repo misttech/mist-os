@@ -148,7 +148,6 @@ source_set("connection_client") {
   public_deps = [
     ":handle",
     ":status",
-    "$magma_build_root/include:msd",
     "$magma_build_root/src/magma_util:macros",
     "..:connection_client_header",
     "..:trace",
@@ -171,7 +170,6 @@ source_set("device_client") {
   deps = [
     "..:device_client_header",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
-    "//src/graphics/lib/magma/include:msd",
     "//src/graphics/lib/magma/src/magma_util:macros",
     "//src/graphics/lib/magma/src/magma_util:short_macros",
     "//src/graphics/lib/magma/src/magma_util:status",

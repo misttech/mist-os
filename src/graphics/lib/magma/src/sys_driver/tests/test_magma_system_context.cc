@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "helper/command_buffer_helper_cpp.h"
-#include "mock/mock_msd_cc.h"
+#include "mock/mock_msd.h"
 
 namespace msd {
 TEST(MagmaSystemContext, ExecuteCommandBuffer_Normal) {

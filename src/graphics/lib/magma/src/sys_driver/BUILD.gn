@@ -12,7 +12,7 @@ source_set("sys_driver") {
   ]
   public_deps = [
     "$magma_build_root/include:magma",
-    "$magma_build_root/include:msd_cc",
+    "$magma_build_root/include:msd",
     "$magma_build_root/src/magma_util:macros",
     "$magma_build_root/src/magma_util:status",
     "$magma_build_root/src/magma_util/platform:buffer",

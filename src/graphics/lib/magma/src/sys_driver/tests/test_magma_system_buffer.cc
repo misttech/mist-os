@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "mock/mock_msd_cc.h"
+#include "mock/mock_msd.h"
 #include "sys_driver/magma_system_connection.h"
 #include "sys_driver/magma_system_device.h"
 
