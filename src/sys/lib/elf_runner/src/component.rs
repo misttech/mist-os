@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    super::{error::ElfRunnerError, runtime_dir::RuntimeDirectory},
+    super::runtime_dir::RuntimeDirectory,
     async_trait::async_trait,
     fidl::endpoints::Proxy,
     fidl_fuchsia_process_lifecycle::LifecycleProxy,
     fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, AsHandleRef, Job, Process, Task},
+    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Job, Process, Task},
     futures::future::{join_all, BoxFuture, FutureExt},
     runner::component::Controllable,
     std::sync::Arc,
@@ -80,10 +80,8 @@ impl ElfComponent {
     /// The rights of the job will be set such that the resulting handle will be apppropriate to
     /// use for diagnostics-only purposes. Right now that is ZX_RIGHTS_BASIC (which includes
     /// INSPECT).
-    pub fn copy_job_for_diagnostics(&self) -> Result<Job, ElfRunnerError> {
-        self.job.as_handle_ref().duplicate(zx::Rights::BASIC).map(|h| Job::from(h)).map_err(
-            |status| ElfRunnerError::job_duplication_failed(self.component_url.clone(), status),
-        )
+    pub fn copy_job_for_diagnostics(&self) -> Result<Job, zx::Status> {
+        self.job.duplicate_handle(zx::Rights::BASIC)
     }
 }
 

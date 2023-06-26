@@ -124,32 +124,51 @@ pub fn get_program_strvec<'a>(
 }
 
 /// Retrieves program.binary from ComponentStartInfo and makes sure that path is relative.
+// TODO(fxbug.dev/129604): This method should accept a program dict instead of start_info
 pub fn get_program_binary(
     start_info: &fcrunner::ComponentStartInfo,
 ) -> Result<String, StartInfoProgramError> {
     if let Some(program) = &start_info.program {
-        if let Some(val) = get_value(program, BINARY_KEY) {
-            if let fdata::DictionaryValue::Str(bin) = val {
-                if !Path::new(bin).is_absolute() {
-                    Ok(bin.to_string())
-                } else {
-                    Err(StartInfoProgramError::BinaryPathNotRelative)
-                }
-            } else {
-                Err(StartInfoProgramError::InValidBinaryType)
-            }
-        } else {
-            Err(StartInfoProgramError::MissingBinary)
-        }
+        get_program_binary_from_dict(&program)
     } else {
         Err(StartInfoProgramError::NotFound)
     }
 }
 
+/// Retrieves `binary` from a ComponentStartInfo dict and makes sure that path is relative.
+pub fn get_program_binary_from_dict(
+    dict: &fdata::Dictionary,
+) -> Result<String, StartInfoProgramError> {
+    if let Some(val) = get_value(&dict, BINARY_KEY) {
+        if let fdata::DictionaryValue::Str(bin) = val {
+            if !Path::new(bin).is_absolute() {
+                Ok(bin.to_string())
+            } else {
+                Err(StartInfoProgramError::BinaryPathNotRelative)
+            }
+        } else {
+            Err(StartInfoProgramError::InValidBinaryType)
+        }
+    } else {
+        Err(StartInfoProgramError::MissingBinary)
+    }
+}
+
 /// Retrieves program.args from ComponentStartInfo and validates them.
+// TODO(fxbug.dev/129604): This method should accept a program dict instead of start_info
 pub fn get_program_args(start_info: &fcrunner::ComponentStartInfo) -> Vec<String> {
     // TODO(https://fxbug.dev/118831): Do not silently ignore bad types for "args" key
     if let Some(vec) = get_program_strvec(start_info, ARGS_KEY) {
+        vec.iter().map(|v| v.clone()).collect()
+    } else {
+        vec![]
+    }
+}
+
+/// Retrieves `args` from a ComponentStartInfo program dict and validates them.
+pub fn get_program_args_from_dict(dict: &fdata::Dictionary) -> Vec<String> {
+    // TODO(https://fxbug.dev/118831): Do not silently ignore bad types for "args" key
+    if let Some(fdata::DictionaryValue::StrVec(vec)) = get_value(&dict, ARGS_KEY) {
         vec.iter().map(|v| v.clone()).collect()
     } else {
         vec![]
@@ -231,12 +250,39 @@ mod tests {
         assert_eq!(get_program_binary(&start_info), Err(StartInfoProgramError::MissingBinary));
     }
 
+    #[test_case("bin/myexecutable", Ok("bin/myexecutable".to_owned()) ; "when binary value is valid")]
+    #[test_case("/bin/myexecutable", Err(StartInfoProgramError::BinaryPathNotRelative) ; "when binary path is not relative")]
+    fn get_program_binary_from_dict_test(
+        value: &str,
+        expected: Result<String, StartInfoProgramError>,
+    ) {
+        let program = new_program_stanza("binary", value);
+        assert_eq!(get_program_binary_from_dict(&program), expected);
+    }
+
+    #[test]
+    fn get_program_binary_from_dict_test_when_binary_key_is_missing() {
+        let program = new_program_stanza("some_other_key", "bin/foo");
+        assert_eq!(
+            get_program_binary_from_dict(&program),
+            Err(StartInfoProgramError::MissingBinary)
+        );
+    }
+
     #[test_case(&[], vec![] ; "when args is empty")]
     #[test_case(&["a".to_owned()], vec!["a".to_owned()] ; "when args is a")]
     #[test_case(&["a".to_owned(), "b".to_owned()], vec!["a".to_owned(), "b".to_owned()] ; "when args a and b")]
     fn get_program_args_test(args: &[String], expected: Vec<String>) {
         let start_info = new_start_info(Some(new_program_stanza_with_vec("args", Vec::from(args))));
         assert_eq!(get_program_args(&start_info), expected);
+    }
+
+    #[test_case(&[], vec![] ; "when args is empty")]
+    #[test_case(&["a".to_owned()], vec!["a".to_owned()] ; "when args is a")]
+    #[test_case(&["a".to_owned(), "b".to_owned()], vec!["a".to_owned(), "b".to_owned()] ; "when args a and b")]
+    fn get_program_args_from_dict_test(args: &[String], expected: Vec<String>) {
+        let program = new_program_stanza_with_vec("args", Vec::from(args));
+        assert_eq!(get_program_args_from_dict(&program), expected);
     }
 
     #[test_case(fdata::DictionaryValue::StrVec(vec!["foo=bar".to_owned(), "bar=baz".to_owned()]), Ok(Some(vec!["foo=bar".to_owned(), "bar=baz".to_owned()])); "when_values_are_valid")]

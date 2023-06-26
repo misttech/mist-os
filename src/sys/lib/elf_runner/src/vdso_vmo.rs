@@ -25,8 +25,12 @@ fn take_vdso_vmos() -> Result<HashMap<String, zx::Vmo>, Error> {
 
 #[derive(Debug, Error, Clone)]
 pub enum VdsoError {
-    #[error("Could not duplicate vDSO VMO handle {}: {}", name, status)]
-    CouldNotDuplicate { name: String, status: zx::Status },
+    #[error("Could not duplicate VMO handle for vDSO with name {}: {}", name, status)]
+    CouldNotDuplicate {
+        name: String,
+        #[source]
+        status: zx::Status,
+    },
 
     #[error("No vDSO VMO found with name {_0}")]
     NotFound(String),

@@ -7,186 +7,68 @@ use {
     ::routing::policy::PolicyError,
     clonable_error::ClonableError,
     fuchsia_zircon as zx,
-    runner::{
-        component::{ComponentNamespaceError, LaunchError},
-        StartInfoProgramError,
-    },
+    runner::component::{ComponentNamespaceError, LaunchError},
+    runner::StartInfoProgramError,
     thiserror::Error,
     tracing::error,
 };
 
-/// Errors produced by `ElfRunner`.
+/// Errors produced when starting a component.
 #[derive(Debug, Clone, Error)]
-pub enum ElfRunnerError {
-    #[error(
-        "failed to register as exception handler for component with url \"{}\": {}",
-        url,
-        status
-    )]
-    ExceptionRegistrationFailed { url: String, status: zx::Status },
-    #[error("failed to retrieve process koid for component with url \"{}\": {}", url, status)]
-    ProcessIdRetrieveFailed { url: String, status: zx::Status },
-    #[error(
-        "failed to mark main process as critical for component with url \"{}\": {}",
-        url,
-        status
-    )]
-    ProcessCriticalMarkFailed { url: String, status: zx::Status },
-    #[error("could not create job for component with url \"{}\": {}", url, err)]
-    JobError {
-        url: String,
-        #[source]
-        err: JobError,
-    },
-    #[error("failed to duplicate job for component with url \"{}\": {}", url, status)]
-    JobDuplicationFailed { url: String, status: zx::Status },
-    #[error("failed to get job koid for component with url \"{}\": {}", url, status)]
-    JobGetKoidFailed { url: String, status: zx::Status },
-    #[error("failed to use next vDSO for component with url \"{}\": {}", url, err)]
-    NextVDSOError {
-        url: String,
-        #[source]
-        err: VdsoError,
-    },
-    #[error("failed to use direct vDSO for component with url \"{}\": {}", url, err)]
-    DirectVDSOError {
-        url: String,
-        #[source]
-        err: VdsoError,
-    },
-    #[error("program key \"{}\" invalid for component with url \"{}\"", key, url)]
-    ProgramKeyInvalid { key: String, url: String },
-    #[error("{err}")]
-    SecurityPolicyError {
-        #[from]
-        err: PolicyError,
-    },
-    #[error("error connecting to fuchsia.process.Launcher protocol for {}: {}", url, err)]
-    ProcessLauncherConnectError {
-        url: String,
-        #[source]
-        err: ClonableError,
-    },
-    #[error("fidl error in fuchsia.process.Launcher protocol for {}: {}", url, err)]
-    ProcessLauncherFidlError {
-        url: String,
-        #[source]
-        err: fidl::Error,
-    },
-    #[error("fuchsia.process.Launcher failed to create process for {}: {}", url, status)]
-    CreateProcessFailed { url: String, status: zx::Status },
-    #[error("fuchsia.process.Launcher did not return a process handle after launching {}", url)]
-    NoProcess { url: String },
-    #[error("failed to duplicate UTC clock for component with url \"{}\": {}", url, status)]
-    UtcClockDuplicateFailed { url: String, status: zx::Status },
-    #[error("failed to populate component's structured config vmo: {_0}")]
-    ComponentConfigVmoError(
-        #[from]
-        #[source]
-        ConfigError,
-    ),
-    #[error("attempting to mark process as shared without also enabling `job_policy_create_raw_processes` for component with url \"{}\".", url)]
-    SharedProcessMarkFailed { url: String },
-
-    #[error("component start info does not have resolved URL")]
-    MissingResolvedUrl,
-
-    #[error("component start info does not have runtime dir")]
-    MissingRuntimeDir,
-
-    #[error("component resolved URL is malformed")]
-    BadResolvedUrl(String),
-
-    #[error("could not get program binary for {}: {}", url, err)]
-    ProgramBinaryError {
-        url: String,
-        #[source]
-        err: StartInfoProgramError,
-    },
-
-    #[error("could not create component namespace for {}, {}", url, err)]
-    ComponentNamespaceError {
-        url: String,
-        #[source]
-        err: ComponentNamespaceError,
-    },
-
-    #[error("error configuring process launcher for {}: {}", url, err)]
-    ConfigureLauncherError {
-        url: String,
-        #[source]
-        err: LaunchError,
-    },
+pub enum StartComponentError {
+    #[error("failed to register as exception handler: {_0}")]
+    ExceptionRegistrationFailed(#[source] zx::Status),
+    #[error("failed to get process koid: {_0}")]
+    ProcessGetKoidFailed(#[source] zx::Status),
+    #[error("failed to get process info: {_0}")]
+    ProcessInfoFailed(#[source] zx::Status),
+    #[error("failed to mark main process as critical: {_0}")]
+    ProcessMarkCriticalFailed(#[source] zx::Status),
+    #[error("could not create job: {_0}")]
+    JobError(#[source] JobError),
+    #[error("failed to duplicate job: {_0}")]
+    JobDuplicateFailed(#[source] zx::Status),
+    #[error("failed to get job koid: {_0}")]
+    JobGetKoidFailed(#[source] zx::Status),
+    #[error("failed to get vDSO: {_0}")]
+    VdsoError(#[source] VdsoError),
+    #[error("error connecting to fuchsia.process.Launcher protocol: {_0}")]
+    ProcessLauncherConnectError(#[source] ClonableError),
+    #[error("fidl error in fuchsia.process.Launcher protocol: {_0}")]
+    ProcessLauncherFidlError(#[source] fidl::Error),
+    #[error("fuchsia.process.Launcher failed to create process: {_0}")]
+    CreateProcessFailed(#[source] zx::Status),
+    #[error("failed to duplicate UTC clock: {_0}")]
+    UtcClockDuplicateFailed(#[source] zx::Status),
+    #[error("failed to process the component's config data: {_0}")]
+    ConfigDataError(#[source] ConfigDataError),
+    #[error("could not create component namespace, {_0}")]
+    ComponentNamespaceError(#[source] ComponentNamespaceError),
+    #[error("error configuring process launcher: {_0}")]
+    ConfigureLauncherError(#[source] LaunchError),
+    #[error("invalid start info: {_0}")]
+    StartInfoError(#[source] StartInfoError),
 }
 
-impl ElfRunnerError {
-    pub fn exception_registration_failed(
-        url: impl Into<String>,
-        status: zx::Status,
-    ) -> ElfRunnerError {
-        ElfRunnerError::ExceptionRegistrationFailed { url: url.into(), status }
-    }
-
-    pub fn process_id_retrieve_failed(
-        url: impl Into<String>,
-        status: zx::Status,
-    ) -> ElfRunnerError {
-        ElfRunnerError::ProcessIdRetrieveFailed { url: url.into(), status }
-    }
-
-    pub fn job_duplication_failed(url: impl Into<String>, status: zx::Status) -> ElfRunnerError {
-        ElfRunnerError::JobDuplicationFailed { url: url.into(), status }
-    }
-
-    pub fn process_critical_mark_failed(
-        url: impl Into<String>,
-        status: zx::Status,
-    ) -> ElfRunnerError {
-        ElfRunnerError::ProcessCriticalMarkFailed { url: url.into(), status }
-    }
-
-    pub fn job_error(url: impl Into<String>, err: JobError) -> ElfRunnerError {
-        ElfRunnerError::JobError { url: url.into(), err }
-    }
-
-    pub fn next_vdso_error(url: impl Into<String>, err: VdsoError) -> ElfRunnerError {
-        ElfRunnerError::NextVDSOError { url: url.into(), err }
-    }
-
-    pub fn direct_vdso_error(url: impl Into<String>, err: VdsoError) -> ElfRunnerError {
-        ElfRunnerError::DirectVDSOError { url: url.into(), err }
-    }
-
-    pub fn program_key_invalid(key: impl Into<String>, url: impl Into<String>) -> ElfRunnerError {
-        ElfRunnerError::ProgramKeyInvalid { key: key.into(), url: url.into() }
-    }
-
-    pub fn shared_process_mark_failed(url: impl Into<String>) -> ElfRunnerError {
-        ElfRunnerError::SharedProcessMarkFailed { url: url.into() }
-    }
-
+impl StartComponentError {
     /// Convert this error into its approximate `zx::Status` equivalent.
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
-            ElfRunnerError::MissingResolvedUrl { .. } => zx::Status::INVALID_ARGS,
-            ElfRunnerError::MissingRuntimeDir { .. } => zx::Status::INVALID_ARGS,
-            ElfRunnerError::BadResolvedUrl { .. } => zx::Status::INVALID_ARGS,
-            ElfRunnerError::ProgramBinaryError { .. } => zx::Status::INVALID_ARGS,
-            ElfRunnerError::ComponentNamespaceError { .. } => zx::Status::INVALID_ARGS,
-            ElfRunnerError::ConfigureLauncherError { .. } => zx::Status::UNAVAILABLE,
-            ElfRunnerError::SecurityPolicyError { .. } => zx::Status::ACCESS_DENIED,
+            StartComponentError::ComponentNamespaceError(_) => zx::Status::INVALID_ARGS,
+            StartComponentError::ConfigureLauncherError(_) => zx::Status::UNAVAILABLE,
+            StartComponentError::StartInfoError(err) => err.as_zx_status(),
             _ => zx::Status::INTERNAL,
         }
     }
 }
 
-/// Errors from populating a component's structured configuration.
+/// Errors from parsing a component's configuration data.
 #[derive(Debug, Clone, Error)]
-pub enum ConfigError {
+pub enum ConfigDataError {
     #[error("failed to create a vmo: {_0}")]
-    VmoCreate(zx::Status),
+    VmoCreate(#[source] zx::Status),
     #[error("failed to write to vmo: {_0}")]
-    VmoWrite(zx::Status),
+    VmoWrite(#[source] zx::Status),
     #[error("encountered an unrecognized variant of fuchsia.mem.Data")]
     UnrecognizedDataVariant,
 }
@@ -194,8 +76,58 @@ pub enum ConfigError {
 /// Errors from creating and initializing a component's job.
 #[derive(Debug, Clone, Error)]
 pub enum JobError {
-    #[error("failed to set job policy: {}", status)]
-    SetPolicy { status: zx::Status },
-    #[error("failed to create child job: {}", status)]
-    CreateChild { status: zx::Status },
+    #[error("failed to set job policy: {_0}")]
+    SetPolicy(#[source] zx::Status),
+    #[error("failed to create child job: {_0}")]
+    CreateChild(#[source] zx::Status),
+}
+
+/// Errors from parsing ComponentStartInfo.
+#[derive(Debug, Clone, Error)]
+pub enum StartInfoError {
+    #[error("missing program")]
+    MissingProgram,
+    #[error("missing runtime dir")]
+    MissingRuntimeDir,
+    #[error("missing resolved URL")]
+    MissingResolvedUrl,
+    #[error("component resolved URL is malformed: {_0}")]
+    BadResolvedUrl(String),
+    #[error("program is invalid: {_0}")]
+    ProgramError(#[source] ProgramError),
+}
+
+impl StartInfoError {
+    /// Convert this error into its approximate `zx::Status` equivalent.
+    pub fn as_zx_status(&self) -> zx::Status {
+        match self {
+            StartInfoError::MissingProgram => zx::Status::INVALID_ARGS,
+            StartInfoError::MissingRuntimeDir => zx::Status::INVALID_ARGS,
+            StartInfoError::MissingResolvedUrl => zx::Status::INVALID_ARGS,
+            StartInfoError::BadResolvedUrl(_) => zx::Status::INVALID_ARGS,
+            StartInfoError::ProgramError(err) => err.as_zx_status(),
+        }
+    }
+}
+
+/// Errors from parsing the component `program` section to `ElfProgramConfig`.
+#[derive(Debug, Clone, Error)]
+pub enum ProgramError {
+    #[error("`is_shared_process` cannot be enabled without also enabling `job_policy_create_raw_processes`")]
+    SharedProcessRequiresJobPolicy,
+    #[error("failed to parse: {_0}")]
+    Parse(#[source] StartInfoProgramError),
+    #[error("configuration violates policy: {_0}")]
+    Policy(#[source] PolicyError),
+}
+
+impl ProgramError {
+    /// Convert this error into its approximate `zx::Status` equivalent.
+    pub fn as_zx_status(&self) -> zx::Status {
+        match self {
+            ProgramError::SharedProcessRequiresJobPolicy => zx::Status::INVALID_ARGS,
+            ProgramError::Parse(_) => zx::Status::INVALID_ARGS,
+            ProgramError::Policy(_) => zx::Status::ACCESS_DENIED,
+        }
+    }
 }
