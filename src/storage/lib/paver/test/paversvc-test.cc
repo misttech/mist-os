@@ -1951,7 +1951,7 @@ TEST_F(PaverServiceBlockTest, DISABLED_InitializePartitionTables) {
   ASSERT_NO_FATAL_FAILURE(
       BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev));
 
-  zx::result connections = GetNewConnectionsMultiplexed(gpt_dev->block_interface());
+  zx::result connections = GetNewConnections(gpt_dev->block_controller_interface());
   ASSERT_OK(connections);
   ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(connections.value())));
 
@@ -1969,7 +1969,7 @@ TEST_F(PaverServiceBlockTest, DISABLED_InitializePartitionTablesMultipleDevices)
   ASSERT_NO_FATAL_FAILURE(
       BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev2));
 
-  zx::result connections = GetNewConnectionsMultiplexed(gpt_dev1->block_interface());
+  zx::result connections = GetNewConnections(gpt_dev1->block_controller_interface());
   ASSERT_OK(connections);
   ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(connections.value())));
 
@@ -1985,7 +1985,7 @@ TEST_F(PaverServiceBlockTest, DISABLED_WipePartitionTables) {
   ASSERT_NO_FATAL_FAILURE(
       BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev));
 
-  zx::result connections = GetNewConnectionsMultiplexed(gpt_dev->block_interface());
+  zx::result connections = GetNewConnections(gpt_dev->block_controller_interface());
   ASSERT_OK(connections);
   ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(connections.value())));
   auto result = data_sink_->InitializePartitionTables();
@@ -2004,7 +2004,7 @@ TEST_F(PaverServiceBlockTest, DISABLED_WipeVolume) {
   ASSERT_NO_FATAL_FAILURE(
       BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev));
 
-  zx::result connections = GetNewConnectionsMultiplexed(gpt_dev->block_interface());
+  zx::result connections = GetNewConnections(gpt_dev->block_controller_interface());
   ASSERT_OK(connections);
   ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(connections.value())));
 
@@ -2072,7 +2072,7 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
     auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
     ASSERT_OK(pauser);
 
-    zx::result new_connection_result = GetNewConnectionsMultiplexed(gpt_dev->block_interface());
+    zx::result new_connection_result = GetNewConnections(gpt_dev->block_controller_interface());
     ASSERT_OK(new_connection_result);
     DeviceAndController& new_connection = new_connection_result.value();
 
@@ -2184,7 +2184,7 @@ TEST_F(PaverServiceLuisTest, WriteOpaqueVolume) {
   auto& [local, remote] = endpoints.value();
 
   {
-    zx::result connections = GetNewConnectionsMultiplexed(gpt_dev_->block_interface());
+    zx::result connections = GetNewConnections(gpt_dev_->block_controller_interface());
     ASSERT_OK(connections);
     ASSERT_OK(client_->UseBlockDevice(
         fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(connections->device)),

@@ -39,10 +39,6 @@ struct DeviceAndController {
   fidl::ClientEnd<fuchsia_device::Controller> controller;
 };
 
-// TODO(fxbug.dev/127870): Replace usages with GetNewConnections.
-zx::result<DeviceAndController> GetNewConnectionsMultiplexed(
-    fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block);
-
 zx::result<DeviceAndController> GetNewConnections(
     fidl::UnownedClientEnd<fuchsia_device::Controller> controller);
 
