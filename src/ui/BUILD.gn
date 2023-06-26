@@ -48,13 +48,13 @@ core_shard("ui_minimal_core_shard") {
 fuchsia_component("ui_component") {
   component_name = "ui"
   manifest = "meta/ui.cml"
-  deps = [ "//src/graphics/display/testing/coordinator-connector:display-coordinator-connector-shard-includes" ]
+  deps = [ "//src/graphics/display/bin/coordinator-connector:shard-includes" ]
 }
 
 fuchsia_component("ui_minimal_component") {
   component_name = "ui_minimal"
   manifest = "meta/ui_minimal.cml"
-  deps = [ "//src/graphics/display/testing/coordinator-connector:display-coordinator-connector-shard-includes" ]
+  deps = [ "//src/graphics/display/bin/coordinator-connector:shard-includes" ]
 }
 
 fuchsia_package("ui_package") {

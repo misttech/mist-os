@@ -1,0 +1,49 @@
+# Copyright 2020 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//tools/cmc/build/expect_includes.gni")
+
+executable("bin") {
+  output_name = "display_coordinator_connector"
+
+  sources = [ "main.cc" ]
+
+  deps = [
+    "//sdk/lib/component/outgoing/cpp",
+    "//src/graphics/display/testing/coordinator-connector-lib:devfs_factory",
+    "//src/lib/fxl",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/trace-provider",
+  ]
+}
+
+fuchsia_component("component") {
+  manifest = "meta/display_coordinator_connector.cml"
+  component_name = "display-coordinator-connector"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("coordinator-connector") {
+  package_name = "display-coordinator-connector"
+  deps = [ ":component" ]
+}
+
+expect_includes("shard-includes") {
+  includes = [ "meta/display_coordinator_connector.shard.cml" ]
+}
+
+# Includes `component` as a child component
+# and performs "includes" check for the real display coordinator provider
+# shard in the component manifest.
+#
+# Only supports statically defined components; do not use this on realms built
+# by Realm Builder.
+group("child-component") {
+  deps = [
+    ":component",
+    ":shard-includes",
+  ]
+}

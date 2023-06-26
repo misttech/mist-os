@@ -15,7 +15,7 @@
 #include "gmock/gmock.h"
 #include "lib/fidl/cpp/wire/status.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/graphics/display/testing/coordinator-connector/fake/service.h"
+#include "src/graphics/display/testing/fake-coordinator-connector/service.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/lib/testing/predicates/status.h"
 

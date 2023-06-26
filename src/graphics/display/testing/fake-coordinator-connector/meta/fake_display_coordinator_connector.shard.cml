@@ -12,7 +12,7 @@
 //
 // For example:
 //   include: [
-//       "//src/graphics/display/testing/coordinator-connector/meta/fake_display_coordinator_connector.shard.cml",
+//       "//src/graphics/display/testing/fake-coordinator-connector/meta/fake_display_coordinator_connector.shard.cml",
 //   ],
 //   children: [
 //       {

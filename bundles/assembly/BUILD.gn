@@ -1343,7 +1343,7 @@ assembly_input_bundle("ui") {
 #
 assembly_input_bundle("ui_eng") {
   cache_packages = [
-    "//src/graphics/display/testing/coordinator-connector:display-coordinator-connector",
+    "//src/graphics/display/bin/coordinator-connector",
     "//src/ui/a11y/bin/a11y_manager:a11y-manager",
     "//src/ui/bin/text:text_manager",
     "//src/ui/scenic:scenic_pkg",
@@ -1359,7 +1359,7 @@ assembly_input_bundle("ui_eng") {
 #
 assembly_input_bundle("ui_user_and_userdebug") {
   base_packages = [
-    "//src/graphics/display/testing/coordinator-connector:display-coordinator-connector",
+    "//src/graphics/display/bin/coordinator-connector",
     "//src/ui/a11y/bin/a11y_manager:a11y-manager",
     "//src/ui/bin/text:text_manager",
     "//src/ui/scenic:scenic_pkg",

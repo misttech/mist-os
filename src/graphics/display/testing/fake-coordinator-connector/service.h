@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_TESTING_COORDINATOR_CONNECTOR_FAKE_SERVICE_H_
-#define SRC_GRAPHICS_DISPLAY_TESTING_COORDINATOR_CONNECTOR_FAKE_SERVICE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_TESTING_FAKE_COORDINATOR_CONNECTOR_SERVICE_H_
+#define SRC_GRAPHICS_DISPLAY_TESTING_FAKE_COORDINATOR_CONNECTOR_SERVICE_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -131,4 +131,4 @@ class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_dis
 
 }  // namespace display
 
-#endif  // SRC_GRAPHICS_DISPLAY_TESTING_COORDINATOR_CONNECTOR_FAKE_SERVICE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_TESTING_FAKE_COORDINATOR_CONNECTOR_SERVICE_H_
