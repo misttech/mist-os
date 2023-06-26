@@ -9,6 +9,7 @@
         "//src/ui/meta/scenic_routes.shard.cml",
         "//src/ui/meta/text_manager_routes.shard.cml",
         "//src/ui/meta/virtual_keyboard_manager_routes.shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     children: [

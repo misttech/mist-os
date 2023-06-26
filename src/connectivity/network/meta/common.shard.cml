@@ -6,6 +6,7 @@
     // in non-prod builds.
     include: [
         "//src/connectivity/network/meta/test-collection.shard.cml",
+        "inspect/offer.shard.cml",
         "trace/client.shard.cml",
     ],
     children: [

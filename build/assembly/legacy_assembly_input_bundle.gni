@@ -266,6 +266,11 @@ template("legacy_assembly_input_bundle") {
             source = rebase_path("//sdk/lib/syslog/offer.shard.cml")
             destination = "syslog/offer.shard.cml"
           },
+          {
+            #TODO(115630): Add the sdk directory to the include paths
+            source = rebase_path("//sdk/lib/inspect/offer.shard.cml")
+            destination = "inspect/offer.shard.cml"
+          },
         ]
 
         foreach(core_shard_include, core_shard_includes) {

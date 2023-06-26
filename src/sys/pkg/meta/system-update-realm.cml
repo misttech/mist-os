@@ -4,7 +4,10 @@
 
 // This manifest defines the contents of the system update realm.
 {
-    include: [ "syslog/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         {
             name: "system-update-committer",
