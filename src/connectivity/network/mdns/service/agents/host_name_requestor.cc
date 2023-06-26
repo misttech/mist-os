@@ -8,6 +8,7 @@
 #include <lib/zx/time.h>
 
 #include <algorithm>
+#include <iterator>
 
 #include "src/connectivity/network/mdns/service/common/mdns_names.h"
 
@@ -24,12 +25,12 @@ HostNameRequestor::HostNameRequestor(MdnsAgent::Owner* owner, const std::string&
       include_local_(include_local),
       include_local_proxies_(include_local_proxies) {}
 
-HostNameRequestor::~HostNameRequestor() {}
+HostNameRequestor::~HostNameRequestor() = default;
 
 void HostNameRequestor::AddSubscriber(Mdns::HostNameSubscriber* subscriber) {
   subscribers_.insert(subscriber);
-  if (started() && !prev_addresses_.empty()) {
-    subscriber->AddressesChanged(prev_addresses());
+  if (started() && !addresses_.empty()) {
+    subscriber->AddressesChanged(addresses_.Addresses());
   }
 }
 
@@ -68,6 +69,7 @@ void HostNameRequestor::ReceiveResource(const DnsResource& resource, MdnsResourc
   }
 
   if (include_local_ && host_full_name_ == local_host_full_name_) {
+    // Local host is handled in |OnLocalHostAddressesChanged|.
     return;
   }
 
@@ -78,44 +80,36 @@ void HostNameRequestor::ReceiveResource(const DnsResource& resource, MdnsResourc
   } else if (resource.type_ == DnsType::kAaaa) {
     address = HostAddress(resource.aaaa_.address_.address_, sender_address.interface_id(),
                           zx::sec(resource.time_to_live_));
+  } else {
+    // Not an address resource.
+    return;
   }
 
-  if (section == MdnsResourceSection::kExpired) {
-    if (prev_addresses_.count(address) == 0) {
-      return;
-    }
-
-    if (addresses_.empty()) {
-      addresses_ = prev_addresses_;
-    }
-
-    addresses_.erase(address);
-
-    if (addresses_.empty()) {
-      SendAddressesChanged();
+  if (resource.time_to_live_ == 0) {
+    if (addresses_.erase(address)) {
+      addresses_dirty_ = true;
     }
 
     return;
   }
 
+  if (resource.cache_flush_) {
+    if (resource.type_ == DnsType::kA) {
+      addresses_.EraseV4AddressesOlderThanOneSecond();
+    } else {
+      addresses_.EraseV6AddressesOlderThanOneSecond();
+    }
+  }
+
   // Add an address.
-  addresses_.insert(std::move(address));
+  if (addresses_.insert(address)) {
+    addresses_dirty_ = true;
+  }
 
   Renew(resource, media_, ip_versions_);
 }
 
-void HostNameRequestor::EndOfMessage() {
-  if (addresses_.empty()) {
-    return;
-  }
-
-  if (addresses_ == prev_addresses_) {
-    addresses_.clear();
-    return;
-  }
-
-  SendAddressesChanged();
-}
+void HostNameRequestor::EndOfMessage() { MaybeSendAddressesChanged(); }
 
 void HostNameRequestor::OnAddProxyHost(const std::string& host_full_name,
                                        const std::vector<HostAddress>& addresses) {
@@ -123,17 +117,10 @@ void HostNameRequestor::OnAddProxyHost(const std::string& host_full_name,
     return;
   }
 
-  addresses_.clear();
-  for (auto& address : addresses) {
-    addresses_.insert(address);
+  if (addresses_.Replace(addresses)) {
+    addresses_dirty_ = true;
+    MaybeSendAddressesChanged();
   }
-
-  if (addresses_ == prev_addresses_) {
-    addresses_.clear();
-    return;
-  }
-
-  SendAddressesChanged();
 }
 
 void HostNameRequestor::OnRemoveProxyHost(const std::string& host_full_name) {
@@ -141,9 +128,11 @@ void HostNameRequestor::OnRemoveProxyHost(const std::string& host_full_name) {
     return;
   }
 
-  addresses_.clear();
-
-  SendAddressesChanged();
+  if (!addresses_.empty()) {
+    addresses_.clear();
+    addresses_dirty_ = true;
+    MaybeSendAddressesChanged();
+  }
 }
 
 void HostNameRequestor::OnLocalHostAddressesChanged() {
@@ -151,23 +140,81 @@ void HostNameRequestor::OnLocalHostAddressesChanged() {
     return;
   }
 
-  auto addresses = local_host_addresses();
-  std::unordered_set<HostAddress, HostAddress::Hash> addresses_set(addresses.begin(),
-                                                                   addresses.end());
-  if (addresses_set == addresses_) {
+  if (addresses_.Replace(local_host_addresses())) {
+    addresses_dirty_ = true;
+    MaybeSendAddressesChanged();
+  }
+}
+
+void HostNameRequestor::MaybeSendAddressesChanged() {
+  if (!addresses_dirty_) {
     return;
   }
 
-  addresses_ = addresses_set;
-  SendAddressesChanged();
-}
-
-void HostNameRequestor::SendAddressesChanged() {
   for (auto subscriber : subscribers_) {
-    subscriber->AddressesChanged(addresses());
+    subscriber->AddressesChanged(addresses_.Addresses());
   }
 
-  prev_addresses_ = std::move(addresses_);
+  addresses_dirty_ = false;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// HostAddressSet implementation.
+
+bool HostNameRequestor::HostAddressSet::Replace(const std::vector<HostAddress>& from) {
+  bool result = false;
+
+  if (from.size() != insert_times_by_address_.size()) {
+    result = true;
+  } else {
+    for (auto& address : from) {
+      if (insert_times_by_address_.find(address) == insert_times_by_address_.end()) {
+        result = true;
+        break;
+      }
+    }
+  }
+
+  if (result) {
+    insert_times_by_address_.clear();
+    std::transform(from.begin(), from.end(),
+                   std::inserter(insert_times_by_address_, insert_times_by_address_.begin()),
+                   [](auto& address) { return std::pair(address, zx::time()); });
+  }
+
+  return result;
+}
+
+void HostNameRequestor::HostAddressSet::EraseV4AddressesOlderThanOneSecond() {
+  auto one_second_ago = zx::clock::get_monotonic() - zx::sec(1);
+
+  for (auto iter = insert_times_by_address_.begin(); iter != insert_times_by_address_.end();) {
+    if (iter->first.address().is_v4() && iter->second < one_second_ago) {
+      iter = insert_times_by_address_.erase(iter);
+    } else {
+      ++iter;
+    }
+  }
+}
+
+// Erases all IPv6 addresses that are older than one second.
+void HostNameRequestor::HostAddressSet::EraseV6AddressesOlderThanOneSecond() {
+  auto one_second_ago = zx::clock::get_monotonic() - zx::sec(1);
+
+  for (auto iter = insert_times_by_address_.begin(); iter != insert_times_by_address_.end();) {
+    if (iter->first.address().is_v6() && iter->second < one_second_ago) {
+      iter = insert_times_by_address_.erase(iter);
+    } else {
+      ++iter;
+    }
+  }
+}
+
+std::vector<HostAddress> HostNameRequestor::HostAddressSet::Addresses() {
+  std::vector<HostAddress> result;
+  std::transform(insert_times_by_address_.begin(), insert_times_by_address_.end(),
+                 std::back_inserter(result), [](auto& pair) { return pair.first; });
+  return result;
 }
 
 }  // namespace mdns

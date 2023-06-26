@@ -48,19 +48,81 @@ class HostNameRequestor : public MdnsAgent {
   void OnLocalHostAddressesChanged() override;
 
  private:
-  std::vector<HostAddress> addresses() const {
-    std::vector<HostAddress> result;
-    result.assign(addresses_.begin(), addresses_.end());
-    return result;
-  }
+  // Set of |HostAddress|es associated with a host.
+  class HostAddressSet {
+   public:
+    HostAddressSet() = default;
 
-  std::vector<HostAddress> prev_addresses() const {
-    std::vector<HostAddress> result;
-    result.assign(prev_addresses_.begin(), prev_addresses_.end());
-    return result;
-  }
+    ~HostAddressSet() = default;
 
-  void SendAddressesChanged();
+    bool operator==(const HostAddressSet& other) {
+      return insert_times_by_address_ == other.insert_times_by_address_;
+    }
+
+    bool operator!=(const HostAddressSet& other) { return !(*this == other); }
+
+    // Indicates whether the set is empty.
+    bool empty() const { return insert_times_by_address_.empty(); }
+
+    // Returns the number of .
+    bool contains(HostAddress address) const {
+      return insert_times_by_address_.find(address) != insert_times_by_address_.end();
+    }
+
+    // Erases |address| from the set. Returns true if the address was in the set, false if not.
+    bool erase(HostAddress address) { return insert_times_by_address_.erase(address); }
+
+    // Inserts |address| into the set if it isn't already there. The age of the address is zeroed
+    // regardless. Returns true if the address was added, false if it was already there.
+    bool insert(HostAddress address) {
+      auto now = zx::clock::get_monotonic();
+
+      auto [iter, inserted] = insert_times_by_address_.emplace(address, now);
+      if (!inserted) {
+        iter->second = now;
+      }
+
+      return inserted;
+    }
+
+    // Clears this collection.
+    void clear() { insert_times_by_address_.clear(); }
+
+    // Replaces all addresses in the set with |from| and returns true, unless this set already
+    // contains exactly the addresses in |from|, in which case changes nothing and returns false.
+    // This is used only for local instances and does not assign meaningful insert times.
+    bool Replace(const std::vector<HostAddress>& from);
+
+    // Erases all IPv4 addresses that are older than one second.
+    void EraseV4AddressesOlderThanOneSecond();
+
+    // Erases all IPv6 addresses that are older than one second.
+    void EraseV6AddressesOlderThanOneSecond();
+
+    // Returns the contained addresses as a vector.
+    std::vector<HostAddress> Addresses();
+
+   private:
+    struct HostAddressHash {
+      std::size_t operator()(const HostAddress& host_address) const noexcept {
+        return std::hash<inet::IpAddress>{}(host_address.address()) ^
+               (std::hash<uint32_t>{}(host_address.interface_id()) << 1);
+      }
+    };
+
+    struct HostAddressesEqual {
+      bool operator()(const HostAddress& lhs, const HostAddress& rhs) const noexcept {
+        return lhs.address() == rhs.address() && lhs.interface_id() == rhs.interface_id();
+      }
+    };
+
+    std::unordered_map<HostAddress, zx::time, HostAddressHash, HostAddressesEqual>
+        insert_times_by_address_;
+  };
+
+  // Sends an |AddressesChanged| notification to the subscribers and clear |addresses_dirty_| if
+  // |addresses_dirty_| is set.
+  void MaybeSendAddressesChanged();
 
   std::string host_name_;
   std::string host_full_name_;
@@ -69,8 +131,8 @@ class HostNameRequestor : public MdnsAgent {
   bool include_local_;
   bool include_local_proxies_;
   std::string local_host_full_name_;
-  std::unordered_set<HostAddress, HostAddress::Hash> addresses_;
-  std::unordered_set<HostAddress, HostAddress::Hash> prev_addresses_;
+  HostAddressSet addresses_;
+  bool addresses_dirty_ = false;
   std::unordered_set<Mdns::HostNameSubscriber*> subscribers_;
 
  public:

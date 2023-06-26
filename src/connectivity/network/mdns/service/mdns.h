@@ -270,7 +270,7 @@ class Mdns : public MdnsAgent::Owner {
                        IpVersions ip_versions, bool include_local, bool include_local_proxies,
                        ResolveHostNameCallback callback);
 
-  // Subscribers to the specified host name. Must not be called before
+  // Subscribes to the specified host name. Must not be called before
   // |Start|'s ready callback is called. The subscription is cancelled when
   // the subscriber is deleted or its |Unsubscribe| method is called.
   // Multiple subscriptions may be created for a given host name.

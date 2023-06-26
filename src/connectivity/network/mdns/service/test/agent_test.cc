@@ -86,7 +86,9 @@ void AgentTest::Query(DnsType type, const std::string& name, Media media, IpVers
 
 void AgentTest::ExpectRenewCall(DnsResource resource) {
   for (auto iter = renew_calls_.begin(); iter != renew_calls_.end(); ++iter) {
-    if (iter->resource_ == resource) {
+    if (iter->resource_.type_ == resource.type_ &&
+        iter->resource_.name_.dotted_string_ == resource.name_.dotted_string_ &&
+        iter->resource_.time_to_live_ == resource.time_to_live_) {
       renew_calls_.erase(iter);
       return;
     }

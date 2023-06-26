@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include "src/connectivity/network/mdns/service/test/agent_test.h"
+#include "src/connectivity/network/mdns/service/test/fake_clock.h"
 
 namespace mdns {
 namespace test {
@@ -262,6 +263,83 @@ TEST_F(HostNameRequestorTest, Change) {
 
   under_test.EndOfMessage();
 
+  // Expect to see the new addresses and the old ones.
+  auto combined_addresses = kAddresses;
+  std::copy(kOtherAddresses.begin(), kOtherAddresses.end(), std::back_inserter(combined_addresses));
+  EXPECT_TRUE(subscriber.addresses_changed_called());
+  EXPECT_TRUE(VerifyAddresses(combined_addresses, subscriber.addresses()));
+  for (const auto& address : kOtherAddresses) {
+    ExpectRenewCall(DnsResource(kHostFullName, address));
+  }
+
+  ExpectNoOther();
+}
+
+// Tests the behavior of the requestor when an address record indicates addresses should be flushed.
+TEST_F(HostNameRequestorTest, AddressCacheFlush) {
+  FakeClock kayfabe;
+
+  HostNameRequestor under_test(this, kHostName, Media::kBoth, IpVersions::kBoth, kExcludeLocal,
+                               kExcludeLocalProxies);
+  SetAgent(under_test);
+
+  under_test.Start(kLocalHostFullName);
+
+  Subscriber subscriber;
+  under_test.AddSubscriber(&subscriber);
+  EXPECT_FALSE(subscriber.addresses_changed_called());
+
+  // Expect A and AAAA questions on start.
+  auto message = ExpectOutboundMessage(ReplyAddress::Multicast(Media::kBoth, IpVersions::kBoth));
+  ExpectQuestion(message.get(), kHostFullName, DnsType::kA);
+  ExpectQuestion(message.get(), kHostFullName, DnsType::kAaaa);
+  ExpectNoOtherQuestionOrResource(message.get());
+  ExpectNoOther();
+
+  EXPECT_FALSE(subscriber.addresses_changed_called());
+
+  // Respond.
+  ReplyAddress sender_address(
+      inet::SocketAddress(192, 168, 1, 200, inet::IpPort::From_uint16_t(5353)),
+      inet::IpAddress(192, 168, 1, 100), kInterfaceId, Media::kWireless, IpVersions::kV4);
+  for (const auto& address : kAddresses) {
+    under_test.ReceiveResource(DnsResource(kHostFullName, address), MdnsResourceSection::kAnswer,
+                               sender_address);
+  }
+
+  under_test.EndOfMessage();
+
+  // Expect to get the addresses.
+  EXPECT_TRUE(subscriber.addresses_changed_called());
+  EXPECT_TRUE(VerifyAddresses(kAddresses, subscriber.addresses()));
+  for (const auto& address : kAddresses) {
+    ExpectRenewCall(DnsResource(kHostFullName, address));
+  }
+
+  ExpectNoOther();
+
+  // Make sure the above addresses are more than one second old.
+  FakeClock::Advance(zx::sec(2));
+
+  // Respond with different addresses with the first cache flush bit set for each resource type.
+  bool cache_flush_a = true;
+  bool cache_flush_aaaa = true;
+  for (const auto& address : kOtherAddresses) {
+    auto resource = DnsResource(kHostFullName, address);
+    if (resource.type_ == DnsType::kA) {
+      resource.cache_flush_ = cache_flush_a;
+      cache_flush_a = false;
+    } else {
+      FX_DCHECK(resource.type_ == DnsType::kAaaa);
+      resource.cache_flush_ = cache_flush_aaaa;
+      cache_flush_aaaa = false;
+    }
+
+    under_test.ReceiveResource(resource, MdnsResourceSection::kAnswer, sender_address);
+  }
+
+  under_test.EndOfMessage();
+
   // Expect to see the new addresses.
   EXPECT_TRUE(subscriber.addresses_changed_called());
   EXPECT_TRUE(VerifyAddresses(kOtherAddresses, subscriber.addresses()));
@@ -315,9 +393,12 @@ TEST_F(HostNameRequestorTest, Expired) {
 
   // Send expirations for received response.
   for (const auto& address : kAddresses) {
-    under_test.ReceiveResource(DnsResource(kHostFullName, address), MdnsResourceSection::kExpired,
-                               sender_address);
+    auto resource = DnsResource(kHostFullName, address);
+    resource.time_to_live_ = 0;
+    under_test.ReceiveResource(resource, MdnsResourceSection::kExpired, sender_address);
   }
+
+  under_test.EndOfMessage();
 
   // Expect an empty address list.
   EXPECT_TRUE(subscriber.addresses_changed_called());
