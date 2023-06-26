@@ -5906,8 +5906,8 @@ pub(crate) mod testutil {
             rng,
             now,
         );
-        let ClientStateMachine { transaction_id, options_to_request: _, state, rng: _ } = &client;
-        let old_transaction_id = *transaction_id;
+        let ClientStateMachine { transaction_id: _, options_to_request: _, state, rng: _ } =
+            &client;
         {
             let Assigned {
                 client_id: _,
@@ -5986,7 +5986,6 @@ pub(crate) mod testutil {
 
         handle_renew_or_rebind_timer(
             client,
-            old_transaction_id,
             client_id,
             server_id,
             non_temporary_addresses_to_assign,
@@ -6034,7 +6033,6 @@ pub(crate) mod testutil {
 
     pub(super) fn handle_renew_or_rebind_timer<R: Rng>(
         mut client: ClientStateMachine<Instant, R>,
-        old_transaction_id: [u8; 3],
         client_id: [u8; CLIENT_ID_LEN],
         server_id: [u8; TEST_SERVER_ID_LEN],
         non_temporary_addresses_to_assign: Vec<TestIaNa>,
@@ -6061,9 +6059,8 @@ pub(crate) mod testutil {
                 buf
             }
         );
-        let ClientStateMachine { transaction_id, options_to_request: _, state, rng: _ } = &client;
-        // Assert that sending a renew starts a new transaction.
-        assert_ne!(*transaction_id, old_transaction_id);
+        let ClientStateMachine { transaction_id: _, options_to_request: _, state, rng: _ } =
+            &client;
         let RenewingOrRebindingInner {
             client_id: got_client_id,
             server_id: got_server_id,
@@ -6139,7 +6136,6 @@ pub(crate) mod testutil {
             rng,
             now,
         );
-        let old_transaction_id = client.transaction_id;
         let (expected_oro, expected_dns_servers) =
             if let Some(expected_dns_servers) = expected_dns_servers {
                 (Some([v6::OptionCode::DnsServers]), expected_dns_servers)
@@ -6149,7 +6145,6 @@ pub(crate) mod testutil {
 
         handle_renew_or_rebind_timer(
             client,
-            old_transaction_id,
             client_id,
             server_id,
             non_temporary_addresses_to_assign,
@@ -9032,13 +9027,8 @@ mod tests {
             StepRng::new(std::u64::MAX / 2, 0),
             now,
         );
-        let ClientStateMachine {
-            transaction_id: old_transaction_id,
-            options_to_request: _,
-            state,
-            rng: _,
-        } = &client;
-        let old_transaction_id = *old_transaction_id;
+        let ClientStateMachine { transaction_id: _, options_to_request: _, state, rng: _ } =
+            &client;
         let Assigned {
             client_id: _,
             non_temporary_addresses: _,
@@ -9069,7 +9059,6 @@ mod tests {
         let _client = if let Some(next_timer) = next_timer {
             handle_renew_or_rebind_timer(
                 client,
-                old_transaction_id,
                 CLIENT_ID,
                 SERVER_ID[0],
                 iana,
