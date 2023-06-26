@@ -8,6 +8,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/driver.h>
 #include <lib/fit/function.h>
 #include <lib/media/codec_impl/codec_diagnostics.h>
 #include <lib/media/codec_impl/codec_metrics.h>
@@ -26,6 +27,9 @@ namespace amlogic_decoder {
 // Anything that's driver-wide can go in here, or in instances rooted here.
 class DriverCtx {
  public:
+  static zx_status_t Init(void** out_ctx);
+  static zx_status_t Bind(void* ctx, zx_device_t* parent);
+
   DriverCtx();
   ~DriverCtx();
 

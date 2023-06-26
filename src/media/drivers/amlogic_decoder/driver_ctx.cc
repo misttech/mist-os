@@ -4,7 +4,6 @@
 
 #include "driver_ctx.h"
 
-#include <lib/ddk/driver.h>
 #include <lib/fdio/directory.h>
 #include <lib/media/codec_impl/codec_metrics.h>
 #include <stdarg.h>
@@ -14,22 +13,16 @@
 #include "device_ctx.h"
 #include "macros.h"
 
-namespace {
+namespace amlogic_decoder {
 
-extern "C" {
-
-zx_status_t amlogic_video_init(void** out_ctx);
-zx_status_t amlogic_video_bind(void* ctx, zx_device_t* parent);
-}
-
-extern zx_status_t amlogic_video_init(void** out_ctx) {
+zx_status_t DriverCtx::Init(void** out_ctx) {
   amlogic_decoder::DriverCtx* driver_ctx = new amlogic_decoder::DriverCtx();
   *out_ctx = reinterpret_cast<void*>(driver_ctx);
   return ZX_OK;
 }
 
 // ctx is the driver ctx (not device ctx)
-zx_status_t amlogic_video_bind(void* ctx, zx_device_t* parent) {
+zx_status_t DriverCtx::Bind(void* ctx, zx_device_t* parent) {
   amlogic_decoder::DriverCtx* driver = reinterpret_cast<amlogic_decoder::DriverCtx*>(ctx);
   auto device = std::make_unique<amlogic_decoder::DeviceCtx>(driver, parent);
 
@@ -62,10 +55,6 @@ zx_status_t amlogic_video_bind(void* ctx, zx_device_t* parent) {
   zxlogf(INFO, "[amlogic_video_bind] bound");
   return ZX_OK;
 }
-
-}  // namespace
-
-namespace amlogic_decoder {
 
 DriverCtx::DriverCtx() {
   // We use kAsyncLoopConfigNoAttachToCurrentThread here, because we don't really want

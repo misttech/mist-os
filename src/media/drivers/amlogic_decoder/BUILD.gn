@@ -64,7 +64,7 @@ if (target_cpu == "arm64") {
       "//sdk/lib/syslog/cpp:backend",
     ]
 
-    sources = [ "binding.c" ]
+    sources = [ "binding.cc" ]
   }
 
   fuchsia_driver_component("amlogic_video_decoder-component") {
@@ -90,8 +90,9 @@ if (target_cpu == "arm64") {
       "//sdk/lib/syslog/cpp:backend",
     ]
     sources = [
-      "test_binding.c",
+      "test_binding.cc",
       "test_device_ctx.cc",
+      "test_device_ctx.h",
     ]
   }
 
