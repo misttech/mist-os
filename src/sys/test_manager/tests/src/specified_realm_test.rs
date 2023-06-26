@@ -29,6 +29,13 @@ macro_rules! connect_run_builder {
     };
 }
 
+macro_rules! connect_query_server {
+    () => {
+        client::connect_to_protocol::<ftest_manager::QueryMarker>()
+            .context("cannot connect to query proxy")
+    };
+}
+
 fn connect_realm() -> Result<ClientEnd<fcomponent::RealmMarker>, Error> {
     let (client_end, server_end) = fidl::endpoints::create_endpoints::<fcomponent::RealmMarker>();
     client::connect_channel_to_protocol::<fcomponent::RealmMarker>(server_end.into_channel())
@@ -110,6 +117,48 @@ async fn launch_and_test_echo_test() {
 
     assert_eq!(logs, Vec::<String>::new());
     assert_eq!(&expected_events, &events);
+}
+
+#[fuchsia::test]
+async fn enumerate_echo_test() {
+    let proxy = connect_query_server!().unwrap();
+    let realm = connect_realm().unwrap();
+    let mut offers = default_event_offers();
+    offers.push(fdecl::Offer::Protocol(fdecl::OfferProtocol {
+        source_name: Some("fidl.examples.routing.echo.Echo".into()),
+        target_name: Some("fidl.examples.routing.echo.Echo".into()),
+        source: None,
+        target: None,
+        dependency_type: None,
+        ..Default::default()
+    }));
+
+    let (iterator, server_end) = fidl::endpoints::create_proxy().unwrap();
+
+    proxy
+        .enumerate_in_realm(
+            "fuchsia-pkg://fuchsia.com/test_manager_test#meta/echo_test_realm.cm",
+            realm,
+            &offers,
+            ECHO_TEST_COL,
+            server_end,
+        )
+        .await
+        .unwrap()
+        .expect("This should not fail");
+
+    let mut cases = vec![];
+    loop {
+        let mut c = iterator.get_next().await.unwrap();
+        if c.is_empty() {
+            break;
+        }
+        cases.append(&mut c);
+    }
+    assert_eq!(
+        cases.into_iter().map(|c| c.name.unwrap()).collect::<Vec<_>>(),
+        vec!["EchoTest".to_string()]
+    );
 }
 
 #[fuchsia::test]

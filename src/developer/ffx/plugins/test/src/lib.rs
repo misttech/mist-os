@@ -64,10 +64,7 @@ impl FfxMain for TestTool {
         match self.cmd.subcommand {
             TestSubCommand::Run(run) => run_test(remote_control, writer, run).await?,
             TestSubCommand::List(list) => {
-                let query_proxy = testing_lib::connect_to_query(&remote_control)
-                    .await
-                    .map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
-                get_tests(query_proxy, writer, list).await?;
+                get_tests(&remote_control, writer, list).await?;
             }
         }
         Ok(())
@@ -324,17 +321,57 @@ async fn test_params_from_args(
 }
 
 async fn get_tests<W: Write>(
-    query_proxy: ftest_manager::QueryProxy,
+    remote_control: &fremotecontrol::RemoteControlProxy,
     mut write: W,
     cmd: ListCommand,
 ) -> Result<()> {
+    let query_proxy = testing_lib::connect_to_query(&remote_control)
+        .await
+        .map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
     let writer = &mut write;
     let (iterator_proxy, iterator) = create_proxy().unwrap();
 
     tracing::info!("launching test suite {}", cmd.test_url);
 
-    query_proxy
-        .enumerate(&cmd.test_url, iterator)
+    let mut provided_realm = None;
+    if let Some(realm_str) = &cmd.realm {
+        let lifecycle_controller =
+            ffx_component::rcs::connect_to_lifecycle_controller(&remote_control).await.map_err(
+                |e| ffx_error!("Parsing realm: Cannot connect to lifecycle controller: {}", e),
+            )?;
+
+        let realm_query = ffx_component::rcs::connect_to_realm_query(&remote_control)
+            .await
+            .map_err(|e| ffx_error!("Parsing realm: Cannot connect to realm query: {}", e))?;
+
+        provided_realm = Some(
+            run_test_suite_lib::parse_provided_realm(
+                &lifecycle_controller,
+                &realm_query,
+                &realm_str,
+            )
+            .await
+            .map_err(|e| ffx_error!("Error parsing realm '{}': {}", realm_str, e))?,
+        );
+    }
+
+    let fut_response = match provided_realm {
+        Some(realm) => {
+            let offers = realm.offers();
+            query_proxy.enumerate_in_realm(
+                &cmd.test_url,
+                realm
+                    .get_realm_client()
+                    .map_err(|e| ffx_error!("Cannot connect to realm client: {}", e))?,
+                offers.as_slice(),
+                realm.collection(),
+                iterator,
+            )
+        }
+        None => query_proxy.enumerate(&cmd.test_url, iterator),
+    };
+
+    fut_response
         .await
         .context("enumeration failed")?
         .map_err(|e| format_err!("error launching test: {:?}", e))?;

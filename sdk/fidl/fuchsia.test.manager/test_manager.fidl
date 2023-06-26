@@ -75,6 +75,20 @@ closed protocol Query {
         test_url fuchsia.url.Url;
         iterator server_end:CaseIterator;
     }) -> () error LaunchError;
+
+    /// Enumerates test cases in non-hermetic tests.
+    strict EnumerateInRealm(resource struct {
+        test_url fuchsia.url.Url;
+
+        /// The realm which contains the collection to launch the test in
+        realm client_end:fuchsia.component.Realm;
+        /// All offers from the realm to the test collection
+        offers vector<fuchsia.component.decl.Offer>:MAX;
+        /// the test collection to launch the test in.
+        test_collection string:MAX;
+
+        iterator server_end:CaseIterator;
+    }) -> () error LaunchError;
 };
 
 /// This is the entry point of running test suites. A test "run" consists of

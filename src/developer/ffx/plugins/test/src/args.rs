@@ -184,6 +184,11 @@ pub struct ListCommand {
     /// test url
     #[argh(positional)]
     pub test_url: String,
+
+    /// the realm to enumerate the test in. This field is optional and takes the form:
+    /// /path/to/realm:test_collection.
+    #[argh(option)]
+    pub realm: Option<String>,
 }
 
 fn log_interest_selector_or_severity(input: &str) -> Result<LogInterestSelector, String> {
