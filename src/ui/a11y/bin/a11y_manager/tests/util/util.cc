@@ -18,21 +18,21 @@ char *ReadFile(vfs::internal::Node *node, int length, char *buffer) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread("ReadingDebugFile");
 
-  int fd = OpenAsFD(node, loop.dispatcher());
-  EXPECT_LE(0, fd);
+  fbl::unique_fd fd = OpenAsFD(node, loop.dispatcher());
+  EXPECT_TRUE(fd);
 
   memset(buffer, 0, kMaxLogBufferSize);
-  EXPECT_EQ(length, pread(fd, buffer, length, 0));
+  EXPECT_EQ(length, pread(fd.get(), buffer, length, 0));
   return buffer;
 }
 
-int OpenAsFD(vfs::internal::Node *node, async_dispatcher_t *dispatcher) {
+fbl::unique_fd OpenAsFD(vfs::internal::Node *node, async_dispatcher_t *dispatcher) {
   zx::channel local, remote;
   EXPECT_EQ(ZX_OK, zx::channel::create(0, &local, &remote));
   EXPECT_EQ(ZX_OK,
             node->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, std::move(remote), dispatcher));
-  int fd = -1;
-  EXPECT_EQ(ZX_OK, fdio_fd_create(local.release(), &fd));
+  fbl::unique_fd fd;
+  EXPECT_EQ(ZX_OK, fdio_fd_create(local.release(), fd.reset_and_get_address()));
   return fd;
 }
 

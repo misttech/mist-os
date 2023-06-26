@@ -4,6 +4,7 @@
 
 #include "lib/vfs/cpp/pseudo_file.h"
 
+#include <fuchsia/io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/fd.h>
@@ -16,7 +17,8 @@
 #include <utility>
 #include <vector>
 
-#include "fuchsia/io/cpp/fidl.h"
+#include <fbl/unique_fd.h>
+
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
 namespace {
@@ -225,14 +227,14 @@ class PseudoFileTest : public gtest::RealLoopFixture {
     RunLoopUntil([&]() { return file_wrapper.buffer() == expected_str; });
   }
 
-  static int OpenAsFD(vfs::internal::Node* node, async_dispatcher_t* dispatcher) {
+  static fbl::unique_fd OpenAsFD(vfs::internal::Node* node, async_dispatcher_t* dispatcher) {
     zx::channel local, remote;
     EXPECT_EQ(ZX_OK, zx::channel::create(0, &local, &remote));
     EXPECT_EQ(ZX_OK, node->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE |
                                      fuchsia::io::OpenFlags::RIGHT_WRITABLE,
                                  std::move(remote), dispatcher));
-    int fd = -1;
-    EXPECT_EQ(ZX_OK, fdio_fd_create(local.release(), &fd));
+    fbl::unique_fd fd;
+    EXPECT_EQ(ZX_OK, fdio_fd_create(local.release(), fd.reset_and_get_address()));
     return fd;
   }
 };
@@ -295,19 +297,19 @@ TEST_F(PseudoFileTest, ServeOnValidFlagsForReadOnlyFile) {
 TEST_F(PseudoFileTest, Simple) {
   auto file_wrapper = FileWrapper::CreateReadWriteFile("test_str", 100);
 
-  int fd = OpenAsFD(file_wrapper.file(), file_wrapper.dispatcher());
-  ASSERT_LE(0, fd);
+  fbl::unique_fd fd = OpenAsFD(file_wrapper.file(), file_wrapper.dispatcher());
+  ASSERT_TRUE(fd);
 
   char buffer[1024];
   memset(buffer, 0, sizeof(buffer));
-  ASSERT_EQ(5, pread(fd, buffer, 5, 0));
+  ASSERT_EQ(5, pread(fd.get(), buffer, 5, 0));
   EXPECT_STREQ("test_", buffer);
 
-  ASSERT_EQ(4, write(fd, "abcd", 4));
-  ASSERT_EQ(5, pread(fd, buffer, 5, 0));
+  ASSERT_EQ(4, write(fd.get(), "abcd", 4));
+  ASSERT_EQ(5, pread(fd.get(), buffer, 5, 0));
   EXPECT_STREQ("abcd_", buffer);
 
-  ASSERT_GE(0, close(fd));
+  ASSERT_GE(0, close(fd.release()));
   file_wrapper.loop().RunUntilIdle();
 
   AssertFileWrapperState(file_wrapper, "abcd_str");

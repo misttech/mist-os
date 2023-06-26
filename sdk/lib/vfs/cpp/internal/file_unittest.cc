@@ -17,6 +17,7 @@
 #include <utility>
 #include <vector>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
 namespace {
@@ -61,14 +62,14 @@ class TestFile : public vfs::internal::File {
   std::vector<uint8_t>* buffer_;
 };
 
-int OpenAsFD(vfs::internal::Node* node, async_dispatcher_t* dispatcher) {
+fbl::unique_fd OpenAsFD(vfs::internal::Node* node, async_dispatcher_t* dispatcher) {
   zx::channel local, remote;
   EXPECT_EQ(ZX_OK, zx::channel::create(0, &local, &remote));
   EXPECT_EQ(ZX_OK, node->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE |
                                    fuchsia::io::OpenFlags::RIGHT_WRITABLE,
                                std::move(remote), dispatcher));
-  int fd = -1;
-  EXPECT_EQ(ZX_OK, fdio_fd_create(local.release(), &fd));
+  fbl::unique_fd fd;
+  EXPECT_EQ(ZX_OK, fdio_fd_create(local.release(), fd.reset_and_get_address()));
   return fd;
 }
 
@@ -79,29 +80,29 @@ TEST(File, Control) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread("vfs test thread");
 
-  int fd = OpenAsFD(&file, loop.dispatcher());
-  ASSERT_LE(0, fd);
+  fbl::unique_fd fd = OpenAsFD(&file, loop.dispatcher());
+  ASSERT_TRUE(fd);
 
-  ASSERT_EQ(4, write(fd, "abcd", 4));
+  ASSERT_EQ(4, write(fd.get(), "abcd", 4));
   EXPECT_EQ(0, strcmp("abcd", reinterpret_cast<char*>(store.data())));
-  ASSERT_EQ(5, write(fd, "exxxi", 5));
+  ASSERT_EQ(5, write(fd.get(), "exxxi", 5));
   EXPECT_EQ(0, strcmp("abcdexxxi", reinterpret_cast<char*>(store.data())));
-  ASSERT_EQ(3, pwrite(fd, "fgh", 3, 5));
+  ASSERT_EQ(3, pwrite(fd.get(), "fgh", 3, 5));
   EXPECT_EQ(0, strcmp("abcdefghi", reinterpret_cast<char*>(store.data())));
 
   char buffer[1024];
   memset(buffer, 0, sizeof(buffer));
-  ASSERT_EQ(7, pread(fd, buffer, 7, 1));
+  ASSERT_EQ(7, pread(fd.get(), buffer, 7, 1));
   EXPECT_EQ(0, strcmp("bcdefgh", buffer));
 
-  ASSERT_EQ(3, write(fd, "jklmn", 5));
+  ASSERT_EQ(3, write(fd.get(), "jklmn", 5));
   EXPECT_EQ('l', store[store.size() - 1]);
 
   memset(buffer, 0, sizeof(buffer));
-  ASSERT_EQ(4, pread(fd, buffer, 10, 8));
+  ASSERT_EQ(4, pread(fd.get(), buffer, 10, 8));
   EXPECT_EQ(0, strcmp("ijkl", buffer));
 
-  ASSERT_GE(0, close(fd));
+  ASSERT_GE(0, close(fd.release()));
 }
 
 TEST(File, Clone) {
@@ -111,24 +112,24 @@ TEST(File, Clone) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread("vfs test thread");
 
-  int fd = OpenAsFD(&file, loop.dispatcher());
-  ASSERT_LE(0, fd);
+  fbl::unique_fd fd = OpenAsFD(&file, loop.dispatcher());
+  ASSERT_TRUE(fd);
 
-  ASSERT_EQ(4, write(fd, "abcd", 4));
+  ASSERT_EQ(4, write(fd.get(), "abcd", 4));
   EXPECT_EQ(0, strcmp("abcd", reinterpret_cast<char*>(store.data())));
 
-  zx_handle_t handle = ZX_HANDLE_INVALID;
-  ASSERT_EQ(ZX_OK, fdio_fd_clone(fd, &handle));
+  zx::handle handle;
+  ASSERT_EQ(ZX_OK, fdio_fd_clone(fd.get(), handle.reset_and_get_address()));
 
-  int cloned = -1;
-  EXPECT_EQ(ZX_OK, fdio_fd_create(handle, &cloned));
-  ASSERT_LE(0, cloned);
+  fbl::unique_fd cloned;
+  EXPECT_EQ(ZX_OK, fdio_fd_create(handle.release(), cloned.reset_and_get_address()));
+  ASSERT_TRUE(cloned);
 
-  ASSERT_EQ(3, write(cloned, "xyz", 3));
+  ASSERT_EQ(3, write(cloned.get(), "xyz", 3));
   EXPECT_EQ(0, strcmp("xyzd", reinterpret_cast<char*>(store.data())));
 
-  ASSERT_GE(0, close(fd));
-  ASSERT_GE(0, close(cloned));
+  ASSERT_GE(0, close(fd.release()));
+  ASSERT_GE(0, close(cloned.release()));
 }
 
 }  // namespace

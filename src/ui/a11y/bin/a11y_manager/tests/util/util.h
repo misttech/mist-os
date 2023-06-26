@@ -9,6 +9,8 @@
 #include <lib/async/dispatcher.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
 
+#include <fbl/unique_fd.h>
+
 namespace accessibility_test {
 
 constexpr int kMaxLogBufferSize = 1024;
@@ -17,7 +19,7 @@ constexpr int kMaxLogBufferSize = 1024;
 char *ReadFile(vfs::internal::Node *node, int length, char *buffer);
 
 // Helper function for ReadFile() to Open a File Descriptor.
-int OpenAsFD(vfs::internal::Node *node, async_dispatcher_t *dispatcher);
+fbl::unique_fd OpenAsFD(vfs::internal::Node *node, async_dispatcher_t *dispatcher);
 
 // Create a test node with only a node id and a label.
 fuchsia::accessibility::semantics::Node CreateTestNode(
