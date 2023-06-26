@@ -47,7 +47,7 @@ use crate::{
     errors::EventLoopError,
     messaging::Sender,
     multicast_groups::ModernGroup,
-    netlink_packet::{IntoAckErrorCode, UNSPECIFIED_SEQUENCE_NUMBER},
+    netlink_packet::{errno::Errno, UNSPECIFIED_SEQUENCE_NUMBER},
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
     NETLINK_LOG_TAG,
 };
@@ -138,13 +138,13 @@ pub(crate) enum RequestError {
     AddressNotFound,
 }
 
-impl IntoAckErrorCode for RequestError {
-    fn into_code(self) -> i32 {
+impl RequestError {
+    pub(crate) fn into_errno(self) -> Errno {
         match self {
-            RequestError::InvalidRequest => libc::EINVAL,
-            RequestError::UnrecognizedInterface => libc::ENODEV,
-            RequestError::AlreadyExists => libc::EEXIST,
-            RequestError::AddressNotFound => libc::EADDRNOTAVAIL,
+            RequestError::InvalidRequest => Errno::EINVAL,
+            RequestError::UnrecognizedInterface => Errno::ENODEV,
+            RequestError::AlreadyExists => Errno::EEXIST,
+            RequestError::AddressNotFound => Errno::EADDRNOTAVAIL,
         }
     }
 }

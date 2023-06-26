@@ -66,7 +66,7 @@ pub mod route {
 
     use crate::{
         interfaces,
-        netlink_packet::{new_ack, new_done, AckErrorCode, NackErrorCode},
+        netlink_packet::{self, errno::Errno},
         routes,
     };
 
@@ -156,7 +156,7 @@ pub mod route {
         req: &RtnlMessage,
         // `true` for new address requests; `false` for delete address requests.
         is_new: bool,
-    ) -> Result<ExtractedAddressRequest, NackErrorCode> {
+    ) -> Result<ExtractedAddressRequest, Errno> {
         let kind = if is_new { "new" } else { "del" };
 
         let interface_id = match NonZeroU32::new(message.header.index) {
@@ -166,7 +166,7 @@ pub mod route {
                     "unspecified interface ID in address {} request from {}: {:?}",
                     kind, client, req,
                 );
-                return Err(NackErrorCode::INVALID);
+                return Err(Errno::EINVAL);
             }
         };
 
@@ -231,7 +231,7 @@ pub mod route {
                     "got different `IFA_ADDRESS` and `IFA_LOCAL` values for {} address request from {}: {:?}",
                     kind, client, req,
                 );
-                    return Err(NackErrorCode::NOT_SUPPORTED);
+                    return Err(Errno::ENOTSUP);
                 }
             }
             (Some(bytes), None) | (None, Some(bytes)) => bytes,
@@ -240,7 +240,7 @@ pub mod route {
                     "missing `IFA_ADDRESS` and `IFA_LOCAL` in address {} request from {}: {:?}",
                     kind, client, req,
                 );
-                return Err(NackErrorCode::INVALID);
+                return Err(Errno::EINVAL);
             }
         };
 
@@ -248,7 +248,7 @@ pub mod route {
             AF_INET => {
                 const BYTES: usize = Ipv4Addr::BYTES as usize;
                 if address_bytes.len() < BYTES {
-                    return Err(NackErrorCode::INVALID);
+                    return Err(Errno::EINVAL);
                 }
 
                 let mut bytes = [0; BYTES as usize];
@@ -258,7 +258,7 @@ pub mod route {
             AF_INET6 => {
                 const BYTES: usize = Ipv6Addr::BYTES as usize;
                 if address_bytes.len() < BYTES {
-                    return Err(NackErrorCode::INVALID);
+                    return Err(Errno::EINVAL);
                 }
 
                 let mut bytes = [0; BYTES];
@@ -270,7 +270,7 @@ pub mod route {
                     "invalid address family ({}) in address {} request from {}: {:?}",
                     family, kind, client, req,
                 );
-                return Err(NackErrorCode::INVALID);
+                return Err(Errno::EINVAL);
             }
         };
 
@@ -282,7 +282,7 @@ pub mod route {
                 | AddrSubnetError::InvalidWitness,
             ) => {
                 debug!("invalid address in address {} request from {}: {:?}", kind, client, req);
-                return Err(NackErrorCode::INVALID);
+                return Err(Errno::EINVAL);
             }
         };
 
@@ -317,7 +317,7 @@ pub mod route {
             };
 
             let is_dump = req_header.flags & NLM_F_DUMP == NLM_F_DUMP;
-            let is_ack = req_header.flags & NLM_F_ACK == NLM_F_ACK;
+            let expects_ack = req_header.flags & NLM_F_ACK == NLM_F_ACK;
 
             use RtnlMessage::*;
             match req {
@@ -337,7 +337,7 @@ pub mod route {
                         .await
                         .expect("interfaces event loop should have handled the request")
                         .expect("link dump requests are infallible");
-                    client.send_unicast(new_done(req_header))
+                    client.send_unicast(netlink_packet::new_done(req_header))
                 }
                 GetAddress(ref message) if is_dump => {
                     let ip_version_filter = match message.header.family.into() {
@@ -349,7 +349,8 @@ pub mod route {
                                 "invalid address family ({}) in address dump request from {}: {:?}",
                                 family, client, req,
                             );
-                            client.send_unicast(new_ack(NackErrorCode::INVALID, req_header));
+                            client.send_unicast(
+                                netlink_packet::new_error(Errno::EINVAL, req_header));
                             return;
                         }
                     };
@@ -371,7 +372,7 @@ pub mod route {
                         .await
                         .expect("interfaces event loop should have handled the request")
                         .expect("addr dump requests are infallible");
-                    client.send_unicast(new_done(req_header))
+                    client.send_unicast(netlink_packet::new_done(req_header))
                 }
                 NewAddress(ref message) => {
                     let ExtractedAddressRequest {
@@ -385,7 +386,7 @@ pub mod route {
                     ) {
                         Ok(o) => o,
                         Err(e) => {
-                            return client.send_unicast(new_ack(e, req_header));
+                            return client.send_unicast(netlink_packet::new_error(e, req_header));
                         }
                     };
 
@@ -404,11 +405,14 @@ pub mod route {
                         client: client.clone(),
                         completer,
                     }).await.expect("interface event loop should never terminate");
-                    let result = waiter
+                    match waiter
                         .await
-                        .expect("interfaces event loop should have handled the request");
-                    if is_ack || result.is_err() {
-                        client.send_unicast(new_ack(result, req_header))
+                        .expect("interfaces event loop should have handled the request"){
+                            Ok(()) => if expects_ack {
+                                client.send_unicast(netlink_packet::new_ack(req_header))
+                            },
+                            Err(e) => client.send_unicast(
+                                netlink_packet::new_error(e.into_errno(), req_header)),
                     }
                 }
                 DelAddress(ref message) => {
@@ -423,7 +427,7 @@ pub mod route {
                     ) {
                         Ok(o) => o,
                         Err(e) => {
-                            return client.send_unicast(new_ack(e, req_header));
+                            return client.send_unicast(netlink_packet::new_error(e, req_header));
                         }
                     };
 
@@ -440,12 +444,15 @@ pub mod route {
                         client: client.clone(),
                         completer,
                     }).await.expect("interface event loop should never terminate");
-                    let result = waiter
+                    match waiter
                         .await
-                        .expect("interfaces event loop should have handled the request");
-                    if is_ack || result.is_err() {
-                        client.send_unicast(new_ack(result, req_header))
-                    }
+                        .expect("interfaces event loop should have handled the request") {
+                            Ok(()) => if expects_ack {
+                                client.send_unicast(netlink_packet::new_ack(req_header))
+                            },
+                            Err(e) => client.send_unicast(
+                                netlink_packet::new_error(e.into_errno(), req_header))
+                        }
                 }
                 GetRoute(ref message) if is_dump => {
                     match message.header.address_family.into() {
@@ -463,12 +470,13 @@ pub mod route {
                         },
                         family => {
                             debug!("invalid address family ({}) in route dump request from {}: {:?}", family, client, req);
-                            client.send_unicast(new_ack(NackErrorCode::INVALID, req_header));
+                            client.send_unicast(
+                                netlink_packet::new_error(Errno::EINVAL, req_header));
                             return;
                         }
                     };
 
-                    client.send_unicast(new_done(req_header))
+                    client.send_unicast(netlink_packet::new_done(req_header))
                 }
                 NewLink(_)
                 | DelLink(_)
@@ -502,12 +510,12 @@ pub mod route {
                 | NewRule(_)
                 // TODO(https://issuetracker.google.com/283134947): Implement DelRule.
                 | DelRule(_) => {
-                    if is_ack {
+                    if expects_ack {
                         warn!(
                             "Received unsupported NETLINK_ROUTE request; responding with an Ack: {:?}",
                             req,
                         );
-                        client.send_unicast(new_ack(AckErrorCode, req_header))
+                        client.send_unicast(netlink_packet::new_ack(req_header))
                     } else {
                         warn!(
                             "Received unsupported NETLINK_ROUTE request that does not expect an Ack: {:?}",
@@ -537,13 +545,13 @@ pub mod route {
                             "Received unsupported NETLINK_ROUTE DUMP request; responding with Done: {:?}",
                             req
                         );
-                        client.send_unicast(new_done(req_header))
-                    } else if is_ack {
+                        client.send_unicast(netlink_packet::new_done(req_header))
+                    } else if expects_ack {
                         warn!(
                             "Received unsupported NETLINK_ROUTE GET request: responding with Ack {:?}",
                             req
                         );
-                        client.send_unicast(new_ack(AckErrorCode, req_header))
+                        client.send_unicast(netlink_packet::new_ack(req_header))
                     } else {
                         warn!(
                             "Received unsupported NETLINK_ROUTE GET request that does not expect an Ack {:?}",
@@ -712,13 +720,14 @@ mod test {
     use crate::{
         interfaces,
         messaging::testutil::{FakeSender, SentMessage},
-        netlink_packet::{new_ack, new_done, AckErrorCode, NackErrorCode},
+        netlink_packet::{self, errno::Errno},
         protocol_family::route::{NetlinkRoute, NetlinkRouteRequestHandler},
         routes,
     };
 
-    enum ExpectedResponse<C> {
-        Ack(C),
+    enum ExpectedResponse {
+        Ack,
+        Error(Errno),
         Done,
     }
 
@@ -741,7 +750,7 @@ mod test {
     #[test_case(
         RtnlMessage::GetTrafficChain,
         NLM_F_ACK,
-        Some(ExpectedResponse::Ack(AckErrorCode)); "get_with_ack_flag")]
+        Some(ExpectedResponse::Ack); "get_with_ack_flag")]
     #[test_case(
         RtnlMessage::GetTrafficChain,
         NLM_F_DUMP,
@@ -761,11 +770,11 @@ mod test {
     #[test_case(
         RtnlMessage::NewTrafficChain,
         NLM_F_ACK,
-        Some(ExpectedResponse::Ack(AckErrorCode)); "new_with_ack_flag")]
+        Some(ExpectedResponse::Ack); "new_with_ack_flag")]
     #[test_case(
         RtnlMessage::NewTrafficChain,
         NLM_F_ACK | NLM_F_DUMP,
-        Some(ExpectedResponse::Ack(AckErrorCode)); "new_with_ack_and_dump_flags")]
+        Some(ExpectedResponse::Ack); "new_with_ack_and_dump_flags")]
     #[test_case(
         RtnlMessage::DelTrafficChain,
         0,
@@ -777,16 +786,16 @@ mod test {
     #[test_case(
         RtnlMessage::DelTrafficChain,
         NLM_F_ACK,
-        Some(ExpectedResponse::Ack(AckErrorCode)); "del_with_ack_flag")]
+        Some(ExpectedResponse::Ack); "del_with_ack_flag")]
     #[test_case(
         RtnlMessage::DelTrafficChain,
         NLM_F_ACK | NLM_F_DUMP,
-        Some(ExpectedResponse::Ack(AckErrorCode)); "del_with_ack_and_dump_flags")]
+        Some(ExpectedResponse::Ack); "del_with_ack_and_dump_flags")]
     #[fuchsia::test]
     async fn test_handle_unsupported_request_response(
         tc_fn: fn(TcMessage) -> RtnlMessage,
         flags: u16,
-        expected_response: Option<ExpectedResponse<AckErrorCode>>,
+        expected_response: Option<ExpectedResponse>,
     ) {
         let (interfaces_request_sink, _interfaces_request_stream) = mpsc::channel(0);
         let (v4_routes_request_sink, _v4_routes_request_stream) = mpsc::channel(0);
@@ -816,14 +825,23 @@ mod test {
             .await;
 
         match expected_response {
-            Some(ExpectedResponse::Ack(code)) => {
+            Some(ExpectedResponse::Ack) => {
                 assert_eq!(
                     client_sink.take_messages(),
-                    [SentMessage::unicast(new_ack(code, header))]
+                    [SentMessage::unicast(netlink_packet::new_ack(header))]
+                )
+            }
+            Some(ExpectedResponse::Error(e)) => {
+                assert_eq!(
+                    client_sink.take_messages(),
+                    [SentMessage::unicast(netlink_packet::new_error(e, header))]
                 )
             }
             Some(ExpectedResponse::Done) => {
-                assert_eq!(client_sink.take_messages(), [SentMessage::unicast(new_done(header))])
+                assert_eq!(
+                    client_sink.take_messages(),
+                    [SentMessage::unicast(netlink_packet::new_done(header))]
+                )
             }
             None => {
                 assert_eq!(client_sink.take_messages(), [])
@@ -880,7 +898,7 @@ mod test {
     #[test_case(
         NLM_F_ACK,
         None,
-        Some(ExpectedResponse::Ack(AckErrorCode)); "ack_flag")]
+        Some(ExpectedResponse::Ack); "ack_flag")]
     #[test_case(
         NLM_F_DUMP,
         Some(interfaces::GetLinkArgs::Dump),
@@ -893,7 +911,7 @@ mod test {
     async fn test_get_link(
         flags: u16,
         expected_request_args: Option<interfaces::GetLinkArgs>,
-        expected_response: Option<ExpectedResponse<AckErrorCode>>,
+        expected_response: Option<ExpectedResponse>,
     ) {
         let header = header_with_flags(flags);
 
@@ -913,8 +931,9 @@ mod test {
                 .into_iter()
                 .map(|expected_response| {
                     SentMessage::unicast(match expected_response {
-                        ExpectedResponse::Ack(code) => new_ack(code, header),
-                        ExpectedResponse::Done => new_done(header),
+                        ExpectedResponse::Ack => netlink_packet::new_ack(header),
+                        ExpectedResponse::Error(e) => netlink_packet::new_error(e, header),
+                        ExpectedResponse::Done => netlink_packet::new_done(header),
                     })
                 })
                 .collect::<Vec<_>>(),
@@ -931,7 +950,7 @@ mod test {
         NLM_F_ACK,
         AF_UNSPEC,
         None,
-        Some(ExpectedResponse::Ack(Ok(()))); "af_unspec_ack_flag")]
+        Some(ExpectedResponse::Ack); "af_unspec_ack_flag")]
     #[test_case(
         NLM_F_DUMP,
         AF_UNSPEC,
@@ -955,7 +974,7 @@ mod test {
         NLM_F_ACK,
         AF_INET,
         None,
-        Some(ExpectedResponse::Ack(Ok(()))); "af_inet_ack_flag")]
+        Some(ExpectedResponse::Ack); "af_inet_ack_flag")]
     #[test_case(
         NLM_F_DUMP,
         AF_INET,
@@ -979,7 +998,7 @@ mod test {
         NLM_F_ACK,
         AF_INET6,
         None,
-        Some(ExpectedResponse::Ack(Ok(()))); "af_inet6_ack_flag")]
+        Some(ExpectedResponse::Ack); "af_inet6_ack_flag")]
     #[test_case(
         NLM_F_DUMP,
         AF_INET6,
@@ -1003,23 +1022,23 @@ mod test {
         NLM_F_ACK,
         AF_PACKET,
         None,
-        Some(ExpectedResponse::Ack(Ok(()))); "af_other_ack_flag")]
+        Some(ExpectedResponse::Ack); "af_other_ack_flag")]
     #[test_case(
         NLM_F_DUMP,
         AF_PACKET,
         None,
-        Some(ExpectedResponse::Ack(Err(NackErrorCode::INVALID))); "af_other_dump_flag")]
+        Some(ExpectedResponse::Error(Errno::EINVAL)); "af_other_dump_flag")]
     #[test_case(
         NLM_F_DUMP | NLM_F_ACK,
         AF_PACKET,
         None,
-        Some(ExpectedResponse::Ack(Err(NackErrorCode::INVALID))); "af_other_dump_and_ack_flags")]
+        Some(ExpectedResponse::Error(Errno::EINVAL)); "af_other_dump_and_ack_flags")]
     #[fuchsia::test]
     async fn test_get_addr(
         flags: u16,
         family: u16,
         expected_request_args: Option<interfaces::GetAddressArgs>,
-        expected_response: Option<ExpectedResponse<Result<(), NackErrorCode>>>,
+        expected_response: Option<ExpectedResponse>,
     ) {
         let header = header_with_flags(flags);
         let address_message = {
@@ -1045,8 +1064,9 @@ mod test {
             expected_response
                 .into_iter()
                 .map(|expected_response| SentMessage::unicast(match expected_response {
-                    ExpectedResponse::Ack(code) => new_ack(code, header),
-                    ExpectedResponse::Done => new_done(header),
+                    ExpectedResponse::Ack => netlink_packet::new_ack(header),
+                    ExpectedResponse::Error(e) => netlink_packet::new_error(e, header),
+                    ExpectedResponse::Done => netlink_packet::new_done(header),
                 }))
                 .collect::<Vec<_>>(),
         )
@@ -1065,7 +1085,7 @@ mod test {
         prefix_len: u8,
         interface_id: u32,
         expected_request_args: Option<RequestAndResponse<interfaces::AddressAndInterfaceArgs>>,
-        expected_response: Option<Result<(), NackErrorCode>>,
+        expected_response: Option<ExpectedResponse>,
     }
 
     fn bytes_from_addr(a: AddrSubnetEither) -> Vec<u8> {
@@ -1112,7 +1132,7 @@ mod test {
                 },
                 response,
             }),
-            expected_response: ack.then_some(Ok(())),
+            expected_response: ack.then_some(ExpectedResponse::Ack),
         }
     }
 
@@ -1146,11 +1166,11 @@ mod test {
         ack: bool,
         addr: AddrSubnetEither,
         interface_id: u64,
-        expected_response: NackErrorCode,
+        errno: Errno,
     ) -> TestAddrCase {
         TestAddrCase {
             expected_request_args: None,
-            expected_response: Some(Err(expected_response)),
+            expected_response: Some(ExpectedResponse::Error(errno)),
             ..valid_new_addr_request(ack, addr, interface_id, Ok(()))
         }
     }
@@ -1168,11 +1188,11 @@ mod test {
         ack: bool,
         addr: AddrSubnetEither,
         interface_id: u64,
-        expected_response: NackErrorCode,
+        errno: Errno,
     ) -> TestAddrCase {
         TestAddrCase {
             expected_request_args: None,
-            expected_response: Some(Err(expected_response)),
+            expected_response: Some(ExpectedResponse::Error(errno)),
             ..valid_del_addr_request(ack, addr, interface_id, Ok(()))
         }
     }
@@ -1250,7 +1270,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::NOT_SUPPORTED,
+                Errno::ENOTSUP,
             )
         }; "new_v6_valid_local_and_empty_address_nlas_no_ack")]
     #[test_case(
@@ -1263,7 +1283,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::ETH_INTERFACE_ID,
-                NackErrorCode::NOT_SUPPORTED,
+                Errno::ENOTSUP,
             )
         }; "new_v4_empty_local_and_valid_address_nlas_no_ack")]
     #[test_case(
@@ -1290,7 +1310,7 @@ mod test {
         }; "new_v6_without_route_ok_ack")]
     #[test_case(
         TestAddrCase {
-            expected_response: Some(Err(NackErrorCode::INVALID)),
+            expected_response: Some(ExpectedResponse::Error(Errno::EINVAL)),
             ..valid_new_addr_request(
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
@@ -1300,7 +1320,7 @@ mod test {
         }; "new_v4_invalid_response_ack")]
     #[test_case(
         TestAddrCase {
-            expected_response: Some(Err(NackErrorCode::new(libc::EEXIST).unwrap())),
+            expected_response: Some(ExpectedResponse::Error(Errno::EEXIST)),
             ..valid_new_addr_request(
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
@@ -1310,7 +1330,7 @@ mod test {
         }; "new_v6_exist_response_no_ack")]
     #[test_case(
         TestAddrCase {
-            expected_response: Some(Err(NackErrorCode::new(libc::ENODEV).unwrap())),
+            expected_response: Some(ExpectedResponse::Error(Errno::ENODEV)),
             ..valid_new_addr_request(
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
@@ -1320,7 +1340,7 @@ mod test {
         }; "new_v6_unrecognized_interface_response_no_ack")]
     #[test_case(
         TestAddrCase {
-            expected_response: Some(Err(NackErrorCode::new(libc::EADDRNOTAVAIL).unwrap())),
+            expected_response: Some(ExpectedResponse::Error(Errno::EADDRNOTAVAIL)),
             ..valid_new_addr_request(
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
@@ -1335,7 +1355,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::LO_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_zero_interface_id_ack")]
     #[test_case(
@@ -1345,7 +1365,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_zero_interface_id_no_ack")]
     #[test_case(
@@ -1355,7 +1375,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_no_nlas_ack")]
     #[test_case(
@@ -1365,7 +1385,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_no_nlas_no_ack")]
     #[test_case(
@@ -1375,7 +1395,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_missing_address_and_local_nla_ack")]
     #[test_case(
@@ -1385,7 +1405,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_missing_address_and_local_nla_no_ack")]
     #[test_case(
@@ -1395,7 +1415,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_invalid_local_nla_ack")]
     #[test_case(
@@ -1405,7 +1425,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_invalid_local_nla_no_ack")]
     #[test_case(
@@ -1415,7 +1435,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_invalid_address_nla_ack")]
     #[test_case(
@@ -1425,7 +1445,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_invalid_address_nla_no_ack")]
     #[test_case(
@@ -1455,7 +1475,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_invalid_prefix_len_ack")]
     #[test_case(
@@ -1465,7 +1485,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_invalid_prefix_len_no_ack")]
     #[test_case(
@@ -1475,7 +1495,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::LO_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_invalid_family_ack")]
     #[test_case(
@@ -1485,7 +1505,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::PPP_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "new_invalid_family_no_ack")]
     // Delete address tests cases.
@@ -1515,7 +1535,7 @@ mod test {
             Ok(())); "del_v6_ok_no_ack")]
     #[test_case(
         TestAddrCase {
-            expected_response: Some(Err(NackErrorCode::INVALID)),
+            expected_response: Some(ExpectedResponse::Error(Errno::EINVAL)),
             ..valid_del_addr_request(
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
@@ -1570,7 +1590,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::NOT_SUPPORTED,
+                Errno::ENOTSUP,
             )
         }; "del_v6_valid_local_and_empty_address_nlas_no_ack")]
     #[test_case(
@@ -1583,12 +1603,12 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::ETH_INTERFACE_ID,
-                NackErrorCode::NOT_SUPPORTED,
+                Errno::ENOTSUP,
             )
         }; "del_v4_empty_local_and_valid_address_nlas_no_ack")]
     #[test_case(
         TestAddrCase {
-            expected_response: Some(Err(NackErrorCode::new(libc::EEXIST).unwrap())),
+            expected_response: Some(ExpectedResponse::Error(Errno::EEXIST)),
             ..valid_del_addr_request(
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
@@ -1598,7 +1618,7 @@ mod test {
         }; "del_v6_exist_response_no_ack")]
     #[test_case(
         TestAddrCase {
-            expected_response: Some(Err(NackErrorCode::new(libc::ENODEV).unwrap())),
+            expected_response: Some(ExpectedResponse::Error(Errno::ENODEV)),
             ..valid_del_addr_request(
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
@@ -1608,7 +1628,7 @@ mod test {
         }; "del_v6_unrecognized_interface_response_no_ack")]
     #[test_case(
         TestAddrCase {
-            expected_response: Some(Err(NackErrorCode::new(libc::EADDRNOTAVAIL).unwrap())),
+            expected_response: Some(ExpectedResponse::Error(Errno::EADDRNOTAVAIL)),
             ..valid_del_addr_request(
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
@@ -1623,7 +1643,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::LO_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_zero_interface_id_ack")]
     #[test_case(
@@ -1633,7 +1653,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_zero_interface_id_no_ack")]
     #[test_case(
@@ -1643,7 +1663,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_no_nlas_ack")]
     #[test_case(
@@ -1653,7 +1673,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_no_nlas_no_ack")]
     #[test_case(
@@ -1663,7 +1683,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_missing_address_and_local_nla_ack")]
     #[test_case(
@@ -1673,7 +1693,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_missing_address_and_local_nla_no_ack")]
     #[test_case(
@@ -1683,7 +1703,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_invalid_local_nla_ack")]
     #[test_case(
@@ -1693,7 +1713,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_invalid_local_nla_no_ack")]
     #[test_case(
@@ -1703,7 +1723,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_invalid_address_nla_ack")]
     #[test_case(
@@ -1713,7 +1733,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_invalid_address_nla_no_ack")]
     #[test_case(
@@ -1743,7 +1763,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_invalid_prefix_len_ack")]
     #[test_case(
@@ -1753,7 +1773,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::WLAN_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_invalid_prefix_len_no_ack")]
     #[test_case(
@@ -1763,7 +1783,7 @@ mod test {
                 true,
                 interfaces::testutil::test_addr_subnet_v4(),
                 interfaces::testutil::LO_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_invalid_family_ack")]
     #[test_case(
@@ -1773,7 +1793,7 @@ mod test {
                 false,
                 interfaces::testutil::test_addr_subnet_v6(),
                 interfaces::testutil::PPP_INTERFACE_ID,
-                NackErrorCode::INVALID,
+                Errno::EINVAL,
             )
         }; "del_invalid_family_no_ack")]
     #[fuchsia::test]
@@ -1837,7 +1857,11 @@ mod test {
             .await,
             expected_response
                 .into_iter()
-                .map(|code| SentMessage::unicast(new_ack(code, header)))
+                .map(|response| SentMessage::unicast(match response {
+                    ExpectedResponse::Ack => netlink_packet::new_ack(header),
+                    ExpectedResponse::Done => netlink_packet::new_done(header),
+                    ExpectedResponse::Error(e) => netlink_packet::new_error(e, header),
+                }))
                 .collect::<Vec<_>>(),
         )
     }
@@ -1902,7 +1926,7 @@ mod test {
         NLM_F_ACK,
         AF_UNSPEC,
         None,
-        Some(ExpectedResponse::Ack(Ok(()))); "af_unspec_ack_flag")]
+        Some(ExpectedResponse::Ack); "af_unspec_ack_flag")]
     #[test_case(
         NLM_F_DUMP,
         AF_UNSPEC,
@@ -1922,7 +1946,7 @@ mod test {
         NLM_F_ACK,
         AF_INET,
         None,
-        Some(ExpectedResponse::Ack(Ok(()))); "af_inet_ack_flag")]
+        Some(ExpectedResponse::Ack); "af_inet_ack_flag")]
     #[test_case(
         NLM_F_DUMP,
         AF_INET,
@@ -1942,7 +1966,7 @@ mod test {
         NLM_F_ACK,
         AF_INET6,
         None,
-        Some(ExpectedResponse::Ack(Ok(()))); "af_inet6_ack_flag")]
+        Some(ExpectedResponse::Ack); "af_inet6_ack_flag")]
     #[test_case(
         NLM_F_DUMP,
         AF_INET6,
@@ -1962,23 +1986,23 @@ mod test {
         NLM_F_ACK,
         AF_PACKET,
         None,
-        Some(ExpectedResponse::Ack(Ok(()))); "af_other_ack_flag")]
+        Some(ExpectedResponse::Ack); "af_other_ack_flag")]
     #[test_case(
         NLM_F_DUMP,
         AF_PACKET,
         None,
-        Some(ExpectedResponse::Ack(Err(NackErrorCode::INVALID))); "af_other_dump_flag")]
+        Some(ExpectedResponse::Error(Errno::EINVAL)); "af_other_dump_flag")]
     #[test_case(
         NLM_F_DUMP | NLM_F_ACK,
         AF_PACKET,
         None,
-        Some(ExpectedResponse::Ack(Err(NackErrorCode::INVALID))); "af_other_dump_and_ack_flags")]
+        Some(ExpectedResponse::Error(Errno::EINVAL)); "af_other_dump_and_ack_flags")]
     #[fuchsia::test]
     async fn test_get_route(
         flags: u16,
         family: u16,
         expected_request_args: Option<routes::GetRouteArgs>,
-        expected_response: Option<ExpectedResponse<Result<(), NackErrorCode>>>,
+        expected_response: Option<ExpectedResponse>,
     ) {
         let header = header_with_flags(flags);
         let route_message = {
@@ -2001,8 +2025,9 @@ mod test {
             expected_response
                 .into_iter()
                 .map(|expected_response| SentMessage::unicast(match expected_response {
-                    ExpectedResponse::Ack(code) => new_ack(code, header),
-                    ExpectedResponse::Done => new_done(header),
+                    ExpectedResponse::Ack => netlink_packet::new_ack(header),
+                    ExpectedResponse::Error(e) => netlink_packet::new_error(e, header),
+                    ExpectedResponse::Done => netlink_packet::new_done(header),
                 }))
                 .collect::<Vec<_>>(),
         )
