@@ -5,7 +5,7 @@
 use {
     crate::input_device,
     async_trait::async_trait,
-    fuchsia_inspect::{self, health::Reporter},
+    fuchsia_inspect::{self, health::Reporter, NumericProperty, Property},
     std::any::Any,
     std::fmt::{Debug, Formatter},
     std::rc::Rc,
@@ -167,6 +167,11 @@ impl InputHandlerStatus {
             last_received_timestamp_ns: last_received_timestamp_ns,
             _health_node: health_node,
         }
+    }
+
+    pub fn count_received_event(&self, event: input_device::InputEvent) {
+        self.events_received_count.add(1);
+        self.last_received_timestamp_ns.set(event.event_time.into_nanos().try_into().unwrap());
     }
 }
 

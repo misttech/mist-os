@@ -835,3 +835,74 @@ fn light_sensor_handler_initialized_with_inspect_node() {
         }
     });
 }
+
+#[fuchsia::test]
+async fn light_sensor_handler_inspect_counts_events() {
+    let sensor_configuration = SensorConfiguration {
+        vendor_id: VENDOR_ID,
+        product_id: PRODUCT_ID,
+        rgbc_to_lux_coefficients: Rgbc { red: 1.5, green: 1.6, blue: 1.7, clear: 1.8 },
+        si_scaling_factors: Rgbc { red: 1.1, green: 1.2, blue: 1.3, clear: 1.4 },
+        settings: get_adjustment_settings(),
+    };
+
+    let (device_proxy, _, _) = get_mock_device_proxy();
+    let inspector = fuchsia_inspect::Inspector::default();
+    let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+    let handler =
+        LightSensorHandler::new(DoublingCalibrator, sensor_configuration, &fake_handlers_node);
+
+    let input_event = InputEvent {
+        device_event: InputDeviceEvent::LightSensor(LightSensorEvent {
+            device_proxy: device_proxy.clone(),
+            rgbc: Rgbc { red: 1, green: 2, blue: 3, clear: 14747 },
+        }),
+        device_descriptor: InputDeviceDescriptor::LightSensor(LightSensorDeviceDescriptor {
+            vendor_id: VENDOR_ID,
+            product_id: PRODUCT_ID,
+            device_id: 3,
+            sensor_layout: Rgbc { red: 1, green: 2, blue: 3, clear: 4 },
+        }),
+        event_time: Time::get_monotonic(),
+        handled: Handled::No,
+        trace_id: None,
+    };
+    let last_event_timestamp: u64 = input_event.clone().event_time.into_nanos().try_into().unwrap();
+
+    // Handle an unhandled input event.
+    let _ = Rc::clone(&handler).handle_input_event(input_event.clone()).await;
+
+    // Handled event should be ignored.
+    let handled_event = InputEvent {
+        device_event: InputDeviceEvent::LightSensor(LightSensorEvent {
+            device_proxy,
+            rgbc: Rgbc { red: 1, green: 2, blue: 3, clear: 14747 },
+        }),
+        device_descriptor: InputDeviceDescriptor::LightSensor(LightSensorDeviceDescriptor {
+            vendor_id: VENDOR_ID,
+            product_id: PRODUCT_ID,
+            device_id: 3,
+            sensor_layout: Rgbc { red: 1, green: 2, blue: 3, clear: 4 },
+        }),
+        event_time: Time::get_monotonic(),
+        handled: Handled::Yes,
+        trace_id: None,
+    };
+    let _ = Rc::clone(&handler).handle_input_event(handled_event).await;
+
+    fuchsia_inspect::assert_data_tree!(inspector, root: {
+        input_handlers_node: {
+            light_sensor_handler: {
+                events_received_count: 1u64,
+                events_handled_count: 0u64,
+                last_received_timestamp_ns: last_event_timestamp,
+                "fuchsia.inspect.Health": {
+                    status: "STARTING_UP",
+                    // Timestamp value is unpredictable and not relevant in this context,
+                    // so we only assert that the property is present.
+                    start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                },
+            }
+        }
+    });
+}

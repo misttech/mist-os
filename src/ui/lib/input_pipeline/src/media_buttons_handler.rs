@@ -24,7 +24,7 @@ pub struct MediaButtonsHandler {
     inner: RefCell<MediaButtonsHandlerInner>,
 
     /// The inventory of this handler's Inspect status.
-    _inspect_status: InputHandlerStatus,
+    pub inspect_status: InputHandlerStatus,
 }
 
 #[derive(Debug)]
@@ -53,6 +53,9 @@ impl UnhandledInputHandler for MediaButtonsHandler {
                 event_time: _,
                 trace_id: _,
             } => {
+                self.inspect_status.count_received_event(input_device::InputEvent::from(
+                    unhandled_input_event.clone(),
+                ));
                 let media_buttons_event = Self::create_media_buttons_event(media_buttons_event);
 
                 // Send the event if the media buttons are supported.
@@ -80,7 +83,7 @@ impl MediaButtonsHandler {
                 last_event: None,
                 send_event_task_tracker: LocalTaskTracker::new(),
             }),
-            _inspect_status: inspect_status,
+            inspect_status,
         };
         Rc::new(media_buttons_handler)
     }
@@ -325,7 +328,7 @@ mod tests {
                 last_event: Some(create_ui_input_media_buttons_event(Some(1), None, None, None)),
                 send_event_task_tracker: LocalTaskTracker::new(),
             }),
-            _inspect_status: inspect_status,
+            inspect_status,
         });
         let device_listener_proxy =
             spawn_device_listener_registry_server(media_buttons_handler.clone());
@@ -723,6 +726,60 @@ mod tests {
                     events_received_count: 0u64,
                     events_handled_count: 0u64,
                     last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn media_buttons_handler_inspect_counts_events() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let media_buttons_handler = MediaButtonsHandler::new(&fake_handlers_node);
+
+        // Unhandled input event should be counted by inspect.
+        let descriptor = testing_utilities::consumer_controls_device_descriptor();
+        let unhandled_input_event = input_device::InputEvent {
+            device_event: input_device::InputDeviceEvent::ConsumerControls(
+                consumer_controls_binding::ConsumerControlsEvent::new(vec![
+                    fidl_input_report::ConsumerControlButton::VolumeUp,
+                ]),
+            ),
+            device_descriptor: descriptor.clone(),
+            event_time: zx::Time::get_monotonic(),
+            handled: input_device::Handled::No,
+            trace_id: None,
+        };
+        let last_event_timestamp: u64 =
+            unhandled_input_event.clone().event_time.into_nanos().try_into().unwrap();
+        media_buttons_handler.clone().handle_input_event(unhandled_input_event).await;
+
+        // Handled input event should be ignored.
+        let handled_input_event = input_device::InputEvent {
+            device_event: input_device::InputDeviceEvent::ConsumerControls(
+                consumer_controls_binding::ConsumerControlsEvent::new(vec![
+                    fidl_input_report::ConsumerControlButton::VolumeUp,
+                ]),
+            ),
+            device_descriptor: descriptor.clone(),
+            event_time: zx::Time::get_monotonic(),
+            handled: input_device::Handled::Yes,
+            trace_id: None,
+        };
+        media_buttons_handler.clone().handle_input_event(handled_input_event).await;
+
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                media_buttons_handler: {
+                    events_received_count: 1u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: last_event_timestamp,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,

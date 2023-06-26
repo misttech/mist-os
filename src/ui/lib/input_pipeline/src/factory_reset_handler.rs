@@ -100,7 +100,7 @@ pub struct FactoryResetHandler {
     countdown_hanging_get: RefCell<ResetCountdownHangingGet>,
 
     /// The inventory of this handler's Inspect status.
-    _inspect_status: InputHandlerStatus,
+    pub inspect_status: InputHandlerStatus,
 }
 
 /// Uses the `ConsumerControlsEvent` to determine whether the device should
@@ -134,7 +134,7 @@ impl FactoryResetHandler {
         Rc::new(Self {
             factory_reset_state: RefCell::new(initial_state),
             countdown_hanging_get: RefCell::new(countdown_hanging_get),
-            _inspect_status: inspect_status,
+            inspect_status,
         })
     }
 
@@ -381,6 +381,9 @@ impl UnhandledInputHandler for FactoryResetHandler {
                 event_time: _,
                 trace_id: _,
             } => {
+                self.inspect_status.count_received_event(input_device::InputEvent::from(
+                    unhandled_input_event.clone(),
+                ));
                 match self.factory_reset_state() {
                     FactoryResetState::Idle => {
                         let event_clone = event.clone();
@@ -411,6 +414,8 @@ mod tests {
     use {
         super::*,
         crate::consumer_controls_binding::ConsumerControlsDeviceDescriptor,
+        crate::input_device,
+        crate::input_handler::InputHandler,
         assert_matches::assert_matches,
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_recovery_policy::{DeviceMarker, DeviceProxy},
@@ -911,6 +916,44 @@ mod tests {
                     events_received_count: 0u64,
                     events_handled_count: 0u64,
                     last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    async fn factory_reset_handler_inspect_counts_events() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let reset_handler = FactoryResetHandler::new(&fake_handlers_node);
+
+        // Send reset event
+        let reset_event = create_reset_input_event();
+        reset_handler.clone().handle_unhandled_input_event(reset_event).await;
+
+        // Send handled event that should be ignored.
+        let mut handled_event = input_device::InputEvent::from(create_reset_input_event());
+        handled_event.handled = input_device::Handled::Yes;
+        reset_handler.clone().handle_input_event(handled_event).await;
+
+        // Send event to simulate releasing the reset button
+        let non_reset_event = create_non_reset_input_event();
+        let last_event_timestamp: u64 =
+            non_reset_event.clone().event_time.into_nanos().try_into().unwrap();
+        reset_handler.clone().handle_unhandled_input_event(non_reset_event).await;
+
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                factory_reset_handler: {
+                    events_received_count: 2u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: last_event_timestamp,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,

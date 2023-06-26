@@ -253,7 +253,7 @@ pub struct LightSensorHandler<T> {
     vendor_id: u32,
     product_id: u32,
     /// The inventory of this handler's Inspect status.
-    _inspect_status: Rc<InputHandlerStatus>,
+    inspect_status: Rc<InputHandlerStatus>,
 }
 
 enum ActiveSettingState {
@@ -316,7 +316,7 @@ impl<T> LightSensorHandler<T> {
             si_scaling_factors: configuration.si_scaling_factors,
             vendor_id: configuration.vendor_id,
             product_id: configuration.product_id,
-            _inspect_status: inspect_status,
+            inspect_status,
         })
     }
 
@@ -514,6 +514,7 @@ where
             trace_id: _,
         } = input_event
         {
+            self.inspect_status.count_received_event(InputEvent::from(input_event.clone()));
             // Validate descriptor matches.
             if !(light_sensor_descriptor.vendor_id == self.vendor_id
                 && light_sensor_descriptor.product_id == self.product_id)
