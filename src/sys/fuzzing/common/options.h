@@ -14,6 +14,7 @@
 namespace fuzzing {
 
 using ::fuchsia::fuzzer::Options;
+using ::fuchsia::fuzzer::OutputFlags;
 using ::fuchsia::fuzzer::SanitizerOptions;
 
 // Define defaults.

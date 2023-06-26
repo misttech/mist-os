@@ -16,5 +16,6 @@
 
 //                   (type,             snake_case_name,    CamelCaseName,    default-value);
 FUCHSIA_FUZZER_OPTION(SanitizerOptions, sanitizer_options,  SanitizerOptions, SanitizerOptions())
+FUCHSIA_FUZZER_OPTION(OutputFlags,      output_flags,       OutputFlags,      OutputFlags())
 
 #include "src/sys/fuzzing/common/options-literal.inc"

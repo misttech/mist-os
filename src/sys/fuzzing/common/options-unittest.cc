@@ -33,6 +33,7 @@ TEST(OptionsTest, Set) {
   bool print_final_stats = true;
   bool use_value_profile = true;
   SanitizerOptions sanitizer_options = {.name = "MYSAN_OPTIONS", .value = "key1=val1:key2=val2"};
+  OutputFlags output_flags = OutputFlags::LIBFUZZER;
 
   Options options1;
 #define FUCHSIA_FUZZER_OPTION(type, option, Option, default_value) options1.set_##option(option);
@@ -98,6 +99,7 @@ TEST(OptionsTest, Copy) {
 
   EXPECT_EQ(options2.sanitizer_options().name, sanitizer_options.name);
   EXPECT_EQ(options2.sanitizer_options().value, sanitizer_options.value);
+  EXPECT_EQ(options2.output_flags(), output_flags);
 }
 
 TEST(OptionsTest, AddDefaults) {
@@ -111,6 +113,7 @@ TEST(OptionsTest, AddDefaults) {
 
   EXPECT_TRUE(options1.sanitizer_options().name.empty());
   EXPECT_TRUE(options1.sanitizer_options().value.empty());
+  EXPECT_EQ(options1.output_flags(), OutputFlags());
 
   // ...but it should not overwrite anything already there.
 #define FUCHSIA_FUZZER_OPTION(type, option, Option, default_value) type option = default_value;
@@ -148,6 +151,7 @@ TEST(OptionsTest, AddDefaults) {
 
   EXPECT_EQ(options2.sanitizer_options().name, sanitizer_options.name);
   EXPECT_EQ(options2.sanitizer_options().value, sanitizer_options.value);
+  EXPECT_EQ(options1.output_flags(), output_flags);
 }
 
 }  // namespace

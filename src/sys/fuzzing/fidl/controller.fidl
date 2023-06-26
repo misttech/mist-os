@@ -135,8 +135,12 @@ closed protocol Controller {
     /// fuzzer should assume the default values for `Options`.
     ///
     /// + request `options` the execution and error detection parameters.
-    /// * error `ZX_ERR_BAD_STATE` if a long-running call such as `Execute`,
-    /// *     `Cleanse`, `Minimize`, `Fuzz`, or `Merge` is in progress.
+    /// * error one of the following:
+    /// * error
+    ///     * `ZX_ERR_BAD_STATE` if a long-running call such as `Execute`,
+    ///       `Cleanse`, `Minimize`, `Fuzz`, or `Merge` is in progress.
+    ///     * `ZX_ERR_NOT_SUPPORTED` if a value provided for an option is not
+    ///       supported by the engine. Check the logs for additional details.
     strict Configure(struct {
         options Options;
     }) -> () error zx.Status;
@@ -221,7 +225,7 @@ closed protocol Controller {
     /// one.
     ///
     /// * error `ZX_ERR_BAD_STATE` if another long-running workflow is in
-    /// *     progress.
+    ///   progress.
     strict Fuzz() -> () error zx.Status;
 
     /// Executes the target code with a single `test_input`.

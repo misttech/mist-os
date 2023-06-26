@@ -37,6 +37,32 @@ type SanitizerOptions = struct {
     value string:MAX_SANITIZER_OPTIONS_VALUE_SIZE;
 };
 
+/// Specifies how a fuzzing engine should configure output streams.
+///
+/// Flags may be combined, e.g. `CLOSE_STDOUT | CLOSE_STDERR`. Support for each
+/// flag is engine-specific. Specifying an unsupported output mode flag may
+/// cause `Controller.Configure` to return `ZX_ERR_NOT_SUPPORTED`.
+type OutputFlags = strict bits {
+    /// Suppress standard output from the engine process. This is analogous to
+    /// libFuzzer's `-close_fd_mask=1`.
+    CLOSE_STDOUT = 0x1;
+
+    /// Suppress standard error from the engine process. Use with care: this may
+    /// remove diagnostic output from the target code (e.g. messages on assert
+    /// failure). This is analogous to libFuzzer's `-close_fd_mask=2`.
+    CLOSE_STDERR = 0x2;
+
+    /// Produce more verbose output from the fuzzer engine. The exact meaning of
+    /// "more verbose" is engine-specific. This is analogous to libFuzzer's
+    /// `-verbosity=2`.
+    VERBOSE = 0x4;
+
+    /// Produce libFuzzer-style output on standard error. This facilitates
+    /// integration with systems like ClusterFuzz.
+    /// See https://llvm.org/docs/LibFuzzer.html#output for example output.
+    LIBFUZZER = 0x8;
+};
+
 /// See `fuchsia.fuzzer.Controller/Configure`.
 type Options = table {
     /// Perform this many fuzzing runs, then exit normally. If unset (or zero),
@@ -135,4 +161,7 @@ type Options = table {
 
     /// Sanitizer options. See `SanitizerOptions`.
    21: sanitizer_options SanitizerOptions;
+
+    /// Output flags. See `OutputFlags`.
+   22: output_flags OutputFlags;
 };
