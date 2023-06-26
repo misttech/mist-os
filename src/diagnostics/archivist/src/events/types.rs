@@ -238,16 +238,25 @@ impl ComponentIdentifier {
             }]));
         }
 
-        if moniker == "." {
+        if moniker == "." || moniker == "./" || moniker == "/" {
             return Ok(ComponentIdentifier::Moniker(vec![MonikerSegment {
                 collection: None,
                 name: "<root>".into(),
             }]));
         }
 
-        let without_root = moniker
-            .strip_prefix("./")
-            .ok_or_else(|| MonikerError::InvalidMonikerPrefix(moniker.to_string()))?;
+        // Optionally strip a "./" or "/" prefix from the moniker string.
+        let without_root = if moniker.starts_with('.') {
+            moniker
+                .strip_prefix("./")
+                .ok_or_else(|| MonikerError::InvalidMonikerPrefix(moniker.to_string()))?
+        } else if moniker.starts_with('/') {
+            moniker
+                .strip_prefix('/')
+                .ok_or_else(|| MonikerError::InvalidMonikerPrefix(moniker.to_string()))?
+        } else {
+            moniker
+        };
 
         let mut segments = vec![];
         for raw_segment in without_root.split('/') {
@@ -380,6 +389,14 @@ mod tests {
         assert_eq!(identifier.unique_key(), vec!["a", "coll:comp", "b"].into());
 
         let identifier = ComponentIdentifier::parse_from_moniker(".").unwrap();
+        assert_eq!(identifier.relative_moniker_for_selectors(), vec!["<root>"].into());
+        assert_eq!(identifier.unique_key(), vec!["<root>"].into());
+
+        let identifier = ComponentIdentifier::parse_from_moniker("/").unwrap();
+        assert_eq!(identifier.relative_moniker_for_selectors(), vec!["<root>"].into());
+        assert_eq!(identifier.unique_key(), vec!["<root>"].into());
+
+        let identifier = ComponentIdentifier::parse_from_moniker("./").unwrap();
         assert_eq!(identifier.relative_moniker_for_selectors(), vec!["<root>"].into());
         assert_eq!(identifier.unique_key(), vec!["<root>"].into());
     }

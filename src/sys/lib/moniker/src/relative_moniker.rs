@@ -30,18 +30,21 @@ pub trait RelativeMonikerBase: Sized {
     }
 
     fn parse_str(input: &str) -> Result<Self, MonikerError> {
-        if input == "." || input == "./" {
+        if input == "." || input == "./" || input == "/" {
             return Ok(Self::new(vec![]));
         }
-        if input.chars().nth(0) != Some('.') {
-            return Err(MonikerError::invalid_moniker(input));
-        }
-        if input.chars().nth(1) != Some('/') {
-            return Err(MonikerError::invalid_moniker(input));
-        }
+
+        // Optionally strip a prefix of "/" or "./".
+        let stripped = match input.strip_prefix("/") {
+            Some(s) => s,
+            None => match input.strip_prefix("./") {
+                Some(s) => s,
+                None => input,
+            },
+        };
 
         let path =
-            input[2..].split('/').map(Self::Part::parse).collect::<Result<_, MonikerError>>()?;
+            stripped.split('/').map(Self::Part::parse).collect::<Result<_, MonikerError>>()?;
 
         Ok(Self::new(path))
     }
@@ -244,7 +247,9 @@ mod tests {
         for (path, string_to_parse) in vec![
             (vec![], "."),
             (vec![], "./"),
+            (vec![], "/"),
             (vec!["a"], "./a"),
+            (vec!["a"], "/a"),
             (vec!["a", "b"], "./a/b"),
             (vec!["a:test1"], "./a:test1"),
             (vec!["a:test1", "b:test2"], "./a:test1/b:test2"),
@@ -256,9 +261,7 @@ mod tests {
             assert_eq!(RelativeMoniker::new(path), string_to_parse.try_into().unwrap());
         }
 
-        for invalid_string_to_parse in
-            vec!["/", "\\", ".\\", "/test", ".test", ".//", "./no:instance-id:test1"]
-        {
+        for invalid_string_to_parse in vec!["\\", ".\\", ".test", ".//", "./no:instance-id:test1"] {
             let res: Result<RelativeMoniker, MonikerError> = invalid_string_to_parse.try_into();
             assert!(
                 res.is_err(),

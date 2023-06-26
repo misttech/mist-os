@@ -87,8 +87,13 @@ mod tests {
                 InstancedAbsoluteMoniker::parse_str("/foo:0/bar:0").unwrap()
             )
         );
+        assert_eq!(
+            InstancedExtendedMoniker::parse_str("foo:0/bar:0").unwrap(),
+            InstancedExtendedMoniker::ComponentInstance(
+                InstancedAbsoluteMoniker::parse_str("/foo:0/bar:0").unwrap()
+            )
+        );
         assert!(InstancedExtendedMoniker::parse_str("").is_err(), "cannot be empty");
-        assert!(InstancedExtendedMoniker::parse_str("foo:0/bar:0").is_err(), "must start with /");
     }
 
     #[test]

@@ -557,9 +557,6 @@ impl RemoteControlService {
 }
 
 fn relative_moniker(moniker: String) -> Option<RelativeMoniker> {
-    // If we have an absolute moniker, make it relative, otherwise attempt to parse as a relative
-    // moniker.
-    let moniker = if moniker.starts_with("/") { format!(".{moniker}") } else { moniker };
     RelativeMoniker::try_from(moniker.as_str()).ok()
 }
 
@@ -1033,13 +1030,6 @@ mod tests {
         }
 
         Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_relative_moniker() {
-        assert!(relative_moniker("/core/foo".to_string()).is_some());
-        assert!(relative_moniker("./core/foo".to_string()).is_some());
-        assert!(relative_moniker("core/foo".to_string()).is_none());
     }
 
     #[fuchsia::test]

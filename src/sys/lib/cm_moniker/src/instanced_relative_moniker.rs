@@ -190,6 +190,7 @@ mod tests {
         for (path, string_to_parse) in vec![
             (vec![], "."),
             (vec![], "./"),
+            (vec![], "/"),
             (vec!["a:1"], "./a:1"),
             (vec!["a:1", "b:2"], "./a:1/b:2"),
             (vec!["a:test:1"], "./a:test:1"),
@@ -202,8 +203,7 @@ mod tests {
             assert_eq!(InstancedRelativeMoniker::new(path), string_to_parse.try_into().unwrap());
         }
 
-        for invalid_string_to_parse in
-            vec!["/", "\\", ".\\", "/test:1", ".test:1", ".//", "./missing:instance-id"]
+        for invalid_string_to_parse in vec!["\\", ".\\", ".test:1", ".//", "./missing:instance-id"]
         {
             let res: Result<InstancedRelativeMoniker, MonikerError> =
                 invalid_string_to_parse.try_into();

@@ -28,14 +28,19 @@ rustc_library("cm_moniker") {
   ]
 
   sources = [
-    "src//lib.rs",
     "src/instanced_abs_moniker.rs",
     "src/instanced_child_moniker.rs",
     "src/instanced_extended_moniker.rs",
     "src/instanced_relative_moniker.rs",
+    "src/lib.rs",
   ]
 }
 
-fuchsia_unittest_package("tests") {
+fuchsia_unittest_package("cm-moniker-tests") {
   deps = [ ":cm_moniker_test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":cm-moniker-tests" ]
 }

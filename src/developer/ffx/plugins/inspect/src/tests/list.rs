@@ -144,7 +144,7 @@ async fn test_list_with_data_with_manifest_and_archive() {
             params.clone(),
             expected_responses.clone(),
         )]),
-        "/./test/component".into(),
+        "/test/component".into(),
         "fuchsia.diagnostics.host.ArchiveAccessor".into(),
     );
     run_command(
