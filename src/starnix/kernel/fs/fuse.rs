@@ -6,13 +6,13 @@ use crate::{
     auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer, OutputBufferCallback},
-        default_eof_offset, default_seek, fileops_impl_nonseekable, fs_args, CacheMode,
-        DirectoryEntryType, DirentSink, FdEvents, FdNumber, FileObject, FileOps, FileSystem,
-        FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
-        FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, XattrOp,
+        default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
+        fs_args, CacheMode, DirectoryEntryType, DirentSink, FdEvents, FdNumber, FileObject,
+        FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode,
+        FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, XattrOp,
     },
     lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
-    logging::{log_error, log_trace, not_implemented},
+    logging::{log_error, log_trace, not_implemented, not_implemented_log_once},
     mm::{vmo::round_up_to_increment, PAGE_SIZE},
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
@@ -471,24 +471,24 @@ impl FileOps for FuseFileObject {
 
     fn ioctl(
         &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _request: u32,
-        _arg: SyscallArg,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        request: u32,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        not_implemented!("FileOps::ioctl");
-        error!(ENOTDIR)
+        not_implemented_log_once!("ioctl is using default implementation for use.");
+        default_ioctl(file, current_task, request, arg)
     }
 
     fn fcntl(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _cmd: u32,
+        cmd: u32,
         _arg: u64,
     ) -> Result<SyscallResult, Errno> {
-        not_implemented!("FileOps::fcntl");
-        error!(ENOTDIR)
+        not_implemented_log_once!("fcntl is using default implementation for use.");
+        default_fcntl(cmd)
     }
 }
 
