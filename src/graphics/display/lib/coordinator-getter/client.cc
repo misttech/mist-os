@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/testing/coordinator-connector-lib/client.h"
+#include "src/graphics/display/lib/coordinator-getter/client.h"
 
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>

@@ -8,7 +8,7 @@
 #ifndef SRC_UI_LIB_DISPLAY_GET_HARDWARE_DISPLAY_CONTROLLER_H_
 #define SRC_UI_LIB_DISPLAY_GET_HARDWARE_DISPLAY_CONTROLLER_H_
 
-#include "src/graphics/display/testing/coordinator-connector-lib/client.h"
+#include "src/graphics/display/lib/coordinator-getter/client.h"
 
 namespace ui_display {
 

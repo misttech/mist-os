@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_TESTING_COORDINATOR_CONNECTOR_LIB_CLIENT_H_
-#define SRC_GRAPHICS_DISPLAY_TESTING_COORDINATOR_CONNECTOR_LIB_CLIENT_H_
+#ifndef SRC_GRAPHICS_DISPLAY_LIB_COORDINATOR_GETTER_CLIENT_H_
+#define SRC_GRAPHICS_DISPLAY_LIB_COORDINATOR_GETTER_CLIENT_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <lib/fpromise/promise.h>
@@ -28,4 +28,4 @@ fpromise::promise<CoordinatorClientEnd, zx_status_t> GetCoordinator();
 
 }  // namespace display
 
-#endif  // SRC_GRAPHICS_DISPLAY_TESTING_COORDINATOR_CONNECTOR_LIB_CLIENT_H_
+#endif  // SRC_GRAPHICS_DISPLAY_LIB_COORDINATOR_GETTER_CLIENT_H_
