@@ -66,8 +66,10 @@ hermetic_code_blob("subprocess.blob") {
   # backtrace-request is included using an absolute path.
   include_dirs = [ "//" ]
 
-  # TODO(fxbug.dev/129545): subprocess crashes when built with thinlto on riscv
-  if (current_cpu == "riscv64") {
-    exclude_toolchain_tags = [ "lto" ]
+  # TODO(fxbug.dev/129545): LLD lets --no-pie trump the code generation
+  # switches, but this needs to be compiled as PIC though linked differently.
+  if (toolchain_variant.tags + [ "lto" ] - [ "lto" ] !=
+      toolchain_variant.tags) {
+    ldflags = [ "-Wl,-mllvm,-relocation-model=pic" ]
   }
 }
