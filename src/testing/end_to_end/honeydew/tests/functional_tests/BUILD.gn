@@ -11,11 +11,27 @@ if (is_host) {
     ]
   }
 
+  group("emulator_tests_fyi") {
+    testonly = true
+    public_deps = [
+      "affordance_tests:emulator_tests_fyi",
+      "device_class_tests:emulator_tests_fyi",
+    ]
+  }
+
   group("nuc_tests") {
     testonly = true
     public_deps = [
       "affordance_tests:nuc_tests",
       "device_class_tests:nuc_tests",
+    ]
+  }
+
+  group("nuc_tests_fyi") {
+    testonly = true
+    public_deps = [
+      "affordance_tests:nuc_tests_fyi",
+      "device_class_tests:nuc_tests_fyi",
     ]
   }
 

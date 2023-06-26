@@ -8,16 +8,32 @@ if (is_host) {
     public_deps = [ "test_generic_fuchsia_device:generic_fuchsia_device_test($host_toolchain)" ]
   }
 
+  group("emulator_tests_fyi") {
+    testonly = true
+    public_deps = [
+      ":emulator_tests",
+      "test_generic_fuchsia_device:generic_fuchsia_device_test_fc($host_toolchain)",
+    ]
+  }
+
   group("nuc_tests") {
     testonly = true
     public_deps = [ "test_x64:x64_test($host_toolchain)" ]
   }
 
+  group("nuc_tests_fyi") {
+    testonly = true
+    public_deps = [
+      ":nuc_tests",
+      "test_x64:x64_test_fc($host_toolchain)",
+    ]
+  }
+
   group("tests") {
     testonly = true
     public_deps = [
-      ":emulator_tests",
-      ":nuc_tests",
+      ":emulator_tests_fyi",
+      ":nuc_tests_fyi",
     ]
   }
 }

@@ -3,26 +3,29 @@
 # found in the LICENSE file.
 
 import("//build/python/python_mobly_test.gni")
+import("//build/testing/environments.gni")
 
 if (is_host) {
   python_mobly_test("generic_fuchsia_device_test") {
     main_source = "test_generic_fuchsia_device.py"
-
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_fuchsia_device:test_fuchsia_device_lib",
     ]
-
     params_source = "params.yaml"
     local_config_source = "../../testbeds/One-FEmu.yaml"
+    environments = [ emu_env ]
+  }
 
-    # Used for infra Swarming bot allocation.
-    environments = [
-      {
-        dimensions = {
-          device_type = "AEMU"
-        }
-      },
+  python_mobly_test("generic_fuchsia_device_test_fc") {
+    main_source = "test_generic_fuchsia_device.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_fuchsia_device:test_fuchsia_device_lib",
     ]
+    params_source = "params.yaml"
+    local_config_source = "../../testbeds/One-FEmu.yaml"
+    transport = "fuchsia-controller"
+    environments = [ emu_env ]
   }
 }
