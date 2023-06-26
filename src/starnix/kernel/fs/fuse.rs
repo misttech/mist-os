@@ -6,13 +6,14 @@ use crate::{
     auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer, OutputBufferCallback},
-        default_eof_offset, default_seek, fileops_impl_nonseekable, fs_args, CacheMode, DirentSink,
-        FdEvents, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-        SeekTarget, SymlinkTarget, XattrOp,
+        default_eof_offset, default_seek, fileops_impl_nonseekable, fs_args, CacheMode,
+        DirectoryEntryType, DirentSink, FdEvents, FdNumber, FileObject, FileOps, FileSystem,
+        FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
+        FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, XattrOp,
     },
     lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::{log_error, log_trace, not_implemented},
+    mm::{vmo::round_up_to_increment, PAGE_SIZE},
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
     types::{
@@ -258,7 +259,7 @@ impl FileOps for FuseFileObject {
         if let Err(e) = self.connection.execute_operation(
             self.kernel.kthreads.system_task(),
             node,
-            FuseOperation::Release(self.open_out),
+            FuseOperation::Release(file.flags(), self.open_out),
         ) {
             log_error!("Error when relasing fh: {e:?}");
         }
@@ -431,12 +432,41 @@ impl FileOps for FuseFileObject {
 
     fn readdir(
         &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _sink: &mut dyn DirentSink,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
-        not_implemented!("FileOps::seek");
-        error!(ENOTDIR)
+        let node = self.get_fuse_node(file)?;
+        // Request a number of bytes related to the user capacity. If none is given, default to a
+        // single page of data.
+        let user_capacity = sink.user_capacity().unwrap_or(*PAGE_SIZE as usize);
+        let response = self.connection.execute_operation(
+            current_task,
+            node,
+            FuseOperation::Readdir(uapi::fuse_read_in {
+                fh: self.open_out.fh,
+                offset: sink.offset().try_into().map_err(|_| errno!(EINVAL))?,
+                size: user_capacity.try_into().map_err(|_| errno!(EINVAL))?,
+                read_flags: 0,
+                lock_owner: 0,
+                flags: 0,
+                padding: 0,
+            }),
+        )?;
+        let dirents = if let FuseResponse::Readdir(dirents) = response {
+            dirents
+        } else {
+            return error!(EINVAL);
+        };
+        for (dirent, name) in dirents {
+            sink.add(
+                dirent.ino,
+                dirent.off.try_into().map_err(|_| errno!(EINVAL))?,
+                DirectoryEntryType::from_bits(dirent.type_.try_into().map_err(|_| errno!(EINVAL))?),
+                &name,
+            )?;
+        }
+        Ok(())
     }
 
     fn ioctl(
@@ -1016,8 +1046,9 @@ enum FuseOperation {
     Open(OpenFlags),
     Poll(uapi::fuse_poll_in),
     Read(uapi::fuse_read_in),
+    Readdir(uapi::fuse_read_in),
     Readlink,
-    Release(uapi::fuse_open_out),
+    Release(OpenFlags, uapi::fuse_open_out),
     Seek(uapi::fuse_lseek_in),
     SetAttr(uapi::fuse_setattr_in),
     Statfs,
@@ -1050,6 +1081,7 @@ enum FuseResponse {
         // Content read
         Vec<u8>,
     ),
+    Readdir(Vec<(uapi::fuse_dirent, FsString)>),
     Statfs(uapi::fuse_statfs_out),
     Write(uapi::fuse_write_out),
     None,
@@ -1098,8 +1130,8 @@ impl FuseOperation {
                 len += Self::write_null_terminated(data, name)?;
                 Ok(len)
             }
-            Self::Read(read_in) => data.write_all(read_in.as_bytes()),
-            Self::Release(open_in) => {
+            Self::Read(read_in) | Self::Readdir(read_in) => data.write_all(read_in.as_bytes()),
+            Self::Release(_, open_in) => {
                 let message = uapi::fuse_release_in {
                     fh: open_in.fh,
                     flags: 0,
@@ -1143,11 +1175,24 @@ impl FuseOperation {
             Self::Mkdir(_, _) => uapi::fuse_opcode_FUSE_MKDIR,
             Self::Mknod(_, _) => uapi::fuse_opcode_FUSE_MKNOD,
             Self::Link(_, _) => uapi::fuse_opcode_FUSE_LINK,
-            Self::Open(_) => uapi::fuse_opcode_FUSE_OPEN,
+            Self::Open(flags) => {
+                if flags.contains(OpenFlags::DIRECTORY) {
+                    uapi::fuse_opcode_FUSE_OPENDIR
+                } else {
+                    uapi::fuse_opcode_FUSE_OPEN
+                }
+            }
             Self::Poll(_) => uapi::fuse_opcode_FUSE_POLL,
             Self::Read(_) => uapi::fuse_opcode_FUSE_READ,
+            Self::Readdir(_) => uapi::fuse_opcode_FUSE_READDIR,
             Self::Readlink => uapi::fuse_opcode_FUSE_READLINK,
-            Self::Release(_) => uapi::fuse_opcode_FUSE_RELEASE,
+            Self::Release(flags, _) => {
+                if flags.contains(OpenFlags::DIRECTORY) {
+                    uapi::fuse_opcode_FUSE_RELEASEDIR
+                } else {
+                    uapi::fuse_opcode_FUSE_RELEASE
+                }
+            }
             Self::Seek(_) => uapi::fuse_opcode_FUSE_LSEEK,
             Self::SetAttr(_) => uapi::fuse_opcode_FUSE_SETATTR,
             Self::Statfs => uapi::fuse_opcode_FUSE_STATFS,
@@ -1223,7 +1268,30 @@ impl FuseOperation {
                 Ok(FuseResponse::Poll(Self::to_response::<uapi::fuse_poll_out>(&buffer)))
             }
             Self::Read(_) | Self::Readlink => Ok(FuseResponse::Read(buffer)),
-            Self::Flush(_) | Self::Release(_) | Self::Unlink(_) => Ok(FuseResponse::None),
+            Self::Readdir(_) => {
+                let mut result = vec![];
+                let mut slice = &buffer[..];
+                while slice.len() >= std::mem::size_of::<uapi::fuse_dirent>() {
+                    let dirent = Self::to_response::<uapi::fuse_dirent>(slice);
+                    slice = &slice[std::mem::size_of::<uapi::fuse_dirent>()..];
+                    let namelen = dirent.namelen as usize;
+                    if slice.len() < namelen {
+                        return error!(EINVAL);
+                    }
+                    let name: FsString = slice[..namelen].to_owned();
+                    result.push((dirent, name));
+                    let skipped = round_up_to_increment(namelen, 8)?;
+                    if slice.len() < skipped {
+                        return error!(EINVAL);
+                    }
+                    slice = &slice[skipped..];
+                }
+                if !slice.is_empty() {
+                    return error!(EINVAL);
+                }
+                Ok(FuseResponse::Readdir(result))
+            }
+            Self::Flush(_) | Self::Release(_, _) | Self::Unlink(_) => Ok(FuseResponse::None),
             Self::Statfs => {
                 Ok(FuseResponse::Statfs(Self::to_response::<uapi::fuse_statfs_out>(&buffer)))
             }

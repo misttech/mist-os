@@ -26,6 +26,10 @@ impl DirectoryEntryType {
     pub const LNK: DirectoryEntryType = DirectoryEntryType(10);
     pub const SOCK: DirectoryEntryType = DirectoryEntryType(12);
 
+    pub fn from_bits(bits: u8) -> DirectoryEntryType {
+        Self(bits)
+    }
+
     pub fn from_mode(mode: FileMode) -> DirectoryEntryType {
         match mode.fmt() {
             FileMode::IFLNK => DirectoryEntryType::LNK,
@@ -92,6 +96,11 @@ pub trait DirentSink {
 
     /// The number of bytes which have been written into the sink.
     fn actual(&self) -> usize;
+
+    /// Optional information about the max number of bytes to send to the user.
+    fn user_capacity(&self) -> Option<usize> {
+        None
+    }
 }
 
 struct BaseDirentSink<'a> {
@@ -171,6 +180,10 @@ impl DirentSink for DirentSink64<'_> {
     fn actual(&self) -> usize {
         self.base.actual
     }
+
+    fn user_capacity(&self) -> Option<usize> {
+        Some(self.base.user_capacity)
+    }
 }
 
 pub struct DirentSink32<'a> {
@@ -223,5 +236,9 @@ impl DirentSink for DirentSink32<'_> {
 
     fn actual(&self) -> usize {
         self.base.actual
+    }
+
+    fn user_capacity(&self) -> Option<usize> {
+        Some(self.base.user_capacity)
     }
 }

@@ -69,7 +69,7 @@ INCLUDE_DIRS = [
 
 # Additional traits that should be added to types matching the regexps.
 AUTO_DERIVE_TRAITS = [
-    (r'__IncompleteArrayField', ['AsBytes, FromBytes', 'FromZeroes']),
+    (r'__IncompleteArrayField', ['Clone', 'AsBytes, FromBytes', 'FromZeroes']),
     (r'__sifields__bindgen_ty_7', ['AsBytes, FromBytes', 'FromZeroes']),
     (
         r'binder_transaction_data__bindgen_ty_2__bindgen_ty_1',
@@ -80,6 +80,7 @@ AUTO_DERIVE_TRAITS = [
         ['AsBytes', 'FromBytes', 'FromZeroes']),
     (r'bpf_attr.*', ['FromBytes', 'FromZeroes']),
     (r'flat_binder_object.*', ['FromBytes', 'FromZeroes']),
+    (r'fuse_dirent', ['Clone', 'AsBytes', 'FromBytes', 'FromZeroes']),
     (r'ifreq.*', ['FromBytes', 'FromZeroes']),
     (r'if_settings.*', ['FromBytes', 'FromZeroes']),
     (r'ip6?t_entry', ['FromBytes', 'FromZeroes']),

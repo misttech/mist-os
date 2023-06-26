@@ -143,7 +143,7 @@ where
     }
 }
 #[repr(transparent)]
-#[derive(Default, AsBytes, FromBytes, FromZeroes)]
+#[derive(Default, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct __IncompleteArrayField<T>(::std::marker::PhantomData<T>, [T; 0]);
 impl<T> __IncompleteArrayField<T> {
     #[inline]
@@ -8976,7 +8976,7 @@ pub struct fuse_out_header {
     pub unique: u64,
 }
 #[repr(C)]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct fuse_dirent {
     pub ino: u64,
     pub off: u64,
@@ -8985,7 +8985,7 @@ pub struct fuse_dirent {
     pub name: __IncompleteArrayField<crate::types::c_char>,
 }
 #[repr(C)]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct fuse_direntplus {
     pub entry_out: fuse_entry_out,
     pub dirent: fuse_dirent,

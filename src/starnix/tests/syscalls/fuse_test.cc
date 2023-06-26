@@ -5,14 +5,17 @@
 #ifndef SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
 #define SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <gtest/gtest.h>
+#include <linux/fuse.h>
 #include <linux/magic.h>
 
 #include "src/starnix/tests/syscalls/syscall_matchers.h"
@@ -275,6 +278,51 @@ TEST_F(FuseTest, Truncate) {
   fd = ScopedFD(open(file.c_str(), O_RDONLY));
   char buffer[10];
   ASSERT_EQ(read(fd.get(), buffer, 10), 2);
+}
+
+TEST_F(FuseTest, Readdir) {
+  // Create enough file to ensure more than one call to the fuse operation is
+  // needed to read the full content of a directory. Experimentally, the libc
+  // creates a buffer of 32k bytes when the user calls readdir.
+  const size_t kFileCount = (32768 / (sizeof(struct fuse_dirent) + 6)) + 1;
+  ASSERT_TRUE(Mount());
+  std::string root = GetMountDir();
+  for (size_t i = 0; i < kFileCount; ++i) {
+    std::string value = std::to_string(i / 2);
+    if (i % 2 == 0) {
+      ASSERT_EQ(mkdir((root + "/dir_" + value).c_str(), 0777), 0);
+    } else {
+      ScopedFD fd(open((root + "/file" + value).c_str(), O_WRONLY | O_CREAT));
+      ASSERT_TRUE(fd.is_valid());
+    }
+  }
+
+  std::map<std::string, struct dirent> files;
+  DIR* dir = opendir(root.c_str());
+  ASSERT_TRUE(dir);
+  while (struct dirent* entry = readdir(dir)) {
+    std::string name = entry->d_name;
+    files[name] = *entry;
+  }
+  closedir(dir);
+  ASSERT_EQ(files.size(), 2u + kFileCount);
+  ASSERT_NE(files.find("witness"), files.end());
+  ASSERT_NE(files.find("."), files.end());
+  // fuse-overlayfs doesn't contain .. on root
+  ASSERT_EQ(files.find(".."), files.end());
+
+  files.clear();
+  std::string dir1 = GetMountDir() + "/dir_0";
+  dir = opendir(dir1.c_str());
+  ASSERT_TRUE(dir);
+  while (struct dirent* entry = readdir(dir)) {
+    std::string name = entry->d_name;
+    files[name] = *entry;
+  }
+  closedir(dir);
+  ASSERT_EQ(files.size(), 2u);
+  ASSERT_NE(files.find("."), files.end());
+  ASSERT_NE(files.find(".."), files.end());
 }
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
