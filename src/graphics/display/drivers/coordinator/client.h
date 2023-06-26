@@ -49,6 +49,7 @@
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
@@ -271,7 +272,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // Cleans up layer state associated with an Image. `image` must be valid.
   // Returns true if a current layer has been modified.
   bool CleanUpImage(Image& image);
-  void CleanUpCaptureImage(uint64_t id);
+  void CleanUpCaptureImage(CaptureImageId id);
 
   // Displays' pending layers list may have been changed by pending
   // SetDisplayLayers() operations.
@@ -286,9 +287,13 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   const bool is_vc_;
   const uint32_t id_;
   bool running_;
-  uint64_t next_capture_image_id_ = 1;  // Only INVALID_ID == 0 is invalid
   Image::Map images_;
+
+  // Only kInvalidCaptureImageId == 0 is invalid.
+  CaptureImageId next_capture_image_id_ = CaptureImageId(1);
+
   CaptureImage::Map capture_images_;
+
   DisplayConfig::Map configs_;
   bool pending_config_valid_ = false;
   bool is_owner_ = false;
@@ -328,16 +333,25 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   bool CheckConfig(fuchsia_hardware_display::wire::ConfigResult* res,
                    std::vector<fuchsia_hardware_display::wire::ClientCompositionOp>* ops);
 
-  uint64_t GetActiveCaptureImage() { return current_capture_image_; }
-
   // The state of the FIDL binding. See comments on
   // |DisplayControllerBindingState|.
   DisplayControllerBindingState binding_state_;
 
   // Capture related book keeping
   uint64_t capture_fence_id_ = INVALID_ID;
-  uint64_t current_capture_image_ = INVALID_ID;
-  uint64_t pending_capture_release_image_ = INVALID_ID;
+
+  // Points to the image whose contents is modified by the current capture.
+  //
+  // Invalid when no is capture in progress.
+  CaptureImageId current_capture_image_id_ = kInvalidCaptureImageId;
+
+  // Tracks an image released by the client while used by a capture.
+  //
+  // The coordinator must ensure that an image remains valid while a display
+  // engine is writing to it. If a client attempts to release the image used by
+  // an in-progress capture, we defer the release operation until the capture
+  // completes. The deferred release is tracked here.
+  CaptureImageId pending_release_capture_image_id_ = kInvalidCaptureImageId;
 
   uint64_t acked_cookie_ = 0;
 };

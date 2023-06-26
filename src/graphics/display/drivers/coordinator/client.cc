@@ -40,11 +40,15 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/string_printf.h>
 
+#include "src/graphics/display/drivers/coordinator/capture-image.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -78,8 +82,7 @@ void DisplayConfig::InitializeInspect(inspect::Node* parent) {
 }
 
 void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& completer) {
-  const display::BufferCollectionId buffer_collection_id =
-      ToBufferCollectionId(request->collection_id);
+  const BufferCollectionId buffer_collection_id = ToBufferCollectionId(request->collection_id);
   auto it = collection_map_.find(buffer_collection_id);
   if (it == collection_map_.end()) {
     completer.Reply(ZX_ERR_INVALID_ARGS);
@@ -88,7 +91,8 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   const auto& collections = it->second;
 
   // Can't import an image with an id that's already in use.
-  auto image_check = images_.find(request->image_id);
+  const ImageId image_id = ToImageId(request->image_id);
+  auto image_check = images_.find(image_id);
   if (image_check.IsValid()) {
     completer.Reply(ZX_ERR_ALREADY_EXISTS);
     return;
@@ -121,7 +125,6 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
     return;
   }
 
-  auto image_id = request->image_id;
   image->id = image_id;
   release_image.cancel();
   images_.insert(std::move(image));
@@ -131,7 +134,8 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
 
 void Client::ReleaseImage(ReleaseImageRequestView request,
                           ReleaseImageCompleter::Sync& /*_completer*/) {
-  auto image = images_.find(request->image_id);
+  const ImageId image_id = ToImageId(request->image_id);
+  auto image = images_.find(image_id);
   if (!image.IsValid()) {
     return;
   }
@@ -541,7 +545,8 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
     return;
   }
 
-  auto image = images_.find(request->image_id);
+  const ImageId image_id = ToImageId(request->image_id);
+  auto image = images_.find(image_id);
   if (!image.IsValid() || !image->Acquire()) {
     zxlogf(ERROR, "SetLayerImage ordinal with %s image", !image.IsValid() ? "invl" : "busy");
     TearDown();
@@ -731,20 +736,22 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
   const uint64_t banjo_driver_buffer_collection_id =
       display::ToBanjoDriverBufferCollectionId(collections.driver_buffer_collection_id);
 
-  uint64_t capture_image_handle = INVALID_ID;
+  uint64_t banjo_driver_capture_image_id = INVALID_ID;
   zx_status_t status = controller_->dc()->ImportImageForCapture(
-      banjo_driver_buffer_collection_id, request->index, &capture_image_handle);
+      banjo_driver_buffer_collection_id, request->index, &banjo_driver_capture_image_id);
   if (status != ZX_OK) {
     completer.ReplyError(status);
     return;
   }
-
-  auto release_image = fit::defer(
-      [this, capture_image_handle]() { controller_->dc()->ReleaseCapture(capture_image_handle); });
+  auto release_image = fit::defer([this, banjo_driver_capture_image_id]() {
+    controller_->dc()->ReleaseCapture(banjo_driver_capture_image_id);
+  });
+  const DriverCaptureImageId driver_capture_image_id =
+      ToDriverCaptureImageId(banjo_driver_capture_image_id);
 
   fbl::AllocChecker alloc_checker;
-  fbl::RefPtr<CaptureImage> capture_image = fbl::AdoptRef(
-      new (&alloc_checker) CaptureImage(controller_, capture_image_handle, &proxy_->node(), id_));
+  fbl::RefPtr<CaptureImage> capture_image = fbl::AdoptRef(new (&alloc_checker) CaptureImage(
+      controller_, driver_capture_image_id, &proxy_->node(), id_));
   if (!alloc_checker.check()) {
     completer.ReplyError(ZX_ERR_NO_MEMORY);
     return;
@@ -752,10 +759,10 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
   // `capture_image_handle` is now owned by the CaptureImage instance.
   release_image.cancel();
 
-  const uint64_t capture_image_id = next_capture_image_id_++;
+  const CaptureImageId capture_image_id = next_capture_image_id_++;
   capture_image->id = capture_image_id;
   capture_images_.insert(std::move(capture_image));
-  completer.ReplySuccess(capture_image_id);
+  completer.ReplySuccess(ToFidlCaptureImageId(capture_image_id));
 }
 
 void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter::Sync& completer) {
@@ -766,7 +773,7 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
   }
 
   // Don't start capture if one is in progress
-  if (current_capture_image_ != INVALID_ID) {
+  if (current_capture_image_id_ != kInvalidCaptureImageId) {
     completer.ReplyError(ZX_ERR_SHOULD_WAIT);
     return;
   }
@@ -779,7 +786,8 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
   }
 
   // Ensure we are capturing into a valid image buffer
-  auto image = capture_images_.find(request->image_id);
+  const CaptureImageId capture_image_id(request->image_id);
+  auto image = capture_images_.find(capture_image_id);
   if (!image.IsValid()) {
     zxlogf(ERROR, "Invalid Capture Image ID requested for capture");
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
@@ -787,7 +795,8 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
   }
 
   capture_fence_id_ = request->signal_event_id;
-  auto status = controller_->dc()->StartCapture(image->capture_image_handle());
+  auto status = controller_->dc()->StartCapture(
+      ToBanjoDriverCaptureImageId(image->driver_capture_image_id()));
   if (status == ZX_OK) {
     fbl::AutoLock lock(controller_->mtx());
     proxy_->EnableCapture(true);
@@ -797,7 +806,7 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
   }
 
   // keep track of currently active capture image
-  current_capture_image_ = request->image_id;  // Is this right?
+  current_capture_image_id_ = capture_image_id;  // Is this right?
 }
 
 void Client::ReleaseCapture(ReleaseCaptureRequestView request,
@@ -809,7 +818,8 @@ void Client::ReleaseCapture(ReleaseCaptureRequestView request,
   }
 
   // Ensure we are releasing a valid image buffer
-  auto image = capture_images_.find(request->image_id);
+  const CaptureImageId capture_image_id(request->image_id);
+  auto image = capture_images_.find(capture_image_id);
   if (!image.IsValid()) {
     zxlogf(ERROR, "Invalid Capture Image ID requested for release");
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
@@ -817,10 +827,10 @@ void Client::ReleaseCapture(ReleaseCaptureRequestView request,
   }
 
   // Make sure we are not releasing an active capture.
-  if (current_capture_image_ == request->image_id) {
+  if (current_capture_image_id_ == capture_image_id) {
     // we have an active capture. Release it when capture is completed
     zxlogf(WARNING, "Capture is active. Will release after capture is complete");
-    pending_capture_release_image_ = current_capture_image_;
+    pending_release_capture_image_id_ = current_capture_image_id_;
   } else {
     // release image now
     capture_images_.erase(image);
@@ -1306,14 +1316,14 @@ void Client::CaptureCompleted() {
   }
 
   // release any pending capture images
-  if (pending_capture_release_image_ != INVALID_ID) {
-    auto image = capture_images_.find(pending_capture_release_image_);
+  if (pending_release_capture_image_id_ != kInvalidCaptureImageId) {
+    auto image = capture_images_.find(pending_release_capture_image_id_);
     if (image.IsValid()) {
       capture_images_.erase(image);
     }
-    pending_capture_release_image_ = INVALID_ID;
+    pending_release_capture_image_id_ = kInvalidCaptureImageId;
   }
-  current_capture_image_ = INVALID_ID;
+  current_capture_image_id_ = kInvalidCaptureImageId;
 }
 
 void Client::TearDown() {
@@ -1333,9 +1343,10 @@ void Client::TearDown() {
   running_ = false;
 
   CleanUpAllImages();
-  zxlogf(INFO, "Releasing %lu capture images cur=%lu, pending=%lu", capture_images_.size(),
-         current_capture_image_, pending_capture_release_image_);
-  current_capture_image_ = pending_capture_release_image_ = INVALID_ID;
+  zxlogf(INFO, "Releasing %zu capture images cur=%" PRIu64 ", pending=%" PRIu64,
+         capture_images_.size(), current_capture_image_id_.value(),
+         pending_release_capture_image_id_.value());
+  current_capture_image_id_ = pending_release_capture_image_id_ = kInvalidCaptureImageId;
   capture_images_.clear();
 
   fences_.Clear();
@@ -1396,8 +1407,8 @@ bool Client::CleanUpImage(Image& image) {
   return current_config_changed;
 }
 
-void Client::CleanUpCaptureImage(uint64_t id) {
-  if (id == INVALID_ID) {
+void Client::CleanUpCaptureImage(CaptureImageId id) {
+  if (id == kInvalidCaptureImageId) {
     return;
   }
   // If the image is currently active, the underlying driver will retain a

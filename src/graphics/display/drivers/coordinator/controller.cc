@@ -41,8 +41,10 @@
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/eld.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
+#include "src/graphics/display/lib/api-types-cpp/capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 
 namespace fidl_display = fuchsia_hardware_display;
 
@@ -280,9 +282,9 @@ void Controller::DisplayCaptureInterfaceOnCaptureComplete() {
   task->set_handler([this](async_dispatcher_t* dispatcher, async::Task* task, zx_status_t status) {
     if (status == ZX_OK) {
       // Free an image that was previously used by the hardware.
-      if (pending_capture_image_release_ != 0) {
-        ReleaseCaptureImage(pending_capture_image_release_);
-        pending_capture_image_release_ = 0;
+      if (pending_release_capture_image_id_ != kInvalidDriverCaptureImageId) {
+        ReleaseCaptureImage(pending_release_capture_image_id_);
+        pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
       }
       fbl::AutoLock lock(mtx());
       if (vc_client_ && vc_ready_) {
@@ -409,7 +411,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
         //
         // NOTE: If changing this flow name or ID, please also do so in the
         // corresponding FLOW_BEGIN in display_swapchain.cc.
-        TRACE_FLOW_END("gfx", "present_image", image_to_retire->id);
+        TRACE_FLOW_END("gfx", "present_image", image_to_retire->id.value());
       } else {
         it++;
       }
@@ -443,7 +445,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
         //
         // NOTE: If changing this flow name or ID, please also do so in the
         // corresponding FLOW_BEGIN in display_swapchain.cc.
-        TRACE_FLOW_END("gfx", "present_image", image.image_id);
+        TRACE_FLOW_END("gfx", "present_image", image.image_id.value());
       }
     }
   }
@@ -634,20 +636,21 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
 
 void Controller::ReleaseImage(Image* image) { dc_.ReleaseImage(&image->info()); }
 
-void Controller::ReleaseCaptureImage(uint64_t handle) {
+void Controller::ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id) {
   if (!supports_capture_) {
     return;
   }
-  if (handle == 0) {
+  if (driver_capture_image_id == kInvalidDriverCaptureImageId) {
     return;
   }
 
-  const zx_status_t release_status = dc_.ReleaseCapture(handle);
+  const zx_status_t release_status =
+      dc_.ReleaseCapture(ToBanjoDriverCaptureImageId(driver_capture_image_id));
   if (release_status == ZX_ERR_SHOULD_WAIT) {
-    ZX_DEBUG_ASSERT_MSG(pending_capture_image_release_ == 0,
+    ZX_DEBUG_ASSERT_MSG(pending_release_capture_image_id_ == kInvalidDriverCaptureImageId,
                         "multiple pending releases for capture images");
     // Delay the image release until the hardware is done.
-    pending_capture_image_release_ = handle;
+    pending_release_capture_image_id_ = driver_capture_image_id;
   }
 }
 

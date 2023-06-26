@@ -56,7 +56,7 @@ class LayerTest : public TestBase {
   static constexpr uint32_t kDisplayHeight = 600;
 
   std::unique_ptr<FenceCollection> fences_;
-  uint64_t next_image_id_ = 1;
+  ImageId next_image_id_ = ImageId(1);
 };
 
 TEST_F(LayerTest, PrimaryBasic) {

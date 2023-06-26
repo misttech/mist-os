@@ -118,7 +118,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
     const ConfigStamp config_stamp;
 
     struct ImageMetadata {
-      uint64_t image_id;
+      ImageId image_id;
       uint64_t client_id;
     };
     std::vector<ImageMetadata> images;

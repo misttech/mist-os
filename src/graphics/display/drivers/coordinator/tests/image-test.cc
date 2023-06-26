@@ -41,7 +41,7 @@ class ImageTest : public TestBase, public FenceCallback {
   }
 
  private:
-  uint64_t next_image_id_ = 1;
+  ImageId next_image_id_ = ImageId(1);
 };
 
 TEST_F(ImageTest, MultipleAcquiresAllowed) {

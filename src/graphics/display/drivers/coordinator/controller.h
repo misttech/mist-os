@@ -29,13 +29,16 @@
 #include <fbl/intrusive_hash_table.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/capture-image.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
+#include "src/graphics/display/lib/api-types-cpp/capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/lib/async-watchdog/watchdog.h"
 
@@ -92,7 +95,7 @@ class Controller : public DeviceType,
       __TA_EXCLUDES(mtx());
 
   void ReleaseImage(Image* image);
-  void ReleaseCaptureImage(uint64_t handle);
+  void ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id);
 
   // |mtx()| must be held for as long as |edid| and |params| are retained.
   bool GetPanelConfig(DisplayId display_id, const fbl::Vector<edid::timing_params_t>** timings,
@@ -166,7 +169,7 @@ class Controller : public DeviceType,
   bool vc_applied_ = false;
   uint32_t applied_layer_stamp_ = UINT32_MAX;
   uint32_t applied_client_id_ = 0;
-  uint64_t pending_capture_image_release_ = 0;
+  DriverCaptureImageId pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
 
   bool supports_capture_ = false;
 

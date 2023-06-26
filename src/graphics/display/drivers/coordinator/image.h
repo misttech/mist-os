@@ -21,6 +21,7 @@
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 
 namespace display {
 
@@ -43,8 +44,7 @@ class Controller;
 //
 // One special transition exists: upon the owning Client's death/disconnection, the
 // ImageUse will move from ACQUIRED to NOT_READY.
-class Image : public fbl::RefCounted<Image>,
-              public IdMappable<fbl::RefPtr<Image>, /*IdType=*/uint64_t> {
+class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image>, ImageId> {
  private:
   // Private forward declaration.
   template <typename PtrType, typename TagType>

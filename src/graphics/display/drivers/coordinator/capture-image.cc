@@ -15,15 +15,17 @@
 
 namespace display {
 
-CaptureImage::CaptureImage(Controller* controller, uint64_t capture_image_handle,
+CaptureImage::CaptureImage(Controller* controller, DriverCaptureImageId driver_capture_image_id,
                            inspect::Node* parent_node, uint32_t client_id)
-    : capture_image_handle_(capture_image_handle), client_id_(client_id), controller_(controller) {
+    : driver_capture_image_id_(driver_capture_image_id),
+      client_id_(client_id),
+      controller_(controller) {
   ZX_DEBUG_ASSERT(controller_ != nullptr);
 
   InitializeInspect(parent_node);
 }
 
-CaptureImage::~CaptureImage() { controller_->ReleaseCaptureImage(capture_image_handle_); }
+CaptureImage::~CaptureImage() { controller_->ReleaseCaptureImage(driver_capture_image_id_); }
 
 void CaptureImage::InitializeInspect(inspect::Node* parent_node) {
   if (!parent_node)

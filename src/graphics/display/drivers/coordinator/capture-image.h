@@ -12,25 +12,27 @@
 #include <fbl/ref_counted.h>
 
 #include "src/graphics/display/drivers/coordinator/id-map.h"
+#include "src/graphics/display/lib/api-types-cpp/capture-image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 
 namespace display {
 
 class Controller;
 
 class CaptureImage : public fbl::RefCounted<CaptureImage>,
-                     public IdMappable<fbl::RefPtr<CaptureImage>, /*IdType=*/uint64_t> {
+                     public IdMappable<fbl::RefPtr<CaptureImage>, CaptureImageId> {
  public:
-  CaptureImage(Controller* controller, uint64_t capture_image_handle, inspect::Node* parent_node,
-               uint32_t client_id);
+  CaptureImage(Controller* controller, DriverCaptureImageId driver_capture_image_id,
+               inspect::Node* parent_node, uint32_t client_id);
   ~CaptureImage();
 
-  uint64_t capture_image_handle() const { return capture_image_handle_; }
+  DriverCaptureImageId driver_capture_image_id() const { return driver_capture_image_id_; }
   uint32_t client_id() const { return client_id_; }
 
  private:
   void InitializeInspect(inspect::Node* parent_node);
 
-  uint64_t capture_image_handle_;
+  DriverCaptureImageId driver_capture_image_id_;
   uint32_t client_id_;
 
   Controller* const controller_;
