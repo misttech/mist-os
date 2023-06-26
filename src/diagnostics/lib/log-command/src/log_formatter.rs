@@ -10,6 +10,7 @@ use diagnostics_data::{LogTextDisplayOptions, LogTextPresenter, LogsData, Timest
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
+use thiserror::Error;
 
 const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
 const NANOS_IN_SECOND: i64 = 1_000_000_000;
@@ -111,7 +112,7 @@ pub trait BootTimeAccessor {
 /// display options
 #[derive(Clone, Debug)]
 pub enum DisplayOption {
-    Text,
+    Text(LogTextDisplayOptions),
     Json,
 }
 
@@ -123,8 +124,16 @@ pub struct LogFormatterOptions {
 
 impl Default for LogFormatterOptions {
     fn default() -> Self {
-        LogFormatterOptions { display: DisplayOption::Text }
+        LogFormatterOptions { display: DisplayOption::Text(Default::default()) }
     }
+}
+
+#[derive(Error, Debug)]
+pub enum FormatterError {
+    #[error(transparent)]
+    UnknownError(#[from] anyhow::Error),
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
 }
 
 /// Default formatter implementation
@@ -137,7 +146,7 @@ pub struct DefaultLogFormatter<'a> {
 impl<'a> LogFormatter for DefaultLogFormatter<'_> {
     async fn push_log(&mut self, log_entry: LogEntry) -> Result<()> {
         match self.options.display {
-            DisplayOption::Text => {
+            DisplayOption::Text(_) => {
                 self.format_text_log(log_entry)?;
             }
             DisplayOption::Json => {
@@ -188,27 +197,25 @@ impl<'a> DefaultLogFormatter<'a> {
 
     // This function's arguments are copied to make lifetimes in push_log easier since borrowing
     // &self would complicate spam highlighting.
-    fn format_text_log(&mut self, log_entry: LogEntry) -> Result<(), anyhow::Error> {
+    fn format_text_log(&mut self, log_entry: LogEntry) -> Result<(), FormatterError> {
+        let text_options = match self.options.display {
+            DisplayOption::Text(o) => o,
+            DisplayOption::Json => {
+                unreachable!("If we are here, we can only be formatting text");
+            }
+        };
         Ok(match log_entry {
             LogEntry { data: LogData::TargetLog(data), .. } => {
                 // TODO(https://fxbug.dev/121413): Add support for log spam redaction and other
                 // features listed in the design doc.
-                writeln!(
-                    self.writer,
-                    "{}",
-                    LogTextPresenter::new(&data, LogTextDisplayOptions::default())
-                )?;
+                writeln!(self.writer, "{}", LogTextPresenter::new(&data, text_options))?;
             }
             LogEntry { data: LogData::SymbolizedTargetLog(mut data, symbolized), .. } => {
                 *data
                     .msg_mut()
                     .expect("if a symbolized message is provided then the payload has a message") =
                     symbolized;
-                writeln!(
-                    self.writer,
-                    "{}",
-                    LogTextPresenter::new(&data, LogTextDisplayOptions::default())
-                )?;
+                writeln!(self.writer, "{}", LogTextPresenter::new(&data, text_options))?;
             }
             LogEntry { data: LogData::MalformedTargetLog(raw), timestamp } => {
                 writeln!(
@@ -386,6 +393,23 @@ mod test {
         assert_eq!(
             String::from_utf8(stdout).unwrap(),
             "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message\n"
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_default_formatter_with_hidden_metadata() {
+        let mut stdout = vec![];
+        let mut options = LogFormatterOptions::default();
+        options.display = DisplayOption::Text(LogTextDisplayOptions {
+            show_metadata: false,
+            ..Default::default()
+        });
+        let mut formatter = DefaultLogFormatter::new(&mut stdout, options.clone());
+        formatter.push_log(log_entry()).await.unwrap();
+        drop(formatter);
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            "[1615535969.000000][some/moniker][tag1,tag2] WARN: message\n"
         );
     }
 
