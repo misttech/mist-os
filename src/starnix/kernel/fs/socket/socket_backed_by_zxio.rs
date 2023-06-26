@@ -6,7 +6,7 @@ use super::*;
 
 use crate::{
     fs::{buffers::*, fuchsia::*, *},
-    logging::log_warn,
+    logging::{log_warn, not_implemented},
     mm::MemoryAccessorExt,
     syscalls::*,
     task::*,
@@ -282,6 +282,13 @@ impl SocketOps for ZxioBackedSocket {
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
         let optval = task.mm.read_buffer(&user_opt)?;
+
+        if level == SOL_SOCKET && optname == SO_ATTACH_FILTER {
+            not_implemented!(
+                "TODO(https://fxbug.dev/129596): `SOL_SOCKET` -> `SO_ATTACH_FILTER` unsupported; returning success anyways"
+            );
+            return Ok(());
+        }
 
         self.zxio
             .setsockopt(level as i32, optname as i32, &optval)
