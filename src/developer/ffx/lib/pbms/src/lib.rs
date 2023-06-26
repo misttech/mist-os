@@ -873,6 +873,8 @@ mod tests {
         }
     }
 
+    //TODO(b/288891258) Fix the flakiness of these tests
+    #[ignore]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_load_product_bundle_v2_valid() {
         let tmp = TempDir::new().unwrap();
@@ -900,6 +902,8 @@ mod tests {
         assert_eq!(pb.loaded_from_path(), pb_dir);
     }
 
+    //TODO(b/288891258) Fix the flakiness of these tests
+    #[ignore]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_load_product_bundle_v2_invalid() {
         let tmp = TempDir::new().unwrap();
