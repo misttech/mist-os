@@ -4,31 +4,6 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-# Provides a C++ implementation of fuchsia.hardware.display.Provider, which returns a connection to
-# the default display controller (via a proxied connection to the driver-provided version).  This
-# makes it easy for a component to implement this service.
-#
-# NOTE: the component's sandbox must contain "dev": "class/display-coordinator".
-source_set("devfs_factory") {
-  sources = [
-    "devfs-factory.cc",
-    "devfs-factory.h",
-  ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/fidl/cpp",
-    "//src/lib/fsl",
-  ]
-  deps = [
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_wire",
-    "//sdk/lib/sys/cpp",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/fbl",
-  ]
-}
-
 # Provides a C++ utility function GetCoordinator() which connects to and
 # interacts with the fuchsia.hardware.display.Provider service, found within
 # the component's environment.

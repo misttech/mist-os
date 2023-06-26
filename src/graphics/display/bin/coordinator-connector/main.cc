@@ -10,7 +10,7 @@
 
 #include <memory>
 
-#include "src/graphics/display/testing/coordinator-connector-lib/devfs-factory.h"
+#include "src/graphics/display/bin/coordinator-connector/devfs-factory.h"
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
