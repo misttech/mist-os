@@ -348,10 +348,10 @@ where
                 _ => {}
             },
 
-            Err(err) => {
+            Err(err_ipv6) => {
                 debug!(
                     "Unable to parse IPv6 packet from host: {:?}, try parse as IPv4 packet",
-                    err
+                    err_ipv6
                 );
 
                 match Ipv4Packet::parse(&mut packet_bytes, ()) {
@@ -359,8 +359,8 @@ where
                         debug!("IPv4 packet from netstack");
                         return true;
                     }
-                    Err(err) => {
-                        warn!("Unable to parse packet as either IPv6 nor IPv4: {:?}", err);
+                    Err(err_ipv4) => {
+                        warn!("Unable to parse packet as either IPv6 nor IPv4: error \"{:?}\" and \"{:?}\", packet first byte: {:#02x}", err_ipv6, err_ipv4, packet_bytes[0]);
                     }
                 }
 
