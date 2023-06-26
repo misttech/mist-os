@@ -329,7 +329,7 @@ impl InputPipeline {
             match async {
                 let dir_proxy = fuchsia_fs::directory::open_in_namespace(
                     input_device::INPUT_REPORT_PATH,
-                    fio::OpenFlags::RIGHT_READABLE,
+                    fio::OpenFlags::empty(),
                 )
                 .with_context(|| format!("failed to open {}", input_device::INPUT_REPORT_PATH))?;
                 let device_watcher =
@@ -942,12 +942,7 @@ mod tests {
             create_proxy::<fio::DirectoryMarker>().unwrap();
         let server_end_for_watcher = dir_server_for_watcher.into_channel().into();
         let scope_for_watcher = ExecutionScope::new();
-        dir.open(
-            scope_for_watcher,
-            fio::OpenFlags::RIGHT_READABLE,
-            Path::dot(),
-            server_end_for_watcher,
-        );
+        dir.open(scope_for_watcher, fio::OpenFlags::empty(), Path::dot(), server_end_for_watcher);
         let device_watcher = Watcher::new(&dir_proxy_for_watcher).await.unwrap();
 
         // Get a proxy to the pseudo directory for the input pipeline. The input pipeline uses this
@@ -958,7 +953,7 @@ mod tests {
         let scope_for_pipeline = ExecutionScope::new();
         pseudo_dir_clone.open(
             scope_for_pipeline,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
             Path::dot(),
             server_end_for_pipeline,
         );
@@ -1069,12 +1064,7 @@ mod tests {
             create_proxy::<fio::DirectoryMarker>().unwrap();
         let server_end_for_watcher = dir_server_for_watcher.into_channel().into();
         let scope_for_watcher = ExecutionScope::new();
-        dir.open(
-            scope_for_watcher,
-            fio::OpenFlags::RIGHT_READABLE,
-            Path::dot(),
-            server_end_for_watcher,
-        );
+        dir.open(scope_for_watcher, fio::OpenFlags::empty(), Path::dot(), server_end_for_watcher);
         let device_watcher = Watcher::new(&dir_proxy_for_watcher).await.unwrap();
 
         // Get a proxy to the pseudo directory for the input pipeline. The input pipeline uses this
@@ -1085,7 +1075,7 @@ mod tests {
         let scope_for_pipeline = ExecutionScope::new();
         pseudo_dir_clone.open(
             scope_for_pipeline,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
             Path::dot(),
             server_end_for_pipeline,
         );
