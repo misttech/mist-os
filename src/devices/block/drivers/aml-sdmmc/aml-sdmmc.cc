@@ -662,19 +662,22 @@ void AmlSdmmc::WaitForBus() const {
   }
 }
 
-zx_status_t AmlSdmmc::TuningDoTransfer(zx::unowned_vmo received_block, size_t blk_pattern_size,
-                                       uint32_t tuning_cmd_idx) {
+zx_status_t AmlSdmmc::TuningDoTransfer(const TuneContext& context) {
+  fbl::AutoLock lock(&lock_);
+
+  SetTuneSettings(context.new_settings);
+
   const sdmmc_buffer_region_t buffer = {
-      .buffer = {.vmo = received_block->get()},
+      .buffer = {.vmo = context.vmo->get()},
       .type = SDMMC_BUFFER_TYPE_VMO_HANDLE,
       .offset = 0,
-      .size = blk_pattern_size,
+      .size = context.expected_block.size(),
   };
   const sdmmc_req_t tuning_req{
-      .cmd_idx = tuning_cmd_idx,
+      .cmd_idx = context.cmd,
       .cmd_flags = MMC_SEND_TUNING_BLOCK_FLAGS,
       .arg = 0,
-      .blocksize = static_cast<uint32_t>(blk_pattern_size),
+      .blocksize = static_cast<uint32_t>(context.expected_block.size()),
       .suppress_error_messages = true,
       .client_id = 0,
       .buffers_list = &buffer,
@@ -682,25 +685,29 @@ zx_status_t AmlSdmmc::TuningDoTransfer(zx::unowned_vmo received_block, size_t bl
   };
 
   uint32_t unused_response[4];
-  return SdmmcRequestLocked(&tuning_req, unused_response);
+  zx_status_t status = SdmmcRequestLocked(&tuning_req, unused_response);
+
+  // Restore the original tuning settings so that client transfers can still go through.
+  SetTuneSettings(context.original_settings);
+
+  return status;
 }
 
-bool AmlSdmmc::TuningTestSettings(cpp20::span<const uint8_t> tuning_blk, uint32_t tuning_cmd_idx,
-                                  zx::unowned_vmo received_block) {
+bool AmlSdmmc::TuningTestSettings(const TuneContext& context) {
   zx_status_t status = ZX_OK;
   size_t n;
   for (n = 0; n < AML_SDMMC_TUNING_TEST_ATTEMPTS; n++) {
-    status = TuningDoTransfer(received_block->borrow(), tuning_blk.size(), tuning_cmd_idx);
+    status = TuningDoTransfer(context);
     if (status != ZX_OK) {
       break;
     }
 
     uint8_t tuning_res[512] = {0};
-    if ((status = received_block->read(tuning_res, 0, tuning_blk.size())) != ZX_OK) {
+    if ((status = context.vmo->read(tuning_res, 0, context.expected_block.size())) != ZX_OK) {
       AML_SDMMC_ERROR("Failed to read VMO: %s", zx_status_get_string(status));
       break;
     }
-    if (memcmp(tuning_blk.data(), tuning_res, tuning_blk.size()) != 0) {
+    if (memcmp(context.expected_block.data(), tuning_res, context.expected_block.size()) != 0) {
       break;
     }
   }
@@ -735,61 +742,75 @@ AmlSdmmc::TuneWindow AmlSdmmc::GetFailingWindow(TuneResults results) {
   return largest_window;
 }
 
-AmlSdmmc::TuneResults AmlSdmmc::TuneDelayLines(cpp20::span<const uint8_t> tuning_blk,
-                                               uint32_t tuning_cmd_idx,
-                                               zx::unowned_vmo received_block) {
+AmlSdmmc::TuneResults AmlSdmmc::TuneDelayLines(const TuneContext& context) {
   TuneResults results = {};
+  TuneContext local_context = context;
   for (uint32_t i = 0; i <= max_delay(); i++) {
-    SetDelayLines(i);
-    if (TuningTestSettings(tuning_blk, tuning_cmd_idx, received_block->borrow())) {
+    local_context.new_settings.delay = i;
+    if (TuningTestSettings(local_context)) {
       results.results |= 1ULL << i;
     }
   }
   return results;
 }
 
-void AmlSdmmc::SetAdjDelay(uint32_t adj_delay) {
+void AmlSdmmc::SetTuneSettings(const TuneSettings& settings) {
   if (board_config_.version_3) {
-    AmlSdmmcAdjust::Get().ReadFrom(&mmio_).set_adj_delay(adj_delay).set_adj_fixed(1).WriteTo(
-        &mmio_);
-  } else {
-    AmlSdmmcAdjustV2::Get().ReadFrom(&mmio_).set_adj_delay(adj_delay).set_adj_fixed(1).WriteTo(
-        &mmio_);
-  }
-}
-
-void AmlSdmmc::SetDelayLines(uint32_t delay) {
-  if (board_config_.version_3) {
+    AmlSdmmcAdjust::Get()
+        .ReadFrom(&mmio_)
+        .set_adj_delay(settings.adj_delay)
+        .set_adj_fixed(1)
+        .WriteTo(&mmio_);
     AmlSdmmcDelay1::Get()
         .ReadFrom(&mmio_)
-        .set_dly_0(delay)
-        .set_dly_1(delay)
-        .set_dly_2(delay)
-        .set_dly_3(delay)
-        .set_dly_4(delay)
+        .set_dly_0(settings.delay)
+        .set_dly_1(settings.delay)
+        .set_dly_2(settings.delay)
+        .set_dly_3(settings.delay)
+        .set_dly_4(settings.delay)
         .WriteTo(&mmio_);
     AmlSdmmcDelay2::Get()
         .ReadFrom(&mmio_)
-        .set_dly_5(delay)
-        .set_dly_6(delay)
-        .set_dly_7(delay)
-        .set_dly_8(delay)
-        .set_dly_9(delay)
+        .set_dly_5(settings.delay)
+        .set_dly_6(settings.delay)
+        .set_dly_7(settings.delay)
+        .set_dly_8(settings.delay)
+        .set_dly_9(settings.delay)
         .WriteTo(&mmio_);
   } else {
+    AmlSdmmcAdjustV2::Get()
+        .ReadFrom(&mmio_)
+        .set_adj_delay(settings.adj_delay)
+        .set_adj_fixed(1)
+        .set_dly_8(settings.delay)
+        .set_dly_9(settings.delay)
+        .WriteTo(&mmio_);
     AmlSdmmcDelayV2::Get()
         .ReadFrom(&mmio_)
-        .set_dly_0(delay)
-        .set_dly_1(delay)
-        .set_dly_2(delay)
-        .set_dly_3(delay)
-        .set_dly_4(delay)
-        .set_dly_5(delay)
-        .set_dly_6(delay)
-        .set_dly_7(delay)
+        .set_dly_0(settings.delay)
+        .set_dly_1(settings.delay)
+        .set_dly_2(settings.delay)
+        .set_dly_3(settings.delay)
+        .set_dly_4(settings.delay)
+        .set_dly_5(settings.delay)
+        .set_dly_6(settings.delay)
+        .set_dly_7(settings.delay)
         .WriteTo(&mmio_);
-    AmlSdmmcAdjustV2::Get().ReadFrom(&mmio_).set_dly_8(delay).set_dly_9(delay).WriteTo(&mmio_);
   }
+}
+
+AmlSdmmc::TuneSettings AmlSdmmc::GetTuneSettings() {
+  TuneSettings settings{};
+
+  if (board_config_.version_3) {
+    settings.adj_delay = AmlSdmmcAdjust::Get().ReadFrom(&mmio_).adj_delay();
+    settings.delay = AmlSdmmcDelay1::Get().ReadFrom(&mmio_).dly_0();
+  } else {
+    settings.adj_delay = AmlSdmmcAdjustV2::Get().ReadFrom(&mmio_).adj_delay();
+    settings.delay = AmlSdmmcDelayV2::Get().ReadFrom(&mmio_).dly_0();
+  }
+
+  return settings;
 }
 
 uint32_t AmlSdmmc::max_delay() const {
@@ -815,39 +836,45 @@ uint32_t AmlSdmmc::DistanceToFailingPoint(TuneSettings point,
 }
 
 zx_status_t AmlSdmmc::SdmmcPerformTuning(uint32_t tuning_cmd_idx) {
-  fbl::AutoLock lock(&lock_);
+  fbl::AutoLock tuning_lock(&tuning_lock_);
 
-  cpp20::span<const uint8_t> tuning_blk;
+  const auto [bw, clk_div, settings] = [this]() {
+    fbl::AutoLock lock(&lock_);
+    const uint32_t bw = AmlSdmmcCfg::Get().ReadFrom(&mmio_).bus_width();
+    const uint32_t clk_div = AmlSdmmcClock::Get().ReadFrom(&mmio_).cfg_div();
+    return std::tuple{bw, clk_div, GetTuneSettings()};
+  }();
 
-  uint32_t bw = AmlSdmmcCfg::Get().ReadFrom(&mmio_).bus_width();
+  TuneContext context{.original_settings = settings};
+
   if (bw == AmlSdmmcCfg::kBusWidth4Bit) {
-    tuning_blk = cpp20::span<const uint8_t>(aml_sdmmc_tuning_blk_pattern_4bit,
-                                            sizeof(aml_sdmmc_tuning_blk_pattern_4bit));
+    context.expected_block = cpp20::span<const uint8_t>(aml_sdmmc_tuning_blk_pattern_4bit,
+                                                        sizeof(aml_sdmmc_tuning_blk_pattern_4bit));
   } else if (bw == AmlSdmmcCfg::kBusWidth8Bit) {
-    tuning_blk = cpp20::span<const uint8_t>(aml_sdmmc_tuning_blk_pattern_8bit,
-                                            sizeof(aml_sdmmc_tuning_blk_pattern_8bit));
+    context.expected_block = cpp20::span<const uint8_t>(aml_sdmmc_tuning_blk_pattern_8bit,
+                                                        sizeof(aml_sdmmc_tuning_blk_pattern_8bit));
   } else {
     AML_SDMMC_ERROR("Tuning at wrong buswidth: %d", bw);
     return ZX_ERR_INTERNAL;
   }
 
-  const uint32_t clk_div = AmlSdmmcClock::Get().ReadFrom(&mmio_).cfg_div();
-
   zx::vmo received_block;
-  zx_status_t status = zx::vmo::create(tuning_blk.size(), 0, &received_block);
+  zx_status_t status = zx::vmo::create(context.expected_block.size(), 0, &received_block);
   if (status != ZX_OK) {
     AML_SDMMC_ERROR("Failed to create VMO: %s", zx_status_get_string(status));
     return status;
   }
 
+  context.vmo = received_block.borrow();
+  context.cmd = tuning_cmd_idx;
+
   TuneResults adj_delay_results[AmlSdmmcClock::kMaxClkDiv] = {};
   for (uint32_t i = 0; i < clk_div; i++) {
-    SetAdjDelay(i);
-
     char property_name[28];  // strlen("tuning_results_adj_delay_63")
     snprintf(property_name, sizeof(property_name), "tuning_results_adj_delay_%u", i);
 
-    adj_delay_results[i] = TuneDelayLines(tuning_blk, tuning_cmd_idx, received_block.borrow());
+    context.new_settings.adj_delay = i;
+    adj_delay_results[i] = TuneDelayLines(context);
 
     const std::string results = adj_delay_results[i].ToString(max_delay());
 
@@ -862,17 +889,16 @@ zx_status_t AmlSdmmc::SdmmcPerformTuning(uint32_t tuning_cmd_idx) {
   zx::result<TuneSettings> tuning_settings =
       PerformTuning({adj_delay_results, adj_delay_results + clk_div});
   if (tuning_settings.is_error()) {
-    SetAdjDelay(0);
-    SetDelayLines(0);
     return tuning_settings.status_value();
   }
 
-  SetAdjDelay(tuning_settings->adj_delay);
+  {
+    fbl::AutoLock lock(&lock_);
+    SetTuneSettings(*tuning_settings);
+  }
+
   inspect_.adj_delay.Set(tuning_settings->adj_delay);
-
-  SetDelayLines(tuning_settings->delay);
   inspect_.delay_lines.Set(tuning_settings->delay);
-
   inspect_.distance_to_failing_point.Set(
       DistanceToFailingPoint(*tuning_settings, adj_delay_results));
 
@@ -883,9 +909,12 @@ zx_status_t AmlSdmmc::SdmmcPerformTuning(uint32_t tuning_cmd_idx) {
 
 zx::result<AmlSdmmc::TuneSettings> AmlSdmmc::PerformTuning(
     cpp20::span<const TuneResults> adj_delay_results) {
+  ZX_DEBUG_ASSERT(adj_delay_results.size() <= UINT32_MAX);
+  const auto clk_div = static_cast<uint32_t>(adj_delay_results.size());
+
   TuneWindow largest_failing_window = {};
   uint32_t failing_adj_delay = 0;
-  for (uint32_t i = 0; i < adj_delay_results.size(); i++) {
+  for (uint32_t i = 0; i < clk_div; i++) {
     const TuneWindow failing_window = GetFailingWindow(adj_delay_results[i]);
     if (failing_window.size > largest_failing_window.size) {
       largest_failing_window = failing_window;
@@ -898,7 +927,6 @@ zx::result<AmlSdmmc::TuneSettings> AmlSdmmc::PerformTuning(
     return zx::ok(TuneSettings{0, 0});
   }
 
-  const uint32_t clk_div = AmlSdmmcClock::Get().ReadFrom(&mmio_).cfg_div();
   const uint32_t best_adj_delay = (failing_adj_delay + (clk_div / 2)) % clk_div;
 
   // For even dividers adj_delay will be exactly 180 degrees phase shifted from the chosen point,

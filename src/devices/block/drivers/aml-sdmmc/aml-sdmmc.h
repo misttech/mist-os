@@ -77,7 +77,7 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
   zx_status_t SdmmcSetBusFreq(uint32_t bus_freq) TA_EXCL(lock_);
   zx_status_t SdmmcSetTiming(sdmmc_timing_t timing) TA_EXCL(lock_);
   zx_status_t SdmmcHwReset() TA_EXCL(lock_);
-  zx_status_t SdmmcPerformTuning(uint32_t cmd_idx) TA_EXCL(lock_);
+  zx_status_t SdmmcPerformTuning(uint32_t cmd_idx) TA_EXCL(tuning_lock_);
   zx_status_t SdmmcRegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb);
   void SdmmcAckInBandInterrupt() {}
   zx_status_t SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo, uint64_t offset,
@@ -151,6 +151,14 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
     void Init(const pdev_device_info_t& device_info);
   };
 
+  struct TuneContext {
+    zx::unowned_vmo vmo;
+    cpp20::span<const uint8_t> expected_block;
+    uint32_t cmd;
+    TuneSettings new_settings;
+    TuneSettings original_settings;
+  };
+
   using SdmmcVmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t, OwnedVmoInfo>>;
 
   aml_sdmmc_desc_t* descs() const TA_REQ(lock_) {
@@ -162,18 +170,16 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
   uint32_t DistanceToFailingPoint(TuneSettings point,
                                   cpp20::span<const TuneResults> adj_delay_results);
   zx::result<TuneSettings> PerformTuning(cpp20::span<const TuneResults> adj_delay_results);
-  zx_status_t TuningDoTransfer(zx::unowned_vmo received_block, size_t blk_pattern_size,
-                               uint32_t tuning_cmd_idx) TA_REQ(lock_);
-  bool TuningTestSettings(cpp20::span<const uint8_t> tuning_blk, uint32_t tuning_cmd_idx,
-                          zx::unowned_vmo received_block) TA_REQ(lock_);
+  zx_status_t TuningDoTransfer(const TuneContext& context) TA_REQ(tuning_lock_);
+  bool TuningTestSettings(const TuneContext& context) TA_REQ(tuning_lock_);
   // Sweeps from zero to the max delay and creates a TuneWindow representing the largest span of
   // delay values that failed.
   TuneWindow GetFailingWindow(TuneResults results);
-  TuneResults TuneDelayLines(cpp20::span<const uint8_t> tuning_blk, uint32_t tuning_cmd_idx,
-                             zx::unowned_vmo received_block) TA_REQ(lock_);
+  TuneResults TuneDelayLines(const TuneContext& context) TA_REQ(tuning_lock_);
 
-  void SetAdjDelay(uint32_t adj_delay) TA_REQ(lock_);
-  void SetDelayLines(uint32_t delay) TA_REQ(lock_);
+  void SetTuneSettings(const TuneSettings& settings) TA_REQ(lock_);
+  TuneSettings GetTuneSettings() TA_REQ(lock_);
+
   uint32_t max_delay() const;
 
   void ConfigureDefaultRegs() TA_REQ(lock_);
@@ -212,7 +218,8 @@ class AmlSdmmc : public AmlSdmmcType, public ddk::SdmmcProtocol<AmlSdmmc, ddk::b
   ddk::IoBuffer descs_buffer_ TA_GUARDED(lock_);
   uint32_t max_freq_, min_freq_;
 
-  fbl::Mutex lock_;
+  fbl::Mutex lock_ TA_ACQ_AFTER(tuning_lock_);
+  fbl::Mutex tuning_lock_ TA_ACQ_BEFORE(lock_);
   bool shutdown_ TA_GUARDED(lock_) = false;
   std::array<SdmmcVmoStore, SDMMC_MAX_CLIENT_ID + 1> registered_vmos_ TA_GUARDED(lock_);
 
