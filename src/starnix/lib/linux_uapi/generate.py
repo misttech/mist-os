@@ -90,6 +90,8 @@ AUTO_DERIVE_TRAITS = [
     (r'in6_pktinfo', ['AsBytes', 'FromBytes', 'FromZeroes']),
     (r'inotify_event', ['AsBytes']),
     (r'ip6t_ip6', ['FromBytes', 'FromZeroes']),
+    (r'robust_list_head', ['FromBytes', 'FromZeroes']),
+    (r'robust_list', ['FromBytes', 'FromZeroes']),
     (r'sockaddr_in*', ['AsBytes', 'FromBytes', 'FromZeroes']),
     (r'sock_fprog', ['FromBytes', 'FromZeroes']),
     (r'sysinfo', ['AsBytes']),

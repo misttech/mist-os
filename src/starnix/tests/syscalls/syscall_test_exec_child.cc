@@ -2,15 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <time.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-#include "src/starnix/tests/syscalls/task_test.h"
-
-// This simple program is used to exec for the Task.Clone3Vfork test. That test blocks until
-// this child process has executed. To help ensure that the test actually waits for this process'
-// completion, this process does a short sleep.
+// This simple program is used for the
+// RobustFutexTest.FutexStateAfterExecCheck test. That test ensures that robust
+// futexes are notified when an exec happens.  Because robust futexes are also
+// notified when the process exits, we wait until the test is finished before
+// exiting the process.  We notify the test that we have started by printing
+// "ready" to stdout.  The test indicates that it has finished checking the futex value
+// by unlocking the file provided in argv[1], at which point this process can exit.
 int main(int argc, char** argv) {
-  struct timespec request = {.tv_sec = 0, .tv_nsec = kCloneVforkSleepNS};
-  nanosleep(&request, nullptr);
-  return 0;
+  if (argc < 2) {
+    return 1;
+  }
+  fprintf(stdout, "ready");
+  int fd = open(argv[1], O_RDWR | O_CREAT | O_TRUNC, 0777);
+  struct flock fl = {.l_type = F_WRLCK, .l_whence = SEEK_SET, .l_start = 0, .l_len = 0};
+  fcntl(fd, F_SETLK, &fl);
 }

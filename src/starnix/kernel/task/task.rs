@@ -75,6 +75,7 @@ type SyscallRestartFunc =
 
 impl std::ops::Drop for CurrentTask {
     fn drop(&mut self) {
+        self.notify_robust_list();
         let _ignored = self.clear_child_tid_if_needed();
         self.thread_group.remove(&self.task);
 
@@ -256,8 +257,9 @@ pub struct TaskMutableState {
     /// List of currently installed seccomp_filters
     pub seccomp_filters: SeccompFilterContainer,
 
-    /// A pointer to the head of the robust futex list of this thread.
-    pub robust_list_head: UserAddress,
+    /// A pointer to the head of the robust futex list of this thread in
+    /// userspace. See get_robust_list(2)
+    pub robust_list_head: UserRef<robust_list_head>,
 }
 
 impl TaskMutableState {
@@ -442,6 +444,7 @@ impl Task {
         no_new_privs: bool,
         seccomp_filter_state: SeccompState,
         seccomp_filters: SeccompFilterContainer,
+        robust_list_head: UserRef<robust_list_head>,
     ) -> Self {
         let fs = {
             let result = OnceCell::new();
@@ -475,7 +478,7 @@ impl Task {
                 no_new_privs,
                 oom_score_adj: Default::default(),
                 seccomp_filters,
-                robust_list_head: UserAddress::NULL,
+                robust_list_head,
             }),
             seccomp_filter_state,
         };
@@ -623,6 +626,7 @@ impl Task {
             false,
             SeccompState::default(),
             SeccompFilterContainer::default(),
+            UserAddress::NULL.into(),
         ));
         current_task.thread_group.add(&current_task.task)?;
 
@@ -714,11 +718,13 @@ impl Task {
         let uts_ns;
         let no_new_privs;
         let seccomp_filters;
+        let robust_list_head;
         {
             let state = self.read();
 
             no_new_privs = state.no_new_privs;
             seccomp_filters = state.seccomp_filters.clone();
+            robust_list_head = UserAddress::NULL.into();
         }
         let TaskInfo { thread, thread_group, memory_manager } = {
             // Make sure to drop these locks ASAP to avoid inversion
@@ -789,6 +795,7 @@ impl Task {
             no_new_privs,
             SeccompState::from(&self.seccomp_filter_state),
             seccomp_filters,
+            robust_list_head,
         ));
 
         // Drop the pids lock as soon as possible after creating the child. Destroying the child
@@ -1433,6 +1440,11 @@ impl CurrentTask {
     /// process crashing. This function is for that second half; any error returned from this
     /// function will be considered unrecoverable.
     fn finish_exec(&mut self, path: CString, resolved_elf: ResolvedElf) -> Result<(), Errno> {
+        // Now that the exec will definitely finish (or crash), notify owners of
+        // locked futexes for the current process, which will be impossible to
+        // update after process image is replaced.  See get_robust_list(2).
+        self.notify_robust_list();
+
         self.mm
             .exec(resolved_elf.file.name.clone())
             .map_err(|status| from_status_like_fdio!(status))?;
@@ -1444,6 +1456,7 @@ impl CurrentTask {
             let mut state = self.write();
             let mut creds = self.creds.write();
             state.signals.alt_stack = None;
+            state.robust_list_head = UserAddress::NULL.into();
 
             // TODO(tbodt): Check whether capability xattrs are set on the file, and grant/limit
             // capabilities accordingly.
@@ -1582,6 +1595,65 @@ impl CurrentTask {
             Err(errno!(ESRCH))
         } else {
             Ok(id.into())
+        }
+    }
+
+    // Notify all futexes in robust list.  The robust list is in user space, so we
+    // are very careful about walking it, and there are a lot of quiet returns if
+    // we fail to walk it.
+    // TODO(fxbug.dev/128610): This only sets the FUTEX_OWNER_DIED bit; it does
+    // not wake up a waiter.
+    pub fn notify_robust_list(&mut self) {
+        let task_state = self.write();
+        let robust_list_addr = task_state.robust_list_head.addr();
+        if robust_list_addr == UserAddress::NULL {
+            // No one has called set_robust_list.
+            return;
+        }
+        let robust_list_res = self.mm.read_object(task_state.robust_list_head);
+
+        let head = if let Ok(head) = robust_list_res {
+            head
+        } else {
+            return;
+        };
+
+        let offset = head.futex_offset;
+        if head.list.next.addr.addr as usize == robust_list_addr.ptr() {
+            // There is a list, but it is empty
+            return;
+        }
+
+        let mut curr_ptr = head.list.next;
+        let null_ref = uaddr { addr: 0 };
+        while curr_ptr.addr != null_ref {
+            let curr_ref = self.mm.read_object(curr_ptr.into());
+
+            let curr = if let Ok(curr) = curr_ref {
+                curr
+            } else {
+                return;
+            };
+
+            let futex_base: u64;
+            if let Some(fb) = curr_ptr.addr.addr.checked_add_signed(offset) {
+                futex_base = fb;
+            } else {
+                return;
+            }
+
+            let futex_ref = UserRef::<u32>::new(UserAddress::from(futex_base));
+
+            let futex = if let Ok(futex) = self.mm.read_object(futex_ref) {
+                futex
+            } else {
+                return;
+            };
+            let owner_died = FUTEX_OWNER_DIED | futex;
+            if self.mm.write_object(futex_ref, &owner_died).is_err() {
+                return;
+            }
+            curr_ptr = curr.next;
         }
     }
 }

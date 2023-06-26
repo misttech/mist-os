@@ -368,7 +368,7 @@ pub fn sys_set_robust_list(
     if len != std::mem::size_of::<robust_list_head>() {
         return error!(EINVAL);
     }
-    current_task.write().robust_list_head = user_head.addr();
+    current_task.write().robust_list_head = user_head;
     Ok(())
 }
 

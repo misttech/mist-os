@@ -13,6 +13,7 @@ group("tests") {
   if (is_linux) {
     deps += [
       ":extended_pstate_initial_state_child",
+      ":syscall_test_exec_child",
       ":syscalls_test_bin",
     ]
   }
@@ -63,6 +64,7 @@ test("syscalls_test_bin") {
     "fcntl_test.cc",
     "fs_test.cc",
     "fuse_test.cc",
+    "futex_test.cc",
     "input_test.cc",
     "ioctl_test.cc",
     "mmap_test.cc",
@@ -138,6 +140,23 @@ if (is_linux) {
       "//build/config/linux:implicit-host-libs",
     ]
   }
+
+  executable("syscall_test_exec_child") {
+    testonly = true
+    sources = [ "syscall_test_exec_child.cc" ]
+    exclude_toolchain_tags = [
+      "asan",
+      "coverage",
+    ]
+    deps = [ ":test_utils" ]
+  }
+
+  resource("syscall_test_exec_child_resource") {
+    testonly = true
+    sources = [ "$root_out_dir/syscall_test_exec_child" ]
+    outputs = [ "data/tests/syscall_test_exec_child" ]
+    deps = [ ":syscall_test_exec_child" ]
+  }
 }
 
 resource("extended_pstate_initial_state_child_resource") {
@@ -152,7 +171,10 @@ resource("extended_pstate_initial_state_child_resource") {
 starnix_linux_test_component("syscalls_test") {
   test_label = ":syscalls_test_bin"
   test_binary = "syscalls_test_bin"
-  deps = [ ":fuse_overlayfs" ]
+  deps = [
+    ":fuse_overlayfs",
+    ":syscall_test_exec_child_resource($target_linux_toolchain)",
+  ]
   uses_expectations = true
 }
 

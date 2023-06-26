@@ -990,7 +990,10 @@
                 // new images.
                 "RlimitTest.SetRlimitHigher",
 
-                // Require robust pthread mutexes.
+                // Requires investigation into error `libgcc_s.so.1 must be
+                // installed for pthread_exit to work`.  It is likely a problem
+                // where we are statically linking libgcc_s and dynamically linking
+                // libpthread.  See http://g/grte/c/AOZW4ySVadE/m/NhMQgRs-5r8J
                 "RobustFutexTest.PthreadMutexAttr",
 
                 // uidgid_test - https://fxbug.dev/79438
