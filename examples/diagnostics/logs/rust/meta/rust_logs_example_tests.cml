@@ -9,13 +9,22 @@
     program: {
         binary: "bin/rust_logs_example_tests",
     },
+    children: [
+        {
+            name: "logs_example",
+            url: "#meta/rust_logs_example.cm",
+        },
+    ],
     use: [
         {
             protocol: [
-                "fake.just.for.Binding",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.logger.Log",
             ],
+        },
+        {
+            protocol: "fuchsia.component.Binder",
+            from: "#logs_example",
         },
     ],
 }

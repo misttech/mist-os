@@ -7,15 +7,10 @@
         runner: "elf",
         binary: "bin/rust_logs_example",
     },
-    capabilities: [
-        {
-            protocol: [ "fake.just.for.Binding" ],
-        },
-    ],
     expose: [
         {
-            protocol: "fake.just.for.Binding",
-            from: "self",
+            protocol: "fuchsia.component.Binder",
+            from: "framework",
         },
     ],
 }
