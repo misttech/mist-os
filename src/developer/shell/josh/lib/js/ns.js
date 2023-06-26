@@ -39,42 +39,34 @@ function ls(path) {
   }
 }
 
-(function(global) {
-  var svc = {};
-  var svcCompletionNames = [];
-
+(function (global) {
   const svcDir = getPath('/svc');
-  const serviceNames = ls(svcDir);
 
-  if (serviceNames != null) {
-    for (const serviceName of serviceNames) {
-      if (serviceName === '.') continue;
+  // TODO: it would be good to enumerate the directory and use that to populate
+  // completions, but we'd need to be able to call fdio_open_fd to get a file
+  // descriptor to the directory without requiring READABLE on the directory.
 
-      // serviceName looks like "fuchsia.kernel.RootJob"
-      // Mangle service names to be valid JS identifiers
+  global['svc'] = new Proxy({}, {
+    // Define a getter that connects to the service
+    get(target, proxyName) {
+      // TODO: should this cache connections until their handles close?
+
       // proxyName looks like "fuchsia_kernel_RootJob"
-      const proxyName = serviceName.replace(/\./g, '_');
+      //
+      // transform it back to the service name such that
+      //
+      // serviceName looks like "fuchsia.kernel.RootJob"
+      const serviceName = proxyName.replaceAll('_', '.');
       const idx = serviceName.lastIndexOf('.');
       // name looks like "RootJob"
       const name = serviceName.substr(idx + 1);
       // libraryName looks like "fuchsia.kernel"
       const libraryName = serviceName.substr(0, idx);
-      // Define a getter that connects to the service
-      // TODO: should this cache connections until their handles close?
-      Object.defineProperty(svc, proxyName, {
-        enumerable: true,
-        get: () => {
-          return new fidl.ProtocolClient(
-              new zx.Channel(fdio.serviceConnect(`${svcDir}/${serviceName}`)),
-              `${libraryName}/${name}`);
-        },
-      });
-      svcCompletionNames.push(proxyName);
-    }
-  }
-
-  svc[Symbol.for('completions')] = svcCompletionNames;
-  global['svc'] = svc;
+      return new fidl.ProtocolClient(
+        new zx.Channel(fdio.serviceConnect(`${svcDir}/${serviceName}`)),
+        `${libraryName}/${name}`);
+    },
+  });
 })(globalThis);
 
 export { getPath, ls };
