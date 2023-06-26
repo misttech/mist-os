@@ -93,9 +93,11 @@ TEST_F(BindManagerTest, BindNodeOverlapTryAllAvailable) {
   VerifyBindOngoingWithRequests({{"node-d", 1}, {"node-e", 1}});
   VerifyNoQueuedBind();
 
-  // Complete the ongoing bind.
+  // Complete the ongoing bind. With no matches, node-d and node-e should added to the
+  // orphaned nodes.
   DriverIndexReplyWithNoMatch("node-d");
   DriverIndexReplyWithNoMatch("node-e");
+  VerifyOrphanedNodes({"node-c", "node-d", "node-e"});
   VerifyNoOngoingBind();
 }
 
@@ -115,14 +117,12 @@ TEST_F(BindManagerTest, OverlappingTryAllAvailable) {
 
   // Match the next two nodes.
   DriverIndexReplyWithNoMatch("node-b");
-  VerifyOrphanedNodes({"node-b"});
   DriverIndexReplyWithNoMatch("node-a");
-  VerifyOrphanedNodes({"node-a", "node-b"});
 
   // Match the final node in the ongoing bind process. This should kickstart a new
-  // bind process with the queued bind requests and reset the orphaned nodes.
+  // bind process with the queued bind requests.
   DriverIndexReplyWithDriver("node-c");
-  VerifyOrphanedNodes({});
+  VerifyOrphanedNodes({"node-a", "node-b"});
 
   // Verify that the TryBindAllAvailable() request is processed with the two orphaned
   // nodes.
@@ -133,6 +133,7 @@ TEST_F(BindManagerTest, OverlappingTryAllAvailable) {
   // consolidated, there shouldn't be a follow up bind process.
   DriverIndexReplyWithNoMatch("node-a");
   DriverIndexReplyWithNoMatch("node-b");
+  VerifyOrphanedNodes({"node-a", "node-b"});
   VerifyNoOngoingBind();
 }
 
@@ -238,6 +239,7 @@ TEST_F(BindManagerTest, AddNodesBetweenAddingLegacyComposite) {
   // be built, kickstarting an ongoing bind process.
   AddAndBindNode("node-b");
   VerifyLegacyCompositeFragmentIsBound(true, "composite-a", "node-b");
+  VerifyLegacyCompositeBuilt(true, "composite-a");
   VerifyBindOngoingWithRequests({{"composite-a", 1}});
 
   DriverIndexReplyWithDriver("composite-a");

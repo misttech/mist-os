@@ -18,11 +18,11 @@ class TestBindManager : public dfv2::BindManager {
                   async_dispatcher_t* dispatcher)
       : BindManager(bridge, node_manager, dispatcher) {}
 
-  const std::unordered_map<std::string, std::weak_ptr<dfv2::Node>>& GetOrphanedNodes() const {
-    return orphaned_nodes();
+  std::unordered_map<std::string, std::weak_ptr<dfv2::Node>> GetOrphanedNodes() const {
+    return bind_node_set().CurrentOrphanedNodes();
   }
 
-  bool GetBindAllOngoing() const { return bind_all_ongoing(); }
+  bool IsBindOngoing() const { return bind_node_set().is_bind_ongoing(); }
 
   std::vector<dfv2::BindRequest> GetPendingRequests() const { return pending_bind_requests(); }
 

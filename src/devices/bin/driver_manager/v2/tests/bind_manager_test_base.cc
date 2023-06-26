@@ -136,7 +136,7 @@ void BindManagerTestBase::AddAndOrphanNode(std::string name, bool enable_multibi
 
   // Invoke bind for a new node in the bind manager.
   AddAndBindNode(name, enable_multibind);
-  ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
+  ASSERT_TRUE(bind_manager_->IsBindOngoing());
   ASSERT_EQ(current_orphan_count, bind_manager_->NumOrphanedNodes());
 
   // Driver index completes the request with no matches for the node. The ongoing
@@ -157,7 +157,7 @@ void BindManagerTestBase::InvokeBind(std::string name) {
 void BindManagerTestBase::InvokeBind_EXPECT_BIND_START(std::string name) {
   VerifyNoOngoingBind();
   InvokeBind(name);
-  ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
+  ASSERT_TRUE(bind_manager_->IsBindOngoing());
 }
 
 void BindManagerTestBase::InvokeBind_EXPECT_QUEUED(std::string name) {
@@ -172,18 +172,18 @@ void BindManagerTestBase::AddAndBindNode_EXPECT_BIND_START(std::string name,
   VerifyNoOngoingBind();
   // Bind process should begin and send a match request to the Driver Index.
   AddAndBindNode(name, enable_multibind);
-  ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
+  ASSERT_TRUE(bind_manager_->IsBindOngoing());
 }
 
 void BindManagerTestBase::AddAndBindNode_EXPECT_QUEUED(std::string name, bool enable_multibind) {
-  ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
+  ASSERT_TRUE(bind_manager_->IsBindOngoing());
   auto expected_data = CurrentBindManagerData();
   expected_data.pending_bind_count += 1;
 
   // The bind request should be queued. There should be no new driver index MatchDriver
   // requests or orphaned nodes.
   AddAndBindNode(name, enable_multibind);
-  ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
+  ASSERT_TRUE(bind_manager_->IsBindOngoing());
   VerifyBindManagerData(expected_data);
 }
 
@@ -210,7 +210,7 @@ void BindManagerTestBase::AddLegacyComposite(std::string composite,
 
 void BindManagerTestBase::AddLegacyComposite_EXPECT_QUEUED(
     std::string composite, std::vector<std::string> fragment_names) {
-  ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
+  ASSERT_TRUE(bind_manager_->IsBindOngoing());
   auto expected_data = CurrentBindManagerData();
   expected_data.pending_orphan_rebind_count += 1;
   AddLegacyComposite(composite, fragment_names);
@@ -225,18 +225,17 @@ void BindManagerTestBase::InvokeTryBindAllAvailable() {
 void BindManagerTestBase::InvokeTryBindAllAvailable_EXPECT_BIND_START() {
   VerifyNoOngoingBind();
   InvokeTryBindAllAvailable();
-  ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
-  ASSERT_EQ(0u, bind_manager_->NumOrphanedNodes());
+  ASSERT_TRUE(bind_manager_->IsBindOngoing());
 }
 
 void BindManagerTestBase::InvokeTryBindAllAvailable_EXPECT_QUEUED() {
-  ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
+  ASSERT_TRUE(bind_manager_->IsBindOngoing());
 
   auto expected_data = CurrentBindManagerData();
   expected_data.pending_orphan_rebind_count += 1;
 
   InvokeTryBindAllAvailable();
-  ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
+  ASSERT_TRUE(bind_manager_->IsBindOngoing());
   VerifyBindManagerData(expected_data);
 }
 
@@ -255,7 +254,7 @@ void BindManagerTestBase::DriverIndexReplyWithNoMatch(std::string node) {
 }
 
 void BindManagerTestBase::VerifyNoOngoingBind() {
-  ASSERT_EQ(false, bind_manager_->GetBindAllOngoing());
+  ASSERT_EQ(false, bind_manager_->IsBindOngoing());
   ASSERT_TRUE(bind_manager_->GetPendingRequests().empty());
   ASSERT_TRUE(bind_manager_->GetPendingOrphanRebindCallbacks().empty());
 }
@@ -275,7 +274,7 @@ void BindManagerTestBase::VerifyOrphanedNodes(std::vector<std::string> expected_
 
 void BindManagerTestBase::VerifyBindOngoingWithRequests(
     std::vector<std::pair<std::string, size_t>> expected_requests) {
-  ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
+  ASSERT_TRUE(bind_manager_->IsBindOngoing());
   for (auto& [name, count] : expected_requests) {
     driver_index_->VerifyRequestCount(GetOrAddInstanceId(name), count);
   }
