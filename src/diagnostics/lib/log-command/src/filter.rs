@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use diagnostics_data::{LogsData, Severity};
+use fuchsia_zircon_types::zx_koid_t;
 
 use crate::{
     log_formatter::{LogData, LogEntry},
@@ -17,11 +18,21 @@ pub struct LogFilterCriteria {
     tags: Vec<String>,
     /// The tags to exclude.
     exclude_tags: Vec<String>,
+    /// Filter by PID
+    pid: Option<zx_koid_t>,
+    /// Filter by TID
+    tid: Option<zx_koid_t>,
 }
 
 impl Default for LogFilterCriteria {
     fn default() -> Self {
-        Self { min_severity: Severity::Info, tags: vec![], exclude_tags: vec![] }
+        Self {
+            min_severity: Severity::Info,
+            tags: vec![],
+            exclude_tags: vec![],
+            pid: None,
+            tid: None,
+        }
     }
 }
 
@@ -33,6 +44,8 @@ impl TryFrom<&LogCommand> for LogFilterCriteria {
             min_severity: cmd.severity,
             tags: cmd.tags.clone(),
             exclude_tags: cmd.exclude_tags.clone(),
+            pid: cmd.pid.clone(),
+            tid: cmd.tid.clone(),
         })
     }
 }
@@ -42,6 +55,18 @@ impl LogFilterCriteria {
     fn match_filters_to_log_data(&self, data: &LogsData) -> bool {
         if data.metadata.severity < self.min_severity {
             return false;
+        }
+
+        if let Some(pid) = self.pid {
+            if data.pid() != Some(pid) {
+                return false;
+            }
+        }
+
+        if let Some(tid) = self.tid {
+            if data.tid() != Some(tid) {
+                return false;
+            }
         }
 
         if !self.tags.is_empty()
@@ -208,6 +233,70 @@ mod test {
                 severity: diagnostics_data::Severity::Debug,
             })
             .set_message("included message")
+            .build()
+            .into()
+        )));
+    }
+
+    #[fuchsia::test]
+    async fn test_pid_filter() {
+        let mut cmd = empty_dump_command();
+        cmd.pid = Some(123);
+        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+
+        assert!(criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "included/moniker".to_string(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("included message")
+            .set_pid(123)
+            .build()
+            .into()
+        )));
+        assert!(!criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "included/moniker".to_string(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("included message")
+            .set_pid(456)
+            .build()
+            .into()
+        )));
+    }
+
+    #[fuchsia::test]
+    async fn test_tid_filter() {
+        let mut cmd = empty_dump_command();
+        cmd.tid = Some(123);
+        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+
+        assert!(criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "included/moniker".to_string(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("included message")
+            .set_tid(123)
+            .build()
+            .into()
+        )));
+        assert!(!criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "included/moniker".to_string(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("included message")
+            .set_tid(456)
             .build()
             .into()
         )));
