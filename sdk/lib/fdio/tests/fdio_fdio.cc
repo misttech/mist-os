@@ -158,7 +158,7 @@ TEST(FDIOTest, GetServiceHandle) {
   EXPECT_EQ(-1, fcntl(fd.get(), F_GETFD));
   (void)fd.release();
 
-  fd.reset(open("/svc", O_DIRECTORY | O_RDONLY));
+  fd.reset(open("/pkg", O_DIRECTORY | O_RDONLY));
   EXPECT_LE(0, fd.get());
   EXPECT_EQ(0, fcntl(fd.get(), F_GETFD));
 #pragma clang diagnostic push
@@ -168,7 +168,7 @@ TEST(FDIOTest, GetServiceHandle) {
   EXPECT_EQ(-1, fcntl(fd.get(), F_GETFD));
   (void)fd.release();
 
-  fd.reset(open("/svc", O_DIRECTORY | O_RDONLY));
+  fd.reset(open("/pkg", O_DIRECTORY | O_RDONLY));
   EXPECT_LE(0, fd.get());
   fbl::unique_fd fd2(dup(fd.get()));
   EXPECT_LE(0, fd2.get());

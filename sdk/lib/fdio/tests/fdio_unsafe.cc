@@ -12,8 +12,10 @@
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
+namespace {
+
 TEST(UnsafeTest, BorrowChannel) {
-  fbl::unique_fd fd(open("/svc", O_DIRECTORY | O_RDONLY));
+  fbl::unique_fd fd(open("/pkg", O_DIRECTORY | O_RDONLY));
   ASSERT_LE(0, fd.get());
 
   fdio_t* io = fdio_unsafe_fd_to_io(fd.get());
@@ -39,7 +41,7 @@ TEST(UnsafeTest, BorrowChannelFromUnsupportedObject) {
 
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
-  fbl::unique_fd fd(open("/svc", O_RDONLY | O_DIRECTORY));
+  fbl::unique_fd fd(open("/pkg", O_RDONLY | O_DIRECTORY));
   ASSERT_LE(0, fd.get());
   ASSERT_OK(fdio_ns_bind_fd(ns, "/test-ns-item", fd.get()));
   ASSERT_EQ(0, close(fd.release()));
@@ -61,3 +63,5 @@ TEST(UnsafeTest, BorrowChannelFromUnsupportedObject) {
 
   ASSERT_OK(fdio_ns_destroy(ns));
 }
+
+}  // namespace
