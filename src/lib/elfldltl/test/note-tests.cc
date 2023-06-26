@@ -159,61 +159,95 @@ TEST(ElfldltlNoteTests, BuildId) {
 
 // Testing all formats isn't necessary for these kinds of tests.
 
-TEST(ElfldltlFileNoteTests, ObserveEmpty) {
+template <class Observer>
+class ElfldltlNoteObserverTests : public ::testing::Test {
+ public:
   using Elf = elfldltl::Elf64<>;
   using Phdr = Elf::Phdr;
 
+  static constexpr auto Make = Observer::Make;
+  static constexpr std::string_view kFailMessage = Observer::kFailMessage;
+
+  template <typename T, typename Diag, typename... Observers>
+  bool ObserveNotes(T& notes_data, Diag& diag, Observers&&... observers) {
+    elfldltl::DirectMemory file{
+        cpp20::span<std::byte>{reinterpret_cast<std::byte*>(std::addressof(notes_data)),
+                               sizeof(notes_data)},
+        0};
+    static constexpr Phdr phdr = {
+        .offset = 0,
+        .vaddr = 0,
+        .filesz = sizeof(notes_data),
+        .memsz = sizeof(notes_data),
+    };
+
+    return Make(Elf{}, file, observers...)
+        .Observe(diag, elfldltl::PhdrTypeMatch<elfldltl::ElfPhdrType::kNote>{}, phdr);
+  }
+};
+
+struct FileObserver {
+  static constexpr auto Make = [](auto&& elf, auto&& file, auto&&... callback) {
+    return elfldltl::PhdrFileNoteObserver(
+        std::forward<decltype(elf)>(elf), std::forward<decltype(file)>(file),
+        elfldltl::NoArrayFromFile<typename std::decay_t<decltype(elf)>::Phdr>{},
+        std::forward<decltype(callback)>(callback)...);
+  };
+
+  static constexpr std::string_view kFailMessage = "failed to read note segment from file";
+};
+
+struct MemoryObserver {
+  static constexpr auto Make = [](auto&&... args) {
+    return elfldltl::PhdrMemoryNoteObserver(std::forward<decltype(args)>(args)...);
+  };
+
+  static constexpr std::string_view kFailMessage = "failed to read note segment from memory image";
+};
+
+using NoteObservers = ::testing::Types<FileObserver, MemoryObserver>;
+
+TYPED_TEST_SUITE(ElfldltlNoteObserverTests, NoteObservers);
+
+TYPED_TEST(ElfldltlNoteObserverTests, ObserveEmpty) {
+  using Elf = typename TestFixture::Elf;
+  using Phdr = typename TestFixture::Phdr;
+
   elfldltl::DirectMemory file;
-  elfldltl::PhdrFileNoteObserver observer(Elf{}, file, elfldltl::NoArrayFromFile<Phdr>(),
-                                          [](const elfldltl::ElfNote& note) {
-                                            EXPECT_TRUE(false) << "callback shouldn't be called";
-                                            return false;
-                                          });
+  auto observer = TestFixture::Make(Elf{}, file, [](const elfldltl::ElfNote& note) {
+    EXPECT_TRUE(false) << "callback shouldn't be called";
+    return false;
+  });
+
   std::vector<std::string> errors;
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
-  Phdr phdr{.filesz = 0};
+  static constexpr Phdr phdr = {.filesz = 0, .memsz = 0};
   ASSERT_TRUE(
       observer.Observe(diag, elfldltl::PhdrTypeMatch<elfldltl::ElfPhdrType::kNote>{}, phdr));
   EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
 }
 
-TEST(ElfldltlFileNoteTests, ObserveBadFile) {
-  using Elf = elfldltl::Elf64<>;
-  using Phdr = Elf::Phdr;
+TYPED_TEST(ElfldltlNoteObserverTests, ObserveBadFile) {
+  using Elf = typename TestFixture::Elf;
+  using Phdr = typename TestFixture::Phdr;
 
   elfldltl::DirectMemory file;
-  elfldltl::PhdrFileNoteObserver observer(Elf{}, file, elfldltl::NoArrayFromFile<Phdr>(),
-                                          [](const elfldltl::ElfNote& note) {
-                                            EXPECT_TRUE(false) << "callback shouldn't be called";
-                                            return false;
-                                          });
+  auto observer = TestFixture::Make(Elf{}, file, [](const elfldltl::ElfNote& note) {
+    EXPECT_TRUE(false) << "callback shouldn't be called";
+    return false;
+  });
   std::vector<std::string> errors;
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
-  Phdr phdr{.filesz = 1};
+  static constexpr Phdr phdr = {.filesz = 1, .memsz = 1};
   observer.Observe(diag, elfldltl::PhdrTypeMatch<elfldltl::ElfPhdrType::kNote>{}, phdr);
   EXPECT_EQ(diag.warnings(), 0u);
   EXPECT_EQ(diag.errors(), 1u);
-  EXPECT_EQ(errors[0], "failed to read note segment from file");
+  EXPECT_EQ(errors[0], TestFixture::kFailMessage);
 }
 
-template <typename T, typename Diag, typename... Observers>
-bool observeNotes(T& notesData, Diag& diag, Observers&&... observers) {
-  using Elf = elfldltl::Elf64<>;
-  using Phdr = Elf::Phdr;
-
-  elfldltl::DirectMemory file{cpp20::span<std::byte>{
-      reinterpret_cast<std::byte*>(std::addressof(notesData)), sizeof(notesData)}};
-  Phdr phdr{.offset = 0, .filesz = sizeof(notesData)};
-
-  elfldltl::PhdrFileNoteObserver observer(Elf{}, file, elfldltl::NoArrayFromFile<Phdr>(),
-                                          observers...);
-
-  return observer.Observe(diag, elfldltl::PhdrTypeMatch<elfldltl::ElfPhdrType::kNote>{}, phdr);
-}
-
-TEST(ElfldltlFileNoteTests, ObserveOneBuildID) {
+TYPED_TEST(ElfldltlNoteObserverTests, ObserveOneBuildID) {
   static InMemoryNote<4, 4> note_data{elfldltl::ElfNoteType::kGnuBuildId, "GNU", "123"};
 
   std::vector<std::string> errors;
@@ -221,7 +255,7 @@ TEST(ElfldltlFileNoteTests, ObserveOneBuildID) {
 
   {
     std::optional<elfldltl::ElfNote> note;
-    EXPECT_FALSE(observeNotes(note_data, diag, ObserveBuildIdNote(note)));
+    EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note)));
     ASSERT_TRUE(note.has_value());
     EXPECT_EQ(note_data, *note);
     EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
@@ -229,14 +263,14 @@ TEST(ElfldltlFileNoteTests, ObserveOneBuildID) {
 
   {
     std::optional<elfldltl::ElfNote> note;
-    EXPECT_TRUE(observeNotes(note_data, diag, ObserveBuildIdNote(note, true)));
+    EXPECT_TRUE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note, true)));
     ASSERT_TRUE(note.has_value());
     EXPECT_EQ(note_data, *note);
     EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
   }
 }
 
-TEST(ElfldltlFileNoteTests, ObserveBuildIDFirst) {
+TYPED_TEST(ElfldltlNoteObserverTests, ObserveBuildIDFirst) {
   static struct {
     InMemoryNote<4, 4> build_id{elfldltl::ElfNoteType::kGnuBuildId, "GNU", "abc"};
     InMemoryNote<4, 2> version{1, "GNU", "1"};
@@ -247,7 +281,7 @@ TEST(ElfldltlFileNoteTests, ObserveBuildIDFirst) {
 
   {
     std::optional<elfldltl::ElfNote> note;
-    EXPECT_FALSE(observeNotes(note_data, diag, ObserveBuildIdNote(note)));
+    EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note)));
     ASSERT_TRUE(note.has_value());
     EXPECT_EQ(note_data.build_id, *note);
     EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
@@ -255,14 +289,14 @@ TEST(ElfldltlFileNoteTests, ObserveBuildIDFirst) {
 
   {
     std::optional<elfldltl::ElfNote> note;
-    EXPECT_TRUE(observeNotes(note_data, diag, ObserveBuildIdNote(note, true)));
+    EXPECT_TRUE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note, true)));
     ASSERT_TRUE(note.has_value());
     EXPECT_EQ(note_data.build_id, *note);
     EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
   }
 }
 
-TEST(ElfldltlFileNoteTests, ObserveBuildIDLast) {
+TYPED_TEST(ElfldltlNoteObserverTests, ObserveBuildIDLast) {
   static struct {
     InMemoryNote<4, 8> version{1, "GNU", "123"};
     InMemoryNote<4, 4> build_id{elfldltl::ElfNoteType::kGnuBuildId, "GNU", "abc"};
@@ -273,7 +307,7 @@ TEST(ElfldltlFileNoteTests, ObserveBuildIDLast) {
 
   {
     std::optional<elfldltl::ElfNote> note;
-    EXPECT_FALSE(observeNotes(note_data, diag, ObserveBuildIdNote(note)));
+    EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note)));
     ASSERT_TRUE(note.has_value());
     EXPECT_EQ(note_data.build_id, *note);
     EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
@@ -281,14 +315,14 @@ TEST(ElfldltlFileNoteTests, ObserveBuildIDLast) {
 
   {
     std::optional<elfldltl::ElfNote> note;
-    EXPECT_TRUE(observeNotes(note_data, diag, ObserveBuildIdNote(note, true)));
+    EXPECT_TRUE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note, true)));
     ASSERT_TRUE(note.has_value());
     EXPECT_EQ(note_data.build_id, *note);
     EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
   }
 }
 
-TEST(ElfldltlFileNoteTests, Observe2BuildIDs) {
+TYPED_TEST(ElfldltlNoteObserverTests, Observe2BuildIDs) {
   static struct {
     InMemoryNote<4, 4> build_id{elfldltl::ElfNoteType::kGnuBuildId, "GNU", "123"};
     InMemoryNote<4, 5> build_id2{elfldltl::ElfNoteType::kGnuBuildId, "GNU", "abcd"};
@@ -300,7 +334,7 @@ TEST(ElfldltlFileNoteTests, Observe2BuildIDs) {
   // These check that ObserveBuildIdNote will yield the first found and not later ones.
   {
     std::optional<elfldltl::ElfNote> note;
-    EXPECT_FALSE(observeNotes(note_data, diag, ObserveBuildIdNote(note)));
+    EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note)));
     ASSERT_TRUE(note.has_value());
     EXPECT_EQ(note_data.build_id, *note);
     EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
@@ -308,14 +342,14 @@ TEST(ElfldltlFileNoteTests, Observe2BuildIDs) {
 
   {
     std::optional<elfldltl::ElfNote> note;
-    EXPECT_TRUE(observeNotes(note_data, diag, ObserveBuildIdNote(note, true)));
+    EXPECT_TRUE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note, true)));
     ASSERT_TRUE(note.has_value());
     EXPECT_EQ(note_data.build_id, *note);
     EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
   }
 }
 
-TEST(ElfldltlFileNoteTests, ObserveNoBuildID) {
+TYPED_TEST(ElfldltlNoteObserverTests, ObserveNoBuildID) {
   static struct {
     InMemoryNote<4, 4> version{1, "GNU", "123"};
     InMemoryNote<4, 5> version2{1, "GNU", "abcd"};
@@ -325,19 +359,19 @@ TEST(ElfldltlFileNoteTests, ObserveNoBuildID) {
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
   std::optional<elfldltl::ElfNote> note;
-  EXPECT_TRUE(observeNotes(note_data, diag, ObserveBuildIdNote(note)));
+  EXPECT_TRUE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note)));
   EXPECT_FALSE(note.has_value());
 }
 
-TEST(ElfldltlFileNoteTests, ObserveMultipleObservers) {
+TYPED_TEST(ElfldltlNoteObserverTests, ObserveMultipleObservers) {
   static InMemoryNote<4, 4> note_data{elfldltl::ElfNoteType::kGnuBuildId, "GNU", "123"};
 
   std::vector<std::string> errors;
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
   std::optional<elfldltl::ElfNote> note, note2;
-  EXPECT_TRUE(observeNotes(note_data, diag, ObserveBuildIdNote(note, true),
-                           ObserveBuildIdNote(note2, true)));
+  EXPECT_TRUE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note, true),
+                                 ObserveBuildIdNote(note2, true)));
   ASSERT_TRUE(note.has_value());
   EXPECT_EQ(note_data, *note);
   ASSERT_TRUE(note2.has_value());
@@ -345,15 +379,15 @@ TEST(ElfldltlFileNoteTests, ObserveMultipleObservers) {
   EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
 }
 
-TEST(ElfldltlFileNoteTests, ObserveMultipleStopsEarly) {
+TYPED_TEST(ElfldltlNoteObserverTests, ObserveMultipleStopsEarly) {
   static InMemoryNote<4, 4> note_data{elfldltl::ElfNoteType::kGnuBuildId, "GNU", "123"};
 
   std::vector<std::string> errors;
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
   std::optional<elfldltl::ElfNote> note, note2;
-  EXPECT_FALSE(
-      observeNotes(note_data, diag, ObserveBuildIdNote(note), ObserveBuildIdNote(note2, true)));
+  EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note),
+                                  ObserveBuildIdNote(note2, true)));
   ASSERT_TRUE(note.has_value());
   EXPECT_EQ(note_data, *note);
   EXPECT_FALSE(note2.has_value());

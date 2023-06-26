@@ -287,12 +287,81 @@ PhdrFileNoteObserver(Elf&&, File&, Allocator&&, Callback&&...)
     -> PhdrFileNoteObserver<std::decay_t<Elf>::kData, File, std::decay_t<Allocator>,
                             std::decay_t<Callback>...>;
 
+// elfldltl::PhdrMemoryNoteObserver works like elfldltl::PhdrFileNoteObserver,
+// but reads PT_NOTE contents from an ELF file's in-memory image via the Memory
+// API (using p_vaddr and p_memsz) in place of reading from the ELF file itself
+// via the File API (using p_offset and p_filesz).
+template <ElfData Data, class Memory, typename... Callback>
+class PhdrMemoryNoteObserver
+    : public PhdrObserver<PhdrMemoryNoteObserver<Data, Memory, Callback...>, ElfPhdrType::kNote> {
+ public:
+  static_assert((std::is_invocable_r_v<bool, Callback, ElfNote> && ...));
+
+  PhdrMemoryNoteObserver() = delete;
+
+  // Copyable and/or movable if Callback is.
+  constexpr PhdrMemoryNoteObserver(const PhdrMemoryNoteObserver&) = default;
+  constexpr PhdrMemoryNoteObserver(PhdrMemoryNoteObserver&&) noexcept = default;
+
+  template <class Elf>
+  explicit constexpr PhdrMemoryNoteObserver(Elf&& elf, Memory& memory, Callback... callback)
+      : memory_(&memory), callback_{std::forward<Callback>(callback)...} {
+    static_assert(std::decay_t<Elf>::kData == Data);
+    static_assert(std::is_copy_constructible_v<PhdrMemoryNoteObserver> ==
+                  (std::is_copy_constructible_v<Callback> && ...));
+    static_assert(std::is_move_constructible_v<PhdrMemoryNoteObserver> ==
+                  (std::is_move_constructible_v<Callback> && ...));
+    static_assert(std::is_copy_assignable_v<PhdrMemoryNoteObserver> ==
+                  (std::is_copy_assignable_v<Callback> && ...));
+    static_assert(std::is_move_assignable_v<PhdrMemoryNoteObserver> ==
+                  (std::is_move_assignable_v<Callback> && ...));
+  }
+
+  // Copy-assignable and/or move-assignable if Callback is.
+  constexpr PhdrMemoryNoteObserver& operator=(const PhdrMemoryNoteObserver&) = default;
+  constexpr PhdrMemoryNoteObserver& operator=(PhdrMemoryNoteObserver&&) noexcept = default;
+
+  template <class Diag, typename Phdr>
+  constexpr bool Observe(Diag& diag, PhdrTypeMatch<ElfPhdrType::kNote> type, const Phdr& phdr) {
+    if (phdr.memsz == 0) [[unlikely]] {
+      return true;
+    }
+    auto bytes = memory_->template ReadArray<std::byte>(phdr.vaddr, phdr.memsz);
+    if (!bytes) [[unlikely]] {
+      return diag.FormatError("failed to read note segment from memory image");
+    }
+    for (const ElfNote& note : ElfNoteSegment<Data>{{bytes->data(), bytes->size()}}) {
+      auto all_callbacks_ok = [&note](auto&&... callback) -> bool {
+        return (callback(note) && ...);
+      };
+      if (!std::apply(all_callbacks_ok, callback_)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  template <class Diag>
+  bool Finish(Diag& diag) {
+    return true;
+  }
+
+ private:
+  Memory* memory_;
+  std::tuple<Callback...> callback_;
+};
+
+// Deduction guide, as for PhdrFileNoteObserver but with no allocator argument.
+template <class Elf, class File, typename... Callback>
+PhdrMemoryNoteObserver(Elf&&, File&, Callback&&...)
+    -> PhdrMemoryNoteObserver<std::decay_t<Elf>::kData, File, std::decay_t<Callback>...>;
+
 // This returns a bool(ElfNote) callback object that can be passed to
-// elfldltl::PhdrFileNoteObserver.  That callback updates build_id to the
-// file's (first) build ID note.  If the optional second argument is true,
-// that callback returns true even after it's found the build ID, so that
-// PhdrFileNoteObserver would continue to call additional callbacks on this
-// and other notes rather than finish immediately.
+// elfldltl::PhdrFileNoteObserver or elfldltl::PhdrMemoryNoteObserver.  That
+// callback updates build_id to the file's (first) build ID note.  If the
+// optional second argument is true, that callback returns true even after it's
+// found the build ID, so that PhdrFileNoteObserver would continue to call
+// additional callbacks on this and other notes rather than finish immediately.
 constexpr auto ObserveBuildIdNote(std::optional<ElfNote>& build_id, bool keep_going = false) {
   return [keep_going, &build_id](const ElfNote& note) -> bool {
     if (!build_id) {
