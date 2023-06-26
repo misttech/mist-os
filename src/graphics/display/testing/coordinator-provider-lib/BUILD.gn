@@ -29,30 +29,34 @@ source_set("devfs_factory") {
   ]
 }
 
-# Provides a C++ utility function GetHardwareDisplayController() which connects to and interacts
-# with the fuchsia.hardware.display.Provider service, found within the component's environment.
+# Provides a C++ utility function GetCoordinator() which connects to and
+# interacts with the fuchsia.hardware.display.Provider service, found within
+# the component's environment.
 source_set("client_hlcpp") {
   sources = [
     "client-hlcpp.cc",
     "client-hlcpp.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/lib/fit-promise",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/files",
+    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/trace",
   ]
 }
 
-# Below tests exercise the different code paths caused by having fake-display injected via
-# facets:injected-services in .cmx files. We have two packages to add two different .cmx configs.
-test("get_hardware_display_controller_test_bin") {
-  sources = [ "tests/get_hardware_display_controller_test.cc" ]
+# Test the client getting display Coordinator without access to display.Provider
+# service.
+test("get_hardware_display_coordinator_without_provider_service_test_bin") {
+  sources = [
+    "tests/get_hardware_display_coordinator_without_provider_service_test.cc",
+  ]
 
   deps = [
     ":client_hlcpp",
@@ -64,9 +68,11 @@ test("get_hardware_display_controller_test_bin") {
   ]
 }
 
-fuchsia_unittest_package("get_hardware_display_controller_test") {
-  deps = [ ":get_hardware_display_controller_test_bin" ]
-  manifest = "tests/meta/get_hardware_display_controller_test.cml"
+fuchsia_unittest_package(
+    "get_hardware_display_coordinator_without_provider_service_test") {
+  deps =
+      [ ":get_hardware_display_coordinator_without_provider_service_test_bin" ]
+  manifest = "tests/meta/get_hardware_display_coordinator_without_provider_service_test.cml"
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
@@ -74,8 +80,11 @@ fuchsia_unittest_package("get_hardware_display_controller_test") {
   }
 }
 
-test("get_hardware_display_controller_inject_services_test_bin") {
-  sources = [ "tests/get_hardware_display_controller_inject_services_test.cc" ]
+# Test the client getting display Coordinator with access to display.Provider
+# service.
+test("get_hardware_display_coordinator_with_provider_service_test_bin") {
+  sources =
+      [ "tests/get_hardware_display_coordinator_with_provider_service_test.cc" ]
 
   deps = [
     ":client_hlcpp",
@@ -87,17 +96,24 @@ test("get_hardware_display_controller_inject_services_test_bin") {
 }
 
 fuchsia_unittest_package(
-    "get_hardware_display_controller_inject_services_test") {
+    "get_hardware_display_coordinator_with_provider_service_test") {
   deps = [
-    ":get_hardware_display_controller_inject_services_test_bin",
+    ":get_hardware_display_coordinator_with_provider_service_test_bin",
     "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-connector-child-component",
   ]
-  manifest =
-      "tests/meta/get_hardware_display_controller_inject_services_test.cml"
+  manifest = "tests/meta/get_hardware_display_coordinator_with_provider_service_test.cml"
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
   }
   test_type = "vulkan"
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":get_hardware_display_coordinator_with_provider_service_test",
+    ":get_hardware_display_coordinator_without_provider_service_test",
+  ]
 }

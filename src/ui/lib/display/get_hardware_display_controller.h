@@ -12,10 +12,10 @@
 
 namespace ui_display {
 
-using DisplayCoordinatorHandles = display::CoordinatorHandlesHlcpp;
+using DisplayCoordinatorHandles = display::CoordinatorClientEnd;
 
 inline fpromise::promise<DisplayCoordinatorHandles, zx_status_t> GetHardwareDisplayCoordinator() {
-  return display::GetCoordinatorHlcpp();
+  return display::GetCoordinator();
 }
 
 }  // namespace ui_display

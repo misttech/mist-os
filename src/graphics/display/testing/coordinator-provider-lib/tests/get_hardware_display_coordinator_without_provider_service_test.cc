@@ -25,9 +25,9 @@ class GetHardwareDisplayCoordinatorWithoutProviderServiceTest : public gtest::Re
 };
 
 TEST_F(GetHardwareDisplayCoordinatorWithoutProviderServiceTest, FailedOnNoProviderService) {
-  std::optional<fpromise::result<CoordinatorHandlesHlcpp, zx_status_t>> coordinator;
-  executor().schedule_task(GetCoordinatorHlcpp().then(
-      [&coordinator](fpromise::result<CoordinatorHandlesHlcpp, zx_status_t>& result) {
+  std::optional<fpromise::result<CoordinatorClientEnd, zx_status_t>> coordinator;
+  executor().schedule_task(GetCoordinator().then(
+      [&coordinator](fpromise::result<CoordinatorClientEnd, zx_status_t>& result) {
         coordinator = std::move(result);
       }));
   RunLoopUntil([&coordinator] { return coordinator.has_value(); });

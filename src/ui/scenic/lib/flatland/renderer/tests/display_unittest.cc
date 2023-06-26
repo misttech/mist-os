@@ -50,7 +50,10 @@ class DisplayTest : public gtest::RealLoopFixture {
     auto hdc_promise = ui_display::GetHardwareDisplayCoordinator();
     executor_->schedule_task(hdc_promise.then(
         [this](fpromise::result<ui_display::DisplayCoordinatorHandles, zx_status_t>& handles) {
-          display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value().coordinator));
+          // TODO(fxbug.dev/76183): Migrate DisplayManager to new C++ bindings.
+          display_manager_->BindDefaultDisplayCoordinator(
+              fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(
+                  handles.value().TakeChannel()));
         }));
 
     RunLoopUntil([this] { return display_manager_->default_display() != nullptr; });

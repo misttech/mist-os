@@ -370,7 +370,10 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
                            });
   executor_.schedule_task(dc_handles_promise.then(
       [this](fpromise::result<ui_display::DisplayCoordinatorHandles, zx_status_t>& handles) {
-        display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value().coordinator));
+        // TODO(fxbug.dev/76183): Migrate DisplayManager to new C++ bindings.
+        display_manager_->BindDefaultDisplayCoordinator(
+            fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(
+                handles.value().TakeChannel()));
       }));
 
   // Schedule a task to finish initialization once all promises have been completed.
