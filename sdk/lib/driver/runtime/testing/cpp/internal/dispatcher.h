@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_RUNTIME_TESTING_CPP_DISPATCHER_H_
-#define LIB_DRIVER_RUNTIME_TESTING_CPP_DISPATCHER_H_
+#ifndef LIB_DRIVER_RUNTIME_TESTING_CPP_INTERNAL_DISPATCHER_H_
+#define LIB_DRIVER_RUNTIME_TESTING_CPP_INTERNAL_DISPATCHER_H_
 
 #include <lib/driver/runtime/testing/cpp/internal/default_dispatcher_setting.h>
 #include <lib/driver/runtime/testing/cpp/sync_helpers.h>
@@ -11,33 +11,11 @@
 #include <lib/fdf/testing.h>
 #include <lib/sync/cpp/completion.h>
 
-namespace fdf {
+namespace fdf_internal {
 
 // A RAII wrapper around an fdf::SynchronizedDispatcher that is meant for testing.
 // There are two types of TestSynchronizedDispatcher: Default and managed. Both types
 // are described in length down below at |kDispatcherDefault| and |kDispatcherManaged|.
-//
-// Example with kDispatcherDefault
-// ```
-// class MyTestFixture
-//  private:
-//   fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherDefault};
-//
-//   // driver_ runs on the dispatcher_ since it is set as the default.
-//   fdf_testing::DriverUnderTest<MyTestDriver> driver_;
-// ```
-//
-// Example with kDispatcherManaged
-// ```
-// class MyTestFixture
-//  private:
-//   fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
-//
-//   // driver_ is wrapped with a dispatcher bound and it lives on the managed dispatcher_.
-//   async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<MyTestDriver>> driver_{
-//     dispatcher_.dispatcher(), std::in_place}
-// ```
-
 class TestSynchronizedDispatcher {
  public:
   // The type of the dispatcher.
@@ -114,6 +92,6 @@ extern const TestSynchronizedDispatcher::DispatcherType kDispatcherDefault;
 // |async_patterns::TestDispatcherBound|.
 extern const TestSynchronizedDispatcher::DispatcherType kDispatcherManaged;
 
-}  // namespace fdf
+}  // namespace fdf_internal
 
-#endif  // LIB_DRIVER_RUNTIME_TESTING_CPP_DISPATCHER_H_
+#endif  // LIB_DRIVER_RUNTIME_TESTING_CPP_INTERNAL_DISPATCHER_H_

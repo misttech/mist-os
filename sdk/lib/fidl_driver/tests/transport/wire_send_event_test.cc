@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/test.transport/cpp/driver/wire.h>
+#include <lib/driver/runtime/testing/cpp/sync_helpers.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <lib/sync/cpp/completion.h>
@@ -12,7 +13,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "sdk/lib/driver/runtime/testing/cpp/dispatcher.h"
 #include "sdk/lib/fidl_driver/tests/transport/scoped_fake_driver.h"
 #include "sdk/lib/fidl_driver/tests/transport/server_on_unbound_helper.h"
 

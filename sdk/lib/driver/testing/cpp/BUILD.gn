@@ -32,13 +32,18 @@ source_set("cpp") {
     "test_environment.h",
   ]
 
-  deps = [ "//zircon/system/ulib/async-default" ]
+  deps = [
+    "//sdk/lib/driver/runtime/testing/cpp",
+    "//zircon/system/ulib/async-default",
+  ]
 
   public_deps = [
     ":test_node",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/component/cpp",
-    "//sdk/lib/driver/runtime/testing/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_testing",
     "//src/devices/bin/driver_runtime",
   ]
 }

@@ -7,7 +7,6 @@
 #include <fuchsia/hardware/powerimpl/c/banjo.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/runtime/testing/cpp/dispatcher.h>
 
 #include <memory>
 

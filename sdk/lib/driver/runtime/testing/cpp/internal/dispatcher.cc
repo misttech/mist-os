@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 #include <lib/async/cpp/task.h>
-#include <lib/driver/runtime/testing/cpp/dispatcher.h>
+#include <lib/driver/runtime/testing/cpp/internal/dispatcher.h>
 #include <lib/driver/runtime/testing/cpp/internal/test_dispatcher_builder.h>
 #include <lib/driver/runtime/testing/cpp/internal/wait_for.h>
 #include <lib/fdf/cpp/env.h>
 #include <lib/fdf/testing.h>
 
-namespace fdf {
+namespace fdf_internal {
 
 TestSynchronizedDispatcher::TestSynchronizedDispatcher(DispatcherType type) {
   if (type == DispatcherType::Default) {
@@ -64,7 +64,7 @@ zx::result<> TestSynchronizedDispatcher::StartDefault(fdf::SynchronizedDispatche
 
 zx::result<> TestSynchronizedDispatcher::Stop() {
   dispatcher_.ShutdownAsync();
-  zx::result<> stop_result = WaitFor(dispatcher_shutdown_);
+  zx::result<> stop_result = fdf::WaitFor(dispatcher_shutdown_);
   default_dispatcher_setting_.reset();
   return stop_result;
 }
@@ -75,4 +75,4 @@ const TestSynchronizedDispatcher::DispatcherType kDispatcherDefault =
 const TestSynchronizedDispatcher::DispatcherType kDispatcherManaged =
     TestSynchronizedDispatcher::DispatcherType::Managed;
 
-}  // namespace fdf
+}  // namespace fdf_internal

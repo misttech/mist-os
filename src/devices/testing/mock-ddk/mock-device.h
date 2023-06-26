@@ -10,7 +10,6 @@
 #include <lib/ddk/binding_priv.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fidl/cpp/wire/wire_messaging.h>
 #include <lib/fit/function.h>

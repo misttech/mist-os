@@ -29,7 +29,6 @@
 
 #include "../optee-smc.h"
 #include "../tee-smc.h"
-#include "sdk/lib/driver/runtime/testing/cpp/dispatcher.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 struct SharedMemoryInfo {

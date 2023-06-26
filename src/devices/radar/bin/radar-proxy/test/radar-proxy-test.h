@@ -7,6 +7,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/driver/runtime/testing/cpp/sync_helpers.h>
 #include <lib/fdio/directory.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/clock.h>
@@ -17,7 +18,6 @@
 #include <zxtest/zxtest.h>
 
 #include "../radar-proxy.h"
-#include "sdk/lib/driver/runtime/testing/cpp/dispatcher.h"
 
 namespace radar {
 

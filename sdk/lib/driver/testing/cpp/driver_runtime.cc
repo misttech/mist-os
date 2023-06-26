@@ -30,7 +30,8 @@ DriverRuntimeEnv::~DriverRuntimeEnv() { fdf_env_reset(); }
 }  // namespace internal
 
 DriverRuntime::DriverRuntime()
-    : initial_thread_id(std::this_thread::get_id()), default_dispatcher_(fdf::kDispatcherDefault) {
+    : initial_thread_id(std::this_thread::get_id()),
+      foreground_dispatcher_(fdf_internal::kDispatcherDefault) {
   ZX_ASSERT_MSG(g_instance == nullptr,
                 "Cannot create more than one instance of DriverRuntime at a time.");
   g_instance = this;
@@ -45,8 +46,8 @@ DriverRuntime* DriverRuntime::GetInstance() { return g_instance; }
 
 fdf::UnownedSynchronizedDispatcher DriverRuntime::StartBackgroundDispatcher() {
   AssertCurrentThreadIsInitialThread();
-  fdf::TestSynchronizedDispatcher& dispatcher =
-      managed_dispatchers_.emplace_back(fdf::kDispatcherManaged);
+  fdf_internal::TestSynchronizedDispatcher& dispatcher =
+      background_dispatchers_.emplace_back(fdf_internal::kDispatcherManaged);
   return dispatcher.driver_dispatcher().borrow();
 }
 
@@ -63,7 +64,7 @@ bool DriverRuntime::RunWithTimeout(zx::duration timeout) {
   auto canceled = std::make_shared<bool>(false);
   bool timed_out = false;
   async::PostDelayedTask(
-      default_dispatcher_.dispatcher(),
+      foreground_dispatcher_.dispatcher(),
       [this, canceled, &timed_out] {
         if (*canceled) {
           return;

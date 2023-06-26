@@ -4,7 +4,7 @@
 
 #include <fidl/test.transport/cpp/driver/fidl.h>
 #include <lib/async/cpp/task.h>
-#include <lib/driver/runtime/testing/cpp/dispatcher.h>
+#include <lib/driver/runtime/testing/cpp/sync_helpers.h>
 #include <lib/sync/cpp/completion.h>
 
 #include <thread>

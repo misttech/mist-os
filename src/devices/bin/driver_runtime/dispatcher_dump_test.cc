@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/driver/runtime/testing/cpp/internal/test_dispatcher_builder.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fdf/cpp/dispatcher.h>

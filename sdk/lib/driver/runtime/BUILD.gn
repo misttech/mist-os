@@ -104,6 +104,7 @@ source_set("driver_runtime_testing") {
   sources = [ "include/lib/fdf/testing.h" ]
   visibility = [
     "//sdk/lib/driver/runtime/*",
+    "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/fidl_driver/tests/transport/*",
     "//src/devices/bin/driver_host/*",
     "//src/devices/bin/driver_host2/*",

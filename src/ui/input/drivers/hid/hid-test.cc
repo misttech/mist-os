@@ -5,7 +5,7 @@
 #include "hid.h"
 
 #include <fuchsia/hardware/hidbus/cpp/banjo.h>
-#include <lib/driver/runtime/testing/cpp/dispatcher.h>
+#include <lib/driver/runtime/testing/cpp/sync_helpers.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <unistd.h>
 

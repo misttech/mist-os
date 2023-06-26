@@ -7,7 +7,7 @@
 
 #include <lib/async/cpp/executor.h>
 #include <lib/async_patterns/cpp/receiver.h>
-#include <lib/driver/runtime/testing/cpp/dispatcher.h>
+#include <lib/driver/runtime/testing/cpp/internal/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 #include <lib/fpromise/bridge.h>
@@ -211,10 +211,10 @@ class DriverRuntime {
   // We will use this ensure calls are being made only on the main thread.
   std::thread::id initial_thread_id;
 
-  fdf::TestSynchronizedDispatcher default_dispatcher_;
-  std::list<fdf::TestSynchronizedDispatcher> managed_dispatchers_;
+  fdf_internal::TestSynchronizedDispatcher foreground_dispatcher_;
+  std::list<fdf_internal::TestSynchronizedDispatcher> background_dispatchers_;
 
-  async_patterns::Receiver<DriverRuntime> quit_receiver_{this, default_dispatcher_.dispatcher()};
+  async_patterns::Receiver<DriverRuntime> quit_receiver_{this, foreground_dispatcher_.dispatcher()};
 };
 
 // Internal template implementation details
@@ -224,7 +224,7 @@ class DriverRuntime {
 
 template <typename PromiseType>
 typename PromiseType::result_type DriverRuntime::RunPromise(PromiseType promise) {
-  async::Executor e(default_dispatcher_.dispatcher());
+  async::Executor e(foreground_dispatcher_.dispatcher());
   cpp17::optional<typename PromiseType::result_type> res;
   e.schedule_task(
       promise.then([&res](typename PromiseType::result_type& v) { res = std::move(v); }));

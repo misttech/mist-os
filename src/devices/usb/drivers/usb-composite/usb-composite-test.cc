@@ -4,15 +4,12 @@
 
 #include "src/devices/usb/drivers/usb-composite/usb-composite.h"
 
-#include <lib/driver/runtime/testing/cpp/dispatcher.h>
-
 #include <queue>
 
 #include <fbl/auto_lock.h>
 #include <fbl/ref_counted.h>
 #include <zxtest/zxtest.h>
 
-#include "lib/driver/runtime/testing/cpp/dispatcher.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/usb-composite/test-helper.h"
 #include "src/devices/usb/drivers/usb-composite/usb-interface.h"

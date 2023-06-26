@@ -6,10 +6,10 @@ source_set("cpp") {
   testonly = true
 
   sources = [
-    "dispatcher.cc",
-    "dispatcher.h",
     "internal/default_dispatcher_setting.cc",
     "internal/default_dispatcher_setting.h",
+    "internal/dispatcher.cc",
+    "internal/dispatcher.h",
     "internal/test_dispatcher_builder.cc",
     "internal/test_dispatcher_builder.h",
     "internal/wait_for.cc",

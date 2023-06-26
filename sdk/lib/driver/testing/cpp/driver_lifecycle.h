@@ -7,7 +7,6 @@
 
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/internal/lifecycle.h>
-#include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/driver/symbols/symbols.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 
