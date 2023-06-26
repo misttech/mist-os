@@ -4,8 +4,8 @@
 
 use {
     crate::{
-        client::network_selection::NetworkSelector, config_management::SavedNetworksManagerApi,
-        telemetry::TelemetrySender, util::listener,
+        client::connection_selection::ConnectionSelector,
+        config_management::SavedNetworksManagerApi, telemetry::TelemetrySender, util::listener,
     },
     anyhow::Error,
     fuchsia_async as fasync,
@@ -27,7 +27,7 @@ pub fn create_iface_manager(
     ap_update_sender: listener::ApListenerMessageSender,
     dev_monitor_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
-    network_selector: Arc<NetworkSelector>,
+    connection_selector: Arc<ConnectionSelector>,
     telemetry_sender: TelemetrySender,
     hasher: WlanHasher,
 ) -> (Arc<Mutex<iface_manager_api::IfaceManager>>, impl Future<Output = Result<Infallible, Error>>)
@@ -50,7 +50,7 @@ pub fn create_iface_manager(
     let iface_manager_service = iface_manager::serve_iface_manager_requests(
         iface_manager,
         iface_manager_sender.clone(),
-        network_selector,
+        connection_selector,
         receiver,
         stats_receiver,
         defect_receiver,

@@ -5,6 +5,7 @@
 use {
     anyhow::{format_err, Error},
     std::convert::TryFrom,
+    tracing::error,
 };
 
 /// Unified type for dB, dBm, and dB/s for Policy consumption.
@@ -89,6 +90,42 @@ pub fn calculate_pseudodecibel_velocity(historical_pdb: Vec<f64>) -> Result<f64,
         / (n.checked_mul(sum_x2).ok_or_else(|| format_err!("overflow in n * sum_x2"))?
             - sum_x.checked_mul(sum_x).ok_or_else(|| format_err!("overflow in sum_x**2"))?);
     Ok(velocity.into())
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SignalData {
+    pub ewma_rssi: EwmaPseudoDecibel,
+    pub ewma_snr: EwmaPseudoDecibel,
+    pub ewma_rssi_velocity: EwmaPseudoDecibel,
+}
+
+impl SignalData {
+    pub fn new(
+        initial_rssi: PseudoDecibel,
+        initial_snr: PseudoDecibel,
+        ewma_weight: usize,
+        ewma_velocity_weight: usize,
+    ) -> Self {
+        Self {
+            ewma_rssi: EwmaPseudoDecibel::new(ewma_weight, initial_rssi),
+            ewma_snr: EwmaPseudoDecibel::new(ewma_weight, initial_snr),
+            ewma_rssi_velocity: EwmaPseudoDecibel::new(ewma_velocity_weight, 0),
+        }
+    }
+    pub fn update_with_new_measurement(&mut self, rssi: PseudoDecibel, snr: PseudoDecibel) {
+        let prev_rssi = self.ewma_rssi.get();
+        self.ewma_rssi.update_average(rssi);
+        self.ewma_snr.update_average(snr);
+
+        match calculate_pseudodecibel_velocity(vec![prev_rssi, self.ewma_rssi.get()]) {
+            Ok(velocity) => {
+                self.ewma_rssi_velocity.update_average(velocity);
+            }
+            Err(e) => {
+                error!("Failed to calculate SignalData velocity: {:?}", e);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -197,5 +234,16 @@ mod tests {
             calculate_pseudodecibel_velocity(vec![-128.0, -1.0]).expect("failed to calculate"),
             127.0
         );
+    }
+
+    #[test]
+    fn test_update_with_new_measurements() {
+        let mut signal_data = SignalData::new(-40, 30, 10, 3);
+        signal_data.update_with_new_measurement(-60, 15);
+        assert_lt!(signal_data.ewma_rssi.get(), -40.0);
+        assert_gt!(signal_data.ewma_rssi.get(), -60.0);
+        assert_lt!(signal_data.ewma_snr.get(), 30.0);
+        assert_gt!(signal_data.ewma_snr.get(), 15.0);
+        assert_lt!(signal_data.ewma_rssi_velocity.get(), 0.0);
     }
 }

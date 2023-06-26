@@ -36,7 +36,7 @@ use {
     wlan_trace as wtrace,
     wlancfg_lib::{
         access_point::AccessPoint,
-        client::{self, network_selection::NetworkSelector, scan},
+        client::{self, connection_selection::ConnectionSelector, scan},
         config_management::{SavedNetworksManager, SavedNetworksManagerApi},
         legacy::{self, IfaceRef},
         mode_management::{
@@ -348,11 +348,11 @@ async fn run_all_futures() -> Result<(), Error> {
         mpsc::channel(scan::SCAN_REQUEST_BUFFER_SIZE);
     let scan_requester = Arc::new(scan::ScanRequester { sender: scan_request_sender });
     let saved_networks = Arc::new(SavedNetworksManager::new(telemetry_sender.clone()).await?);
-    let network_selector = Arc::new(NetworkSelector::new(
+    let connection_selector = Arc::new(ConnectionSelector::new(
         saved_networks.clone(),
         scan_requester.clone(),
         hasher.clone(),
-        component::inspector().root().create_child("network_selector"),
+        component::inspector().root().create_child("connection_selector"),
         persistence_req_sender.clone(),
         telemetry_sender.clone(),
     ));
@@ -376,7 +376,7 @@ async fn run_all_futures() -> Result<(), Error> {
         ap_sender.clone(),
         monitor_svc.clone(),
         saved_networks.clone(),
-        network_selector.clone(),
+        connection_selector.clone(),
         telemetry_sender.clone(),
         hasher,
     );

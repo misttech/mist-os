@@ -27,8 +27,7 @@ use {
     tracing::{error, info, warn},
 };
 
-pub mod bss_selection;
-pub mod network_selection;
+pub mod connection_selection;
 pub mod scan;
 pub mod state_machine;
 pub mod types;

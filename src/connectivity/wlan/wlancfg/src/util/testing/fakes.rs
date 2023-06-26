@@ -6,13 +6,14 @@
 use {
     crate::{
         client::{
-            bss_selection::{self, SignalData},
+            connection_selection::{EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR},
             scan, types as client_types,
         },
         config_management::{
             Credential, NetworkConfig, NetworkConfigError, NetworkIdentifier, PastConnectionData,
             PastConnectionList, SavedNetworksManagerApi,
         },
+        util::pseudo_energy::SignalData,
     },
     async_trait::async_trait,
     fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
@@ -305,8 +306,8 @@ pub fn random_connection_data() -> PastConnectionData {
         SignalData::new(
             rng.gen_range(-90..-20),
             rng.gen_range(10..50),
-            bss_selection::EWMA_SMOOTHING_FACTOR,
-            bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
+            EWMA_SMOOTHING_FACTOR,
+            EWMA_VELOCITY_SMOOTHING_FACTOR,
         ),
         rng.gen::<u8>().into(),
     )

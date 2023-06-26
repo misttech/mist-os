@@ -6,8 +6,11 @@
 use fidl_fuchsia_wlan_common_security as fidl_security;
 use {
     crate::{
-        client::{bss_selection::SignalData, types as client_types},
-        util::historical_list::{HistoricalList, Timestamped},
+        client::types as client_types,
+        util::{
+            historical_list::{HistoricalList, Timestamped},
+            pseudo_energy::SignalData,
+        },
     },
     arbitrary::Arbitrary,
     fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync, fuchsia_zircon as zx,

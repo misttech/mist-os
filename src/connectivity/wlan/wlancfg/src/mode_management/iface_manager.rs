@@ -6,7 +6,9 @@ use {
     crate::{
         access_point::{state_machine as ap_fsm, state_machine::AccessPointApi, types as ap_types},
         client::{
-            network_selection::{score_connection_quality, NetworkSelector},
+            connection_selection::{
+                scoring_functions::score_connection_quality, ConnectionSelector,
+            },
             state_machine::{
                 self as client_fsm, ConnectionStatsReceiver, ConnectionStatsSender,
                 PeriodicConnectionStats,
@@ -142,7 +144,7 @@ pub(crate) struct IfaceManagerService {
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
     fsm_futures:
         FuturesUnordered<future_with_metadata::FutureWithMetadata<(), StateMachineMetadata>>,
-    network_selection_futures:
+    connection_selection_futures:
         FuturesUnordered<BoxFuture<'static, Option<client_types::ScannedCandidate>>>,
     bss_selection_futures: FuturesUnordered<BoxFuture<'static, BssSelectionOperation>>,
     telemetry_sender: TelemetrySender,
@@ -174,7 +176,7 @@ impl IfaceManagerService {
             aps: Vec::new(),
             saved_networks,
             fsm_futures: FuturesUnordered::new(),
-            network_selection_futures: FuturesUnordered::new(),
+            connection_selection_futures: FuturesUnordered::new(),
             bss_selection_futures: FuturesUnordered::new(),
             telemetry_sender,
             stats_sender,
@@ -371,7 +373,7 @@ impl IfaceManagerService {
         reason: client_types::DisconnectReason,
     ) -> BoxFuture<'static, Result<(), Error>> {
         // Cancel any ongoing network selection, since a disconnect makes it invalid.
-        self.network_selection_futures.clear();
+        self.connection_selection_futures.clear();
 
         // Find the client interface associated with the given network config and disconnect from
         // the network.
@@ -432,7 +434,7 @@ impl IfaceManagerService {
     async fn handle_connect_request(
         &mut self,
         connect_request: ConnectAttemptRequest,
-        network_selector: Arc<NetworkSelector>,
+        connection_selector: Arc<ConnectionSelector>,
     ) -> Result<(), Error> {
         // Check to see if client connections are enabled.
         {
@@ -474,7 +476,7 @@ impl IfaceManagerService {
             Err(e) => error!("failed to send state update: {:?}", e),
         };
 
-        initiate_bss_selection_for_connect_request(connect_request, self, network_selector).await
+        initiate_bss_selection_for_connect_request(connect_request, self, connection_selector).await
     }
 
     async fn connect(&mut self, selection: client_types::ConnectSelection) -> Result<(), Error> {
@@ -514,7 +516,7 @@ impl IfaceManagerService {
         }
 
         // Cancel any ongoing attempt to auto connect the previously idle iface.
-        self.network_selection_futures.clear();
+        self.connection_selection_futures.clear();
 
         client_iface.last_roam_time = fasync::Time::now();
         self.clients.push(client_iface);
@@ -943,40 +945,40 @@ pub fn wpa3_supported(security_support: fidl_common::SecuritySupport) -> bool {
             || security_support.sae.sme_handler_supported)
 }
 
-async fn initiate_network_selection(
+async fn initiate_connection_selection(
     iface_manager: &mut IfaceManagerService,
-    network_selector: Arc<NetworkSelector>,
+    connection_selector: Arc<ConnectionSelector>,
 ) {
     if !iface_manager.idle_clients().is_empty()
         && iface_manager.saved_networks.known_network_count().await > 0
-        && iface_manager.network_selection_futures.is_empty()
+        && iface_manager.connection_selection_futures.is_empty()
     {
         iface_manager
             .telemetry_sender
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: false });
         info!("Initiating network selection for idle client interface.");
         let fut = async move {
-            network_selector
+            connection_selector
                 .find_and_select_scanned_candidate(
                     None,
                     client_types::ConnectReason::IdleInterfaceAutoconnect,
                 )
                 .await
         };
-        iface_manager.network_selection_futures.push(fut.boxed());
+        iface_manager.connection_selection_futures.push(fut.boxed());
     }
 }
 
 async fn initiate_bss_selection_for_connect_request(
     connect_request: ConnectAttemptRequest,
     iface_manager: &mut IfaceManagerService,
-    network_selector: Arc<NetworkSelector>,
+    connection_selector: Arc<ConnectionSelector>,
 ) -> Result<(), Error> {
     // Create connection selection future and enqueue.
     let fut = async move {
         BssSelectionOperation::FulfillConnectRequest(
             connect_request.clone(),
-            network_selector
+            connection_selector
                 .find_and_select_scanned_candidate(
                     Some(connect_request.network),
                     connect_request.reason,
@@ -989,13 +991,13 @@ async fn initiate_bss_selection_for_connect_request(
     Ok(())
 }
 
-async fn handle_network_selection_results(
-    network_selection_result: Option<client_types::ScannedCandidate>,
+async fn handle_connection_selection_results(
+    connection_selection_result: Option<client_types::ScannedCandidate>,
     iface_manager: &mut IfaceManagerService,
     reconnect_monitor_interval: &mut i64,
     connectivity_monitor_timer: &mut fasync::Interval,
 ) {
-    if let Some(scanned_candidate) = network_selection_result {
+    if let Some(scanned_candidate) = connection_selection_result {
         *reconnect_monitor_interval = 1;
 
         let connect_selection = client_types::ConnectSelection {
@@ -1029,7 +1031,7 @@ async fn handle_bss_selection_results_for_connect_request(
     mut request: ConnectAttemptRequest,
     result: Option<client_types::ScannedCandidate>,
     iface_manager: &mut IfaceManagerService,
-    network_selector: Arc<NetworkSelector>,
+    connection_selector: Arc<ConnectionSelector>,
 ) {
     request.attempts += 1;
     match result {
@@ -1050,7 +1052,7 @@ async fn handle_bss_selection_results_for_connect_request(
                 match initiate_bss_selection_for_connect_request(
                     request,
                     iface_manager,
-                    network_selector.clone(),
+                    connection_selector.clone(),
                 )
                 .await
                 {
@@ -1086,7 +1088,7 @@ async fn handle_bss_selection_results_for_connect_request(
 async fn handle_terminated_state_machine(
     terminated_fsm: StateMachineMetadata,
     iface_manager: &mut IfaceManagerService,
-    selector: Arc<NetworkSelector>,
+    selector: Arc<ConnectionSelector>,
 ) {
     match terminated_fsm.role {
         fidl_fuchsia_wlan_common::WlanMacRole::Ap => {
@@ -1100,7 +1102,7 @@ async fn handle_terminated_state_machine(
         }
         fidl_fuchsia_wlan_common::WlanMacRole::Client => {
             iface_manager.record_idle_client(terminated_fsm.iface_id);
-            initiate_network_selection(iface_manager, selector.clone()).await;
+            initiate_connection_selection(iface_manager, selector.clone()).await;
         }
         fidl_fuchsia_wlan_common::WlanMacRole::Mesh => {
             // Not yet supported.
@@ -1192,7 +1194,7 @@ fn handle_periodic_connection_stats(
     connection_stats: PeriodicConnectionStats,
     iface_manager: &mut IfaceManagerService,
     _iface_manager_client: Arc<Mutex<dyn IfaceManagerApi + Send>>,
-    _network_selector: Arc<NetworkSelector>,
+    _connection_selector: Arc<ConnectionSelector>,
 ) {
     // If any kind of bss selection is in progress, ignore.
     if !iface_manager.bss_selection_futures.is_empty() {
@@ -1239,7 +1241,7 @@ fn initiate_record_defect(
 
 async fn handle_iface_manager_request(
     iface_manager: &mut IfaceManagerService,
-    network_selector: Arc<NetworkSelector>,
+    connection_selector: Arc<ConnectionSelector>,
     operation_futures: &mut FuturesUnordered<BoxFuture<'static, IfaceManagerOperation>>,
     token: atomic_oneshot_stream::Token,
     request: IfaceManagerRequest,
@@ -1247,7 +1249,11 @@ async fn handle_iface_manager_request(
     match request {
         IfaceManagerRequest::Connect(ConnectRequest { request, responder }) => {
             if responder
-                .send(iface_manager.handle_connect_request(request, network_selector.clone()).await)
+                .send(
+                    iface_manager
+                        .handle_connect_request(request, connection_selector.clone())
+                        .await,
+                )
                 .is_err()
             {
                 error!("could not respond to ScanForConnectionSelection");
@@ -1377,7 +1383,7 @@ fn attempt_atomic_operation<T: 'static>(
 pub(crate) async fn serve_iface_manager_requests(
     mut iface_manager: IfaceManagerService,
     iface_manager_client: Arc<Mutex<dyn IfaceManagerApi + Send>>,
-    network_selector: Arc<NetworkSelector>,
+    connection_selector: Arc<ConnectionSelector>,
     requests: mpsc::Receiver<IfaceManagerRequest>,
     mut stats_receiver: ConnectionStatsReceiver,
     mut defect_receiver: mpsc::UnboundedReceiver<Defect>,
@@ -1405,13 +1411,13 @@ pub(crate) async fn serve_iface_manager_requests(
                 handle_terminated_state_machine(
                     terminated_fsm.1,
                     &mut iface_manager,
-                    network_selector.clone(),
+                    connection_selector.clone(),
                 ).await;
             },
             () = connectivity_monitor_timer.select_next_some() => {
-                initiate_network_selection(
+                initiate_connection_selection(
                     &mut iface_manager,
-                    network_selector.clone(),
+                    connection_selector.clone(),
                 ).await;
             },
             op = operation_futures.select_next_some() => match op {
@@ -1424,9 +1430,9 @@ pub(crate) async fn serve_iface_manager_requests(
                 IfaceManagerOperation::ConfigureStateMachine
                 | IfaceManagerOperation::ReportDefect => {},
             },
-            network_selection_result = iface_manager.network_selection_futures.select_next_some() => {
-                handle_network_selection_results(
-                    network_selection_result,
+            connection_selection_result = iface_manager.connection_selection_futures.select_next_some() => {
+                handle_connection_selection_results(
+                    connection_selection_result,
                     &mut iface_manager,
                     &mut reconnect_monitor_interval,
                     &mut connectivity_monitor_timer
@@ -1438,7 +1444,7 @@ pub(crate) async fn serve_iface_manager_requests(
                         request,
                         result,
                         &mut iface_manager,
-                        network_selector.clone()
+                        connection_selector.clone()
                     ).await;
                 },
                 // TODO(fxbug.dev/116552): Handle result of bss selection for local roam.
@@ -1449,7 +1455,7 @@ pub(crate) async fn serve_iface_manager_requests(
                     connection_stats,
                     &mut iface_manager,
                     iface_manager_client.clone(),
-                    network_selector.clone(),
+                    connection_selector.clone(),
                 );
             },
             defect = defect_receiver.select_next_some() => {
@@ -1458,7 +1464,7 @@ pub(crate) async fn serve_iface_manager_requests(
             (token, req) = atomic_iface_manager_requests.select_next_some() => {
                 handle_iface_manager_request(
                     &mut iface_manager,
-                    network_selector.clone(),
+                    connection_selector.clone(),
                     &mut operation_futures,
                     token,
                     req
@@ -1539,7 +1545,7 @@ mod tests {
         pub ap_update_sender: listener::ApListenerMessageSender,
         pub ap_update_receiver: mpsc::UnboundedReceiver<listener::ApMessage>,
         pub saved_networks: Arc<dyn SavedNetworksManagerApi>,
-        pub network_selector: Arc<NetworkSelector>,
+        pub connection_selector: Arc<ConnectionSelector>,
         pub scan_requester: Arc<FakeScanRequester>,
         pub node: inspect::Node,
         pub telemetry_sender: TelemetrySender,
@@ -1573,11 +1579,11 @@ mod tests {
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let scan_requester = Arc::new(FakeScanRequester::new());
         let hasher = create_wlan_hasher();
-        let network_selector = Arc::new(NetworkSelector::new(
+        let connection_selector = Arc::new(ConnectionSelector::new(
             saved_networks.clone(),
             scan_requester.clone(),
             hasher.clone(),
-            inspector.root().create_child("network_selection"),
+            inspector.root().create_child("connection_selection"),
             persistence_req_sender,
             telemetry_sender.clone(),
         ));
@@ -1594,7 +1600,7 @@ mod tests {
             saved_networks,
             scan_requester,
             node,
-            network_selector,
+            connection_selector,
             telemetry_sender,
             telemetry_receiver,
             stats_sender,
@@ -2112,7 +2118,7 @@ mod tests {
                 fasync::Timer::new(zx::Duration::from_millis(1).after_now()).await
             }
         }
-        iface_manager.network_selection_futures.push(blocking_fn().boxed());
+        iface_manager.connection_selection_futures.push(blocking_fn().boxed());
 
         // Request a connect through IfaceManager and respond to requests needed to complete it.
         {
@@ -2139,7 +2145,7 @@ mod tests {
         }
 
         // Verify that the network selection future was dropped from the list.
-        assert!(iface_manager.network_selection_futures.is_empty());
+        assert!(iface_manager.connection_selection_futures.is_empty());
     }
 
     #[fuchsia::test]
@@ -2157,8 +2163,8 @@ mod tests {
                 fasync::Timer::new(zx::Duration::from_millis(1).after_now()).await
             }
         }
-        iface_manager.network_selection_futures.push(blocking_fn().boxed());
-        assert!(!iface_manager.network_selection_futures.is_empty());
+        iface_manager.connection_selection_futures.push(blocking_fn().boxed());
+        assert!(!iface_manager.connection_selection_futures.is_empty());
 
         // Request a disconnect through IfaceManager.
         let disconnect_fut = iface_manager.disconnect(
@@ -2171,7 +2177,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
 
         // Verify that the network selection future was dropped from the list.
-        assert!(iface_manager.network_selection_futures.is_empty());
+        assert!(iface_manager.connection_selection_futures.is_empty());
     }
 
     #[fuchsia::test]
@@ -2487,14 +2493,14 @@ mod tests {
             test_values.hasher.clone(),
         );
 
-        // Create a NetworkSelector
+        // Create a ConnectionSelector
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let selector = Arc::new(NetworkSelector::new(
+        let selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks,
             test_values.scan_requester.clone(),
             test_values.hasher.clone(),
-            inspect::Inspector::default().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -4126,7 +4132,7 @@ mod tests {
 
     fn run_service_test<T: std::fmt::Debug>(
         exec: &mut fuchsia_async::TestExecutor,
-        network_selector: Arc<NetworkSelector>,
+        connection_selector: Arc<ConnectionSelector>,
         iface_manager: IfaceManagerService,
         req: IfaceManagerRequest,
         mut req_receiver: oneshot::Receiver<Result<T, Error>>,
@@ -4143,7 +4149,7 @@ mod tests {
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
             iface_manager_client,
-            network_selector,
+            connection_selector,
             receiver,
             stats_receiver,
             defect_receiver,
@@ -4204,7 +4210,7 @@ mod tests {
 
     fn run_service_test_with_unit_return(
         exec: &mut fuchsia_async::TestExecutor,
-        network_selector: Arc<NetworkSelector>,
+        connection_selector: Arc<ConnectionSelector>,
         iface_manager: IfaceManagerService,
         req: IfaceManagerRequest,
         mut req_receiver: oneshot::Receiver<()>,
@@ -4220,7 +4226,7 @@ mod tests {
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
             iface_manager_client,
-            network_selector,
+            connection_selector,
             receiver,
             stats_receiver,
             defect_receiver,
@@ -4284,7 +4290,7 @@ mod tests {
 
         run_service_test(
             &mut exec,
-            test_values.network_selector,
+            test_values.connection_selector,
             iface_manager,
             req,
             ack_receiver,
@@ -4330,7 +4336,7 @@ mod tests {
 
         run_service_test(
             &mut exec,
-            test_values.network_selector,
+            test_values.connection_selector,
             iface_manager,
             req,
             ack_receiver,
@@ -4360,11 +4366,11 @@ mod tests {
         let iface_manager_client = Arc::new(Mutex::new(FakeIfaceManagerRequester::new()));
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let network_selector = Arc::new(NetworkSelector::new(
+        let connection_selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks,
             test_values.scan_requester,
             test_values.hasher.clone(),
-            inspect::Inspector::default().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -4375,7 +4381,7 @@ mod tests {
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
             iface_manager_client,
-            network_selector,
+            connection_selector,
             receiver,
             stats_receiver,
             test_values.defect_receiver,
@@ -4419,11 +4425,11 @@ mod tests {
         let iface_manager_client = Arc::new(Mutex::new(FakeIfaceManagerRequester::new()));
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let network_selector = Arc::new(NetworkSelector::new(
+        let connection_selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks,
             test_values.scan_requester,
             test_values.hasher.clone(),
-            inspect::Inspector::default().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -4434,7 +4440,7 @@ mod tests {
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
             iface_manager_client,
-            network_selector,
+            connection_selector,
             receiver,
             stats_receiver,
             test_values.defect_receiver,
@@ -4467,11 +4473,11 @@ mod tests {
         let iface_manager_client = Arc::new(Mutex::new(FakeIfaceManagerRequester::new()));
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let network_selector = Arc::new(NetworkSelector::new(
+        let connection_selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks,
             test_values.scan_requester,
             test_values.hasher.clone(),
-            inspect::Inspector::default().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -4482,7 +4488,7 @@ mod tests {
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
             iface_manager_client,
-            network_selector,
+            connection_selector,
             receiver,
             stats_receiver,
             test_values.defect_receiver,
@@ -4614,11 +4620,11 @@ mod tests {
         let iface_manager_client = Arc::new(Mutex::new(FakeIfaceManagerRequester::new()));
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let network_selector = Arc::new(NetworkSelector::new(
+        let connection_selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks,
             test_values.scan_requester,
             test_values.hasher.clone(),
-            inspect::Inspector::default().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -4628,7 +4634,7 @@ mod tests {
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
             iface_manager_client,
-            network_selector,
+            connection_selector,
             receiver,
             test_values.stats_receiver,
             test_values.defect_receiver,
@@ -4755,7 +4761,7 @@ mod tests {
 
         run_service_test_with_unit_return(
             &mut exec,
-            test_values.network_selector,
+            test_values.connection_selector,
             iface_manager,
             req,
             new_iface_receiver,
@@ -4780,7 +4786,7 @@ mod tests {
 
         run_service_test_with_unit_return(
             &mut exec,
-            test_values.network_selector,
+            test_values.connection_selector,
             iface_manager,
             req,
             remove_iface_receiver,
@@ -4857,7 +4863,7 @@ mod tests {
 
         run_service_test(
             &mut exec,
-            test_values.network_selector,
+            test_values.connection_selector,
             iface_manager,
             req,
             start_receiver,
@@ -4938,7 +4944,7 @@ mod tests {
 
         run_service_test(
             &mut exec,
-            test_values.network_selector,
+            test_values.connection_selector,
             iface_manager,
             req,
             stop_receiver,
@@ -4968,7 +4974,7 @@ mod tests {
 
         run_service_test(
             &mut exec,
-            test_values.network_selector,
+            test_values.connection_selector,
             iface_manager,
             req,
             start_receiver,
@@ -5001,7 +5007,7 @@ mod tests {
 
         run_service_test(
             &mut exec,
-            test_values.network_selector,
+            test_values.connection_selector,
             iface_manager,
             req,
             stop_receiver,
@@ -5028,7 +5034,7 @@ mod tests {
 
         run_service_test(
             &mut exec,
-            test_values.network_selector,
+            test_values.connection_selector,
             iface_manager,
             req,
             stop_receiver,
@@ -5237,7 +5243,7 @@ mod tests {
     #[test_case(NetworkSelectionMissingAttribute::SavedNetwork; "no saved networks")]
     #[test_case(NetworkSelectionMissingAttribute::NetworkSelectionInProgress; "selection already in progress")]
     #[fuchsia::test(add_test_attr = false)]
-    fn test_initiate_network_selection(test_type: NetworkSelectionMissingAttribute) {
+    fn test_initiate_connection_selection(test_type: NetworkSelectionMissingAttribute) {
         // Start out by setting the test up such that we would expect a scan to be requested.
         let mut exec = fuchsia_async::TestExecutor::new();
 
@@ -5274,11 +5280,11 @@ mod tests {
         // Create a network selector to be used by the network selection request.
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let selector = Arc::new(NetworkSelector::new(
+        let selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks.clone(),
             test_values.scan_requester.clone(),
             test_values.hasher.clone(),
-            inspect::Inspector::default().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -5309,13 +5315,13 @@ mod tests {
             }
             NetworkSelectionMissingAttribute::NetworkSelectionInProgress => {
                 // Insert a future so that it looks like a scan is in progress.
-                iface_manager.network_selection_futures.push(ready(None).boxed());
+                iface_manager.connection_selection_futures.push(ready(None).boxed());
             }
         }
 
         {
             // Run the future to completion.
-            let fut = initiate_network_selection(&mut iface_manager, selector);
+            let fut = initiate_connection_selection(&mut iface_manager, selector);
             pin_mut!(fut);
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         }
@@ -5335,9 +5341,13 @@ mod tests {
             }
         }
 
-        // Run all network_selection futures to completion.
-        for mut network_selection_future in iface_manager.network_selection_futures.iter_mut() {
-            assert_variant!(exec.run_until_stalled(&mut network_selection_future), Poll::Ready(_));
+        // Run all connection_selection futures to completion.
+        for mut connection_selection_future in iface_manager.connection_selection_futures.iter_mut()
+        {
+            assert_variant!(
+                exec.run_until_stalled(&mut connection_selection_future),
+                Poll::Ready(_)
+            );
         }
 
         // We are using a scan request issuance as a proxy to determine if the network selection
@@ -5376,7 +5386,7 @@ mod tests {
 
         for i in 0..5 {
             {
-                let fut = handle_network_selection_results(
+                let fut = handle_connection_selection_results(
                     None,
                     &mut iface_manager,
                     &mut reconnect_monitor_interval,
@@ -5390,7 +5400,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_reconnect_on_network_selection_results() {
+    fn test_reconnect_on_connection_selection_results() {
         let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
@@ -5418,7 +5428,7 @@ mod tests {
 
         {
             // Run reconnection attempt
-            let fut = handle_network_selection_results(
+            let fut = handle_connection_selection_results(
                 network,
                 &mut iface_manager,
                 &mut reconnect_monitor_interval,
@@ -5483,7 +5493,7 @@ mod tests {
 
         {
             // Run reconnection attempt
-            let fut = handle_network_selection_results(
+            let fut = handle_connection_selection_results(
                 network,
                 &mut iface_manager,
                 &mut reconnect_monitor_interval,
@@ -5534,7 +5544,7 @@ mod tests {
                 request,
                 Some(connect_selection.target.clone()),
                 &mut iface_manager,
-                test_values.network_selector.clone(),
+                test_values.connection_selector.clone(),
             );
             pin_mut!(fut);
 
@@ -5571,11 +5581,11 @@ mod tests {
         // Create a network selector.
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let selector = Arc::new(NetworkSelector::new(
+        let selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks.clone(),
             test_values.scan_requester.clone(),
             test_values.hasher.clone(),
-            inspect::Inspector::default().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -5606,7 +5616,7 @@ mod tests {
         assert!(iface_manager.idle_clients().contains(&TEST_CLIENT_IFACE_ID));
 
         // Verify that a scan has been kicked off.
-        assert!(!iface_manager.network_selection_futures.is_empty());
+        assert!(!iface_manager.connection_selection_futures.is_empty());
     }
 
     #[fuchsia::test]
@@ -5615,11 +5625,11 @@ mod tests {
         let test_values = test_setup(&mut exec);
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let selector = Arc::new(NetworkSelector::new(
+        let selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks.clone(),
             test_values.scan_requester.clone(),
             test_values.hasher.clone(),
-            inspect::Inspector::default().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -5788,7 +5798,7 @@ mod tests {
 
         run_service_test(
             &mut exec,
-            test_values.network_selector,
+            test_values.connection_selector,
             iface_manager,
             req,
             set_country_receiver,
@@ -5905,7 +5915,7 @@ mod tests {
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
             iface_manager_client,
-            test_values.network_selector,
+            test_values.connection_selector,
             receiver,
             test_values.stats_receiver,
             test_values.defect_receiver,
@@ -6036,7 +6046,7 @@ mod tests {
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
             iface_manager_client,
-            test_values.network_selector,
+            test_values.connection_selector,
             req_receiver,
             stats_receiver,
             defect_receiver,

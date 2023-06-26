@@ -6,7 +6,12 @@ use fasync::TimeoutExt;
 
 use {
     crate::{
-        client::{bss_selection, types},
+        client::{
+            connection_selection::{
+                bss_selection, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR,
+            },
+            types,
+        },
         config_management::{PastConnectionData, SavedNetworksManagerApi},
         mode_management::{Defect, IfaceFailure},
         telemetry::{
@@ -19,6 +24,7 @@ use {
                 ClientListenerMessageSender, ClientNetworkState, ClientStateUpdate,
                 Message::NotifyListeners,
             },
+            pseudo_energy::SignalData,
             state_machine::{self, ExitReason, IntoStateExt},
         },
     },
@@ -579,11 +585,11 @@ async fn connected_state(
         )
         .await;
     let mut bss_quality_data = bss_selection::BssQualityData::new(
-        bss_selection::SignalData::new(
+        SignalData::new(
             options.ap_state.tracked.signal.rssi_dbm,
             options.ap_state.tracked.signal.snr_db,
-            bss_selection::EWMA_SMOOTHING_FACTOR,
-            bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
+            EWMA_SMOOTHING_FACTOR,
+            EWMA_VELOCITY_SMOOTHING_FACTOR,
         ),
         options.ap_state.tracked.channel,
         past_connections,
@@ -829,7 +835,7 @@ async fn record_disconnect(
     options: &ConnectedOptions,
     connect_start_time: fasync::Time,
     reason: types::DisconnectReason,
-    signal_data: bss_selection::SignalData,
+    signal_data: SignalData,
 ) {
     let curr_time = fasync::Time::now();
     let uptime = curr_time - connect_start_time;
@@ -1356,11 +1362,11 @@ mod tests {
                 disconnect_time: fasync::Time::now(),
                 connection_uptime: zx::Duration::from_minutes(0),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
-                signal_data_at_disconnect: bss_selection::SignalData::new(
+                signal_data_at_disconnect: SignalData::new(
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
-                    bss_selection::EWMA_SMOOTHING_FACTOR,
-                    bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
+                    EWMA_SMOOTHING_FACTOR,
+                    EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -1964,11 +1970,11 @@ mod tests {
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::FidlStopClientConnectionsRequest,
-                signal_data_at_disconnect: bss_selection::SignalData::new(
+                signal_data_at_disconnect: SignalData::new(
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
-                    bss_selection::EWMA_SMOOTHING_FACTOR,
-                    bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
+                    EWMA_SMOOTHING_FACTOR,
+                    EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -2046,11 +2052,11 @@ mod tests {
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
-                signal_data_at_disconnect: bss_selection::SignalData::new(
+                signal_data_at_disconnect: SignalData::new(
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
-                    bss_selection::EWMA_SMOOTHING_FACTOR,
-                    bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
+                    EWMA_SMOOTHING_FACTOR,
+                    EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -2228,11 +2234,11 @@ mod tests {
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(5),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
-                signal_data_at_disconnect: bss_selection::SignalData::new(
+                signal_data_at_disconnect: SignalData::new(
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
-                    bss_selection::EWMA_SMOOTHING_FACTOR,
-                    bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
+                    EWMA_SMOOTHING_FACTOR,
+                    EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 average_tx_rate: 0,
             },
@@ -2453,11 +2459,11 @@ mod tests {
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::ProactiveNetworkSwitch,
-                signal_data_at_disconnect: bss_selection::SignalData::new(
+                signal_data_at_disconnect: SignalData::new(
                     first_bss_desc.rssi_dbm,
                     first_bss_desc.snr_db,
-                    bss_selection::EWMA_SMOOTHING_FACTOR,
-                    bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
+                    EWMA_SMOOTHING_FACTOR,
+                    EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
