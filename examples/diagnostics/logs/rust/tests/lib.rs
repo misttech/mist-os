@@ -6,13 +6,23 @@ use diagnostics_reader::{assert_data_tree, ArchiveReader, Data, Logs, Severity};
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage};
 use fuchsia_async::Task;
 use fuchsia_syslog_listener::run_log_listener_with_proxy;
+use fuchsia_zircon::{self as zx, AsHandleRef as _};
 use futures::{channel::mpsc, prelude::*};
 
 #[fuchsia::test]
 async fn launch_example_and_read_hello_world() {
     let url = "fuchsia-pkg://fuchsia.com/rust_logs_example_tests#meta/rust_logs_example.cm";
     // launch our sibling by opening the path, this will cause CM to launch it even though its a dud
-    std::fs::File::open("/svc/fake.just.for.Binding").ok();
+    {
+        let (server_end, client_end) = zx::Channel::create();
+        let () = fuchsia_component::client::connect_channel_to_protocol_at_path(
+            server_end,
+            "/svc/fake.just.for.Binding",
+        )
+        .unwrap();
+        let _: zx::Signals =
+            client_end.wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE).unwrap();
+    }
 
     let (logs, mut new_logs, _tasks) = listen_to_logs();
     pin_utils::pin_mut!(logs);
