@@ -54,3 +54,5 @@ toc:
   path: /docs/development/testing/testability_rubric.md
 - title: "Hardware testing guide"
   path: /docs/development/testing/hardware/guide.md
+- title: "Testing Third Party Changes"
+  path: /docs/development/testing/testing_third_party_changes.md
