@@ -13,6 +13,7 @@ use fuchsia_zircon_sys::{
     self as sys, zx_info_maps_type_t, zx_koid_t, zx_time_t, zx_vaddr_t, zx_vm_option_t,
     InfoMapsTypeUnion, PadByte, ZX_MAX_NAME_LEN, ZX_OBJ_TYPE_UPPER_BOUND,
 };
+use std::mem::MaybeUninit;
 
 bitflags! {
     /// Options that may be used when creating a `Process`.
@@ -216,17 +217,58 @@ impl Process {
     /// [zx_process_read_memory](https://fuchsia.dev/fuchsia-src/reference/syscalls/process_read_memory.md)
     /// syscall.
     pub fn read_memory(&self, vaddr: sys::zx_vaddr_t, bytes: &mut [u8]) -> Result<usize, Status> {
-        let mut actual = 0;
+        // SAFETY: It's OK to interpret &mut [u8] as &mut [MaybeUninit<u8>] as long as we don't
+        // expose the MaybeUninit reference to code that would write uninitialized values to
+        // elements of the slice. Every valid state for a u8 is also a valid state for
+        // MaybeUninit<u8>, although the reverse is not true.
+        let (actually_read, _) = self.read_memory_uninit(vaddr, unsafe {
+            std::slice::from_raw_parts_mut(bytes.as_mut_ptr() as *mut MaybeUninit<u8>, bytes.len())
+        })?;
+        Ok(actually_read.len())
+    }
+
+    /// Read memory from inside a process without requiring the output buffer to be initialized.
+    ///
+    /// Wraps the
+    /// [zx_process_read_memory](https://fuchsia.dev/fuchsia-src/reference/syscalls/process_read_memory.md)
+    /// syscall.
+    pub fn read_memory_uninit<'a>(
+        &self,
+        vaddr: sys::zx_vaddr_t,
+        buffer: &'a mut [MaybeUninit<u8>],
+    ) -> Result<(&'a mut [u8], &'a mut [MaybeUninit<u8>]), Status> {
+        let mut actually_read = 0;
+        // SAFETY: This is a system call that requires the pointers passed are valid to write to.
+        // We get the pointers from a valid mutable slice so we know it's safe to ask the kernel to
+        // write to them. Casting the *mut MaybeUninit<u8> to a *mut u8 is safe because all valid
+        // values for u8 are a subset of the valid values for MaybeUninit<u8> and we know the
+        // kernel won't write uninitialized values to the slice.
         let status = unsafe {
             sys::zx_process_read_memory(
                 self.raw_handle(),
                 vaddr,
-                bytes.as_mut_ptr(),
-                bytes.len(),
-                &mut actual,
+                // TODO(https://fxbug.dev/129307) use MaybeUninit::slice_as_mut_ptr when stable
+                buffer.as_mut_ptr() as *mut u8,
+                buffer.len(),
+                &mut actually_read,
             )
         };
-        ok(status).map(|()| actual)
+        ok(status)?;
+        let (initialized, uninitialized) = buffer.split_at_mut(actually_read);
+        Ok((
+            // TODO(https://fxbug.dev/129307) use MaybeUninit::slice_assume_init_mut when stable
+            // SAFETY: We're converting &mut [MaybeUninit<u8>] back to &mut [u8], which is only
+            // valid to do if all elements of `initialized` have actually been initialized. Here we
+            // have to trust that the kernel didn't lie when it said it wrote to the entire buffer,
+            // but as long as that assumption is valid them it's safe to assume this slice is init.
+            unsafe {
+                std::slice::from_raw_parts_mut(
+                    initialized.as_mut_ptr() as *mut u8,
+                    initialized.len(),
+                )
+            },
+            uninitialized,
+        ))
     }
 
     /// Wraps the
