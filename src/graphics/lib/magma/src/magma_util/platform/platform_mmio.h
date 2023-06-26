@@ -5,6 +5,7 @@
 #ifndef PLATFORM_MMIO_H
 #define PLATFORM_MMIO_H
 
+#include <lib/mmio-ptr/mmio-ptr.h>
 #include <stdint.h>
 
 #include <memory>
@@ -17,7 +18,7 @@ namespace magma {
 // Created from a PlatformPciDevice.
 class PlatformMmio {
  public:
-  PlatformMmio(void* addr, uint64_t size) : addr_(addr), size_(size) {}
+  PlatformMmio(MMIO_PTR void* addr, uint64_t size) : addr_(addr), size_(size) {}
 
   virtual ~PlatformMmio() {}
 
@@ -34,41 +35,41 @@ class PlatformMmio {
   void Write32(uint32_t val, uint64_t offset) {
     MAGMA_DASSERT(offset < size());
     MAGMA_DASSERT((offset & 0x3) == 0);
-    *reinterpret_cast<volatile uint32_t*>(addr(offset)) = val;
+    MmioWrite32(val, reinterpret_cast<MMIO_PTR volatile uint32_t*>(addr(offset)));
   }
 
   uint32_t Read32(uint64_t offset) {
     MAGMA_DASSERT(offset < size());
     MAGMA_DASSERT((offset & 0x3) == 0);
-    return *reinterpret_cast<volatile uint32_t*>(addr(offset));
+    return MmioRead32(reinterpret_cast<MMIO_PTR volatile uint32_t*>(addr(offset)));
   }
 
   void Write64(uint64_t val, uint64_t offset) {
     MAGMA_DASSERT(offset < size());
     MAGMA_DASSERT((offset & 0x7) == 0);
-    *reinterpret_cast<volatile uint64_t*>(addr(offset)) = val;
+    MmioWrite64(val, reinterpret_cast<MMIO_PTR volatile uint64_t*>(addr(offset)));
   }
 
   uint64_t Read64(uint64_t offset) {
     MAGMA_DASSERT(offset < size());
     MAGMA_DASSERT((offset & 0x7) == 0);
-    return *reinterpret_cast<volatile uint64_t*>(addr(offset));
+    return MmioRead64(reinterpret_cast<MMIO_PTR volatile uint64_t*>(addr(offset)));
   }
 
   // Posting reads serve to ensure that a previous bus write at the same address has completed.
   uint32_t PostingRead32(uint64_t offset) { return Read32(offset); }
   uint64_t PostingRead64(uint64_t offset) { return Read64(offset); }
 
-  void* addr() { return addr_; }
+  MMIO_PTR void* addr() { return addr_; }
   uint64_t size() { return size_; }
 
  private:
-  void* addr(uint64_t offset) {
+  MMIO_PTR volatile void* addr(uint64_t offset) {
     MAGMA_DASSERT(offset < size_);
-    return reinterpret_cast<uint8_t*>(addr_) + offset;
+    return reinterpret_cast<MMIO_PTR volatile uint8_t*>(addr_) + offset;
   }
 
-  void* addr_;
+  MMIO_PTR void* addr_;
   uint64_t size_;
 
   PlatformMmio(const PlatformMmio&) = delete;

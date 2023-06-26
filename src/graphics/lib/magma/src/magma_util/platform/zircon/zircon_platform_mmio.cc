@@ -21,8 +21,7 @@ static_assert(ZX_CACHE_POLICY_WRITE_COMBINING ==
               "enum mismatch");
 
 ZirconPlatformMmio::ZirconPlatformMmio(fdf::MmioBuffer mmio)
-    // TODO(fxbug.dev/56253): Add MMIO_PTR to cast.
-    : PlatformMmio((void*)mmio.get(), mmio.get_size()), mmio_(std::move(mmio)) {}
+    : PlatformMmio(mmio.get(), mmio.get_size()), mmio_(std::move(mmio)) {}
 
 bool ZirconPlatformMmio::Pin(const zx::bti& bti) {
   zx_status_t status = mmio_.Pin(bti, &pinned_mmio_);

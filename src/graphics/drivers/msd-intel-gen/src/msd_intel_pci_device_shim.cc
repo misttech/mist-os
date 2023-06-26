@@ -77,7 +77,7 @@ class MsdIntelPciMmio : public magma::PlatformMmio {
     virtual void* context() = 0;
   };
 
-  MsdIntelPciMmio(Owner* owner, void* addr, uint64_t size, uint32_t pci_bar)
+  MsdIntelPciMmio(Owner* owner, MMIO_PTR void* addr, uint64_t size, uint32_t pci_bar)
       : magma::PlatformMmio(addr, size), owner_(owner), pci_bar_(pci_bar) {}
 
   ~MsdIntelPciMmio() { owner_->ops()->unmap_pci_mmio(owner_->context(), pci_bar_); }
@@ -131,7 +131,8 @@ class MsdIntelPciDeviceShim : public MsdIntelPciDevice,
     zx_status_t status = ops()->map_pci_mmio(context(), pci_bar, &addr, &size);
     if (status != ZX_OK)
       return DRETP(nullptr, "map_pci_mmio failed: %d", status);
-    return std::make_unique<MsdIntelPciMmio>(this, addr, size, pci_bar);
+    return std::make_unique<MsdIntelPciMmio>(
+        this, reinterpret_cast<MMIO_PTR void*>(reinterpret_cast<uintptr_t>(addr)), size, pci_bar);
   }
 
   bool RegisterInterruptCallback(InterruptManager::InterruptCallback callback, void* data,

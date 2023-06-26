@@ -135,7 +135,10 @@ source_set("iommu") {
 source_set("mmio_header") {
   public_configs = [ ":platform_include_config" ]
 
-  public_deps = [ "$magma_build_root/src/magma_util:macros" ]
+  public_deps = [
+    "$magma_build_root/src/magma_util:macros",
+    "//zircon/system/ulib/mmio-ptr",
+  ]
 
   sources = [ "platform_mmio.h" ]
 }

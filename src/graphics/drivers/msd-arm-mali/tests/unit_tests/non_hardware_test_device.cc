@@ -24,12 +24,16 @@
 namespace {
 class MaliMockMmioBase : public magma::PlatformMmio {
  public:
-  virtual ~MaliMockMmioBase() { free(addr()); }
+  virtual ~MaliMockMmioBase() {
+    free(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(addr())));
+  }
 
   uint64_t physical_address() override { return 0; }
 
  protected:
-  MaliMockMmioBase(void* addr, size_t size) : magma::PlatformMmio(addr, size) {}
+  MaliMockMmioBase(void* addr, size_t size)
+      : magma::PlatformMmio(reinterpret_cast<MMIO_PTR void*>(reinterpret_cast<uintptr_t>(addr)),
+                            size) {}
 };
 
 using MaliMockMmio = mali::RegisterIoAdapter<MaliMockMmioBase>;
