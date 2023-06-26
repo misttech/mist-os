@@ -74,4 +74,9 @@ per-file .gitignore,.gitmodules = file:/infra/OWNERS
 per-file **/README.md = aaronwood@google.com
 per-file **.cml = aaronwood@google.com
 
+# For the effort to reform the way we handle Global Approvers, grant some folks
+# ownership over OWNERS files.  This should be re-evaluated for removal
+# quarterly, the next review at the start of 2023Q4: 2023-10-01
+per-file OWNERS = hjfreyer@google.com,neelsa@google.com
+
 per-file .ignore = *
