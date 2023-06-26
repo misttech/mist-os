@@ -17,7 +17,7 @@ rustc_test("resolve_bootfs_package") {
   deps = [
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
     "//src/lib/storage/vfs/rust:vfs",
     "//src/sys/component_manager:lib",

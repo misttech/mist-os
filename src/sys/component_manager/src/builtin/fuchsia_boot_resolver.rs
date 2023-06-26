@@ -57,15 +57,10 @@ impl FuchsiaBootResolver {
     /// the namespace, and returns Ok(None) if not present. For unit and integration tests, this
     /// path may point to /pkg.
     pub async fn new(path: &'static str) -> Result<Option<FuchsiaBootResolver>, Error> {
-        // Note that this check is synchronous. The async executor also likely is not being polled
-        // yet, since this is called during startup.
         let bootfs_dir = Path::new(path);
 
-        // WARNING: The below is a synchronous call that is re-entrant into the same process.
-        // This means that any process hosting the bootfs and the fuchsia boot resolver needs at
-        // least 2 threads to avoid hanging.
-        // TODO(97517): Remove this check if there is never a case for starting component manager without
-        // a /boot dir in namespace.
+        // TODO(97517): Remove this check if there is never a case for starting component manager
+        // without a /boot dir in namespace.
         if !bootfs_dir.exists() {
             return Ok(None);
         }

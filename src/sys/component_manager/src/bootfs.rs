@@ -4,20 +4,20 @@
 
 use {
     fidl::AsHandleRef as _,
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_bootfs::{BootfsParser, BootfsParserError},
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
     fuchsia_zircon::{self as zx, HandleBased, Resource},
     std::convert::{From, TryFrom},
-    std::mem::replace,
     std::sync::Arc,
     thiserror::Error,
     tracing::info,
     vfs::{
-        directory::entry::DirectoryEntry,
+        directory::{entry::DirectoryEntry, immutable::connection::io1::ImmutableConnection},
         execution_scope::ExecutionScope,
         file::vmo,
         tree_builder::{self, TreeBuilder},
+        ToObjectRequest,
     },
 };
 
@@ -316,23 +316,34 @@ impl BootfsSvc {
         Ok(self)
     }
 
-    pub fn create_and_bind_vfs(&mut self) -> Result<(), BootfsError> {
+    pub fn create_and_bind_vfs(mut self) -> Result<(), BootfsError> {
         info!("[BootfsSvc] Finalizing rust bootfs service.");
 
-        let tree_builder = replace(&mut self.tree_builder, TreeBuilder::empty_dir());
+        let (directory, directory_server_end) = fidl::endpoints::create_endpoints();
 
         let mut get_inode = |_| -> u64 { BootfsSvc::get_next_inode(&mut self.next_inode) };
 
-        let vfs = tree_builder.build_with_inode_generator(&mut get_inode);
-        let (directory, directory_server_end) = fidl::endpoints::create_endpoints();
-        vfs.open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE
+        let vfs = self.tree_builder.build_with_inode_generator(&mut get_inode);
+
+        // Run the service with its own executor to avoid reentrancy issues.
+        std::thread::spawn(move || {
+            let flags = fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_EXECUTABLE
-                | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            fidl::endpoints::ServerEnd::<fio::NodeMarker>::new(directory_server_end.into_channel()),
-        );
+                | fio::OpenFlags::DIRECTORY;
+            fasync::LocalExecutor::new().run_singlethreaded(
+                flags
+                    .to_object_request(directory_server_end)
+                    .handle(|object_request| {
+                        ImmutableConnection::create(
+                            ExecutionScope::new(),
+                            vfs,
+                            flags,
+                            object_request,
+                        )
+                    })
+                    .unwrap(),
+            );
+        });
 
         let ns = fdio::Namespace::installed().map_err(BootfsError::Namespace)?;
         assert!(

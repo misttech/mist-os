@@ -7,8 +7,7 @@
 /// hermetic.
 use {
     component_manager::{bootfs::BootfsSvc, builtin::fuchsia_boot_resolver::FuchsiaBootResolver},
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
-    fuchsia_async as fasync, fuchsia_fs,
+    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio, fuchsia_fs,
 };
 
 // macros
@@ -18,7 +17,7 @@ use vfs::directory::test_utils::DirentsSameInodeBuilder;
 
 const ZBI_PATH: &str = "/pkg/data/tests/uncompressed_bootfs";
 const HELLO_WORLD_URL: &str = "fuchsia-boot:///hello_world#meta/hello_world.cm";
-#[fasync::run(2, test)]
+#[fuchsia::test]
 async fn package_resolution() {
     let bootfs_image = fuchsia_fs::file::open_in_namespace(
         ZBI_PATH,

@@ -129,11 +129,15 @@ impl ObjectRequest {
     }
 
     /// Calls `f` and sends an error on the object request channel upon failure.
-    pub fn handle<T>(self, f: impl FnOnce(ObjectRequestRef) -> Result<T, zx::Status>) {
+    pub fn handle<T>(self, f: impl FnOnce(ObjectRequestRef) -> Result<T, zx::Status>) -> Option<T> {
         let mut request = Some(self);
-        if let Err(s) = f(ObjectRequestRef(&mut request)) {
-            if let Some(r) = request {
-                r.shutdown(s);
+        match f(ObjectRequestRef(&mut request)) {
+            Ok(o) => Some(o),
+            Err(s) => {
+                if let Some(r) = request {
+                    r.shutdown(s);
+                }
+                None
             }
         }
     }

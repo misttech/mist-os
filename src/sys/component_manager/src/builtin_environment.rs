@@ -206,12 +206,11 @@ impl BuiltinEnvironmentBuilder {
     pub async fn build(mut self) -> Result<BuiltinEnvironment, Error> {
         let system_resource_handle =
             take_startup_handle(HandleType::SystemResource.into()).map(zx::Resource::from);
-        if self.bootfs_svc.is_some() {
+        if let Some(bootfs_svc) = self.bootfs_svc {
             // Set up the Rust bootfs VFS, and bind to the '/boot' namespace. This should
             // happen as early as possible when building the component manager as other objects
             // may require reading from '/boot' for configuration, etc.
-            self.bootfs_svc
-                .unwrap()
+            bootfs_svc
                 .ingest_bootfs_vmo(&system_resource_handle)?
                 .publish_kernel_vmo(get_stable_vdso_vmo()?)?
                 .publish_kernel_vmo(get_next_vdso_vmo()?)?
