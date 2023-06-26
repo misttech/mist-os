@@ -62,12 +62,15 @@ _common_test_package_deps = [
   # netemul-sandbox is used to create hermetic test realms.
   "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
 
-  # netstack is under test.
-  "//src/connectivity/network/netstack:component-debug",
-
   # netstack3 is under test.
   "//src/connectivity/network/netstack3:component-debug",
 ]
+
+# RISC-V on Fuchsia does not support Golang.
+if (target_cpu != "riscv64") {
+  _common_test_package_deps +=
+      [ "//src/connectivity/network/netstack:component-debug" ]
+}
 
 fuchsia_test_package("netstack-fidl-tests-with-expectations") {
   test_components = []
