@@ -13,9 +13,9 @@
 
 #include "lib/inspect/cpp/inspect.h"
 #include "lib/sys/inspect/cpp/component.h"
+#include "src/graphics/display/lib/coordinator-getter/client.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
-#include "src/ui/lib/display/get_hardware_display_controller.h"
 #include "src/ui/scenic/bin/app.h"
 #include "src/ui/scenic/lib/scenic/util/scheduler_profile.h"
 
@@ -33,7 +33,7 @@ int main(int argc, const char** argv) {
   // Set up an inspect::Node to inject into the App.
   sys::ComponentInspector inspector(app_context.get());
 
-  auto display_coordinator_promise = ui_display::GetHardwareDisplayCoordinator();
+  auto display_coordinator_promise = display::GetCoordinator();
 
   // Instantiate Scenic app.
   scenic_impl::App app(std::move(app_context), inspector.root().CreateChild("scenic"),

@@ -30,9 +30,9 @@ source_set("smoketest_lib") {
 
   public_deps = [
     "//sdk/lib/ui/scenic/cpp:cpp",
+    "//src/graphics/display/lib/coordinator-getter:client",
     "//src/lib/fsl:fsl",
     "//src/lib/testing/loop_fixture:gtest",
-    "//src/ui/lib/display:hdcp_client",
     "//src/ui/lib/escher/test/common:gtest_escher",
     "//src/ui/scenic/lib/display:display",
     "//src/ui/scenic/lib/flatland/engine",

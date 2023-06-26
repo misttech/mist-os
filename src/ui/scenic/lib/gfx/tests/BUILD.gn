@@ -137,8 +137,8 @@ executable("swapchain_tests") {
   sources = [ "display_swapchain_test.cc" ]
   deps = [
     ":testing_deps",
+    "//src/graphics/display/lib/coordinator-getter:client",
     "//src/lib/fxl/test:gtest_main",
-    "//src/ui/lib/display:hdcp_client",
   ]
   include_dirs = [ "//src/ui/lib/escher" ]
 }

@@ -11,6 +11,7 @@
 #include <optional>
 
 #include "rapidjson/document.h"
+#include "src/graphics/display/lib/coordinator-getter/client.h"
 #include "src/lib/files/file.h"
 #include "src/ui/lib/escher/vk/pipeline_builder.h"
 #include "src/ui/scenic/lib/display/color_converter.h"
@@ -240,7 +241,7 @@ void DisplayInfoDelegate::GetDisplayOwnershipEvent(
 }
 
 App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspect_node,
-         fpromise::promise<ui_display::DisplayCoordinatorHandles, zx_status_t> dc_handles_promise,
+         fpromise::promise<::display::CoordinatorClientEnd, zx_status_t> dc_handles_promise,
          fit::closure quit_callback)
     : executor_(async_get_default_dispatcher()),
       app_context_(std::move(app_context)),
@@ -369,7 +370,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
                              completer.complete_ok(display_manager_->default_display_shared());
                            });
   executor_.schedule_task(dc_handles_promise.then(
-      [this](fpromise::result<ui_display::DisplayCoordinatorHandles, zx_status_t>& handles) {
+      [this](fpromise::result<::display::CoordinatorClientEnd, zx_status_t>& handles) {
         // TODO(fxbug.dev/76183): Migrate DisplayManager to new C++ bindings.
         display_manager_->BindDefaultDisplayCoordinator(
             fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(

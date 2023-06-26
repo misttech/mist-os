@@ -24,8 +24,8 @@ executable("unittests") {
 
   deps = [
     "//sdk/lib/sys/cpp/testing:unit",
+    "//src/graphics/display/lib/coordinator-getter:client",
     "//src/lib/testing/loop_fixture",
-    "//src/ui/lib/display:hdcp_client",
     "//src/ui/scenic/lib/allocation",
     "//src/ui/scenic/lib/gfx/tests:testing_deps",
     "//src/ui/scenic/lib/screen_capture",

@@ -10,9 +10,9 @@
 #include <memory>
 #include <optional>
 
+#include "src/graphics/display/lib/coordinator-getter/client.h"
 #include "src/lib/async-watchdog/watchdog.h"
 #include "src/lib/fsl/io/device_watcher.h"
-#include "src/ui/lib/display/get_hardware_display_controller.h"
 #include "src/ui/lib/escher/escher.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/annotation/annotation_registry.h"
@@ -93,7 +93,7 @@ struct ConfigValues {
 class App {
  public:
   App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspect_node,
-      fpromise::promise<ui_display::DisplayCoordinatorHandles, zx_status_t> dc_handles_promise,
+      fpromise::promise<::display::CoordinatorClientEnd, zx_status_t> dc_handles_promise,
       fit::closure quit_callback);
 
   ~App();

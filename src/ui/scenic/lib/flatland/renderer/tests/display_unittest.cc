@@ -11,9 +11,9 @@
 
 #include <thread>
 
+#include "src/graphics/display/lib/coordinator-getter/client.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
-#include "src/ui/lib/display/get_hardware_display_controller.h"
 #include "src/ui/lib/escher/vk/vulkan_device_queues.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/display/display_manager.h"
@@ -47,9 +47,9 @@ class DisplayTest : public gtest::RealLoopFixture {
     // test cases in the same test component, so the display coordinator may be
     // in a dirty state. Tests should request a reset of display coordinator
     // here.
-    auto hdc_promise = ui_display::GetHardwareDisplayCoordinator();
+    auto hdc_promise = display::GetCoordinator();
     executor_->schedule_task(hdc_promise.then(
-        [this](fpromise::result<ui_display::DisplayCoordinatorHandles, zx_status_t>& handles) {
+        [this](fpromise::result<display::CoordinatorClientEnd, zx_status_t>& handles) {
           // TODO(fxbug.dev/76183): Migrate DisplayManager to new C++ bindings.
           display_manager_->BindDefaultDisplayCoordinator(
               fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(

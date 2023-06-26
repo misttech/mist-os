@@ -33,8 +33,8 @@ executable("unittests") {
 
   deps = [
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
+    "//src/graphics/display/lib/coordinator-getter:client",
     "//src/lib/testing/loop_fixture:gtest",
-    "//src/ui/lib/display:hdcp_client",
     "//src/ui/lib/escher/test/common:gtest_escher",
     "//src/ui/lib/escher/test/common:readback_fixtures",
     "//src/ui/scenic/lib/display:display",
