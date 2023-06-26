@@ -47,9 +47,7 @@ class DriverUnderTestBase {
   DriverLifecycle driver_lifecycle_symbol_;
   async::synchronization_checker checker_;
   std::optional<zx::result<OpaqueDriverPtr>> driver_ __TA_GUARDED(checker_);
-  std::optional<std::promise<zx::result<>>> start_promise_ __TA_GUARDED(checker_);
-  std::optional<std::promise<zx::result<>>> prepare_stop_promise_ __TA_GUARDED(checker_);
-  std::shared_future<zx::result<>> prepare_stop_promise_future_ __TA_GUARDED(checker_);
+  bool prepare_stop_completed_ __TA_GUARDED(checker_) = false;
 };
 
 // This is a RAII wrapper over a driver under test. On destruction, it will call |Stop| for the

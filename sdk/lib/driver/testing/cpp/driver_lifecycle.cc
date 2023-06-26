@@ -102,27 +102,25 @@ DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::Start(fdf::DriverSta
 
   EncodedDriverStartArgs encoded_start_args{msg, wire_format_metadata};
 
-  ZX_ASSERT_MSG(!start_promise_.has_value(), "Start can only be called once.");
-  start_promise_.emplace();
-
+  fpromise::bridge<zx::result<>> bridge;
   if (driver_lifecycle_symbol_.version >= 3 && driver_lifecycle_symbol_.v3.start != nullptr) {
-    internal::StartDriverV3(
-        driver_lifecycle_symbol_, encoded_start_args, driver_dispatcher_,
-        [this](zx::result<OpaqueDriverPtr> driver_result) mutable {
-          std::lock_guard guard(checker_);
-          driver_.emplace(driver_result);
-          start_promise_->set_value(zx::make_result(driver_result.status_value()));
-        });
+    internal::StartDriverV3(driver_lifecycle_symbol_, encoded_start_args, driver_dispatcher_,
+                            [this, completer = bridge.completer.bind()](
+                                zx::result<OpaqueDriverPtr> driver_result) mutable {
+                              std::lock_guard guard(checker_);
+                              driver_.emplace(driver_result);
+                              completer(zx::make_result(driver_result.status_value()));
+                            });
   } else {
     OpaqueDriverPtr out_driver = nullptr;
     zx_status_t status =
         driver_lifecycle_symbol_.v1.start(encoded_start_args, driver_dispatcher_, &out_driver);
 
     driver_.emplace(zx::make_result(status, out_driver));
-    start_promise_->set_value(zx::make_result(status));
+    bridge.completer.complete_ok(zx::make_result(status));
   }
 
-  return DriverRuntime::AsyncTask<zx::result<>>(start_promise_.value());
+  return DriverRuntime::AsyncTask<zx::result<>>(bridge.consumer.promise());
 }
 
 DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::PrepareStop() {
@@ -130,22 +128,22 @@ DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::PrepareStop() {
   ZX_ASSERT_MSG(driver_.has_value(), "Driver does not exist.");
   ZX_ASSERT_MSG(driver_.value().is_ok(), "Driver start did not succeed: %s.",
                 driver_.value().status_string());
-  ZX_ASSERT_MSG(!prepare_stop_promise_.has_value(), "PrepareStop can only be called once.");
-  prepare_stop_promise_.emplace();
-  prepare_stop_promise_future_ = prepare_stop_promise_->get_future().share();
-
+  fpromise::bridge<zx::result<>> bridge;
   if (driver_lifecycle_symbol_.version >= 2 &&
       driver_lifecycle_symbol_.v2.prepare_stop != nullptr) {
-    internal::PrepareStopV2(driver_lifecycle_symbol_, driver_.value().value(), driver_dispatcher_,
-                            [this](zx::result<> result) mutable {
-                              std::lock_guard guard(checker_);
-                              prepare_stop_promise_->set_value(result);
-                            });
+    internal::PrepareStopV2(
+        driver_lifecycle_symbol_, driver_.value().value(), driver_dispatcher_,
+        [this, completer = bridge.completer.bind()](zx::result<> result) mutable {
+          std::lock_guard guard(checker_);
+          prepare_stop_completed_ = true;
+          completer(result);
+        });
   } else {
-    prepare_stop_promise_->set_value(zx::ok());
+    prepare_stop_completed_ = true;
+    bridge.completer.complete_ok(zx::ok());
   }
 
-  return DriverRuntime::AsyncTask<zx::result<>>(prepare_stop_promise_future_);
+  return DriverRuntime::AsyncTask<zx::result<>>(bridge.consumer.promise());
 }
 
 zx::result<> DriverUnderTestBase::Stop() {
@@ -153,11 +151,7 @@ zx::result<> DriverUnderTestBase::Stop() {
   ZX_ASSERT_MSG(driver_.has_value(), "Driver does not exist.");
   ZX_ASSERT_MSG(driver_.value().is_ok(), "Driver start did not succeed: %s.",
                 driver_.value().status_string());
-  ZX_ASSERT_MSG(prepare_stop_promise_future_.valid(),
-                "PrepareStop must have been called before Stop.");
-  ZX_ASSERT_MSG(
-      prepare_stop_promise_future_.wait_for(std::chrono::seconds(0)) == std::future_status::ready,
-      "PrepareStop has not completed.");
+  ZX_ASSERT_MSG(prepare_stop_completed_, "PrepareStop must have been called and completed.");
 
   zx_status_t status = driver_lifecycle_symbol_.v1.stop(driver_.value().value());
   driver_.reset();

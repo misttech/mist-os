@@ -43,19 +43,17 @@ class DriverRuntimeEnv {
 // thread.
 class DriverRuntime {
  public:
-  // This class wraps a std::shared_future for an asynchronous task. This prevents the user from
-  // calling the future's blocking get incorrectly.
+  // This class wraps a fpromise::promise for an asynchronous task. This prevents the user from
+  // being exposed directly to the fpromise type inside.
   // Use |DriverRuntime::RunToCompletion| to get the result of the task.
   template <typename ResultType>
   class [[nodiscard]] AsyncTask {
    public:
-    explicit AsyncTask(std::shared_future<ResultType> future) : future_(std::move(future)) {}
-    explicit AsyncTask(std::future<ResultType>& future) : AsyncTask(future.share()) {}
-    explicit AsyncTask(std::promise<ResultType>& promise) : AsyncTask(promise.get_future()) {}
+    explicit AsyncTask(fpromise::promise<ResultType> promise) : promise_(std::move(promise)) {}
 
    private:
     friend DriverRuntime;
-    std::shared_future<ResultType> future_;
+    fpromise::promise<ResultType> promise_;
   };
 
   // Starts the driver runtime environment. If the env fails to start, this will throw an assert.
@@ -122,11 +120,9 @@ class DriverRuntime {
   // Runs the foreground dispatcher until the |task| has completed.
   // Returns the result of the |task| when complete.
   template <typename Result>
-  Result RunToCompletion(const AsyncTask<Result>& task) {
+  Result RunToCompletion(AsyncTask<Result> async_task) {
     AssertCurrentThreadIsInitialThread();
-    PerformBlockingWork([task]() { task.future_.wait(); });
-
-    return task.future_.get();
+    return RunPromise(std::move(async_task.promise_)).take_value();
   }
 
   // Runs the foreground dispatcher until the given |fpromise::promise| completes, and returns the
