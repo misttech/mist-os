@@ -428,6 +428,7 @@ pub fn netstack_test(attrs: TokenStream, input: TokenStream) -> TokenStream {
             Variant {
                 trait_bound: str_to_syn_path("Netstack"),
                 implementations: &[
+                    #[cfg(not(target_arch = "riscv64"))]
                     Implementation {
                         type_name: str_to_syn_path("netstack_testing_common::realms::Netstack2"),
                         suffix: "ns2",
@@ -454,12 +455,14 @@ pub fn netstack_test(attrs: TokenStream, input: TokenStream) -> TokenStream {
             Variant {
                 trait_bound: str_to_syn_path("NetstackAndDhcpClient"),
                 implementations: &[
+                    #[cfg(not(target_arch = "riscv64"))]
                     Implementation {
                         type_name: str_to_syn_path(
                             "netstack_testing_common::realms::Netstack2AndInStackDhcpClient",
                         ),
                         suffix: "ns2_with_dhcp_in_stack",
                     },
+                    #[cfg(not(target_arch = "riscv64"))]
                     Implementation {
                         type_name: str_to_syn_path(
                             "netstack_testing_common::realms::Netstack2AndOutOfStackDhcpClient",

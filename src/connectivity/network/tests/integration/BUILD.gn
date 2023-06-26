@@ -84,9 +84,6 @@ package_deps = [
   # netstack is under test.
   ":netstack-empty-netemul-config",
   ":netstack-specified-procs-netemul-config",
-  "//src/connectivity/network/netstack:component",
-  "//src/connectivity/network/netstack:component-debug",
-  "//src/connectivity/network/netstack:component-with-fast-udp-debug",
 
   # netstack3 is under test.
   "//src/connectivity/network/netstack3:component",
@@ -123,6 +120,15 @@ package_deps = [
   "//src/connectivity/network/netcfg:component-advanced",
   "//src/connectivity/network/netcfg:component-basic",
 ]
+
+# RISC-V on Fuchsia does not support Golang.
+if (target_cpu != "riscv64") {
+  package_deps += [
+    "//src/connectivity/network/netstack:component",
+    "//src/connectivity/network/netstack:component-debug",
+    "//src/connectivity/network/netstack:component-with-fast-udp-debug",
+  ]
+}
 
 fuchsia_test_package("netstack-integration-tests") {
   test_components = []
