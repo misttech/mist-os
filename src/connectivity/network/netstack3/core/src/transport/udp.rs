@@ -634,8 +634,6 @@ impl<I: Ip + IpExt, D: WeakId> DatagramSockets<IpPortSpec<I, D>, Udp<I, D>> {
         device: D,
     ) -> impl Iterator<Item = LookupResult<I, D>> + '_ {
         let matching_entries = self.iter_receivers((src_ip, src_port), (dst_ip, dst_port), device);
-        let Self { bound: _, state } = self;
-
         match matching_entries {
             None => Either::Left(None),
             Some(FoundSockets::Single(entry)) => {
@@ -666,7 +664,7 @@ impl<I: Ip + IpExt, D: WeakId> DatagramSockets<IpPortSpec<I, D>, Udp<I, D>> {
                     },
                     _sharing,
                     _addr,
-                ) = assert_matches!(state.get(&id).expect("socket ID is valid"),
+                ) = assert_matches!(self.get_socket_state(&id).expect("socket ID is valid"),
                     DatagramSocketState::Bound(DatagramBoundSocketState::Connected(state)) => state
                 );
                 !shutdown_receive
@@ -4373,10 +4371,9 @@ mod tests {
             remote_port,
         )
         .expect("connect failed");
-        let Sockets { sockets: DatagramSockets { state, bound: _ }, lazy_port_alloc: _ } =
-            &sync_ctx.outer.sockets;
+        let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
         let (_state, _tag_state, addr) = assert_matches!(
-            state.get(&conn.try_into().unwrap()).unwrap(),
+            sockets.get_socket_state(&conn.try_into().unwrap()).unwrap(),
             DatagramSocketState::Bound(DatagramBoundSocketState::Connected(state)) => state
         );
 
@@ -4500,28 +4497,27 @@ mod tests {
             NonZeroU16::new(1010).unwrap(),
         )
         .expect("connect failed");
-        let Sockets { sockets: DatagramSockets { state, bound: _ }, lazy_port_alloc: _ } =
-            &sync_ctx.outer.sockets;
+        let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
         let valid_range = &UdpBoundSocketMap::<I, FakeWeakDeviceId<FakeDeviceId>>::EPHEMERAL_RANGE;
-        let port_a = assert_matches!(state.get(&conn_a.try_into().unwrap()),
+        let port_a = assert_matches!(sockets.get_socket_state(&conn_a.try_into().unwrap()),
             Some(DatagramSocketState::Bound(SocketState::Connected(
                 (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
             ))) => local_identifier)
         .get();
         assert!(valid_range.contains(&port_a));
-        let port_b = assert_matches!(state.get(&conn_b.try_into().unwrap()),
+        let port_b = assert_matches!(sockets.get_socket_state(&conn_b.try_into().unwrap()),
             Some(DatagramSocketState::Bound(SocketState::Connected(
                 (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
             ))) => local_identifier)
         .get();
         assert_ne!(port_a, port_b);
-        let port_c = assert_matches!(state.get(&conn_c.try_into().unwrap()),
+        let port_c = assert_matches!(sockets.get_socket_state(&conn_c.try_into().unwrap()),
             Some(DatagramSocketState::Bound(SocketState::Connected(
                 (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
             ))) => local_identifier)
         .get();
         assert_ne!(port_a, port_c);
-        let port_d = assert_matches!(state.get(&conn_d.try_into().unwrap()),
+        let port_d = assert_matches!(sockets.get_socket_state(&conn_d.try_into().unwrap()),
             Some(DatagramSocketState::Bound(SocketState::Connected(
                 (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
             ))) => local_identifier)
@@ -4600,16 +4596,16 @@ mod tests {
         )
         .expect("listen_udp failed");
 
-        let Sockets { sockets: DatagramSockets { state, bound: _ }, lazy_port_alloc: _ } =
-            &sync_ctx.outer.sockets;
+        let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
         let wildcard_port = assert_matches!(
-            state.get(&wildcard_list.try_into().unwrap()),
+            sockets.get_socket_state(&wildcard_list.try_into().unwrap()),
             Some(DatagramSocketState::Bound(SocketState::Listener((
                 _,
                 _,
                 ListenerAddr{ ip: ListenerIpAddr {identifier, addr: None}, device: None}
             )))) => identifier);
-        let specified_port = assert_matches!(state.get(&specified_list.try_into().unwrap()),
+        let specified_port = assert_matches!(
+            sockets.get_socket_state(&specified_list.try_into().unwrap()),
             Some(DatagramSocketState::Bound(SocketState::Listener((
                 _,
                 _,
@@ -4651,11 +4647,10 @@ mod tests {
             ip: ListenerIpAddr { addr: None, identifier: local_port },
             device: None,
         };
-        let Sockets { sockets: DatagramSockets { state, bound: _ }, lazy_port_alloc: _ } =
-            &sync_ctx.outer.sockets;
+        let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
         for listener in listeners {
             assert_matches!(
-                state.get(&listener.try_into().unwrap()),
+                sockets.get_socket_state(&listener.try_into().unwrap()),
                 Some(DatagramSocketState::Bound(SocketState::Listener((_, _, addr))))
                 => assert_eq!(addr, &expected_addr));
         }
@@ -4774,9 +4769,8 @@ mod tests {
 
         // Assert that that connection id was removed from the connections
         // state.
-        let Sockets { sockets: DatagramSockets { state, bound: _ }, lazy_port_alloc: _ } =
-            &sync_ctx.outer.sockets;
-        assert_matches!(state.get(&conn.try_into().unwrap()), None);
+        let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
+        assert_matches!(sockets.get_socket_state(&conn.try_into().unwrap()), None);
     }
 
     /// Tests [`remove_udp`]
@@ -4801,9 +4795,8 @@ mod tests {
         let info = assert_matches!(info, SocketInfo::Listener(info) => info);
         assert_eq!(info.local_ip.unwrap(), local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port, local_port);
-        let Sockets { sockets: DatagramSockets { state, bound: _ }, lazy_port_alloc: _ } =
-            &sync_ctx.outer.sockets;
-        assert_matches!(state.get(&list.try_into().unwrap()), None);
+        let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
+        assert_matches!(sockets.get_socket_state(&list.try_into().unwrap()), None);
 
         // Test removing a wildcard listener.
         let unbound = SocketHandler::create_udp(&mut sync_ctx);
@@ -4819,9 +4812,8 @@ mod tests {
         let info = assert_matches!(info, SocketInfo::Listener(info) => info);
         assert_eq!(info.local_ip, None);
         assert_eq!(info.local_port, local_port);
-        let Sockets { sockets: DatagramSockets { state, bound: _ }, lazy_port_alloc: _ } =
-            &sync_ctx.outer.sockets;
-        assert_matches!(state.get(&list.try_into().unwrap()), None);
+        let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
+        assert_matches!(sockets.get_socket_state(&list.try_into().unwrap()), None);
     }
 
     fn try_join_leave_multicast<I: Ip + TestIpExt>(
@@ -6114,9 +6106,8 @@ where {
         let _: SocketInfo<_, _> =
             SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, unbound);
 
-        let Sockets { sockets: DatagramSockets { state, bound: _ }, lazy_port_alloc: _ } =
-            &sync_ctx.outer.sockets;
-        assert_matches!(state.get(&unbound.into()), None)
+        let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
+        assert_matches!(sockets.get_socket_state(&unbound.into()), None)
     }
 
     #[ip_test]

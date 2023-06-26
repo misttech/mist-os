@@ -56,8 +56,8 @@ pub(crate) struct Sockets<A: SocketMapAddrSpec, S: DatagramSocketStateSpec>
 where
     Bound<S>: Tagged<AddrVec<A>>,
 {
-    pub(crate) bound: BoundSocketMap<A, S>,
-    pub(crate) state: IdMapCollection<SocketId<S>, SocketState<A, S>>,
+    bound: BoundSocketMap<A, S>,
+    state: IdMapCollection<SocketId<S>, SocketState<A, S>>,
 }
 
 #[derive(Derivative)]
@@ -89,6 +89,11 @@ where
     {
         let Self { bound, state: _ } = self;
         bound.lookup((src_ip, src_port), (dst_ip, dst_port), device)
+    }
+
+    pub(crate) fn get_socket_state(&self, id: &SocketId<S>) -> Option<&SocketState<A, S>> {
+        let Self { state, bound: _ } = self;
+        state.get(id)
     }
 }
 
