@@ -178,7 +178,10 @@ impl ProfileRegistrar {
 
         let l2cap_channel = match self
             .profile_upstream
-            .connect(&peer_id.into(), &l2cap_connect_parameters(Psm::RFCOMM))
+            .connect(
+                &peer_id.into(),
+                &l2cap_connect_parameters(Psm::RFCOMM, bredr::ChannelMode::Basic),
+            )
             .await
         {
             Ok(Ok(channel)) => channel.try_into().unwrap(),
@@ -620,7 +623,10 @@ mod tests {
         peer_id: PeerId,
         psm: u16,
     ) -> impl Future<Output = Result<Result<bredr::Channel, ErrorCode>, fidl::Error>> {
-        client.connect(&peer_id.into(), &l2cap_connect_parameters(Psm::new(psm)))
+        client.connect(
+            &peer_id.into(),
+            &l2cap_connect_parameters(Psm::new(psm), bredr::ChannelMode::Basic),
+        )
     }
 
     fn new_client(

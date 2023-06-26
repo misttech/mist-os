@@ -339,7 +339,10 @@ async fn passthrough_search_discovers_advertisement() {
     // Passthrough L2CAP connection is OK - the channel endpoints should be delivered to the
     // `client` and `test_driven_peer`.
     let _client_channel = profile
-        .connect(&test_driven_peer.peer_id().into(), &l2cap_connect_parameters(Psm::AVDTP))
+        .connect(
+            &test_driven_peer.peer_id().into(),
+            &l2cap_connect_parameters(Psm::AVDTP, bredr::ChannelMode::Basic),
+        )
         .await;
 
     let (other_id, _test_driven_peer_channel, _, _) = connect_requests

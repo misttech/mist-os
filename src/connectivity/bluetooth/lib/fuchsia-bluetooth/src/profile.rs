@@ -368,9 +368,16 @@ impl From<&ProtocolDescriptor> for fidl_bredr::ProtocolDescriptor {
     }
 }
 
-pub fn l2cap_connect_parameters(psm: Psm) -> fidl_bredr::ConnectParameters {
+pub fn l2cap_connect_parameters(
+    psm: Psm,
+    mode: fidl_bredr::ChannelMode,
+) -> fidl_bredr::ConnectParameters {
     fidl_bredr::ConnectParameters::L2cap(fidl_bredr::L2capParameters {
         psm: Some(psm.into()),
+        parameters: Some(fidl_bredr::ChannelParameters {
+            channel_mode: Some(mode),
+            ..fidl_bredr::ChannelParameters::default()
+        }),
         ..fidl_bredr::L2capParameters::default()
     })
 }

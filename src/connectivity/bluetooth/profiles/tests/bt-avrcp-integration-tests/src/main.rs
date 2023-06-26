@@ -200,7 +200,7 @@ async fn remote_initiates_connection_to_avrcp(mut tf: AvrcpIntegrationTest) {
     fasync::Timer::new(fasync::Time::after(MAX_AVRCP_CONNECTION_ESTABLISHMENT)).await;
 
     // Mock peer attempts to connect to AVRCP.
-    let params = l2cap_connect_parameters(Psm::AVCTP);
+    let params = l2cap_connect_parameters(Psm::AVCTP, bredr::ChannelMode::Basic);
     let channel = tf.mock_peer.make_connection(avrcp_profile_id, params).await.unwrap();
     let channel: Channel = channel.try_into().unwrap();
 
@@ -263,7 +263,8 @@ async fn remote_initiates_browse_channel_before_control(mut tf: AvrcpIntegration
         }
     };
     // Mock peer tries to initiate a browse channel connection.
-    let params = l2cap_connect_parameters(Psm::AVCTP_BROWSE);
+    let params =
+        l2cap_connect_parameters(Psm::AVCTP_BROWSE, bredr::ChannelMode::EnhancedRetransmission);
     let channel = tf.mock_peer.make_connection(avrcp_profile_id, params).await.unwrap();
     let channel: Channel = channel.try_into().unwrap();
 

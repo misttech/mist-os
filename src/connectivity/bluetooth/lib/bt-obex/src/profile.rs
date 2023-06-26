@@ -77,13 +77,16 @@ pub fn parse_obex_search_result(
     // The GoepL2capPsm attribute is included when the peer supports both RFCOMM and L2CAP.
     // Prefer L2CAP if both are supported.
     if let Some(l2cap_psm) = attributes.iter().find_map(parse_goep_l2cap_psm_attribute) {
-        return Some(l2cap_connect_parameters(l2cap_psm));
+        return Some(l2cap_connect_parameters(
+            l2cap_psm,
+            bredr::ChannelMode::EnhancedRetransmission,
+        ));
     }
 
     // Otherwise the service supports only one of L2CAP or RFCOMM.
     // Try L2CAP first.
     if let Some(psm) = psm_from_protocol(protocol) {
-        return Some(l2cap_connect_parameters(psm));
+        return Some(l2cap_connect_parameters(psm, bredr::ChannelMode::EnhancedRetransmission));
     }
 
     // Otherwise, it's RFCOMM.
@@ -143,6 +146,10 @@ mod tests {
         let l2cap_protocol = obex_protocol_l2cap(Psm::new(59));
         let expected = bredr::ConnectParameters::L2cap(bredr::L2capParameters {
             psm: Some(59),
+            parameters: Some(bredr::ChannelParameters {
+                channel_mode: Some(bredr::ChannelMode::EnhancedRetransmission),
+                ..bredr::ChannelParameters::default()
+            }),
             ..bredr::L2capParameters::default()
         });
         let result =
@@ -176,6 +183,10 @@ mod tests {
         // Expected should be the L2CAP PSM.
         let expected = bredr::ConnectParameters::L2cap(bredr::L2capParameters {
             psm: Some(55),
+            parameters: Some(bredr::ChannelParameters {
+                channel_mode: Some(bredr::ChannelMode::EnhancedRetransmission),
+                ..bredr::ChannelParameters::default()
+            }),
             ..bredr::L2capParameters::default()
         });
         let result = parse_obex_search_result(&obex_protocol_rfcomm(server_channel), &attributes)
