@@ -109,10 +109,9 @@ class OutgoingDirectoryTest : public gtest::RealLoopFixture {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     EXPECT_TRUE(endpoints.is_ok()) << endpoints.status_string();
     auto& [client_end, server_end] = endpoints.value();
-    auto status = fidl::WireCall(root)->Open(
-        fuchsia_io::wire::OpenFlags::kRightWritable | fuchsia_io::wire::OpenFlags::kRightReadable |
-            fuchsia_io::wire::OpenFlags::kDirectory,
-        {}, path, fidl::ServerEnd<fuchsia_io::Node>{server_end.TakeChannel()});
+    fidl::OneWayStatus status =
+        fidl::WireCall(root)->Open(fuchsia_io::wire::OpenFlags::kDirectory, {}, path,
+                                   fidl::ServerEnd<fuchsia_io::Node>{server_end.TakeChannel()});
     EXPECT_TRUE(status.ok()) << status.FormatDescription();
     return std::move(client_end);
   }

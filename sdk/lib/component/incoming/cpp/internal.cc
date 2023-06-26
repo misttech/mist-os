@@ -6,7 +6,6 @@
 #include <lib/component/incoming/cpp/constants.h>
 #include <lib/component/incoming/cpp/internal.h>
 #include <lib/fdio/directory.h>
-#include <lib/fdio/namespace.h>
 
 namespace component::internal {
 
@@ -113,20 +112,17 @@ zx::result<> DirectoryOpenFunc(zx::unowned_channel dir, fidl::StringView path,
 }
 
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> GetGlobalServiceDirectory() {
-  fdio_ns_t* global_ns = nullptr;
-  if (auto status = fdio_ns_get_installed(&global_ns); status != ZX_OK) {
-    return zx::error(status);
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
   }
-
-  auto directory = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  constexpr fuchsia_io::wire::OpenFlags kFlags = fuchsia_io::wire::OpenFlags::kRightReadable;
-  if (auto status = fdio_ns_open(global_ns, kServiceDirectory, static_cast<uint32_t>(kFlags),
-                                 directory->server.TakeChannel().release());
+  auto& [client, server] = endpoints.value();
+  if (zx_status_t status = fdio_service_connect(kServiceDirectory, server.TakeChannel().release());
       status != ZX_OK) {
     return zx::error(status);
   }
 
-  return zx::ok(std::move(directory->client));
+  return zx::ok(std::move(client));
 }
 
 }  // namespace component::internal

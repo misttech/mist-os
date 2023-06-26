@@ -36,16 +36,19 @@ class IncomingTest : public gtest::RealLoopFixture {
 
   fidl::ClientEnd<fuchsia_io::Directory> TakeSvcDirectoryRoot() {
     return PerformBlockingWork([&]() {
-      auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
+      zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
+      ZX_ASSERT_MSG(endpoints.is_ok(), "Failed to create fuchsia.io/Node endpoints: %s",
+                    endpoints.status_string());
+      auto& [client, server] = endpoints.value();
       fidl::Request<fuchsia_io::Directory::Open> request(
-          /*flags=*/fuchsia_io::OpenFlags::kRightReadable,
+          /*flags=*/fuchsia_io::OpenFlags{},
           /*mode=*/fuchsia_io::ModeType{},
           /*path=*/component::OutgoingDirectory::kServiceDirectory,
-          /*object=*/std::move(endpoints->server));
-      auto result = outgoing_client_->Open(std::move(request));
-      ZX_ASSERT_MSG(result.is_ok(), "Failed to invoke fuchsia.io/Directory.Open: %s",
-                    result.error_value().status_string());
-      return fidl::ClientEnd<fuchsia_io::Directory>(endpoints->client.TakeChannel());
+          /*object=*/std::move(server));
+      fit::result status = outgoing_client_->Open(std::move(request));
+      ZX_ASSERT_MSG(status.is_ok(), "Failed to invoke fuchsia.io/Directory.Open: %s",
+                    status.error_value().FormatDescription().c_str());
+      return fidl::ClientEnd<fuchsia_io::Directory>(client.TakeChannel());
     });
   }
 
