@@ -6,10 +6,7 @@
 
 use super::shared::{execute_syscall, process_completed_restricted_exit, TaskInfo};
 use crate::{
-    arch::{
-        execution::{generate_cfi_directives, restore_cfi_directives},
-        registers::RegisterState,
-    },
+    arch::execution::{generate_cfi_directives, restore_cfi_directives},
     logging::{log_trace, log_warn, set_current_task_info, set_zx_name},
     mm::MemoryManager,
     signals::{deliver_signal, SignalActions, SignalInfo},
@@ -151,58 +148,6 @@ impl std::ops::Drop for RestrictedState {
 
 const RESTRICTED_ENTER_OPTIONS: u32 = 0;
 
-trait ExceptionContext {
-    fn read_registers(&self) -> RegisterState;
-    fn write_registers(&mut self, registers: RegisterState);
-    fn set_exception_state(
-        &mut self,
-        state: &zx::sys::zx_exception_state_t,
-    ) -> Result<(), zx::Status>;
-}
-
-struct ChannelException {
-    pub exception: zx::Exception,
-    pub thread: zx::Thread,
-}
-
-impl ExceptionContext for ChannelException {
-    fn read_registers(&self) -> RegisterState {
-        self.thread.read_state_general_regs().unwrap().into()
-    }
-    fn write_registers(&mut self, registers: RegisterState) {
-        self.thread.write_state_general_regs(registers.into()).unwrap();
-    }
-    fn set_exception_state(
-        &mut self,
-        state: &zx::sys::zx_exception_state_t,
-    ) -> Result<(), zx::Status> {
-        self.exception.set_exception_state(state)
-    }
-}
-
-struct InThreadException<'a> {
-    pub current_task: &'a mut CurrentTask,
-    pub exception_state: zx::sys::zx_exception_state_t,
-}
-
-impl<'a> ExceptionContext for InThreadException<'a> {
-    // Note we don't read/write to the state VMO here because the top-level task will
-    // already handle moving register state to/from the VMO from the CurrentTask.
-    fn read_registers(&self) -> RegisterState {
-        self.current_task.registers
-    }
-    fn write_registers(&mut self, registers: RegisterState) {
-        self.current_task.registers = registers;
-    }
-    fn set_exception_state(
-        &mut self,
-        state: &zx::sys::zx_exception_state_t,
-    ) -> Result<(), zx::Status> {
-        self.exception_state = *state;
-        Ok(())
-    }
-}
-
 /// Runs the `current_task` to completion.
 ///
 /// The high-level flow of this function looks as follows:
@@ -325,33 +270,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                     zx::sys::zx_thread_state_general_regs_t::from(&restricted_exception.state)
                         .into();
                 let exception_result = task.process_exception(&restricted_exception.exception);
-
-                let task = current_task.task.clone();
-                let mut exception = InThreadException {
-                    current_task,
-                    // Matches the default disposition on zx::Exception objects.
-                    exception_state: zx::sys::ZX_EXCEPTION_STATE_TRY_NEXT,
-                };
-                process_completed_exception(task, exception_result, &mut exception);
-
-                match exception.exception_state {
-                    zx::sys::ZX_EXCEPTION_STATE_HANDLED => {}
-                    zx::sys::ZX_EXCEPTION_STATE_THREAD_EXIT => {
-                        return Ok(current_task.task.read().exit_status.as_ref().unwrap().clone());
-                    }
-                    zx::sys::ZX_EXCEPTION_STATE_TRY_NEXT => {
-                        // Try-next means we have not handled the exception. We don't have any other exception
-                        // handlers to delegate to when using in-thread exceptions so we will request a backtrace
-                        // for the thread and exit.
-                        generate_cfi_directives!(state);
-                        debug::backtrace_request_current_thread();
-                        restore_cfi_directives!();
-                        return Ok(current_task.task.read().exit_status.as_ref().unwrap().clone());
-                    }
-                    state => {
-                        return Err(format_err!("Unknown exception state: {}", state));
-                    }
-                }
+                process_completed_exception(current_task, exception_result);
             }
             zx::sys::ZX_RESTRICTED_REASON_KICK => {
                 // Copy the register state out of the VMO.
@@ -450,26 +369,15 @@ where
     };
 }
 
-fn process_completed_exception<E: ExceptionContext>(
-    task: Arc<Task>,
-    exception_result: ExceptionResult,
-    exception: &mut E,
-) {
+fn process_completed_exception(current_task: &mut CurrentTask, exception_result: ExceptionResult) {
     match exception_result {
-        ExceptionResult::Handled => {
-            exception.set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED).unwrap();
-        }
+        ExceptionResult::Handled => {}
         ExceptionResult::Signal(signal) => {
             // TODO: Verify that the rip is actually in restricted code.
-
-            let mut registers = exception.read_registers();
-
+            let mut registers = current_task.registers;
             registers.reset_flags();
-
-            deliver_signal(&task, signal, &mut registers);
-
-            exception.write_registers(registers);
-            exception.set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED).unwrap();
+            deliver_signal(current_task, signal, &mut registers);
+            current_task.registers = registers;
         }
     }
 }
