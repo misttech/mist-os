@@ -728,25 +728,22 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
     return;
   }
   const auto& collections = it->second;
-
-  // capture_image will contain a handle that will be used by display driver to trigger
-  // capture start/release.
-  image_t capture_image_info = {};
-
   const uint64_t banjo_driver_buffer_collection_id =
       display::ToBanjoDriverBufferCollectionId(collections.driver_buffer_collection_id);
+
+  uint64_t capture_image_handle = INVALID_ID;
   zx_status_t status = controller_->dc()->ImportImageForCapture(
-      banjo_driver_buffer_collection_id, request->index, &capture_image_info.handle);
+      banjo_driver_buffer_collection_id, request->index, &capture_image_handle);
 
   if (status == ZX_OK) {
-    auto release_image = fit::defer([this, &capture_image_info]() {
-      controller_->dc()->ReleaseCapture(capture_image_info.handle);
+    auto release_image = fit::defer([this, capture_image_handle]() {
+      controller_->dc()->ReleaseCapture(capture_image_handle);
     });
 
-    fbl::AllocChecker ac;
+    fbl::AllocChecker alloc_checker;
     auto capture_image = fbl::AdoptRef(
-        new (&ac) CaptureImage(controller_, capture_image_info, &proxy_->node(), id_));
-    if (!ac.check()) {
+        new (&alloc_checker) CaptureImage(controller_, capture_image_handle, &proxy_->node(), id_));
+    if (!alloc_checker.check()) {
       completer.ReplyError(ZX_ERR_NO_MEMORY);
       return;
     }
@@ -788,7 +785,7 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
   }
 
   capture_fence_id_ = request->signal_event_id;
-  auto status = controller_->dc()->StartCapture(image->info().handle);
+  auto status = controller_->dc()->StartCapture(image->capture_image_handle());
   if (status == ZX_OK) {
     fbl::AutoLock lock(controller_->mtx());
     proxy_->EnableCapture(true);

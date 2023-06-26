@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CAPTURE_IMAGE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CAPTURE_IMAGE_H_
 
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
 
 #include <cstdint>
@@ -21,21 +20,20 @@ class Controller;
 class CaptureImage : public fbl::RefCounted<CaptureImage>,
                      public IdMappable<fbl::RefPtr<CaptureImage>, /*IdType=*/uint64_t> {
  public:
-  CaptureImage(Controller* controller, const image_t& info, inspect::Node* parent_node,
+  CaptureImage(Controller* controller, uint64_t capture_image_handle, inspect::Node* parent_node,
                uint32_t client_id);
   ~CaptureImage();
 
-  image_t& info() { return info_; }
+  uint64_t capture_image_handle() const { return capture_image_handle_; }
   uint32_t client_id() const { return client_id_; }
 
  private:
   void InitializeInspect(inspect::Node* parent_node);
 
-  image_t info_;
+  uint64_t capture_image_handle_;
+  uint32_t client_id_;
 
   Controller* const controller_;
-
-  uint32_t client_id_;
 
   inspect::Node node_;
   inspect::ValueList properties_;

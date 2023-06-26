@@ -4,8 +4,8 @@
 
 #include "src/graphics/display/drivers/coordinator/capture-image.h"
 
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <zircon/assert.h>
 
 #include <cstdint>
 
@@ -15,21 +15,21 @@
 
 namespace display {
 
-CaptureImage::CaptureImage(Controller* controller, const image_t& info, inspect::Node* parent_node,
-                           uint32_t client_id)
-    : info_(info), controller_(controller), client_id_(client_id) {
+CaptureImage::CaptureImage(Controller* controller, uint64_t capture_image_handle,
+                           inspect::Node* parent_node, uint32_t client_id)
+    : capture_image_handle_(capture_image_handle), client_id_(client_id), controller_(controller) {
+  ZX_DEBUG_ASSERT(controller_ != nullptr);
+
   InitializeInspect(parent_node);
 }
 
-CaptureImage::~CaptureImage() { controller_->ReleaseCaptureImage(info_.handle); }
+CaptureImage::~CaptureImage() { controller_->ReleaseCaptureImage(capture_image_handle_); }
 
 void CaptureImage::InitializeInspect(inspect::Node* parent_node) {
   if (!parent_node)
     return;
   node_ = parent_node->CreateChild(fbl::StringPrintf("capture-image-%p", this).c_str());
-  node_.CreateUint("width", info_.width, &properties_);
-  node_.CreateUint("height", info_.height, &properties_);
-  node_.CreateUint("type", info_.type, &properties_);
+  node_.CreateUint("client_id", client_id_, &properties_);
 }
 
 }  // namespace display
