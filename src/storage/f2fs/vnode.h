@@ -105,8 +105,9 @@ class VnodeF2fs : public fs::PagedVnode,
   //      buffer_head *bh_result, int create);
 #endif
 
-  void UpdateInode(LockedPage &inode_page);
-  zx_status_t WriteInode(bool is_reclaim = false);
+  void UpdateInodePage(LockedPage &inode_page);
+  zx_status_t UpdateInodePage();
+
   zx_status_t DoTruncate(size_t len);
   // Caller should ensure node_page is locked.
   int TruncateDataBlocksRange(NodePage &node_page, uint32_t ofs_in_node, uint32_t count);
@@ -146,10 +147,6 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t WatchDir(fs::FuchsiaVfs *vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,
                        fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher) final;
 
-  // Set dirty flag and insert |this| to VnodeCache::dirty_list_.
-  // If |to_back| is set and |this| is already in the list, it moves |this| to the back of the list.
-  void MarkInodeDirty(bool to_back = false);
-
   void GetExtentInfo(const Extent &i_ext) __TA_EXCLUDES(extent_cache_mutex_);
   void SetRawExtent(Extent &i_ext) __TA_EXCLUDES(extent_cache_mutex_);
 
@@ -159,6 +156,7 @@ class VnodeF2fs : public fs::PagedVnode,
   void ClearNlink() { nlink_.store(0, std::memory_order_release); }
   void SetNlink(const uint32_t nlink) { nlink_.store(nlink, std::memory_order_release); }
   uint32_t GetNlink() const { return nlink_.load(std::memory_order_acquire); }
+  bool HasLink() const { return nlink_.load(std::memory_order_acquire) > 0; }
 
   void SetMode(const umode_t &mode);
   umode_t GetMode() const;
@@ -364,8 +362,11 @@ class VnodeF2fs : public fs::PagedVnode,
   bool IsActive() const;
   void WaitForDeactive(std::mutex &mutex);
 
-  void ClearDirty() { ClearFlag(InodeInfoFlag::kDirty); }
-  bool IsDirty() const { return TestFlag(InodeInfoFlag::kDirty); }
+  // Set dirty flag and insert |this| to VnodeCache::dirty_list_.
+  bool SetDirty() __TA_EXCLUDES(info_mutex_);
+  bool ClearDirty() __TA_EXCLUDES(info_mutex_);
+  bool IsDirty() __TA_EXCLUDES(info_mutex_);
+
   bool IsBad() const { return TestFlag(InodeInfoFlag::kBad); }
 
   void WaitForInit() const { WaitOnFlag(InodeInfoFlag::kInit); }
@@ -374,7 +375,7 @@ class VnodeF2fs : public fs::PagedVnode,
     flags_[static_cast<uint8_t>(InodeInfoFlag::kInit)].notify_all();
   }
 
-  bool ShouldFlush() const { return !(!GetNlink() || !IsDirty() || IsBad()); }
+  bool IsValid() const { return HasLink() && !IsBad() && !file_cache_->IsOrphan(); }
 
   zx_status_t FindPage(pgoff_t index, fbl::RefPtr<Page> *out) {
     return file_cache_->FindPage(index, out);
@@ -402,9 +403,10 @@ class VnodeF2fs : public fs::PagedVnode,
     return file_cache_->InvalidatePages(start, end);
   }
   void ResetFileCache(pgoff_t start = 0, pgoff_t end = kPgOffMax) { file_cache_->Reset(); }
-  void ClearDirtyPagesForOrphan() {
+  void SetOrphan() {
     if (!file_cache_->SetOrphan()) {
       file_cache_->ClearDirtyPages();
+      ClearDirty();
     }
   }
 

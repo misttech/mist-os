@@ -287,7 +287,7 @@ void Dir::SetLink(DirEntry *de, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) {
     SetMTime(cur_time);
   }
 
-  MarkInodeDirty();
+  SetDirty();
 }
 
 void Dir::SetLinkSafe(DirEntry *de, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) {
@@ -344,7 +344,7 @@ zx_status_t Dir::InitInodeMetadata(VnodeF2fs *vnode) {
 
   if (vnode->TestFlag(InodeInfoFlag::kIncLink)) {
     vnode->IncNlink();
-    vnode->WriteInode(false);
+    vnode->UpdateInodePage();
   }
   return ZX_OK;
 }
@@ -369,7 +369,7 @@ void Dir::UpdateParentMetadata(VnodeF2fs *vnode, unsigned int current_depth) {
     SetFlag(InodeInfoFlag::kUpdateDir);
   }
 
-  MarkInodeDirty();
+  SetDirty();
 
   vnode->ClearFlag(InodeInfoFlag::kIncLink);
 }
@@ -400,7 +400,7 @@ zx_status_t Dir::AddLink(std::string_view name, VnodeF2fs *vnode) {
   auto umount = fit::defer([&] {
     if (TestFlag(InodeInfoFlag::kUpdateDir)) {
       ClearFlag(InodeInfoFlag::kUpdateDir);
-      WriteInode(false);
+      UpdateInodePage();
     }
   });
 
@@ -506,23 +506,23 @@ void Dir::DeleteEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnod
     SetMTime(cur_time);
 
     if (!vnode || !vnode->IsDir()) {
-      MarkInodeDirty();
+      SetDirty();
     }
 
     if (vnode) {
       if (vnode->IsDir()) {
         DropNlink();
-        WriteInode(false);
+        UpdateInodePage();
       }
 
-      vnode->MarkInodeDirty();
+      vnode->SetDirty();
       vnode->SetCTime(cur_time);
       vnode->DropNlink();
       if (vnode->IsDir()) {
         vnode->DropNlink();
         vnode->SetSize(0);
       }
-      vnode->WriteInode(false);
+      vnode->UpdateInodePage();
       if (vnode->GetNlink() == 0) {
         fs()->AddOrphanInode(vnode);
       }

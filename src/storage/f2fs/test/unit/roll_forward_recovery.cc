@@ -384,8 +384,8 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   // Checkpoint should be performed instead of fsync
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
   fsync_vnode->SetNlink(temp_nlink);
-  fsync_vnode->MarkInodeDirty();
-  fsync_vnode->WriteInode();
+  fsync_vnode->SetDirty();
+  fsync_vnode->UpdateInodePage();
 
   ASSERT_EQ(fsync_vnode->Close(), ZX_OK);
   fsync_vnode = nullptr;

@@ -33,7 +33,7 @@ zx_status_t VnodeF2fs::ReserveNewBlock(NodePage &node_page, uint32_t ofs_in_node
   }
 
   SetDataBlkaddr(node_page, ofs_in_node, kNewAddr);
-  MarkInodeDirty();
+  SetDirty();
   return ZX_OK;
 }
 
@@ -136,7 +136,7 @@ void VnodeF2fs::UpdateExtentCache(block_t blk_addr, pgoff_t file_offset) {
     return;
   } while (false);
 #endif
-  MarkInodeDirty();
+  SetDirty();
 }
 
 zx::result<block_t> VnodeF2fs::FindDataBlkAddr(pgoff_t index) {
@@ -343,7 +343,7 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
     SetSize((index + 1) << kPageCacheShift);
     // TODO: mark sync when fdatasync is available.
     SetFlag(InodeInfoFlag::kUpdateDir);
-    MarkInodeDirty();
+    SetDirty();
   }
 
   *out = std::move(page);
@@ -495,10 +495,9 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::WriteBegin(const size_t offset, c
   if (unlikely(pages_or.is_error())) {
     return pages_or.take_error();
   }
-  // Here, we make sure that orphans do not touch anything. Locked |*pages_or| ensures that
-  // VnodeF2fs::ClearDirtyPagesForOrphan() don't access FileCache during locking.
+  // If |this| is an orphan, we don't need to set dirty flag for |*pages_or|.
   if (file_cache_->IsOrphan()) {
-    ZX_DEBUG_ASSERT(!GetNlink());
+    ZX_DEBUG_ASSERT(!HasLink());
     return zx::ok(std::move(pages_or.value()));
   }
   data_pages = std::move(pages_or.value());

@@ -417,7 +417,7 @@ zx_status_t VnodeF2fs::SetAttributes(fs::VnodeAttributesUpdate attr) {
   }
 
   if (need_inode_sync) {
-    MarkInodeDirty();
+    SetDirty();
   }
 
   return ZX_OK;
@@ -510,7 +510,7 @@ zx_status_t VnodeF2fs::Vget(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) {
   return ZX_OK;
 }
 
-void VnodeF2fs::UpdateInode(LockedPage &inode_page) {
+void VnodeF2fs::UpdateInodePage(LockedPage &inode_page) {
   inode_page->WaitOnWriteback();
   Inode &inode = inode_page->GetAddress<Node>()->i;
 
@@ -575,23 +575,19 @@ void VnodeF2fs::UpdateInode(LockedPage &inode_page) {
   inode_page.SetDirty();
 }
 
-zx_status_t VnodeF2fs::WriteInode(bool is_reclaim) {
+zx_status_t VnodeF2fs::UpdateInodePage() {
   SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
-  zx_status_t ret = ZX_OK;
 
   if (ino_ == superblock_info.GetNodeIno() || ino_ == superblock_info.GetMetaIno()) {
+    return ZX_OK;
+  }
+
+  fs::SharedLock rlock(superblock_info.GetFsLock(LockType::kNodeOp));
+  LockedPage node_page;
+  if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(ino_, &node_page); ret != ZX_OK) {
     return ret;
   }
-
-  if (IsDirty()) {
-    fs::SharedLock rlock(superblock_info.GetFsLock(LockType::kNodeOp));
-    LockedPage node_page;
-    if (ret = fs()->GetNodeManager().GetNodePage(ino_, &node_page); ret != ZX_OK) {
-      return ret;
-    }
-    UpdateInode(node_page);
-  }
-
+  UpdateInodePage(node_page);
   return ZX_OK;
 }
 
@@ -611,7 +607,7 @@ zx_status_t VnodeF2fs::DoTruncate(size_t len) {
     clock_gettime(CLOCK_REALTIME, &cur_time);
     SetCTime(cur_time);
     SetMTime(cur_time);
-    MarkInodeDirty();
+    SetDirty();
   }
 
   fs()->GetSegmentManager().BalanceFs();
@@ -635,7 +631,7 @@ int VnodeF2fs::TruncateDataBlocksRange(NodePage &node_page, uint32_t ofs_in_node
     LockedPage lock_page(fbl::RefPtr<Page>(&node_page), false);
     lock_page.SetDirty();
     lock_page.release(false);
-    MarkInodeDirty();
+    SetDirty();
   }
   return nr_free;
 }
@@ -804,13 +800,28 @@ void VnodeF2fs::Init() {
   Activate();
 }
 
-void VnodeF2fs::MarkInodeDirty(bool to_back) {
-  if (IsNode() || IsMeta() || !GetNlink()) {
-    return;
+bool VnodeF2fs::SetDirty() {
+  if (IsNode() || IsMeta() || !HasLink()) {
+    return false;
   }
-  if (!SetFlag(InodeInfoFlag::kDirty) || to_back) {
-    ZX_ASSERT(fs()->GetVCache().AddDirty(this, to_back) == ZX_OK);
+  std::lock_guard lock(info_mutex_);
+  if (fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>>::InContainer()) {
+    return false;
   }
+  return fs()->GetVCache().AddDirty(this) == ZX_OK;
+}
+
+bool VnodeF2fs::ClearDirty() {
+  std::lock_guard lock(info_mutex_);
+  if (!fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>>::InContainer()) {
+    return false;
+  }
+  return fs()->GetVCache().RemoveDirty(this) == ZX_OK;
+}
+
+bool VnodeF2fs::IsDirty() {
+  fs::SharedLock lock(info_mutex_);
+  return fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>>::InContainer();
 }
 
 void VnodeF2fs::Sync(SyncCallback closure) {
@@ -869,8 +880,7 @@ zx_status_t VnodeF2fs::SyncFile(loff_t start, loff_t end, int datasync) {
 
   // TODO: STRICT mode will be supported when FUA interface is added.
   // Currently, only POSIX mode is supported.
-  // TODO: We should consider fdatasync for WriteInode().
-  WriteInode(false);
+  UpdateInodePage();
   bool need_cp = NeedToCheckpoint();
 
   if (need_cp) {

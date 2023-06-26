@@ -56,7 +56,7 @@ zx_status_t Dir::NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
   vnode->SetFlag(InodeInfoFlag::kNewInode);
 
   fs()->InsertVnode(vnode.get());
-  vnode->MarkInodeDirty();
+  vnode->SetDirty();
 
   *out = std::move(vnode);
   return ZX_OK;
@@ -109,7 +109,7 @@ zx_status_t Dir::DoCreate(std::string_view name, umode_t mode, fbl::RefPtr<fs::V
     if (zx_status_t err = AddLink(name, vnode); err != ZX_OK) {
       vnode->ClearNlink();
       vnode->UnlockNewInode();
-      [[maybe_unused]] auto vnode_or = fs()->GetVCache().RemoveDirty(vnode);
+      vnode->ClearDirty();
       fs()->GetNodeManager().AddFreeNid(vnode->Ino());
       return err;
     }
@@ -279,7 +279,7 @@ zx_status_t Dir::Mkdir(std::string_view name, umode_t mode, fbl::RefPtr<fs::Vnod
       vnode->ClearFlag(InodeInfoFlag::kIncLink);
       vnode->ClearNlink();
       vnode->UnlockNewInode();
-      [[maybe_unused]] auto vnode_or = fs()->GetVCache().RemoveDirty(vnode);
+      vnode->ClearDirty();
       fs()->GetNodeManager().AddFreeNid(vnode->Ino());
       return err;
     }
@@ -464,7 +464,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
       if (!new_vnode->GetNlink()) {
         fs()->AddOrphanInode(new_vnode.get());
       }
-      new_vnode->WriteInode(false);
+      new_vnode->UpdateInodePage();
     } else {
       if (is_same_dir && oldname == newname) {
         return ZX_OK;
@@ -478,7 +478,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
         }
         if (old_dir_entry) {
           IncNlink();
-          WriteInode(false);
+          UpdateInodePage();
         }
       } else {
         if (zx_status_t err = new_dir->AddLinkSafe(newname, old_vnode.get()); err != ZX_OK) {
@@ -486,7 +486,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
         }
         if (old_dir_entry) {
           new_dir->IncNlink();
-          new_dir->WriteInode(false);
+          new_dir->UpdateInodePage();
         }
       }
     }
@@ -494,7 +494,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
     old_vnode->SetParentNid(new_dir->Ino());
     old_vnode->SetCTime(cur_time);
     old_vnode->SetFlag(InodeInfoFlag::kNeedCp);
-    old_vnode->MarkInodeDirty();
+    old_vnode->SetDirty();
 
     DeleteEntry(old_entry, old_page, nullptr);
 
@@ -504,7 +504,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
                                                            new_dir.get());
       }
       DropNlink();
-      WriteInode(false);
+      UpdateInodePage();
     }
 
     // Add new parent directory to VnodeSet to ensure consistency of renamed vnode.

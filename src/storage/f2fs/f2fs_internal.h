@@ -527,7 +527,6 @@ inline int ClearValidBitmap(uint64_t nr, uint8_t *addr) {
 enum class InodeInfoFlag {
   kInit = 0,      // indicate inode is being initialized
   kActive,        // indicate open_count > 0
-  kDirty,         // indicate dirty vnode
   kNewInode,      // indicate newly allocated vnode
   kNeedCp,        // need to do checkpoint during fsync
   kIncLink,       // need to increment i_nlink

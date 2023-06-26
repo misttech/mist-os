@@ -190,7 +190,7 @@ zx_status_t Dir::ConvertInlineDir() {
     SetFlag(InodeInfoFlag::kUpdateDir);
   }
 
-  UpdateInode(dnode_page);
+  UpdateInodePage(dnode_page);
 #if 0  // porting needed
   // stat_dec_inline_inode(dir);
 #endif
@@ -212,7 +212,7 @@ zx::result<bool> Dir::AddInlineEntry(std::string_view name, VnodeF2fs *vnode) {
 
       if (zx_status_t err = InitInodeMetadata(vnode); err != ZX_OK) {
         if (TestFlag(InodeInfoFlag::kUpdateDir)) {
-          UpdateInode(ipage);
+          UpdateInodePage(ipage);
           ClearFlag(InodeInfoFlag::kUpdateDir);
         }
         return zx::error(err);
@@ -235,8 +235,8 @@ zx::result<bool> Dir::AddInlineEntry(std::string_view name, VnodeF2fs *vnode) {
 
       ipage.SetDirty();
       UpdateParentMetadata(vnode, 0);
-      vnode->WriteInode();
-      UpdateInode(ipage);
+      vnode->UpdateInodePage();
+      UpdateInodePage(ipage);
 
       ClearFlag(InodeInfoFlag::kUpdateDir);
       return zx::ok(false);
@@ -278,19 +278,19 @@ void Dir::DeleteInlineEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs
 
   if (vnode) {
     clock_gettime(CLOCK_REALTIME, &cur_time);
-    vnode->MarkInodeDirty();
+    vnode->SetDirty();
     vnode->SetCTime(cur_time);
     vnode->DropNlink();
     if (vnode->IsDir()) {
       vnode->DropNlink();
       vnode->SetSize(0);
     }
-    vnode->WriteInode(false);
+    vnode->UpdateInodePage();
     if (vnode->GetNlink() == 0) {
       fs()->AddOrphanInode(vnode);
     }
   }
-  UpdateInode(lock_page);
+  UpdateInodePage(lock_page);
 }
 
 bool Dir::IsEmptyInlineDir() {
@@ -414,7 +414,7 @@ zx_status_t File::ConvertInlineData() {
   ClearFlag(InodeInfoFlag::kInlineData);
   ClearFlag(InodeInfoFlag::kDataExist);
 
-  UpdateInode(dnode_page);
+  UpdateInodePage(dnode_page);
 
   return ZX_OK;
 }
@@ -436,7 +436,7 @@ zx_status_t File::WriteInline(const void *data, size_t len, size_t offset, size_
   clock_gettime(CLOCK_REALTIME, &cur_time);
   SetCTime(cur_time);
   SetMTime(cur_time);
-  MarkInodeDirty();
+  SetDirty();
 
   *out_actual = len;
 
@@ -468,7 +468,7 @@ zx_status_t File::TruncateInline(size_t len, bool is_recover) {
   clock_gettime(CLOCK_REALTIME, &cur_time);
   SetCTime(cur_time);
   SetMTime(cur_time);
-  MarkInodeDirty();
+  SetDirty();
 
   return ZX_OK;
 }

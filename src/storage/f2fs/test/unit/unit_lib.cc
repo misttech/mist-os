@@ -104,7 +104,7 @@ void FileTester::Unmount(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache> *bc) 
 
 void FileTester::SuddenPowerOff(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache> *bc) {
   fs->GetVCache().ForDirtyVnodesIf([&](fbl::RefPtr<VnodeF2fs> &vnode) {
-    [[maybe_unused]] auto vnode_or = fs->GetVCache().RemoveDirty(vnode.get());
+    vnode->ClearDirty();
     return ZX_OK;
   });
   fs->ResetPsuedoVnodes();
@@ -192,7 +192,7 @@ void FileTester::VnodeWithoutParent(F2fs *fs, uint32_t mode, fbl::RefPtr<VnodeF2
   vnode->InitFileCache();
   vnode->UnlockNewInode();
   fs->InsertVnode(vnode.get());
-  vnode->MarkInodeDirty();
+  vnode->SetDirty();
 }
 
 void FileTester::CheckInlineDir(VnodeF2fs *vn) {

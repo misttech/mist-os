@@ -249,7 +249,7 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
   // Write node page in place
   GetSegmentManager().SetSummary(&sum, dnode_page.GetPage<NodePage>().NidOfNode(), 0, 0);
   if (dnode_page.GetPage<NodePage>().IsInode()) {
-    vnode.MarkInodeDirty();
+    vnode.SetDirty();
   }
 
   dnode_page.GetPage<NodePage>().CopyNodeFooterFrom(page);

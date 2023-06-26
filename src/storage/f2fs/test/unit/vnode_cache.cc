@@ -182,8 +182,8 @@ TEST_F(VnodeCacheTest, VnodeCacheExceptionCase) {
   test_vnode->Writeback(op);
   WritebackOperation op_root = {.bSync = true};
   root_dir_->Writeback(op_root);
-  ASSERT_TRUE(fs_->GetVCache().RemoveDirty(test_vnode.get()).is_ok());
-  ASSERT_TRUE(fs_->GetVCache().RemoveDirty(root_dir_.get()).is_ok());
+  ASSERT_TRUE(fs_->GetVCache().RemoveDirty(test_vnode.get()) == ZX_OK);
+  ASSERT_TRUE(fs_->GetVCache().RemoveDirty(root_dir_.get()) == ZX_OK);
   ASSERT_EQ(GetDirtyVnodeCount(fs_->GetVCache()), 0U);
   ASSERT_EQ(GetCachedVnodeCount(fs_->GetVCache()), 2U);
 

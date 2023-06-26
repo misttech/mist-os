@@ -141,7 +141,7 @@ File::File(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
 
 //   if (!(mode & FALLOC_FL_KEEP_SIZE) && i_size <= (offset + len)) {
 //     i_size = offset;
-//     MarkInodeDirty();
+//     SetDirty();
 //   }
 
 //   return ret;
@@ -202,7 +202,7 @@ File::File(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
 
 //   if (!(mode & FALLOC_FL_KEEP_SIZE) && i_size < new_size) {
 //     i_size = new_size;
-//     MarkInodeDirty();
+//     SetDirty();
 //   }
 
 //   return ret;
@@ -284,7 +284,7 @@ File::File(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
 
   //     f2fs_set_inode_flags(inode);
   //     inode->i_ctime = CURRENT_TIME;
-  //     MarkInodeDirty(inode);
+  //     SetDirty(inode);
   // out:
   //     mnt_drop_write(filp->f_path.mnt);
   //     return ret;
@@ -489,7 +489,7 @@ void File::VmoDirty(uint64_t offset, uint64_t length) {
   clock_gettime(CLOCK_REALTIME, &cur_time);
   SetCTime(cur_time);
   SetMTime(cur_time);
-  MarkInodeDirty(true);
+  SetDirty();
   return VnodeF2fs::VmoDirty(offset, length);
 }
 

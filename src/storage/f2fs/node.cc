@@ -601,7 +601,7 @@ void NodeManager::TruncateNode(VnodeF2fs &vnode, nid_t nid, NodePage &node_page)
     fs_->GetSuperblockInfo().RemoveVnodeFromVnodeSet(InoType::kOrphanIno, nid);
     fs_->DecValidInodeCount();
   } else {
-    vnode.MarkInodeDirty();
+    vnode.SetDirty();
   }
 
   node_page.Invalidate();
@@ -889,7 +889,7 @@ zx_status_t NodeManager::NewNodePage(VnodeF2fs &vnode, nid_t nid, uint32_t ofs, 
   }
   SetNodeAddr(new_ni, kNewAddr);
 
-  vnode.MarkInodeDirty();
+  vnode.SetDirty();
 
   page.SetDirty();
   page.GetPage<NodePage>().SetColdNode(vnode.IsDir());
@@ -952,15 +952,13 @@ pgoff_t NodeManager::FlushDirtyNodePages(WritebackOperation &operation) {
     return 0;
   }
   if (zx_status_t status = fs_->GetVCache().ForDirtyVnodesIf(
-          [this](fbl::RefPtr<VnodeF2fs> &vnode) {
-            if (!vnode->ShouldFlush()) {
-              ZX_ASSERT(fs_->GetVCache().RemoveDirty(vnode.get()).is_ok());
+          [](fbl::RefPtr<VnodeF2fs> &vnode) {
+            if (!vnode->IsValid()) {
+              ZX_ASSERT(vnode->ClearDirty());
               return ZX_ERR_NEXT;
             }
-            ZX_ASSERT(vnode->WriteInode(false) == ZX_OK);
-            ZX_ASSERT(fs_->GetVCache().RemoveDirty(vnode.get()).is_ok());
-            ZX_ASSERT(vnode->IsDirty() == true);
-            vnode->ClearDirty();
+            vnode->UpdateInodePage();
+            ZX_ASSERT(vnode->ClearDirty());
             return ZX_OK;
           },
           [](fbl::RefPtr<VnodeF2fs> &vnode) {

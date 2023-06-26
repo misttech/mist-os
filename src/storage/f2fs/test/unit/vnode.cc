@@ -44,7 +44,7 @@ void VgetFaultInjetionAndTest(F2fs &fs, Dir &root_dir, std::string_view name, T 
     node_page.SetDirty();
   }
 
-  ASSERT_TRUE(fs.GetVCache().RemoveDirty(test_vnode.get()).is_ok());
+  ASSERT_TRUE(test_vnode->ClearDirty());
   fs.EvictVnode(test_vnode.get());
 
   // test vget
@@ -171,18 +171,18 @@ TEST_F(VnodeTest, WriteInode) {
   test_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(dir_raw_vnode));
   nid_t nid = test_vnode->GetKey();
 
-  ASSERT_EQ(test_vnode->WriteInode(false), ZX_OK);
+  ASSERT_EQ(test_vnode->UpdateInodePage(), ZX_OK);
 
   block_t temp_block_address;
   MapTester::GetCachedNatEntryBlockAddress(node_manager, nid, temp_block_address);
 
   // Enable fault injection to dnode(vnode)
   MapTester::SetCachedNatEntryBlockAddress(node_manager, nid, kNullAddr);
-  ASSERT_EQ(test_vnode->WriteInode(false), ZX_ERR_NOT_FOUND);
+  ASSERT_EQ(test_vnode->UpdateInodePage(), ZX_ERR_NOT_FOUND);
 
   // Disable fault injection
   MapTester::SetCachedNatEntryBlockAddress(node_manager, nid, temp_block_address);
-  ASSERT_EQ(test_vnode->WriteInode(false), ZX_OK);
+  ASSERT_EQ(test_vnode->UpdateInodePage(), ZX_OK);
 
   // 3. Is clean inode
   ASSERT_TRUE(test_vnode->IsDirty());
@@ -289,7 +289,7 @@ TEST_F(VnodeTest, SyncFile) {
   // 1. Check need_cp
   uint64_t pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   fs_->GetSuperblockInfo().ClearOpt(kMountDisableRollForward);
-  file_vnode->SetFlag(InodeInfoFlag::kDirty);
+  file_vnode->SetDirty();
   ASSERT_EQ(file_vnode->SyncFile(0, safemath::checked_cast<loff_t>(file_vnode->GetSize()), 0),
             ZX_OK);
   uint64_t curr_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
@@ -307,7 +307,7 @@ TEST_F(VnodeTest, SyncFile) {
   // 3. Check kNeedCp
   pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   file_vnode->SetFlag(InodeInfoFlag::kNeedCp);
-  file_vnode->SetFlag(InodeInfoFlag::kDirty);
+  file_vnode->SetDirty();
   ASSERT_EQ(file_vnode->SyncFile(0, safemath::checked_cast<loff_t>(file_vnode->GetSize()), 0),
             ZX_OK);
   ASSERT_FALSE(file_vnode->TestFlag(InodeInfoFlag::kNeedCp));
@@ -318,7 +318,7 @@ TEST_F(VnodeTest, SyncFile) {
   pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   block_t temp_user_block_count = fs_->GetSuperblockInfo().GetUserBlockCount();
   fs_->GetSuperblockInfo().SetUserBlockCount(0);
-  file_vnode->SetFlag(InodeInfoFlag::kDirty);
+  file_vnode->SetDirty();
   ASSERT_EQ(file_vnode->SyncFile(0, safemath::checked_cast<loff_t>(file_vnode->GetSize()), 0),
             ZX_OK);
   ASSERT_FALSE(file_vnode->TestFlag(InodeInfoFlag::kNeedCp));
