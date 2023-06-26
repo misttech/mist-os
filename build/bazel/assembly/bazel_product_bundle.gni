@@ -333,6 +333,9 @@ template("bazel_product_bundle") {
             if (zircon_r_partition != "") {
               fastboot_flash = [ zircon_r_partition ]
             }
+            if (recovery_is_zedboot) {
+              bootserver_pave_zedboot = [ "--zircona" ]
+            }
           },
         ]
 
@@ -381,6 +384,9 @@ template("bazel_product_bundle") {
               fastboot_flash = []
               if (vbmeta_r_partition != "") {
                 fastboot_flash = [ vbmeta_r_partition ]
+              }
+              if (recovery_is_zedboot) {
+                bootserver_pave_zedboot = [ "--vbmetaa" ]
               }
             },
           ]
