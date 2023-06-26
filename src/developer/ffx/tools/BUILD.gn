@@ -9,6 +9,7 @@ _tools = [
   "echo",
   "starnix",
   "target-package",
+  "log-ng",
 ]
 
 group("tools") {

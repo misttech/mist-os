@@ -143,7 +143,7 @@ impl Deref for DetailedDateTime {
 #[derive(FromArgs, Clone, Debug, PartialEq)]
 #[argh(
     subcommand,
-    name = "log",
+    name = "log-ng",
     description = "Display logs from a target device",
     note = "Logs are retrieve from the target at the moment this command is called.
 
