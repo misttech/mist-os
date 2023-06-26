@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.wlan.tap/cpp/wire.h>
 #include <lib/driver/logging/cpp/logger.h>
 
+#include "fidl/fuchsia.wlan.softmac/cpp/markers.h"
 #include "lib/fidl/cpp/wire/internal/transport.h"
 
 namespace wlan_tap = fuchsia_wlan_tap::wire;
@@ -39,6 +40,8 @@ class WlantapMac : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmac> {
 
   WlantapMac(Listener* listener, wlan_common::WlanMacRole,
              std::shared_ptr<wlan_tap::WlantapPhyConfig> config, zx::channel sme_channel);
+
+  fidl::ProtocolHandler<fuchsia_wlan_softmac::WlanSoftmac> ProtocolHandler();
 
   // WlanSoftmac protocol implementation.
   void Query(fdf::Arena& arena, QueryCompleter::Sync& completer) override;
@@ -83,6 +86,8 @@ class WlantapMac : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmac> {
   std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config_;
 
   zx::channel sme_channel_;
+
+  fdf::ServerBindingGroup<fuchsia_wlan_softmac::WlanSoftmac> bindings_;
 };
 
 }  // namespace wlan

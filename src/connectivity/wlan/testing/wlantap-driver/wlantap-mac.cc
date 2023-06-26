@@ -6,6 +6,7 @@
 
 #include <wlan/common/channel.h>
 
+#include "lib/fidl/cpp/wire/channel.h"
 #include "lib/fidl_driver/cpp/wire_messaging_declarations.h"
 #include "utils.h"
 
@@ -29,6 +30,11 @@ void WlantapMac::Query(fdf::Arena& arena, QueryCompleter::Sync& completer) {
   wlan_softmac::WlanSoftmacQueryResponse resp;
   ConvertTapPhyConfig(&resp, *phy_config_, table_arena);
   completer.buffer(arena).ReplySuccess(resp);
+}
+
+fidl::ProtocolHandler<fuchsia_wlan_softmac::WlanSoftmac> WlantapMac::ProtocolHandler() {
+  return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
+                                 fidl::kIgnoreBindingClosure);
 }
 
 void WlantapMac::QueryDiscoverySupport(fdf::Arena& arena,

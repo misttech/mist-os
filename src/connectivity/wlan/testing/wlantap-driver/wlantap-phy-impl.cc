@@ -75,7 +75,7 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
 void WlanPhyImplDevice::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
                                      DestroyIfaceCompleter::Sync& completer) {
   FDF_LOG(INFO, "%s: received a 'DestroyIface' DDK request", name_.c_str());
-  if (!softmac_controller_.is_valid()) {
+  if (!softmac_controller_.is_valid() || !wlantap_mac_) {
     FDF_LOG(ERROR, "Iface doesn't exist");
     completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
     return;
@@ -87,6 +87,8 @@ void WlanPhyImplDevice::DestroyIface(DestroyIfaceRequestView request, fdf::Arena
     completer.buffer(arena).ReplyError(status.status());
     return;
   }
+
+  wlantap_mac_.reset();
 
   completer.buffer(arena).ReplySuccess();
 }
@@ -140,10 +142,7 @@ zx_status_t WlanPhyImplDevice::CreateWlanSoftmac(wlan_common::WlanMacRole role,
     return endpoints.status_value();
   }
 
-  auto wlantap_mac = std::make_unique<WlantapMac>(wlantap_phy_.get(), role, phy_config_,
-                                                  std::move(mlme_channel));
-
-  zx_status_t status = ServeWlanSoftmac(name, std::move(wlantap_mac));
+  zx_status_t status = ServeWlanSoftmac(name, role, std::move(mlme_channel));
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "ServeWlanSoftmac failed: %s", zx_status_get_string(status));
     return status;
@@ -192,15 +191,19 @@ zx_status_t WlanPhyImplDevice::AddWlanSoftmacChild(
 }
 
 zx_status_t WlanPhyImplDevice::ServeWlanSoftmac(std::string_view name,
-                                                std::unique_ptr<WlantapMac> impl) {
-  auto protocol_handler =
-      [impl = std::move(impl)](fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmac> request) mutable {
-        fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(request), std::move(impl));
-      };
+                                                wlan_common::WlanMacRole role,
+                                                zx::channel mlme_channel) {
+  if (wlantap_mac_) {
+    FDF_LOG(ERROR, "Softmac already exists, only one allowed");
+    return ZX_ERR_ALREADY_EXISTS;
+  }
+
+  wlantap_mac_ =
+      std::make_unique<WlantapMac>(wlantap_phy_.get(), role, phy_config_, std::move(mlme_channel));
 
   FDF_LOG(INFO, "Adding softmac outgoing service");
   fuchsia_wlan_softmac::Service::InstanceHandler handler(
-      {.wlan_softmac = std::move(protocol_handler)});
+      {.wlan_softmac = wlantap_mac_->ProtocolHandler()});
 
   zx::result result = driver_context_.outgoing()->AddService<fuchsia_wlan_softmac::Service>(
       std::move(handler), name);

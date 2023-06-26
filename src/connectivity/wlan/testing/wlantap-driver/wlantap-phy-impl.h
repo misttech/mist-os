@@ -9,6 +9,7 @@
 #include <lib/zx/channel.h>
 
 #include "wlantap-driver-context.h"
+#include "wlantap-mac.h"
 #include "wlantap-phy.h"
 
 namespace wlan {
@@ -22,8 +23,6 @@ class WlanPhyImplDevice : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyIm
   WlanPhyImplDevice(WlantapDriverContext context, zx::channel user_channel,
                     std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config,
                     NodeControllerClient phy_controller);
-
-  ~WlanPhyImplDevice() override = default;
 
   // WlanPhyImpl protocol implementation
   void GetSupportedMacRoles(fdf::Arena& arena,
@@ -44,7 +43,8 @@ class WlanPhyImplDevice : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyIm
   zx_status_t CreateWlanSoftmac(wlan_common::WlanMacRole role, zx::channel mlme_channel);
   zx_status_t AddWlanSoftmacChild(std::string_view name,
                                   fidl::ServerEnd<fuchsia_driver_framework::NodeController> server);
-  zx_status_t ServeWlanSoftmac(std::string_view name, std::unique_ptr<WlantapMac> impl);
+  zx_status_t ServeWlanSoftmac(std::string_view name, wlan_common::WlanMacRole role,
+                               zx::channel mlme_channel);
 
   WlantapDriverContext driver_context_;
 
@@ -53,6 +53,8 @@ class WlanPhyImplDevice : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyIm
   std::string name_{"wlanphyimpl"};
 
   std::unique_ptr<WlantapPhy> wlantap_phy_;
+
+  std::unique_ptr<WlantapMac> wlantap_mac_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> softmac_controller_;
 };
