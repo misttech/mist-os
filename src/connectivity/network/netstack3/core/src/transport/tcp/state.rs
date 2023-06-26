@@ -443,7 +443,7 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                                 .window_scale
                                 .map(|snd_wnd_scale| (rcv_wnd_scale, snd_wnd_scale))
                                 .unwrap_or_default();
-                            let established = Established {
+                            let mut established = Established {
                                 snd: Send {
                                     nxt: iss + 1,
                                     max: iss + 1,
@@ -465,12 +465,13 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                                     timer: None,
                                     mss: smss,
                                     wnd_scale: rcv_wnd_scale,
+                                    last_window_update: (irs + 1, buffer_sizes.rwnd()),
                                 },
                             };
                             let ack_seg = Segment::ack(
                                 established.snd.nxt,
                                 established.rcv.nxt(),
-                                established.rcv.wnd() >> rcv_wnd_scale,
+                                established.rcv.select_window() >> rcv_wnd_scale,
                             );
                             SynSentOnSegmentDisposition::SendAckAndEnterEstablished(
                                 ack_seg,
@@ -755,17 +756,53 @@ struct Recv<I, R> {
     timer: Option<ReceiveTimer<I>>,
     mss: Mss,
     wnd_scale: WindowScale,
+    last_window_update: (SeqNum, WindowSize),
 }
 
 impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
-    fn wnd(&self) -> WindowSize {
-        // TODO(https://fxbug.dev/128525): When selecting window sizes, modern
-        // implementations tend to take into account factors more than just free
-        // space available. We need to also take similar measures to address
-        // silly window syndrome, also we need to avoid advertising spurious
-        // zero-window-probe when window scaling is in effect.
-        let BufferLimits { capacity, len } = self.buffer.limits();
-        WindowSize::new(capacity - len).unwrap_or(WindowSize::MAX)
+    fn select_window(&mut self) -> WindowSize {
+        let Self {
+            buffer,
+            assembler,
+            timer: _,
+            mss,
+            wnd_scale: _,
+            last_window_update: (rcv_wup, last_wnd),
+        } = self;
+        let rcv_nxt = assembler.nxt();
+        // Per RFC 9293 Section 3.8.6.2.2:
+        //   The suggested SWS avoidance algorithm for the receiver is to keep
+        //   RCV.NXT+RCV.WND fixed until the reduction satisfies:
+        //     RCV.BUFF - RCV.USER - RCV.WND  >=
+        //            min( Fr * RCV.BUFF, Eff.snd.MSS )
+        //   where Fr is a fraction whose recommended value is 1/2, and
+        //   Eff.snd.MSS is the effective send MSS for the connection.
+        //   When the inequality is satisfied, RCV.WND is set to RCV.BUFF-RCV.USER.
+
+        // `len` and `capacity` are RCV.USER and RCV.BUFF respectively.
+        let BufferLimits { capacity, len } = buffer.limits();
+        // `unused_window` is RCV.WND as described above.
+        let unused_window = WindowSize::from_u32(u32::try_from(*rcv_wup + *last_wnd - rcv_nxt).unwrap_or_else(|_: TryFromIntError| {
+            tracing::error!(
+                "we received more bytes than we advertised, rcv_nxt: {:?}, rcv_wup: {:?}, last_wnd: {:?}",
+                rcv_nxt, rcv_wup, last_wnd
+            );
+            0
+        })).unwrap_or(WindowSize::MAX);
+        // Note: between the last window update and now, it's possible that we
+        // have reduced our receive buffer's capacity, so we need to use
+        // saturating arithmetic below.
+        let reduction = capacity.saturating_sub(len.saturating_add(usize::from(unused_window)));
+        *rcv_wup = rcv_nxt;
+        *last_wnd = if reduction >= usize::min(capacity / 2, usize::from(mss.get().get())) {
+            // We have enough reduction in the buffer space, advertise more.
+            WindowSize::new(capacity - len).unwrap_or(WindowSize::MAX)
+        } else {
+            // Keep the right edge fixed by only advertise whatever is unused in
+            // the last advertisement.
+            unused_window
+        };
+        *last_wnd
     }
 
     fn nxt(&self) -> SeqNum {
@@ -773,23 +810,26 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
     }
 
     fn take(&mut self) -> Self {
-        let Self { buffer, assembler, timer, mss, wnd_scale } = self;
+        let Self { buffer, assembler, timer, mss, wnd_scale, last_window_update } = self;
         Self {
             buffer: buffer.take(),
             assembler: core::mem::replace(assembler, Assembler::new(SeqNum::new(0))),
             timer: *timer,
             mss: *mss,
             wnd_scale: *wnd_scale,
+            last_window_update: *last_window_update,
         }
     }
 
     fn set_capacity(&mut self, size: usize) {
-        let Self { buffer, assembler: _, timer: _, mss: _, wnd_scale: _ } = self;
+        let Self { buffer, assembler: _, timer: _, mss: _, wnd_scale: _, last_window_update: _ } =
+            self;
         buffer.request_capacity(size)
     }
 
     fn target_capacity(&self) -> usize {
-        let Self { buffer, assembler: _, timer: _, mss: _, wnd_scale: _ } = self;
+        let Self { buffer, assembler: _, timer: _, mss: _, wnd_scale: _, last_window_update: _ } =
+            self;
         buffer.target_capacity()
     }
 
@@ -797,7 +837,7 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
         match self.timer {
             Some(ReceiveTimer::DelayedAck { at, received_bytes: _ }) => (at <= now).then(|| {
                 self.timer = None;
-                Segment::ack(snd_nxt, self.nxt(), self.wnd() >> self.wnd_scale)
+                Segment::ack(snd_nxt, self.nxt(), self.select_window() >> self.wnd_scale)
             }),
             None => None,
         }
@@ -1569,7 +1609,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                     )
                 }
                 State::Established(Established { rcv, snd }) => {
-                    (rcv.nxt(), rcv.wnd(), rcv.wnd_scale, snd.nxt)
+                    (rcv.nxt(), rcv.select_window(), rcv.wnd_scale, snd.nxt)
                 }
                 State::CloseWait(CloseWait { snd, last_ack, last_wnd }) => {
                     (*last_ack, *last_wnd, WindowScale::default(), snd.nxt)
@@ -1579,10 +1619,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                     (*last_ack, *last_wnd, WindowScale::default(), snd.nxt)
                 }
                 State::FinWait1(FinWait1 { rcv, snd }) => {
-                    (rcv.nxt(), rcv.wnd(), rcv.wnd_scale, snd.nxt)
+                    (rcv.nxt(), rcv.select_window(), rcv.wnd_scale, snd.nxt)
                 }
                 State::FinWait2(FinWait2 { last_seq, rcv, timeout_at: _ }) => {
-                    (rcv.nxt(), rcv.wnd(), rcv.wnd_scale, *last_seq)
+                    (rcv.nxt(), rcv.select_window(), rcv.wnd_scale, *last_seq)
                 }
                 State::TimeWait(TimeWait {
                     last_seq,
@@ -1715,6 +1755,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                                     timer: None,
                                     mss: *smss,
                                     wnd_scale: rcv_wnd_scale,
+                                    last_window_update: (*irs + 1, buffer_sizes.rwnd()),
                                 },
                             });
                         }
@@ -1873,8 +1914,9 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                                 }
                             }
                         }
-                        (!matches!(rcv.timer, Some(ReceiveTimer::DelayedAck { .. })))
-                            .then_some(Segment::ack(snd_nxt, rcv.nxt(), rcv.wnd() >> rcv.wnd_scale))
+                        (!matches!(rcv.timer, Some(ReceiveTimer::DelayedAck { .. }))).then_some(
+                            Segment::ack(snd_nxt, rcv.nxt(), rcv.select_window() >> rcv.wnd_scale),
+                        )
                     }
                     State::CloseWait(_)
                     | State::LastAck(_)
@@ -1907,7 +1949,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-75):
                         //   Enter the CLOSE-WAIT state.
                         let last_ack = rcv.nxt() + 1;
-                        let last_wnd = rcv.wnd().checked_sub(1).unwrap_or(WindowSize::ZERO);
+                        let last_wnd =
+                            rcv.select_window().checked_sub(1).unwrap_or(WindowSize::ZERO);
                         let scaled_wnd = last_wnd >> rcv.wnd_scale;
                         *self = State::CloseWait(CloseWait { snd: snd.take(), last_ack, last_wnd });
                         Some(Segment::ack(snd_nxt, last_ack, scaled_wnd))
@@ -1924,7 +1967,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                     }
                     State::FinWait1(FinWait1 { snd, rcv }) => {
                         let last_ack = rcv.nxt() + 1;
-                        let last_wnd = rcv.wnd().checked_sub(1).unwrap_or(WindowSize::ZERO);
+                        let last_wnd =
+                            rcv.select_window().checked_sub(1).unwrap_or(WindowSize::ZERO);
                         let scaled_wnd = last_wnd >> rcv.wnd_scale;
                         *self = State::Closing(Closing {
                             snd: snd.take(),
@@ -1936,7 +1980,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                     }
                     State::FinWait2(FinWait2 { last_seq, rcv, timeout_at: _ }) => {
                         let last_ack = rcv.nxt() + 1;
-                        let last_wnd = rcv.wnd().checked_sub(1).unwrap_or(WindowSize::ZERO);
+                        let last_wnd =
+                            rcv.select_window().checked_sub(1).unwrap_or(WindowSize::ZERO);
                         let scaled_window = last_wnd >> rcv.wnd_scale;
                         *self = State::TimeWait(TimeWait {
                             last_seq: *last_seq,
@@ -2004,7 +2049,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             // FIN_WAIT_1 if we choose the alternative, because otherwise we
             // will have a spurious retransmitted FIN.
             let rcv_nxt = rcv.nxt();
-            let rcv_wnd = rcv.wnd();
+            let rcv_wnd = rcv.select_window();
             let seg = rcv
                 .poll_send(snd.nxt, now)
                 .map(Into::into)
@@ -2277,6 +2322,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                         timer: None,
                         mss: *smss,
                         wnd_scale: rcv_wnd_scale,
+                        last_window_update: (*irs + 1, buffer_sizes.rwnd()),
                     },
                 });
                 Ok(())
@@ -2593,7 +2639,7 @@ pub(super) enum CloseReason<I: Instant> {
 #[cfg(test)]
 mod test {
     use alloc::vec;
-    use core::{fmt::Debug, time::Duration};
+    use core::{fmt::Debug, num::NonZeroU16, time::Duration};
 
     use assert_matches::assert_matches;
     use net_types::ip::Ipv4;
@@ -2948,11 +2994,12 @@ mod test {
                     wnd_scale: WindowScale::default(),
                 },
                 rcv: Recv {
-                    buffer: NullBuffer,
+                    buffer: RingBuffer::default(),
                     assembler: Assembler::new(ISS_1 + 1),
                     timer: None,
                     mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                     wnd_scale: WindowScale::default(),
+                    last_window_update: (ISS_1 + 1, WindowSize::DEFAULT),
                 },
             }
         ))
@@ -2994,14 +3041,14 @@ mod test {
                     wnd_scale: WindowScale::default(),
             },
             last_ack: ISS_1 + 2,
-            last_wnd: WindowSize::ZERO,
+            last_wnd: WindowSize::from_u32(u32::from(u16::MAX - 1)).unwrap(),
         }))
     => Some(
-        Segment::ack(ISS_2 + 1, ISS_1 + 2, UnscaledWindowSize::from(0))
+        Segment::ack(ISS_2 + 1, ISS_1 + 2, UnscaledWindowSize::from(u16::MAX - 1))
     ); "fin")]
     fn segment_arrives_when_syn_rcvd(
         incoming: Segment<()>,
-        expected: Option<State<FakeInstant, NullBuffer, NullBuffer, ()>>,
+        expected: Option<State<FakeInstant, RingBuffer, NullBuffer, ()>>,
     ) -> Option<Segment<()>> {
         let mut clock = FakeInstantCtx::default();
         let mut state = State::SynRcvd(SynRcvd {
@@ -3131,6 +3178,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::new(2).unwrap()),
             },
         });
         let (seg, passive_open) = state
@@ -3172,6 +3220,7 @@ mod test {
             timer: None,
             mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             wnd_scale: WindowScale::default(),
+            last_window_update: (ISS_2 + 1, WindowSize::new(TEST_BYTES.len()).unwrap()),
         };
         for mut state in [
             State::Established(Established { snd: new_snd(), rcv: new_rcv() }),
@@ -3233,6 +3282,7 @@ mod test {
             timer: None,
             mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             wnd_scale: WindowScale::default(),
+            last_window_update: (ISS_2 + 1, WindowSize::ZERO),
         };
         for mut state in [
             State::Established(Established { snd: new_snd(), rcv: new_rcv() }),
@@ -3441,14 +3491,14 @@ mod test {
             .on_segment_with_default_options::<_, ClientlessBufferProvider>(syn_ack, clock.now());
         let ack_seg = seg.expect("failed to generate a ack segment");
         assert_eq!(passive_open, None);
-        assert_eq!(ack_seg, Segment::ack(ISS_1 + 1, ISS_2 + 1, UnscaledWindowSize::from(0)));
+        assert_eq!(ack_seg, Segment::ack(ISS_1 + 1, ISS_2 + 1, UnscaledWindowSize::from(u16::MAX)));
         assert_matches!(active, State::Established(ref established) if established == &Established {
             snd: Send {
                 nxt: ISS_1 + 1,
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
-                buffer: NullBuffer,
+                buffer: RingBuffer::default(),
                 wl1: ISS_2,
                 wl2: ISS_1 + 1,
                 rtt_estimator: Estimator::Measured {
@@ -3461,12 +3511,13 @@ mod test {
                 wnd_scale: WindowScale::default(),
             },
             rcv: Recv {
-                buffer: NullBuffer,
+                buffer: RingBuffer::default(),
                 assembler: Assembler::new(ISS_2 + 1),
                 timer: None,
 
                 mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
             }
         });
         clock.sleep(RTT / 2);
@@ -3482,8 +3533,8 @@ mod test {
                 nxt: ISS_2 + 1,
                 max: ISS_2 + 1,
                 una: ISS_2 + 1,
-                wnd: WindowSize::ZERO,
-                buffer: NullBuffer,
+                wnd: WindowSize::DEFAULT,
+                buffer: RingBuffer::default(),
                 wl1: ISS_1 + 1,
                 wl2: ISS_2 + 1,
                 rtt_estimator: Estimator::Measured {
@@ -3496,11 +3547,12 @@ mod test {
                 wnd_scale: WindowScale::default(),
             },
             rcv: Recv {
-                buffer: NullBuffer,
+                buffer: RingBuffer::default(),
                 assembler: Assembler::new(ISS_1 + 1),
                 timer: None,
                 mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_1 + 1, WindowSize::DEFAULT),
             }
         })
     }
@@ -3629,14 +3681,14 @@ mod test {
                 syn_ack2,
                 clock.now()
             ),
-            (Some(Segment::ack(ISS_1 + 1, ISS_2 + 1, UnscaledWindowSize::from(0))), None)
+            (Some(Segment::ack(ISS_1 + 1, ISS_2 + 1, UnscaledWindowSize::from(u16::MAX))), None)
         );
         assert_eq!(
             state2.on_segment_with_default_options::<_, ClientlessBufferProvider>(
                 syn_ack1,
                 clock.now()
             ),
-            (Some(Segment::ack(ISS_2 + 1, ISS_1 + 1, UnscaledWindowSize::from(0))), None)
+            (Some(Segment::ack(ISS_2 + 1, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX))), None)
         );
 
         assert_matches!(state1, State::Established(established) if established == Established {
@@ -3645,7 +3697,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
-                buffer: NullBuffer,
+                buffer: RingBuffer::default(),
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
                 rtt_estimator: Estimator::Measured {
@@ -3658,11 +3710,12 @@ mod test {
                 wnd_scale: WindowScale::default(),
             },
             rcv: Recv {
-                buffer: NullBuffer,
+                buffer: RingBuffer::default(),
                 assembler: Assembler::new(ISS_2 + 1),
                 timer: None,
                 mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT)
             }
         });
 
@@ -3672,7 +3725,7 @@ mod test {
                 max: ISS_2 + 1,
                 una: ISS_2 + 1,
                 wnd: WindowSize::DEFAULT,
-                buffer: NullBuffer,
+                buffer: RingBuffer::default(),
                 wl1: ISS_1 + 1,
                 wl2: ISS_2 + 1,
                 rtt_estimator: Estimator::Measured {
@@ -3685,11 +3738,12 @@ mod test {
                 wnd_scale: WindowScale::default(),
             },
             rcv: Recv {
-                buffer: NullBuffer,
+                buffer: RingBuffer::default(),
                 assembler: Assembler::new(ISS_1 + 1),
                 timer: None,
                 mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_1 + 1, WindowSize::DEFAULT)
             }
         });
     }
@@ -3712,17 +3766,18 @@ mod test {
                 rtt_estimator: Estimator::default(),
                 last_seq_ts: None,
                 timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
+                congestion_control: CongestionControl::cubic_with_mss(Mss(
+                    NonZeroU16::new(5).unwrap()
+                )),
                 wnd_scale: WindowScale::default(),
             },
             rcv: Recv {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 assembler: Assembler::new(ISS_2 + 1),
                 timer: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+                mss: Mss(NonZeroU16::new(5).unwrap()),
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
             },
         });
 
@@ -3834,6 +3889,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
             },
         });
         // Data queued but the window is not opened, nothing to send.
@@ -4060,6 +4116,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
             },
         });
         let last_wnd = WindowSize::new(BUFFER_SIZE - 1).unwrap();
@@ -4211,17 +4268,18 @@ mod test {
                 last_seq_ts: None,
                 rtt_estimator: Estimator::default(),
                 timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
+                congestion_control: CongestionControl::cubic_with_mss(Mss(
+                    NonZeroU16::new(5).unwrap()
+                )),
                 wnd_scale: WindowScale::default(),
             },
             rcv: Recv {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 assembler: Assembler::new(ISS_2 + 1),
                 timer: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+                mss: Mss(NonZeroU16::new(5).unwrap()),
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
             },
         });
         assert_eq!(state.close(CloseReason::Shutdown, &SocketOptions::default()), Ok(()));
@@ -4403,6 +4461,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
             },
         });
         assert_eq!(
@@ -4451,6 +4510,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_1 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
             },
         });
         assert_eq!(state.close(CloseReason::Shutdown, &SocketOptions::default()), Ok(()));
@@ -4566,6 +4626,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 5, WindowSize::DEFAULT),
             },
         }),
         Segment::data(ISS_2, ISS_1, UnscaledWindowSize::from(u16::MAX), TEST_BYTES) =>
@@ -4637,6 +4698,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2, WindowSize::DEFAULT),
             },
         });
 
@@ -4737,6 +4799,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2, WindowSize::DEFAULT),
             },
         });
 
@@ -4949,6 +5012,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
             },
         });
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now()), None);
@@ -5043,6 +5107,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
             },
         });
         let mut socket_options = SocketOptions::default();
@@ -5160,6 +5225,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
             },
         });
         let mut times = 1;
@@ -5239,6 +5305,10 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (
+                    ISS_2 + 1,
+                    WindowSize::new(TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize).unwrap()
+                ),
             },
         }); "established")]
     #[test_case(
@@ -5270,6 +5340,10 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (
+                    ISS_2 + 1,
+                    WindowSize::new(TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize).unwrap()
+                ),
             },
         }); "fin_wait_1")]
     #[test_case(
@@ -5283,6 +5357,10 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (
+                    ISS_2 + 1,
+                    WindowSize::new(TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize).unwrap()
+                ),
             },
             timeout_at: None,
         }); "fin_wait_2")]
@@ -5393,6 +5471,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::new(TEST_BYTES.len() + 1).unwrap()),
             },
         });
         // Upon receiving an out-of-order segment, we should send an ACK
@@ -5478,6 +5557,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2, WindowSize::DEFAULT),
             },
             timeout_at: None,
         });
@@ -5736,5 +5816,38 @@ mod test {
         );
 
         assert_eq!(snd.nxt, ISS_1 + 1 + (TEST_BYTES.len() - RESERVED_BYTES));
+    }
+
+    #[test]
+    fn silly_window_avoidance() {
+        const MULTIPLE: usize = 3;
+        const CAP: usize = TEST_BYTES.len() * MULTIPLE;
+        let mut rcv: Recv<FakeInstant, _> = Recv {
+            buffer: RingBuffer::new(CAP),
+            assembler: Assembler::new(ISS_1),
+            timer: None,
+            mss: Mss(NonZeroU16::new(TEST_BYTES.len() as u16).unwrap()),
+            wnd_scale: WindowScale::default(),
+            last_window_update: (ISS_1, WindowSize::new(CAP).unwrap()),
+        };
+        // Initially the entire buffer is advertised.
+        assert_eq!(rcv.select_window(), WindowSize::new(CAP).unwrap());
+
+        for _ in 0..MULTIPLE {
+            assert_eq!(rcv.buffer.enqueue_data(TEST_BYTES), TEST_BYTES.len());
+        }
+        assert_eq!(rcv.assembler.insert(ISS_1..ISS_1 + CAP), CAP);
+        // Since the buffer is full, we now get a zero window.
+        assert_eq!(rcv.select_window(), WindowSize::ZERO);
+
+        // The user reads 1 byte, but our implementation should not advertise
+        // a new window because it is too small;
+        assert_eq!(rcv.buffer.read_with(|_| 1), 1);
+        assert_eq!(rcv.select_window(), WindowSize::ZERO);
+
+        // Now at least there is at least 1 MSS worth of free space in the
+        // buffer, advertise it.
+        assert_eq!(rcv.buffer.read_with(|_| TEST_BYTES.len()), TEST_BYTES.len());
+        assert_eq!(rcv.select_window(), WindowSize::new(TEST_BYTES.len() + 1).unwrap());
     }
 }
