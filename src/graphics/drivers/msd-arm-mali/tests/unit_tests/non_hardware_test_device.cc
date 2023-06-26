@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fdf/testing.h>
 #include <lib/fdio/directory.h>
 #include <lib/inspect/cpp/reader.h>
@@ -439,10 +440,11 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void MaliProtocol() {
-    fdf::TestSynchronizedDispatcher test_dispatcher{fdf::kDispatcherManaged};
+    fdf_testing::DriverRuntime runtime;
+    fdf::UnownedSynchronizedDispatcher test_dispatcher = runtime.StartBackgroundDispatcher();
 
     ASSERT_EQ(ZX_OK,
-              fdf::RunOnDispatcherSync(test_dispatcher.dispatcher(), [&]() {
+              fdf::RunOnDispatcherSync(test_dispatcher->async_dispatcher(), [&]() {
                 auto driver = MsdArmDriver::Create();
                 auto parent = std::make_unique<FakeParentDevice>();
                 auto device =
@@ -478,14 +480,15 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void ProtectedCallbacks() {
-    fdf::TestSynchronizedDispatcher test_dispatcher{fdf::kDispatcherManaged};
+    fdf_testing::DriverRuntime runtime;
+    fdf::UnownedSynchronizedDispatcher test_dispatcher = runtime.StartBackgroundDispatcher();
 
     auto driver = MsdArmDriver::Create();
     ArmMaliServer server;
     server.use_protected_mode_callbacks_ = true;
     libsync::Completion server_completion;
     ASSERT_EQ(ZX_OK,
-              fdf::RunOnDispatcherSync(test_dispatcher.dispatcher(), [&]() {
+              fdf::RunOnDispatcherSync(test_dispatcher->async_dispatcher(), [&]() {
                 auto dispatcher = fdf::SynchronizedDispatcher::Create(
                     {}, "mali_server_test", [&](fdf_dispatcher_t*) { server_completion.Signal(); });
                 ASSERT_FALSE(dispatcher.is_error()) << dispatcher.status_string();

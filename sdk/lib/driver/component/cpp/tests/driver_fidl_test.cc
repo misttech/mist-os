@@ -9,7 +9,7 @@
 #include <lib/driver/component/cpp/tests/test_driver.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdio/directory.h>
@@ -104,17 +104,18 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
     return std::move(svc_endpoints->client);
   }
 
-  async_dispatcher_t* env_dispatcher() { return test_env_dispatcher_.dispatcher(); }
+  async_dispatcher_t* env_dispatcher() { return env_dispatcher_->async_dispatcher(); }
 
  protected:
   fuchsia_driver_framework::DriverStartArgs& start_args() { return start_args_; }
+  fdf_testing::DriverRuntime& runtime() { return runtime_; }
 
  private:
-  // This starts up the initial managed thread. It must come before the dispatcher.
-  fdf_testing::DriverRuntimeEnv managed_runtime_env_;
+  // Attaches a foreground dispatcher for us automatically.
+  fdf_testing::DriverRuntime runtime_;
 
   // Env dispatcher. Managed by driver runtime threads.
-  fdf::TestSynchronizedDispatcher test_env_dispatcher_{fdf::kDispatcherManaged};
+  fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
 
   // Servers for the incoming FIDLs to the driver.
   async_patterns::TestDispatcherBound<ZirconProtocolServer> zircon_proto_server_{env_dispatcher(),
@@ -150,22 +151,18 @@ class TestIncomingAndOutgoingFidlsDefaultDriver : public TestIncomingAndOutgoing
 
   void SetUp() override {
     TestIncomingAndOutgoingFidlsBase::SetUp();
-    zx::result result = driver_.Start(std::move(start_args())).Await();
+    zx::result result = runtime().RunToCompletion(driver_.Start(std::move(start_args())));
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   void TearDown() override {
-    zx::result result = driver_.PrepareStop().Await();
+    zx::result result = runtime().RunToCompletion(driver_.PrepareStop());
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   TestDriver* driver() { return *driver_; }
-  async_dispatcher_t* driver_dispatcher() { return test_driver_dispatcher_.dispatcher(); }
 
  private:
-  // Driver dispatcher set as the test's default dispatcher.
-  fdf::TestSynchronizedDispatcher test_driver_dispatcher_{fdf::kDispatcherDefault};
-
   // The driver under test.
   fdf_testing::DriverUnderTest<TestDriver> driver_;
 };
@@ -237,26 +234,25 @@ class TestIncomingAndOutgoingFidlsManagedDriver : public TestIncomingAndOutgoing
  public:
   void SetUp() override {
     TestIncomingAndOutgoingFidlsBase::SetUp();
-    zx::result result =
-        driver_.SyncCall(&fdf_testing::DriverUnderTest<TestDriver>::Start, std::move(start_args()))
-            .Await();
+    zx::result result = runtime().RunToCompletion(driver_.SyncCall(
+        &fdf_testing::DriverUnderTest<TestDriver>::Start, std::move(start_args())));
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   void TearDown() override {
-    zx::result result =
-        driver_.SyncCall(&fdf_testing::DriverUnderTest<TestDriver>::PrepareStop).Await();
+    zx::result result = runtime().RunToCompletion(
+        driver_.SyncCall(&fdf_testing::DriverUnderTest<TestDriver>::PrepareStop));
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<TestDriver>>& driver() {
     return driver_;
   }
-  async_dispatcher_t* driver_dispatcher() { return test_driver_dispatcher_.dispatcher(); }
+  async_dispatcher_t* driver_dispatcher() { return driver_dispatcher_->async_dispatcher(); }
 
  private:
-  // Driver dispatcher set as a managed dispatcher.
-  fdf::TestSynchronizedDispatcher test_driver_dispatcher_{fdf::kDispatcherManaged};
+  // Driver dispatcher set as a background dispatcher.
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime().StartBackgroundDispatcher();
 
   // The driver under test.
   async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<TestDriver>> driver_{

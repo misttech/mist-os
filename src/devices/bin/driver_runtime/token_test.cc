@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/cpp/protocol.h>
 #include <lib/fit/defer.h>
@@ -25,7 +25,7 @@ class TokenTest : public RuntimeTestCase {
   void TearDown() override;
 
  protected:
-  fdf_testing::DriverRuntimeEnv managed_env;
+  fdf_testing::internal::DriverRuntimeEnv runtime_env;
 
   fdf::Dispatcher dispatcher_local_;
   libsync::Completion dispatcher_local_shutdown_completion_;

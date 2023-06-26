@@ -8,7 +8,7 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdf/env.h>
@@ -22,9 +22,9 @@
 using fuchsia_hardware_powersource::wire::BatteryUnit;
 using fuchsia_hardware_powersource::wire::PowerType;
 
-// If the environment needs to run on a managed driver dispatcher (for example if the driver needs
-// to make sync FIDL calls), we need to run the environment on a managed dispatcher while keeping
-// the driver on the main thread.
+// If the environment needs to run on a background driver dispatcher (for example if the driver
+// needs to make sync FIDL calls), we need to run the environment on a background dispatcher while
+// keeping the driver on the main thread.
 class FakeBatteryDriverTest : public ::testing::Test {
  public:
   static void RunSyncClientTask(fit::closure task) {
@@ -44,31 +44,26 @@ class FakeBatteryDriverTest : public ::testing::Test {
         test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
                                    std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, init_result.status_value());
-    zx::result start_result = driver_.Start(std::move(start_args->start_args)).Await();
-    EXPECT_EQ(ZX_OK, start_result.status_value());
+    zx::result driver = runtime_.RunToCompletion(driver_.Start(std::move(start_args->start_args)));
+    EXPECT_EQ(ZX_OK, driver.status_value());
   }
 
   void TearDown() override {
-    zx::result prepare_stop_result = driver_.PrepareStop().Await();
-    EXPECT_EQ(ZX_OK, prepare_stop_result.status_value());
+    zx::result result = runtime_.RunToCompletion(driver_.PrepareStop());
+    EXPECT_EQ(ZX_OK, result.status_value());
   }
 
   fdf_testing::DriverUnderTest<fake_battery::Driver>& driver() { return driver_; }
 
-  async_dispatcher_t* env_dispatcher() { return test_env_dispatcher_.dispatcher(); }
+  async_dispatcher_t* env_dispatcher() { return test_env_dispatcher_->async_dispatcher(); }
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode>& node_server() { return node_server_; }
 
  private:
-  // This starts up the initial managed thread. It must come before the dispatcher.
-  fdf_testing::DriverRuntimeEnv managed_runtime_env_;
-
-  // Driver dispatcher. Started as the current thread's default dispatcher and not ran on the
-  // managed runtime thread pool.
-  fdf::TestSynchronizedDispatcher test_driver_dispatcher_{fdf::kDispatcherDefault};
+  fdf_testing::DriverRuntime runtime_;
 
   // Env dispatcher. Managed by driver runtime threads because we need to make sync calls into it.
-  fdf::TestSynchronizedDispatcher test_env_dispatcher_{fdf::kDispatcherManaged};
+  fdf::UnownedSynchronizedDispatcher test_env_dispatcher_ = runtime_.StartBackgroundDispatcher();
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
       env_dispatcher(), std::in_place, std::string("root")};

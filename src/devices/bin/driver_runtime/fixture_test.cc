@@ -2,8 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sdk/lib/driver/runtime/testing/loop_fixture/test_loop_fixture.h"
+#include <lib/driver/testing/cpp/driver_runtime.h>
 
-class FixtureTest : public ::gtest::DriverTestLoopFixture {};
+#include <gtest/gtest.h>
+
+class FixtureTest : public ::testing::Test {
+ private:
+  fdf_testing::DriverRuntime runtime;
+  fdf::UnownedSynchronizedDispatcher dispatcher_ = runtime.StartBackgroundDispatcher();
+};
 
 TEST_F(FixtureTest, BuildTest) {}

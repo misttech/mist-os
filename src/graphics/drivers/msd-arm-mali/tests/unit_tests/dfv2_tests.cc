@@ -5,7 +5,7 @@
 #include <fidl/fuchsia.kernel/cpp/wire_test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fake-resource/resource.h>
@@ -80,13 +80,11 @@ class TestEnvironmentWrapper {
 };
 
 TEST(MsdArmDFv2, LoadDriver) {
-  fdf_testing::DriverRuntimeEnv managed_env;
-  // This dispatcher is used by the driver itself.
-  fdf::TestSynchronizedDispatcher driver_dispatcher{fdf::kDispatcherDefault};
+  fdf_testing::DriverRuntime runtime;
 
   // This dispatcher is used by the test environment, and hosts the FakePDevFidl and incoming
   // directory.
-  fdf::TestSynchronizedDispatcher test_env_dispatcher{fdf::kDispatcherManaged};
+  fdf::UnownedSynchronizedDispatcher test_env_dispatcher = runtime.StartBackgroundDispatcher();
 
   // Initialize MMIOs and IRQs needed by the device.
   zx::interrupt gpu_interrupt;
@@ -111,7 +109,7 @@ TEST(MsdArmDFv2, LoadDriver) {
   }
 
   async_patterns::TestDispatcherBound<TestEnvironmentWrapper> test_environment{
-      test_env_dispatcher.dispatcher(), std::in_place};
+      test_env_dispatcher->async_dispatcher(), std::in_place};
 
   fdf::DriverStartArgs start_args =
       test_environment.SyncCall(&TestEnvironmentWrapper::Setup, std::move(config));
@@ -152,13 +150,13 @@ TEST(MsdArmDFv2, LoadDriver) {
 
   fdf_testing::DriverUnderTest<> driver;
 
-  zx::result start_result = driver.Start(std::move(start_args)).Await();
+  zx::result start_result = runtime.RunToCompletion(driver.Start(std::move(start_args)));
   ASSERT_EQ(ZX_OK, start_result.status_value());
 
   // Hook ownership should have been taken by the driver.
   EXPECT_FALSE(hook_s);
 
-  zx::result prepare_stop_result = driver.PrepareStop().Await();
+  zx::result prepare_stop_result = runtime.RunToCompletion(driver.PrepareStop());
   ASSERT_EQ(ZX_OK, prepare_stop_result.status_value());
 }
 

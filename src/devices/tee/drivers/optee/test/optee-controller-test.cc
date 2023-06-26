@@ -278,8 +278,7 @@ class FakeDdkOptee : public zxtest::Test {
   FakeSysmem sysmem_;
   FakeRpmbService rpmb_service_;
 
-  fdf_testing::DriverRuntimeEnv runtime_;
-  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherDefault};
+  fdf_testing::DriverRuntime runtime_;
 
   // TODO(fxb/124464): Migrate test to use dispatcher integration.
   std::shared_ptr<MockDevice> parent_ =

@@ -29,6 +29,7 @@
 #include <gtest/gtest.h>
 #include <mock-boot-arguments/server.h>
 
+#include "lib/driver/testing/cpp/driver_runtime.h"
 #include "sdk/lib/driver/runtime/testing/cpp/dispatcher.h"
 #include "src/devices/misc/drivers/compat/v1_test.h"
 #include "src/lib/storage/vfs/cpp/managed_vfs.h"
@@ -517,9 +518,10 @@ class DriverTest : public testing::Test {
         },
         &ctx);
 
-    compat::DriverFactory::CreateDriver(std::move(start_args),
-                                        driver_dispatcher_.driver_dispatcher().borrow(),
-                                        std::move(start_completer));
+    compat::DriverFactory::CreateDriver(
+        std::move(start_args),
+        fdf::UnownedSynchronizedDispatcher(fdf::Dispatcher::GetCurrent()->get()),
+        std::move(start_completer));
 
     while (driver == nullptr) {
       fdf_testing_run_until_idle();
@@ -558,14 +560,14 @@ class DriverTest : public testing::Test {
     EXPECT_FALSE(node().children().empty());
   }
 
-  async_dispatcher_t* dispatcher() { return driver_dispatcher_.dispatcher(); }
+  async_dispatcher_t* dispatcher() { return fdf::Dispatcher::GetCurrent()->async_dispatcher(); }
 
  private:
   async::Loop ns_loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_ns_{ns_loop_.dispatcher(),
                                                                       std::in_place};
   zx_protocol_device_t device_ops_;
-  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherDefault};
+  fdf_testing::DriverRuntime runtime_;
   std::optional<fdf_testing::TestNode> node_;
 };
 
@@ -588,10 +590,10 @@ class GlobalLoggerListTest : public testing::Test {
     ZX_ASSERT(ZX_OK == logger.status_value());
     return std::shared_ptr<fdf::Logger>((*logger).release());
   }
-  async_dispatcher_t* dispatcher() { return driver_dispatcher_.dispatcher(); }
+  async_dispatcher_t* dispatcher() { return fdf::Dispatcher::GetCurrent()->async_dispatcher(); }
 
  private:
-  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherDefault};
+  fdf_testing::DriverRuntime runtime_;
 };
 
 TEST_F(DriverTest, Start) {

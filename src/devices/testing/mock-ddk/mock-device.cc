@@ -10,6 +10,27 @@
 #include <algorithm>
 #include <latch>
 
+namespace {
+std::mutex g_mutex;
+std::weak_ptr<fdf_testing::DriverRuntime> g_runtime __TA_GUARDED(g_mutex);
+}  // namespace
+
+namespace mock_ddk {
+
+std::shared_ptr<fdf_testing::DriverRuntime> GetDriverRuntime() {
+  std::lock_guard guard(g_mutex);
+  std::shared_ptr shared = g_runtime.lock();
+  if (shared) {
+    return shared;
+  }
+
+  shared = std::make_shared<fdf_testing::DriverRuntime>();
+  g_runtime = shared;
+  return shared;
+}
+
+}  // namespace mock_ddk
+
 MockDevice::MockDevice(device_add_args_t* args, MockDevice* parent)
     : parent_(parent),
       ops_(args->ops),
@@ -17,8 +38,7 @@ MockDevice::MockDevice(device_add_args_t* args, MockDevice* parent)
       name_(args->name),
       inspect_(zx::vmo{args->inspect_vmo}),
       outgoing_(zx::channel{args->outgoing_dir_channel}),
-      driver_runtime_enabled_(parent_->driver_runtime_enabled_),
-      dispatcher_(parent_->dispatcher_) {
+      driver_runtime_(parent_->driver_runtime_) {
   if (args->proto_id && args->proto_ops) {
     AddProtocol(args->proto_id, args->proto_ops, ctx_);
   }
@@ -68,44 +88,27 @@ MockDevice* MockDevice::GetLatestChild() {
 // If they were not set, the fallback parameter is returned to the caller
 // (usually ZX_ERR_NOT_SUPPORTED)
 template <typename RetType, typename... ArgTypes>
-RetType Dispatch(async_dispatcher_t* dispatcher, void* ctx, RetType (*op)(void* ctx, ArgTypes...),
-                 RetType fallback, ArgTypes... args) {
+RetType Dispatch(void* ctx, RetType (*op)(void* ctx, ArgTypes...), RetType fallback,
+                 ArgTypes... args) {
   if (!op) {
     return fallback;
   }
 
-  if (!dispatcher) {
-    return (*op)(ctx, args...);
-  }
-
-  RetType result;
-  zx::result dispatch_result =
-      fdf::RunOnDispatcherSync(dispatcher, [&]() { result = (*op)(ctx, args...); });
-  ZX_ASSERT_MSG(dispatch_result.is_ok(), "Failed to dispatch op: %s",
-                dispatch_result.status_string());
-  return result;
+  return (*op)(ctx, args...);
 }
 
 template <typename... ArgTypes>
-void Dispatch(async_dispatcher_t* dispatcher, void* ctx, void (*op)(void* ctx, ArgTypes...),
-              ArgTypes... args) {
+void Dispatch(void* ctx, void (*op)(void* ctx, ArgTypes...), ArgTypes... args) {
   if (!op) {
     return;
   }
 
-  if (!dispatcher) {
-    (*op)(ctx, args...);
-    return;
-  }
-
-  zx::result dispatch_result = fdf::RunOnDispatcherSync(dispatcher, [&]() { (*op)(ctx, args...); });
-  ZX_ASSERT_MSG(dispatch_result.is_ok(), "Failed to dispatch op: %s",
-                dispatch_result.status_string());
+  (*op)(ctx, args...);
 }
 
-void MockDevice::InitOp() { Dispatch(dispatcher(), ctx_, ops_->init); }
+void MockDevice::InitOp() { Dispatch(ctx_, ops_->init); }
 
-void MockDevice::UnbindOp() { Dispatch(dispatcher(), ctx_, ops_->unbind); }
+void MockDevice::UnbindOp() { Dispatch(ctx_, ops_->unbind); }
 
 void MockDevice::ReleaseOp() {
   if (!IsRootParent()) {
@@ -116,7 +119,7 @@ void MockDevice::ReleaseOp() {
     parent_->RecordChildPreRelease(ZX_OK);
   }
 
-  Dispatch(dispatcher(), ctx_, ops_->release);
+  Dispatch(ctx_, ops_->release);
 
   // Delete instance from parent's children_ accounting.
   for (auto it = parent_->children_.begin(); it != parent_->children_.end(); ++it) {
@@ -134,26 +137,26 @@ MockDevice::~MockDevice() {
 }
 
 void MockDevice::SuspendNewOp(uint8_t requested_state, bool enable_wake, uint8_t suspend_reason) {
-  Dispatch(dispatcher(), ctx_, ops_->suspend, requested_state, enable_wake, suspend_reason);
+  Dispatch(ctx_, ops_->suspend, requested_state, enable_wake, suspend_reason);
 }
 
 zx_status_t MockDevice::SetPerformanceStateOp(uint32_t requested_state, uint32_t* out_state) {
-  return Dispatch(dispatcher(), ctx_, ops_->set_performance_state, ZX_ERR_NOT_SUPPORTED,
-                  requested_state, out_state);
+  return Dispatch(ctx_, ops_->set_performance_state, ZX_ERR_NOT_SUPPORTED, requested_state,
+                  out_state);
 }
 
 zx_status_t MockDevice::ConfigureAutoSuspendOp(bool enable, uint8_t requested_state) {
-  return Dispatch(dispatcher(), ctx_, ops_->configure_auto_suspend, ZX_ERR_NOT_SUPPORTED, enable,
+  return Dispatch(ctx_, ops_->configure_auto_suspend, ZX_ERR_NOT_SUPPORTED, enable,
                   requested_state);
 }
 
 void MockDevice::ResumeNewOp(uint32_t requested_state) {
-  Dispatch(dispatcher(), ctx_, ops_->resume, requested_state);
+  Dispatch(ctx_, ops_->resume, requested_state);
 }
 
 bool MockDevice::MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t txn) {
   if (ops_->message) {
-    Dispatch(dispatcher(), ctx_, ops_->message, std::move(msg).ReleaseToEncodedCMessage(), txn);
+    Dispatch(ctx_, ops_->message, std::move(msg).ReleaseToEncodedCMessage(), txn);
     return true;
   }
 
@@ -161,7 +164,7 @@ bool MockDevice::MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t
 }
 
 void MockDevice::ChildPreReleaseOp(void* child_ctx) {
-  Dispatch(dispatcher(), ctx_, ops_->child_pre_release, child_ctx);
+  Dispatch(ctx_, ops_->child_pre_release, child_ctx);
 }
 
 void MockDevice::SetMetadata(uint32_t type, const void* data, size_t data_length) {

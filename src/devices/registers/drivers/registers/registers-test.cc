@@ -7,7 +7,7 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
@@ -119,7 +119,7 @@ class RegistersDeviceTest : public zxtest::Test {
     }
 
     auto device =
-        std::make_unique<FakeRegistersDeviceWrapper<T>>(registers_dispatcher_.dispatcher());
+        std::make_unique<FakeRegistersDeviceWrapper<T>>(registers_dispatcher_->async_dispatcher());
     device->Init(std::move(mmios));
     return device;
   }
@@ -131,12 +131,12 @@ class RegistersDeviceTest : public zxtest::Test {
   }
 
  protected:
-  // The |Register| device lives on a driver runtime managed dispatcher since it uses the
+  // The |Register| device lives on a driver runtime background dispatcher since it uses the
   // |fdf::Dispatcher::GetCurrent()| API. It serves the FIDL protocol on this dispatcher.
   // This dispatcher must be separate from the test as the test calls synchronously into
   // this FIDL protocol.
-  fdf_testing::DriverRuntimeEnv managed_runtime_env_;
-  fdf::TestSynchronizedDispatcher registers_dispatcher_{fdf::kDispatcherManaged};
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher registers_dispatcher_ = runtime_.StartBackgroundDispatcher();
 
   std::vector<std::unique_ptr<ddk_mock::MockMmioRegRegion>> mock_mmio_;
   fidl::Arena<2048> allocator_;

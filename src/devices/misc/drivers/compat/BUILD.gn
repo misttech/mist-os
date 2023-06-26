@@ -179,7 +179,7 @@ executable("unittests") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/compat/cpp:symbols",
     "//sdk/lib/driver/runtime/testing/cpp",
-    "//sdk/lib/driver/testing/cpp:test_node",
+    "//sdk/lib/driver/testing/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/testing/fidl:placeholders_cpp_wire",

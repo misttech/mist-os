@@ -4,7 +4,7 @@
 
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/driver/runtime/testing/cpp/internal/test_dispatcher_builder.h>
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/cpp/env.h>
 #include <lib/fdf/testing.h>
@@ -25,7 +25,7 @@ class DispatcherDumpTest : public RuntimeTestCase {
  protected:
   static constexpr std::string_view kDispatcherName = "synchronized";
 
-  fdf_testing::DriverRuntimeEnv managed_env;
+  fdf_testing::internal::DriverRuntimeEnv runtime_env;
 
   fdf::SynchronizedDispatcher dispatcher_;
   libsync::Completion shutdown_completion_;

@@ -6,7 +6,7 @@
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fake-bti/bti.h>
 
 #include <vector>
@@ -207,14 +207,14 @@ class AmlCanvasTest : public testing::Test {
     return lut_addr.reg_value();
   }
 
-  fdf_testing::DriverRuntimeEnv env_;
-  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher dispatcher_ = runtime_.StartBackgroundDispatcher();
   std::vector<uint8_t> canvas_indices_;
 
   constexpr static int kMmioRangeSize = 0x100;
   ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
 
-  async_patterns::TestDispatcherBound<AmlCanvasWrap> canvas_{dispatcher_.dispatcher(),
+  async_patterns::TestDispatcherBound<AmlCanvasWrap> canvas_{dispatcher_->async_dispatcher(),
                                                              std::in_place};
   fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_client_;
 };

@@ -73,7 +73,7 @@ DriverUnderTestBase::~DriverUnderTestBase() {
   }
 }
 
-AsyncTask<zx::result<>> DriverUnderTestBase::Start(fdf::DriverStartArgs start_args) {
+DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::Start(fdf::DriverStartArgs start_args) {
   std::lock_guard guard(checker_);
   ZX_ASSERT_MSG(!driver_.has_value(), "Cannot start driver more than once.");
 
@@ -122,10 +122,10 @@ AsyncTask<zx::result<>> DriverUnderTestBase::Start(fdf::DriverStartArgs start_ar
     start_promise_->set_value(zx::make_result(status));
   }
 
-  return AsyncTask<zx::result<>>(start_promise_->get_future().share());
+  return DriverRuntime::AsyncTask<zx::result<>>(start_promise_.value());
 }
 
-AsyncTask<zx::result<>> DriverUnderTestBase::PrepareStop() {
+DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::PrepareStop() {
   std::lock_guard guard(checker_);
   ZX_ASSERT_MSG(driver_.has_value(), "Driver does not exist.");
   ZX_ASSERT_MSG(driver_.value().is_ok(), "Driver start did not succeed: %s.",
@@ -145,7 +145,7 @@ AsyncTask<zx::result<>> DriverUnderTestBase::PrepareStop() {
     prepare_stop_promise_->set_value(zx::ok());
   }
 
-  return AsyncTask<zx::result<>>(prepare_stop_promise_future_);
+  return DriverRuntime::AsyncTask<zx::result<>>(prepare_stop_promise_future_);
 }
 
 zx::result<> DriverUnderTestBase::Stop() {

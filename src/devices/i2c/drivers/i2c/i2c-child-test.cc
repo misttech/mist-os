@@ -57,7 +57,7 @@ class I2cChildTest : public zxtest::Test {
  public:
   void TearDown() override {
     // Destruction must happen on the framework dispatcher.
-    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [this]() {
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [this]() {
       device_async_remove(fake_root_->GetLatestChild());
       for (auto& child : fake_root_->GetLatestChild()->children()) {
         device_async_remove(child.get());
@@ -113,7 +113,7 @@ class I2cChildTest : public zxtest::Test {
     *client = fidl::WireSyncClient<fuchsia_hardware_i2c::Device>(std::move(endpoints->client));
 
     {
-      auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [&]() {
+      auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
         EXPECT_OK(I2cDevice::Create(nullptr, fake_root_.get()));
       });
 
@@ -125,7 +125,7 @@ class I2cChildTest : public zxtest::Test {
 
     {
       auto result = fdf::RunOnDispatcherSync(
-          dispatcher_.dispatcher(), [=, server = std::move(endpoints->server)]() mutable {
+          dispatcher_->async_dispatcher(), [=, server = std::move(endpoints->server)]() mutable {
             auto* const i2c_child = i2c_root->GetLatestChild()->GetDeviceContext<I2cChild>();
             i2c_child->Bind(std::move(server));
           });
@@ -136,7 +136,8 @@ class I2cChildTest : public zxtest::Test {
   // TODO(fxb/124464): Migrate test to use dispatcher integration.
   std::shared_ptr<zx_device> fake_root_{
       MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()};
-  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher dispatcher_ = runtime_.StartBackgroundDispatcher();
 };
 
 TEST_F(I2cChildTest, Write3BytesOnce) {

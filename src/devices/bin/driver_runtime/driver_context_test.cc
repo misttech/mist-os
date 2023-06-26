@@ -4,7 +4,7 @@
 
 #include "src/devices/bin/driver_runtime/driver_context.h"
 
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 
 #include <thread>
 
@@ -32,7 +32,7 @@ class DriverContextTest : public zxtest::Test {
   }
 
  private:
-  fdf_testing::DriverRuntimeEnv managed_env;
+  fdf_testing::internal::DriverRuntimeEnv runtime_env;
 
   int next_driver_ = 0xDEADBEEF;
 };

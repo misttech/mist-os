@@ -156,12 +156,11 @@ class GenericPowerTest : public zxtest::Test {
   }
 
  protected:
-  fdf_testing::DriverRuntimeEnv managed_env_;
-  fdf::TestSynchronizedDispatcher env_dispatcher_{fdf::kDispatcherManaged};
-  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherDefault};
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
+  fdf::UnownedSynchronizedDispatcher env_dispatcher_ =
+      fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher();
   std::unique_ptr<PowerDevice> dut_;
-  async_patterns::TestDispatcherBound<FakePower> parent_power_{env_dispatcher_.dispatcher(),
+  async_patterns::TestDispatcherBound<FakePower> parent_power_{env_dispatcher_->async_dispatcher(),
                                                                std::in_place};
   std::unique_ptr<FakePowerImpl> power_impl_;
 };

@@ -7,9 +7,10 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/legacy-bind-constants/legacy-bind-constants.h>
 #include <lib/driver/logging/cpp/logger.h>
-#include <lib/driver/runtime/testing/loop_fixture/test_loop_fixture.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
@@ -143,7 +144,31 @@ class FakeCompositeNodeManager final
   std::vector<AddSpecRequest> requests_;
 };
 
-class ManagerTest : public gtest::DriverTestLoopFixture {
+class EnvWrapper {
+ public:
+  void Bind(fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus_endpoints_server,
+            fidl::ServerEnd<fuchsia_driver_framework::CompositeNodeManager> mgr_endpoints_server) {
+    fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(pbus_endpoints_server), &pbus_);
+    fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                     std::move(mgr_endpoints_server), &mgr_);
+  }
+
+  size_t pbus_node_size() { return pbus_.nodes().size(); }
+
+  size_t mgr_requests_size() { return mgr_.requests().size(); }
+
+  FakeCompositeNodeManager::AddSpecRequest mgr_requests_at(size_t index) {
+    return mgr_.requests()[1];
+  }
+
+  fuchsia_hardware_platform_bus::Node pbus_nodes_at(size_t index) { return pbus_.nodes()[index]; }
+
+ private:
+  FakePlatformBus pbus_;
+  FakeCompositeNodeManager mgr_;
+};
+
+class ManagerTest : public ::testing::Test {
  public:
   ManagerTest() { ConnectLogger(); }
 
@@ -200,21 +225,18 @@ class ManagerTest : public gtest::DriverTestLoopFixture {
     ASSERT_EQ(ZX_OK, node_endpoints.status_value());
     node_.Bind(std::move(node_endpoints->client));
 
-    RunOnDispatcher([&]() {
-      fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(pbus_endpoints->server),
-                      &pbus_);
-      fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                       std::move(mgr_endpoints->server), &mgr_);
-    });
-
+    env_.SyncCall(&EnvWrapper::Bind, std::move(pbus_endpoints->server),
+                  std::move(mgr_endpoints->server));
     ASSERT_EQ(
         ZX_OK,
         manager.PublishDevices(std::move(pbus_endpoints->client), std::move(mgr_endpoints->client))
             .status_value());
   }
 
-  FakePlatformBus pbus_;
-  FakeCompositeNodeManager mgr_;
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher env_dispatcher = runtime_.StartBackgroundDispatcher();
+  async_patterns::TestDispatcherBound<EnvWrapper> env_{env_dispatcher->async_dispatcher(),
+                                                       std::in_place};
   fidl::SyncClient<fuchsia_driver_framework::Node> node_;
   std::unique_ptr<fdf::Logger> logger_;
 };
@@ -277,11 +299,11 @@ TEST_F(ManagerTest, TestPublishesSimpleNode) {
   ASSERT_EQ(ZX_OK, manager.Walk(manager.default_visitor()).status_value());
 
   DoPublish(manager);
-  ASSERT_EQ(2lu, pbus_.nodes().size());
+  ASSERT_EQ(2lu, env_.SyncCall(&EnvWrapper::pbus_node_size));
 
-  ASSERT_EQ(2lu, mgr_.requests().size());
+  ASSERT_EQ(2lu, env_.SyncCall(&EnvWrapper::mgr_requests_size));
 
-  auto composite_node_spec = mgr_.requests()[1];
+  auto composite_node_spec = env_.SyncCall(&EnvWrapper::mgr_requests_at, 1);
   ASSERT_TRUE(composite_node_spec.parents().has_value());
   ASSERT_TRUE(composite_node_spec.name().has_value());
   EXPECT_NE(nullptr, strstr("example-device", composite_node_spec.name()->data()));
@@ -310,9 +332,9 @@ TEST_F(ManagerTest, TestMmioProperties) {
 
   DoPublish(manager);
 
-  ASSERT_EQ(2lu, pbus_.nodes().size());
+  ASSERT_EQ(2lu, env_.SyncCall(&EnvWrapper::pbus_node_size));
   // First node is devicetree root. Second one is the sample-device. Check MMIO of sample-device.
-  auto mmio = pbus_.nodes()[1].mmio();
+  auto mmio = env_.SyncCall(&EnvWrapper::pbus_nodes_at, 1).mmio();
 
   // Test MMIO properties.
   ASSERT_TRUE(mmio);

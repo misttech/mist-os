@@ -6,7 +6,7 @@
 
 #include <fuchsia/hardware/hidbus/cpp/banjo.h>
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <unistd.h>
 
 #include <thread>
@@ -141,7 +141,7 @@ class HidDeviceTest : public zxtest::Test {
 
   void TearDown() override {
     auto child = fake_root_->GetLatestChild();
-    ASSERT_EQ(ZX_OK, fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [child]() {
+    ASSERT_EQ(ZX_OK, fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [child]() {
                        child->UnbindOp();
                      }).status_value());
     child->UnbindOp();
@@ -167,13 +167,13 @@ class HidDeviceTest : public zxtest::Test {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::Device>();
     ASSERT_OK(endpoints.status_value());
 
-    ASSERT_EQ(
-        ZX_OK,
-        fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [dispatcher = dispatcher_.dispatcher(),
-                                                            server = std::move(endpoints->server),
-                                                            device = device_]() mutable {
-          ASSERT_OK(device->CreateInstance(dispatcher, std::move(server)));
-        }).status_value());
+    ASSERT_EQ(ZX_OK, fdf::RunOnDispatcherSync(
+                         dispatcher_->async_dispatcher(),
+                         [dispatcher = dispatcher_->async_dispatcher(),
+                          server = std::move(endpoints->server), device = device_]() mutable {
+                           ASSERT_OK(device->CreateInstance(dispatcher, std::move(server)));
+                         })
+                         .status_value());
 
     sync_client_ = fidl::WireSyncClient(std::move(endpoints->client));
 
@@ -210,8 +210,8 @@ class HidDeviceTest : public zxtest::Test {
   }
 
  protected:
-  fdf_testing::DriverRuntimeEnv managed_runtime_env_;
-  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher dispatcher_ = runtime_.StartBackgroundDispatcher();
 
   fidl::WireSyncClient<fuchsia_hardware_input::Device> sync_client_;
   zx::event report_event_;

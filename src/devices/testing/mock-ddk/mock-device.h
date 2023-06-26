@@ -6,11 +6,12 @@
 #define SRC_DEVICES_TESTING_MOCK_DDK_MOCK_DEVICE_H_
 
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/async/cpp/task.h>
 #include <lib/ddk/binding_priv.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fidl/cpp/wire/wire_messaging.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/span.h>
@@ -42,6 +43,12 @@ struct ProtocolEntry {
 };
 
 using ConnectCallback = fit::function<zx_status_t(zx::channel)>;
+
+// The driver runtime for all mock devices is shared.
+// This is because there can only be one DriverRuntime,
+// but users can create multiple root MockDevices.
+std::shared_ptr<fdf_testing::DriverRuntime> GetDriverRuntime();
+
 }  // namespace mock_ddk
 
 // MockDevice is an implementation of the opaque type zx_device which mocks much of
@@ -92,31 +99,22 @@ using ConnectCallback = fit::function<zx_status_t(zx::channel)>;
 struct MockDevice : public std::enable_shared_from_this<MockDevice> {
  public:
   // Create a Root Parent.  This device has limited functionality.
-  // The test thread and the driver dispatcher thread are the same when using this, since the driver
-  // runtime does not start up to manage the driver dispatcher.
+  // This will create the |fdf_testing::DriverRuntime| instance for the user. The instance will
+  // start the driver runtime, and create a foreground driver dispatcher for the user.
   //
-  // All driver 'op' hooks are run on the main test thread.
+  // Background dispatchers can be created through this object. Grab the instance using the
+  // |fdf_testing::DriverRuntime::GetInstance()| call.
+  //
+  // The test thread and the driver dispatcher thread are the same when using this. All driver
+  // 'op' hooks are therefore run directly on the main test thread.
   static std::shared_ptr<MockDevice> FakeRootParent() {
     // Using `new` to access a non-public constructor.
-    return std::shared_ptr<MockDevice>(new MockDevice(false, fdf::kDispatcherDefault));
-  }
-
-  // Create a Root Parent.  This device has limited functionality.
-  // This will start up the driver runtime environment, making the driver dispatcher run on its
-  // managed threads. Tasks that touch devices should be posted to the driver dispatcher for
-  // thread safety using the |fdf::RunOnDispatcherSync| helper, eg:
-  // `EXPECT_OK(fdf::RunOnDispatcherSync(parent_->dispatcher(), []() {...}));`
-  //
-  // All driver 'op' hooks are sent to the managed driver dispatcher where they run on
-  // threads managed by the driver runtime. The 'op' call will block until the op handler finishes.
-  static std::shared_ptr<MockDevice> FakeRootParentWithDriverRuntime() {
-    // Using `new` to access a non-public constructor.
-    return std::shared_ptr<MockDevice>(new MockDevice(true, fdf::kDispatcherManaged));
+    return std::shared_ptr<MockDevice>(new MockDevice(mock_ddk::GetDriverRuntime()));
   }
 
   // DEPRECATED!
   // This is here only for soft migration of tests that manually manage the runtime and dispatchers
-  // today. For new tests, use `FakeRootParent` or `FakeRootParentWithDriverRuntime`.
+  // today. For new tests, use `FakeRootParent`.
   // Create a Root Parent.  This device has limited functionality.
   // TODO(fxb/124464): Remove when all usages are removed.
   static std::shared_ptr<MockDevice> FakeRootParentNoDispatcherIntegrationDEPRECATED() {
@@ -245,14 +243,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   // Convenience version which takes string:
   void SetFirmware(std::string firmware, std::string_view path = {});
 
-  async_dispatcher_t* dispatcher() const {
-    return dispatcher_ ? dispatcher_->dispatcher() : nullptr;
-  }
-
-  fdf_dispatcher_t* driver_dispatcher() const {
-    return dispatcher_ ? dispatcher_->driver_dispatcher().get() : nullptr;
-  }
-
  private:
   constexpr static zx_protocol_device_t kDefaultOps = {};
   // |ctx| must outlive |*out_dev|.  This is managed in the full binary by creating
@@ -306,19 +296,11 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
 
   // Default constructor for making deprecated root parent without dispatcher integration.
   // TODO(fxb/124464): Remove when all tests migrated.
-  explicit MockDevice() : driver_runtime_enabled_(false) {}
+  explicit MockDevice() : driver_runtime_(nullptr) {}
 
   // Constructor for root parent.
-  // |enable_driver_runtime| indicates whether this test should enable the managed driver runtime
-  // environment to manage the dispatcher.
-  // |dispatcher_type| is the type of the driver dispatcher to create.
-  explicit MockDevice(bool enable_driver_runtime,
-                      fdf::TestSynchronizedDispatcher::DispatcherType dispatcher_type)
-      : driver_runtime_enabled_(enable_driver_runtime),
-        driver_runtime_env_(enable_driver_runtime
-                                ? std::make_optional<fdf_testing::DriverRuntimeEnv>()
-                                : std::nullopt),
-        dispatcher_(std::make_shared<fdf::TestSynchronizedDispatcher>(dispatcher_type)) {}
+  explicit MockDevice(std::shared_ptr<fdf_testing::DriverRuntime> runtime)
+      : driver_runtime_(std::move(runtime)) {}
 
   // Copies this device's metadata to all descendants.
   void PropagateMetadata();
@@ -356,11 +338,8 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   std::vector<zx_device_str_prop_t> str_props_;
   zx::vmo inspect_;
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_;
-  const bool driver_runtime_enabled_;
-  // Only the root MockDevice holds the runtime env.
-  std::optional<fdf_testing::DriverRuntimeEnv> driver_runtime_env_;
-  // This is shared amongst all of the MockDevices in the tree.
-  std::shared_ptr<fdf::TestSynchronizedDispatcher> dispatcher_;
+  // Created as a refcounted global that's shared between all MockDevices.
+  std::shared_ptr<fdf_testing::DriverRuntime> driver_runtime_;
 };
 
 namespace mock_ddk {

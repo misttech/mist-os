@@ -13,9 +13,9 @@ executable("msd_arm_mali_nonhardware_tests") {
 
   public_deps = [
     ":tests_not_requiring_hardware",
-    "//src/devices/testing/driver-runtime-main:gtest",
     "//src/devices/testing/no_ddk",
     "//src/graphics/lib/magma/tests/helper:logger_init_helper",
+    "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-vthread",
@@ -40,7 +40,7 @@ source_set("tests_not_requiring_hardware") {
 
   deps = [
     ":test_deps",
-    "//sdk/lib/driver/runtime/testing/loop_fixture:gtest",
+    "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/fdio",
     "//src/graphics/lib/magma/tests/helper:msd_stubs",
     "//src/graphics/lib/magma/tests/mock:bus_mapper",

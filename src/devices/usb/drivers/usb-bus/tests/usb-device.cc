@@ -258,11 +258,11 @@ class DeviceTest : public zxtest::Test {
 
     auto hci_endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_hci::UsbHci>();
     ASSERT_OK(hci_endpoints);
-    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [&]() {
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
       auto device = fbl::MakeRefCounted<UsbDevice>(
           root_.get(), ddk::UsbHciProtocolClient(hci_.proto()), std::move(hci_endpoints->client),
-          kDeviceId, kHubId, kDeviceSpeed, timer_, dispatcher_.dispatcher());
-      ASSERT_OK(device->Init(dispatcher_.dispatcher()));
+          kDeviceId, kHubId, kDeviceSpeed, timer_, dispatcher_->async_dispatcher());
+      ASSERT_OK(device->Init(dispatcher_->async_dispatcher()));
       device_ = device.get();
     });
     EXPECT_TRUE(result.is_ok());
@@ -273,7 +273,7 @@ class DeviceTest : public zxtest::Test {
   }
 
   void TearDown() override {
-    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [&]() {
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
       device_->DdkAsyncRemove();
       mock_ddk::ReleaseFlaggedDevices(root_.get());
     });
@@ -328,9 +328,9 @@ class DeviceTest : public zxtest::Test {
   std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
 
  private:
-  fdf_testing::DriverRuntimeEnv managed_env_;
+  fdf_testing::DriverRuntime runtime_;
   async::Loop fidl_loop_{&kAsyncLoopConfigNeverAttachToThread};
-  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
+  fdf::UnownedSynchronizedDispatcher dispatcher_ = runtime_.StartBackgroundDispatcher();
   fbl::RefPtr<FakeTimer> timer_;
   fidl::WireSyncClient<fuchsia_hardware_usb_device::Device> fidl_;
   FakeHci hci_;

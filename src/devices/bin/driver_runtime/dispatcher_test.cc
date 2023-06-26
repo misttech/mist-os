@@ -9,7 +9,7 @@
 #include <lib/async/sequence_id.h>
 #include <lib/async/task.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fdf/arena.h>
 #include <lib/fdf/channel.h>
 #include <lib/fdf/cpp/channel_read.h>
@@ -81,7 +81,7 @@ class DispatcherTest : public RuntimeTestCase {
     static_cast<driver_runtime::Dispatcher*>(dispatcher)->WaitUntilIdle();
   }
 
-  fdf_testing::DriverRuntimeEnv managed_env;
+  fdf_testing::internal::DriverRuntimeEnv runtime_env;
 
   fdf_handle_t local_ch_;
   fdf_handle_t remote_ch_;

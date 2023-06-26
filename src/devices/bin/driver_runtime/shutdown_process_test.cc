@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fdf/channel.h>
 #include <lib/fdf/cpp/channel_read.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -28,7 +28,7 @@ extern DispatcherCoordinator& GetDispatcherCoordinator();
 // wide async loop backing the dispatcher, and that can't be restarted.
 class ShutdownProcessTest : public RuntimeTestCase {
  protected:
-  fdf_testing::DriverRuntimeEnv managed_env;
+  fdf_testing::DriverRuntime runtime;
 };
 
 // Tests shutting down the process async loop while requests are still pending.

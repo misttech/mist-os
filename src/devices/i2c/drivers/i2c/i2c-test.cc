@@ -74,18 +74,20 @@ class I2cMetadataTest : public zxtest::Test {
   }
 
   void TearDown() override {
-    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [parent = fake_root_.get()]() {
-      for (auto& device : parent->children()) {
-        device_async_remove(device.get());
-      }
+    auto result =
+        fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [parent = fake_root_.get()]() {
+          for (auto& device : parent->children()) {
+            device_async_remove(device.get());
+          }
 
-      mock_ddk::ReleaseFlaggedDevices(parent);
-    });
+          mock_ddk::ReleaseFlaggedDevices(parent);
+        });
     EXPECT_TRUE(result.is_ok());
   }
 
  protected:
-  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher dispatcher_ = runtime_.StartBackgroundDispatcher();
   std::shared_ptr<zx_device> fake_root_;
 };
 
@@ -98,10 +100,11 @@ TEST_F(I2cMetadataTest, ProvidesMetadataToChildren) {
   auto impl = FakeI2cImpl::Create(fake_root_.get(), std::move(channels));
 
   {
-    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [parent = impl->zxdev()]() {
-      // Make the fake I2C driver.
-      ASSERT_OK(i2c::I2cDevice::Create(nullptr, parent));
-    });
+    auto result =
+        fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [parent = impl->zxdev()]() {
+          // Make the fake I2C driver.
+          ASSERT_OK(i2c::I2cDevice::Create(nullptr, parent));
+        });
     EXPECT_TRUE(result.is_ok());
   }
 
@@ -111,7 +114,7 @@ TEST_F(I2cMetadataTest, ProvidesMetadataToChildren) {
   // I2cDevice::Create has posted a task to create children on its dispatcher. Verify device
   // properties on that dispatcher to ensure we are running after the children have been added.
   {
-    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [impl]() {
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [impl]() {
       zx_device_t* i2c = impl->zxdev()->GetLatestChild();
       // There should be two devices per channel.
       ASSERT_EQ(i2c->child_count(), 2);
@@ -132,13 +135,4 @@ TEST_F(I2cMetadataTest, ProvidesMetadataToChildren) {
     });
     EXPECT_TRUE(result.is_ok());
   }
-}
-
-int main(int argc, char** argv) {
-  // This must be called exactly once before any test cases run.
-  fdf_env_start();
-  // TODO(https://fxbug.dev/122526): Remove this once the elf runner no longer
-  // fools libc into block-buffering stdout.
-  setlinebuf(stdout);
-  return RUN_ALL_TESTS(argc, argv);
 }

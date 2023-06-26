@@ -6,7 +6,7 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/zx/result.h>
@@ -66,24 +66,24 @@ class FakeDriver : public MagmaProductionDriverBase {
 
 // Check that the test driver class can be instantiated (not started).
 TEST(MagmaDriver, CreateTestDriver) {
-  fdf::TestSynchronizedDispatcher driver_dispatcher{fdf::kDispatcherDefault};
+  fdf_testing::DriverRuntime runtime;
   fdf_testing::TestNode node_server("root");
 
   zx::result start_args = node_server.CreateStartArgsAndServe();
   EXPECT_EQ(ZX_OK, start_args.status_value());
   FakeTestDriver driver{std::move(start_args->start_args),
-                        driver_dispatcher.driver_dispatcher().borrow()};
+                        fdf::UnownedSynchronizedDispatcher(fdf::Dispatcher::GetCurrent()->get())};
 }
 
 // Check that the driver class can be instantiated (not started).
 TEST(MagmaDriver, CreateDriver) {
-  fdf::TestSynchronizedDispatcher driver_dispatcher{fdf::kDispatcherDefault};
+  fdf_testing::DriverRuntime runtime;
   fdf_testing::TestNode node_server("root");
 
   zx::result start_args = node_server.CreateStartArgsAndServe();
   EXPECT_EQ(ZX_OK, start_args.status_value());
   FakeDriver driver{std::move(start_args->start_args),
-                    driver_dispatcher.driver_dispatcher().borrow()};
+                    fdf::UnownedSynchronizedDispatcher(fdf::Dispatcher::GetCurrent()->get())};
 }
 
 class MagmaDriverStarted : public testing::Test {
@@ -99,16 +99,14 @@ class MagmaDriverStarted : public testing::Test {
                                    std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, result.status_value());
 
-    zx::result start_result = driver_
-                                  .SyncCall(&fdf_testing::DriverUnderTest<FakeTestDriver>::Start,
-                                            std::move(start_args->start_args))
-                                  .Await();
+    zx::result start_result = runtime_.RunToCompletion(driver_.SyncCall(
+        &fdf_testing::DriverUnderTest<FakeTestDriver>::Start, std::move(start_args->start_args)));
     ASSERT_EQ(ZX_OK, start_result.status_value());
   }
 
   void TearDown() override {
-    zx::result prepare_stop_result =
-        driver_.SyncCall(&fdf_testing::DriverUnderTest<FakeTestDriver>::PrepareStop).Await();
+    zx::result prepare_stop_result = runtime_.RunToCompletion(
+        driver_.SyncCall(&fdf_testing::DriverUnderTest<FakeTestDriver>::PrepareStop));
     ASSERT_EQ(ZX_OK, prepare_stop_result.status_value());
   }
 
@@ -121,17 +119,17 @@ class MagmaDriverStarted : public testing::Test {
   }
 
  protected:
-  fdf_testing::DriverRuntimeEnv managed_env;
-  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherManaged};
-  fdf::TestSynchronizedDispatcher test_env_dispatcher_{fdf::kDispatcherManaged};
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
+  fdf::UnownedSynchronizedDispatcher test_env_dispatcher_ = runtime_.StartBackgroundDispatcher();
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
-      test_env_dispatcher_.dispatcher(), std::in_place, std::string("root")};
+      test_env_dispatcher_->async_dispatcher(), std::in_place, std::string("root")};
   async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
-      test_env_dispatcher_.dispatcher(), std::in_place};
+      test_env_dispatcher_->async_dispatcher(), std::in_place};
 
   async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<FakeTestDriver>> driver_{
-      driver_dispatcher_.dispatcher(), std::in_place};
+      driver_dispatcher_->async_dispatcher(), std::in_place};
 };
 
 TEST_F(MagmaDriverStarted, TestDriver) {}
@@ -191,9 +189,9 @@ TEST_F(MagmaDriverStarted, DependencyInjection) {
   auto result = client->SetMemoryPressureProvider(std::move(memory_pressure_endpoints->client));
   ASSERT_EQ(ZX_OK, result.status());
 
-  EXPECT_EQ(ZX_OK, fdf::RunOnDispatcherSync(test_env_dispatcher_.dispatcher(), [&]() {
+  EXPECT_EQ(ZX_OK, fdf::RunOnDispatcherSync(test_env_dispatcher_->async_dispatcher(), [&]() {
                      auto server = std::make_unique<MemoryPressureProviderServer>();
-                     fidl::BindServer(test_env_dispatcher_.dispatcher(),
+                     fidl::BindServer(test_env_dispatcher_->async_dispatcher(),
                                       std::move(memory_pressure_endpoints->server),
                                       std::move(server));
                    }).status_value());

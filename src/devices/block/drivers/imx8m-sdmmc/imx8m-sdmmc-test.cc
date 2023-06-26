@@ -143,7 +143,7 @@ class Imx8mSdmmcTest : public zxtest::Test {
   }
 
   void InjectInterrupt() { irq_signaller_->trigger(0, zx::clock::get_monotonic()); }
-  async_dispatcher_t* DriverDispatcher() { return test_driver_dispatcher_.dispatcher(); }
+  async_dispatcher_t* DriverDispatcher() { return test_driver_dispatcher_->async_dispatcher(); }
 
  protected:
   // TODO(fxb/124464): Migrate test to use dispatcher integration.
@@ -153,7 +153,8 @@ class Imx8mSdmmcTest : public zxtest::Test {
   Imx8mSdmmc* dut_;
 
  private:
-  fdf::TestSynchronizedDispatcher test_driver_dispatcher_{fdf::kDispatcherManaged};
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher test_driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};

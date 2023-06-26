@@ -9,7 +9,7 @@
 #include <lib/driver/component/cpp/internal/lifecycle.h>
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/driver/symbols/symbols.h>
-#include <lib/driver/testing/cpp/async_task.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 
 // This is the exported driver lifecycle symbol that the driver framework looks for.
 // NOLINTNEXTLINE(bugprone-reserved-identifier)
@@ -27,14 +27,14 @@ class DriverUnderTestBase {
   virtual ~DriverUnderTestBase();
 
   // Start the driver. This is an asynchronous operation.
-  // Use |fdf::WaitFor| to await the completion of the future.
+  // Use |DriverRuntime::RunToCompletion| to await the completion of the async task.
   // The resulting zx::result is the result of the start operation.
-  AsyncTask<zx::result<>> Start(fdf::DriverStartArgs start_args);
+  DriverRuntime::AsyncTask<zx::result<>> Start(fdf::DriverStartArgs start_args);
 
   // PrepareStop the driver. This is an asynchronous operation.
-  // Use |fdf::WaitFor| to await the completion of the future.
+  // Use |DriverRuntime::RunToCompletion| to await the completion of the async task.
   // The resulting zx::result is the result of the prepare stop operation.
-  AsyncTask<zx::result<>> PrepareStop();
+  DriverRuntime::AsyncTask<zx::result<>> PrepareStop();
 
   // Stop the driver. The PrepareStop operation must have been completed before Stop is called.
   // Returns the result of the stop operation.

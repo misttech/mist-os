@@ -71,7 +71,7 @@ class WlanphyDeviceTest : public ::zxtest::Test,
                                                                    client_dispatcher_phy_);
 
     libsync::Completion wlanphy_created;
-    async::PostTask(driver_dispatcher_.dispatcher(), [&]() {
+    async::PostTask(driver_dispatcher_->async_dispatcher(), [&]() {
       wlanphy_device_ =
           new Device(fake_wlan_phy_impl_device_.get(), std::move(endpoints_phy_impl->client));
 
@@ -93,8 +93,8 @@ class WlanphyDeviceTest : public ::zxtest::Test,
     EXPECT_OK(status);
     EXPECT_NOT_NULL(wlanphy_device_);
 
-    fdf::BindServer(server_dispatcher_phy_impl_.driver_dispatcher().get(),
-                    std::move(endpoints_phy_impl->server), this);
+    fdf::BindServer(server_dispatcher_phy_impl_->get(), std::move(endpoints_phy_impl->server),
+                    this);
 
     // Initialize struct to avoid random values.
     memset(static_cast<void*>(&create_iface_req_), 0, sizeof(create_iface_req_));
@@ -206,7 +206,7 @@ class WlanphyDeviceTest : public ::zxtest::Test,
   void* dummy_ctx_;
 
  private:
-  fdf_testing::DriverRuntimeEnv managed_env_;
+  fdf_testing::DriverRuntime runtime_;
   async::Loop client_loop_phy_;
 
   // Dispatcher for the FIDL client sending requests to wlanphy device.
@@ -214,9 +214,10 @@ class WlanphyDeviceTest : public ::zxtest::Test,
 
   // Dispatcher for being a driver transport FIDL server to receive and dispatch requests from
   // wlanphy device.
-  fdf::TestSynchronizedDispatcher server_dispatcher_phy_impl_{fdf::kDispatcherManaged};
+  fdf::UnownedSynchronizedDispatcher server_dispatcher_phy_impl_ =
+      runtime_.StartBackgroundDispatcher();
   // The driver dispatcher used for testing.
-  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherManaged};
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
 
   // fake zx_device as the the parent of wlanphy device.
   std::shared_ptr<MockDevice> fake_wlan_phy_impl_device_;

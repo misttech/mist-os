@@ -24,8 +24,7 @@ A dispatcher, assigned to a driver, coordinates and performs asynchronous
 operations for the driver. All dispatchers in a driver host (therefore, in the
 same process) are backed by a pool of shared threads managed by the
 driver runtime. Dispatchers can only operate within a driver runtime environment,
-such as a driver host or a driver testing framework (for example,
-[`DriverTestLoopFixture`][driver-test-loop-fixture]).
+such as a driver host or a driver testing framework.
 
 A dispatcher mainly handles two tasks: it schedules asynchronous work to run on
 threads in a driver host (in response to a callback created by a driver or a
@@ -174,7 +173,6 @@ driver’s additional dispatchers before the driver’s `Stop()` hook is called.
 [driver-transport]: /docs/development/languages/fidl/tutorials/cpp/topics/driver-transport.md
 [async-lib]: https://cs.opensource.google/fuchsia/fuchsia/+/main:/zircon/system/ulib/async/README.md
 [driver-runtime]: /docs/concepts/drivers/driver_framework.md#driver_runtime
-[driver-test-loop-fixture]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/runtime/testing/loop_fixture/test_loop_fixture.h
 [async-cpp-task]: http://cs/fuchsia/zircon/system/ulib/async/include/lib/async/cpp/task.h
 [async-cpp-wait]: http://cs/fuchsia/zircon/system/ulib/async/include/lib/async/cpp/wait.h
 [driver-hook]: http://cs/fuchsia/src/lib/ddk/include/lib/ddk/driver.h

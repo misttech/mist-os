@@ -151,7 +151,7 @@ test("driver_runtime_shutdown_process_test") {
 test("fixture_test") {
   sources = [ "fixture_test.cc" ]
   deps = [
-    "//sdk/lib/driver/runtime/testing/loop_fixture:gtest",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/fxl/test:gtest_main",
   ]

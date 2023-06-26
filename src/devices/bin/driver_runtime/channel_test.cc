@@ -8,7 +8,7 @@
 #include <lib/async/task.h>
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/driver/runtime/testing/cpp/internal/test_dispatcher_builder.h>
-#include <lib/driver/testing/cpp/driver_runtime_env.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fdf/cpp/channel_read.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/cpp/env.h>
@@ -47,7 +47,7 @@ class ChannelTest : public RuntimeTestCase {
   void AllocateTestDataWithStartValue(fdf_arena_t* arena, size_t size, size_t start_value,
                                       void** out_data);
 
-  fdf_testing::DriverRuntimeEnv managed_env;
+  fdf_testing::DriverRuntime runtime;
 
   fdf::Channel local_;
   fdf::Channel remote_;

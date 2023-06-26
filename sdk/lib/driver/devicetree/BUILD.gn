@@ -41,7 +41,7 @@ test("devicetree-manager-test") {
     ":devicetree",
     "//sdk/lib/driver/legacy-bind-constants",
     "//sdk/lib/driver/logging/cpp",
-    "//sdk/lib/driver/runtime/testing/loop_fixture:gtest",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/bin/driver_runtime",
     "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",

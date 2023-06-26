@@ -61,7 +61,7 @@ class UsbCompositeTest : public zxtest::Test {
     composite_ = fake_parent_->GetLatestChild();
     dut_ = composite_->GetDeviceContext<usb_composite::UsbComposite>();
 
-    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [&]() {
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
       composite_->InitOp();
       EXPECT_OK(composite_->WaitUntilInitReplyCalled());
       EXPECT_TRUE(composite_->InitReplyCalled());
@@ -70,7 +70,7 @@ class UsbCompositeTest : public zxtest::Test {
   }
 
   void TearDown() override {
-    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [&]() {
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
       device_async_remove(composite_);
       mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
     });
@@ -113,9 +113,9 @@ class UsbCompositeTest : public zxtest::Test {
  private:
   void ExpectConfigureEndpoints();
 
-  fdf_testing::DriverRuntimeEnv managed_env_;
-  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
+  fdf::UnownedSynchronizedDispatcher dispatcher_ =
+      fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher();
 };
 
 constexpr struct interface_config_t {
