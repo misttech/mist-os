@@ -559,18 +559,22 @@ pub trait FidlRouteIpExt: Ip {
         + std::fmt::Debug
         + PartialEq
         + Unpin;
+    /// The "route" FIDL type to use for this IP version.
+    type Route: TryFrom<Route<Self>, Error = NetTypeConversionError>;
 }
 
 impl FidlRouteIpExt for Ipv4 {
     type StateMarker = fnet_routes::StateV4Marker;
     type WatcherMarker = fnet_routes::WatcherV4Marker;
     type WatchEvent = fnet_routes::EventV4;
+    type Route = fnet_routes::RouteV4;
 }
 
 impl FidlRouteIpExt for Ipv6 {
     type StateMarker = fnet_routes::StateV6Marker;
     type WatcherMarker = fnet_routes::WatcherV6Marker;
     type WatchEvent = fnet_routes::EventV6;
+    type Route = fnet_routes::RouteV6;
 }
 
 /// Dispatches either `GetWatcherV4` or `GetWatcherV6` on the state proxy.

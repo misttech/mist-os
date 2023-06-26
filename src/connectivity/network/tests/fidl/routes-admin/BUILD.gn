@@ -9,7 +9,6 @@ rustc_test("routes-admin") {
   output_name = "netstack_routes_admin_fidl_test"
   deps = [
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
-    "//sdk/fidl/fuchsia.net.routes.admin:fuchsia.net.routes.admin_rust",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/testing/netemul/rust:lib",
