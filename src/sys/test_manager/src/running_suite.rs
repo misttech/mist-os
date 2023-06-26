@@ -412,10 +412,6 @@ impl RunningSuite {
     /// Mark the resources associated with the suite for destruction, then wait for destruction to
     /// complete. Returns an error only if destruction fails.
     pub(crate) async fn destroy(self) -> Result<(), Error> {
-        // TODO(fxbug.dev/92769) Remove timeout once component manager hangs are removed.
-        // This value is set to be slightly longer than the shutdown timeout for tests (30 sec).
-        const TEARDOWN_TIMEOUT: zx::Duration = zx::Duration::from_seconds(32);
-
         let exposed_dir_fut = self.exposed_dir.close();
         let exposed_dir_close_task = fasync::Task::spawn(async move {
             let _ = exposed_dir_fut.await;
@@ -437,14 +433,13 @@ impl RunningSuite {
         if let Some(mock_ready_task) = self.mock_ready_task {
             mock_ready_task.await;
         }
-        futures::future::join_all(tokens_closed_signals)
-            .map(|_| Ok(()))
-            .on_timeout(TEARDOWN_TIMEOUT, || {
-                Err(anyhow!("Timeout waiting for clients to access storage"))
-            })
-            .await?;
+        futures::future::join_all(tokens_closed_signals).await;
 
         exposed_dir_close_task.await;
+
+        // TODO(fxbug.dev/92769) Remove timeout once component manager hangs are removed.
+        // This value is set to be slightly longer than the shutdown timeout for tests (30 sec).
+        const TEARDOWN_TIMEOUT: zx::Duration = zx::Duration::from_seconds(32);
 
         // Make the call to destroy the test, before destroying the entire realm. Once this
         // completes, it guarantees that any of its service providers (archivist, storage,
