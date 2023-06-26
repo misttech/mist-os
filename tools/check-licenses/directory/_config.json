@@ -37,6 +37,14 @@
             },
             {
                 "paths": [
+                    "prebuilt/third_party/sysroot/linux"
+                ],
+                "notes": [
+                    "Skip Linux sysroot directory, see fxbug.dev/59222."
+                ]
+            },
+            {
+                "paths": [
                     "prebuilt/third_party/bazel/linux-x64/install_base/embedded_tools/jdk/legal/java.base/ADDITIONAL_LICENSE_INFO",
                     "prebuilt/third_party/cmake/linux-x64/doc/cmake-3.25/cmliblzma/COPYING",
                     "prebuilt/third_party/cmake/linux-x64/share/cmake-3.25/Templates/CPack.GenericLicense.txt"
