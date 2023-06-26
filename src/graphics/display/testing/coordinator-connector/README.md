@@ -42,8 +42,8 @@ display coordinator connector. The child must be named
 `display-coordinator-connector` to make its capabilities be correctly routed.
 
 They should also include the corresponding shard component manifest file
-(`display_coordinator_provider.shard.cml` for the real connector, or
-`fake_display_coordinator_provider.shard.cml` for the fake connector) to route
+(`display_coordinator_connector.shard.cml` for the real connector, or
+`fake_display_coordinator_connector.shard.cml` for the fake connector) to route
 required capabilities to the `display-coordinator-connector` child.
 
 They should also explicitly offer the `fuchsia.hardware.display.Provider`
@@ -58,7 +58,7 @@ to the display coordinator connector, and providing the
 ```json5
 {
   include: [
-    "//src/graphics/display/testing/coordinator-provider/meta/fake_display_coordinator_provider.shard.cml",
+    "//src/graphics/display/testing/coordinator-connector/meta/fake_display_coordinator_connector.shard.cml",
   ],
   children: [
     {

@@ -47,8 +47,8 @@ group("tests") {
     "bin/display-tweak:tests",
     "drivers:tests",
     "lib:tests",
-    "testing/coordinator-provider:tests",
-    "testing/coordinator-provider-lib:tests",
+    "testing/coordinator-connector:tests",
+    "testing/coordinator-connector-lib:tests",
   ]
 }
 

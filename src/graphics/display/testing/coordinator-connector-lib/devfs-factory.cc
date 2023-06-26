@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/testing/coordinator-provider-lib/devfs-factory.h"
+#include "src/graphics/display/testing/coordinator-connector-lib/devfs-factory.h"
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>

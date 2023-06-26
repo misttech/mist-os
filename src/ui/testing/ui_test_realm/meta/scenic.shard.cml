@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/graphics/display/testing/coordinator-provider/meta/fake_display_coordinator_provider.shard.cml",
+        "//src/graphics/display/testing/coordinator-connector/meta/fake_display_coordinator_connector.shard.cml",
 
         // Defines a base set of services scenic uses and exposes.
         "//src/ui/meta/scenic_base_routes.shard.cml",

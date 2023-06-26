@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/testing/coordinator-provider/fake/service.h"
+#include "src/graphics/display/testing/coordinator-connector/fake/service.h"
 
 #include <lib/async/cpp/task.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>

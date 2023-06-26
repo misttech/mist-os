@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//tools/cmc/build/expect_includes.gni")
 
-group("coordinator-provider") {
+group("coordinator-connector") {
   testonly = true
   public_deps = [
     ":display-coordinator-connector",
@@ -20,7 +20,7 @@ group("tests") {
 
 fuchsia_component("fake-display-coordinator-connector-component") {
   testonly = true
-  manifest = "meta/fake_display_coordinator_provider.cml"
+  manifest = "meta/fake_display_coordinator_connector.cml"
   component_name = "display-coordinator-connector"
   deps = [ "fake:bin" ]
 }
@@ -32,7 +32,7 @@ fuchsia_package("fake-display-coordinator-connector") {
 }
 
 fuchsia_component("display-coordinator-connector-component") {
-  manifest = "meta/display_coordinator_provider.cml"
+  manifest = "meta/display_coordinator_connector.cml"
   component_name = "display-coordinator-connector"
   deps = [ "real:bin" ]
 }
@@ -43,11 +43,11 @@ fuchsia_package("display-coordinator-connector") {
 }
 
 expect_includes("fake-display-coordinator-connector-shard-includes") {
-  includes = [ "meta/fake_display_coordinator_provider.shard.cml" ]
+  includes = [ "meta/fake_display_coordinator_connector.shard.cml" ]
 }
 
 expect_includes("display-coordinator-connector-shard-includes") {
-  includes = [ "meta/display_coordinator_provider.shard.cml" ]
+  includes = [ "meta/display_coordinator_connector.shard.cml" ]
 }
 
 # Includes `fake-display-coordinator-connector-component` as a child component

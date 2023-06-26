@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/graphics/display/testing/coordinator-provider/meta/display_coordinator_provider.shard.cml",
+        "//src/graphics/display/testing/coordinator-connector/meta/display_coordinator_connector.shard.cml",
         "//src/ui/meta/a11y_routes.shard.cml",
         "//src/ui/meta/scene_manager_routes.shard.cml",
         "//src/ui/meta/scenic_routes.shard.cml",
