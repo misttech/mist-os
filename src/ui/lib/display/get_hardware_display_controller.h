@@ -8,7 +8,7 @@
 #ifndef SRC_UI_LIB_DISPLAY_GET_HARDWARE_DISPLAY_CONTROLLER_H_
 #define SRC_UI_LIB_DISPLAY_GET_HARDWARE_DISPLAY_CONTROLLER_H_
 
-#include "src/graphics/display/testing/coordinator-provider-lib/client-hlcpp.h"
+#include "src/graphics/display/testing/coordinator-provider-lib/client.h"
 
 namespace ui_display {
 

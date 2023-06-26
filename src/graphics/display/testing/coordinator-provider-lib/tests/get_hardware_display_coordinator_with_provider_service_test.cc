@@ -8,7 +8,7 @@
 
 #include <gtest/gtest.h>
 
-#include "src/graphics/display/testing/coordinator-provider-lib/client-hlcpp.h"
+#include "src/graphics/display/testing/coordinator-provider-lib/client.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
 namespace display {
