@@ -37,6 +37,10 @@ collection of Linux processes. This shared `starnix_kernel` instance manages all
 the state of the Linux programs in the container, such as file descriptor tables,
 a global virtual filesystem, and a table of running threads.
 
+For more information on the state shared between the Zircon processes
+that run the `starnix_kernel`, see the restricted mode [RFC][rfc] and
+[`ShareableProcessState`][shareable-state] struct.
+
 ![Shared Starnix instance](images/making-linux-syscalls-in-fuchsia-02.png "Diagram showing a shared instance of starnix_kernel")
 
 **Figure 2**. The `starnix_kernel` instance is shared across all Linux processes
@@ -126,6 +130,8 @@ loop {
 
 <!-- Reference links -->
 
+[rfc]: https://fuchsia-review.googlesource.com/c/fuchsia/+/688090
+[shareable-state]: https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/kernel/object/include/object/shareable_process_state.h
 [starnix-runner]: /docs/concepts/components/v2/starnix.md
 [starnix-readme]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/starnix/kernel/README.md
 [linux-container]: https://en.wikipedia.org/wiki/LXC
