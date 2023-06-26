@@ -9,6 +9,7 @@
 #include <zircon/types.h>
 
 #include <memory>
+#include <variant>
 
 #include "fuchsia/input/virtualkeyboard/cpp/fidl.h"
 #include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_controller.h"
@@ -106,8 +107,10 @@ void FidlBoundVirtualKeyboardCoordinator::RequestTypeAndVisibility(
     bool is_visible) {
   view_koid_to_pending_manager_config_[requestor_view_koid] =
       KeyboardConfig{.text_type = text_type, .is_visible = is_visible};
-  if (const auto applied_view_koid = ApplyFocusedRequest(); applied_view_koid.has_value()) {
-    if (applied_view_koid != requestor_view_koid) {
+
+  const auto result = ApplyFocusedRequest();
+  if (const zx_koid_t* applied_view_koid = std::get_if<zx_koid_t>(&result); applied_view_koid) {
+    if (*applied_view_koid != requestor_view_koid) {
       // If `requestor_view_koid` is focused, then `ApplyFocusedRequest()` should have
       // applied the request from `requestor_view_koid`. If some other view is focused,
       // that view's request should have been processed by a prior call to
@@ -117,11 +120,15 @@ void FidlBoundVirtualKeyboardCoordinator::RequestTypeAndVisibility(
       // on requests being made to other controllers.
       FX_LOGS(ERROR) << __FUNCTION__ << " expected to apply request for koid "
                      << requestor_view_koid << " but applied request for koid "
-                     << applied_view_koid.value();
+                     << *applied_view_koid;
     }
     FX_LOGS(INFO) << __FUNCTION__ << ": applied";
+  } else if (const std::string* reason = std::get_if<std::string>(&result); reason != nullptr) {
+    FX_LOGS(INFO) << __FUNCTION__
+                  << ": buffered request (requestor_view_koid=" << requestor_view_koid
+                  << ", reason=" << *reason << ")";
   } else {
-    FX_LOGS(INFO) << __FUNCTION__ << ": buffered";
+    FX_LOGS(ERROR) << __FUNCTION__ << ": unexpected result variant with index " << result.index();
   }
 }
 
@@ -159,7 +166,7 @@ void FidlBoundVirtualKeyboardCoordinator::NotifyFocusChange(
     controller->impl()->OnUserAction(VirtualKeyboardController::UserAction::HIDE_KEYBOARD);
   }
 
-  if (ApplyFocusedRequest().has_value()) {
+  if (std::holds_alternative<zx_koid_t>(ApplyFocusedRequest())) {
     FX_LOGS(INFO) << __FUNCTION__ << ": applied pending config";
   }
 }
@@ -174,7 +181,7 @@ void FidlBoundVirtualKeyboardCoordinator::BindManager(
   manager_binding_.emplace(std::move(manager), std::move(request));
   manager_binding_->set_error_handler(
       [this](zx_status_t status) { HandleManagerBindingError(status); });
-  if (ApplyFocusedRequest().has_value()) {
+  if (std::holds_alternative<zx_koid_t>(ApplyFocusedRequest())) {
     FX_LOGS(INFO) << __FUNCTION__ << ": applied pending config";
   }
 }
@@ -190,21 +197,18 @@ void FidlBoundVirtualKeyboardCoordinator::HandleManagerBindingError(zx_status_t 
                          fuchsia::input::virtualkeyboard::VisibilityChangeReason::USER_INTERACTION);
 }
 
-std::optional<zx_koid_t> FidlBoundVirtualKeyboardCoordinator::ApplyFocusedRequest() {
+std::variant<zx_koid_t, std::string> FidlBoundVirtualKeyboardCoordinator::ApplyFocusedRequest() {
   if (!manager_binding_) {
-    FX_LOGS(DEBUG) << __FUNCTION__ << ": no manager binding";
-    return {};
+    return "no manager binding";
   }
   if (!focused_view_koid_.has_value()) {
-    FX_LOGS(DEBUG) << __FUNCTION__ << ": no focused view koid";
-    return {};
+    return "no focused view koid";
   }
 
   zx_koid_t view_koid = focused_view_koid_.value();
   auto pending_config = view_koid_to_pending_manager_config_.extract(view_koid);
   if (pending_config.empty()) {
-    FX_LOGS(DEBUG) << __FUNCTION__ << ": no pending config for " << view_koid;
-    return {};
+    return "no pending config for focused_view_koid_ " + std::to_string(view_koid);
   }
   manager_binding_->impl()->SetTypeAndVisibility(pending_config.mapped().text_type,
                                                  pending_config.mapped().is_visible);

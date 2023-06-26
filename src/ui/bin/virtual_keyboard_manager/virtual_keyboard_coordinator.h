@@ -114,8 +114,9 @@ class FidlBoundVirtualKeyboardCoordinator
   // Also clears the entry for `focused_view_koid_` in the map,
   // if it exists.
   //
-  // Returns the KOID of the View whose request was applied, if any.
-  std::optional<zx_koid_t> ApplyFocusedRequest();
+  // Returns the KOID of the View whose request was applied, or
+  // a string describing why the request was not applied.
+  std::variant<zx_koid_t, std::string> ApplyFocusedRequest();
 
   fidl::BindingSet<fuchsia::input::virtualkeyboard::ControllerCreator> creator_bindings_;
   fidl::BindingSet<fuchsia::input::virtualkeyboard::Controller,
