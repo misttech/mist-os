@@ -732,7 +732,12 @@ impl AudioDaemon {
             };
             match request_result {
                 Ok(_) => println!("Request succeeded."),
-                Err(e) => println!("Request {request_name} failed with error {e}"),
+                Err(e) => {
+                    let error_msg = format!("Request {request_name} failed with error {e} \n");
+                    println!("{}", &error_msg);
+                    let mut async_stderr_writer = fidl::AsyncSocket::from_socket(stderr_local)?;
+                    let _ = async_stderr_writer.write_all(error_msg.as_bytes()).await;
+                }
             }
         }
         Ok(())
