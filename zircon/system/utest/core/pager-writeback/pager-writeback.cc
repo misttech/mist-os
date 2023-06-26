@@ -7565,6 +7565,22 @@ TEST(PagerWriteback, InvalidQuery) {
   zx_pager_vmo_stats_t stats = {};
   ASSERT_EQ(ZX_ERR_INVALID_ARGS,
             zx_pager_query_vmo_stats(pager.get(), vmo.get(), 100, &stats, sizeof(stats)));
+
+  // buffer too small
+  ASSERT_EQ(ZX_ERR_BUFFER_TOO_SMALL,
+            zx_pager_query_vmo_stats(pager.get(), vmo.get(), 0, &stats, 0));
+
+  // invalid buffer
+  // Dirty a page first, so the query has something to enumerate.
+  ASSERT_OK(
+      zx_pager_supply_pages(pager.get(), vmo.get(), 0, zx_system_get_page_size(), vmo2.get(), 0));
+  uint64_t data = 42;
+  ASSERT_OK(vmo.write(&data, 0, sizeof(data)));
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_pager_query_dirty_ranges(pager.get(), vmo.get(), 0, zx_system_get_page_size(),
+                                        nullptr, sizeof(zx_vmo_dirty_range_t), nullptr, nullptr));
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_pager_query_vmo_stats(pager.get(), vmo.get(), 0, nullptr, sizeof(stats)));
 }
 
 }  // namespace pager_tests

@@ -75,7 +75,9 @@ value is returned.
 **ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_READ**.
 
 **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*, or *options* is neither 0 or
-**ZX_PAGER_RESET_VMO_STATS**.
+**ZX_PAGER_RESET_VMO_STATS**, or *buffer* is an invalid pointer.
+
+**ZX_ERR_BUFFER_TOO_SMALL** *buffer_size* is not large enough to accommodate `zx_pager_vmo_stats_t`.
 
 ## See also
 

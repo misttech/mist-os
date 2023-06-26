@@ -116,7 +116,8 @@ error value is returned.
 
 **ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_READ**.
 
-**ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*.
+**ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*, or *buffer* is an invalid
+pointer.
 
 **ZX_ERR_OUT_OF_RANGE** The specified range in *pager_vmo* is invalid.
 

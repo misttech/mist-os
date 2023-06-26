@@ -214,6 +214,7 @@ zx_status_t PagerDispatcher::QueryDirtyRanges(VmAspace* current_aspace, fbl::Ref
         // Stash fault information if a fault is encountered. Return early from enumeration with
         // ZX_ERR_SHOULD_WAIT so that the page fault can be resolved.
         if (copy_result.status != ZX_OK) {
+          DEBUG_ASSERT(copy_result.fault_info.has_value());
           info.captured_fault_info = true;
           info.pf_va = copy_result.fault_info->pf_va;
           info.pf_flags = copy_result.fault_info->pf_flags;
@@ -244,7 +245,7 @@ zx_status_t PagerDispatcher::QueryDirtyRanges(VmAspace* current_aspace, fbl::Ref
       DEBUG_ASSERT(info.captured_fault_info);
       zx_status_t fault_status = current_aspace->SoftFault(info.pf_va, info.pf_flags);
       if (fault_status != ZX_OK) {
-        return fault_status;
+        return ZX_ERR_INVALID_ARGS;
       }
       // Reset |captured_fault_info| so that a future page fault can set it again.
       info.captured_fault_info = false;
@@ -301,7 +302,7 @@ zx_status_t PagerDispatcher::QueryPagerVmoStats(VmAspace* current_aspace, fbl::R
     zx_status_t fault_status =
         current_aspace->SoftFault(copy_result.fault_info->pf_va, copy_result.fault_info->pf_flags);
     if (fault_status != ZX_OK) {
-      return fault_status;
+      return ZX_ERR_INVALID_ARGS;
     }
   } while (true);
 
