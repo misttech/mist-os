@@ -1,0 +1,22 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Tested in //src/zircon/tests/profile/role-api.cc.
+
+config("include") {
+  include_dirs = [ "include" ]
+}
+
+source_set("cpp") {
+  public = [ "include/lib/scheduler/role.h" ]
+  sources = [ "role.cc" ]
+
+  public_configs = [ ":include" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
+    "//sdk/lib/component/incoming/cpp:cpp",
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/zx",
+  ]
+}
