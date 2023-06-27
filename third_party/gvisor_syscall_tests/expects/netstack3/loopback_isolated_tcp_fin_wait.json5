@@ -13,10 +13,23 @@
             include: "../loopback_isolated_tcp_fin_wait_filter.json5",
         },
         {
-            type: "skip",
+            type: "expect_failure",
             matchers: [
-                // Currently NS3 can't run the FinWait suite.
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/*",
+                // Netstack3 does not support dual-stack TCP sockets yet.
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.*/ListenV6Any_ConnectV4MappedLoopback",
             ],
         },
     ],

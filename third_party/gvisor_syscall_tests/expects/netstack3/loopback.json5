@@ -12,18 +12,23 @@
         {
             type: "expect_failure",
             matchers: [
+                "All/SocketInetLoopbackTest.TCPResetAfterClose/*",
+
                 // Netstack3 does not have complete support for multicast sockets.
                 "BadSocketPairArgs.ValidateErrForBadCallsToSocketPair",
                 "SocketInetLoopbackTest.LoopbackAddressRangeConnect",
+
                 // Netstack3 does not support SO_REUSEADDR and only partially supports
                 // SO_REUSEPORT for UDP sockets.
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.NoReusePortFollowingReusePort/TCP",
+
                 // Netstack3 does not support dual-stack sockets.
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReservesEverything/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4EphemeralPortReserved/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedAnyOnlyReservesV4/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedEphemeralPortReserved/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedLoopbackOnlyReservesV4/*",
+
                 // Netstack3 does not fully support TCP (yet).
                 "All/SocketInetLoopbackTest.TCP/*",
                 "All/SocketInetLoopbackTest.TCPInfoState/*",
@@ -54,12 +59,14 @@
                 "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Any_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Any_ConnectV4MappedAny",
                 "All/SocketInetReusePortTest.TcpPortReuseMultiThread/*",
+
                 // Netstack3 does not have complete support for multicast sockets.
                 "BadSocketPairArgs.ValidateErrForBadCallsToSocketPair",
                 "SocketInetLoopbackTest.LoopbackAddressRangeConnect",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.PortReuseTwoSockets/TCP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6EphemeralPortReserved/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6OnlyV6AnyReservesV6/*",
+
                 // TODO(https://fxbug.dev/21198): Netstack3 doesn't have dual-stack sockets.
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedAny",
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Loopback_ConnectV4MappedLoopback",
@@ -85,6 +92,21 @@
                 "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4MappedLoopback_ConnectV4Loopback",
                 "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4Any_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV6Any_ConnectV4Any",
+
                 // TODO(https://fxbug.dev/113481): Netstack3 does not interpret listener
                 // backlog exactly as Linux does.
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedAny",
@@ -106,9 +128,11 @@
             matchers: [
                 // Skip tests run by loopback_tcp_accept_backlog_listen_* targets
                 "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/Listen*",
+
                 // Skip tests run by loopback_tcp_accept_backlog target
                 "All/SocketInetLoopbackTest.TCPBacklog/*",
                 "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/*",
+
                 // Skip tests run by loopback_tcp_accept target
                 "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/*",
                 "All/SocketInetLoopbackTest.TCPAcceptAfterReset/*",
@@ -118,24 +142,40 @@
                 // Netstack3 does not support SO_REUSEADDR and only partially supports
                 // SO_REUSEPORT for UDP sockets.
                 "All/SocketInetReusePortTest.UdpPortReuseMultiThread/*",
+
                 // Netstack3 does not support dual-stack sockets.
                 "All/DualStackSocketTest.AddressOperations/*",
                 "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV4Loopback_ConnectV4MappedLoopback",
                 "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV6Any_ConnectV4Loopback",
+
                 // Cases fail on TCP.
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReuseAddrDoesNotReserveV4Any/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyWithListenReservesEverything/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReuseAddrListenReservesV4Any/*",
-                // Skip tests that will otherwise hang forever.
-                // TODO(b/245940107): un-skip some of these when the data path is ready.
-                "All/SocketInetLoopbackTest.TCPResetAfterClose/*",
-                "All/SocketInetLoopbackTest.TCPListenClose/*",
-                "All/SocketInetLoopbackTest.TCPListenUnbound/*",
+
+                // TODO(https://fxbug.dev/21198): Netstack3 doesn't have dual-stack sockets.
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenClose/ListenV6Any_ConnectV4Any",
+
                 // TODO(https://fxbug.dev/118516): This test sometimes times out in CI.
                 "All/SocketInetLoopbackTest.TCPListenShutdownListen/*",
+
                 // TODO(https://fxbug.dev/113481): Netstack3 does not interpret listener
                 // backlog exactly as Linux does.
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4Loopback",
+
                 // Netstack3 does not interpret listener backlog exactly as Linux does.
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4Any",
             ],
