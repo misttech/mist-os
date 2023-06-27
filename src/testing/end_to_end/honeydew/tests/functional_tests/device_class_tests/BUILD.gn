@@ -16,15 +16,10 @@ if (is_host) {
     ]
   }
 
-  group("nuc_tests") {
-    testonly = true
-    public_deps = [ "test_x64:x64_test($host_toolchain)" ]
-  }
-
   group("nuc_tests_fyi") {
     testonly = true
     public_deps = [
-      ":nuc_tests",
+      "test_x64:x64_test($host_toolchain)",
       "test_x64:x64_test_fc($host_toolchain)",
     ]
   }
