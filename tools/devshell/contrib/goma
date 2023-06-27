@@ -73,22 +73,12 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/va
 
 set -euo pipefail
 
-readonly GOMA_AUTH="$PREBUILT_GOMA_DIR/goma_auth.py"
-readonly GOMA_CTL="$PREBUILT_GOMA_DIR/goma_ctl.py"
-readonly GOMACC="$PREBUILT_GOMA_DIR/gomacc"
-readonly PYTHON_CMD="$PREBUILT_PYTHON3_DIR/bin/python3.8"
 
 if [[ -z "${GOMA_LOCAL_OUTPUT_CACHE_DIR+x}" ]]; then
   GOMA_CACHE_DIR="${FUCHSIA_DIR}/.jiri_root/goma_cache"
 else
   # inherit the local cache dir from the environment if already set
   GOMA_CACHE_DIR="$GOMA_LOCAL_OUTPUT_CACHE_DIR"
-fi
-
-if [[ ! -x "$GOMA_AUTH" || ! -x "$GOMA_CTL" ]]; then
-  echo "*** $PREBUILT_GOMA_DIR is not current."
-  echo "*** Be sure to run \`jiri fetch-packages\` or \`jiri update\`."
-  exit 1
 fi
 
 function main {
@@ -140,9 +130,9 @@ function main {
   check
   check-build $update
 
-  "$PYTHON_CMD" "$GOMA_AUTH" info || "$PYTHON_CMD" "$GOMA_AUTH" login "$@"
-  if "$PYTHON_CMD" "$GOMA_CTL" status; then
-    "$PYTHON_CMD" "$GOMA_CTL" update_hook
+  fx-command-run goma_auth info || fx-command-run goma_auth login "$@"
+  if fx-command-run goma_ctl status; then
+    fx-command-run goma_ctl update_hook
     return 0
   fi
   goma_tmp_dir=""
@@ -173,11 +163,11 @@ function main {
     echo ""
   fi
 
-  GOMA_ARBITRARY_TOOLCHAIN_SUPPORT="$use_ats" GOMACTL_USE_PROXY="$use_http2" GOMA_LOCAL_OUTPUT_CACHE_DIR="$goma_tmp_dir" "$PYTHON_CMD" "$GOMA_CTL" ensure_start
+  GOMA_ARBITRARY_TOOLCHAIN_SUPPORT="$use_ats" GOMACTL_USE_PROXY="$use_http2" GOMA_LOCAL_OUTPUT_CACHE_DIR="$goma_tmp_dir" fx-command-run goma_ctl ensure_start
 }
 
 function kill-goma {
-  "$PYTHON_CMD" "$GOMA_CTL" ensure_stop
+  fx-command-run goma_ctl ensure_stop
 }
 
 # TODO(mcgrathr): Remove this after some period when old installs are gone.
@@ -189,14 +179,15 @@ function check {
     echo "*** But check your dot files to make sure it's not set at login."
   fi
 
-  local goma_dir="$("$PYTHON_CMD" "$GOMA_CTL" goma_dir 2> /dev/null)"
+  local goma_dir running_goma_version prebuilt_goma_version
+  goma_dir="$(fx-command-run goma_ctl goma_dir 2> /dev/null)"
   if [[ -d "$goma_dir" && \
         "$(cd "$goma_dir" && /bin/pwd)" = "$(cd "$PREBUILT_GOMA_DIR" && /bin/pwd)" ]]; then
     return 0
   fi
   # Running goma has different directory than current one, test the versions.
-  local running_goma_version="$("$goma_dir"/compiler_proxy --version)"
-  local prebuilt_goma_version="$("$PREBUILT_GOMA_DIR"/compiler_proxy --version)"
+  running_goma_version="$("$goma_dir"/compiler_proxy --version)"
+  prebuilt_goma_version="$("$PREBUILT_GOMA_DIR"/compiler_proxy --version)"
   if [[ "$running_goma_version" = "$prebuilt_goma_version" ]]; then
     # Running daemon has same version string as one from prebuilt.
     return 0
