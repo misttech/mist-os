@@ -5,7 +5,7 @@
 use std::{
     collections::{HashMap, VecDeque},
     mem::size_of,
-    sync::{Arc, Weak},
+    sync::Arc,
 };
 use zerocopy::AsBytes;
 
@@ -44,13 +44,11 @@ pub struct InotifyWatcher {
     pub watch_id: WdNumber,
 
     pub mask: InotifyMask,
-
-    pub inotify: Weak<FileObject>,
 }
 
 #[derive(Default)]
 pub struct InotifyWatchers {
-    watchers: Mutex<Vec<InotifyWatcher>>,
+    watchers: Mutex<HashMap<WeakKey<FileObject>, InotifyWatcher>>,
 }
 
 // Serialized to inotify_event, see inotify(7).
@@ -87,23 +85,27 @@ impl InotifyFileObject {
         &self,
         dir_entry: DirEntryHandle,
         mask: InotifyMask,
-        inotify_file: Weak<FileObject>,
+        inotify_file: &Arc<FileObject>,
     ) -> Result<WdNumber, Errno> {
+        let weak_key = WeakKey::from(inotify_file);
+        if let Some(watch_id) = dir_entry.node.watchers.maybe_update(mask, &weak_key)? {
+            return Ok(watch_id);
+        }
+
         let watch_id;
         {
             let mut state = self.state.lock();
-            // TODO(fxbug.dev/79283): Need to check if watch already exists on the FsNode.
             watch_id = state.next_watch_id();
             state.watches.insert(watch_id, dir_entry.clone());
         }
-        dir_entry.node.watchers.add(mask, watch_id, inotify_file);
+        dir_entry.node.watchers.add(mask, watch_id, weak_key);
         Ok(watch_id)
     }
 
     /// Removes a watch to the inotify instance.
     ///
     /// Detaches the corresponding InotifyWatcher from FsNode.
-    pub fn remove_watch(&self, watch_id: WdNumber, file: Weak<FileObject>) -> Result<(), Errno> {
+    pub fn remove_watch(&self, watch_id: WdNumber, file: &Arc<FileObject>) -> Result<(), Errno> {
         let dir_entry;
         {
             let mut state = self.state.lock();
@@ -115,7 +117,7 @@ impl InotifyFileObject {
                 FsString::new(),
             ));
         }
-        dir_entry.node.watchers.remove(file);
+        dir_entry.node.watchers.remove(&WeakKey::from(file));
         Ok(())
     }
 
@@ -261,19 +263,53 @@ impl InotifyEvent {
 }
 
 impl InotifyWatchers {
-    fn add(&self, mask: InotifyMask, watch_id: WdNumber, inotify: Weak<FileObject>) {
+    fn add(&self, mask: InotifyMask, watch_id: WdNumber, inotify: WeakKey<FileObject>) {
         let mut watchers = self.watchers.lock();
-        watchers.push(inotify::InotifyWatcher { watch_id, mask, inotify });
+        watchers.insert(inotify, inotify::InotifyWatcher { watch_id, mask });
     }
 
-    fn remove(&self, inotify: Weak<FileObject>) {
+    // Checks if inotify is already part of watchers. Replaces mask if found and returns the WdNumber.
+    // Combines mask if IN_MASK_ADD is specified in mask. Returns None if no present in watchers.
+    //
+    // Errors if:
+    //  - both IN_MASK_ADD and IN_MASK_CREATE are specified in mask, or
+    //  - IN_MASK_CREATE is specified and existing entry is found.
+    fn maybe_update(
+        &self,
+        mask: InotifyMask,
+        inotify: &WeakKey<FileObject>,
+    ) -> Result<Option<WdNumber>, Errno> {
+        let combine_existing = mask.contains(InotifyMask::MASK_ADD);
+        let create_new = mask.contains(InotifyMask::MASK_CREATE);
+        if combine_existing && create_new {
+            return error!(EINVAL);
+        }
+
         let mut watchers = self.watchers.lock();
-        watchers.retain(|watcher| !watcher.inotify.ptr_eq(&inotify));
+        if let Some(watcher) = watchers.get_mut(inotify) {
+            if create_new {
+                return error!(EEXIST);
+            }
+
+            if combine_existing {
+                watcher.mask.insert(mask);
+            } else {
+                watcher.mask = mask;
+            }
+            Ok(Some(watcher.watch_id))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn remove(&self, inotify: &WeakKey<FileObject>) {
+        let mut watchers = self.watchers.lock();
+        watchers.remove(inotify);
     }
 
     fn remove_by_ref(&self, inotify: &FileObject) {
         let mut watchers = self.watchers.lock();
-        watchers.retain(|watcher| watcher.inotify.as_ptr() != inotify as *const _);
+        watchers.retain(|weak_key, _| weak_key.0.as_ptr() != inotify as *const _);
     }
 
     /// Notifies all watchers that have the specified event mask.
@@ -282,9 +318,9 @@ impl InotifyWatchers {
         let mut watch_id_to_files: Vec<(WdNumber, Arc<FileObject>)> = vec![];
         {
             let watchers = self.watchers.lock();
-            for watcher in &(*watchers) {
+            for (inotify, watcher) in &(*watchers) {
                 if watcher.mask.contains(event_mask) {
-                    if let Some(file) = watcher.inotify.upgrade() {
+                    if let Some(file) = inotify.0.upgrade() {
                         watch_id_to_files.push((watcher.watch_id, file.clone()));
                     }
                 }
@@ -338,9 +374,7 @@ mod tests {
 
         // Use root as the watched directory.
         let root = current_task.fs().root().entry;
-        assert!(inotify
-            .add_watch(root.clone(), InotifyMask::ALL_EVENTS, Arc::downgrade(&file))
-            .is_ok());
+        assert!(inotify.add_watch(root.clone(), InotifyMask::ALL_EVENTS, &file).is_ok());
 
         {
             let watchers = root.node.watchers.watchers.lock();
@@ -386,6 +420,60 @@ mod tests {
         {
             let state = inotify.state.lock();
             assert_eq!(state.events.len(), 0);
+        }
+    }
+
+    #[::fuchsia::test]
+    async fn inotify_on_same_file() {
+        let (_kernel, current_task) = create_kernel_and_task();
+
+        let file = InotifyFileObject::new_file(&current_task, true);
+        let file_key = WeakKey::from(&file);
+        let inotify =
+            file.downcast_file::<InotifyFileObject>().expect("failed to downcast to inotify");
+
+        // Use root as the watched directory.
+        let root = current_task.fs().root().entry;
+
+        // Cannot add with both MASK_ADD and MASK_CREATE.
+        assert!(inotify
+            .add_watch(
+                root.clone(),
+                InotifyMask::MODIFY | InotifyMask::MASK_ADD | InotifyMask::MASK_CREATE,
+                &file
+            )
+            .is_err());
+
+        assert!(inotify
+            .add_watch(root.clone(), InotifyMask::MODIFY | InotifyMask::MASK_CREATE, &file)
+            .is_ok());
+
+        {
+            let watchers = root.node.watchers.watchers.lock();
+            assert_eq!(watchers.len(), 1);
+            assert!(watchers.get(&file_key).unwrap().mask.contains(InotifyMask::MODIFY));
+        }
+
+        // Replaces existing mask.
+        assert!(inotify.add_watch(root.clone(), InotifyMask::ACCESS, &file).is_ok());
+
+        {
+            let watchers = root.node.watchers.watchers.lock();
+            assert_eq!(watchers.len(), 1);
+            assert!(watchers.get(&file_key).unwrap().mask.contains(InotifyMask::ACCESS));
+            assert!(!watchers.get(&file_key).unwrap().mask.contains(InotifyMask::MODIFY));
+        }
+
+        // Merges with existing mask.
+        assert!(inotify
+            .add_watch(root.clone(), InotifyMask::MODIFY | InotifyMask::MASK_ADD, &file)
+            .is_ok());
+
+        {
+            let watchers = root.node.watchers.watchers.lock();
+            assert_eq!(watchers.len(), 1);
+            assert!(watchers.get(&file_key).unwrap().mask.contains(InotifyMask::ACCESS));
+            assert!(watchers.get(&file_key).unwrap().mask.contains(InotifyMask::MODIFY));
         }
     }
 }

@@ -149,7 +149,6 @@
                 "Inotify.CreatingFileGeneratesEvents",
                 "Inotify.DeletingChildGeneratesEvents",
                 "Inotify.InOnlyDirFlagRespected",
-                "Inotify.MaskAddMergesWithExistingEventMask",
                 "Inotify.RmdirOnWatchedTargetGeneratesEvent",
                 "Inotify.ChildrenDeletionInWatchedDirGeneratesEvent",
                 "Inotify.CoalesceEvents",

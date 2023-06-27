@@ -2120,7 +2120,7 @@ pub fn sys_inotify_add_watch(
     let inotify_file = file.downcast_file::<InotifyFileObject>().ok_or_else(|| errno!(EINVAL))?;
     let watched_node =
         lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
-    inotify_file.add_watch(watched_node.entry, mask, Arc::downgrade(&file))
+    inotify_file.add_watch(watched_node.entry, mask, &file)
 }
 
 pub fn sys_inotify_rm_watch(
@@ -2130,7 +2130,7 @@ pub fn sys_inotify_rm_watch(
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let inotify_file = file.downcast_file::<InotifyFileObject>().ok_or_else(|| errno!(EINVAL))?;
-    inotify_file.remove_watch(watch_id, Arc::downgrade(&file))
+    inotify_file.remove_watch(watch_id, &file)
 }
 
 pub fn sys_utimensat(
