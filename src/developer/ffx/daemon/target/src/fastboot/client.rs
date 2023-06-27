@@ -526,7 +526,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
                 ADMIN_MONIKER,
                 AdminMarker::PROTOCOL_NAME,
                 server_end.into_channel(),
-                OpenFlags::RIGHT_READABLE,
+                OpenFlags::empty(),
             )
             .await?
             .map(|_| proxy)

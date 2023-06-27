@@ -13,7 +13,7 @@ use ffx_daemon_target::{
 };
 use ffx_ssh::ssh::get_ssh_key_paths;
 use fidl::{
-    endpoints::{ProtocolMarker, ServerEnd},
+    endpoints::{DiscoverableProtocolMarker as _, ServerEnd},
     Error,
 };
 use fidl_fuchsia_developer_ffx::{
@@ -80,9 +80,9 @@ impl RebootController {
             .await?
             .connect_capability(
                 ADMIN_MONIKER,
-                AdminMarker::DEBUG_NAME,
+                AdminMarker::PROTOCOL_NAME,
                 server_end.into_channel(),
-                OpenFlags::RIGHT_READABLE,
+                OpenFlags::empty(),
             )
             .await?
             .map(|_| proxy)

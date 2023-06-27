@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Context as _, Result};
 use errors;
-use fidl::{endpoints::ProtocolMarker, prelude::*};
+use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::{
     ConnectCapabilityError, IdentifyHostError, RemoteControlMarker, RemoteControlProxy,
@@ -145,7 +145,7 @@ async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsEr
             "/core/remote-control",
             RemoteControlMarker::PROTOCOL_NAME,
             knock_remote,
-            OpenFlags::RIGHT_READABLE,
+            OpenFlags::empty(),
         )
         .await?
         .map_err(|e| KnockRcsError::RcsConnectCapabilityError(e))?;
@@ -164,12 +164,8 @@ pub async fn connect_with_timeout_at(
     rcs_proxy: &RemoteControlProxy,
     server_end: fidl::Channel,
 ) -> Result<()> {
-    let connect_capability_fut = rcs_proxy.connect_capability(
-        moniker,
-        capability_name,
-        server_end,
-        OpenFlags::RIGHT_READABLE,
-    );
+    let connect_capability_fut =
+        rcs_proxy.connect_capability(moniker, capability_name, server_end, OpenFlags::empty());
     timeout::timeout(dur, connect_capability_fut
         .map_ok_or_else(|e| Result::<(), anyhow::Error>::Err(anyhow::anyhow!(e)), |fidl_result| {
             fidl_result.map(|_| ()).map_err(|e| {
@@ -209,11 +205,11 @@ If you have encountered what you think is a bug, Please report it at http://fxbu
 To diagnose the issue, use `ffx doctor`.").into()).and_then(|r| r)
 }
 
-pub async fn connect_with_timeout<P: ProtocolMarker>(
+pub async fn connect_with_timeout<P: DiscoverableProtocolMarker>(
     dur: Duration,
     moniker: &str,
     rcs_proxy: &RemoteControlProxy,
     server_end: fidl::Channel,
 ) -> Result<()> {
-    connect_with_timeout_at(dur, moniker, P::DEBUG_NAME, rcs_proxy, server_end).await
+    connect_with_timeout_at(dur, moniker, P::PROTOCOL_NAME, rcs_proxy, server_end).await
 }

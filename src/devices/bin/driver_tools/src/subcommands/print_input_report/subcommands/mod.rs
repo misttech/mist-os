@@ -28,7 +28,7 @@ fn connect_to_input_device(
         .as_os_str()
         .to_str()
         .ok_or(anyhow::anyhow!("Failed to get device path string"))?;
-    dev.open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), device_path, server)
+    dev.open(fio::OpenFlags::empty(), fio::ModeType::empty(), device_path, server)
         .context("Failed to open device file")?;
     Ok(fir::InputDeviceProxy::new(proxy.into_channel().unwrap()))
 }
@@ -40,7 +40,7 @@ async fn get_all_input_device_paths(
     let input_device_dir = fuchsia_fs::directory::open_directory_no_describe(
         &dev,
         INPUT_DEVICE_DIR,
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::empty(),
     )
     .with_context(|| format!("Failed to open {}", INPUT_DEVICE_DIR))?;
     let input_device_paths = device_watcher::watch_for_files(&input_device_dir)

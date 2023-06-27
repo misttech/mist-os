@@ -422,7 +422,7 @@ impl<'a> Logger<'a> {
                 BRIDGE_MONIKER,
                 RemoteDiagnosticsBridgeMarker::PROTOCOL_NAME,
                 log_server_end.into_channel(),
-                OpenFlags::RIGHT_READABLE,
+                OpenFlags::empty(),
             )
             .await?
         {

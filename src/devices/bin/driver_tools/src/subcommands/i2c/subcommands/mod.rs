@@ -8,25 +8,27 @@ pub mod transact;
 pub mod write;
 
 use {
-    anyhow::{Context, Result},
-    fidl::endpoints::Proxy,
+    anyhow::{Context as _, Result},
     fidl_fuchsia_hardware_i2c as fi2c, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
-    std::{convert::AsRef, fmt::Debug, path::Path},
+    std::path::Path,
 };
 
 fn connect_to_i2c_device(
-    device_path: impl AsRef<Path> + Debug,
+    device_path: impl AsRef<Path>,
     root: &fio::DirectoryProxy,
 ) -> Result<fi2c::DeviceProxy> {
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>()?;
-    let device_path = device_path
-        .as_ref()
-        .as_os_str()
-        .to_str()
-        .ok_or(anyhow::anyhow!("Failed to get device path string"))?;
-    root.open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), device_path, server)
+    let device_path =
+        device_path.as_ref().to_str().ok_or(anyhow::anyhow!("Failed to get device path string"))?;
+    let (proxy, server) = fidl::endpoints::create_proxy::<fi2c::DeviceMarker>()?;
+    let () = root
+        .open(
+            fio::OpenFlags::empty(),
+            fio::ModeType::empty(),
+            device_path,
+            fidl::endpoints::ServerEnd::new(server.into_channel()),
+        )
         .context("Failed to open I2C device file")?;
-    Ok(fi2c::DeviceProxy::new(proxy.into_channel().unwrap()))
+    Ok(proxy)
 }
 
 async fn read_byte_from_i2c_device(device: &fi2c::DeviceProxy, address: &[u8]) -> Result<u8> {

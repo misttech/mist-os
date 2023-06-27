@@ -20,7 +20,7 @@ use {
     ffx_core::ffx_plugin,
     ffx_profile_memory_args::MemoryCommand,
     ffx_writer::Writer,
-    fidl::endpoints::ProtocolMarker,
+    fidl::endpoints::DiscoverableProtocolMarker,
     fidl::Socket,
     fidl_fuchsia_developer_remotecontrol as rc,
     fidl_fuchsia_io::OpenFlags,
@@ -63,22 +63,22 @@ impl JsonCollector for DeprecatedJsonCollectorImpl {
 }
 
 /// Connect to a protocol on a remote device using the remote control proxy.
-async fn remotecontrol_connect<S: ProtocolMarker>(
+async fn remotecontrol_connect<S: DiscoverableProtocolMarker>(
     remote_control: &rc::RemoteControlProxy,
     moniker: &str,
 ) -> Result<S::Proxy> {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
-        .with_context(|| format!("failed to create proxy to {}", S::DEBUG_NAME))?;
+        .with_context(|| format!("failed to create proxy to {}", S::PROTOCOL_NAME))?;
     remote_control
         .connect_capability(
             moniker,
-            S::DEBUG_NAME,
+            S::PROTOCOL_NAME,
             server_end.into_channel(),
-            OpenFlags::RIGHT_READABLE,
+            OpenFlags::empty(),
         )
         .await?
         .map_err(|e| {
-            anyhow::anyhow!("failed to connect to {} at {}: {:?}", S::DEBUG_NAME, moniker, e)
+            anyhow::anyhow!("failed to connect to {} at {}: {:?}", S::PROTOCOL_NAME, moniker, e)
         })?;
     Ok(proxy)
 }

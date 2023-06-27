@@ -233,7 +233,7 @@ impl DaemonProtocolProvider for Daemon {
 
         // TODO(awdavies): Handle these errors properly so the client knows what happened.
         rcs.proxy
-            .connect_capability(moniker, capability_name, server, OpenFlags::RIGHT_READABLE)
+            .connect_capability(moniker, capability_name, server, OpenFlags::empty())
             .await
             .context("FIDL connection")?
             .map_err(|e| anyhow!("{:#?}", e))

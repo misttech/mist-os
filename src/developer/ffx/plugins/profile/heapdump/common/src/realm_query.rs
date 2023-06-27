@@ -66,7 +66,7 @@ pub async fn connect_to_collector(
             &moniker,
             fheapdump_client::CollectorMarker::PROTOCOL_NAME,
             collector_server.into_channel(),
-            OpenFlags::RIGHT_READABLE,
+            OpenFlags::empty(),
         )
         .await?
         .map_err(|err| {

@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use component_debug::capability;
 use ffx_driver_args::DriverCommand;
 use fho::{FfxMain, FfxTool, SimpleWriter};
-use fidl::endpoints::ProtocolMarker;
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 use fidl_fuchsia_developer_remotecontrol as rc;
 use fidl_fuchsia_device_manager as fdm;
 use fidl_fuchsia_driver_development as fdd;
@@ -20,10 +20,29 @@ struct DriverConnector {
     remote_control: Option<rc::RemoteControlProxy>,
 }
 
-#[derive(Default)]
 struct CapabilityOptions {
-    capability_name: Option<&'static str>,
-    default_capability_name_for_query: Option<&'static str>,
+    capability_name: &'static str,
+    default_capability_name_for_query: &'static str,
+}
+
+struct DiscoverableCapabilityOptions<P> {
+    _phantom: std::marker::PhantomData<P>,
+}
+
+// #[derive(Default)] imposes a spurious P: Default bound.
+impl<P> Default for DiscoverableCapabilityOptions<P> {
+    fn default() -> Self {
+        Self { _phantom: Default::default() }
+    }
+}
+
+impl<P: DiscoverableProtocolMarker> Into<CapabilityOptions> for DiscoverableCapabilityOptions<P> {
+    fn into(self) -> CapabilityOptions {
+        CapabilityOptions {
+            capability_name: P::PROTOCOL_NAME,
+            default_capability_name_for_query: P::PROTOCOL_NAME,
+        }
+    }
 }
 
 impl DriverConnector {
@@ -34,7 +53,7 @@ impl DriverConnector {
     async fn get_component_with_capability<S: ProtocolMarker>(
         &self,
         moniker: &str,
-        capability_options: CapabilityOptions,
+        capability_options: impl Into<CapabilityOptions>,
         select: bool,
     ) -> Result<S::Proxy> {
         async fn remotecontrol_connect<S: ProtocolMarker>(
@@ -49,7 +68,7 @@ impl DriverConnector {
                     moniker,
                     capability,
                     server_end.into_channel(),
-                    fio::OpenFlags::RIGHT_READABLE,
+                    fio::OpenFlags::empty(),
                 )
                 .await?
                 .map_err(|e| {
@@ -125,10 +144,7 @@ impl DriverConnector {
         }
 
         let CapabilityOptions { capability_name, default_capability_name_for_query } =
-            capability_options;
-        let default_capability_name_for_query =
-            default_capability_name_for_query.unwrap_or(S::DEBUG_NAME);
-        let capability_name = capability_name.unwrap_or(S::DEBUG_NAME);
+            capability_options.into();
 
         if let Some(ref remote_control) = self.remote_control {
             let (moniker, capability): (String, &str) = match select {
@@ -152,7 +168,7 @@ impl driver_connector::DriverConnector for DriverConnector {
     ) -> Result<fdd::DriverDevelopmentProxy> {
         self.get_component_with_capability::<fdd::DriverDevelopmentMarker>(
             "/bootstrap/driver_manager",
-            CapabilityOptions::default(),
+            DiscoverableCapabilityOptions::<fdd::DriverDevelopmentMarker>::default(),
             select,
         )
         .await
@@ -163,8 +179,8 @@ impl driver_connector::DriverConnector for DriverConnector {
         self.get_component_with_capability::<fio::DirectoryMarker>(
             "/bootstrap/devfs",
             CapabilityOptions {
-                capability_name: Some("dev"),
-                default_capability_name_for_query: Some("dev-topological"),
+                capability_name: "dev",
+                default_capability_name_for_query: "dev-topological",
             },
             select,
         )
@@ -175,7 +191,10 @@ impl driver_connector::DriverConnector for DriverConnector {
     async fn get_device_watcher_proxy(&self) -> Result<fdm::DeviceWatcherProxy> {
         self.get_component_with_capability::<fdm::DeviceWatcherMarker>(
             "/bootstrap/driver_manager",
-            CapabilityOptions::default(),
+            CapabilityOptions {
+                capability_name: "fuchsia.hardware.usb.DeviceWatcher",
+                default_capability_name_for_query: "fuchsia.hardware.usb.DeviceWatcher",
+            },
             false,
         )
         .await
@@ -185,7 +204,7 @@ impl driver_connector::DriverConnector for DriverConnector {
     async fn get_driver_registrar_proxy(&self, select: bool) -> Result<fdr::DriverRegistrarProxy> {
         self.get_component_with_capability::<fdr::DriverRegistrarMarker>(
             "/bootstrap/driver_index",
-            CapabilityOptions::default(),
+            DiscoverableCapabilityOptions::<fdr::DriverRegistrarMarker>::default(),
             select,
         )
         .await
@@ -195,7 +214,7 @@ impl driver_connector::DriverConnector for DriverConnector {
     async fn get_tool_runner_proxy(&self, select: bool) -> Result<fdp::ToolRunnerProxy> {
         self.get_component_with_capability::<fdp::ToolRunnerMarker>(
             "/core/driver_playground",
-            CapabilityOptions::default(),
+            DiscoverableCapabilityOptions::<fdp::ToolRunnerMarker>::default(),
             select,
         )
         .await
@@ -205,7 +224,7 @@ impl driver_connector::DriverConnector for DriverConnector {
     async fn get_run_builder_proxy(&self) -> Result<ftm::RunBuilderProxy> {
         self.get_component_with_capability::<ftm::RunBuilderMarker>(
             "/core/test_manager",
-            CapabilityOptions::default(),
+            DiscoverableCapabilityOptions::<ftm::RunBuilderMarker>::default(),
             false,
         )
         .await

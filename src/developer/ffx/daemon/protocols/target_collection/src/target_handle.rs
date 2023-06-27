@@ -363,7 +363,7 @@ mod tests {
                                         flags,
                                         responder,
                                     } => {
-                                        assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE);
+                                        assert_eq!(flags, fio::OpenFlags::empty());
                                         assert_eq!(moniker, "/core/remote-control");
                                         assert_eq!(
                                             capability_name,

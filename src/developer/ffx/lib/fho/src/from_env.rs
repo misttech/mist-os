@@ -204,7 +204,11 @@ pub struct WithMoniker<P> {
 }
 
 #[async_trait(?Send)]
-impl<P: Proxy + 'static> TryFromEnvWith for WithMoniker<P> {
+impl<P> TryFromEnvWith for WithMoniker<P>
+where
+    P: Proxy + 'static,
+    P::Protocol: fidl::endpoints::DiscoverableProtocolMarker,
+{
     type Output = P;
     async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>()

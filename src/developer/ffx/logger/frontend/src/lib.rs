@@ -14,7 +14,7 @@ use ffx_daemon_target::logger::{
 use ffx_log_data::{EventType, LogData, LogEntry};
 use ffx_log_utils::{run_logging_pipeline, OrderedBatchPipeline};
 use fidl::{
-    endpoints::{create_proxy, ProtocolMarker, ServerEnd},
+    endpoints::{create_proxy, DiscoverableProtocolMarker as _, ServerEnd},
     AsyncSocket,
 };
 use fidl_fuchsia_developer_ffx::{
@@ -516,9 +516,9 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
         rcs_client
             .connect_capability(
                 ARCHIVIST_MONIKER,
-                ArchiveAccessorMarker::DEBUG_NAME,
+                ArchiveAccessorMarker::PROTOCOL_NAME,
                 channel,
-                fio::OpenFlags::RIGHT_READABLE,
+                fio::OpenFlags::empty(),
             )
             .await??;
         Ok(diagnostics_client)
@@ -1124,7 +1124,7 @@ mod test {
         use_socket: bool,
     ) -> Option<Option<ControlFlow<()>>> {
         assert_eq!(moniker, ARCHIVIST_MONIKER);
-        assert_eq!(capability_name, ArchiveAccessorMarker::DEBUG_NAME);
+        assert_eq!(capability_name, ArchiveAccessorMarker::PROTOCOL_NAME);
         responder.send(Ok(())).unwrap();
         let server_end = ServerEnd::<ArchiveAccessorMarker>::new(service_chan);
         let mut diagnostics_stream = server_end.into_stream().unwrap();

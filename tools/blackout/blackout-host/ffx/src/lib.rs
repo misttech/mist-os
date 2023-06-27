@@ -8,7 +8,7 @@ use {
     ffx_storage_blackout_step_args::{
         BlackoutCommand, BlackoutSubcommand, SetupCommand, TestCommand, VerifyCommand,
     },
-    fidl::endpoints::ProtocolMarker,
+    fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_blackout_test as fblackout,
     fidl_fuchsia_developer_remotecontrol as fremotecontrol,
     fidl_fuchsia_io::OpenFlags,
@@ -16,7 +16,7 @@ use {
 };
 
 /// Connect to a protocol on a remote device using the remote control proxy.
-async fn remotecontrol_connect<S: ProtocolMarker>(
+async fn remotecontrol_connect<S: DiscoverableProtocolMarker>(
     remote_control: &fremotecontrol::RemoteControlProxy,
     moniker: &str,
 ) -> Result<S::Proxy> {
@@ -24,15 +24,15 @@ async fn remotecontrol_connect<S: ProtocolMarker>(
     remote_control
         .connect_capability(
             moniker,
-            S::DEBUG_NAME,
+            S::PROTOCOL_NAME,
             server_end.into_channel(),
-            OpenFlags::RIGHT_READABLE,
+            OpenFlags::empty(),
         )
         .await?
         .map_err(|e| {
             anyhow::anyhow!(
                 "failed to connect to protocol {} at {}: {:?}",
-                S::DEBUG_NAME.to_string(),
+                S::PROTOCOL_NAME.to_string(),
                 moniker,
                 e
             )

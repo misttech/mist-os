@@ -14,7 +14,7 @@ use ffx_core::macro_deps::futures::{
     stream::FuturesUnordered,
     StreamExt,
 };
-use fidl::endpoints::{ProtocolMarker, RequestStream, ServerEnd};
+use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream, ServerEnd};
 use fidl_fuchsia_developer_ffx::{
     TargetCollectionMarker, TargetCollectionRequest, TargetMarker, TargetRequest,
 };
@@ -191,13 +191,13 @@ async fn handle_connect_capability(
     scheduler: TaskScheduler,
 ) {
     match capability_name {
-        ArchiveAccessorMarker::DEBUG_NAME => {
+        ArchiveAccessorMarker::PROTOCOL_NAME => {
             handle_archive_accessor(
                 ServerEnd::<ArchiveAccessorMarker>::new(channel).into_stream().unwrap(),
             )
             .await
         }
-        LogSettingsMarker::DEBUG_NAME => handle_log_settings(channel, scheduler.clone()).await,
+        LogSettingsMarker::PROTOCOL_NAME => handle_log_settings(channel, scheduler.clone()).await,
         _ => {
             unreachable!();
         }

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use fidl::endpoints::ProtocolMarker;
+use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
 use fidl_fuchsia_test_manager as ftest_manager;
 
@@ -29,7 +29,7 @@ pub async fn connect_to_query(
     connect_to_protocol::<ftest_manager::QueryMarker>(QUERY_MONIKER, remote_control).await
 }
 
-async fn connect_to_protocol<P: ProtocolMarker>(
+async fn connect_to_protocol<P: DiscoverableProtocolMarker>(
     moniker: &'static str,
     remote_control: &fremotecontrol::RemoteControlProxy,
 ) -> Result<P::Proxy> {

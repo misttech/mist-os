@@ -8,7 +8,7 @@
 use anyhow::Context as _;
 use errors::FfxError;
 use ffx_core::ffx_plugin;
-use fidl::endpoints::ProtocolMarker;
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net_debug as fdebug;
@@ -32,7 +32,7 @@ struct FfxConnector<'a> {
 }
 
 impl FfxConnector<'_> {
-    async fn remotecontrol_connect<S: ProtocolMarker>(
+    async fn remotecontrol_connect<S: DiscoverableProtocolMarker>(
         &self,
         moniker_suffix: &str,
     ) -> Result<S::Proxy, anyhow::Error> {
@@ -45,17 +45,17 @@ impl FfxConnector<'_> {
             moniker = format!("/{moniker}");
         }
         let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
-            .with_context(|| format!("failed to create proxy to {}", S::DEBUG_NAME))?;
+            .with_context(|| format!("failed to create proxy to {}", S::PROTOCOL_NAME))?;
         remote_control
             .connect_capability(
                 &moniker,
-                S::DEBUG_NAME,
+                S::PROTOCOL_NAME,
                 server_end.into_channel(),
-                fio::OpenFlags::RIGHT_READABLE,
+                fio::OpenFlags::empty(),
             )
             .await?
             .map_err(|e| {
-                anyhow::anyhow!("failed to connect to {} at {}: {:?}", S::DEBUG_NAME, moniker, e)
+                anyhow::anyhow!("failed to connect to {} at {}: {:?}", S::PROTOCOL_NAME, moniker, e)
             })?;
         Ok(proxy)
     }

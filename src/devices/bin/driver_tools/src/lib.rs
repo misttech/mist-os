@@ -126,7 +126,7 @@ pub async fn driver(
                 .get_dev_proxy(subcmd.select)
                 .await
                 .context("Failed to get dev proxy")?;
-            subcommands::lspci::lspci(subcmd, dev).await.context("Lspci subcommand failed")?;
+            subcommands::lspci::lspci(subcmd, &dev).await.context("Lspci subcommand failed")?;
         }
         #[cfg(not(target_os = "fuchsia"))]
         DriverSubCommand::Lsusb(subcmd) => {

@@ -115,7 +115,7 @@ impl HostArchiveReader {
                         &format!("/{}", moniker_and_protocol.moniker),
                         &moniker_and_protocol.protocol,
                         server.into_channel(),
-                        OpenFlags::RIGHT_READABLE,
+                        OpenFlags::empty(),
                     )
                     .await??;
                 Cow::Owned(client.into_proxy()?)

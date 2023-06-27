@@ -5,17 +5,18 @@
 pub mod args;
 
 use {
-    anyhow::Result, args::LspciCommand, fidl::endpoints::Proxy, fidl_fuchsia_hardware_pci as fhpci,
-    fidl_fuchsia_io as fio, lspci::bridge::Bridge, lspci::device::Device, lspci::Args,
+    anyhow::Result, args::LspciCommand, fidl_fuchsia_hardware_pci as fhpci, fidl_fuchsia_io as fio,
+    lspci::bridge::Bridge, lspci::device::Device, lspci::Args,
 };
 
-pub async fn lspci(cmd: LspciCommand, dev: fio::DirectoryProxy) -> Result<()> {
-    // Creates the proxy and server
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>()?;
-
-    dev.open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), &cmd.service, server)?;
-
-    let bus = fhpci::BusProxy::new(proxy.into_channel().unwrap());
+pub async fn lspci(cmd: LspciCommand, dev: &fio::DirectoryProxy) -> Result<()> {
+    let (bus, server) = fidl::endpoints::create_proxy::<fhpci::BusMarker>()?;
+    let () = dev.open(
+        fio::OpenFlags::empty(),
+        fio::ModeType::empty(),
+        &cmd.service,
+        fidl::endpoints::ServerEnd::new(server.into_channel()),
+    )?;
     let pci_ids = include_bytes!("../../../../../../../third_party/pciids/pci.ids.zst");
     // The capacity to 2 MB, because the decompressed data
     // should always be less than the capacity's bytes

@@ -8,7 +8,7 @@ use {
     anyhow::{anyhow, bail, Context as _, Error, Result},
     errors::ffx_bail,
     ffx_fuzz_args::*,
-    fidl::endpoints::ProtocolMarker,
+    fidl::endpoints::DiscoverableProtocolMarker as _,
     fidl_fuchsia_developer_remotecontrol as rcs, fidl_fuchsia_fuzzer as fuzz,
     fidl_fuchsia_io::OpenFlags,
     fuchsia_fuzzctl::{get_corpus_type, get_fuzzer_urls, Duration, Manager, OutputSink, Writer},
@@ -619,9 +619,9 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
             .remote_control
             .connect_capability(
                 "/core/fuzz-manager",
-                fuzz::ManagerMarker::DEBUG_NAME,
+                fuzz::ManagerMarker::PROTOCOL_NAME,
                 server_end.into_channel(),
-                OpenFlags::RIGHT_READABLE,
+                OpenFlags::empty(),
             )
             .await
             .context("fuchsia.developer.remotecontrol/ConnectCapability")?;
@@ -658,7 +658,7 @@ mod test_fixtures {
         crate::reader::test_fixtures::ScriptReader,
         anyhow::{anyhow, Context as _, Result},
         ffx_fuzz_args::FuzzerState,
-        fidl::endpoints::{create_proxy, ProtocolMarker, ServerEnd},
+        fidl::endpoints::{create_proxy, DiscoverableProtocolMarker as _, ServerEnd},
         fidl_fuchsia_developer_remotecontrol as rcs,
         fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
         fuchsia_async as fasync,
@@ -816,7 +816,7 @@ mod test_fixtures {
                     responder,
                 }) => {
                     assert_eq!(moniker, "/core/fuzz-manager");
-                    assert_eq!(capability_name, fuzz::ManagerMarker::DEBUG_NAME);
+                    assert_eq!(capability_name, fuzz::ManagerMarker::PROTOCOL_NAME);
                     let server_end = ServerEnd::<fuzz::ManagerMarker>::new(server_chan);
                     responder.send(Ok(()))?;
                     task =
