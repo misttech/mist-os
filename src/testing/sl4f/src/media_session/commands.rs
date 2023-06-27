@@ -17,6 +17,18 @@ impl Facade for MediaSessionFacade {
                 let result = self.watch_active_session_status().await?;
                 Ok(to_value(result)?)
             }
+            "PublishMockPlayer" => {
+                let result = self.publish_mock_player().await?;
+                Ok(to_value(result)?)
+            }
+            "StopMockPlayer" => {
+                let result = self.stop_mock_player().await?;
+                Ok(to_value(result)?)
+            }
+            "ListReceivedRequests" => {
+                let result = self.list_received_requests().await?;
+                Ok(to_value(result)?)
+            }
             _ => bail!("Invalid MediaSessionFacade FIDL method: {:?}", method),
         }
     }

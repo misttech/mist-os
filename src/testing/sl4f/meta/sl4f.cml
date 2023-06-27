@@ -59,6 +59,7 @@
                 "fuchsia.location.namedplace.RegulatoryRegionConfigurator",
                 "fuchsia.media.ProfileProvider",
                 "fuchsia.media.sessions2.ActiveSession",
+                "fuchsia.media.sessions2.Publisher",
                 "fuchsia.media.sounds.Player",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.metricslogger.test.MetricsLogger",
