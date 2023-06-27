@@ -141,6 +141,7 @@ foreach(board_info, _boards) {
     test_specs = {
       environments = [ test_env ]
     }
+    test_type = "device"
   }
 }
 

@@ -19,7 +19,4 @@
             path: "/dev",
         },
     ],
-    facets: {
-        "fuchsia.test": { type: "devices" },
-    },
 }
