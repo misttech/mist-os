@@ -1,0 +1,58 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("performance_counter_device") {
+  sources = [
+    "magma_performance_counter_device.cc",
+    "magma_performance_counter_device.h",
+  ]
+  deps = [
+    "//src/graphics/lib/magma/src/magma_util:macros",
+    "//src/graphics/lib/magma/src/magma_util:short_macros",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/mmio",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+source_set("dependency_injection_device") {
+  sources = [
+    "magma_dependency_injection_device.cc",
+    "magma_dependency_injection_device.h",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//src/devices/lib/driver",
+    "//src/graphics/lib/magma/include:msd",
+    "//src/graphics/lib/magma/src/magma_util:macros",
+    "//src/graphics/lib/magma/src/magma_util:short_macros",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+source_set("device_impl") {
+  sources = [ "magma_device_impl.h" ]
+
+  public_deps = [
+    ":dependency_injection_device",
+    ":performance_counter_device",
+    "..:sys_driver",
+    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//src/devices/lib/driver",
+    "//src/graphics/lib/magma/src/magma_util:macros",
+    "//src/graphics/lib/magma/src/magma_util/platform:thread",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+  ]
+}

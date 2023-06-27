@@ -27,9 +27,8 @@
 #include "magma_util/dlog.h"
 #include "msd_defs.h"
 #include "msd_intel_pci_device.h"
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/magma_performance_counter_device.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
-#include "src/graphics/lib/magma/src/sys_driver/magma_device_impl.h"
+#include "src/graphics/lib/magma/src/sys_driver/dfv1/magma_device_impl.h"
 #include "sys_driver/magma_driver.h"
 
 #if MAGMA_TEST_DRIVER

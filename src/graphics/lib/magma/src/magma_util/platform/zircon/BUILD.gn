@@ -48,43 +48,6 @@ source_set("bus_mapper") {
   ]
 }
 
-source_set("performance_counter_device") {
-  sources = [
-    "magma_performance_counter_device.cc",
-    "magma_performance_counter_device.h",
-  ]
-  deps = [
-    "$magma_build_root/src/magma_util:short_macros",
-    "//src/graphics/lib/magma/src/magma_util:macros",
-  ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/mmio",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-source_set("dependency_injection_device") {
-  sources = [
-    "magma_dependency_injection_device.cc",
-    "magma_dependency_injection_device.h",
-  ]
-  public_deps = [
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:short_macros",
-    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
-    "//src/devices/lib/driver",
-    "//src/graphics/lib/magma/include:msd",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
 source_set("interrupt") {
   sources = [ "zircon_platform_interrupt.h" ]
 

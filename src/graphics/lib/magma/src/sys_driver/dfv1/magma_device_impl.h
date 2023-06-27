@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_DEVICE_IMPL_H_
-#define SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_DEVICE_IMPL_H_
+#ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_DFV1_MAGMA_DEVICE_IMPL_H_
+#define SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_DFV1_MAGMA_DEVICE_IMPL_H_
 
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/ddk/device.h>
@@ -11,9 +11,9 @@
 
 #include <ddktl/device.h>
 
+#include "magma_dependency_injection_device.h"
+#include "magma_performance_counter_device.h"
 #include "platform_thread.h"
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/magma_dependency_injection_device.h"
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/magma_performance_counter_device.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 #include "sys_driver/magma_driver.h"
 
@@ -223,4 +223,4 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
 
 }  // namespace msd
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_DEVICE_IMPL_H_
+#endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_DFV1_MAGMA_DEVICE_IMPL_H_

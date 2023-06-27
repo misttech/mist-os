@@ -41,7 +41,7 @@ if (is_fuchsia) {
       "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
       "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_hlcpp",
       "//src/devices/testing/mock-ddk",
-      "//src/graphics/lib/magma/src/magma_util/platform/zircon:dependency_injection_device",
+      "//src/graphics/lib/magma/src/sys_driver/dfv1:dependency_injection_device",
       "//third_party/googletest:gtest",
       "//zircon/system/ulib/async:async-cpp",
       "//zircon/system/ulib/async-loop:async-loop-default",

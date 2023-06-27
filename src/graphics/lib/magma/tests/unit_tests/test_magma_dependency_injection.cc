@@ -13,7 +13,7 @@
 #include <gtest/gtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/magma_dependency_injection_device.h"
+#include "src/graphics/lib/magma/src/sys_driver/dfv1/magma_dependency_injection_device.h"
 
 namespace {
 class TestOwner : public magma::MagmaDependencyInjectionDevice::Owner {

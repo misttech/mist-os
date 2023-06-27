@@ -72,10 +72,9 @@ source_set("msd_intel_entry") {
     "//src/devices/lib/driver",
     "//src/graphics/lib/magma/src/magma_util:macros",
     "//src/graphics/lib/magma/src/magma_util/platform:trace",
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:performance_counter_device",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
     "//src/graphics/lib/magma/src/sys_driver",
-    "//src/graphics/lib/magma/src/sys_driver:device_impl",
+    "//src/graphics/lib/magma/src/sys_driver/dfv1:device_impl",
     "//src/lib/ddk",
     "//src/zircon/lib/zircon",
     "//zircon/system/ulib/trace",
@@ -100,7 +99,7 @@ source_set("msd_intel_test_entry") {
     "//src/graphics/lib/magma/src/magma_util/platform:trace",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
     "//src/graphics/lib/magma/src/sys_driver",
-    "//src/graphics/lib/magma/src/sys_driver:device_impl",
+    "//src/graphics/lib/magma/src/sys_driver/dfv1:device_impl",
     "//src/lib/ddk",
     "//src/zircon/lib/zircon",
     "//zircon/system/ulib/trace",
@@ -110,7 +109,6 @@ source_set("msd_intel_test_entry") {
   deps += [
     "tests/unit_tests:hardware_tests",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:pci_driver_gtest",
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:performance_counter_device",
     "//src/graphics/lib/magma/tests/unit_tests:magma_platform_pci_device_tests",
     "//src/graphics/lib/magma/tests/unit_tests:msd_conformance_tests_cc",
   ]

@@ -28,7 +28,7 @@
 #include "platform_bus_mapper.h"
 #include "platform_logger.h"
 #include "src/graphics/drivers/msd-arm-mali/src/parent_device.h"
-#include "src/graphics/lib/magma/src/sys_driver/magma_device_impl.h"
+#include "src/graphics/lib/magma/src/sys_driver/dfv1/magma_device_impl.h"
 #include "sys_driver/magma_driver.h"
 #include "sys_driver/magma_system_device.h"
 

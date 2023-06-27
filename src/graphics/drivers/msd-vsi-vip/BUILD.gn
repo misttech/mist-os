@@ -88,7 +88,7 @@ entry_deps = [
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
   "//src/graphics/lib/magma/src/sys_driver",
-  "//src/graphics/lib/magma/src/sys_driver:device_impl",
+  "//src/graphics/lib/magma/src/sys_driver/dfv1:device_impl",
   "//src/lib/ddk",
   "//src/lib/ddktl",
   "//zircon/system/ulib/trace",
