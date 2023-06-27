@@ -14,6 +14,9 @@
             path: "/root",
         },
     ],
+    use: [
+        { protocol: "fuchsia.scheduler.ProfileProvider" },
+    ],
     expose: [
         {
             directory: "memfs",

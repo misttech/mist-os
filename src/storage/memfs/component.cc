@@ -4,6 +4,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/scheduler/role.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stdlib.h>
 #include <zircon/process.h>
@@ -31,6 +32,8 @@ int main() {
 
   tmp->ServeDirectory(outgoing_dir, fidl::ServerEnd<fuchsia_io::Directory>(
                                         zx::channel(zx_take_startup_handle(PA_DIRECTORY_REQUEST))));
+
+  fuchsia_scheduler::SetRoleForThisThread("fuchsia.storage.memfs.main");
 
   loop.Run();
 

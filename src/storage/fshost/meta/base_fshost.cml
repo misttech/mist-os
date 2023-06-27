@@ -65,7 +65,10 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
+            protocol: [
+                "fuchsia.logger.LogSink",
+                "fuchsia.scheduler.ProfileProvider",
+            ],
             from: "parent",
             to: [ "#tmpfs" ],
         },

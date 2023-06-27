@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <getopt.h>
+#include <lib/scheduler/role.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <unistd.h>
@@ -71,6 +72,8 @@ int StartComponent(std::unique_ptr<minfs::Bcache> bc, const minfs::MountOptions&
   }
   fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle_request(
       std::move(lifecycle_channel));
+
+  fuchsia_scheduler::SetRoleForThisThread("fuchsia.storage.minfs.main");
 
   zx::result status = minfs::StartComponent(std::move(outgoing_dir), std::move(lifecycle_request));
   if (status.is_error()) {

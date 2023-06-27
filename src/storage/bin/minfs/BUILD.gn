@@ -13,6 +13,7 @@ executable("minfs") {
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp_wire",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
+    "//src/lib/scheduler/cpp",
     "//src/lib/storage/block_client/cpp",
     "//src/storage/minfs",
     "//zircon/system/ulib/zx",
