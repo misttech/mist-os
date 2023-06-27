@@ -281,12 +281,13 @@ pub(crate) enum InterfacesNetstackError {
     Update(fnet_interfaces_ext::UpdateError),
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone)]
 struct InterfaceState {
     // `BTreeMap` so that addresses are iterated in deterministic order
     // (useful for tests).
     addresses: BTreeMap<fnet::IpAddress, NetlinkAddressMessage>,
     link_address: Option<Vec<u8>>,
+    control: Option<fnet_interfaces_ext::admin::Control>,
 }
 
 async fn set_link_address(
@@ -416,7 +417,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
 
             for fnet_interfaces_ext::PropertiesAndState {
                 properties,
-                state: InterfaceState { addresses, link_address },
+                state: InterfaceState { addresses, link_address, control: _ },
             } in interface_properties.values_mut()
             {
                 set_link_address(&self.interfaces_proxy, properties.id, link_address).await;
@@ -516,7 +517,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         false,
                         |fnet_interfaces_ext::PropertiesAndState {
                              properties: _,
-                             state: InterfaceState { addresses, link_address: _ },
+                             state: InterfaceState { addresses, link_address: _, control: _ },
                          }| {
                             let fnet::Subnet { addr, prefix_len: _ } = address.clone().into_ext();
                             addresses.contains_key(&addr)
@@ -566,7 +567,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         match update {
             fnet_interfaces_ext::UpdateResult::Added {
                 properties,
-                state: InterfaceState { addresses, link_address },
+                state: InterfaceState { addresses, link_address, control: _ },
             } => {
                 set_link_address(&self.interfaces_proxy, properties.id, link_address).await;
 
@@ -616,7 +617,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         has_default_ipv4_route: _,
                         has_default_ipv6_route: _,
                     },
-                state: InterfaceState { addresses: interface_addresses, link_address },
+                state: InterfaceState { addresses: interface_addresses, link_address, control: _ },
             } => {
                 if online.is_some() {
                     if let Some(message) =
@@ -659,7 +660,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             fnet_interfaces_ext::UpdateResult::Removed(
                 fnet_interfaces_ext::PropertiesAndState {
                     properties,
-                    state: InterfaceState { mut addresses, link_address },
+                    state: InterfaceState { mut addresses, link_address, control: _ },
                 },
             ) => {
                 update_addresses(&mut addresses, BTreeMap::new(), &self.route_clients);
@@ -691,16 +692,23 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         Ok(())
     }
 
+    /// Returns an admistrative control for the interface.
+    ///
+    /// Returns `None` if the interface is not known by the `EventLoop`.
     fn get_interface_control(
-        &self,
+        &mut self,
         interface_id: NonZeroU32,
-    ) -> fnet_interfaces_ext::admin::Control {
-        let (control, server_end) = fnet_interfaces_ext::admin::Control::create_endpoints()
-            .expect("create Control endpoints");
-        self.interfaces_proxy
-            .get_admin(interface_id.get().into(), server_end)
-            .expect("send get admin request");
-        control
+    ) -> Option<&fnet_interfaces_ext::admin::Control> {
+        let interface = self.interface_properties.get_mut(&interface_id.get().into())?;
+
+        Some(interface.state.control.get_or_insert_with(|| {
+            let (control, server_end) = fnet_interfaces_ext::admin::Control::create_endpoints()
+                .expect("create Control endpoints");
+            self.interfaces_proxy
+                .get_admin(interface_id.get().into(), server_end)
+                .expect("send get admin request");
+            control
+        }))
     }
 
     /// Handles a new address request.
@@ -709,14 +717,15 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     /// added so that the caller can make sure their local state (from the
     /// interfaces watcher) has sent an event holding the added address.
     async fn handle_new_address_request(
-        &self,
+        &mut self,
         NewAddressArgs {
             address_and_interface_id:
                 address_and_interface_id @ AddressAndInterfaceArgs { address, interface_id },
             add_subnet_route,
         }: NewAddressArgs,
     ) -> Result<AddressAndInterfaceArgs, RequestError> {
-        let control = self.get_interface_control(interface_id);
+        let control =
+            self.get_interface_control(interface_id).ok_or(RequestError::UnrecognizedInterface)?;
 
         let (asp, asp_server_end) =
             fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
@@ -823,13 +832,14 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     /// removed so that the caller can make sure their local state (from the
     /// interfaces watcher) has sent an event without the removed address.
     async fn handle_del_address_request(
-        &self,
+        &mut self,
         DelAddressArgs {
             address_and_interface_id:
                 address_and_interface_id @ AddressAndInterfaceArgs { address, interface_id },
         }: DelAddressArgs,
     ) -> Result<AddressAndInterfaceArgs, RequestError> {
-        let control = self.get_interface_control(interface_id);
+        let control =
+            self.get_interface_control(interface_id).ok_or(RequestError::UnrecognizedInterface)?;
 
         match control.remove_address(&mut address.into_ext()).await.map_err(|e| {
             warn!("error removing {address} from interface ({interface_id}): {e:?}");
@@ -866,7 +876,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     /// caller needs to make sure the update has been propagated to the local
     /// state (the interfaces watcher has sent an event for our update).
     async fn handle_request(
-        &self,
+        &mut self,
         Request { args, sequence_number, mut client, completer }: Request<S>,
     ) -> Option<PendingAddressRequest<S>> {
         debug!("handling request {args:?} from {client}");
@@ -879,7 +889,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         .filter_map(
                             |fnet_interfaces_ext::PropertiesAndState {
                                  properties,
-                                 state: InterfaceState { addresses: _, link_address },
+                                 state: InterfaceState { addresses: _, link_address, control: _ },
                              }| {
                                 NetlinkLinkMessage::optionally_from(properties, link_address)
                             },
@@ -1602,7 +1612,7 @@ mod tests {
     use fnet_interfaces::AddressAssignmentState;
     use fuchsia_async::{self as fasync};
 
-    use futures::{future::Future, sink::SinkExt as _, stream::Stream};
+    use futures::{sink::SinkExt as _, stream::Stream};
     use netlink_packet_route::RTNLGRP_IPV4_ROUTE;
     use pretty_assertions::assert_eq;
     use test_case::test_case;
@@ -2283,29 +2293,30 @@ mod tests {
         }
     }
 
-    async fn expect_only_get_mac_root_requests(
+    fn expect_only_get_mac_root_requests(
         interfaces_request_stream: fnet_root::InterfacesRequestStream,
-    ) -> impl IntoIterator<Item = fnet_interfaces::Event> {
-        interfaces_request_stream
-            .for_each(|req| async move { handle_get_mac_root_request_or_panic(req.unwrap()) })
-            .await;
+    ) -> impl Stream<Item = fnet_interfaces::Event> {
+        futures::stream::unfold(interfaces_request_stream, |interfaces_request_stream| async move {
+            interfaces_request_stream
+                .for_each(|req| async move { handle_get_mac_root_request_or_panic(req.unwrap()) })
+                .await;
 
-        std::iter::empty()
+            None
+        })
     }
 
     async fn expect_only_get_mac_root_requests_fut(
         interfaces_request_stream: fnet_root::InterfacesRequestStream,
     ) {
         expect_only_get_mac_root_requests(interfaces_request_stream)
+            .for_each(|item| async move { panic!("unexpected item = {item:?}") })
             .await
-            .into_iter()
-            .for_each(|item| panic!("unexpected item = {item:?}"))
     }
 
     #[derive(Debug, PartialEq)]
     struct TestRequestResult {
         messages: Vec<SentMessage<RtnlMessage>>,
-        waiter_result: Result<(), RequestError>,
+        waiter_results: Vec<Result<(), RequestError>>,
     }
 
     /// Test helper to handle a request.
@@ -2314,11 +2325,10 @@ mod tests {
     /// `fuchsia.net.interfaces/Event`s to feed to the netlink eventloop's
     /// interfaces watcher after a root API request is handled.
     async fn test_request<
-        I: IntoIterator<Item = fnet_interfaces::Event>,
-        Fut: Future<Output = I>,
-        F: FnOnce(fnet_root::InterfacesRequestStream) -> Fut,
+        St: Stream<Item = fnet_interfaces::Event>,
+        F: FnOnce(fnet_root::InterfacesRequestStream) -> St,
     >(
-        args: RequestArgs,
+        args: impl IntoIterator<Item = RequestArgs>,
         root_handler: F,
     ) -> TestRequestResult {
         let (mut expected_sink, expected_client) = crate::client::testutil::new_fake_client::<
@@ -2333,7 +2343,7 @@ mod tests {
         let Setup {
             event_loop_fut,
             mut watcher_stream,
-            mut request_sink,
+            request_sink,
             interfaces_request_stream,
             interfaces_handler_sink: _,
         } = setup_with_route_clients({
@@ -2378,44 +2388,47 @@ mod tests {
         assert_eq!(&expected_sink.take_messages()[..], &[]);
         assert_eq!(&other_sink.take_messages()[..], &[]);
 
-        let (completer, waiter) = oneshot::channel();
-        let fut = request_sink
-            .send(Request {
-                args,
-                sequence_number: TEST_SEQUENCE_NUMBER,
-                client: expected_client.clone(),
-                completer,
-            })
-            .then(|res| {
-                res.expect("send request");
-                waiter
-            });
+        let expected_client = &expected_client;
+        let fut = futures::stream::iter(args).fold(
+            (Vec::new(), request_sink),
+            |(mut results, mut request_sink), args| async move {
+                let (completer, waiter) = oneshot::channel();
+                request_sink
+                    .send(Request {
+                        args,
+                        sequence_number: TEST_SEQUENCE_NUMBER,
+                        client: expected_client.clone(),
+                        completer,
+                    })
+                    .await
+                    .unwrap();
+                results.push(waiter.await.unwrap());
+                (results, request_sink)
+            },
+        );
         // Handle root API requests then feed the returned
         // `fuchsia.net.interfaces/Event`s to the watcher.
-        let watcher_fut = root_handler(interfaces_request_stream).then(|events| {
-            futures::stream::iter(std::iter::once(events)).map(Ok).forward(futures::sink::unfold(
-                watcher_stream.by_ref(),
-                |st, events| async {
-                    respond_to_watcher(st.by_ref(), events).await;
-                    Ok::<_, std::convert::Infallible>(st)
-                },
-            ))
-        });
-        let waiter_result = futures::select! {
-            res = fut.fuse() => res.unwrap(),
+        let watcher_fut = root_handler(interfaces_request_stream).map(Ok).forward(
+            futures::sink::unfold(watcher_stream.by_ref(), |st, event| async {
+                respond_to_watcher(st.by_ref(), [event]).await;
+                Ok::<_, std::convert::Infallible>(st)
+            }),
+        );
+        let waiter_results = futures::select! {
+            (results, _request_sink) = fut.fuse() => results,
             res = futures::future::join(watcher_fut, event_loop_fut) => {
                 unreachable!("eventloop/watcher should not return: {res:?}")
             }
         };
         assert_eq!(&other_sink.take_messages()[..], &[]);
-        TestRequestResult { messages: expected_sink.take_messages(), waiter_result }
+        TestRequestResult { messages: expected_sink.take_messages(), waiter_results }
     }
 
     #[fuchsia::test]
     async fn test_get_link() {
         assert_eq!(
             test_request(
-                RequestArgs::Link(LinkRequestArgs::Get(GetLinkArgs::Dump)),
+                [RequestArgs::Link(LinkRequestArgs::Get(GetLinkArgs::Dump))],
                 expect_only_get_mac_root_requests,
             )
             .await,
@@ -2440,7 +2453,7 @@ mod tests {
                         .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true)
                     ),
                 ],
-                waiter_result: Ok(()),
+                waiter_results: vec![Ok(())],
             },
         )
     }
@@ -2452,9 +2465,9 @@ mod tests {
     async fn test_get_addr(ip_version_filter: Option<IpVersion>) {
         pretty_assertions::assert_eq!(
             test_request(
-                RequestArgs::Address(AddressRequestArgs::Get(GetAddressArgs::Dump {
+                [RequestArgs::Address(AddressRequestArgs::Get(GetAddressArgs::Dump {
                     ip_version_filter
-                })),
+                }))],
                 expect_only_get_mac_root_requests,
             )
             .await,
@@ -2486,7 +2499,7 @@ mod tests {
                     })
                     .flatten()
                     .collect(),
-                waiter_result: Ok(()),
+                waiter_results: vec![Ok(())],
             },
         );
     }
@@ -2551,7 +2564,7 @@ mod tests {
         let address_and_interface_id = AddressAndInterfaceArgs { address, interface_id };
         pretty_assertions::assert_eq!(
             test_request(
-                if is_new {
+                [if is_new {
                     RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
                         address_and_interface_id,
                         add_subnet_route: false,
@@ -2560,36 +2573,39 @@ mod tests {
                     RequestArgs::Address(AddressRequestArgs::Del(DelAddressArgs {
                         address_and_interface_id,
                     }))
-                },
-                |interfaces_request_stream| async {
-                    interfaces_request_stream
-                        .for_each(|req| {
-                            futures::future::ready(match req.unwrap() {
-                                fnet_root::InterfacesRequest::GetAdmin {
-                                    id,
-                                    control,
-                                    control_handle: _,
-                                } => {
-                                    pretty_assertions::assert_eq!(id, LO_INTERFACE_ID);
-                                    let control = control.into_stream().unwrap();
-                                    let control = control.control_handle();
-                                    if let Some(reason) = removal_reason {
-                                        control.send_on_interface_removed(reason).unwrap()
+                }],
+                |interfaces_request_stream| futures::stream::unfold(
+                    interfaces_request_stream,
+                    |interfaces_request_stream| async move {
+                        interfaces_request_stream
+                            .for_each(|req| {
+                                futures::future::ready(match req.unwrap() {
+                                    fnet_root::InterfacesRequest::GetAdmin {
+                                        id,
+                                        control,
+                                        control_handle: _,
+                                    } => {
+                                        pretty_assertions::assert_eq!(id, LO_INTERFACE_ID);
+                                        let control = control.into_stream().unwrap();
+                                        let control = control.control_handle();
+                                        if let Some(reason) = removal_reason {
+                                            control.send_on_interface_removed(reason).unwrap()
+                                        }
+                                        control.shutdown();
                                     }
-                                    control.shutdown();
-                                }
-                                req => handle_get_mac_root_request_or_panic(req),
+                                    req => handle_get_mac_root_request_or_panic(req),
+                                })
                             })
-                        })
-                        .await;
+                            .await;
 
-                    std::iter::empty()
-                },
+                        unreachable!("interfaces request stream should not end")
+                    },
+                ),
             )
             .await,
             TestRequestResult {
                 messages: Vec::new(),
-                waiter_result: Err(RequestError::UnrecognizedInterface),
+                waiter_results: vec![Err(RequestError::UnrecognizedInterface)],
             },
         )
     }
@@ -2599,21 +2615,56 @@ mod tests {
         Del,
     }
 
-    /// A test helper that calls the callback with a
-    /// [`fnet_interfaces_admin::ControlRequest`] as they arrive.
-    async fn test_interface_request<
-        I: IntoIterator<Item = fnet_interfaces::Event>,
-        Fut: Future<Output = I>,
-        F: FnMut(fnet_interfaces_admin::ControlRequest) -> Fut,
-    >(
+    /// Test that a request for an interface the eventloop does not recognize
+    /// fails with an unrecognized interface error.
+    #[test_case(
+        add_test_addr_subnet_v4(),
+        AddressRequestKind::New { add_subnet_route: false }; "v4_new")]
+    #[test_case(
+        add_test_addr_subnet_v6(),
+        AddressRequestKind::New { add_subnet_route: false }; "v6_new")]
+    #[test_case(add_test_addr_subnet_v4(), AddressRequestKind::Del; "v4_del")]
+    #[test_case(add_test_addr_subnet_v6(), AddressRequestKind::Del; "v6_del")]
+    #[fuchsia::test]
+    async fn test_unknown_interface_request(address: AddrSubnetEither, kind: AddressRequestKind) {
+        let interface_id = NonZeroU32::new(WLAN_INTERFACE_ID.try_into().unwrap()).unwrap();
+        let address_and_interface_id = AddressAndInterfaceArgs { address, interface_id };
+        pretty_assertions::assert_eq!(
+            test_request(
+                [match kind {
+                    AddressRequestKind::New { add_subnet_route } => {
+                        RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
+                            address_and_interface_id,
+                            add_subnet_route,
+                        }))
+                    }
+                    AddressRequestKind::Del => {
+                        RequestArgs::Address(AddressRequestArgs::Del(DelAddressArgs {
+                            address_and_interface_id,
+                        }))
+                    }
+                }],
+                expect_only_get_mac_root_requests,
+            )
+            .await,
+            TestRequestResult {
+                messages: Vec::new(),
+                waiter_results: vec![Err(RequestError::UnrecognizedInterface)],
+            },
+        )
+    }
+
+    struct TestInterfaceRequestCase<F> {
         address: AddrSubnetEither,
         kind: AddressRequestKind,
-        mut control_request_handler: F,
-    ) -> TestRequestResult {
-        let interface_id = NonZeroU32::new(ETH_INTERFACE_ID.try_into().unwrap()).unwrap();
-        let address_and_interface_id = AddressAndInterfaceArgs { address, interface_id };
-        test_request(
-            match kind {
+        control_request_handler: F,
+    }
+
+    impl<F> TestInterfaceRequestCase<F> {
+        fn into_request_args_and_handler(self, interface_id: NonZeroU32) -> (RequestArgs, F) {
+            let Self { address, kind, control_request_handler } = self;
+            let address_and_interface_id = AddressAndInterfaceArgs { address, interface_id };
+            let args = match kind {
                 AddressRequestKind::New { add_subnet_route } => {
                     RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
                         address_and_interface_id,
@@ -2625,30 +2676,97 @@ mod tests {
                         address_and_interface_id,
                     }))
                 }
-            },
-            |interfaces_request_stream| async move {
-                interfaces_request_stream
-                    .filter_map(|req| {
-                        futures::future::ready(match req.unwrap() {
-                            fnet_root::InterfacesRequest::GetAdmin {
-                                id,
-                                control,
-                                control_handle: _,
-                            } => {
-                                pretty_assertions::assert_eq!(id, ETH_INTERFACE_ID);
-                                Some(control.into_stream().unwrap())
-                            }
-                            req => {
-                                handle_get_mac_root_request_or_panic(req);
-                                None
-                            }
-                        })
+            };
+
+            (args, control_request_handler)
+        }
+    }
+
+    /// A test helper that calls the (up to two) test cases' callback with a
+    /// [`fnet_interfaces_admin::ControlRequest`] as they arrive.
+    ///
+    /// This implementation makes sure that the the control handle for the
+    /// interface is only requested once.
+    async fn test_maybe_two_interface_requests_on_single_control<
+        St1: Stream<Item = fnet_interfaces::Event>,
+        F1: FnMut(fnet_interfaces_admin::ControlRequest) -> St1,
+        St2: Stream<Item = fnet_interfaces::Event>,
+        F2: FnMut(fnet_interfaces_admin::ControlRequest) -> St2,
+    >(
+        case1: TestInterfaceRequestCase<F1>,
+        case2: Option<TestInterfaceRequestCase<F2>>,
+    ) -> TestRequestResult {
+        let interface_id = NonZeroU32::new(ETH_INTERFACE_ID.try_into().unwrap()).unwrap();
+        let (args1, mut control_request_handler1) =
+            case1.into_request_args_and_handler(interface_id);
+
+        let (args2, control_request_handler2) = if let Some(case) = case2 {
+            let (args, control_request_handler) = case.into_request_args_and_handler(interface_id);
+            (Some(args), Some(control_request_handler))
+        } else {
+            (None, None)
+        };
+
+        test_request([args1].into_iter().chain(args2), |interfaces_request_stream| {
+            interfaces_request_stream
+                .filter_map(|req| {
+                    futures::future::ready(match req.unwrap() {
+                        fnet_root::InterfacesRequest::GetAdmin {
+                            id,
+                            control,
+                            control_handle: _,
+                        } => {
+                            pretty_assertions::assert_eq!(id, ETH_INTERFACE_ID);
+                            Some(control.into_stream().unwrap())
+                        }
+                        req => {
+                            handle_get_mac_root_request_or_panic(req);
+                            None
+                        }
                     })
-                    .flatten()
-                    .next()
-                    .then(|req| control_request_handler(req.unwrap().unwrap()))
-                    .await
-            },
+                })
+                .into_future()
+                // This method supports tests that want to make sure that the
+                // admin control is only requested once so we drop the remaining
+                // stream of admin control request streams.
+                .map(|(admin_control_stream, _stream_of_admin_control_streams)| {
+                    admin_control_stream.unwrap()
+                })
+                .flatten_stream()
+                .into_future()
+                .map(|(admin_control_req, admin_control_stream)| {
+                    control_request_handler1(admin_control_req.unwrap().unwrap()).chain(
+                        futures::stream::iter(control_request_handler2.map(
+                            |mut control_request_handler2| {
+                                admin_control_stream
+                                    .into_future()
+                                    .map(move |(admin_control_req, _admin_control_stream)| {
+                                        control_request_handler2(
+                                            admin_control_req.unwrap().unwrap(),
+                                        )
+                                    })
+                                    .flatten_stream()
+                            },
+                        ))
+                        .flatten(),
+                    )
+                })
+                .flatten_stream()
+        })
+        .await
+    }
+
+    /// A test helper that calls the callback with a
+    /// [`fnet_interfaces_admin::ControlRequest`] as they arrive.
+    async fn test_interface_request<
+        St: Stream<Item = fnet_interfaces::Event>,
+        F: FnMut(fnet_interfaces_admin::ControlRequest) -> St,
+    >(
+        case: TestInterfaceRequestCase<F>,
+    ) -> TestRequestResult {
+        test_maybe_two_interface_requests_on_single_control(
+            case,
+            None::<TestInterfaceRequestCase<fn(_) -> futures::stream::Pending<_>>>,
         )
         .await
     }
@@ -2656,16 +2774,17 @@ mod tests {
     /// An RTM_NEWADDR test helper that calls the callback with a stream of ASP
     /// requests.
     async fn test_new_addr_asp_helper<
-        I: IntoIterator<Item = fnet_interfaces::Event>,
-        Fut: Future<Output = I>,
-        F: Fn(fnet_interfaces_admin::AddressStateProviderRequestStream) -> Fut,
+        St: Stream<Item = fnet_interfaces::Event>,
+        F: Fn(fnet_interfaces_admin::AddressStateProviderRequestStream) -> St,
     >(
         address: AddrSubnetEither,
         add_subnet_route: bool,
         asp_handler: F,
     ) -> TestRequestResult {
-        test_interface_request(address, AddressRequestKind::New { add_subnet_route }, |req| async {
-            match req {
+        test_interface_request(TestInterfaceRequestCase {
+            address,
+            kind: AddressRequestKind::New { add_subnet_route },
+            control_request_handler: |req| match req {
                 fnet_interfaces_admin::ControlRequest::AddAddress {
                     address: got_address,
                     parameters,
@@ -2680,10 +2799,10 @@ mod tests {
                             ..fnet_interfaces_admin::AddressParameters::default()
                         },
                     );
-                    asp_handler(address_state_provider.into_stream().unwrap()).await
+                    asp_handler(address_state_provider.into_stream().unwrap())
                 }
                 req => panic!("unexpected request {req:?}"),
-            }
+            },
         })
         .await
     }
@@ -2695,13 +2814,13 @@ mod tests {
     #[fuchsia::test]
     async fn test_new_addr_drop_asp_immediately(address: AddrSubnetEither) {
         pretty_assertions::assert_eq!(
-            test_new_addr_asp_helper(address, false, |_asp_request_stream| async {
-                std::iter::empty()
+            test_new_addr_asp_helper(address, false, |_asp_request_stream| {
+                futures::stream::empty()
             })
             .await,
             TestRequestResult {
                 messages: Vec::new(),
-                waiter_result: Err(RequestError::UnrecognizedInterface),
+                waiter_results: vec![Err(RequestError::UnrecognizedInterface)],
             },
         )
     }
@@ -2712,9 +2831,9 @@ mod tests {
         address: AddrSubnetEither,
         reason: AddressRemovalReason,
     ) -> TestRequestResult {
-        test_new_addr_asp_helper(address, true, |asp_request_stream| async move {
+        test_new_addr_asp_helper(address, true, |asp_request_stream| {
             asp_request_stream.control_handle().send_on_address_removed(reason).unwrap();
-            std::iter::empty()
+            futures::stream::empty()
         })
         .await
     }
@@ -2773,30 +2892,33 @@ mod tests {
     ) {
         pretty_assertions::assert_eq!(
             test_new_addr_failed_helper(address, reason).await,
-            TestRequestResult { messages: Vec::new(), waiter_result: Err(expected_error) },
+            TestRequestResult { messages: Vec::new(), waiter_results: vec![Err(expected_error)] },
         )
     }
 
     /// An RTM_NEWADDR test helper that calls the callback with a stream of ASP
     /// requests after the Detach request is handled.
     async fn test_new_addr_asp_detach_handled_helper<
-        I: IntoIterator<Item = fnet_interfaces::Event>,
-        Fut: Future<Output = I>,
-        F: Fn(fnet_interfaces_admin::AddressStateProviderRequestStream) -> Fut,
+        St: Stream<Item = fnet_interfaces::Event>,
+        F: Fn(fnet_interfaces_admin::AddressStateProviderRequestStream) -> St,
     >(
         address: AddrSubnetEither,
         add_subnet_route: bool,
         asp_handler: F,
     ) -> TestRequestResult {
-        test_new_addr_asp_helper(address, add_subnet_route, |mut asp_request_stream| async {
-            let _: fnet_interfaces_admin::AddressStateProviderControlHandle = asp_request_stream
-                .next()
-                .await
-                .expect("eventloop uses ASP before dropping")
-                .expect("unexpected error while waiting for Detach request")
-                .into_detach()
-                .expect("eventloop makes detach request immediately");
-            asp_handler(asp_request_stream).await
+        test_new_addr_asp_helper(address, add_subnet_route, |asp_request_stream| {
+            asp_request_stream
+                .into_future()
+                .map(|(asp_request, asp_request_stream)| {
+                    let _: fnet_interfaces_admin::AddressStateProviderControlHandle = asp_request
+                        .expect("eventloop uses ASP before dropping")
+                        .expect("unexpected error while waiting for Detach request")
+                        .into_detach()
+                        .expect("eventloop makes detach request immediately");
+
+                    asp_handler(asp_request_stream)
+                })
+                .flatten_stream()
         })
         .await
     }
@@ -2808,13 +2930,13 @@ mod tests {
     #[fuchsia::test]
     async fn test_new_addr_drop_asp_after_detach(address: AddrSubnetEither) {
         pretty_assertions::assert_eq!(
-            test_new_addr_asp_detach_handled_helper(address, false, |_asp_stream| async {
-                std::iter::empty()
+            test_new_addr_asp_detach_handled_helper(address, false, |_asp_stream| {
+                futures::stream::empty()
             })
             .await,
             TestRequestResult {
                 messages: Vec::new(),
-                waiter_result: Err(RequestError::UnrecognizedInterface),
+                waiter_results: vec![Err(RequestError::UnrecognizedInterface)],
             },
         )
     }
@@ -2828,29 +2950,32 @@ mod tests {
             test_new_addr_asp_detach_handled_helper(
                 address,
                 true,
-                |mut asp_request_stream| async move {
-                    let responder = asp_request_stream
-                        .next()
-                        .await
-                        .expect(
-                            "eventloop watches for address assignment state before dropping ASP",
-                        )
-                        .expect("unexpected error while waiting for event from event loop")
-                        .into_watch_address_assignment_state()
-                        .expect("eventloop only makes WatchAddressAssignmentState request");
-                    responder.send(AddressAssignmentState::Assigned).unwrap();
+                |asp_request_stream| {
+                    asp_request_stream
+                        .into_future()
+                        .map(|(asp_request, _asp_request_stream)| {
+                            let responder = asp_request
+                                .expect(
+                                    "eventloop watches for address assignment state before dropping ASP",
+                                )
+                                .expect("unexpected error while waiting for event from event loop")
+                                .into_watch_address_assignment_state()
+                                .expect("eventloop only makes WatchAddressAssignmentState request");
+                            responder.send(AddressAssignmentState::Assigned).unwrap();
 
-                    // Send an update with the deleted address to complete the
-                    // request.
-                    [fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
-                        id: Some(ETH_INTERFACE_ID.try_into().unwrap()),
-                        addresses: Some(vec![test_addr(address.into_ext())]),
-                        ..fnet_interfaces::Properties::default()
-                    })]
+                            // Send an update with the deleted address to complete the
+                            // request.
+                            futures::stream::iter([fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
+                                id: Some(ETH_INTERFACE_ID.try_into().unwrap()),
+                                addresses: Some(vec![test_addr(address.into_ext())]),
+                                ..fnet_interfaces::Properties::default()
+                            })])
+                        })
+                        .flatten_stream()
                 }
             )
             .await,
-            TestRequestResult { messages: Vec::new(), waiter_result: Ok(()) },
+            TestRequestResult { messages: Vec::new(), waiter_results: vec![Ok(())] },
         )
     }
 
@@ -2879,23 +3004,63 @@ mod tests {
         address: AddrSubnetEither,
         removal_reason: InterfaceRemovedReason,
     ) {
-        let _: TestRequestResult =
-            test_interface_request(address, AddressRequestKind::Del, |req| async move {
+        let _: TestRequestResult = test_interface_request(TestInterfaceRequestCase {
+            address,
+            kind: AddressRequestKind::Del,
+            control_request_handler: |req| match req {
+                fnet_interfaces_admin::ControlRequest::RemoveAddress {
+                    address: got_address,
+                    responder,
+                } => {
+                    pretty_assertions::assert_eq!(got_address, address.into_ext());
+                    let control_handle = responder.control_handle();
+                    control_handle.send_on_interface_removed(removal_reason).unwrap();
+                    control_handle.shutdown();
+                    futures::stream::empty()
+                }
+                req => panic!("unexpected request {req:?}"),
+            },
+        })
+        .await;
+    }
+
+    fn del_addr_test_interface_case(
+        address: AddrSubnetEither,
+        response: Result<bool, fnet_interfaces_admin::ControlRemoveAddressError>,
+        remaining_address: Option<AddrSubnetEither>,
+    ) -> TestInterfaceRequestCase<
+        impl FnMut(
+            fnet_interfaces_admin::ControlRequest,
+        ) -> futures::stream::Iter<core::array::IntoIter<fnet_interfaces::Event, 1>>,
+    > {
+        TestInterfaceRequestCase {
+            address,
+            kind: AddressRequestKind::Del,
+            control_request_handler: move |req| {
                 match req {
                     fnet_interfaces_admin::ControlRequest::RemoveAddress {
                         address: got_address,
                         responder,
                     } => {
                         pretty_assertions::assert_eq!(got_address, address.into_ext());
-                        let control_handle = responder.control_handle();
-                        control_handle.send_on_interface_removed(removal_reason).unwrap();
-                        control_handle.shutdown();
-                        std::iter::empty()
+                        responder.send(response).unwrap();
+
+                        // Send an update without the deleted address to complete
+                        // the request.
+                        futures::stream::iter([fnet_interfaces::Event::Changed(
+                            fnet_interfaces::Properties {
+                                id: Some(ETH_INTERFACE_ID.try_into().unwrap()),
+                                addresses: Some(remaining_address.map_or_else(Vec::new, |addr| {
+                                    vec![test_addr(addr.into_ext())]
+                                })),
+                                ..fnet_interfaces::Properties::default()
+                            },
+                        )])
                     }
                     req => panic!("unexpected request {req:?}"),
                 }
-            })
-            .await;
+            },
+        }
     }
 
     /// Test RTM_DELADDR with all interesting responses to remove address.
@@ -2930,28 +3095,24 @@ mod tests {
         waiter_result: Result<(), RequestError>,
     ) {
         pretty_assertions::assert_eq!(
-            test_interface_request(address, AddressRequestKind::Del, |req| async move {
-                match req {
-                    fnet_interfaces_admin::ControlRequest::RemoveAddress {
-                        address: got_address,
-                        responder,
-                    } => {
-                        pretty_assertions::assert_eq!(got_address, address.into_ext());
-                        responder.send(response).unwrap();
+            test_interface_request(del_addr_test_interface_case(address, response, None)).await,
+            TestRequestResult { messages: Vec::new(), waiter_results: vec![waiter_result] },
+        )
+    }
 
-                        // Send an update without the deleted address to complete
-                        // the request.
-                        [fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
-                            id: Some(ETH_INTERFACE_ID.try_into().unwrap()),
-                            addresses: Some(Vec::new()),
-                            ..fnet_interfaces::Properties::default()
-                        })]
-                    }
-                    req => panic!("unexpected request {req:?}"),
-                }
-            })
+    /// Tests that multiple interface update requests result in only one
+    /// admin handle being created for that interface.
+    #[fuchsia::test]
+    async fn test_single_get_admin_for_multiple_interface_requests() {
+        let first_address = test_addr_subnet_v4();
+        let second_address = test_addr_subnet_v6();
+        pretty_assertions::assert_eq!(
+            test_maybe_two_interface_requests_on_single_control(
+                del_addr_test_interface_case(first_address, Ok(true), Some(second_address)),
+                Some(del_addr_test_interface_case(second_address, Ok(true), None)),
+            )
             .await,
-            TestRequestResult { messages: Vec::new(), waiter_result },
+            TestRequestResult { messages: Vec::new(), waiter_results: vec![Ok(()), Ok(())] },
         )
     }
 }
