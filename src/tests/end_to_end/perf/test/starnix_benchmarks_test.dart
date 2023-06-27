@@ -29,6 +29,7 @@ void main() {
     await runTestComponent(
         packageName: 'starnix_microbenchmarks_perftestmode',
         componentName: 'starnix_microbenchmarks.cm',
+        realm: "/core/testing:starnix-tests",
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}'
             ' --runs $iterationsPerTestPerProcess',
         processRuns: processRuns,
