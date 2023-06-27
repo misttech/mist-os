@@ -8,7 +8,6 @@
 #include <memory>
 
 #include "msd.h"
-#include "platform_semaphore.h"
 
 namespace msd {
 class MagmaSystemSemaphore {
