@@ -44,8 +44,6 @@ group("additional_build_targets") {
     # TODO(fxbug.dev/129093): Enable once the bug is fixed.
     # "//src/lib:tests",
 
-    # TODO(fxbug.dev/128952): Enable after disabling battery_manager_go_test
-    # on RISC-V.
-    # "//src/power:tests",
+    "//src/power:tests",
   ]
 }
