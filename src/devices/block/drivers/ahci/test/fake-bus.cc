@@ -231,7 +231,7 @@ zx_status_t FakePort::Write(size_t offset, uint32_t val) {
       return ZX_OK;
 
     case kPortSataActive:
-      // Just ack'ing.
+      reg.sact |= val;  // Set additional active bits without clearing existing.
       return ZX_OK;
 
     default:

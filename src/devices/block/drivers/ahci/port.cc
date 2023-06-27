@@ -316,7 +316,10 @@ bool Port::ProcessQueued() {
     // Issue the command to the device.
     zx_status_t st = TxnBeginLocked(slot, txn);
     // complete the transaction if it failed during processing
-    if (st != ZX_OK) {
+    if (st == ZX_OK) {
+      running_ |= (1u << slot);
+      commands_[slot] = txn;
+    } else {
       lock_.Release();
       txn->Complete(st);
       lock_.Acquire();
@@ -446,9 +449,6 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, SataTransaction* txn) {
     prd->dbc = ((length - 1) & (AHCI_PRD_MAX_SIZE - 1));  // 0-based byte count
     cl->prdtl++;
   }
-
-  running_ |= (1u << slot);
-  commands_[slot] = txn;
 
   zxlogf(TRACE,
          "ahci.%u: do_txn txn %p (%c) offset 0x%" PRIx64 " length 0x%" PRIx64 " slot %d prdtl %u\n",
