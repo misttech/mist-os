@@ -259,26 +259,20 @@ mod tests {
 
         let log_reader1 =
             harness.create_default_reader(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::Legacy {
-                    moniker: vec![".", "foo"].into(),
-                    instance_id: "0".into(),
-                },
+                ComponentIdentifier::parse_from_moniker("./foo").unwrap(),
                 "http://foo.com",
             ));
 
         let log_reader2 =
             harness.create_default_reader(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::Legacy {
-                    moniker: vec![".", "bar"].into(),
-                    instance_id: "0".into(),
-                },
+                ComponentIdentifier::parse_from_moniker("./bar").unwrap(),
                 "http://bar.com",
             ));
 
         attributed_inspect_two_streams_different_identities_by_reader!(
             harness,
-            log_reader1 @ "./foo",
-            log_reader2 @ "./bar",
+            log_reader1 @ "foo",
+            log_reader2 @ "bar",
         );
     }
 
@@ -301,17 +295,14 @@ mod tests {
         let log_reader1 = harness.create_event_stream_reader("./foo", "http://foo.com");
         let log_reader2 =
             harness.create_default_reader(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::Legacy {
-                    moniker: vec![".", "bar"].into(),
-                    instance_id: "0".into(),
-                },
+                ComponentIdentifier::parse_from_moniker("./bar").unwrap(),
                 "http://bar.com",
             ));
 
         attributed_inspect_two_streams_different_identities_by_reader!(
             harness,
             log_reader1 @ "foo",
-            log_reader2 @ "./bar",
+            log_reader2 @ "bar",
         );
     }
 

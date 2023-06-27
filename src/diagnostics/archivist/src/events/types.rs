@@ -187,13 +187,6 @@ impl std::fmt::Display for MonikerSegment {
 /// Represents the ID of a component.
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum ComponentIdentifier {
-    Legacy {
-        /// The realm path plus the name of the component.
-        moniker: Moniker,
-
-        /// The instance ID of the component.
-        instance_id: Box<str>,
-    },
     Moniker(Vec<MonikerSegment>),
 }
 
@@ -202,7 +195,6 @@ impl ComponentIdentifier {
     /// For legacy components (v1), this is the relative moniker with respect to the root realm.
     pub fn relative_moniker_for_selectors(&self) -> Moniker {
         match self {
-            Self::Legacy { moniker, .. } => moniker.clone(),
             Self::Moniker(segments) => {
                 if segments.is_empty() {
                     Moniker(vec![])
@@ -215,11 +207,6 @@ impl ComponentIdentifier {
 
     pub fn unique_key(&self) -> UniqueKey {
         match self {
-            Self::Legacy { instance_id, .. } => {
-                let mut key = self.relative_moniker_for_selectors().0;
-                key.push(instance_id.into());
-                UniqueKey(key)
-            }
             Self::Moniker(segments) => {
                 let mut key = vec![];
                 for segment in segments {

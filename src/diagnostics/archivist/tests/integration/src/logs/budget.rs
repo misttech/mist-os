@@ -276,9 +276,6 @@ struct MessageReceipt {
 
 impl PartialEq<Data<Logs>> for MessageReceipt {
     fn eq(&self, other: &Data<Logs>) -> bool {
-        // we launch `socket_puppet0.cmx` and store that moniker, but the moniker we get back from
-        // archivist looks like `socket_puppet0.cmx:12345`, so we do a prefix match instead of
-        // full string equality
-        other.moniker.starts_with(&self.moniker) && other.metadata.timestamp == self.timestamp
+        other.moniker == self.moniker && other.metadata.timestamp == self.timestamp
     }
 }

@@ -401,14 +401,6 @@ mod tests {
                 ComponentIdentifier::parse_from_moniker("./a/b").unwrap(),
                 TEST_URL
             ));
-        static ref LEGACY_IDENTITY: Arc<ComponentIdentity> =
-            Arc::new(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::Legacy {
-                    instance_id: "12345".to_string().into_boxed_str(),
-                    moniker: vec!["a", "b", "foo.cmx"].into(),
-                },
-                TEST_URL
-            ));
     }
 
     #[derive(Default)]
@@ -680,7 +672,7 @@ mod tests {
             events: vec![EventType::InspectSinkRequested],
         });
 
-        producer1.emit(EventType::DiagnosticsReady, LEGACY_IDENTITY.clone()).await;
+        producer1.emit(EventType::DiagnosticsReady, IDENTITY.clone()).await;
         producer2.emit(EventType::LogSinkRequested, IDENTITY.clone()).await;
         producer3.emit(EventType::InspectSinkRequested, IDENTITY.clone()).await;
 
@@ -700,7 +692,7 @@ mod tests {
                     "0": {
                         "@time": inspect::testing::AnyProperty,
                         event: "diagnostics_ready",
-                        moniker: "a/b/foo.cmx:12345"
+                        moniker: "a/b"
                     },
                     "1": {
                         "@time": inspect::testing::AnyProperty,

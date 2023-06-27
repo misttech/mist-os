@@ -343,10 +343,7 @@ mod tests {
     #[fuchsia::test]
     async fn inspect_repo_disallows_duplicated_dirs() {
         let inspect_repo = Arc::new(InspectRepository::default());
-        let moniker = vec!["a", "b", "foo.cmx"].into();
-        let instance_id = "1234".to_string().into_boxed_str();
-
-        let component_id = ComponentIdentifier::Legacy { instance_id, moniker };
+        let component_id = ComponentIdentifier::parse_from_moniker("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
 
         let (proxy, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
@@ -381,10 +378,7 @@ mod tests {
     #[fuchsia::test]
     async fn data_repo_updates_existing_entry_to_hold_inspect_data() {
         let data_repo = Arc::new(InspectRepository::default());
-        let moniker = vec!["a", "b", "foo.cmx"].into();
-        let instance_id = "1234".to_string().into_boxed_str();
-
-        let component_id = ComponentIdentifier::Legacy { instance_id, moniker };
+        let component_id = ComponentIdentifier::parse_from_moniker("a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
         let (proxy, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
@@ -409,9 +403,7 @@ mod tests {
     #[fuchsia::test]
     async fn repo_removes_entries_when_inspect_is_disconnected() {
         let data_repo = Arc::new(InspectRepository::default());
-        let moniker = vec!["a", "b", "foo.cmx"].into();
-        let instance_id = "1234".to_string().into_boxed_str();
-        let component_id = ComponentIdentifier::Legacy { instance_id, moniker };
+        let component_id = ComponentIdentifier::parse_from_moniker("a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
@@ -435,14 +427,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn repo_integrates_with_the_pipeline() {
-        let selector = selectors::parse_selector::<FastError>(r#"a/b/foo.cmx:root"#).unwrap();
+        let selector = selectors::parse_selector::<FastError>(r#"a/b/foo:root"#).unwrap();
         let static_selectors_opt = Some(vec![selector]);
         let pipeline = Arc::new(Pipeline::for_test(static_selectors_opt));
         let data_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
-        let moniker = vec!["a", "b", "foo.cmx"].into();
-        let instance_id = "1234".to_string();
-        let component_id =
-            ComponentIdentifier::Legacy { instance_id: instance_id.into_boxed_str(), moniker };
+        let component_id = ComponentIdentifier::parse_from_moniker("a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
@@ -462,7 +451,7 @@ mod tests {
                 .await
                 .static_selectors_matchers()
                 .unwrap()
-                .get(&Moniker::from(vec!["a", "b", "foo.cmx"]))
+                .get(&Moniker::from(vec!["a", "b", "foo"]))
                 .is_some())
         }
 
@@ -477,19 +466,14 @@ mod tests {
             .await
             .static_selectors_matchers()
             .unwrap()
-            .get(&Moniker::from(vec!["a", "b", "foo.cmx"]))
+            .get(&Moniker::from(vec!["a", "b", "foo"]))
             .is_none())
     }
 
     #[fuchsia::test]
     async fn data_repo_filters_inspect_by_selectors() {
         let data_repo = Arc::new(InspectRepository::default());
-        let realm_path = vec!["a".to_string(), "b".to_string()];
-        let instance_id = "1234".to_string().into_boxed_str();
-
-        let mut moniker = realm_path.clone();
-        moniker.push("foo.cmx".to_string());
-        let component_id = ComponentIdentifier::Legacy { instance_id, moniker: moniker.into() };
+        let component_id = ComponentIdentifier::parse_from_moniker("a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
 
         Arc::clone(&data_repo)
@@ -506,12 +490,7 @@ mod tests {
             })
             .await;
 
-        let mut moniker = realm_path;
-        moniker.push("foo2.cmx".to_string());
-        let component_id2 = ComponentIdentifier::Legacy {
-            instance_id: "12345".to_string().into_boxed_str(),
-            moniker: moniker.into(),
-        };
+        let component_id2 = ComponentIdentifier::parse_from_moniker("a/b/foo2").unwrap();
         let identity2 =
             Arc::new(ComponentIdentity::from_identifier_and_url(component_id2, TEST_URL));
 
@@ -532,7 +511,7 @@ mod tests {
         assert_eq!(2, data_repo.inner.read().await.fetch_inspect_data(&None, None).await.len());
 
         let selectors = Some(vec![
-            selectors::parse_selector::<FastError>("a/b/foo.cmx:root").expect("parse selector")
+            selectors::parse_selector::<FastError>("a/b/foo:root").expect("parse selector")
         ]);
         assert_eq!(
             1,
@@ -540,16 +519,15 @@ mod tests {
         );
 
         let selectors = Some(vec![
-            selectors::parse_selector::<FastError>("a/b/f*.cmx:root").expect("parse selector")
+            selectors::parse_selector::<FastError>("a/b/f*:root").expect("parse selector")
         ]);
         assert_eq!(
             2,
             data_repo.inner.read().await.fetch_inspect_data(&selectors, None).await.len()
         );
 
-        let selectors = Some(vec![
-            selectors::parse_selector::<FastError>("foo.cmx:root").expect("parse selector")
-        ]);
+        let selectors =
+            Some(vec![selectors::parse_selector::<FastError>("foo:root").expect("parse selector")]);
         assert_eq!(
             0,
             data_repo.inner.read().await.fetch_inspect_data(&selectors, None).await.len()

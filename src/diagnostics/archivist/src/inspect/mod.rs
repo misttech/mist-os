@@ -752,10 +752,9 @@ mod tests {
                     join_all(dir_name_and_filecount.iter().map(|(dir, _)| async move {
                         let full_path = format!("{path}/{dir}");
                         let proxy = collector::find_directory_proxy(&full_path).await.unwrap();
-                        let unique_cid = ComponentIdentifier::Legacy {
-                            instance_id: "1234".into(),
-                            moniker: vec![format!("component_{dir}.cmx")].into(),
-                        };
+                        let unique_cid =
+                            ComponentIdentifier::parse_from_moniker(&format!("./component_{dir}"))
+                                .unwrap();
                         (unique_cid, proxy)
                     }))
                     .await;
@@ -831,8 +830,7 @@ mod tests {
         let child_1_1_selector =
             selectors::parse_selector::<VerboseError>(r#"*:root/child_1/*:some-int"#).unwrap();
         let child_2_selector =
-            selectors::parse_selector::<VerboseError>(r#"test_component.cmx:root/child_2:*"#)
-                .unwrap();
+            selectors::parse_selector::<VerboseError>(r#"test_component:root/child_2:*"#).unwrap();
 
         let static_selectors_opt = Some(vec![child_1_1_selector, child_2_selector]);
 
@@ -843,11 +841,7 @@ mod tests {
 
         // The absolute moniker here is made up since the selector is a glob
         // selector, so any path would match.
-        let component_id = ComponentIdentifier::Legacy {
-            instance_id: "1234".into(),
-            moniker: vec!["test_component.cmx"].into(),
-        };
-
+        let component_id = ComponentIdentifier::parse_from_moniker("./test_component").unwrap();
         let inspector = Inspector::default();
         let root = inspector.root();
         let test_archive_accessor_node = root.create_child("test_archive_accessor_node");
@@ -994,7 +988,7 @@ mod tests {
                         max_snapshot_sizes_bytes: AnyProperty,
                         snapshot_schema_truncation_percentage: AnyProperty,
                         longest_processing_times: contains {
-                            "test_component.cmx": contains {
+                            "test_component": contains {
                                 "@time": AnyProperty,
                                 duration_seconds: AnyProperty,
                             }
@@ -1065,7 +1059,7 @@ mod tests {
                         max_snapshot_sizes_bytes: AnyProperty,
                         snapshot_schema_truncation_percentage: AnyProperty,
                         longest_processing_times: contains {
-                            "test_component.cmx": contains {
+                            "test_component": contains {
                                 "@time": AnyProperty,
                                 duration_seconds: AnyProperty,
                             }

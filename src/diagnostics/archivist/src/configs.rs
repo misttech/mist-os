@@ -184,7 +184,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let config_path = dir.path().join("config");
         fs::create_dir(&config_path).unwrap();
-        fs::write(config_path.join("ok.cfg"), "my_component.cmx:root:status").unwrap();
+        fs::write(config_path.join("ok.cfg"), "my_component:root:status").unwrap();
         fs::write(config_path.join("ignored.txt"), "This file is ignored").unwrap();
         fs::write(config_path.join("bad.cfg"), "This file fails to parse").unwrap();
 
@@ -218,13 +218,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let config_path = dir.path().join("config");
         fs::create_dir(&config_path).unwrap();
-        fs::write(config_path.join("ok.cfg"), "my_component.cmx:root:status").unwrap();
+        fs::write(config_path.join("ok.cfg"), "my_component:root:status").unwrap();
         fs::write(config_path.join("ignored.txt"), "This file is ignored").unwrap();
-        fs::write(
-            config_path.join("also_ok.cfg"),
-            "my_component.cmx:root:a\nmy_component.cmx:root/b:c\n",
-        )
-        .unwrap();
+        fs::write(config_path.join("also_ok.cfg"), "my_component:root:a\nmy_component:root/b:c\n")
+            .unwrap();
 
         let mut config = PipelineConfig::from_directory(&config_path, EmptyBehavior::Disable);
 
@@ -280,13 +277,10 @@ mod tests {
         fs::create_dir(&config_path).unwrap();
         fs::write(config_path.join("DISABLE_FILTERING.txt"), "This file disables filtering.")
             .unwrap();
-        fs::write(config_path.join("ok.cfg"), "my_component.cmx:root:status").unwrap();
+        fs::write(config_path.join("ok.cfg"), "my_component:root:status").unwrap();
         fs::write(config_path.join("ignored.txt"), "This file is ignored").unwrap();
-        fs::write(
-            config_path.join("also_ok.cfg"),
-            "my_component.cmx:root:a\nmy_component.cmx:root/b:c\n",
-        )
-        .unwrap();
+        fs::write(config_path.join("also_ok.cfg"), "my_component:root:a\nmy_component:root/b:c\n")
+            .unwrap();
 
         let mut config = PipelineConfig::from_directory(&config_path, EmptyBehavior::Disable);
 

@@ -330,8 +330,8 @@ mod tests {
         let a: Vec<String> = key(vec!["core", "foo", "bar"]);
         let b: Vec<String> = key(vec!["core", "foo", "baz"]);
         let c: Vec<String> = key(vec!["core", "quux"]);
-        let d: Vec<String> = key(vec!["foo.cmx", "3"]);
-        let e: Vec<String> = key(vec!["foo.cmx", "2"]);
+        let d: Vec<String> = key(vec!["foo", "3"]);
+        let e: Vec<String> = key(vec!["foo", "2"]);
 
         insert(a.clone(), 1);
         insert(b.clone(), 2);
@@ -357,7 +357,7 @@ mod tests {
             (key(vec![]), None),
             (key(vec!["core"]), None),
             (key(vec!["core", "foo"]), None),
-            (key(vec!["foo.cmx"]), None),
+            (key(vec!["foo"]), None),
             (c.clone(), Some(Data(3))),
             (a.clone(), Some(Data(1))),
             (b.clone(), Some(Data(2))),
@@ -370,9 +370,7 @@ mod tests {
         trie.remove(&c);
         trie.remove(&d);
 
-        check!(
-            vec![(e.clone(), Some(Data(5))), (key(vec!["foo.cmx"]), None), (key(vec![]), None),]
-        );
+        check!(vec![(e.clone(), Some(Data(5))), (key(vec!["foo"]), None), (key(vec![]), None),]);
 
         trie.remove(&e);
         check!(vec![(key(vec![]), None::<Data>)]);

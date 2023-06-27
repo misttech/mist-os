@@ -118,10 +118,7 @@ mod tests {
 
     fn test_message_with_tag(tag: Option<&str>) -> LogsData {
         let identity = ComponentIdentity::from_identifier_and_url(
-            ComponentIdentifier::Legacy {
-                moniker: vec!["bogus", "specious-at-best.cmx"].into(),
-                instance_id: "0".into(),
-            },
+            ComponentIdentifier::parse_from_moniker("./bogus/specious-at-best").unwrap(),
             "fuchsia-pkg://not-a-package",
         );
         let mut builder = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -295,7 +292,7 @@ mod tests {
     fn should_send_attributed_tag() {
         let message = test_message();
         let filter = MessageFilter {
-            tags: vec!["specious-at-best.cmx".to_string()].into_iter().collect(),
+            tags: vec!["specious-at-best".to_string()].into_iter().collect(),
             ..MessageFilter::default()
         };
 

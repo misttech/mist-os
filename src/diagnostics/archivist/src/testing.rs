@@ -11,11 +11,8 @@ use std::sync::Arc;
 lazy_static! {
     pub static ref TEST_IDENTITY: Arc<ComponentIdentity> = {
         Arc::new(ComponentIdentity::from_identifier_and_url(
-            ComponentIdentifier::Legacy {
-                moniker: vec!["fake-test-env", "test-component.cmx"].into(),
-                instance_id: "".into(),
-            },
-            "fuchsia-pkg://fuchsia.com/testing123#test-component.cmx",
+            ComponentIdentifier::parse_from_moniker("fake-test-env/test-component").unwrap(),
+            "fuchsia-pkg://fuchsia.com/testing123#test-component.cm",
         ))
     };
 }

@@ -81,7 +81,7 @@ pub mod tests {
                 header: Some(fcomponent::EventHeader {
                     event_type: Some(fcomponent::EventType::DirectoryReady),
                     moniker: Some("./foo/bar".to_string()),
-                    component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/bar.cmx".to_string()),
+                    component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/bar.cm".to_string()),
                     timestamp: Some(zx::Time::get_monotonic().into_nanos()),
                     ..Default::default()
                 }),
@@ -102,7 +102,7 @@ pub mod tests {
                 header: Some(fcomponent::EventHeader {
                     event_type: Some(fcomponent::EventType::CapabilityRequested),
                     moniker: Some("./foo/bar".to_string()),
-                    component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/bar.cmx".to_string()),
+                    component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/bar.cm".to_string()),
                     timestamp: Some(zx::Time::get_monotonic().into_nanos()),
                     ..Default::default()
                 }),
@@ -120,7 +120,7 @@ pub mod tests {
         let expected_component_id = ComponentIdentifier::parse_from_moniker("./foo/bar").unwrap();
         let expected_identity = ComponentIdentity::from_identifier_and_url(
             expected_component_id,
-            "fuchsia-pkg://fuchsia.com/foo#meta/bar.cmx",
+            "fuchsia-pkg://fuchsia.com/foo#meta/bar.cm",
         );
 
         // Assert the third received event was a DirectoryReady event for diagnostics.

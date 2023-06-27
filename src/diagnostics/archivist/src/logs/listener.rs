@@ -367,11 +367,8 @@ mod tests {
 
     fn get_test_identity() -> ComponentIdentity {
         ComponentIdentity::from_identifier_and_url(
-            ComponentIdentifier::Legacy {
-                moniker: vec!["fake-test-env", "bleebloo.cmx"].into(),
-                instance_id: "".into(),
-            },
-            "fuchsia-pkg://fuchsia.com/testing123#test-component.cmx",
+            ComponentIdentifier::parse_from_moniker("fake-test-env/bleebloo").unwrap(),
+            "fuchsia-pkg://fuchsia.com/testing123#test-component.cm",
         )
     }
 }

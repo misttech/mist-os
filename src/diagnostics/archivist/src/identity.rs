@@ -27,7 +27,6 @@ impl ComponentIdentity {
         ComponentIdentity {
             relative_moniker: identifier.relative_moniker_for_selectors(),
             instance_id: match identifier {
-                ComponentIdentifier::Legacy { instance_id, .. } => Some(instance_id),
                 ComponentIdentifier::Moniker(..) => None,
             },
             url: url.into(),
@@ -37,10 +36,7 @@ impl ComponentIdentity {
     /// Returns generic metadata, suitable for providing a uniform ID to unattributed data.
     pub fn unknown() -> Self {
         Self::from_identifier_and_url(
-            ComponentIdentifier::Legacy {
-                instance_id: "0".into(),
-                moniker: vec!["UNKNOWN"].into(),
-            },
+            ComponentIdentifier::parse_from_moniker("./UNKNOWN").unwrap(),
             "fuchsia-pkg://UNKNOWN",
         )
     }
