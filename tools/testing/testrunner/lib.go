@@ -225,7 +225,10 @@ func execute(
 			if err != nil {
 				return fmt.Errorf("failed to initialize fuchsia tester: %w", err)
 			}
-			ffxTester := NewFFXTester(ffx, t, outputs.OutDir, opts.FFXExperimentLevel)
+			ffxTester, err := NewFFXTester(ctx, ffx, t, outputs.OutDir, opts.FFXExperimentLevel)
+			if err != nil {
+				return fmt.Errorf("failed to initialize ffx tester: %w", err)
+			}
 			defer func() {
 				// outputs.Record() moves output files to paths within the output directory
 				// specified by test name.

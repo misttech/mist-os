@@ -528,13 +528,18 @@ type FFXTester struct {
 }
 
 // NewFFXTester returns an FFXTester.
-func NewFFXTester(ffx FFXInstance, sshTester Tester, localOutputDir string, experimentLevel int) *FFXTester {
+func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localOutputDir string, experimentLevel int) (*FFXTester, error) {
+	if err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
+		return ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
+	}, nil); err != nil {
+		return nil, err
+	}
 	return &FFXTester{
 		ffx:             ffx,
 		sshTester:       sshTester,
 		localOutputDir:  localOutputDir,
 		experimentLevel: experimentLevel,
-	}
+	}, nil
 }
 
 func (t *FFXTester) EnabledForTest(test testsharder.Test) bool {

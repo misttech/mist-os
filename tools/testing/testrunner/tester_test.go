@@ -422,7 +422,10 @@ func TestFFXTester(t *testing.T) {
 				outcome = ffxutil.TestNotStarted
 			}
 			ffx := &ffxutil.MockFFXInstance{TestOutcome: outcome}
-			tester := NewFFXTester(ffx, sshTester, t.TempDir(), c.experimentLevel)
+			tester, err := NewFFXTester(context.Background(), ffx, sshTester, t.TempDir(), c.experimentLevel)
+			if err != nil {
+				t.Fatalf("NewFFXTester got unexpected error: %s", err)
+			}
 
 			defer func() {
 				if err := tester.Close(); err != nil {
