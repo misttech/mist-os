@@ -10,6 +10,7 @@ use {
     fuchsia_component::client,
     tracing::warn,
 };
+
 /// Connects to the appropriate `fuchsia.process.Launcher` service based on the options provided in
 /// `ProcessLauncherConnector::new`.
 ///
@@ -39,7 +40,7 @@ impl ProcessLauncherConnector {
             fasync::Task::spawn(async move {
                 let result = ProcessLauncher::serve(stream).await;
                 if let Err(error) = result {
-                    warn!(%error, "ProcessLauncherConnector.connect failed");
+                    warn!(%error, "ProcessLauncher.serve failed");
                 }
             })
             .detach();

@@ -4,7 +4,6 @@
 
 use {
     crate::vdso_vmo::get_stable_vdso_vmo,
-    anyhow::Error,
     fidl_fuchsia_process as fproc,
     fuchsia_runtime::{HandleInfo, HandleInfoError},
     fuchsia_zircon::{self as zx, AsHandleRef},
@@ -83,7 +82,7 @@ impl ProcessLauncher {
     /// Serves an instance of the `fuchsia.process.Launcher` protocol given an appropriate
     /// RequestStream. Returns when the channel backing the RequestStream is closed or an
     /// unrecoverable error, like a failure to read from the stream, occurs.
-    pub async fn serve(mut stream: fproc::LauncherRequestStream) -> Result<(), Error> {
+    pub async fn serve(mut stream: fproc::LauncherRequestStream) -> Result<(), fidl::Error> {
         // `fuchsia.process.Launcher is stateful. The Add methods accumulate state that is
         // consumed/reset by either Launch or CreateWithoutStarting.
         let mut state = ProcessLauncherState::default();

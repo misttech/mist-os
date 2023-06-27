@@ -4,7 +4,7 @@
 
 use {
     crate::crash_info::{ComponentCrashInfo, CrashRecords},
-    anyhow::Error,
+    crate::error::ExceptionError,
     fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::TryStreamExt,
@@ -59,10 +59,10 @@ async fn record_exception(
     moniker: AbsoluteMoniker,
     exception_info: task_exceptions::ExceptionInfo,
     crash_records: &CrashRecords,
-) -> Result<(), Error> {
+) -> Result<(), ExceptionError> {
     // An exception has occurred, record information about the crash so that it may be retrieved
     // later.
-    let thread_koid = exception_info.thread.get_koid()?;
+    let thread_koid = exception_info.thread.get_koid().map_err(ExceptionError::GetThreadKoid)?;
     crash_records.add_report(thread_koid, ComponentCrashInfo { url: resolved_url, moniker }).await;
 
     // We've stored all the information we need, so mark the exception handle such that the next
@@ -70,7 +70,7 @@ async fn record_exception(
     exception_info
         .exception_handle
         .set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_TRY_NEXT)
-        .expect("failed to set exception state");
+        .map_err(ExceptionError::SetState)?;
 
     // Returning drops exception_info.exception_handle, which allows zircon to proceed with
     // exception handling.
@@ -81,7 +81,7 @@ async fn record_exception(
 mod tests {
     use {
         super::*,
-        anyhow::Context as _,
+        anyhow::{Context as _, Error},
         fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
         fuchsia_component::client as fclient,
         fuchsia_fs, fuchsia_runtime as fruntime,

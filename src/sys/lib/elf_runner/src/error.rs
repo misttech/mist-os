@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::vdso_vmo::VdsoError,
     ::routing::policy::PolicyError,
     clonable_error::ClonableError,
     fuchsia_zircon as zx,
     runner::component::{ComponentNamespaceError, LaunchError},
     runner::StartInfoProgramError,
+    std::ffi::CString,
     thiserror::Error,
     tracing::error,
 };
@@ -130,4 +130,27 @@ impl ProgramError {
             ProgramError::Policy(_) => zx::Status::ACCESS_DENIED,
         }
     }
+}
+
+/// Errors from exception handling.
+#[derive(Debug, Clone, Error)]
+pub enum ExceptionError {
+    #[error("failed to get thread koid: {_0}")]
+    GetThreadKoid(#[source] zx::Status),
+    #[error("failed to set exception state: {_0}")]
+    SetState(#[source] zx::Status),
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum VdsoError {
+    #[error("Could not duplicate VMO handle for vDSO with name \"{}\": {}", name.to_string_lossy(), status)]
+    CouldNotDuplicate {
+        name: CString,
+        #[source]
+        status: zx::Status,
+    },
+    #[error("No vDSO VMO found with name \"{}\"", _0.to_string_lossy())]
+    NotFound(CString),
+    #[error("failed to get vDSO name: {_0}")]
+    GetName(#[source] zx::Status),
 }

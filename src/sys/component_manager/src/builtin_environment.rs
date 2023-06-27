@@ -68,6 +68,7 @@ use {
     anyhow::{format_err, Context as _, Error},
     cm_rust::{Availability, RunnerRegistration, UseEventStreamDecl, UseSource},
     cm_types::Name,
+    cstr::cstr,
     elf_runner::{
         crash_info::CrashRecords,
         vdso_vmo::{get_direct_vdso_vmo, get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo},
@@ -215,8 +216,8 @@ impl BuiltinEnvironmentBuilder {
                 .publish_kernel_vmo(get_stable_vdso_vmo()?)?
                 .publish_kernel_vmo(get_next_vdso_vmo()?)?
                 .publish_kernel_vmo(get_direct_vdso_vmo()?)?
-                .publish_kernel_vmo(get_vdso_vmo("vdso/test1")?)?
-                .publish_kernel_vmo(get_vdso_vmo("vdso/test2")?)?
+                .publish_kernel_vmo(get_vdso_vmo(cstr!("vdso/test1"))?)?
+                .publish_kernel_vmo(get_vdso_vmo(cstr!("vdso/test2"))?)?
                 .publish_kernel_vmos(HandleType::KernelFileVmo, 0)?
                 .create_and_bind_vfs()?;
         }
