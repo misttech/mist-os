@@ -284,6 +284,22 @@ void BindManagerTestBase::AddCompositeNodeSpec(std::string composite,
   RunLoopUntilIdle();
 }
 
+void BindManagerTestBase::AddCompositeNodeSpec_EXPECT_BIND_START(std::string composite,
+                                                                 std::vector<std::string> parents) {
+  VerifyNoOngoingBind();
+  AddCompositeNodeSpec(composite, std::move(parents));
+  ASSERT_TRUE(bind_manager_->IsBindOngoing());
+}
+
+void BindManagerTestBase::AddCompositeNodeSpec_EXPECT_QUEUED(std::string composite,
+                                                             std::vector<std::string> parents) {
+  ASSERT_TRUE(bind_manager_->IsBindOngoing());
+  auto expected_data = CurrentBindManagerData();
+  expected_data.pending_orphan_rebind_count += 1;
+  AddCompositeNodeSpec(composite, std::move(parents));
+  VerifyBindManagerData(expected_data);
+}
+
 void BindManagerTestBase::InvokeTryBindAllAvailable() {
   bind_manager_->TryBindAllAvailable();
   RunLoopUntilIdle();
@@ -353,6 +369,14 @@ void BindManagerTestBase::VerifyOrphanedNodes(std::vector<std::string> expected_
   for (const auto& node : expected_nodes) {
     ASSERT_NE(bind_manager_->GetOrphanedNodes().find(node),
               bind_manager_->GetOrphanedNodes().end());
+  }
+}
+
+void BindManagerTestBase::VerifyMultibindNodes(std::vector<std::string> expected_nodes) {
+  auto multibind_nodes = bind_manager_->GetMultibindNodes();
+  ASSERT_EQ(expected_nodes.size(), multibind_nodes.size());
+  for (const auto& node : expected_nodes) {
+    ASSERT_NE(multibind_nodes.find(node), multibind_nodes.end());
   }
 }
 

@@ -59,6 +59,11 @@ void BindNodeSet::AddMultibindNode(Node& node) {
   multibind_nodes_.emplace(node.MakeComponentMoniker(), node.weak_from_this());
 }
 
+bool BindNodeSet::MultibindContains(std::string node_moniker) const {
+  return multibind_nodes_.find(node_moniker) != multibind_nodes_.end() ||
+         new_multibind_nodes_.find(node_moniker) != new_multibind_nodes_.end();
+}
+
 BindManager::BindManager(BindManagerBridge* bridge, NodeManager* node_manager,
                          async_dispatcher_t* dispatcher)
     : legacy_composite_manager_(node_manager, dispatcher,
@@ -94,7 +99,7 @@ void BindManager::TryBindAllAvailable(NodeBindingInfoResultCallback result_callb
         ProcessPendingBindRequests();
       };
   std::shared_ptr<BindResultTracker> tracker = std::make_shared<BindResultTracker>(
-      bind_node_set_.NumOfOrphanedNodes(), std::move(next_attempt));
+      bind_node_set_.NumOfAvailableNodes(), std::move(next_attempt));
   TryBindAllAvailableInternal(tracker);
 }
 
@@ -104,6 +109,7 @@ void BindManager::Bind(Node& node, std::string_view driver_url_suffix,
       .node = node.weak_from_this(),
       .driver_url_suffix = std::string(driver_url_suffix),
       .tracker = result_tracker,
+      .composite_only = false,
   };
   if (bind_node_set_.is_bind_ongoing()) {
     pending_bind_requests_.push_back(std::move(request));
@@ -126,9 +132,17 @@ void BindManager::TryBindAllAvailableInternal(std::shared_ptr<BindResultTracker>
 
   auto multibind_nodes = bind_node_set_.CurrentMultibindNodes();
   for (auto& [path, node_weak] : multibind_nodes) {
-    if (auto node = node_weak.lock(); node) {
-      legacy_composite_manager_.BindNode(node);
+    std::shared_ptr node = node_weak.lock();
+    if (!node) {
+      tracker->ReportNoBind();
+      continue;
     }
+
+    BindInternal(BindRequest{
+        .node = node_weak,
+        .tracker = tracker,
+        .composite_only = true,
+    });
   }
 
   std::unordered_map<std::string, std::weak_ptr<Node>> orphaned_nodes =
@@ -137,6 +151,7 @@ void BindManager::TryBindAllAvailableInternal(std::shared_ptr<BindResultTracker>
     BindInternal(BindRequest{
         .node = node,
         .tracker = tracker,
+        .composite_only = false,
     });
   }
 }
@@ -156,15 +171,23 @@ void BindManager::BindInternal(BindRequest request,
 
   // Check the DFv1 composites first, and don't bind to others if they match.
   if (legacy_composite_manager_.BindNode(node)) {
-    if (node->can_multibind_composites()) {
-      bind_node_set_.AddMultibindNode(*node);
-    }
     bind_node_set_.RemoveOrphanedNode(node->MakeComponentMoniker());
-    if (request.tracker) {
-      request.tracker->ReportSuccessfulBind(node->MakeComponentMoniker(), "");
+
+    // Complete bind if the node can't multibind. Otherwise, follow through to send
+    // a match request to the Driver Index for composite node specs.
+    if (!node->can_multibind_composites()) {
+      if (request.tracker) {
+        request.tracker->ReportSuccessfulBind(node->MakeComponentMoniker(), "");
+      }
+      match_complete_callback();
+      return;
     }
-    match_complete_callback();
-    return;
+
+    bind_node_set_.AddMultibindNode(*node);
+
+    // If the node matched to a legacy composite, then it should only be matched to
+    // other composites.
+    request.composite_only = true;
   }
 
   std::string driver_url_suffix = request.driver_url_suffix;
@@ -205,8 +228,9 @@ void BindManager::OnMatchDriverCallback(
     return;
   }
 
-  auto driver_url = BindNodeToResult(*node, result, request.tracker != nullptr);
-  if (driver_url == std::nullopt) {
+  auto driver_url =
+      BindNodeToResult(*node, request.composite_only, result, request.tracker != nullptr);
+  if (driver_url == std::nullopt && !request.composite_only) {
     bind_node_set_.AddOrphanedNode(*node);
     report_no_bind.call();
     return;
@@ -215,13 +239,14 @@ void BindManager::OnMatchDriverCallback(
   bind_node_set_.RemoveOrphanedNode(node->MakeComponentMoniker().c_str());
   report_no_bind.cancel();
   if (request.tracker) {
-    request.tracker->ReportSuccessfulBind(node->MakeComponentMoniker(), driver_url.value());
+    request.tracker->ReportSuccessfulBind(node->MakeComponentMoniker(), driver_url.value_or(""));
   }
   match_complete_callback();
 }
 
 std::optional<std::string> BindManager::BindNodeToResult(
-    Node& node, fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result, bool has_tracker) {
+    Node& node, bool composite_only, fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result,
+    bool has_tracker) {
   if (!result.ok()) {
     LOGF(ERROR, "Failed to call match Node '%s': %s", node.name().c_str(),
          result.error().FormatDescription().data());
@@ -243,6 +268,10 @@ std::optional<std::string> BindManager::BindNodeToResult(
   }
 
   auto& matched_driver = result->value()->driver;
+  if (composite_only && !matched_driver.is_parent_spec()) {
+    return std::nullopt;
+  }
+
   if (!matched_driver.is_driver() && !matched_driver.is_parent_spec()) {
     LOGF(WARNING,
          "Failed to match Node '%s', the MatchedDriver is not a normal driver or a "
@@ -268,6 +297,12 @@ std::optional<std::string> BindManager::BindNodeToResult(
   }
 
   ZX_ASSERT(matched_driver.is_driver());
+
+  // If the node is already part of a composite, it should not bind to a driver.
+  if (bind_node_set_.MultibindContains(node.MakeComponentMoniker())) {
+    return std::nullopt;
+  }
+
   auto start_result = bridge_->StartDriver(node, matched_driver.driver());
   if (start_result.is_error()) {
     LOGF(ERROR, "Failed to start driver '%s': %s", node.name().c_str(),
@@ -281,10 +316,17 @@ std::optional<std::string> BindManager::BindNodeToResult(
 
 zx::result<> BindManager::BindNodeToSpec(
     Node& node, fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo parents) {
-  auto result = bridge_->BindToParentSpec(parents, node.weak_from_this(), false);
+  if (node.can_multibind_composites()) {
+    bind_node_set_.AddMultibindNode(node);
+  }
+
+  auto result =
+      bridge_->BindToParentSpec(parents, node.weak_from_this(), node.can_multibind_composites());
   if (result.is_error()) {
-    LOGF(ERROR, "Failed to bind node '%s' to any of the matched parent specs.",
-         node.name().c_str());
+    if (result.error_value() != ZX_ERR_NOT_FOUND) {
+      LOGF(ERROR, "Failed to bind node '%s' to any of the matched parent specs.",
+           node.name().c_str());
+    }
     return result.take_error();
   }
 
@@ -293,23 +335,19 @@ zx::result<> BindManager::BindNodeToSpec(
     return zx::ok();
   }
 
-  // TODO(fxb/122531): Support composite multibind.
-  ZX_ASSERT(composite_list.size() == 1u);
-  auto composite_node_and_driver = composite_list[0];
-
-  auto composite_node = std::get<std::weak_ptr<dfv2::Node>>(composite_node_and_driver.node);
-  auto locked_composite_node = composite_node.lock();
-  ZX_ASSERT(locked_composite_node);
-
-  auto start_result =
-      bridge_->StartDriver(*locked_composite_node, composite_node_and_driver.driver);
-  if (start_result.is_error()) {
-    LOGF(ERROR, "Failed to start driver '%s': %s", node.name().c_str(),
-         zx_status_get_string(start_result.error_value()));
-    return start_result.take_error();
+  for (auto& composite : composite_list) {
+    auto weak_composite_node = std::get<std::weak_ptr<dfv2::Node>>(composite.node);
+    std::shared_ptr composite_node = weak_composite_node.lock();
+    ZX_ASSERT(composite_node);
+    auto start_result = bridge_->StartDriver(*composite_node, composite.driver);
+    if (start_result.is_error()) {
+      LOGF(ERROR, "Failed to start driver '%s': %s", node.name().c_str(),
+           zx_status_get_string(start_result.error_value()));
+      continue;
+    }
+    composite_node->OnBind();
   }
 
-  node.OnBind();
   return zx::ok();
 }
 
@@ -331,9 +369,10 @@ void BindManager::ProcessPendingBindRequests() {
   bind_node_set_.StartNextBindProcess();
 
   bool have_bind_all_orphans_request = !pending_orphan_rebind_callbacks_.empty();
-  size_t bind_tracker_size = have_bind_all_orphans_request ? pending_bind_requests_.size() +
-                                                                 bind_node_set_.NumOfOrphanedNodes()
-                                                           : pending_bind_requests_.size();
+  size_t bind_tracker_size =
+      have_bind_all_orphans_request
+          ? pending_bind_requests_.size() + bind_node_set_.NumOfAvailableNodes()
+          : pending_bind_requests_.size();
 
   // If there are no nodes to bind, then we'll run through all the callbacks and end the bind
   // process.

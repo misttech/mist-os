@@ -23,6 +23,10 @@ class TestBindManager : public dfv2::BindManager {
     return bind_node_set().CurrentOrphanedNodes();
   }
 
+  std::unordered_map<std::string, std::weak_ptr<dfv2::Node>> GetMultibindNodes() const {
+    return bind_node_set().CurrentMultibindNodes();
+  }
+
   bool IsBindOngoing() const { return bind_node_set().is_bind_ongoing(); }
 
   std::vector<dfv2::BindRequest> GetPendingRequests() const { return pending_bind_requests(); }
@@ -170,6 +174,9 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
                                         std::vector<std::string> fragment_names);
 
   void AddCompositeNodeSpec(std::string composite, std::vector<std::string> parents);
+  void AddCompositeNodeSpec_EXPECT_BIND_START(std::string composite,
+                                              std::vector<std::string> parents);
+  void AddCompositeNodeSpec_EXPECT_QUEUED(std::string composite, std::vector<std::string> parents);
 
   // Invoke Bind() for the node with the given |name|. The node should already exist.
   // If EXPECT_BIND_START, the function verifies that it started a new bind process.
@@ -200,6 +207,9 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
 
   // Verify that the orphaned nodes set in BindManager contains |expected_nodes|.
   void VerifyOrphanedNodes(std::vector<std::string> expected_nodes);
+
+  // Verify that multibind nodes set in BindManager contains |expected_nodes|.
+  void VerifyMultibindNodes(std::vector<std::string> expected_nodes);
 
   void VerifyLegacyCompositeFragmentIsBound(bool expect_bound, std::string composite,
                                             std::string fragment_name);

@@ -22,6 +22,7 @@ struct BindRequest {
   std::weak_ptr<Node> node;
   std::string driver_url_suffix;
   std::shared_ptr<BindResultTracker> tracker;
+  bool composite_only;
 };
 
 // Bridge class for driver manager related interactions.
@@ -58,6 +59,7 @@ class BindNodeSet {
   void RemoveOrphanedNode(std::string node_moniker);
 
   void AddMultibindNode(Node& node);
+  bool MultibindContains(std::string node_moniker) const;
 
   // Functions to return a copy of |orphaned_nodes_| and |multibind_nodes_|. We return a copy, not
   // const reference to prevent iterator invalidating errors.
@@ -69,7 +71,6 @@ class BindNodeSet {
   }
 
   size_t NumOfOrphanedNodes() const { return orphaned_nodes_.size(); }
-
   size_t NumOfAvailableNodes() const { return orphaned_nodes_.size() + multibind_nodes_.size(); }
 
   bool is_bind_ongoing() const { return is_bind_ongoing_; }
@@ -160,10 +161,11 @@ class BindManager {
       fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>& result,
       BindMatchCompleteCallback match_complete_callback);
 
-  // Binds |node| to |result. Returns a driver URL string if successful. Otherwise,
+  // Binds |node| to |result|. Returns a driver URL string if successful. Otherwise,
   // return std::nullopt.
   std::optional<std::string> BindNodeToResult(
-      Node& node, fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>& result,
+      Node& node, bool composite_only,
+      fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>& result,
       bool has_tracker);
 
   zx::result<> BindNodeToSpec(Node& node,
