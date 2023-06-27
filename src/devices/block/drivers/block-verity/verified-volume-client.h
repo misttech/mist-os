@@ -20,6 +20,7 @@ namespace block_verity {
 class VerifiedVolumeClient {
  public:
   VerifiedVolumeClient(fidl::ClientEnd<fuchsia_hardware_block_verified::DeviceManager> verity_chan,
+                       fidl::ClientEnd<fuchsia_device::Controller> verity_controller,
                        fbl::unique_fd devfs_root_fd);
 
   // Disallow copy, assign, and move
@@ -37,10 +38,9 @@ class VerifiedVolumeClient {
   // the the devfs root (`devfs_root_fd`), prepare a `VerifiedVolumeClient` by
   // possibly binding the driver according to `disposition` and waiting up to
   // `timeout` for the `verity` child of `block_dev_fd` to appear.
-  static zx_status_t CreateFromBlockDevice(
+  static zx::result<std::unique_ptr<VerifiedVolumeClient>> CreateFromBlockDevice(
       fidl::UnownedClientEnd<fuchsia_device::Controller> device, fbl::unique_fd devfs_root_fd,
-      Disposition disposition, const zx::duration& timeout,
-      std::unique_ptr<VerifiedVolumeClient>* out);
+      Disposition disposition, const zx::duration& timeout);
 
   // Requests that the volume be opened for authoring.  If successful,
   // `mutable_block_fd_out` will contain an open handle to the mutable block
@@ -68,6 +68,7 @@ class VerifiedVolumeClient {
 
  private:
   fidl::ClientEnd<fuchsia_hardware_block_verified::DeviceManager> verity_chan_;
+  fidl::ClientEnd<fuchsia_device::Controller> verity_controller_;
   fbl::unique_fd devfs_root_fd_;
 };
 

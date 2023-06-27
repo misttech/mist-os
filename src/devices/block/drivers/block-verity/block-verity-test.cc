@@ -75,10 +75,12 @@ class BlockVerityTest : public zxtest::Test {
         component::ConnectAt<fuchsia_device::Controller>(caller.directory(), ramdisk_->path());
     ASSERT_OK(channel.status_value());
     fbl::unique_fd devfs_root(dup(ramdisk_->devfs_root_fd().get()));
-    ASSERT_OK(block_verity::VerifiedVolumeClient::CreateFromBlockDevice(
+    zx::result verity = block_verity::VerifiedVolumeClient::CreateFromBlockDevice(
         channel.value(), std::move(devfs_root),
         block_verity::VerifiedVolumeClient::Disposition::kDriverNeedsBinding,
-        zx::duration::infinite(), &vvc_));
+        zx::duration::infinite());
+    ASSERT_OK(verity);
+    vvc_ = std::move(verity).value();
   }
 
   void OpenForAuthoring(fbl::unique_fd& mutable_block_fd) {
@@ -125,12 +127,11 @@ TEST_F(BlockVerityTest, Bind) {
       component::ConnectAt<fuchsia_device::Controller>(caller.directory(), ramdisk_->path());
   ASSERT_OK(channel.status_value());
   ASSERT_OK(BindVerityDriver(channel.value()));
-  std::unique_ptr<block_verity::VerifiedVolumeClient> vvc;
   fbl::unique_fd devfs_root(dup(ramdisk_->devfs_root_fd().get()));
   ASSERT_OK(block_verity::VerifiedVolumeClient::CreateFromBlockDevice(
       channel.value(), std::move(devfs_root),
       block_verity::VerifiedVolumeClient::Disposition::kDriverAlreadyBound,
-      zx::duration::infinite(), &vvc));
+      zx::duration::infinite()));
 }
 
 TEST_F(BlockVerityTest, BasicWrites) {
