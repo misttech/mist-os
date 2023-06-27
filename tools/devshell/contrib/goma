@@ -71,13 +71,14 @@
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/vars.sh || exit $?
 
-set -e
+set -euo pipefail
 
 readonly GOMA_AUTH="$PREBUILT_GOMA_DIR/goma_auth.py"
 readonly GOMA_CTL="$PREBUILT_GOMA_DIR/goma_ctl.py"
 readonly GOMACC="$PREBUILT_GOMA_DIR/gomacc"
 readonly PYTHON_CMD="$PREBUILT_PYTHON3_DIR/bin/python3.8"
-if [[ -z "$GOMA_LOCAL_OUTPUT_CACHE_DIR" ]]; then
+
+if [[ -z "${GOMA_LOCAL_OUTPUT_CACHE_DIR+x}" ]]; then
   GOMA_CACHE_DIR="${FUCHSIA_DIR}/.jiri_root/goma_cache"
 else
   # inherit the local cache dir from the environment if already set
@@ -181,7 +182,7 @@ function kill-goma {
 
 # TODO(mcgrathr): Remove this after some period when old installs are gone.
 function check {
-  if [[ -n "$GOMA_DIR" ]]; then
+  if [[ ! -z "${GOMA_DIR+x}" ]]; then
     echo "*** Detected GOMA_DIR environment variable."
     echo "*** Remove GOMA_DIR from the environment and run \`fx goma\` again."
     echo "*** \`unset GOMA_DIR\` will remove it from the running shell."
@@ -236,7 +237,7 @@ function check-build {
     status=1
   fi
 
-  if [[ -z "$GOMA_DIR" ]]; then
+  if [[ -z "${GOMA_DIR+x}" ]]; then
     echo "$FUCHSIA_BUILD_DIR uses prebuilt Goma client."
   elif $update; then
     echo "*** $FUCHSIA_BUILD_DIR was using non-default goma_dir=\"$GOMA_DIR\"."
