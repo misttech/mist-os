@@ -161,7 +161,7 @@ impl Discovery {
         let observer = Observer::new(session_info_stream, status_request_stream);
         let task = future::join(partitioner, observer).map(drop).boxed();
 
-        if let Some(player) = self.players.inner().get_mut(&session_id) {
+        if let Some(player) = self.players.inner_mut().get_mut(&session_id) {
             player.serve_controls(control_request_stream);
             player.add_proxy_task(task);
         }
@@ -209,7 +209,7 @@ impl Discovery {
             self.interrupt_paused_players.remove(id);
         } else {
             let mut usage = None;
-            if let Some(player) = self.players.inner().get_mut(id) {
+            if let Some(player) = self.players.inner_mut().get_mut(id) {
                 usage = player.usage_to_pause_on_interruption();
             }
 
@@ -250,7 +250,7 @@ impl Discovery {
         // drop from the StreamMap when disconnected on their own.
         match stage {
             InterruptionStage::Begin => {
-                for (id, player) in self.players.inner().iter() {
+                for (id, player) in self.players.inner_mut().iter() {
                     if player.usage_to_pause_on_interruption() == Some(usage) && player.is_active()
                     {
                         let _ = player.pause();
@@ -259,7 +259,7 @@ impl Discovery {
                 }
             }
             InterruptionStage::End => {
-                for (id, player) in self.players.inner().iter() {
+                for (id, player) in self.players.inner_mut().iter() {
                     if interrupted.remove(&id)
                         && player.usage_to_pause_on_interruption() == Some(usage)
                     {
@@ -296,7 +296,7 @@ impl Discovery {
 
         let observer = Observer::new(session_info_stream, status_request_stream);
 
-        if let Some(player) = self.players.inner().get_mut(&session_id) {
+        if let Some(player) = self.players.inner_mut().get_mut(&session_id) {
             player.add_proxy_task(observer.map(drop).boxed());
         }
     }

@@ -34,7 +34,7 @@ impl<T> PairingRequests<T> {
     /// Insert a new pending request future, identified by HostId and PeerId
     pub fn insert(&mut self, host: HostId, peer: PeerId, request: BoxFuture<'static, T>) {
         self.inner
-            .inner()
+            .inner_mut()
             .entry(host)
             .or_insert(Box::pin(FuturesUnordered::new()))
             .push(request.tagged(peer))
@@ -46,7 +46,7 @@ impl<T> PairingRequests<T> {
     /// Remove all pending requests, returning the PeerIds of those requests
     pub fn take_all_requests(&mut self) -> HashMap<HostId, Vec<PeerId>> {
         self.inner
-            .inner()
+            .inner_mut()
             .drain()
             .map(|(host, mut futs)| (host, futs.iter_mut().map(|f| f.tag()).collect()))
             .collect()

@@ -896,7 +896,7 @@ impl Controller {
                 responder.send(result)?;
             }
             fntr::ControllerRequest::StopDhcpv6Client { responder } => {
-                let result = if self.dhcpv6_client_stream_map.inner().drain().count() == 0 {
+                let result = if self.dhcpv6_client_stream_map.inner_mut().drain().count() == 0 {
                     Err(fntr::Error::Dhcpv6ClientNotRunning)
                 } else {
                     Ok(())
@@ -1419,7 +1419,7 @@ impl Controller {
         self.hermetic_network_connector = None;
         self.multicast_v4_socket = None;
         self.multicast_v6_socket = None;
-        self.dhcpv6_client_stream_map.inner().clear();
+        self.dhcpv6_client_stream_map.inner_mut().clear();
         Ok(())
     }
 

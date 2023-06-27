@@ -54,10 +54,19 @@ impl<K: Eq + Hash + Unpin, St: Stream> StreamMap<K, St> {
     }
 
     /// Provide mutable access to the inner hashmap.
+    ///
     /// This is safe as if the stream were being polled, we would not be able to access a mutable
     /// reference to self to pass to this method.
-    pub fn inner(&mut self) -> &mut HashMap<K, Pin<Box<St>>> {
+    pub fn inner_mut(&mut self) -> &mut HashMap<K, Pin<Box<St>>> {
         &mut self.inner
+    }
+
+    /// Provide immutable access to the inner hashmap.
+    ///
+    /// This is safe as if the stream were being polled, we would not be able to access a
+    /// reference to self to pass to this method.
+    pub fn inner(&self) -> &HashMap<K, Pin<Box<St>>> {
+        &self.inner
     }
 }
 
