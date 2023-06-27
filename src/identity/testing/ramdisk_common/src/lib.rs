@@ -93,10 +93,7 @@ pub async fn setup_ramdisk(
     }
 
     // Open ramdisk device again as fidl_fuchsia_device::ControllerProxy
-    //
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-    let client_end = ramdisk.open().await.expect("Could not re-open ramdisk");
-    let client_end = fidl::endpoints::ClientEnd::<ControllerMarker>::new(client_end.into_channel());
+    let client_end = ramdisk.open_controller().await.expect("Could not re-open ramdisk");
     let controller =
         client_end.into_proxy().expect("Could not convert ramdisk channel to async channel");
 
