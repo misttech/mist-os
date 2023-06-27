@@ -74,8 +74,8 @@ impl BpfHandle {
 
 /// A BPF Type Format object, often referred to as BTF. See
 /// https://www.kernel.org/doc/html/latest/bpf/btf.html
-#[allow(dead_code)]
 struct BpfTypeFormat {
+    #[allow(dead_code)]
     data: Vec<u8>,
 }
 impl BpfObject for BpfTypeFormat {}

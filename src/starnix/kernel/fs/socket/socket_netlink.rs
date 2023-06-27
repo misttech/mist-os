@@ -147,7 +147,6 @@ impl NetlinkFamily {
     }
 }
 
-#[allow(dead_code)]
 struct NetlinkSocketInner {
     /// The specific type of netlink socket.
     family: NetlinkFamily,

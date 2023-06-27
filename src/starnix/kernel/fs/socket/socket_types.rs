@@ -140,7 +140,6 @@ impl SocketProtocol {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SocketAddress {
     /// An address in the AF_UNSPEC domain.
-    #[allow(dead_code)]
     Unspecified,
 
     /// A `Unix` socket address contains the filesystem path that was used to bind the socket.
