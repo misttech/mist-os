@@ -46,7 +46,6 @@ cd $HONEYDEW_SRC
 python -m pip install --editable ".[test,guidelines]"
 
 echo "Configuring environment for honeydew..."
-pushd $FUCHSIA_DIR/$BUILD_DIR > /dev/null
 OLD_PYTHONPATH=$PYTHONPATH
 PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$PYTHONPATH
 
@@ -59,7 +58,7 @@ fi
 
 echo "Restoring environment..."
 PYTHONPATH=$OLD_PYTHONPATH
-popd > /dev/null
+
 cd $STARTING_DIR
 
 echo "Installation is now completed..."

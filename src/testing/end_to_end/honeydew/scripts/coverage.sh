@@ -23,7 +23,6 @@ else
 fi
 
 echo "Configuring environment..."
-pushd $FUCHSIA_DIR/$BUILD_DIR > /dev/null
 OLD_PYTHONPATH=$PYTHONPATH
 PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$PYTHONPATH
 
@@ -40,4 +39,3 @@ rm -rf .coverage
 
 echo "Restoring environment..."
 PYTHONPATH=$OLD_PYTHONPATH
-popd > /dev/null

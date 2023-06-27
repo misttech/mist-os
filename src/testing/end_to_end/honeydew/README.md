@@ -55,9 +55,9 @@ as all of the in-tree code is developed using `fuchsia-vendored-python`
 (fuchsia_python_venv)~/fuchsia/src/testing/end_to_end/honeydew$ python -m pip install --editable ".[test,guidelines]"
 
 # verify you are able to import honeydew from a python terminal running inside this virtual environment
-(fuchsia_python_venv)~/fuchsia/src/testing/end_to_end/honeydew$ cd $FUCHSIA_DIR/$BUILD_DIR
-(fuchsia_python_venv)~/fuchsia/out/default$
-(fuchsia_python_venv)~/fuchsia.out/default$ python
+(fuchsia_python_venv)~/fuchsia/src/testing/end_to_end/honeydew$ cd $FUCHSIA_DIR
+(fuchsia_python_venv)~/fuchsia$
+(fuchsia_python_venv)~/fuchsia$ python
 Python 3.8.8+chromium.12 (tags/v3.8.8-dirty:024d8058b0, Feb 19 2021, 16:18:16)
 [GCC 4.8.2 20140120 (Red Hat 4.8.2-15)] on linux
 Type "help", "copyright", "credits" or "license" for more information.
@@ -77,14 +77,9 @@ To fully uninstall HoneyDew, delete the virtual environment that was crated
 ## Usage
 
 ### Device object creation
-First compile fuchsia with `fx build` before running these commands.
+First [build fuchsia] before running these commands.
 
-From your Fuchsia directory, change to your build directory:
-```shell
-~/fuchsia$ cd $(cat .fx-build-dir)
-```
-
-Now you can use the `fuchsia-vendored-python` interpreter and play around with
+You can then use `fuchsia-vendored-python` interpreter and play around with
 HoneyDew:
 ```python
 # Update `sys.path` to include HoneyDew's path before importing it
@@ -321,7 +316,6 @@ follow the below instructions every time HoneyDew code is changed:
 (fuchsia_python_venv)~/fuchsia$ BUILD_DIR=$(cat "$FUCHSIA_DIR"/.fx-build-dir)
 (fuchsia_python_venv)~/fuchsia$ OLD_PYTHONPATH=$PYTHONPATH
 (fuchsia_python_venv)~/fuchsia$ PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$PYTHONPATH
-(fuchsia_python_venv)~/fuchsia$ pushd $FUCHSIA_DIR/$BUILD_DIR
 
 # Run unit tests using coverage tool
 (fuchsia_python_venv)~/fuchsia$ coverage run -m unittest discover --top-level-directory $FUCHSIA_DIR/src/testing/end_to_end/honeydew --start-directory $FUCHSIA_DIR/src/testing/end_to_end/honeydew/tests/unit_tests --pattern "*_test.py"
@@ -334,7 +328,6 @@ follow the below instructions every time HoneyDew code is changed:
 
 # Restore environment
 (fuchsia_python_venv)~/fuchsia$ PYTHONPATH=$OLD_PYTHONPATH
-(fuchsia_python_venv)~/fuchsia$ popd
 ```
 
 ### Cleanup
@@ -428,3 +421,5 @@ with the CL reviewers
 [coverage]: https://coverage.readthedocs.io/
 
 [pip]: https://pip.pypa.io/en/stable/getting-started/
+
+[build fuchsia]: https://fuchsia.dev/fuchsia-src/get-started/build_fuchsia
