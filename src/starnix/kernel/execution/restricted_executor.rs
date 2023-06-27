@@ -12,7 +12,7 @@ use crate::{
     signals::{deliver_signal, SignalActions, SignalInfo},
     syscalls::decls::SyscallDecl,
     task::{
-        CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, Task, ThreadGroup,
+        CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, ThreadGroup,
         ThreadGroupWriteGuard,
     },
     types::*,
@@ -304,15 +304,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             return Ok(exit_status);
         }
     }
-}
-
-/// Note: This does not actually create a Zircon thread. It creates a thread group and memory
-/// manager. The exception executor does use this to create an actual thread, but once that executor
-/// is removed this function can be renamed/reworked.
-pub fn create_zircon_thread(parent: &Task) -> Result<TaskInfo, Errno> {
-    let thread_group = parent.thread_group.clone();
-    let memory_manager = parent.mm.clone();
-    Ok(TaskInfo { thread: None, thread_group, memory_manager })
 }
 
 pub fn create_zircon_process(

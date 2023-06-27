@@ -431,6 +431,7 @@ impl Task {
         abstract_socket_namespace: Arc<AbstractUnixSocketNamespace>,
         abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
         exit_signal: Option<Signal>,
+        signal_mask: SigSet,
         vfork_event: Option<zx::Event>,
         priority: u8,
         uts_ns: UtsNamespaceHandle,
@@ -461,7 +462,7 @@ impl Task {
             vfork_event,
             mutable_state: RwLock::new(TaskMutableState {
                 clear_child_tid: UserRef::default(),
-                signals: Default::default(),
+                signals: SignalState::with_mask(signal_mask),
                 exit_status: None,
                 dump_on_exit: false,
                 priority,
@@ -612,6 +613,7 @@ impl Task {
             Arc::clone(&kernel.default_abstract_socket_namespace),
             Arc::clone(&kernel.default_abstract_vsock_namespace),
             None,
+            Default::default(),
             None,
             DEFAULT_TASK_PRIORITY,
             kernel.root_uts_ns.clone(),
@@ -718,6 +720,8 @@ impl Task {
             seccomp_filters = state.seccomp_filters.clone();
             robust_list_head = UserAddress::NULL.into();
         }
+        let child_signal_mask = self.read().signals.mask();
+
         let TaskInfo { thread, thread_group, memory_manager } = {
             // Make sure to drop these locks ASAP to avoid inversion
             let thread_group_state = self.thread_group.write();
@@ -742,7 +746,9 @@ impl Task {
             };
 
             if clone_thread {
-                create_zircon_thread(self)?
+                let thread_group = self.thread_group.clone();
+                let memory_manager = self.mm.clone();
+                TaskInfo { thread: None, thread_group, memory_manager }
             } else {
                 // Drop the lock on this task before entering `create_zircon_process`, because it will
                 // take a lock on the new thread group, and locks on thread groups have a higher
@@ -781,6 +787,7 @@ impl Task {
             self.abstract_socket_namespace.clone(),
             self.abstract_vsock_namespace.clone(),
             child_exit_signal,
+            child_signal_mask,
             vfork_event,
             priority,
             uts_ns,

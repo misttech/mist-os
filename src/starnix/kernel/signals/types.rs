@@ -84,6 +84,10 @@ pub struct SignalState {
 }
 
 impl SignalState {
+    pub fn with_mask(mask: SigSet) -> Self {
+        Self { mask, ..Default::default() }
+    }
+
     /// Sets the signal mask of the state, and returns the old signal mask.
     pub fn set_mask(&mut self, signal_mask: SigSet) -> SigSet {
         let old_mask = self.mask;

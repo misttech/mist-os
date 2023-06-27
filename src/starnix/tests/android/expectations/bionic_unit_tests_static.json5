@@ -105,7 +105,6 @@
                 "pthread.pthread_mutex_timedlock_pi",
                 "pthread.pthread_mutex_unlock_null_32",
                 "pthread.pthread_setschedprio",
-                "pthread.pthread_sigmask",
                 "scs_test.stack_overflow",
                 "setjmp.setjmp_signal_mask",
                 "setjmp.sigsetjmp_1_signal_mask",
