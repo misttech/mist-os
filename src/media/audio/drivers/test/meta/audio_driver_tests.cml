@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/devices/testing/devices_test.shard.cml",
         "sys/component/realm_builder.shard.cml",
 
         // This test defines its own main

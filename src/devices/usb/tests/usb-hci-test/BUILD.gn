@@ -40,6 +40,7 @@ fuchsia_unittest_package("usb-hci-test-package") {
       },
     ]
   }
+  test_type = "device"
 }
 
 # Each e2e test must run in its own executable.

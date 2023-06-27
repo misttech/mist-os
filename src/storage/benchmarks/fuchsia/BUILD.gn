@@ -61,6 +61,7 @@ fuchsia_test_component("fuchsia-storage-benchmarks-component") {
   component_name = "storage-benchmarks"
   manifest = "meta/storage-benchmarks.cml"
   deps = [ ":fuchsia-storage-benchmarks" ]
+  test_type = "device"
 }
 
 fuchsia_test_package("benchmarks") {

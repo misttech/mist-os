@@ -20,6 +20,7 @@ void main() {
     final resultsFileFull = await helper.runTestComponentReturningResultsFile(
         packageName: 'storage-benchmarks',
         componentName: 'storage-benchmarks.cm',
+        realm: '/core/testing:devices-tests',
         commandArgs:
             '--output-fuchsiaperf ${PerfTestHelper.componentOutputPath}',
         resultsFileSuffix: '');

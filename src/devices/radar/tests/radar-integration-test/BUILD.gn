@@ -22,6 +22,7 @@ executable("bin") {
 fuchsia_test_component("component") {
   deps = [ ":bin" ]
   manifest = "meta/manifest.cml"
+  test_type = "device"
 }
 
 fuchsia_test_package("radar-integration-test") {

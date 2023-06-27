@@ -27,7 +27,4 @@
             path: "/tmp",
         },
     ],
-    facets: {
-        "fuchsia.test": { type: "devices" },
-    },
 }

@@ -28,6 +28,7 @@ fuchsia_unittest_package("audio_driver_tests") {
   test_specs = {
     environments = hardware_envs + basic_envs
   }
+  test_type = "device"
 }
 
 executable("audio_driver_tests_bin") {

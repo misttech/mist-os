@@ -628,6 +628,7 @@ Possible values of `test_type`:
 
 | Value | Description |
 | ----- | ----------- |
+| `device` | [Device tests] |
 | `drm` | [DRM tests] |
 | `starnix` | [Starnix tests] |
 | `system` | [Legacy non hermetic realm][system-test-realm] with access to some system capabilities. |
@@ -653,8 +654,8 @@ explicitly mark itself to run in the legacy realm as shown below.
         // rust, gtest, go, etc.
         "//src/sys/test_runners/rust/default.shard.cml",
 
-        // This includes the facet which marks the test type as 'devices'.
-        {{ '<strong>' }}"//src/devices/testing/devices_test.shard.cml",{{ '</strong>' }}
+        // This includes the facet which marks the test type as 'starnix'.
+        {{ '<strong>' }}"//src/devices/testing/starnix_test.shard.cml",{{ '</strong>' }}
     ],
     program: {
         binary: "bin/my_component_test",
@@ -662,7 +663,7 @@ explicitly mark itself to run in the legacy realm as shown below.
     {{ '<strong>' }}
     use: [
         {
-            protocol: [ "fuchsia.driver.development.DriverDevelopment" ],
+            protocol: [ "fuchsia.vulkan.loader.Loader" ],
         },
     ],{{ '</strong>' }}
 }
@@ -671,7 +672,7 @@ explicitly mark itself to run in the legacy realm as shown below.
 The shard includes following facet in the manifest file:
 
 ```json5
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/devices/testing/devices_test.shard.cml" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/starnix/testing/starnix_test.shard.cml" %}
 ```
 
 Possible values of `fuchsia.test.type`:
@@ -682,7 +683,6 @@ Possible values of `fuchsia.test.type`:
 | `chromium` | Chromium test realm |
 | `chromium-system` | Chromium system test realm |
 | `cts` | [CTF test realm] |
-| `devices` | Device test realm. |
 | `google` | Google test realm |
 | `media` | Media test realm |
 | `system-validation` | system validation apps test realm |
@@ -831,6 +831,7 @@ offer: [
 [create-test-realm]: /docs/development/testing/components/create_test_realm.md
 [CTF test realm]: /docs/development/testing/ctf/test_collection.md
 [custom-artifact-example]: /examples/tests/rust/custom_artifact_test.rs
+[Device tests]: /src/devices/testing/devices_test_realm.shard.cml
 [DRM tests]: /src/media/testing/drm_test_realm.shard.cml
 [ffx]: /docs/development/tools/ffx/overview.md
 [fidl-test-manager]: /sdk/fidl/fuchsia.test.manager/test_manager.fidl

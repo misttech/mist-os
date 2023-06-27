@@ -25,4 +25,11 @@ test("partition-mapping") {
 fuchsia_unittest_package("partition-mapping-test") {
   manifest = "meta/partition-mapping.cml"
   deps = [ ":partition-mapping" ]
+
+  # The test needs to examine the actual partition labels on the real storage
+  # on the device to make sure the label to zircon partition type mapping is
+  # correct. Thus we add the following to mark the test as non-hermetic.
+  # Ideally, a much preferred solution is to mock out the entire GPT storage
+  # and test in an isolated environment.
+  test_type = "device"
 }

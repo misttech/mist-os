@@ -228,10 +228,32 @@
             from: "parent",
             to: "#testing",
         },
+
+        // Needed for driver tests.
+        {
+            directory: [
+                "dev-class",
+                "dev-topological",
+            ],
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            protocol: "fuchsia.driver.development.DriverDevelopment",
+            from: "parent",
+            to: "#testing",
+        },
         {
             directory: "boot",
             from: "parent",
             to: "#testing",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-codec",
+            to: "#testing",
+            subdir: "codec",
         },
         {
             directory: "dev-class",
@@ -361,6 +383,13 @@
             as: "dev-sysmem",
             to: "#testing",
             subdir: "sysmem",
+        },
+        {
+            directory: "dev-topological",
+            from: "parent",
+            as: "sys",
+            to: "#testing",
+            subdir: "sys",
         },
         {
             directory: "root-ssl-certificates",

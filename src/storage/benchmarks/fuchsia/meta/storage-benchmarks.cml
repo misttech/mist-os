@@ -50,7 +50,4 @@
             ],
         },
     ],
-    facets: {
-        "fuchsia.test": { type: "devices" },
-    },
 }

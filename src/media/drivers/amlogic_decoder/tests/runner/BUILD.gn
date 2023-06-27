@@ -15,6 +15,7 @@ fuchsia_unittest_package("amlogic_decoder_integration_tests") {
       vim3_env,
     ]
   }
+  test_type = "device"
 }
 
 executable("amlogic_decoder_integration_tests_bin") {

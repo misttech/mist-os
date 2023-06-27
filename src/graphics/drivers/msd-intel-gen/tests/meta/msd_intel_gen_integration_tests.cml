@@ -19,7 +19,4 @@
         },
         { protocol: "fuchsia.tracing.provider.Registry" },
     ],
-    facets: {
-        "fuchsia.test": { type: "devices" },
-    },
 }

@@ -60,6 +60,7 @@ fuchsia_unittest_package("msd-vsi-vip-integration-tests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "device"
 }
 
 group("integration") {

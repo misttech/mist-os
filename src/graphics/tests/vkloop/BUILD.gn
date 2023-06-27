@@ -34,8 +34,7 @@ resource("shaders") {
   outputs = [ "data/{{source_file_part}}" ]
 }
 
-fuchsia_component("vkloop_cmp") {
-  testonly = true
+fuchsia_test_component("vkloop_cmp") {
   manifest = "meta/vkloop.cml"
   component_name = "vkloop"
   deps = [
@@ -43,6 +42,7 @@ fuchsia_component("vkloop_cmp") {
     ":vkloop_bin",
     "//src/lib/vulkan/validation_layers",
   ]
+  test_type = "device"
 }
 
 fuchsia_test_package("vkloop-pkg") {

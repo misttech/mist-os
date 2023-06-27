@@ -54,4 +54,5 @@ fuchsia_unittest_package("msd-arm-mali-integration-tests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "device"
 }

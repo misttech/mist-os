@@ -47,11 +47,17 @@
         {
             storage: [
                 "cache",
-                "data",
                 "tmp",
             ],
             from: "self",
             to: [ "#devices-tests" ],
+        },
+        {
+            storage: "fxfs_tests_data",
+            from: "self",
+            as: "data",
+            to: [ "#devices-tests" ],
+            rights: [ "rw*" ],
         },
         {
             directory: [
