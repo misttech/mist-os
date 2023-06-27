@@ -23,7 +23,10 @@ labels = {
         bazel_product_bundle_target != "",
         "bazel_product_bundle_prefix and bazel_product_bundle_board must be set to use Bazel assembly")
 
+    # When Bazel assembly is enabled, Bazel builds both product and recovery
+    # images, and include them in the product bundle.
     images = bazel_product_bundle_target
+    recovery_images = bazel_product_bundle_target
 
     # images_prime target is used to provide extra metadata, for Bazel assembly
     # we consolidate metadata on the same product bundle GN wrapper.
@@ -34,17 +37,18 @@ labels = {
     bazel_package_manifests_list = "${images}_package_manifests_list"
   } else if (use_bringup_assembly) {
     images = "//build/images/bringup(${default_toolchain})"
+    recovery_images = recovery_label
     assembly_name = "bringup"
   } else {
     _images_without_toolchain = "//build/images/fuchsia"
     images = "${_images_without_toolchain}(${default_toolchain})"
+    recovery_images = recovery_label
     assembly_name = "fuchsia"
 
     fuchsia_netboot = "${_images_without_toolchain}:netboot"
 
     meta_packages = "${_images_without_toolchain}:fuchsia.meta_packages"
   }
-  zedboot_images = "//build/images/zedboot"
 
   _qemu_deps = qemu_boot_shim.deps
   assert(_qemu_deps == [ _qemu_deps[0] ])
@@ -68,9 +72,6 @@ files = {
     images_outdir = get_label_info(labels.images, "target_out_dir")
     assembly_outdir = images_outdir + "/${labels.assembly_name}"
   }
-
-  zedboot_assembly_outdir =
-      get_label_info(labels.zedboot_images, "target_out_dir") + "/zedboot"
 
   if (!use_bringup_assembly) {
     blobfs = "${assembly_outdir}/blob.blk"
@@ -134,16 +135,19 @@ files = {
 
   # Recovery output image and vbmeta
   if (use_bazel_images_only) {
-    _recovery_outdir = images_outdir + "/system_r"
+    # GN and Bazel assembly should share the same recovry image config, so use
+    # GN's recovery_label to determine Bazel's recovery image name.
     _recovery_name = get_label_info(recovery_label, "name")
+    _recovery_outdir = images_outdir + "/system_r"
 
     recovery_zbi = "${_recovery_outdir}/${_recovery_name}.${_image_suffix}"
     recovery_vbmeta = "${_recovery_outdir}/${_recovery_name}.vbmeta"
   } else {
     if (recovery_is_zedboot) {
-      _recovery_outdir = zedboot_assembly_outdir
-      recovery_zbi = "${zedboot_assembly_outdir}/zedboot.${_image_suffix}"
-      recovery_vbmeta = "${zedboot_assembly_outdir}/zedboot.vbmeta"
+      _recovery_outdir = get_label_info("//build/images/zedboot",
+                                        "target_out_dir") + "/zedboot"
+      recovery_zbi = "${_recovery_outdir}/zedboot.${_image_suffix}"
+      recovery_vbmeta = "${_recovery_outdir}/zedboot.vbmeta"
     } else if (recovery_is_recovery_eng) {
       _recovery_outdir = root_out_dir
       recovery_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-eng/recovery-eng.${_image_suffix}"

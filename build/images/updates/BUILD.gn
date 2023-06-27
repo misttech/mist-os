@@ -82,7 +82,7 @@ if (use_bringup_assembly) {
       labels.images,
 
       # The recovery image
-      recovery_label,
+      labels.recovery_images,
     ]
 
     # Restrict usages to //BUILD.gn targets only (build_api_module()s, for the

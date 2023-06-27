@@ -1467,7 +1467,10 @@ group("default") {
   }
 
   if (use_bazel_images_only) {
-    assert_no_deps = [ "//build/images/fuchsia" ]
+    assert_no_deps = [
+      "//build/images/fuchsia",
+      "//build/images/zedboot",
+    ]
   }
 }
 

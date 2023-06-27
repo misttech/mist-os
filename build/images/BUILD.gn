@@ -159,7 +159,7 @@ if (gpt_image != "") {
 
 default_image_deps += [ "//build/images/tools:board_tools" ]
 
-default_image_deps += [ recovery_label ]
+default_image_deps += [ labels.recovery_images ]
 
 # Build the UEFI disk image.
 # GCE, a consumer of this image, requires it to be named disk.raw
@@ -177,9 +177,9 @@ compiled_action("uefi-disk") {
   no_output_dir_leaks = false
 
   deps = [
-    "zedboot",
     "//src/firmware/gigaboot/cpp:fuchsia",
     labels.images,
+    labels.recovery_images,
     mkfs_label,
   ]
   testonly = true
