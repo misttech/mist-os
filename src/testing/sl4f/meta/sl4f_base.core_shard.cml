@@ -156,11 +156,13 @@
             ],
             from: "#wlancfg",
             to: "#sl4f",
+            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.wlan.device.service.DeviceMonitor" ],
             from: "#wlandevicemonitor",
             to: "#sl4f",
+            source_availability: "unknown",
         },
         {
             protocol: [
