@@ -30,6 +30,7 @@ template("fuchsia_test_component") {
                              "manifest",
                              "testonly",
                              "metadata",
+                             "test_type",
 
                              # don't override target name from invoker as it is
                              # used below and in `fuchsia_component` template
@@ -42,12 +43,12 @@ template("fuchsia_test_component") {
         forward_variables_from(invoker.metadata, "*")
       }
 
-      if (defined(test_type)) {
+      if (defined(invoker.test_type)) {
         test_components = [
           {
             test_component = {
               label = get_label_info(":$target_name", "label_with_toolchain")
-              moniker = _type_moniker_map[test_type]
+              moniker = _type_moniker_map[invoker.test_type]
             }
           },
         ]

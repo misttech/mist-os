@@ -240,6 +240,7 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     component_name = "starnix_microbenchmarks"
 
     deps = [ ":no_op_executable_in_test_dir($host_toolchain)" ]
+    test_type = "starnix"
   }
 
   group("container_resources") {

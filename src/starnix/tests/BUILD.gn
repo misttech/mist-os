@@ -48,6 +48,7 @@ group("container_resources") {
 if (host_os == "linux" && host_cpu == "x64") {
   starnix_host_test_component("fdio-test") {
     test_label = "//sdk/lib/fdio/tests:fdio-test"
+    test_type = "starnix"
   }
 
   fuchsia_test_package("starnix_user_tests") {
@@ -61,11 +62,13 @@ if (host_os == "linux" && host_cpu == "x64") {
 starnix_linux_test_component("virtmagma_conformance_tests") {
   test_label =
       "//src/graphics/lib/magma/tests/integration:virtmagma_conformance_tests"
+  test_type = "starnix"
 }
 
 starnix_linux_test_component("virtmagma_image_tests") {
   test_label =
       "//src/graphics/lib/magma/tests_linux/unit_tests:virtmagma_image_tests"
+  test_type = "starnix"
 }
 
 fuchsia_test_package("starnix_magma_tests") {

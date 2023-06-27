@@ -176,11 +176,13 @@ starnix_linux_test_component("syscalls_test") {
     ":syscall_test_exec_child_resource($target_linux_toolchain)",
   ]
   uses_expectations = true
+  test_type = "starnix"
 }
 
 starnix_linux_test_component("crash_test") {
   test_label = ":crash"
   test_binary = "crash"
+  test_type = "starnix"
 }
 
 group("container_resources") {
