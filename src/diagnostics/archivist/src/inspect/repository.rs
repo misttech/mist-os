@@ -378,7 +378,7 @@ mod tests {
     #[fuchsia::test]
     async fn data_repo_updates_existing_entry_to_hold_inspect_data() {
         let data_repo = Arc::new(InspectRepository::default());
-        let component_id = ComponentIdentifier::parse_from_moniker("a/b/foo").unwrap();
+        let component_id = ComponentIdentifier::parse_from_moniker("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
         let (proxy, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
@@ -403,7 +403,7 @@ mod tests {
     #[fuchsia::test]
     async fn repo_removes_entries_when_inspect_is_disconnected() {
         let data_repo = Arc::new(InspectRepository::default());
-        let component_id = ComponentIdentifier::parse_from_moniker("a/b/foo").unwrap();
+        let component_id = ComponentIdentifier::parse_from_moniker("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
@@ -431,7 +431,7 @@ mod tests {
         let static_selectors_opt = Some(vec![selector]);
         let pipeline = Arc::new(Pipeline::for_test(static_selectors_opt));
         let data_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
-        let component_id = ComponentIdentifier::parse_from_moniker("a/b/foo").unwrap();
+        let component_id = ComponentIdentifier::parse_from_moniker("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
@@ -473,7 +473,7 @@ mod tests {
     #[fuchsia::test]
     async fn data_repo_filters_inspect_by_selectors() {
         let data_repo = Arc::new(InspectRepository::default());
-        let component_id = ComponentIdentifier::parse_from_moniker("a/b/foo").unwrap();
+        let component_id = ComponentIdentifier::parse_from_moniker("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
 
         Arc::clone(&data_repo)
@@ -490,7 +490,7 @@ mod tests {
             })
             .await;
 
-        let component_id2 = ComponentIdentifier::parse_from_moniker("a/b/foo2").unwrap();
+        let component_id2 = ComponentIdentifier::parse_from_moniker("./a/b/foo2").unwrap();
         let identity2 =
             Arc::new(ComponentIdentity::from_identifier_and_url(component_id2, TEST_URL));
 

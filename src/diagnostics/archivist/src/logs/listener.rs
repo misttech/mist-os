@@ -367,7 +367,7 @@ mod tests {
 
     fn get_test_identity() -> ComponentIdentity {
         ComponentIdentity::from_identifier_and_url(
-            ComponentIdentifier::parse_from_moniker("fake-test-env/bleebloo").unwrap(),
+            ComponentIdentifier::parse_from_moniker("./fake-test-env/bleebloo").unwrap(),
             "fuchsia-pkg://fuchsia.com/testing123#test-component.cm",
         )
     }
