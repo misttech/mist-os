@@ -123,7 +123,7 @@ async fn handle_runner_request(
                         .wait_for_ready()
                         .await
                         .context("wait for event subscription to complete")?;
-                    let mut event_stream = events::EventStream::new(connection);
+                    let mut event_stream = events::EventStream::new_v2(connection);
                     let test_stopped_fut = async move {
                         component_events::matcher::EventMatcher::ok()
                             .moniker(".")

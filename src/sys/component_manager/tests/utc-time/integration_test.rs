@@ -107,7 +107,7 @@ async fn builtin_time_service_and_clock_routed() {
         .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
         .unwrap();
 
-    let event_stream = component_events::events::EventStream::new(proxy);
+    let event_stream = component_events::events::EventStream::new_v2(proxy);
 
     // Unblock the component_manager.
     debug!("starting component tree");

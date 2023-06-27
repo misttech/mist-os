@@ -246,7 +246,7 @@ mod tests {
         let (proxy, server) = fidl::endpoints::create_proxy::<fcomponent::EventStreamMarker>()
             .context("failed to make EventStream proxy")?;
         Ok((
-            EventStream::new(proxy),
+            EventStream::new_v2(proxy),
             fuchsia_async::Task::spawn(run_server(events, server.into_stream()?)),
         ))
     }

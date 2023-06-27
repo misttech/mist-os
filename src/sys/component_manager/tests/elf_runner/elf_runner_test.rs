@@ -28,7 +28,7 @@ async fn run_single_test(url: &str) {
         .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
         .unwrap();
     proxy.wait_for_ready().await.unwrap();
-    let mut event_stream = EventStream::new(proxy);
+    let mut event_stream = EventStream::new_v2(proxy);
 
     instance.start_component_tree().await.unwrap();
 

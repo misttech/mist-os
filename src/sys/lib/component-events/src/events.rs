@@ -51,19 +51,21 @@ pub enum EventStreamError {
 }
 
 impl EventStream {
-    pub fn new(stream: fcomponent::EventStreamProxy) -> Self {
+    pub fn new_v2(stream: fcomponent::EventStreamProxy) -> Self {
         Self { stream: InternalStream::New(stream), buffer: VecDeque::new() }
     }
 
     pub fn open_at_path_pipelined(path: impl Into<String>) -> Result<Self, Error> {
-        Ok(Self::new(connect_to_protocol_at_path::<fcomponent::EventStreamMarker>(&path.into())?))
+        Ok(Self::new_v2(connect_to_protocol_at_path::<fcomponent::EventStreamMarker>(
+            &path.into(),
+        )?))
     }
 
     pub async fn open_at_path(path: impl Into<String>) -> Result<Self, Error> {
         let event_stream =
             connect_to_protocol_at_path::<fcomponent::EventStreamMarker>(&path.into())?;
         event_stream.wait_for_ready().await?;
-        Ok(Self::new(event_stream))
+        Ok(Self::new_v2(event_stream))
     }
 
     pub async fn open() -> Result<Self, Error> {
@@ -71,11 +73,11 @@ impl EventStream {
             "/svc/fuchsia.component.EventStream",
         )?;
         event_stream.wait_for_ready().await?;
-        Ok(Self::new(event_stream))
+        Ok(Self::new_v2(event_stream))
     }
 
     pub fn open_pipelined() -> Result<Self, Error> {
-        Ok(Self::new(connect_to_protocol_at_path::<fcomponent::EventStreamMarker>(
+        Ok(Self::new_v2(connect_to_protocol_at_path::<fcomponent::EventStreamMarker>(
             "/svc/fuchsia.component.EventStream",
         )?))
     }

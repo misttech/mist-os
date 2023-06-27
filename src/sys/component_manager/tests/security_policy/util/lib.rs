@@ -38,7 +38,7 @@ pub async fn start_policy_test(
         .unwrap();
     proxy.wait_for_ready().await.unwrap();
 
-    let event_stream = EventStream::new(proxy);
+    let event_stream = EventStream::new_v2(proxy);
 
     instance.start_component_tree().await.unwrap();
 
