@@ -29,7 +29,7 @@ use std::{
     sync::{Arc, OnceLock},
 };
 use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio};
-use zerocopy::{AsBytes as _, ByteOrder as _, FromBytes as _, NetworkEndian};
+use zerocopy::{AsBytes as _, ByteOrder as _, FromBytes as _, NativeEndian};
 
 /// The size of a buffer suitable to carry netlink route messages.
 const NETLINK_ROUTE_BUF_SIZE: usize = 1024;
@@ -334,24 +334,35 @@ impl SocketOps for ZxioBackedSocket {
 
                 let ifru_addr = {
                     let mut addr = sockaddr::default();
+                    let s_addr = address_msgs
+                        .into_iter()
+                        .next()
+                        .and_then(|msg| {
+                            msg.nlas.into_iter().find_map(|nla| {
+                                if let AddressNla::Address(bytes) = nla {
+                                    // The bytes are held in network-endian
+                                    // order and `in_addr_t` is documented to
+                                    // hold values in network order as well. Per
+                                    // POSIX specifications for `sockaddr_in`
+                                    // https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/netinet_in.h.html.
+                                    //
+                                    //   The sin_port and sin_addr members shall
+                                    //   be in network byte order.
+                                    //
+                                    // Because of this, we read the bytes in
+                                    // native endian which is effectively a
+                                    // `core::mem::transmute` to `u32`.
+                                    Some(NativeEndian::read_u32(&bytes[..]))
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                        .unwrap_or(0);
                     sockaddr_in {
                         sin_family: AF_INET,
                         sin_port: 0,
-                        sin_addr: in_addr {
-                            s_addr: address_msgs
-                                .into_iter()
-                                .next()
-                                .and_then(|msg| {
-                                    msg.nlas.into_iter().find_map(|nla| {
-                                        if let AddressNla::Address(bytes) = nla {
-                                            Some(NetworkEndian::read_u32(&bytes[..]))
-                                        } else {
-                                            None
-                                        }
-                                    })
-                                })
-                                .unwrap_or(0),
-                        },
+                        sin_addr: in_addr { s_addr },
                         __pad: Default::default(),
                     }
                     .write_to_prefix(addr.as_bytes_mut());

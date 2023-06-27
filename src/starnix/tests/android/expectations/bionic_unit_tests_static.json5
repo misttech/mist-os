@@ -73,9 +73,6 @@
                 // sigqueue(getpid(), (32 + 4), signal_value) fails
                 "android_mallopt.set_allocation_limit_multiple_threads",
 
-                // ioctl not supported
-                "ifaddrs.getifaddrs_INET",
-
                 // Requires MTE support
                 "malloc.disable_mte",
 

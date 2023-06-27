@@ -91,7 +91,7 @@ void GetIfAddr(fbl::unique_fd& fd, in_addr_t expected_addr) {
   sockaddr_in* s = reinterpret_cast<sockaddr_in*>(&ifr.ifr_addr);
   EXPECT_EQ(s->sin_family, AF_INET);
   EXPECT_EQ(s->sin_port, 0);
-  EXPECT_EQ(s->sin_addr.s_addr, expected_addr);
+  EXPECT_EQ(ntohl(s->sin_addr.s_addr), expected_addr);
 }
 
 TEST_F(IoctlTest, SIOCGIFADDR_Success) { ASSERT_NO_FATAL_FAILURE(GetIfAddr(fd, INADDR_LOOPBACK)); }
