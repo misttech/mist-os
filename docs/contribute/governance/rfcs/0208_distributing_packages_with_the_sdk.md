@@ -121,24 +121,11 @@ The following stages are accomplished in-tree:
 distributed.
 1. Building - Building the selected packages for all required
 architectures.
-1. Archiving - Producing the archives that will be uploaded and
-referencing them in the IDK. The archives will consist of all blobs
-for selected packages and their dependencies.
-1. Uploading - Uploading the produced archives for later retrieval.
+1. Bundling - Producing a package directory structure
+that will be included in the IDK.
 
-SDK Packages are then available for use in OOT repositories.
-The use of a SDK Package is accomplished in the following
-stages:
-
-1. Referencing - Choosing which SDK Package from the IDK to use.
-1. Downloading - Downloading the package contents (and all of its
-subpackage dependencies) for local use.
-1. Including - Using the package in a build (e.g. as a subpackage)
-by re-publishing it in a product package repository.
-
-![Alt text:
-overview of the flow of packages from fuchsia.git to downstream repositories
-](resources/0208_distributing_packages_with_the_sdk/overview.png){:#fig-1}
+SDK Packages are made available for immediate consumption in OOT repositories
+through a package directory structure in the SDK at `sdk://packages/`.
 
 The rest of this section provides detailed designs for each stage.
 
@@ -151,7 +138,7 @@ in-tree repository for use OOT, rather, we must commit to a
 specific set of packages that will be distributed along with a
 platform release.
 
-We will create a new GN template called `fuchsia_sdk_package`
+We will create a new GN template called `sdk_fuchsia_package`
 requiring the following information:
 
 * The `fuchsia_package` target to distribute.
@@ -162,8 +149,12 @@ removal from the SDK.
 * The list of files expected in the package and their "disposition."
 Described in the next section.
 
-A new GN Target will list all `fuchsia_sdk_package` targets
-for the current platform API Level.
+This GN template will use the `sdk_atom` target to benefit from
+established paths around verification / tooling of SDK primitives.
+
+A new GN Target, `sdk_package_bundle`, will list all `sdk_fuchsia_package`
+targets for the current platform API Level. This target will use the
+`sdk_molecule` target to enforce bundle-level checks.
 
 This mechanism allows platform owners to explicitly commit to
 providing specific packages for OOT use for specific API Levels
@@ -172,7 +163,7 @@ time).
 
 As an implementation detail, we should avoid relying on GN metadata
 and instead explicitly list all packages included in a
-`fuchsia_sdk_package` target.
+`sdk_fuchsia_package` target.
 
 Note: We will not rely on GN metadata because it makes for a brittle
 interface that is difficult to audit. Explicitly listing SDK packages
@@ -275,9 +266,7 @@ that must be maintained over time for compatibility (e.g. component
 manifests).
 
 `internal` means that a file is not part of the contract, but
-is present in the local build. All files that are not explicitly
-listed in the build rule but that are present in the resulting
-package are implicitly `internal`.
+is present in the local build.
 
 Additional dispositions may be added when needed as extensions to
 this RFC.
@@ -351,62 +340,152 @@ will be produced and uploaded to the appropriate GCS buckets. This
 is the same process used for binaries and shared libraries distributed
 directly in the IDK bundle.
 
-#### Archiving
+#### Bundling
 
-Builds producing a Fuchsia IDK must follow additional steps in which
-they archive the set of SDK Packages for distribution. These steps
-will be added to the normal process for producing an IDK:
+Once built, packages will be distributed in a directory structure laid out
+as the following:
 
-1. A new Fuchsia Package Repository is initialized on disk as a
-directory in The Update Framework (TUF) format. "Fuchsia Package Repository"
-is defined as a directory ready to be served as a package repository
-for a Fuchsia device.
-1. Each package for one architecture (e.g. arm64) is added to the
-repository by adding its content blobs. If the package has
-subpackages, the blobs of every nested subpackage (recursively)
-must also be added to the repository in this step.
-1. The `.api` file for each package selected for distribution must
-be added to the repository to support OOT tooling.
-1. The `LICENSES` files for all dependencies of binaries and libraries
-used by those packages must be included in the repository directory.
-1. The repository directory is archived as a `.tar.gz` file, called
-`fuchsia-distributed-packages-${arch}.tar.gz` (e.g.
-`fuchsia-distributed-packages-arm64.tar.gz`).
-1. A new file containing the SHA-256 hash of the above archive is
-added to the IDK at `fuchsia-distributed-packages${arch}.tar.gz.sha256`.
+```
+sdk://
+├── blobs
+│   ├── CONTENT_MERKLE_1
+│   └── CONTENT_MERKLE_2
+└── packages
+    ├── arm64
+    │   ├── 10
+    │   │   ├── debug
+    │   │   │   ├── PACKAGE_BAR
+    │   │   │   │   ├── api
+    │   │   │   │   └── package_manifest.json
+    │   │   │   └── PACKAGE_FOO
+    │   │   │       ├── api
+    │   │   │       └── package_manifest.json
+    │   │   └── release
+    │   │       ├── PACKAGE_BAR
+    │   │       │   ├── api
+    │   │       │   └── package_manifest.json
+    │   │       └── PACKAGE_FOO
+    │   │           ├── api
+    │   │           └── package_manifest.json
+    │   └── 11
+    │       ├── debug
+    │       │   ├── PACKAGE_BAR
+    │       │   │   ├── api
+    │       │   │   └── package_manifest.json
+    │       │   ├── PACKAGE_BAZ
+    │       │   │   ├── api
+    │       │   │   └── package_manifest.json
+    │       │   └── PACKAGE_FOO
+    │       │       ├── api
+    │       │       └── package_manifest.json
+    │       └── release
+    │           ├── PACKAGE_BAR
+    │           │   ├── api
+    │           │   └── package_manifest.json
+    │           ├── PACKAGE_BAZ
+    │           │   ├── api
+    │           │   └── package_manifest.json
+    │           └── PACKAGE_FOO
+    │               ├── api
+    │               └── package_manifest.json
+    ├── x64
+    │   ├── 10
+    │   │   ├── debug
+    │   │   │   ├── PACKAGE_BAR
+    │   │   │   │   ├── api
+    │   │   │   │   └── package_manifest.json
+    │   │   │   └── PACKAGE_FOO
+    │   │   │       ├── api
+    │   │   │       └── package_manifest.json
+    │   │   └── release
+    │   │       ├── PACKAGE_BAR
+    │   │       │   ├── api
+    │   │       │   └── package_manifest.json
+    │   │       └── PACKAGE_FOO
+    │   │           ├── api
+    │   │           └── package_manifest.json
+    │   └── 11
+    │       ├── debug
+    │       │   ├── PACKAGE_BAR
+    │       │   │   ├── api
+    │       │   │   └── package_manifest.json
+    │       │   ├── PACKAGE_BAZ
+    │       │   │   ├── api
+    │       │   │   └── package_manifest.json
+    │       │   └── PACKAGE_FOO
+    │       │       ├── api
+    │       │       └── package_manifest.json
+    │       └── release
+    │           ├── PACKAGE_BAR
+    │           │   ├── api
+    │           │   └── package_manifest.json
+    │           ├── PACKAGE_BAZ
+    │           │   ├── api
+    │           │   └── package_manifest.json
+    │           └── PACKAGE_FOO
+    │               ├── api
+    │               └── package_manifest.json
+    └── subpackage_manifests
+        ├── META_FAR_MERKLE_1
+        └── META_FAR_MERKLE_2
+```
 
-The above process is repeated for each architecture.
+Each package manifest will be put in a directory path constructed
+from both the target architecture and API level:
+`sdk://packages/<ARCH>/<API_LEVEL>/{debug/release}/<PACKAGE_NAME>`.
+These paths will serve as stable SDK contracts that products can depend upon.
+This directory will contain both the `package_manifest.json` of the package,
+as well as its API file for verification purposes.
 
-The Fuchsia Package Repository structure is used for several reasons:
+Additionally, any subpackages will have their manifests stored by package
+merkle in a separate top-level directory:
+`sdk://packages/subpackage_manifests/<META_FAR_MERKLE>`.
 
-* Blobs are automatically deduplicated, resulting in significant
-space savings (compared to archiving each package separately) in
-the common case of packages containing the same blobs (e.g. shared
-libraries and binaries).
-* The repositories are ready to serve over The Update Framework
-(TUF), which simplifies providing this set of packages to systems
-for non-hermetic use cases.
+Finally, all blobs will be stored as content-addressed names
+at `sdk://blobs/<CONTENT_MERKLE>`. The blobs and manifests directories
+are implementation details of the packages, and may change over time. Products
+should not depend on these paths to be stable.
+
+The `LICENSES` files for all
+dependencies of binaries and libraries used by those packages will be bundled
+and included as part of the canonical SDK licensing story.
+
+This directory-based structure is used for several reasons:
+
+* Packages can be published to a repository or used as a subpackage without
+the need to parse an intermediate file.
+* Blobs are automatically deduplicated, even across API levels,
+resulting in significant space savings (compared to archiving each
+package separately) in the common case of packages containing the
+same blobs (e.g. shared libraries and binaries).
+* Directory structure lays groundwork for supporting multiple API levels,
+as well as providing debug and release versions.
 * Tools for interacting with package repositories already exist in
 the SDK (`ffx` and `pm`).
-* We may directly upload these packages to a single canonical TUF
-repository in the future, further simplifying distribution.
-* Subpackaging workflows are aligned no matter if they are reading
-from a remote server or a local repository.
+* Subpackaging workflows are enabled by referencing the package manifests
+directly, making it easy to publish directly into a repository.
 
-#### Uploading
+One known downside of this approach is the case where a package is declared
+as a top-level package, as well as a subpackage. In this case, the
+`package_manifest.json` will be duplicated. Package manifest files are small
+enough that having them listed both as a top-level, named, file and also
+identified by their package merkle isn't a concern, and allows us to do a
+better job of hiding the subpackaging details. The overall simplicity of
+this layout outweighs this negative.
 
-Following the creation of the archives with associated SHA256 hashes
-in the IDK bundle, the archives must be uploaded to CIPD to a known
-location (e.g. `fuchsia/sdk/packages/${arch}`).
+Note: The initial implementation is expected to only include packages built
+with the current toolchain and latest API level. Future SDK releases will be
+eventually include packages built with all compatible API levels.
+Additionally, while layout will be exactly the same, the specific naming of
+`sdk://packages` is TBD. There already exists a conflicting directory,
+`sdk://pkg`, so naming will be resolved outside of this RFC.
 
 ### Using SDK Packages
 
-#### Referencing
-
-OOT repositories using the SDK should have a way to reference SDK
-Packages by the name specified at IDK build time. Uses of files
-within the packages should be checked against the distributed `.api`
-files.
+Consuming SDK packages OOT will be as simple as consuming the package's
+`package_manifest.json` relevant to both architecture and desired
+API level of your system. Uses of files within the packages should be
+checked against the distributed `.api` files.
 
 This allows OOT tools and builds to properly warn about common
 pitfalls, such as:
@@ -419,14 +498,6 @@ contract for the package.
 Implementing this functionality is the responsibility of the SDK
 maintainer for each individual build system and is not described
 in this RFC.
-
-#### Downloading
-
-When OOT repositories depend on a package listed in the SDK, they
-should download the archive matching the hash included in the SDK
-for local use. This process should be transparent to most users and
-will be implemented in the build system integration; users will not
-need to explicitly download packages.
 
 #### Including
 
@@ -523,38 +594,48 @@ This includes instructions on how to configure the `.api` tests.
 
 ## Drawbacks, alternatives, and unknowns
 
-### Alternatives to CIPD for distribution
+### Alternatives to distributing packages directly in the SDK
 
-Instead of SDK Packages through CIPD, we could instead
-include the data inline in the SDK bundle. This would increase the
-size of the bundle and could be the source of unbounded bloat as
-more packages are included. Some SDK users do not need the package
-distribution, so having an optional archive means those users could
-avoid downloading it entirely.
+A previous iteration of this RFC proposed a mechanism of
+archiving and uploading SDK Packages separately through CIPD,
+decreasing any size changes to the SDK bundle. Similarly, SDK users
+do not need the package distribution, so having an optional archive
+means those users could avoid downloading it entirely.
 
-When the SDK supports separating pieces from the existing monolith
-and composing them together downstream, the set of SDK Packages
-will be an excellent candidate for distributing using such a
-mechanism.
+While great for future efforts, this pattern is not standard to the
+SDK build, and would require novel build tooling for enforcing SDK category,
+`.api` tests, as well as novel tooling for downloading and using these
+SDK Packages OOT.
 
-### Alternatives to Fuchsia Package Repository format (TUF)
+To address size concerns for the SDK, only a small initial set of SDK packages
+for enabling test cases will be included. For example, these may be considered
+for inclusion:
 
-We could distribute packages as Fuchsia Archive (FAR) files
-individually. This means that the individual package can be downloaded
-along with all of its dependencies. We decided against this because
-FAR archives do not deduplicate blobs between packages, and this
-would increase the total download size of retrieving a large set
-of the SDK Packages.
+* driver_test_realm
+* archivist-for-embedding
+* log-encoding-validator
+* realm_builder_server
+* test_ui_stack
 
-We could choose another distribution format other than a Fuchsia
-Package Repository for the packages that explicitly lists files for
-each package and also deduplicates metadata. To serve the packages
-to a device, however, this data would need to be converted into a
-package in a repository anyway. Distributing a repository ready to
-be served using TUF saves this additional step without loss of
-flexibility. Additionally, aligning on package repositories means
-we can use the same tools for locally build packages, downloaded
-packages, and remote repositories over the Internet.
+These packages built as a release build for x64 add up to approximately 43 MiB
+uncompressed, or 18 MiB compressed with the default gzip settings. This seems
+reasonable compared to the current SDK at 700 MiB compressed.
+
+Any additional packages included will be subject to Fuchsia API Council review
+for both content and size changes. Additionally, Future iterations of this
+framework may point to remote-stored blobs to further help on concerns of
+size storage.
+
+### Alternatives to using a directory structure
+
+Instead of using a directory structure for enforcing architecture and API
+level, a file at the top level could present the same information in a JSON
+format. A benefit to this design comes from malleability of the file, compared
+to altering a directory structure. However, parsing such a file would require
+additional SDK tooling, and benefits of this are not present today.
+
+Future iterations of this tooling may shift away from a directory structure,
+and required tooling will be built and provided should this case arise.
 
 ## Prior art and references
 
