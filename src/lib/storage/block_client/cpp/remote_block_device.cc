@@ -19,12 +19,7 @@ zx_status_t RemoteBlockDevice::FifoTransaction(block_fifo_request_t* requests, s
 }
 
 zx::result<std::string> RemoteBlockDevice::GetTopologicalPath() const {
-  fidl::UnownedClientEnd<fuchsia_device::Controller> controller = controller_;
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  if (!controller) {
-    controller = fidl::UnownedClientEnd<fuchsia_device::Controller>(device_.channel().borrow());
-  }
-  const fidl::WireResult result = fidl::WireCall(controller)->GetTopologicalPath();
+  const fidl::WireResult result = fidl::WireCall(controller_)->GetTopologicalPath();
   if (!result.ok()) {
     return zx::error(result.status());
   }
@@ -36,13 +31,8 @@ zx::result<std::string> RemoteBlockDevice::GetTopologicalPath() const {
 }
 
 zx::result<> RemoteBlockDevice::Rebind(std::string_view url_suffix) const {
-  fidl::UnownedClientEnd<fuchsia_device::Controller> controller = controller_;
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  if (!controller) {
-    controller = fidl::UnownedClientEnd<fuchsia_device::Controller>(device_.channel().borrow());
-  }
   const fidl::WireResult result =
-      fidl::WireCall(controller)->Rebind(fidl::StringView::FromExternal(url_suffix));
+      fidl::WireCall(controller_)->Rebind(fidl::StringView::FromExternal(url_suffix));
   if (!result.ok()) {
     return zx::error(result.status());
   }
@@ -129,10 +119,6 @@ zx_status_t RemoteBlockDevice::VolumeShrink(uint64_t offset, uint64_t length) {
   const fidl::WireResponse response = result.value();
   return response.status;
 }
-zx::result<std::unique_ptr<RemoteBlockDevice>> RemoteBlockDevice::Create(
-    fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device) {
-  return Create(std::move(device), {});
-}
 
 zx::result<std::unique_ptr<RemoteBlockDevice>> RemoteBlockDevice::Create(
     fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device,
@@ -155,16 +141,6 @@ zx::result<std::unique_ptr<RemoteBlockDevice>> RemoteBlockDevice::Create(
   }
   return zx::ok(std::unique_ptr<RemoteBlockDevice>(new RemoteBlockDevice(
       std::move(device), std::move(controller), std::move(session), std::move(response->fifo))));
-}
-
-zx_status_t RemoteBlockDevice::Create(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
-                                      std::unique_ptr<RemoteBlockDevice>* out) {
-  zx::result ret =
-      Create(fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>{device.TakeChannel()});
-  if (ret.is_ok()) {
-    *out = std::move(ret.value());
-  }
-  return ret.status_value();
 }
 
 RemoteBlockDevice::RemoteBlockDevice(fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device,
