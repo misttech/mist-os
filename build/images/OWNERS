@@ -1,5 +1,4 @@
-per-file BUILD.gn=leonardchan@google.com
-per-file BUILD.gn=phosek@google.com
+per-file **.gn=leonardchan@google.com
+per-file **.gn=phosek@google.com
 
-aaronwood@google.com
 awolter@google.com

@@ -47,8 +47,13 @@ tamird@google.com
 thatguy@google.com
 tmandry@google.com
 
-# Build system files in the source root
-per-file .gn,BUILD.gn = file:/build/OWNERS
+# NOTE: This file uses the 'GLOB' style path expressions (not the `find-owners`
+# style), which is documented here:
+# https://android-review.googlesource.com/plugins/code-owners/Documentation/path-expressions.html#findOwnersCaveat
+#
+# - 'foo' matches the file 'foo' in this directory only (not in any subdirectories)
+# - '*.foo' matches files in this directory only.
+# - '**.foo' matches files in this directory and any subdirectory.
 
 # Build system files throughout the tree
 per-file **.gn,**.gni,**.bazel,**.bzl,fuchsia.code-workspace = file:/build/OWNERS

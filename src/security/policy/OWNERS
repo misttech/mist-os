@@ -3,9 +3,11 @@ set noparent
 
 include /src/security/OWNERS
 
-per-file build_info_allowlist_* = file: /src/sys/component_manager/OWNERS
-per-file package_resolver_allowlist_* = file: /src/sys/pkg/OWNERS
-per-file package_cache_allowlist_* = file: /src/sys/pkg/OWNERS
-per-file pkgfs_versions_allowlist_* = file: /src/sys/pkg/OWNERS
-per-file pkgfs_non_static_pkgs_allowlist_* = file: /src/sys/pkg/OWNERS
-per-file system_updater_allowlist_* = file: /src/sys/pkg/OWNERS
+
+per-file appmgr/build_info_allowlist_* = file: /src/sys/component_manager/OWNERS
+per-file appmgr/package_resolver_allowlist_* = file: /src/sys/pkg/OWNERS
+per-file appmgr/package_cache_allowlist_* = file: /src/sys/pkg/OWNERS
+per-file appmgr/pkgfs_versions_allowlist_* = file: /src/sys/pkg/OWNERS
+per-file appmgr/system_updater_allowlist_* = file: /src/sys/pkg/OWNERS
+
+per-file pkgfs/pkgfs_non_static_pkgs_allowlist_* = file: /src/sys/pkg/OWNERS
