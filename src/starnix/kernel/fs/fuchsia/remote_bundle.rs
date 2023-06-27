@@ -35,7 +35,7 @@ pub struct RemoteBundle {
 impl RemoteBundle {
     /// Returns a new RemoteBundle filesystem that can be found at `path` relative to `base`.
     pub fn new_fs(
-        kernel: &Kernel,
+        kernel: &Arc<Kernel>,
         base: &fio::DirectorySynchronousProxy,
         rights: fio::OpenFlags,
         path: &str,
@@ -138,8 +138,10 @@ impl FsNodeOps for File {
     fn get_xattr(
         &self,
         node: &FsNode,
+        _current_task: &CurrentTask,
         name: &crate::fs::FsStr,
-    ) -> Result<FsString, crate::types::Errno> {
+        _size: usize,
+    ) -> Result<ValueOrSize<FsString>, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         Ok(bundle
@@ -147,10 +149,16 @@ impl FsNodeOps for File {
             .extended_attributes
             .get(name)
             .ok_or(errno!(ENOENT))?
-            .to_vec())
+            .to_vec()
+            .into())
     }
 
-    fn list_xattrs(&self, node: &FsNode) -> Result<Vec<crate::fs::FsString>, crate::types::Errno> {
+    fn list_xattrs(
+        &self,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+        _size: usize,
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         Ok(bundle
@@ -158,7 +166,8 @@ impl FsNodeOps for File {
             .extended_attributes
             .keys()
             .map(|k| k.clone().to_vec())
-            .collect())
+            .collect::<Vec<_>>()
+            .into())
     }
 }
 
@@ -255,8 +264,10 @@ impl FsNodeOps for DirectoryObject {
     fn get_xattr(
         &self,
         node: &FsNode,
+        _current_task: &CurrentTask,
         name: &crate::fs::FsStr,
-    ) -> Result<FsString, crate::types::Errno> {
+        _size: usize,
+    ) -> Result<ValueOrSize<FsString>, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         let value = bundle
@@ -265,10 +276,15 @@ impl FsNodeOps for DirectoryObject {
             .get(name)
             .ok_or(errno!(ENOENT))?
             .to_vec();
-        Ok(value)
+        Ok(value.into())
     }
 
-    fn list_xattrs(&self, node: &FsNode) -> Result<Vec<crate::fs::FsString>, crate::types::Errno> {
+    fn list_xattrs(
+        &self,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+        _size: usize,
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         Ok(bundle
@@ -276,7 +292,8 @@ impl FsNodeOps for DirectoryObject {
             .extended_attributes
             .keys()
             .map(|k| k.clone().to_vec())
-            .collect())
+            .collect::<Vec<_>>()
+            .into())
     }
 }
 
@@ -349,18 +366,27 @@ mod test {
         assert_eq!(&buffer[..6], b"hello\n");
 
         assert_eq!(
-            &test_file.node().get_xattr(&current_task, b"user.a").expect("get_xattr failed"),
+            &test_file
+                .node()
+                .get_xattr(&current_task, b"user.a", usize::MAX)
+                .expect("get_xattr failed")
+                .unwrap(),
             b"apple"
         );
         assert_eq!(
-            &test_file.node().get_xattr(&current_task, b"user.b").expect("get_xattr failed"),
+            &test_file
+                .node()
+                .get_xattr(&current_task, b"user.b", usize::MAX)
+                .expect("get_xattr failed")
+                .unwrap(),
             b"ball"
         );
         assert_eq!(
             test_file
                 .node()
-                .list_xattrs(&current_task)
+                .list_xattrs(&current_task, usize::MAX)
                 .expect("list_xattr failed")
+                .unwrap()
                 .into_iter()
                 .collect::<HashSet<_>>(),
             [b"user.a".to_vec(), b"user.b".to_vec()].into(),

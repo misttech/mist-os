@@ -25,6 +25,7 @@ const LRU_CAPACITY: usize = 32;
 
 /// A file system that can be mounted in a namespace.
 pub struct FileSystem {
+    kernel: Weak<Kernel>,
     root: OnceCell<DirEntryHandle>,
     next_node_id: AtomicU64,
     ops: Box<dyn FileSystemOps>,
@@ -109,12 +110,13 @@ pub enum CacheMode {
 impl FileSystem {
     /// Create a new filesystem.
     pub fn new(
-        kernel: &Kernel,
+        kernel: &Arc<Kernel>,
         cache_mode: CacheMode,
         ops: impl FileSystemOps,
         options: FileSystemOptions,
     ) -> FileSystemHandle {
         Arc::new(FileSystem {
+            kernel: Arc::downgrade(kernel),
             root: OnceCell::new(),
             next_node_id: AtomicU64::new(1),
             ops: Box::new(ops),
@@ -164,7 +166,15 @@ impl FileSystem {
     /// filesystem.
     fn prepare_node_for_insertion(&self, node: &Arc<FsNode>) -> Weak<FsNode> {
         if let Some(label) = self.selinux_context.get() {
-            let _ = node.ops().set_xattr(node, b"security.selinux", label, XattrOp::Create);
+            if let Some(kernel) = self.kernel.upgrade() {
+                let _ = node.ops().set_xattr(
+                    node,
+                    kernel.kthreads.system_task(),
+                    b"security.selinux",
+                    label,
+                    XattrOp::Create,
+                );
+            }
         }
         Arc::downgrade(node)
     }

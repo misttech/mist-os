@@ -32,7 +32,7 @@ const ROOT_NODE_ID: ino_t = 1;
 const PTMX_NODE_ID: ino_t = 2;
 const FIRST_PTS_NODE_ID: ino_t = 3;
 
-pub fn dev_pts_fs(kernel: &Kernel, options: FileSystemOptions) -> &FileSystemHandle {
+pub fn dev_pts_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> &FileSystemHandle {
     kernel.dev_pts_fs.get_or_init(|| init_devpts(kernel, options))
 }
 
@@ -57,7 +57,7 @@ pub fn create_main_and_replica(
     Ok((pty_file, pts_file))
 }
 
-fn init_devpts(kernel: &Kernel, options: FileSystemOptions) -> FileSystemHandle {
+fn init_devpts(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHandle {
     let state = Arc::new(TTYState::new());
     let device = DevPtsDevice::new(state.clone());
 

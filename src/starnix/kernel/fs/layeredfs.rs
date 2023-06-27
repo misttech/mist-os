@@ -21,7 +21,7 @@ impl LayeredFs {
     /// `mappings`: The map of top level directory to filesystems that will be layered on top of
     /// `base_fs`.
     pub fn new_fs(
-        kernel: &Kernel,
+        kernel: &Arc<Kernel>,
         base_fs: FileSystemHandle,
         mappings: BTreeMap<FsString, FileSystemHandle>,
     ) -> FileSystemHandle {

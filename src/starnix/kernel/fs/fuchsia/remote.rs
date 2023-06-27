@@ -53,7 +53,7 @@ impl FileSystemOps for RemoteFs {
 
 impl RemoteFs {
     pub fn new_fs(
-        kernel: &Kernel,
+        kernel: &Arc<Kernel>,
         root: zx::Channel,
         source: &str,
         rights: fio::OpenFlags,
@@ -133,7 +133,7 @@ struct RemoteNode {
 /// The handle must be a channel, socket, vmo or debuglog object. If the handle is a
 /// channel, then the channel must implement the `fuchsia.unknown/Queryable` protocol.
 pub fn new_remote_file(
-    kernel: &Kernel,
+    kernel: &Arc<Kernel>,
     handle: zx::Handle,
     flags: OpenFlags,
 ) -> Result<FileHandle, Errno> {
@@ -492,17 +492,24 @@ impl FsNodeOps for RemoteNode {
         Ok(symlink)
     }
 
-    fn get_xattr(&self, _node: &FsNode, name: &FsStr) -> Result<FsString, Errno> {
+    fn get_xattr(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+        _max_size: usize,
+    ) -> Result<ValueOrSize<FsString>, Errno> {
         let value = self.zxio.xattr_get(name).map_err(|status| match status {
             zx::Status::NOT_FOUND => errno!(ENODATA),
             status => from_status_like_fdio!(status),
         })?;
-        Ok(value)
+        Ok(value.into())
     }
 
     fn set_xattr(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         name: &FsStr,
         value: &FsStr,
         op: XattrOp,
@@ -519,15 +526,28 @@ impl FsNodeOps for RemoteNode {
         })
     }
 
-    fn remove_xattr(&self, _node: &FsNode, name: &FsStr) -> Result<(), Errno> {
+    fn remove_xattr(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<(), Errno> {
         self.zxio.xattr_remove(name).map_err(|status| match status {
             zx::Status::NOT_FOUND => errno!(ENODATA),
             _ => from_status_like_fdio!(status),
         })
     }
 
-    fn list_xattrs(&self, _node: &FsNode) -> Result<Vec<FsString>, Errno> {
-        self.zxio.xattr_list().map_err(|status| from_status_like_fdio!(status))
+    fn list_xattrs(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _size: usize,
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+        self.zxio
+            .xattr_list()
+            .map(ValueOrSize::from)
+            .map_err(|status| from_status_like_fdio!(status))
     }
 }
 

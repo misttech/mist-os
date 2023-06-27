@@ -311,6 +311,49 @@ pub enum XattrOp {
     Replace,
 }
 
+impl XattrOp {
+    pub fn into_flags(self) -> u32 {
+        match self {
+            Self::Set => 0,
+            Self::Create => uapi::XATTR_CREATE,
+            Self::Replace => uapi::XATTR_REPLACE,
+        }
+    }
+}
+
+/// Returns a value, or the size required to contains it.
+#[derive(Clone, Debug)]
+pub enum ValueOrSize<T> {
+    Value(T),
+    Size(usize),
+}
+
+impl<T> ValueOrSize<T> {
+    pub fn map<F, U>(self, f: F) -> ValueOrSize<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        match self {
+            Self::Size(s) => ValueOrSize::Size(s),
+            Self::Value(v) => ValueOrSize::Value(f(v)),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn unwrap(self) -> T {
+        match self {
+            Self::Size(_) => panic!("Unwrap ValueOrSize that is a Size"),
+            Self::Value(v) => v,
+        }
+    }
+}
+
+impl<T> From<T> for ValueOrSize<T> {
+    fn from(t: T) -> Self {
+        Self::Value(t)
+    }
+}
+
 pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Build the `FileOps` for the file associated to this node.
     ///
@@ -448,7 +491,17 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     }
 
     /// Get an extended attribute on the node.
-    fn get_xattr(&self, _node: &FsNode, _name: &FsStr) -> Result<FsString, Errno> {
+    ///
+    /// An implementation can systematically return a value. Otherwise, if `max_size` is 0, it can
+    /// instead return the size of the attribute, and can return an ERANGE error if max_size is not
+    /// 0, and lesser than the required size.
+    fn get_xattr(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _name: &FsStr,
+        _max_size: usize,
+    ) -> Result<ValueOrSize<FsString>, Errno> {
         error!(ENOTSUP)
     }
 
@@ -456,6 +509,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     fn set_xattr(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         _value: &FsStr,
         _op: XattrOp,
@@ -463,11 +517,24 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         error!(ENOTSUP)
     }
 
-    fn remove_xattr(&self, _node: &FsNode, _name: &FsStr) -> Result<(), Errno> {
+    fn remove_xattr(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _name: &FsStr,
+    ) -> Result<(), Errno> {
         error!(ENOTSUP)
     }
 
-    fn list_xattrs(&self, _node: &FsNode) -> Result<Vec<FsString>, Errno> {
+    /// An implementation can systematically return a value. Otherwise, if `max_size` is 0, it can
+    /// instead return the size of the 0 separated string needed to represent the value, and can
+    /// return an ERANGE error if max_size is not 0, and lesser than the required size.
+    fn list_xattrs(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _max_size: usize,
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         error!(ENOTSUP)
     }
 }
@@ -552,14 +619,17 @@ macro_rules! fs_node_impl_xattr_delegate {
         fn get_xattr(
             &$self,
             _node: &FsNode,
+            _current_task: &CurrentTask,
             name: &crate::fs::FsStr,
-        ) -> Result<FsString, crate::types::Errno> {
-            $delegate.get_xattr(name)
+            _size: usize,
+        ) -> Result<crate::fs::ValueOrSize<crate::fs::FsString>, crate::types::Errno> {
+            Ok($delegate.get_xattr(name)?.into())
         }
 
         fn set_xattr(
             &$self,
             _node: &FsNode,
+            _current_task: &CurrentTask,
             name: &crate::fs::FsStr,
             value: &crate::fs::FsStr,
             op: crate::fs::XattrOp,
@@ -570,6 +640,7 @@ macro_rules! fs_node_impl_xattr_delegate {
         fn remove_xattr(
             &$self,
             _node: &FsNode,
+            _current_task: &CurrentTask,
             name: &crate::fs::FsStr,
         ) -> Result<(), crate::types::Errno> {
             $delegate.remove_xattr(name)
@@ -578,8 +649,10 @@ macro_rules! fs_node_impl_xattr_delegate {
         fn list_xattrs(
             &$self,
             _node: &FsNode,
-        ) -> Result<Vec<crate::fs::FsString>, crate::types::Errno> {
-            $delegate.list_xattrs()
+            _current_task: &CurrentTask,
+            _size: usize,
+        ) -> Result<crate::fs::ValueOrSize<Vec<crate::fs::FsString>>, crate::types::Errno> {
+            Ok($delegate.list_xattrs()?.into())
         }
     };
     ($delegate:expr) => { fs_node_impl_xattr_delegate(self, $delegate) };
@@ -1170,10 +1243,15 @@ impl FsNode {
         Ok(())
     }
 
-    pub fn get_xattr(&self, current_task: &CurrentTask, name: &FsStr) -> Result<FsString, Errno> {
+    pub fn get_xattr(
+        &self,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        max_size: usize,
+    ) -> Result<ValueOrSize<FsString>, Errno> {
         self.check_access(current_task, Access::READ)?;
         self.check_trusted_attribute_access(current_task, name, || errno!(ENODATA))?;
-        self.ops().get_xattr(self, name)
+        self.ops().get_xattr(self, current_task, name, max_size)
     }
 
     pub fn set_xattr(
@@ -1185,24 +1263,26 @@ impl FsNode {
     ) -> Result<(), Errno> {
         self.check_access(current_task, Access::WRITE)?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
-        self.ops().set_xattr(self, name, value, op)
+        self.ops().set_xattr(self, current_task, name, value, op)
     }
 
     pub fn remove_xattr(&self, current_task: &CurrentTask, name: &FsStr) -> Result<(), Errno> {
         self.check_access(current_task, Access::WRITE)?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
-        self.ops().remove_xattr(self, name)
+        self.ops().remove_xattr(self, current_task, name)
     }
 
-    pub fn list_xattrs(&self, current_task: &CurrentTask) -> Result<Vec<FsString>, Errno> {
-        Ok(self
-            .ops()
-            .list_xattrs(self)?
-            .into_iter()
-            .filter(|name| {
+    pub fn list_xattrs(
+        &self,
+        current_task: &CurrentTask,
+        max_size: usize,
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+        Ok(self.ops().list_xattrs(self, current_task, max_size)?.map(|mut v| {
+            v.retain(|name| {
                 self.check_trusted_attribute_access(current_task, name, || errno!(EPERM)).is_ok()
-            })
-            .collect())
+            });
+            v
+        }))
     }
 
     pub fn info(&self) -> RwLockReadGuard<'_, FsNodeInfo> {

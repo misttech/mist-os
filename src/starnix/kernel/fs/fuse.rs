@@ -9,10 +9,11 @@ use crate::{
         default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
         fs_args, CacheMode, DirectoryEntryType, DirentSink, FdEvents, FdNumber, FileObject,
         FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode,
-        FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, XattrOp,
+        FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget,
+        ValueOrSize, XattrOp,
     },
     lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
-    logging::{log_error, log_trace, not_implemented, not_implemented_log_once},
+    logging::{log_error, log_trace, log_warn, not_implemented, not_implemented_log_once},
     mm::{vmo::round_up_to_increment, PAGE_SIZE},
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
@@ -28,6 +29,8 @@ use std::{
     sync::Arc,
 };
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
+
+const CONFIGURATION_AVAILABLE_EVENT: u64 = u64::MAX;
 
 #[derive(Debug, Default)]
 pub struct DevFuse {
@@ -684,30 +687,95 @@ impl FsNodeOps for Arc<FuseNode> {
         Ok(RwLockWriteGuard::downgrade(info))
     }
 
-    fn get_xattr(&self, _node: &FsNode, _name: &FsStr) -> Result<FsString, Errno> {
-        not_implemented!("FsNodeOps::get_xattr");
-        error!(ENOTSUP)
+    fn get_xattr(
+        &self,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        max_size: usize,
+    ) -> Result<ValueOrSize<FsString>, Errno> {
+        let response = self.connection.execute_operation(
+            current_task,
+            self,
+            FuseOperation::GetXAttr(
+                uapi::fuse_getxattr_in {
+                    size: max_size.try_into().map_err(|_| errno!(EINVAL))?,
+                    padding: 0,
+                },
+                name.to_vec(),
+            ),
+        )?;
+        if let FuseResponse::GetXAttr(result) = response {
+            Ok(result)
+        } else {
+            error!(EINVAL)
+        }
     }
 
     fn set_xattr(
         &self,
         _node: &FsNode,
-        _name: &FsStr,
-        _value: &FsStr,
-        _op: XattrOp,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        value: &FsStr,
+        op: XattrOp,
     ) -> Result<(), Errno> {
-        not_implemented!("FsNodeOps::set_xattr");
-        error!(ENOTSUP)
+        self.connection.execute_operation(
+            current_task,
+            self,
+            FuseOperation::SetXAttr(
+                uapi::fuse_setxattr_in {
+                    size: value.len().try_into().map_err(|_| errno!(EINVAL))?,
+                    flags: op.into_flags(),
+                    setxattr_flags: 0,
+                    padding: 0,
+                },
+                name.to_owned(),
+                value.to_owned(),
+            ),
+        )?;
+        Ok(())
     }
 
-    fn remove_xattr(&self, _node: &FsNode, _name: &FsStr) -> Result<(), Errno> {
-        not_implemented!("FsNodeOps::remove_xattr");
-        error!(ENOTSUP)
+    fn remove_xattr(
+        &self,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<(), Errno> {
+        self.connection.execute_operation(
+            current_task,
+            self,
+            FuseOperation::RemoveXAttr(name.to_owned()),
+        )?;
+        Ok(())
     }
 
-    fn list_xattrs(&self, _node: &FsNode) -> Result<Vec<FsString>, Errno> {
-        not_implemented!("FsNodeOps::list_xattrs");
-        error!(ENOTSUP)
+    fn list_xattrs(
+        &self,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        max_size: usize,
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+        let response = self.connection.execute_operation(
+            current_task,
+            self,
+            FuseOperation::ListXAttr(uapi::fuse_getxattr_in {
+                size: max_size.try_into().map_err(|_| errno!(EINVAL))?,
+                padding: 0,
+            }),
+        )?;
+        if let FuseResponse::GetXAttr(result) = response {
+            Ok(result.map(|s| {
+                let mut result = s.split(|c| *c == 0).map(|s| s.to_vec()).collect::<Vec<_>>();
+                // The returned string ends with a '\0', so the split ends with an empty value that
+                // needs to be removed.
+                result.pop();
+                result
+            }))
+        } else {
+            error!(EINVAL)
+        }
     }
 }
 
@@ -722,6 +790,27 @@ impl FuseConnection {
         self.state.lock().disconnect()
     }
 
+    fn get_configuration(
+        &self,
+        current_task: &CurrentTask,
+    ) -> Result<Arc<FuseConfiguration>, Errno> {
+        let mut state = self.state.lock();
+        if let Some(configuration) = state.configuration.as_ref() {
+            return Ok(configuration.clone());
+        }
+        loop {
+            if state.disconnected {
+                return error!(EINTR);
+            }
+            let waiter = Waiter::new();
+            state.waiters.wait_async_value(&waiter, CONFIGURATION_AVAILABLE_EVENT);
+            if let Some(configuration) = state.configuration.as_ref() {
+                return Ok(configuration.clone());
+            }
+            MutexGuard::unlocked(&mut state, || waiter.wait(current_task))?;
+        }
+    }
+
     /// Execute the given operation on the `node`. If the operation is not asynchronous, this
     /// method will wait on the userspace process for a response. If the operation is interrupted,
     /// an interrupt will be sent to the userspace process and the operation will then block until
@@ -733,13 +822,18 @@ impl FuseConnection {
         node: &FuseNode,
         operation: FuseOperation,
     ) -> Result<FuseResponse, Errno> {
+        let configuration = match operation {
+            FuseOperation::Init => Arc::new(FuseConfiguration::for_init()),
+            _ => self.get_configuration(task)?,
+        };
         let waiter = Waiter::new();
         let is_async = operation.is_async();
         let mut state = self.state.lock();
         if let Some(result) = state.operations_state.get(&operation.opcode()) {
             return result.clone();
         }
-        let unique_id = state.queue_operation(task, node, operation, Some(&waiter))?;
+        let unique_id =
+            state.queue_operation(task, node, operation, configuration.clone(), Some(&waiter))?;
         if is_async {
             return Ok(FuseResponse::None);
         }
@@ -754,7 +848,12 @@ impl FuseConnection {
                     // If interrupted by another process, send an interrupt command to the server
                     // the first time, then wait unconditionally.
                     if first_loop {
-                        self.state.lock().interrupt(task, node, unique_id)?;
+                        self.state.lock().interrupt(
+                            task,
+                            node,
+                            unique_id,
+                            configuration.clone(),
+                        )?;
                         first_loop = false;
                     }
                 }
@@ -788,6 +887,30 @@ impl FuseConnection {
     }
 }
 
+#[derive(Debug)]
+struct FuseConfiguration {
+    flags: FuseInitFlags,
+}
+
+impl FuseConfiguration {
+    // Build a fake configuration, valid only to send the Init message.
+    fn for_init() -> Self {
+        Self { flags: FuseInitFlags::all() }
+    }
+}
+
+impl TryFrom<uapi::fuse_init_out> for FuseConfiguration {
+    type Error = Errno;
+    fn try_from(init_out: uapi::fuse_init_out) -> Result<Self, Errno> {
+        let unknown_flags = init_out.flags & !FuseInitFlags::all().bits();
+        if unknown_flags != 0 {
+            log_warn!("FUSE daemon requested unknown flags in init: {unknown_flags}");
+        }
+        let flags = FuseInitFlags::from_bits_truncate(init_out.flags);
+        Ok(Self { flags })
+    }
+}
+
 /// A per connection state for operations that can be shortcircuited.
 ///
 /// For a number of Fuse operation, Fuse protocol specifies that if they fail in a specific way,
@@ -805,6 +928,9 @@ struct FuseMutableState {
     /// Last unique id used to identify messages between the kernel and user space.
     last_unique_id: u64,
 
+    /// The configuration, negotiated with the client.
+    configuration: Option<Arc<FuseConfiguration>>,
+
     /// In progress operations.
     operations: HashMap<u64, RunningOperation>,
 
@@ -821,6 +947,12 @@ struct FuseMutableState {
 }
 
 impl FuseMutableState {
+    fn set_configuration(&mut self, configuration: FuseConfiguration) {
+        debug_assert!(self.configuration.is_none());
+        self.configuration = Some(Arc::new(configuration));
+        self.waiters.notify_value_event(CONFIGURATION_AVAILABLE_EVENT);
+    }
+
     /// Disconnect the mount. Happens on unmount. Every filesystem operation will fail with EINTR,
     /// and every read/write on the /dev/fuse fd will fail with ENODEV.
     fn disconnect(&mut self) {
@@ -843,6 +975,7 @@ impl FuseMutableState {
         task: &CurrentTask,
         node: &FuseNode,
         operation: FuseOperation,
+        configuration: Arc<FuseConfiguration>,
         waiter: Option<&Waiter>,
     ) -> Result<u64, Errno> {
         debug_assert!(waiter.is_some() == operation.has_response(), "{operation:?}");
@@ -851,7 +984,8 @@ impl FuseMutableState {
         }
         let operation = Arc::new(operation);
         self.last_unique_id += 1;
-        let message = FuseKernelMessage::new(self.last_unique_id, task, node, operation)?;
+        let message =
+            FuseKernelMessage::new(self.last_unique_id, task, node, operation, configuration)?;
         if let Some(waiter) = waiter {
             self.waiters.wait_async_value(waiter, self.last_unique_id);
         }
@@ -874,6 +1008,7 @@ impl FuseMutableState {
         task: &CurrentTask,
         node: &FuseNode,
         unique_id: u64,
+        configuration: Arc<FuseConfiguration>,
     ) -> Result<(), Errno> {
         debug_assert!(self.operations.contains_key(&unique_id));
 
@@ -891,7 +1026,8 @@ impl FuseMutableState {
             // Nothing to do, the operation has been cancelled before being sent.
             return error!(EINTR);
         }
-        self.queue_operation(task, node, FuseOperation::Interrupt(unique_id), None).map(|_| ())
+        self.queue_operation(task, node, FuseOperation::Interrupt(unique_id), configuration, None)
+            .map(|_| ())
     }
 
     /// Returns the response for the operation with the given identifier. Returns None if the
@@ -925,7 +1061,7 @@ impl FuseMutableState {
             return error!(ENODEV);
         }
         if let Some(message) = self.message_queue.pop_front() {
-            message.serialize(data)
+            message.serialize(data, &message.configuration)
         } else {
             error!(EAGAIN)
         }
@@ -944,30 +1080,48 @@ impl FuseMutableState {
             return error!(EINVAL);
         }
         self.waiters.notify_value_event(header.unique);
-        let operation = self.operations.get_mut(&header.unique).ok_or_else(|| errno!(EINVAL))?;
+        let running_operation =
+            self.operations.get_mut(&header.unique).ok_or_else(|| errno!(EINVAL))?;
+        let operation = running_operation.operation.clone();
         if header.error < 0 {
             log_trace!("Fuse: {operation:?} -> {header:?}");
             let code = i16::try_from(-header.error).unwrap_or(EINVAL.error_code() as i16);
             let errno = errno_from_code!(code);
-            operation.response =
-                Some(operation.operation.handle_error(&mut self.operations_state, errno));
+            running_operation.response =
+                Some(operation.handle_error(&mut self.operations_state, errno));
         } else {
             let mut buffer = vec![0u8; remainder];
             if data.read(&mut buffer)? != remainder {
                 return error!(EINVAL);
             }
-            let response = operation.operation.parse_response(buffer)?;
+            let response = operation.parse_response(buffer)?;
             log_trace!("Fuse: {operation:?} -> {response:?}");
-            if operation.operation.is_async() {
-                operation.operation.handle_async(response)?;
+            if operation.is_async() {
+                self.handle_async(&operation, response)?;
             } else {
-                operation.response = Some(Ok(response));
+                running_operation.response = Some(Ok(response));
             }
         }
-        if operation.operation.is_async() {
+        if operation.is_async() {
             self.operations.remove(&header.unique);
         }
         Ok(header.len as usize)
+    }
+
+    fn handle_async(
+        &mut self,
+        operation: &FuseOperation,
+        response: FuseResponse,
+    ) -> Result<(), Errno> {
+        debug_assert!(operation.is_async());
+        if let FuseOperation::Init = operation {
+            if let FuseResponse::Init(init_out) = response {
+                self.set_configuration(init_out.try_into()?);
+            } else {
+                return error!(EINVAL);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -989,6 +1143,7 @@ impl From<Arc<FuseOperation>> for RunningOperation {
 struct FuseKernelMessage {
     header: uapi::fuse_in_header,
     operation: Arc<FuseOperation>,
+    configuration: Arc<FuseConfiguration>,
 }
 
 impl FuseKernelMessage {
@@ -997,12 +1152,15 @@ impl FuseKernelMessage {
         task: &CurrentTask,
         node: &FuseNode,
         operation: Arc<FuseOperation>,
+        configuration: Arc<FuseConfiguration>,
     ) -> Result<Self, Errno> {
         let creds = task.creds();
         Ok(Self {
             header: uapi::fuse_in_header {
-                len: u32::try_from(std::mem::size_of::<uapi::fuse_in_header>() + operation.len())
-                    .map_err(|_| errno!(EINVAL))?,
+                len: u32::try_from(
+                    std::mem::size_of::<uapi::fuse_in_header>() + operation.len(&configuration),
+                )
+                .map_err(|_| errno!(EINVAL))?,
                 opcode: operation.opcode(),
                 unique,
                 nodeid: node.nodeid,
@@ -1012,21 +1170,28 @@ impl FuseKernelMessage {
                 padding: 0,
             },
             operation,
+            configuration,
         })
     }
 
-    fn serialize(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
+    fn serialize(
+        &self,
+        data: &mut dyn OutputBuffer,
+        configuration: &FuseConfiguration,
+    ) -> Result<usize, Errno> {
         let size = data.write(self.header.as_bytes())?;
-        Ok(size + self.operation.serialize(data)?)
+        Ok(size + self.operation.serialize(data, configuration)?)
     }
 }
 
 bitflags::bitflags! {
     pub struct FuseInitFlags : u32 {
+        const BIG_WRITES = uapi::FUSE_BIG_WRITES;
         const DONT_MASK = uapi::FUSE_DONT_MASK;
         const SPLICE_READ = uapi::FUSE_SPLICE_READ;
         const SPLICE_WRITE = uapi::FUSE_SPLICE_WRITE;
         const SPLICE_MOVE = uapi::FUSE_SPLICE_MOVE;
+        const SETXATTR_EXT = uapi::FUSE_SETXATTR_EXT;
     }
 }
 
@@ -1039,6 +1204,12 @@ enum FuseOperation {
         // Identifier of the operation to interrupt
         u64,
     ),
+    GetXAttr(
+        uapi::fuse_getxattr_in,
+        // Name of the attribute
+        FsString,
+    ),
+    ListXAttr(uapi::fuse_getxattr_in),
     Lookup(FsString),
     Mkdir(uapi::fuse_mkdir_in, FsString),
     Mknod(uapi::fuse_mknod_in, FsString),
@@ -1049,8 +1220,19 @@ enum FuseOperation {
     Readdir(uapi::fuse_read_in),
     Readlink,
     Release(OpenFlags, uapi::fuse_open_out),
+    RemoveXAttr(
+        // Name of the attribute
+        FsString,
+    ),
     Seek(uapi::fuse_lseek_in),
     SetAttr(uapi::fuse_setattr_in),
+    SetXAttr(
+        uapi::fuse_setxattr_in,
+        // Name of the attribute
+        FsString,
+        // Value of the attribute
+        FsString,
+    ),
     Statfs,
     Symlink(
         // Target of the link
@@ -1073,14 +1255,15 @@ enum FuseOperation {
 enum FuseResponse {
     Attr(uapi::fuse_attr_out),
     Entry(uapi::fuse_entry_out),
+    GetXAttr(ValueOrSize<FsString>),
     Init(uapi::fuse_init_out),
-    Seek(uapi::fuse_lseek_out),
     Open(uapi::fuse_open_out),
     Poll(uapi::fuse_poll_out),
     Read(
         // Content read
         Vec<u8>,
     ),
+    Seek(uapi::fuse_lseek_out),
     Readdir(Vec<(uapi::fuse_dirent, FsString)>),
     Statfs(uapi::fuse_statfs_out),
     Write(uapi::fuse_write_out),
@@ -1088,7 +1271,11 @@ enum FuseResponse {
 }
 
 impl FuseOperation {
-    fn serialize(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
+    fn serialize(
+        &self,
+        data: &mut dyn OutputBuffer,
+        configuration: &FuseConfiguration,
+    ) -> Result<usize, Errno> {
         match self {
             Self::Flush(open_in) => {
                 let message =
@@ -1096,6 +1283,11 @@ impl FuseOperation {
                 data.write_all(message.as_bytes())
             }
             Self::GetAttr | Self::Readlink | Self::Statfs => Ok(0),
+            Self::GetXAttr(getxattr_in, name) => {
+                let mut len = data.write_all(getxattr_in.as_bytes())?;
+                len += Self::write_null_terminated(data, name)?;
+                Ok(len)
+            }
             Self::Init => {
                 let message = uapi::fuse_init_in {
                     major: uapi::FUSE_KERNEL_VERSION,
@@ -1109,6 +1301,7 @@ impl FuseOperation {
                 let message = uapi::fuse_interrupt_in { unique: *unique };
                 data.write_all(message.as_bytes())
             }
+            Self::ListXAttr(getxattr_in) => data.write_all(getxattr_in.as_bytes()),
             Self::Lookup(name) => Self::write_null_terminated(data, name),
             Self::Open(open_flags) => {
                 let message = uapi::fuse_open_in { flags: open_flags.bits(), open_flags: 0 };
@@ -1140,8 +1333,20 @@ impl FuseOperation {
                 };
                 data.write_all(message.as_bytes())
             }
+            Self::RemoveXAttr(name) => Self::write_null_terminated(data, name),
             Self::Seek(seek_in) => data.write_all(seek_in.as_bytes()),
             Self::SetAttr(setattr_in) => data.write_all(setattr_in.as_bytes()),
+            Self::SetXAttr(setxattr_in, name, value) => {
+                let header = if configuration.flags.contains(FuseInitFlags::SETXATTR_EXT) {
+                    setxattr_in.as_bytes()
+                } else {
+                    &setxattr_in.as_bytes()[..8]
+                };
+                let mut len = data.write_all(header)?;
+                len += Self::write_null_terminated(data, name)?;
+                len += data.write_all(value.as_bytes())?;
+                Ok(len)
+            }
             Self::Symlink(target, name) => {
                 let mut len = Self::write_null_terminated(data, name)?;
                 len += Self::write_null_terminated(data, target)?;
@@ -1169,8 +1374,10 @@ impl FuseOperation {
         match self {
             Self::Flush(_) => uapi::fuse_opcode_FUSE_FLUSH,
             Self::GetAttr => uapi::fuse_opcode_FUSE_GETATTR,
+            Self::GetXAttr(_, _) => uapi::fuse_opcode_FUSE_GETXATTR,
             Self::Init => uapi::fuse_opcode_FUSE_INIT,
             Self::Interrupt(_) => uapi::fuse_opcode_FUSE_INTERRUPT,
+            Self::ListXAttr(_) => uapi::fuse_opcode_FUSE_LISTXATTR,
             Self::Lookup(_) => uapi::fuse_opcode_FUSE_LOOKUP,
             Self::Mkdir(_, _) => uapi::fuse_opcode_FUSE_MKDIR,
             Self::Mknod(_, _) => uapi::fuse_opcode_FUSE_MKNOD,
@@ -1193,8 +1400,10 @@ impl FuseOperation {
                     uapi::fuse_opcode_FUSE_RELEASE
                 }
             }
+            Self::RemoveXAttr(_) => uapi::fuse_opcode_FUSE_REMOVEXATTR,
             Self::Seek(_) => uapi::fuse_opcode_FUSE_LSEEK,
             Self::SetAttr(_) => uapi::fuse_opcode_FUSE_SETATTR,
+            Self::SetXAttr(_, _, _) => uapi::fuse_opcode_FUSE_SETXATTR,
             Self::Statfs => uapi::fuse_opcode_FUSE_STATFS,
             Self::Symlink(_, _) => uapi::fuse_opcode_FUSE_SYMLINK,
             Self::Unlink(_) => uapi::fuse_opcode_FUSE_UNLINK,
@@ -1202,7 +1411,7 @@ impl FuseOperation {
         }
     }
 
-    fn len(&self) -> usize {
+    fn len(&self, configuration: &FuseConfiguration) -> usize {
         #[derive(Debug, Default)]
         struct CountingOutputBuffer {
             written: usize,
@@ -1228,7 +1437,8 @@ impl FuseOperation {
         }
 
         let mut counting_output_buffer = CountingOutputBuffer::default();
-        self.serialize(&mut counting_output_buffer).expect("Serialization should not fail");
+        self.serialize(&mut counting_output_buffer, configuration)
+            .expect("Serialization should not fail");
         counting_output_buffer.written
     }
 
@@ -1252,6 +1462,17 @@ impl FuseOperation {
         match self {
             Self::GetAttr | Self::SetAttr(_) => {
                 Ok(FuseResponse::Attr(Self::to_response::<uapi::fuse_attr_out>(&buffer)))
+            }
+            Self::GetXAttr(getxattr_in, _) | Self::ListXAttr(getxattr_in) => {
+                if getxattr_in.size == 0 {
+                    if buffer.len() < std::mem::size_of::<uapi::fuse_getxattr_out>() {
+                        return error!(EINVAL);
+                    }
+                    let getxattr_out = Self::to_response::<uapi::fuse_getxattr_out>(&buffer);
+                    Ok(FuseResponse::GetXAttr(ValueOrSize::Size(getxattr_out.size as usize)))
+                } else {
+                    Ok(FuseResponse::GetXAttr(buffer.into()))
+                }
             }
             Self::Init => Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer))),
             Self::Lookup(_)
@@ -1291,7 +1512,11 @@ impl FuseOperation {
                 }
                 Ok(FuseResponse::Readdir(result))
             }
-            Self::Flush(_) | Self::Release(_, _) | Self::Unlink(_) => Ok(FuseResponse::None),
+            Self::Flush(_)
+            | Self::Release(_, _)
+            | Self::RemoveXAttr(_)
+            | Self::SetXAttr(_, _, _)
+            | Self::Unlink(_) => Ok(FuseResponse::None),
             Self::Statfs => {
                 Ok(FuseResponse::Statfs(Self::to_response::<uapi::fuse_statfs_out>(&buffer)))
             }
@@ -1305,15 +1530,6 @@ impl FuseOperation {
                 panic!("Response for operation without one");
             }
         }
-    }
-
-    fn handle_async(&self, response: FuseResponse) -> Result<(), Errno> {
-        debug_assert!(self.is_async());
-        if let Self::Init = self {
-            debug_assert!(matches!(response, FuseResponse::Init(_)));
-            // TODO(https://fxbug.dev/125496): save init response.
-        }
-        Ok(())
     }
 
     /// Handles an error from the userspace daemon.

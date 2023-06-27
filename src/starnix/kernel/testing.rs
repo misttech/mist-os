@@ -25,7 +25,7 @@ use crate::{
 /// Create a FileSystemHandle for use in testing.
 ///
 /// Open "/pkg" and returns an FsContext rooted in that directory.
-fn create_pkgfs(kernel: &Kernel) -> FileSystemHandle {
+fn create_pkgfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
     let (server, client) = zx::Channel::create();
     fdio::open("/pkg", rights, server).expect("failed to open /pkg");
@@ -46,7 +46,7 @@ pub fn create_kernel_and_task() -> (Arc<Kernel>, CurrentTask) {
 ///
 /// The `Task` is backed by a real process, and can be used to test syscalls.
 fn create_kernel_and_task_with_fs(
-    create_fs: impl FnOnce(&Kernel) -> FileSystemHandle,
+    create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
 ) -> (Arc<Kernel>, CurrentTask) {
     let kernel =
         Kernel::new(b"test-kernel", &[], &Vec::new(), None).expect("failed to create kernel");

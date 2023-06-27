@@ -7,6 +7,7 @@ use crate::{
     task::{CurrentTask, Kernel},
     types::*,
 };
+use std::sync::Arc;
 
 pub struct Anon;
 
@@ -23,7 +24,7 @@ impl FsNodeOps for Anon {
 
 impl Anon {
     pub fn new_file_extended(
-        kernel: &Kernel,
+        kernel: &Arc<Kernel>,
         ops: Box<dyn FileOps>,
         flags: OpenFlags,
         info: impl FnOnce(ino_t) -> FsNodeInfo,
@@ -55,7 +56,7 @@ impl FileSystemOps for AnonFs {
         b"anon"
     }
 }
-pub fn anon_fs(kernel: &Kernel) -> &FileSystemHandle {
+pub fn anon_fs(kernel: &Arc<Kernel>) -> &FileSystemHandle {
     kernel.anon_fs.get_or_init(|| {
         FileSystem::new(kernel, CacheMode::Uncached, AnonFs, FileSystemOptions::default())
     })

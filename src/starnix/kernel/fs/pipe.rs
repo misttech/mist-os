@@ -265,7 +265,7 @@ impl FileSystemOps for PipeFs {
         b"pipe"
     }
 }
-fn pipe_fs(kernel: &Kernel) -> &FileSystemHandle {
+fn pipe_fs(kernel: &Arc<Kernel>) -> &FileSystemHandle {
     kernel.pipe_fs.get_or_init(|| {
         FileSystem::new(kernel, CacheMode::Uncached, PipeFs, FileSystemOptions::default())
     })

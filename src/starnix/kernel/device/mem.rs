@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, cprng_draw};
-
 use crate::{
     auth::FsCred,
     fs::{
@@ -15,10 +13,12 @@ use crate::{
     task::*,
     types::*,
 };
+use fuchsia_zircon::{self as zx, cprng_draw};
+use std::sync::Arc;
 
 struct DevNull;
 
-pub fn new_null_file(kernel: &Kernel, flags: OpenFlags) -> FileHandle {
+pub fn new_null_file(kernel: &Arc<Kernel>, flags: OpenFlags) -> FileHandle {
     Anon::new_file_extended(
         kernel,
         Box::new(DevNull),

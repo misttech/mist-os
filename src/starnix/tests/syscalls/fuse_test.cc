@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/statfs.h>
 #include <sys/types.h>
+#include <sys/xattr.h>
 #include <unistd.h>
 
 #include <gtest/gtest.h>
@@ -100,7 +101,7 @@ class FuseTest : public ::testing::Test {
     pid_t child_pid = fork_helper_.RunInForkedProcess([&] {
       std::string configuration =
           "lowerdir=" + lowerdir + ",upperdir=" + upperdir + ",workdir=" + workdir;
-      execl(GetOverlayFsPath().c_str(), GetOverlayFsPath().c_str(), "-f", "-o",
+      execl(GetOverlayFsPath().c_str(), GetOverlayFsPath().c_str(), "-f", "-d", "-o",
             configuration.c_str(), mergedir.c_str(), NULL);
     });
     if (child_pid <= 0) {
@@ -323,6 +324,43 @@ TEST_F(FuseTest, Readdir) {
   ASSERT_EQ(files.size(), 2u);
   ASSERT_NE(files.find("."), files.end());
   ASSERT_NE(files.find(".."), files.end());
+}
+
+TEST_F(FuseTest, XAttr) {
+  const char attribute_name[] = "user.comment\0";
+  ASSERT_TRUE(Mount());
+
+  std::string filename = GetMountDir() + "/file";
+  ScopedFD fd(open(filename.c_str(), O_RDWR | O_CREAT));
+  ASSERT_TRUE(fd.is_valid());
+
+  ASSERT_EQ(fgetxattr(fd.get(), attribute_name, nullptr, 0), -1);
+  ASSERT_EQ(errno, ENODATA);
+  ASSERT_EQ(fsetxattr(fd.get(), attribute_name, "hello", 5, XATTR_CREATE), 0);
+  ASSERT_EQ(fgetxattr(fd.get(), attribute_name, nullptr, 1), -1);
+  ASSERT_EQ(errno, ERANGE);
+  ASSERT_EQ(fgetxattr(fd.get(), attribute_name, nullptr, 0), 5);
+  char buffer[5];
+  ASSERT_EQ(fgetxattr(fd.get(), attribute_name, buffer, 5), 5);
+  ASSERT_EQ(memcmp(buffer, "hello", 5), 0);
+
+  ssize_t list_size = flistxattr(fd.get(), nullptr, 0);
+  ASSERT_GE(list_size, 0);
+  char list[list_size];
+  ASSERT_EQ(flistxattr(fd.get(), list, list_size), list_size);
+  ASSERT_EQ(list[list_size - 1], '\0');
+  std::set<std::string> attributes;
+  ssize_t index = 0;
+  while (index < list_size) {
+    std::string content = std::string(&list[index]);
+    attributes.insert(content);
+    index += content.size() + 1;
+  }
+  ASSERT_NE(attributes.find(attribute_name), attributes.end());
+
+  ASSERT_EQ(fremovexattr(fd.get(), attribute_name), 0);
+  ASSERT_EQ(fgetxattr(fd.get(), attribute_name, nullptr, 0), -1);
+  ASSERT_EQ(errno, ENODATA);
 }
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_

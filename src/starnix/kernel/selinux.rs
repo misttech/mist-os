@@ -32,7 +32,7 @@ impl FileSystemOps for SeLinuxFs {
 }
 
 impl SeLinuxFs {
-    fn new_fs(kernel: &Kernel, options: FileSystemOptions) -> Result<FileSystemHandle, Errno> {
+    fn new_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, SeLinuxFs, options);
         let mut dir = StaticDirectoryBuilder::new(&fs);
         dir.entry(b"load", BytesFile::new_node(SeLoad), mode!(IFREG, 0o600));
@@ -350,7 +350,7 @@ impl BytesFileOps for AttrNode {
     }
 }
 
-pub fn selinux_fs(kern: &Kernel, options: FileSystemOptions) -> &FileSystemHandle {
+pub fn selinux_fs(kern: &Arc<Kernel>, options: FileSystemOptions) -> &FileSystemHandle {
     kern.selinux_fs
         .get_or_init(|| SeLinuxFs::new_fs(kern, options).expect("failed to construct selinuxfs"))
 }

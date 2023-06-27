@@ -169,7 +169,7 @@ pub fn parse_numbered_handles(
 /// Create a filesystem to access the content of the fuchsia directory available at `fs_src` inside
 /// `pkg`.
 pub fn create_remotefs_filesystem(
-    kernel: &Kernel,
+    kernel: &Arc<Kernel>,
     root: &fio::DirectorySynchronousProxy,
     rights: fio::OpenFlags,
     fs_src: &str,

@@ -86,12 +86,12 @@ impl FileSystemOps for Arc<TmpFs> {
 }
 
 impl TmpFs {
-    pub fn new_fs(kernel: &Kernel) -> FileSystemHandle {
+    pub fn new_fs(kernel: &Arc<Kernel>) -> FileSystemHandle {
         Self::new_fs_with_options(kernel, Default::default()).expect("empty options cannot fail")
     }
 
     pub fn new_fs_with_options(
-        kernel: &Kernel,
+        kernel: &Arc<Kernel>,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, Arc::new(TmpFs(())), options);

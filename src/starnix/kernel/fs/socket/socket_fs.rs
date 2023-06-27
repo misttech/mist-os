@@ -7,6 +7,7 @@ use crate::{
     task::{CurrentTask, Kernel},
     types::{statfs, Errno, SOCKFS_MAGIC},
 };
+use std::sync::Arc;
 
 /// `SocketFs` is the file system where anonymous socket nodes are created, for example in
 /// `sys_socket`.
@@ -21,7 +22,7 @@ impl FileSystemOps for SocketFs {
 }
 
 /// Returns a handle to the `SocketFs` instance in `kernel`, initializing it if needed.
-pub fn socket_fs(kernel: &Kernel) -> &FileSystemHandle {
+pub fn socket_fs(kernel: &Arc<Kernel>) -> &FileSystemHandle {
     kernel.socket_fs.get_or_init(|| {
         FileSystem::new(kernel, CacheMode::Uncached, SocketFs, FileSystemOptions::default())
     })

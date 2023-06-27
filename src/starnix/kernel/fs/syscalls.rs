@@ -879,7 +879,10 @@ fn do_getxattr(
     size: usize,
 ) -> Result<usize, Errno> {
     let name = read_xattr_name(current_task, name_addr)?;
-    let value = node.entry.node.get_xattr(current_task, &name)?;
+    let value = match node.entry.node.get_xattr(current_task, &name, size)? {
+        ValueOrSize::Size(s) => return Ok(s),
+        ValueOrSize::Value(v) => v,
+    };
     if size == 0 {
         return Ok(value.len());
     }
@@ -1037,7 +1040,10 @@ fn do_listxattr(
     size: usize,
 ) -> Result<usize, Errno> {
     let mut list = vec![];
-    let xattrs = node.entry.node.list_xattrs(current_task)?;
+    let xattrs = match node.entry.node.list_xattrs(current_task, size)? {
+        ValueOrSize::Size(s) => return Ok(s),
+        ValueOrSize::Value(v) => v,
+    };
     for name in xattrs.iter() {
         list.extend_from_slice(name);
         list.push(b'\0');
