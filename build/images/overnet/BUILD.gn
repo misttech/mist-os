@@ -3,8 +3,12 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/board.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/sys/core/build/core.gni")
+
+assert(images_config_label != false,
+       "images_config_label must be defined for the build")
 
 core_realm_definition("core") {
   testonly = true
@@ -13,6 +17,7 @@ core_realm_definition("core") {
 
 assembled_system("overnet") {
   testonly = true
+  assembly_images_config_label = images_config_label
   product_assembly_config_label = "//build/assembly:default_product_config"
 
   base_packages = [
