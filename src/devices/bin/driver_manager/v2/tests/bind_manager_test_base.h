@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.driver.index/cpp/fidl.h>
 
 #include "src/devices/bin/driver_manager/v2/bind_manager.h"
+#include "src/devices/bin/driver_manager/v2/composite_node_spec_v2.h"
 #include "src/devices/bin/driver_manager/v2/node.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
@@ -60,22 +61,34 @@ class TestDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
   async_dispatcher_t* dispatcher_;
 };
 
-class TestBindManagerBridge final : public dfv2::BindManagerBridge {
+class TestBindManagerBridge final : public dfv2::BindManagerBridge, public CompositeManagerBridge {
  public:
+  struct CompositeNodeSpecData {
+    dfv2::CompositeNodeSpecV2* spec;
+    fuchsia_driver_index::MatchedCompositeNodeSpecInfo fidl_info;
+  };
+
   explicit TestBindManagerBridge(fidl::WireClient<fuchsia_driver_index::DriverIndex> client)
-      : client_(std::move(client)) {}
+      : client_(std::move(client)), composite_manager_(this) {}
   ~TestBindManagerBridge() = default;
 
+  // BindManagerBridge implementation:
   zx::result<std::vector<CompositeNodeAndDriver>> BindToParentSpec(
       fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo match_info,
       std::weak_ptr<dfv2::Node> node, bool enable_multibind) override {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
+    return composite_manager_.BindParentSpec(match_info, node, enable_multibind);
   }
 
   zx::result<std::string> StartDriver(
       dfv2::Node& node, fuchsia_driver_index::wire::MatchedDriverInfo driver_info) override {
     return zx::ok("");
   }
+
+  // CompositeManagerBridge implementation:
+  void BindNodesForCompositeNodeSpec() override { bind_manager_->TryBindAllAvailable(); }
+
+  void AddSpecToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
+                            AddToIndexCallback callback) override;
 
   void RequestMatchFromDriverIndex(
       fuchsia_driver_index::wire::MatchDriverArgs args,
@@ -84,8 +97,21 @@ class TestBindManagerBridge final : public dfv2::BindManagerBridge {
     client_->MatchDriver(args).Then(std::move(match_callback));
   }
 
+  void AddCompositeNodeSpec(std::string composite, std::vector<std::string> parent_names,
+                            std::vector<fuchsia_driver_framework::ParentSpec> parents,
+                            std::unique_ptr<dfv2::CompositeNodeSpecV2> spec);
+
+  const std::unordered_map<std::string, CompositeNodeSpecData>& specs() const { return specs_; }
+
+  void set_bind_manager(TestBindManager* bind_manager) { bind_manager_ = bind_manager; }
+
  private:
   fidl::WireClient<fuchsia_driver_index::DriverIndex> client_;
+
+  CompositeNodeSpecManager composite_manager_;
+  std::unordered_map<std::string, CompositeNodeSpecData> specs_;
+
+  TestBindManager* bind_manager_;
 };
 
 class TestNodeManager : public dfv2::NodeManager {
@@ -143,6 +169,8 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
   void AddLegacyComposite_EXPECT_QUEUED(std::string composite,
                                         std::vector<std::string> fragment_names);
 
+  void AddCompositeNodeSpec(std::string composite, std::vector<std::string> parents);
+
   // Invoke Bind() for the node with the given |name|. The node should already exist.
   // If EXPECT_BIND_START, the function verifies that it started a new bind process.
   // If EXPECT_QUEUED, the function verifies that it queued new bind request.
@@ -159,6 +187,8 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
 
   // Invoke DriverIndex reply for a match request for |node|.
   void DriverIndexReplyWithDriver(std::string node);
+  void DriverIndexReplyWithComposite(std::string node,
+                                     std::vector<std::pair<std::string, size_t>> specs);
   void DriverIndexReplyWithNoMatch(std::string node);
 
   void VerifyNoOngoingBind();
@@ -174,6 +204,8 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
   void VerifyLegacyCompositeFragmentIsBound(bool expect_bound, std::string composite,
                                             std::string fragment_name);
   void VerifyLegacyCompositeBuilt(bool expect_built, std::string composite);
+
+  void VerifyCompositeNodeExists(bool expected, std::string spec_name);
 
   void VerifyPendingBindRequestCount(size_t expected);
 

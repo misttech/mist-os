@@ -4,7 +4,11 @@
 
 #include "src/devices/bin/driver_manager/v2/tests/bind_manager_test_base.h"
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+
+#include <bind/fuchsia/cpp/bind.h>
 
 namespace fdi = fuchsia_driver_index;
 
@@ -61,6 +65,44 @@ void TestDriverIndex::VerifyRequestCount(uint32_t id, size_t expected_count) {
   ASSERT_EQ(expected_count, completers_[id].size());
 }
 
+void TestBindManagerBridge::AddSpecToDriverIndex(
+    fuchsia_driver_framework::wire::CompositeNodeSpec spec, AddToIndexCallback callback) {
+  auto name = std::string(spec.name().get());
+  auto response = fdi::DriverIndexAddCompositeNodeSpecResponse(
+      fdi::MatchedCompositeInfo{{
+          .composite_name = name,
+          .driver_info = fdi::MatchedDriverInfo{{.driver_url = "fuchsia-boot:///#meta/test.cm"}},
+      }},
+      specs_.at(name).fidl_info.node_names().value());
+  callback(zx::ok(response));
+}
+
+void TestBindManagerBridge::AddCompositeNodeSpec(std::string composite,
+                                                 std::vector<std::string> parent_names,
+                                                 std::vector<fdf::ParentSpec> parents,
+                                                 std::unique_ptr<dfv2::CompositeNodeSpecV2> spec) {
+  auto composite_info = fdi::MatchedCompositeInfo{{
+      .composite_name = composite,
+      .driver_info = fdi::MatchedDriverInfo{{.driver_url = "fuchsia-boot:///#meta/test.cm"}},
+  }};
+  auto fidl_spec_info = fdi::MatchedCompositeNodeSpecInfo{{
+      .name = composite,
+      .composite = composite_info,
+      .num_nodes = parents.size(),
+      .node_names = parent_names,
+      .primary_index = 0,
+  }};
+  specs_.emplace(composite, CompositeNodeSpecData{
+                                .spec = spec.get(),
+                                .fidl_info = fidl_spec_info,
+                            });
+
+  fidl::Arena arena;
+  auto fidl_data = fdf::CompositeNodeSpec{{.name = composite, .parents = std::move(parents)}};
+  auto result = composite_manager_.AddSpec(fidl::ToWire(arena, fidl_data), std::move(spec));
+  ASSERT_TRUE(result.is_ok());
+}
+
 void BindManagerTestBase::SetUp() {
   TestLoopFixture::SetUp();
 
@@ -77,6 +119,7 @@ void BindManagerTestBase::SetUp() {
 
   bind_manager_ = std::make_unique<TestBindManager>(bridge_.get(), &node_manager_, dispatcher());
   node_manager_.set_bind_manager(bind_manager_.get());
+  bridge_->set_bind_manager(bind_manager_.get());
 
   ASSERT_EQ(0u, bind_manager_->NumOrphanedNodes());
   VerifyNoOngoingBind();
@@ -217,6 +260,30 @@ void BindManagerTestBase::AddLegacyComposite_EXPECT_QUEUED(
   VerifyBindManagerData(expected_data);
 }
 
+void BindManagerTestBase::AddCompositeNodeSpec(std::string composite,
+                                               std::vector<std::string> parents) {
+  std::vector<fdf::ParentSpec> parent_specs;
+  parent_specs.reserve(parents.size());
+  for (auto& parent : parents) {
+    auto instance_id = GetOrAddInstanceId(parent);
+    parent_specs.push_back(fdf::ParentSpec{
+        {.bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID,
+                                                instance_id)},
+         .properties = {fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id)}}});
+  }
+
+  auto spec = std::make_unique<dfv2::CompositeNodeSpecV2>(
+      CompositeNodeSpecCreateInfo{
+          .name = composite,
+          .size = parents.size(),
+      },
+      dispatcher(), &node_manager_);
+
+  bridge_->AddCompositeNodeSpec(composite, std::move(parents), std::move(parent_specs),
+                                std::move(spec));
+  RunLoopUntilIdle();
+}
+
 void BindManagerTestBase::InvokeTryBindAllAvailable() {
   bind_manager_->TryBindAllAvailable();
   RunLoopUntilIdle();
@@ -244,6 +311,23 @@ void BindManagerTestBase::DriverIndexReplyWithDriver(std::string node) {
   auto driver_info = fdi::MatchedDriverInfo{{.driver_url = "fuchsia-boot:///#meta/test.cm"}};
   driver_index_->ReplyWithMatch(instance_ids_[node],
                                 zx::ok(fdi::MatchedDriver::WithDriver(driver_info)));
+  RunLoopUntilIdle();
+}
+
+void BindManagerTestBase::DriverIndexReplyWithComposite(
+    std::string node, std::vector<std::pair<std::string, size_t>> matched_specs) {
+  std::vector<fdi::MatchedCompositeNodeSpecInfo> fidl_specs;
+  fidl_specs.reserve(matched_specs.size());
+  for (auto& [name, index] : matched_specs) {
+    auto match_info = bridge_->specs().at(name).fidl_info;
+    match_info.node_index() = index;
+    fidl_specs.push_back(match_info);
+  }
+
+  driver_index_->ReplyWithMatch(
+      instance_ids_[node],
+      zx::ok(fdi::MatchedDriver::WithParentSpec(
+          fdi::MatchedCompositeNodeParentInfo{{.specs = std::move(fidl_specs)}})));
   RunLoopUntilIdle();
 }
 
@@ -275,9 +359,12 @@ void BindManagerTestBase::VerifyOrphanedNodes(std::vector<std::string> expected_
 void BindManagerTestBase::VerifyBindOngoingWithRequests(
     std::vector<std::pair<std::string, size_t>> expected_requests) {
   ASSERT_TRUE(bind_manager_->IsBindOngoing());
+  size_t expected_count = 0;
   for (auto& [name, count] : expected_requests) {
     driver_index_->VerifyRequestCount(GetOrAddInstanceId(name), count);
+    expected_count += count;
   }
+  ASSERT_EQ(expected_count, driver_index_->NumOfMatchRequests());
 }
 
 void BindManagerTestBase::VerifyPendingBindRequestCount(size_t expected) {
@@ -308,6 +395,11 @@ void BindManagerTestBase::VerifyLegacyCompositeBuilt(bool expect_built, std::str
                    [&composite](const auto& it) { return it->name() == composite; });
   ASSERT_NE(composite_itr, assemblers.end());
   EXPECT_EQ(expect_built, (*composite_itr)->is_assembled());
+}
+
+void BindManagerTestBase::VerifyCompositeNodeExists(bool expected, std::string spec_name) {
+  EXPECT_EQ(expected,
+            bridge_->specs().at(spec_name).spec->completed_composite_node() != std::nullopt);
 }
 
 uint32_t BindManagerTestBase::GetOrAddInstanceId(std::string node_name) {

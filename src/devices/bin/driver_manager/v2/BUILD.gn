@@ -101,8 +101,10 @@ executable("bind_manager_test") {
 
   deps = [
     ":driver_runner",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//zircon/system/ulib/zircon-internal",

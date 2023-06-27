@@ -361,3 +361,58 @@ TEST_F(BindManagerTest, AddMultipleLegacyCompositeDuringBind) {
   VerifyOrphanedNodes({"node-a.composite-a"});
   VerifyNoOngoingBind();
 }
+
+TEST_F(BindManagerTest, AddCompositeNodeSpecThenBind) {
+  AddCompositeNodeSpec("composite-a", {"node-a", "node-b"});
+
+  // Add and bind node-a.
+  AddAndBindNode("node-a");
+  VerifyBindOngoingWithRequests({{"node-a", 1}});
+  DriverIndexReplyWithComposite("node-a", {{"composite-a", 0}});
+
+  // Add and bind node-b.
+  AddAndBindNode("node-b");
+  VerifyBindOngoingWithRequests({{"node-b", 1}});
+  DriverIndexReplyWithComposite("node-b", {{"composite-a", 1}});
+
+  VerifyCompositeNodeExists(true, "composite-a");
+  VerifyNoOngoingBind();
+}
+
+TEST_F(BindManagerTest, AddNodesBetweenAddingSpec) {
+  AddAndOrphanNode("node-a");
+  VerifyNoOngoingBind();
+
+  // Add the spec. It should kickstart the bind process.
+  AddCompositeNodeSpec("composite-a", {"node-a", "node-b"});
+  VerifyBindOngoingWithRequests({{"node-a", 1}});
+
+  DriverIndexReplyWithComposite("node-a", {{"composite-a", 0}});
+  VerifyOrphanedNodes({});
+  VerifyNoOngoingBind();
+
+  // Add the remaining node for the spec.
+  AddAndBindNode("node-b");
+  VerifyBindOngoingWithRequests({{"node-b", 1}});
+
+  DriverIndexReplyWithComposite("node-b", {{"composite-a", 1}});
+  VerifyCompositeNodeExists(true, "composite-a");
+  VerifyOrphanedNodes({});
+  VerifyNoOngoingBind();
+}
+
+TEST_F(BindManagerTest, AddNodesThenSpec) {
+  AddAndOrphanNode("node-a");
+  AddAndOrphanNode("node-b");
+  VerifyNoOngoingBind();
+
+  AddCompositeNodeSpec("composite-a", {"node-a", "node-b"});
+  VerifyBindOngoingWithRequests({{"node-a", 1}, {"node-b", 1}});
+
+  DriverIndexReplyWithComposite("node-a", {{"composite-a", 0}});
+  DriverIndexReplyWithComposite("node-b", {{"composite-a", 1}});
+  VerifyCompositeNodeExists(true, "composite-a");
+
+  VerifyOrphanedNodes({});
+  VerifyNoOngoingBind();
+}
