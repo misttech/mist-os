@@ -144,9 +144,14 @@ group("tests") {
   # infra machines running OSX 10.15
   if (host_os != "mac") {
     deps += [
-      "tests:fuchsia_controller_e2e_test",
       "tests:fuchsia_controller_errors_test",
       "tests:fuchsia_controller_importing_test",
     ]
+
+    # TODO(https://fxbug.dev/129633): Re-enable when the corrupt profile header
+    # issue is fixed.
+    if (!is_coverage) {
+      deps += [ "tests:fuchsia_controller_e2e_test" ]
+    }
   }
 }
