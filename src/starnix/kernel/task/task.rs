@@ -22,7 +22,7 @@ use crate::{
     execution::*,
     fs::*,
     loader::*,
-    lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    lock::{RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::*,
     mm::{MemoryAccessorExt, MemoryManager},
     signals::{types::*, SignalInfo},
@@ -377,13 +377,6 @@ pub struct Task {
     /// The signal this task generates on exit.
     pub exit_signal: Option<Signal>,
 
-    /// The address of the signal trampoline in the task, or nullptr if no trampoline has been mapped.
-    ///
-    /// The signal trampoline consists of a call to sys_rt_sigreturn, which allows the kernel to restore
-    /// the task state after a signal handler has run.
-    // TODO(fxbug.dev/121659): Remove this onec the vDSO contains a signal trampoline.
-    pub signal_trampoline: Mutex<UserAddress>,
-
     /// The mutable state of the Task.
     mutable_state: RwLock<TaskMutableState>,
 
@@ -466,7 +459,6 @@ impl Task {
             command: RwLock::new(command),
             creds: RwLock::new(creds),
             vfork_event,
-            signal_trampoline: Default::default(),
             mutable_state: RwLock::new(TaskMutableState {
                 clear_child_tid: UserRef::default(),
                 signals: Default::default(),
