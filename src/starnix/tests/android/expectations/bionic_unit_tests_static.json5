@@ -247,6 +247,10 @@
                 "wctype.towupper",
                 "wctype.towupper_l",
 
+                // This is effectively a benchmark that sometimes takes too long on our bots.
+                // See https://fxbug.dev/129654#c15
+                "stdio*.fread_unbuffered_pathological_performance",
+
                 // TODO(https://fxbug.dev/129654): Flaky on the bots - need to be investigated.
                 "pthread.pthread_getcpuclockid__clock_gettime",
                 "unistd*.sleep",
