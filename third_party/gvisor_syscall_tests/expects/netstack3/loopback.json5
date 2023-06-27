@@ -80,6 +80,8 @@
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedLoopback_ConnectV4Loopback",
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4Any",
                 "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV6Any_ConnectV4MappedAny",
                 "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4Loopback_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4MappedAny_ConnectV4Any",
@@ -106,21 +108,6 @@
                 "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4MappedLoopback_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV6Any_ConnectV4Loopback",
                 "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV6Any_ConnectV4Any",
-
-                // TODO(https://fxbug.dev/113481): Netstack3 does not interpret listener
-                // backlog exactly as Linux does.
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Loopback_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4Any",
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4MappedAny",
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedLoopback_ConnectV4Any",
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedLoopback_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedLoopback_ConnectV4MappedLoopback",
             ],
         },
         {
@@ -171,13 +158,6 @@
 
                 // TODO(https://fxbug.dev/118516): This test sometimes times out in CI.
                 "All/SocketInetLoopbackTest.TCPListenShutdownListen/*",
-
-                // TODO(https://fxbug.dev/113481): Netstack3 does not interpret listener
-                // backlog exactly as Linux does.
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4Loopback",
-
-                // Netstack3 does not interpret listener backlog exactly as Linux does.
-                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4Any",
             ],
         },
     ],
