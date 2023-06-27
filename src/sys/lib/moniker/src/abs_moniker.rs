@@ -31,23 +31,14 @@ pub trait AbsoluteMonikerBase:
     }
 
     fn parse_str(input: &str) -> Result<Self, MonikerError> {
-        if input.is_empty() {
+        if input.chars().nth(0) != Some('/') {
             return Err(MonikerError::invalid_moniker(input));
         }
-        if input == "/" || input == "." || input == "./" {
-            return Ok(Self::new(vec![]));
+        if input == "/" {
+            return Ok(Self::root());
         }
-
-        // Optionally strip a prefix of "/" or "./".
-        let stripped = match input.strip_prefix("/") {
-            Some(s) => s,
-            None => match input.strip_prefix("./") {
-                Some(s) => s,
-                None => input,
-            },
-        };
         let path =
-            stripped.split('/').map(Self::Part::parse).collect::<Result<_, MonikerError>>()?;
+            input[1..].split('/').map(Self::Part::parse).collect::<Result<_, MonikerError>>()?;
         Ok(Self::new(path))
     }
 
@@ -258,35 +249,5 @@ mod tests {
         let relative: RelativeMoniker = vec![].try_into().unwrap();
         let descendant = scope_root.descendant(&relative);
         assert_eq!("/a:test1/b:test2", format!("{}", descendant));
-    }
-
-    #[test]
-    fn absolute_moniker_parse_str() {
-        assert_eq!(
-            AbsoluteMoniker::try_from("/foo").unwrap(),
-            AbsoluteMoniker::try_from(vec!["foo"]).unwrap()
-        );
-        assert_eq!(
-            AbsoluteMoniker::try_from("./foo").unwrap(),
-            AbsoluteMoniker::try_from(vec!["foo"]).unwrap()
-        );
-        assert_eq!(
-            AbsoluteMoniker::try_from("foo").unwrap(),
-            AbsoluteMoniker::try_from(vec!["foo"]).unwrap()
-        );
-        assert_eq!(
-            AbsoluteMoniker::try_from("/").unwrap(),
-            AbsoluteMoniker::try_from(vec![]).unwrap()
-        );
-        assert_eq!(
-            AbsoluteMoniker::try_from("./").unwrap(),
-            AbsoluteMoniker::try_from(vec![]).unwrap()
-        );
-
-        assert!(AbsoluteMoniker::try_from("//foo").is_err());
-        assert!(AbsoluteMoniker::try_from(".//foo").is_err());
-        assert!(AbsoluteMoniker::try_from("/./foo").is_err());
-        assert!(AbsoluteMoniker::try_from("../foo").is_err());
-        assert!(AbsoluteMoniker::try_from(".foo").is_err());
     }
 }
