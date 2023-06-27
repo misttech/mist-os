@@ -2,11 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::log_socket_stream::{JsonDeserializeError, LogsDataStream};
+use crate::{
+    filter::LogFilterCriteria,
+    log_socket_stream::{JsonDeserializeError, LogsDataStream},
+};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::{Local, TimeZone};
-use diagnostics_data::{LogTextDisplayOptions, LogTextPresenter, LogsData, Timestamp};
+use diagnostics_data::{
+    LogTextColor, LogTextDisplayOptions, LogTextPresenter, LogsData, Timestamp,
+};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
@@ -119,13 +124,28 @@ pub enum DisplayOption {
 /// Log formatter options
 #[derive(Clone, Debug)]
 pub struct LogFormatterOptions {
+    /// Text display options
     pub display: DisplayOption,
+    /// If true, highlights spam, if false, filters it out.
+    pub highlight_spam: bool,
 }
 
 impl Default for LogFormatterOptions {
     fn default() -> Self {
-        LogFormatterOptions { display: DisplayOption::Text(Default::default()) }
+        LogFormatterOptions {
+            display: DisplayOption::Text(Default::default()),
+            highlight_spam: false,
+        }
     }
+}
+
+/// Trait used to filter spam from log messages. An implementation
+/// will check the file, line number, and message against a set of
+/// detection rules to determine if it is spam.
+pub trait LogSpamFilter {
+    /// Returns true if the message containing the given msg content
+    /// in the given file and line is considered to be spam.
+    fn is_spam(&self, file: Option<&str>, line: Option<u64>, msg: &str) -> bool;
 }
 
 #[derive(Error, Debug)]
@@ -139,15 +159,26 @@ pub enum FormatterError {
 /// Default formatter implementation
 pub struct DefaultLogFormatter<'a> {
     writer: Box<dyn std::io::Write + 'a>,
+    filters: LogFilterCriteria,
     options: LogFormatterOptions,
 }
 
 #[async_trait(?Send)]
 impl<'a> LogFormatter for DefaultLogFormatter<'_> {
     async fn push_log(&mut self, log_entry: LogEntry) -> Result<()> {
+        let is_spam = self.filters.is_spam(&log_entry);
+
+        if (!self.options.highlight_spam && is_spam) || !self.filters.matches(&log_entry) {
+            return Ok(());
+        }
         match self.options.display {
-            DisplayOption::Text(_) => {
-                self.format_text_log(log_entry)?;
+            DisplayOption::Text(mut text_options) => {
+                if self.options.highlight_spam && is_spam {
+                    text_options.color = LogTextColor::Highlight;
+                }
+                let mut options_for_this_line_only = self.options.clone();
+                options_for_this_line_only.display = DisplayOption::Text(text_options);
+                self.format_text_log(options_for_this_line_only, log_entry)?;
             }
             DisplayOption::Json => {
                 match log_entry {
@@ -191,14 +222,22 @@ fn format_ffx_event(msg: &str, timestamp: Option<Timestamp>) -> String {
 }
 
 impl<'a> DefaultLogFormatter<'a> {
-    pub fn new(writer: impl std::io::Write + 'a, options: LogFormatterOptions) -> Self {
-        Self { writer: Box::new(writer), options }
+    pub fn new(
+        filters: LogFilterCriteria,
+        writer: impl std::io::Write + 'a,
+        options: LogFormatterOptions,
+    ) -> Self {
+        Self { filters, writer: Box::new(writer), options }
     }
 
     // This function's arguments are copied to make lifetimes in push_log easier since borrowing
     // &self would complicate spam highlighting.
-    fn format_text_log(&mut self, log_entry: LogEntry) -> Result<(), FormatterError> {
-        let text_options = match self.options.display {
+    fn format_text_log(
+        &mut self,
+        options: LogFormatterOptions,
+        log_entry: LogEntry,
+    ) -> Result<(), FormatterError> {
+        let text_options = match options.display {
             DisplayOption::Text(o) => o,
             DisplayOption::Json => {
                 unreachable!("If we are here, we can only be formatting text");
@@ -247,7 +286,7 @@ pub trait LogFormatter {
 mod test {
     use assert_matches::assert_matches;
     use diagnostics_data::{LogsDataBuilder, Severity};
-    use std::time::Duration;
+    use std::{cell::Cell, time::Duration};
 
     use super::*;
 
@@ -285,6 +324,17 @@ mod test {
         async fn push_log(&mut self, log_entry: LogEntry) -> anyhow::Result<()> {
             self.logs.push(log_entry);
             Ok(())
+        }
+    }
+
+    struct AlternatingSpamFilter {
+        last_message_was_spam: Cell<bool>,
+    }
+    impl LogSpamFilter for AlternatingSpamFilter {
+        fn is_spam(&self, _file: Option<&str>, _line: Option<u64>, _msg: &str) -> bool {
+            let prev = self.last_message_was_spam.get();
+            self.last_message_was_spam.set(!prev);
+            prev
         }
     }
 
@@ -387,7 +437,8 @@ mod test {
     async fn test_default_formatter() {
         let mut stdout = vec![];
         let options = LogFormatterOptions::default();
-        let mut formatter = DefaultLogFormatter::new(&mut stdout, options.clone());
+        let mut formatter =
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
         formatter.push_log(log_entry()).await.unwrap();
         drop(formatter);
         assert_eq!(
@@ -404,7 +455,8 @@ mod test {
             show_metadata: false,
             ..Default::default()
         });
-        let mut formatter = DefaultLogFormatter::new(&mut stdout, options.clone());
+        let mut formatter =
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
         formatter.push_log(log_entry()).await.unwrap();
         drop(formatter);
         assert_eq!(
@@ -416,9 +468,13 @@ mod test {
     #[fuchsia::test]
     async fn test_default_formatter_with_json() {
         let mut output = vec![];
-        let options = LogFormatterOptions { display: DisplayOption::Json };
+        let options = LogFormatterOptions { display: DisplayOption::Json, highlight_spam: false };
         {
-            let mut formatter = DefaultLogFormatter::new(&mut output, options.clone());
+            let mut formatter = DefaultLogFormatter::new(
+                LogFilterCriteria::default(),
+                &mut output,
+                options.clone(),
+            );
             formatter.push_log(log_entry()).await.unwrap();
         }
         assert_eq!(serde_json::from_slice::<LogEntry>(&output).unwrap(), log_entry());
@@ -428,7 +484,8 @@ mod test {
     async fn test_default_formatter_symbolized_log_message() {
         let mut stdout = vec![];
         let options = LogFormatterOptions::default();
-        let mut formatter = DefaultLogFormatter::new(&mut stdout, options);
+        let mut formatter =
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
         let mut entry = log_entry();
         entry.data = assert_matches!(entry.data.clone(), LogData::TargetLog(d)=>LogData::SymbolizedTargetLog(d, "symbolized".to_string()));
         formatter.push_log(entry).await.unwrap();
@@ -442,8 +499,9 @@ mod test {
     #[fuchsia::test]
     async fn test_default_formatter_symbolized_json_log_message() {
         let mut stdout = vec![];
-        let options = LogFormatterOptions { display: DisplayOption::Json };
-        let mut formatter = DefaultLogFormatter::new(&mut stdout, options);
+        let options = LogFormatterOptions { display: DisplayOption::Json, highlight_spam: false };
+        let mut formatter =
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
         let mut entry = log_entry();
         entry.data = assert_matches!(entry.data.clone(), LogData::TargetLog(d)=>LogData::SymbolizedTargetLog(d, "symbolized".to_string()));
         formatter.push_log(entry.clone()).await.unwrap();
@@ -454,8 +512,9 @@ mod test {
     #[fuchsia::test]
     async fn test_default_formatter_symbolize_failed_json_log_message() {
         let mut stdout = vec![];
-        let options = LogFormatterOptions { display: DisplayOption::Json };
-        let mut formatter = DefaultLogFormatter::new(&mut stdout, options);
+        let options = LogFormatterOptions { display: DisplayOption::Json, highlight_spam: false };
+        let mut formatter =
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
         let mut entry = log_entry();
         entry.data = assert_matches!(entry.data.clone(), LogData::TargetLog(d)=>LogData::SymbolizedTargetLog(d, "".to_string()));
         formatter.push_log(entry.clone()).await.unwrap();
@@ -467,7 +526,8 @@ mod test {
     async fn test_default_formatter_disconnect_event() {
         let mut stdout = vec![];
         let options = LogFormatterOptions::default();
-        let mut formatter = DefaultLogFormatter::new(&mut stdout, options.clone());
+        let mut formatter =
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
         let mut entry = log_entry();
         entry.data = LogData::FfxEvent(EventType::TargetDisconnected);
         formatter.push_log(entry).await.unwrap();
@@ -479,10 +539,57 @@ mod test {
     }
 
     #[fuchsia::test]
+    async fn test_spam_list_applies_highlighting_only_to_spam_line() {
+        let options = LogFormatterOptions {
+            display: DisplayOption::Text(Default::default()),
+            highlight_spam: true,
+        };
+
+        let mut filter = LogFilterCriteria::default();
+        filter.with_spam_filter(AlternatingSpamFilter { last_message_was_spam: Cell::new(false) });
+        let mut output = vec![];
+        {
+            let mut formatter = DefaultLogFormatter::new(filter, &mut output, options.clone());
+            formatter.push_log(log_entry()).await.unwrap();
+            formatter.push_log(log_entry()).await.unwrap();
+            formatter.push_log(log_entry()).await.unwrap();
+        }
+        assert_eq!(
+            String::from_utf8(output).unwrap(),
+            "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message
+\u{1b}[38;5;11m[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message\u{1b}[m
+[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message\n",
+            "first message should be uncolored, second should be yellow, third should be uncolored"
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_spam_filter_filters_spam_if_highlighting_is_disabled() {
+        let options = LogFormatterOptions::default();
+
+        let mut filter = LogFilterCriteria::default();
+        filter.with_spam_filter(AlternatingSpamFilter { last_message_was_spam: Cell::new(false) });
+        let mut output = vec![];
+        {
+            let mut formatter = DefaultLogFormatter::new(filter, &mut output, options.clone());
+            formatter.push_log(log_entry()).await.unwrap();
+            formatter.push_log(log_entry()).await.unwrap();
+            formatter.push_log(log_entry()).await.unwrap();
+        }
+        assert_eq!(
+            String::from_utf8(output).unwrap(),
+            "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message
+[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message\n",
+            "should only get two messages"
+        );
+    }
+
+    #[fuchsia::test]
     async fn test_default_formatter_started_event() {
         let mut stdout = vec![];
         let options = LogFormatterOptions::default();
-        let mut formatter = DefaultLogFormatter::new(&mut stdout, options.clone());
+        let mut formatter =
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
         let mut entry = log_entry();
         entry.data = LogData::FfxEvent(EventType::LoggingStarted);
         formatter.push_log(entry).await.unwrap();
@@ -497,7 +604,8 @@ mod test {
     async fn test_default_formatter_malformed_log() {
         let mut stdout = vec![];
         let options = LogFormatterOptions::default();
-        let mut formatter = DefaultLogFormatter::new(&mut stdout, options.clone());
+        let mut formatter =
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
         let mut entry = log_entry();
         entry.data = LogData::MalformedTargetLog("Invalid log".to_string());
         formatter.push_log(entry).await.unwrap();

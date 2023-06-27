@@ -6,7 +6,7 @@ use diagnostics_data::{LogsData, Severity};
 use fuchsia_zircon_types::zx_koid_t;
 
 use crate::{
-    log_formatter::{LogData, LogEntry},
+    log_formatter::{LogData, LogEntry, LogSpamFilter},
     LogCommand,
 };
 
@@ -18,6 +18,8 @@ pub struct LogFilterCriteria {
     tags: Vec<String>,
     /// The tags to exclude.
     exclude_tags: Vec<String>,
+    /// Spam filter
+    spam_filter: Option<Box<dyn LogSpamFilter>>,
     /// Filter by PID
     pid: Option<zx_koid_t>,
     /// Filter by TID
@@ -32,6 +34,7 @@ impl Default for LogFilterCriteria {
             exclude_tags: vec![],
             pid: None,
             tid: None,
+            spam_filter: None,
         }
     }
 }
@@ -46,42 +49,12 @@ impl TryFrom<&LogCommand> for LogFilterCriteria {
             exclude_tags: cmd.exclude_tags.clone(),
             pid: cmd.pid.clone(),
             tid: cmd.tid.clone(),
+            spam_filter: None,
         })
     }
 }
 
 impl LogFilterCriteria {
-    /// Returns true if the given `LogsData` matches the filter criteria.
-    fn match_filters_to_log_data(&self, data: &LogsData) -> bool {
-        if data.metadata.severity < self.min_severity {
-            return false;
-        }
-
-        if let Some(pid) = self.pid {
-            if data.pid() != Some(pid) {
-                return false;
-            }
-        }
-
-        if let Some(tid) = self.tid {
-            if data.tid() != Some(tid) {
-                return false;
-            }
-        }
-
-        if !self.tags.is_empty()
-            && !self.tags.iter().any(|f| data.tags().map(|t| t.contains(f)).unwrap_or(false))
-        {
-            return false;
-        }
-
-        if self.exclude_tags.iter().any(|f| data.tags().map(|t| t.contains(f)).unwrap_or(false)) {
-            return false;
-        }
-
-        true
-    }
-
     /// Sets the minimum severity of logs to include.
     pub fn set_min_severity(&mut self, severity: Severity) {
         self.min_severity = severity;
@@ -115,6 +88,71 @@ impl LogFilterCriteria {
             LogEntry { data: LogData::FfxEvent(_), .. } => true,
             LogEntry { data: LogData::MalformedTargetLog(_), .. } => true,
         }
+    }
+
+    /// Returns true if this is spam.
+    pub fn is_spam(&self, entry: &LogEntry) -> bool {
+        match entry {
+            LogEntry { data: LogData::TargetLog(data), .. } => self.inner_is_spam(
+                data.metadata.file.as_ref().map(|value| value.as_str()),
+                data.metadata.line,
+                data.msg().unwrap_or(""),
+            ),
+            LogEntry { data: LogData::SymbolizedTargetLog(data, message), .. } => self
+                .inner_is_spam(
+                    data.metadata.file.as_ref().map(|value| value.as_str()),
+                    data.metadata.line,
+                    message.as_str(),
+                ),
+            _ => false,
+        }
+    }
+
+    /// Sets a spam filter
+    pub fn with_spam_filter<S>(&mut self, spam_filter: S)
+    where
+        S: LogSpamFilter + 'static,
+    {
+        self.spam_filter = Some(Box::new(spam_filter));
+    }
+
+    /// Returns true if the given `LogsData` matches the filter criteria.
+    fn inner_is_spam(&self, file: Option<&str>, line: Option<u64>, msg: &str) -> bool {
+        match &self.spam_filter {
+            None => false,
+            Some(f) => f.is_spam(file, line, msg),
+        }
+    }
+
+    /// Returns true if the given `LogsData` matches the filter criteria.
+    fn match_filters_to_log_data(&self, data: &LogsData) -> bool {
+        if data.metadata.severity < self.min_severity {
+            return false;
+        }
+
+        if let Some(pid) = self.pid {
+            if data.pid() != Some(pid) {
+                return false;
+            }
+        }
+
+        if let Some(tid) = self.tid {
+            if data.tid() != Some(tid) {
+                return false;
+            }
+        }
+
+        if !self.tags.is_empty()
+            && !self.tags.iter().any(|f| data.tags().map(|t| t.contains(f)).unwrap_or(false))
+        {
+            return false;
+        }
+
+        if self.exclude_tags.iter().any(|f| data.tags().map(|t| t.contains(f)).unwrap_or(false)) {
+            return false;
+        }
+
+        true
     }
 }
 
