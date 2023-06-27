@@ -4,11 +4,7 @@
 
 import("//build/config.gni")
 
-group("workstation_memory_monitor_config") {
-  deps = [ ":workstation_config_for_memory_monitor" ]
-}
-
-config_data("workstation_config_for_memory_monitor") {
+config_data("workstation_memory_monitor_config") {
   for_pkg = "memory_monitor"
   outputs = [ "buckets.json" ]
   sources = [ "workstation_memory_buckets.json" ]
