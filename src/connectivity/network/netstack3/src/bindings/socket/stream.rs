@@ -2041,6 +2041,15 @@ mod tests {
         })
     }
 
+    const LARGE_PAYLOAD: [u8; 1 << 12] = [b'a'; 1 << 12];
+
+    /// Fills up the ring buffer and zircon socket.
+    fn fill(peer: &zx::Socket, sbuf: &mut SendBufferWithZirconSocket) {
+        while peer.write(&LARGE_PAYLOAD[..]).map_or(false, |l| l == LARGE_PAYLOAD.len()) {
+            sbuf.poll();
+        }
+    }
+
     #[test]
     fn send_buffer_resize_empties_zircon_socket() {
         // Regression test for https://fxbug.dev/119242.
@@ -2053,9 +2062,7 @@ mod tests {
         );
 
         // Fill up the ring buffer and zircon socket.
-        while peer.write(TEST_BYTES).map_or(false, |l| l == TEST_BYTES.len()) {
-            sbuf.poll();
-        }
+        fill(&peer, &mut sbuf);
 
         sbuf.request_capacity(SendBufferWithZirconSocket::MIN_CAPACITY + TEST_BYTES.len());
         assert_eq!(peer.write(TEST_BYTES), Ok(TEST_BYTES.len()));
@@ -2073,9 +2080,7 @@ mod tests {
         );
 
         // Fill up the ring buffer and zircon socket.
-        while peer.write(TEST_BYTES).map_or(false, |l| l == TEST_BYTES.len()) {
-            sbuf.poll();
-        }
+        fill(&peer, &mut sbuf);
 
         // Request a shrink of the send buffer.
         let capacity_before = sbuf.limits().capacity;
@@ -2106,7 +2111,7 @@ mod tests {
         // until the send buffer's ring buffer is full and the socket buffer is
         // full, then exit.
         while sbuf.limits().len < capacity {
-            let _: usize = peer.write(TEST_BYTES).expect("can write");
+            let _: usize = peer.write(&LARGE_PAYLOAD[..]).expect("can write");
             sbuf.poll();
         }
     }
