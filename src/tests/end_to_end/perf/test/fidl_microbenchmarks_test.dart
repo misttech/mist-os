@@ -80,15 +80,6 @@ void main(List<String> args) {
             (resultsFile) => '/bin/rust_fidl_microbenchmarks $resultsFile',
             expectedMetricNamesFile: 'fuchsia.fidl_microbenchmarks.rust.txt');
       }, timeout: Timeout.none);
-    })
-    ..add(() {
-      test('dart_fidl_microbenchmarks', () async {
-        await runTestComponent(
-            packageName: 'dart-fidl-benchmarks',
-            componentName: 'dart-fidl-benchmarks.cm',
-            commandArgs: '',
-            expectedMetricNamesFile: 'fuchsia.fidl_microbenchmarks.dart.txt');
-      }, timeout: Timeout.none);
     });
 
   runShardTests(args, _tests);

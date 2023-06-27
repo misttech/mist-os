@@ -177,7 +177,6 @@ if (is_host) {
     "fuchsia.diagnostics_log_rust.encoding.txt",
     "fuchsia.extended_pstate.txt",
     "fuchsia.fidl_microbenchmarks.cpp.txt",
-    "fuchsia.fidl_microbenchmarks.dart.txt",
     "fuchsia.fidl_microbenchmarks.driver_cpp.txt",
     "fuchsia.fidl_microbenchmarks.driver_llcpp.txt",
     "fuchsia.fidl_microbenchmarks.go.txt",
