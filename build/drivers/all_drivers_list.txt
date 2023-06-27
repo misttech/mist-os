@@ -244,6 +244,10 @@
 //src/devices/tests/fidl-service:parent-driver
 //src/devices/tests/isolateddevmgr:isolateddevmgr-test-driver-driver
 //src/devices/tests/mock-device:mock-device-driver
+//src/devices/tests/multibind-composite-test/drivers:legacy-composite-driver
+//src/devices/tests/multibind-composite-test/drivers:root-driver
+//src/devices/tests/multibind-composite-test/drivers:spec-composite-1-driver
+//src/devices/tests/multibind-composite-test/drivers:spec-composite-2-driver
 //src/devices/tests/node-group-test/drivers:leaf-driver
 //src/devices/tests/node-group-test/drivers:node-group-driver
 //src/devices/tests/node-group-test/drivers:root-driver
