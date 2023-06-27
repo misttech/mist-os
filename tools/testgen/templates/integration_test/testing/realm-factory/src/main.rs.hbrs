@@ -13,17 +13,14 @@ use {
     fidl_server::*,
     fuchsia_component::server::ServiceFs,
     futures::StreamExt,
-    tracing::*,
 };
 
 enum IncomingService {
     RealmFactory(RealmFactoryRequestStream),
 }
 
-#[fuchsia::main(logging = true)]
+#[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    info!("starting");
-
     let mut fs = ServiceFs::new();
     fs.dir("svc").add_fidl_service(IncomingService::RealmFactory);
     fs.take_and_serve_directory_handle()?;
