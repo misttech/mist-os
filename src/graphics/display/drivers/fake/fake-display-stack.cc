@@ -48,7 +48,7 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
   mock_root_->AddProtocol(ZX_PROTOCOL_SYSMEM, sysmem_->proto()->ops, sysmem_->proto()->ctx,
                           "sysmem");
 
-  display_ = new fake_display::FakeDisplay(mock_root_.get(), device_config);
+  display_ = new fake_display::FakeDisplay(mock_root_.get(), device_config, inspect::Inspector{});
   if (auto status = display_->Bind(); status != ZX_OK) {
     ZX_PANIC("display_->Bind() return status was not ZX_OK. Error: %s.",
              zx_status_get_string(status));

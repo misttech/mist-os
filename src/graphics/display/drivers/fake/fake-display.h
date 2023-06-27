@@ -12,6 +12,8 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/device-protocol/pdev-fidl.h>
+#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/inspector.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -60,7 +62,8 @@ class FakeDisplay : public DeviceType,
                     public ddk::DisplayControllerImplProtocol<FakeDisplay, ddk::base_protocol>,
                     public ddk::DisplayClampRgbImplProtocol<FakeDisplay> {
  public:
-  explicit FakeDisplay(zx_device_t* parent, FakeDisplayDeviceConfig device_config);
+  explicit FakeDisplay(zx_device_t* parent, FakeDisplayDeviceConfig device_config,
+                       inspect::Inspector inspector);
 
   FakeDisplay(const FakeDisplay&) = delete;
   FakeDisplay& operator=(const FakeDisplay&) = delete;
@@ -175,6 +178,10 @@ class FakeDisplay : public DeviceType,
   // Constraints applicable to image buffers that will be bound to layers.
   void SetLayerImageFormatConstraints(fuchsia_sysmem::ImageFormatConstraints& constraints);
 
+  // Records the display config to the inspector's root node. The root node must
+  // be already initialized.
+  void RecordDisplayConfigToInspectRootNode();
+
   // Banjo vtable for fuchsia.hardware.display.controller.DisplayControllerImpl.
   const display_controller_impl_protocol_t display_controller_impl_banjo_protocol_;
 
@@ -242,6 +249,8 @@ class FakeDisplay : public DeviceType,
 
   // Display Capture interface protocol
   ddk::DisplayCaptureInterfaceProtocolClient capture_interface_client_ TA_GUARDED(capture_lock_);
+
+  inspect::Inspector inspector_;
 };
 
 }  // namespace fake_display

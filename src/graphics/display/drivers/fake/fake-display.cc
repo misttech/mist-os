@@ -9,6 +9,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/image-format/image_format.h>
+#include <lib/inspect/cpp/inspector.h>
 #include <lib/zx/pmt.h>
 #include <lib/zx/time.h>
 #include <sys/types.h>
@@ -69,11 +70,13 @@ constexpr uint32_t kRefreshRateFps = 60;
 constexpr uint64_t kNumOfVsyncsForCapture = 5;  // 5 * 16ms = 80ms
 }  // namespace
 
-FakeDisplay::FakeDisplay(zx_device_t* parent, FakeDisplayDeviceConfig device_config)
+FakeDisplay::FakeDisplay(zx_device_t* parent, FakeDisplayDeviceConfig device_config,
+                         inspect::Inspector inspector)
     : DeviceType(parent),
       display_controller_impl_banjo_protocol_({&display_controller_impl_protocol_ops_, this}),
       display_clamp_rgb_impl_banjo_protocol_({&display_clamp_rgb_impl_protocol_ops_, this}),
-      device_config_(device_config) {
+      device_config_(device_config),
+      inspector_(std::move(inspector)) {
   ZX_DEBUG_ASSERT(parent);
 }
 
@@ -787,6 +790,18 @@ void FakeDisplay::SendVsync() {
   }
 }
 
+void FakeDisplay::RecordDisplayConfigToInspectRootNode() {
+  inspect::Node& root_node = inspector_.GetRoot();
+  ZX_ASSERT(root_node);
+  root_node.RecordChild("device_config", [&](inspect::Node& config_node) {
+    config_node.RecordInt("width_px", kWidth);
+    config_node.RecordInt("height_px", kHeight);
+    config_node.RecordDouble("refresh_rate_hz", kRefreshRateFps);
+    config_node.RecordBool("manual_vsync_trigger", device_config_.manual_vsync_trigger);
+    config_node.RecordBool("no_buffer_access", device_config_.no_buffer_access);
+  });
+}
+
 zx_status_t FakeDisplay::Bind() {
   zx::result pdev_result = ddk::PDevFidl::Create(parent(), ddk::PDevFidl::kFragmentName);
   if (pdev_result.is_error()) {
@@ -837,11 +852,13 @@ zx_status_t FakeDisplay::Bind() {
     }
   }
 
-  status = DdkAdd("fake-display");
+  status = DdkAdd(ddk::DeviceAddArgs("fake-display").set_inspect_vmo(inspector_.DuplicateVmo()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
     return status;
   }
+
+  RecordDisplayConfigToInspectRootNode();
 
   return ZX_OK;
 }

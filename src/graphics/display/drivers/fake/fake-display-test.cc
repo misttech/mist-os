@@ -7,6 +7,9 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/image-format/image_format.h>
+#include <lib/inspect/cpp/hierarchy.h>
+#include <lib/inspect/cpp/reader.h>
+#include <lib/inspect/cpp/vmo/types.h>
 #include <lib/sync/cpp/completion.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
@@ -35,10 +38,10 @@ class FakeDisplayTest : public testing::Test {
   FakeDisplayTest() = default;
 
   void SetUp() override {
-    std::shared_ptr<zx_device> mock_root = MockDevice::FakeRootParent();
+    mock_root_ = MockDevice::FakeRootParent();
     auto sysmem = std::make_unique<display::GenericSysmemDeviceWrapper<sysmem_driver::Device>>(
-        mock_root.get());
-    tree_ = std::make_unique<display::FakeDisplayStack>(std::move(mock_root), std::move(sysmem),
+        mock_root_.get());
+    tree_ = std::make_unique<display::FakeDisplayStack>(mock_root_, std::move(sysmem),
                                                         GetFakeDisplayDeviceConfig());
   }
 
@@ -60,9 +63,57 @@ class FakeDisplayTest : public testing::Test {
     return tree_->sysmem_client();
   }
 
+  MockDevice* mock_root() const { return mock_root_.get(); }
+
  private:
+  std::shared_ptr<MockDevice> mock_root_;
   std::unique_ptr<display::FakeDisplayStack> tree_;
 };
+
+TEST_F(FakeDisplayTest, Inspect) {
+  MockDevice* fake_display = mock_root()->GetLatestChild();
+  fpromise::result<inspect::Hierarchy> read_result =
+      inspect::ReadFromVmo(fake_display->GetInspectVmo());
+  ASSERT_TRUE(read_result.is_ok());
+
+  const inspect::Hierarchy& hierarchy = read_result.value();
+  const inspect::Hierarchy* config = hierarchy.GetByPath({"device_config"});
+  ASSERT_NE(config, nullptr);
+
+  // Must be the same as `kWidth` defined in fake-display.cc.
+  // TODO(fxbug.dev/114001): Use configurable values instead.
+  constexpr int kWidth = 1280;
+  const inspect::IntPropertyValue* width_px =
+      config->node().get_property<inspect::IntPropertyValue>("width_px");
+  ASSERT_NE(width_px, nullptr);
+  EXPECT_EQ(width_px->value(), kWidth);
+
+  // Must be the same as `kHeight` defined in fake-display.cc.
+  // TODO(fxbug.dev/114001): Use configurable values instead.
+  constexpr int kHeight = 800;
+  const inspect::IntPropertyValue* height_px =
+      config->node().get_property<inspect::IntPropertyValue>("height_px");
+  ASSERT_NE(height_px, nullptr);
+  EXPECT_EQ(height_px->value(), kHeight);
+
+  // Must be the same as `kRefreshRateFps` defined in fake-display.cc.
+  // TODO(fxbug.dev/114001): Use configurable values instead.
+  constexpr double kRefreshRateHz = 60.0;
+  const inspect::DoublePropertyValue* refresh_rate_hz =
+      config->node().get_property<inspect::DoublePropertyValue>("refresh_rate_hz");
+  ASSERT_NE(refresh_rate_hz, nullptr);
+  EXPECT_DOUBLE_EQ(refresh_rate_hz->value(), kRefreshRateHz);
+
+  const inspect::BoolPropertyValue* manual_vsync_trigger =
+      config->node().get_property<inspect::BoolPropertyValue>("manual_vsync_trigger");
+  ASSERT_NE(manual_vsync_trigger, nullptr);
+  EXPECT_EQ(manual_vsync_trigger->value(), true);
+
+  const inspect::BoolPropertyValue* no_buffer_access =
+      config->node().get_property<inspect::BoolPropertyValue>("no_buffer_access");
+  ASSERT_NE(no_buffer_access, nullptr);
+  EXPECT_EQ(no_buffer_access->value(), false);
+}
 
 class FakeDisplayRealSysmemTest : public FakeDisplayTest {
  public:
