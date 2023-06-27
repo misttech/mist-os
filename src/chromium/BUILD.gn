@@ -106,5 +106,10 @@ group("chromium_test_base_deps") {
     # TODO(crbug.com/1451376): Move it to a peer group as appropriate.
     "//src/diagnostics/archivist:archivist-for-embedding",
     "//src/testing/fidl/intl_property_manager",
+
+    # A font provider with built-in font file assets.
+    # TODO(crbug.com/1408597): Once OOT fakes are available, this can be
+    # turned into a hermetic component, or a subpackage.
+    "//src/fonts:fonts_hermetic_for_test",
   ]
 }
