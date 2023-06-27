@@ -10,7 +10,7 @@ use crate::{AsHandleRef, Bti, Handle, HandleBased, HandleRef, Koid, Resource, Ri
 use crate::{Property, PropertyQuery};
 use bitflags::bitflags;
 use fuchsia_zircon_sys as sys;
-use std::ptr;
+use std::{mem::MaybeUninit, ptr};
 
 /// An object representing a Zircon
 /// [virtual memory object](https://fuchsia.dev/fuchsia-src/concepts/objects/vm_object.md).
@@ -115,22 +115,34 @@ impl Vmo {
         }
     }
 
-    /// Same as read, but reads into memory that might not be initialized.  The memory can be
-    /// assumed as initialized upon success.  There will be no short reads.
-    pub fn read_uninit(
+    /// Same as read, but reads into memory that might not be initialized, returning an initialized
+    /// slice of bytes on success.
+    pub fn read_uninit<'a>(
         &self,
-        data: &mut [std::mem::MaybeUninit<u8>],
+        data: &'a mut [MaybeUninit<u8>],
         offset: u64,
-    ) -> Result<(), Status> {
+    ) -> Result<&'a mut [u8], Status> {
+        // SAFETY: This system call requires that the pointer and length we pass are valid to write
+        // to, which we guarantee here by getting the pointer and length from a valid slice.
         unsafe {
             let status = sys::zx_vmo_read(
                 self.raw_handle(),
-                data.as_mut_ptr() as *mut _,
+                // TODO(https://fxbug.dev/129307) use MaybeUninit::slice_as_mut_ptr when stable
+                data.as_mut_ptr() as *mut u8,
                 offset,
                 data.len(),
             );
-            ok(status)
+            ok(status)?;
         }
+        // TODO(https://fxbug.dev/129307) use MaybeUninit::slice_assume_init_mut when stable
+        Ok(
+            // SAFETY: We're converting &mut [MaybeUninit<u8>] back to &mut [u8], which is only
+            // valid to do if all elements of `data` have actually been initialized. Here we
+            // have to trust that the kernel didn't lie when it said it wrote to the entire
+            // buffer, but as long as that assumption is valid them it's safe to assume this
+            // slice is init.
+            unsafe { std::slice::from_raw_parts_mut(data.as_mut_ptr() as *mut u8, data.len()) },
+        )
     }
 
     /// Same as read, but returns a Vec.
