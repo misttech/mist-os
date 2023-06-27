@@ -111,7 +111,7 @@
         },
         {
             protocol: "fuchsia.update.channelcontrol.ChannelControl",
-            from: "#system-update-checker",
+            from: "#system-update",
             to: "#feedback",
             dependency: "weak",
             source_availability: "unknown",

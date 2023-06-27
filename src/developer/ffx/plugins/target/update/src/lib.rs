@@ -18,8 +18,8 @@ use futures::prelude::*;
 /// Main entry point for the `update` subcommand.
 #[ffx_plugin(
     "target_update",
-    ManagerProxy = "core/system-update-checker:expose:fuchsia.update.Manager",
-    ChannelControlProxy = "core/system-update-checker:expose:fuchsia.update.channelcontrol.ChannelControl"
+    ManagerProxy = "core/system-update:expose:fuchsia.update.Manager",
+    ChannelControlProxy = "core/system-update:expose:fuchsia.update.channelcontrol.ChannelControl"
     InstallerProxy = "core/system-updater:expose:fuchsia.update.installer.Installer",
 )]
 pub async fn update_cmd(

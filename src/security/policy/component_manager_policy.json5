@@ -378,7 +378,8 @@
                 target_monikers: [
                     "/bootstrap/fshost",
                     "/core/system-updater",
-                    "/core/system-update-checker",
+                    "/core/system-update/omaha-client-service",
+                    "/core/system-update/system-update-checker",
                 ],
             },
             {
@@ -417,7 +418,8 @@
                     "/core",
                     "/core/process_resolver",
                     "/core/full-resolver",
-                    "/core/system-update-checker",
+                    "/core/system-update/omaha-client-service",
+                    "/core/system-update/system-update-checker",
                     "/core/system-updater",
                 ],
             },
@@ -554,7 +556,8 @@
                     "/core/build-info",
                     "/core/feedback",
                     "/core/sshd-host",
-                    "/core/system-update-checker",
+                    "/core/system-update/omaha-client-service",
+                    "/core/system-update/system-update-checker",
                     "/core/system-updater",
 
                     // TODO(crbug.com/1326674): Is this still needed for one
@@ -624,7 +627,8 @@
                     "/core/appmgr",
                     "/core/sshd-host",
                     "/core/system-updater",
-                    "/core/system-update-checker",
+                    "/core/system-update/omaha-client-service",
+                    "/core/system-update/system-update-checker",
                 ],
             },
 
@@ -868,7 +872,8 @@
                 "/core/network/netstack",
                 "/core/setui_service",
                 "/core/sysmem_connector",
-                "/core/system-update-checker",
+                "/core/system-update/omaha-client-service",
+                "/core/system-update/system-update-checker",
                 "/core/system-update/system-update-committer",
                 "/core/wlancfg",
                 "/core/wlandevicemonitor",

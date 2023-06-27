@@ -2,67 +2,69 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    use: [
+    children: [
         {
-            protocol: [
-                "fuchsia.update.channel.Provider",
-                "fuchsia.update.channelcontrol.ChannelControl",
-                "fuchsia.update.Manager",
-            ],
-            from: "#system-update",
+            name: "omaha-client-service",
+            url: "fuchsia-pkg://fuchsia.com/omaha-client#meta/omaha-client-service.cm",
+            startup: "eager",
+            on_terminate: "reboot",
         },
     ],
     offer: [
         {
             protocol: "fuchsia.update.config.OptOut",
-            from: "#system-update-configurator",
-            to: "#system-update",
-            source_availability: "unknown",
-            availability: "optional",
+            from: "parent",
+            to: "#omaha-client-service",
+            availability: "same_as_target",
         },
         {
             protocol: "fuchsia.update.installer.Installer",
-            from: "#system-updater",
-            to: "#system-update",
+            from: "parent",
+            to: "#omaha-client-service",
         },
         {
             protocol: [
                 "fuchsia.cobalt.SystemDataUpdater",
                 "fuchsia.metrics.MetricEventLoggerFactory",
             ],
-            from: "#cobalt",
-            to: "#system-update",
+            from: "parent",
+            to: "#omaha-client-service",
         },
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "parent",
-            to: "#system-update",
+            to: "#omaha-client-service",
         },
         {
             protocol: "fuchsia.stash.Store2",
-            from: "#stash2",
-            to: "#system-update",
+            from: "parent",
+            to: "#omaha-client-service",
         },
         {
             protocol: [
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",
             ],
-            from: "#network",
-            to: "#system-update",
+            from: "parent",
+            to: "#omaha-client-service",
+        },
+        {
+            protocol: "fuchsia.update.CommitStatusProvider",
+            from: "#system-update-committer",
+            to: "#omaha-client-service",
         },
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
-            to: "#system-update",
+            to: "#omaha-client-service",
         },
         {
             protocol: [
                 "fuchsia.feedback.ComponentDataRegister",
                 "fuchsia.feedback.CrashReporter",
             ],
-            from: "#feedback",
-            to: "#system-update",
+            from: "parent",
+            to: "#omaha-client-service",
 
             // TODO: break the dependency cycle
             dependency: "weak",
@@ -73,29 +75,38 @@
                 "fuchsia.paver.Paver",
             ],
             from: "parent",
-            to: "#system-update",
+            to: "#omaha-client-service",
         },
         {
             protocol: "fuchsia.pkg.Cup",
-            from: "#pkg-resolver",
-            to: "#system-update",
+            from: "parent",
+            to: "#omaha-client-service",
         },
         {
             directory: "build-info",
             from: "parent",
-            to: "#system-update",
+            to: "#omaha-client-service",
         },
         {
-            directory: "config-data",
+            directory: "omaha-client-service-config-data",
             from: "parent",
-            as: "omaha-client-service-config-data",
-            to: "#system-update",
-            subdir: "omaha-client",
+            as: "config-data",
+            to: "#omaha-client-service",
         },
         {
             directory: "root-ssl-certificates",
             from: "parent",
-            to: "#system-update",
+            to: "#omaha-client-service",
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.update.channel.Provider",
+                "fuchsia.update.channelcontrol.ChannelControl",
+                "fuchsia.update.Manager",
+            ],
+            from: "#omaha-client-service",
         },
     ],
 }

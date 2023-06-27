@@ -2,14 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    children: [
-        {
-            name: "system-update-checker",
-            url: "fuchsia-pkg://fuchsia.com/system-update-checker#meta/system-update-checker.cm",
-            startup: "eager",
-            on_terminate: "reboot",
-        },
-    ],
     use: [
         {
             protocol: [
@@ -17,56 +9,47 @@
                 "fuchsia.update.channelcontrol.ChannelControl",
                 "fuchsia.update.Manager",
             ],
-            from: "#system-update-checker",
+            from: "#system-update",
         },
     ],
     offer: [
         {
             protocol: "fuchsia.update.installer.Installer",
             from: "#system-updater",
-            to: [ "#system-update-checker" ],
+            to: [ "#system-update" ],
         },
         {
             protocol: "fuchsia.cobalt.SystemDataUpdater",
             from: "#cobalt",
-            to: "#system-update-checker",
+            to: "#system-update",
         },
         {
             protocol: "fuchsia.pkg.PackageResolver",
             from: "#pkg-resolver",
-            to: "#system-update-checker",
+            to: "#system-update",
         },
         {
             protocol: "fuchsia.pkg.RepositoryManager",
             from: "#pkg-resolver",
-            to: "#system-update-checker",
+            to: "#system-update",
         },
         {
             protocol: "fuchsia.space.Manager",
             from: "parent",
-            to: "#system-update-checker",
+            to: "#system-update",
         },
         {
             directory: "system",
             from: "parent",
             as: "pkgfs-system",
-            to: "#system-update-checker",
+            to: "#system-update",
         },
         {
             directory: "config-data",
             from: "parent",
-            to: "#system-update-checker",
+            as: "system-update-checker-config-data",
+            to: "#system-update",
             subdir: "system-update-checker",
-        },
-        {
-            protocol: "fuchsia.update.CommitStatusProvider",
-            from: "#system-update",
-            to: "#system-update-checker",
-        },
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#system-update-checker",
         },
         {
             protocol: [
@@ -74,7 +57,7 @@
                 "fuchsia.paver.Paver",
             ],
             from: "parent",
-            to: "#system-update-checker",
+            to: "#system-update",
         },
     ],
 }

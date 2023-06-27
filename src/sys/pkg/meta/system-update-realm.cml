@@ -4,10 +4,6 @@
 
 // This manifest defines the contents of the system update realm.
 {
-    include: [
-        "inspect/offer.shard.cml",
-        "syslog/offer.shard.cml",
-    ],
     children: [
         {
             name: "system-update-committer",
@@ -17,6 +13,16 @@
         },
     ],
     offer: [
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: "all",
+        },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: "all",
+        },
         {
             protocol: [
                 "fuchsia.hardware.power.statecontrol.Admin",

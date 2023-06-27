@@ -206,9 +206,6 @@ assembly_input_bundle("core_realm") {
     # This is a required dependency of pkg-cache
     "//src/sys/pkg/bin/system-update-committer",
 
-    # This is the update realm which will contain system-update-committer
-    "//src/sys/pkg:system-update-realm",
-
     # Build-Information
     "//src/developer/build_info:build-info-service",
 
@@ -238,6 +235,17 @@ assembly_input_bundle("core_realm") {
                     "//sdk/lib/inspect/offer.shard.cml",
                   ],
                   root_build_dir)
+        },
+      ]
+    },
+    {
+      name = "system-update-realm"
+      components = [
+        {
+          component_name = "system-update-realm"
+
+          shards = rebase_path("//src/sys/pkg/meta/system-update-realm.cml",
+                               root_build_dir)
         },
       ]
     },
@@ -1102,6 +1110,17 @@ assembly_input_bundle("system_update_checker") {
         },
       ]
     },
+    {
+      name = "system-update-realm"
+      component_shards = [
+        {
+          component_name = "system-update-realm"
+          shards = rebase_path(
+                  [ "//src/sys/pkg/bin/system-update-checker/meta/system_update_checker.system_update_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
   ]
 }
 
@@ -1115,6 +1134,17 @@ assembly_input_bundle("omaha_client") {
           component_name = "core"
           shards = rebase_path(
                   [ "//src/sys/pkg/bin/omaha-client/meta/omaha_client_service.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+    {
+      name = "system-update-realm"
+      component_shards = [
+        {
+          component_name = "system-update-realm"
+          shards = rebase_path(
+                  [ "//src/sys/pkg/bin/omaha-client/meta/omaha_client_service.system_update_shard.cml" ],
                   root_build_dir)
         },
       ]

@@ -144,7 +144,7 @@
                 "fuchsia.update.channelcontrol.ChannelControl",
                 "fuchsia.update.Manager",
             ],
-            from: "#system-update-checker",
+            from: "#system-update",
             to: "#session-manager",
         },
 
