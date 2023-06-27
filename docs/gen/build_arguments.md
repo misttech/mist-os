@@ -7529,7 +7529,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"sEPJOTRQJTIygsr5E35R0ZTwE3p4hlWsI6ANfThySDoC"`
+**Current value (from the default):** `"pU3MVOQHs05LMl61t6N6Bz0Zxf7JvGK9k36vHBIcslcC"`
 
 From //build/rust/config.gni:32
 
