@@ -22,7 +22,7 @@
         {
             directory: "svc_for_legacy_shell",
             from: "self",
-            rights: [ "r*" ],
+            rights: [ "connect" ],
         },
     ],
 }

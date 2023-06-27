@@ -4,15 +4,12 @@
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/fdio/directory.h>
+#include <lib/async-loop/loop.h>
+#include <lib/fdio/namespace.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
-#include <stdio.h>
 #include <zircon/process.h>
-#include <zircon/processargs.h>
 #include <zircon/status.h>
-#include <zircon/types.h>
 
 #include <fbl/ref_ptr.h>
 
@@ -20,39 +17,38 @@
 #include "src/lib/storage/vfs/cpp/remote_dir.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 
-namespace {
-void ServeFromNamespace(fs::PseudoDir* out_dir, const char* ns_path, const char* out_path) {
-  zx_status_t status;
-  zx::channel ns_server, ns_client;
-  status = zx::channel::create(0, &ns_server, &ns_client);
-  FX_CHECK(status == ZX_OK) << "failed to create channel: " << zx_status_get_string(status);
-  status = fdio_open(ns_path,
-                     static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory |
-                                           fuchsia_io::wire::OpenFlags::kRightReadable),
-                     ns_server.release());
-  if (status != ZX_OK) {
-    FX_LOGS(WARNING) << "core_proxy cannot serve " << ns_path << ": "
-                     << zx_status_get_string(status);
-    return;
+int main() {
+  fdio_flat_namespace_t* ns;
+  {
+    zx_status_t status = fdio_ns_export_root(&ns);
+    FX_CHECK(status == ZX_OK) << "failed to export root namespace: "
+                              << zx_status_get_string(status);
+  }
+  fbl::RefPtr out_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+  for (size_t i = 0; i < ns->count; ++i) {
+    if (std::string_view{ns->path[i]} == "/svc") {
+      zx_status_t status = out_dir->AddEntry(
+          "svc_for_legacy_shell",
+          fbl::MakeRefCounted<fs::RemoteDir>(fidl::ClientEnd<fuchsia_io::Directory>{
+              zx::channel{std::exchange(ns->handle[i], ZX_HANDLE_INVALID)}}));
+      FX_CHECK(status == ZX_OK) << "failed to add entry to outgoing dir: "
+                                << zx_status_get_string(status);
+    }
+  }
+  fdio_ns_free_flat_ns(ns);
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  fs::SynchronousVfs out_vfs(loop.dispatcher());
+
+  {
+    zx_status_t status = out_vfs.ServeDirectory(
+        out_dir, fidl::ServerEnd<fuchsia_io::Directory>{
+                     zx::channel{zx_take_startup_handle(PA_DIRECTORY_REQUEST)}});
+    FX_CHECK(status == ZX_OK) << "failed to serve outgoing dir: " << zx_status_get_string(status);
   }
 
-  auto subdir = fbl::MakeRefCounted<fs::RemoteDir>(
-      fidl::ClientEnd<fuchsia_io::Directory>(std::move(ns_client)));
-  out_dir->AddEntry(out_path, subdir);
-}
-}  // namespace
-
-int main() {
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  fs::SynchronousVfs out_vfs(loop.dispatcher());
-  fbl::RefPtr<fs::PseudoDir> out_dir(fbl::MakeRefCounted<fs::PseudoDir>());
-  ServeFromNamespace(out_dir.get(), "/svc", "svc_for_legacy_shell");
-
-  auto pa_directory_request = zx_take_startup_handle(PA_DIRECTORY_REQUEST);
-  zx_status_t status = out_vfs.ServeDirectory(
-      out_dir, fidl::ServerEnd<fuchsia_io::Directory>(zx::channel(pa_directory_request)));
-  FX_CHECK(status == ZX_OK) << "failed to serve outgoing dir: " << zx_status_get_string(status);
-
-  loop.Run();
+  {
+    zx_status_t status = loop.Run();
+    FX_CHECK(status == ZX_OK) << "failed to run loop: " << zx_status_get_string(status);
+  }
   return 0;
 }

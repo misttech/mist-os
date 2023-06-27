@@ -52,7 +52,10 @@
             directory: "svc_for_legacy_shell",
             from: "self",
             to: "#sshd-host",
-            rights: [ "r*" ],
+            rights: [
+                "connect",
+                "enumerate",
+            ],
         },
 
         // Directories in legacy shell namespace

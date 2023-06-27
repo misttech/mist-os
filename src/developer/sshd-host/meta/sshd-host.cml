@@ -33,7 +33,10 @@
         // for the ssh child process and its children.
         {
             directory: "svc_for_legacy_shell",
-            rights: [ "r*" ],
+            rights: [
+                "connect",
+                "enumerate",
+            ],
             path: "/svc_for_legacy_shell",
         },
         {
