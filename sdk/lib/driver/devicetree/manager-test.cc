@@ -68,9 +68,10 @@ std::string DebugStringifyProperty(const fuchsia_driver_framework::NodeProperty&
   return ret.str();
 }
 
-void AssertHasProperties(std::vector<fuchsia_driver_framework::NodeProperty> expected,
-                         const fuchsia_driver_framework::ParentSpec& node) {
-  for (auto& property : node.properties()) {
+void AssertHasProperties(
+    std::vector<fuchsia_driver_framework::NodeProperty> expected,
+    const std::vector<::fuchsia_driver_framework::NodeProperty>& node_properties) {
+  for (auto& property : node_properties) {
     auto iter = std::find(expected.begin(), expected.end(), property);
     EXPECT_NE(expected.end(), iter) << "Unexpected property: " << DebugStringifyProperty(property);
     if (iter != expected.end()) {
@@ -301,29 +302,20 @@ TEST_F(ManagerTest, TestPublishesSimpleNode) {
   DoPublish(manager);
   ASSERT_EQ(2lu, env_.SyncCall(&EnvWrapper::pbus_node_size));
 
-  ASSERT_EQ(2lu, env_.SyncCall(&EnvWrapper::mgr_requests_size));
+  ASSERT_EQ(0lu, env_.SyncCall(&EnvWrapper::mgr_requests_size));
 
-  auto composite_node_spec = env_.SyncCall(&EnvWrapper::mgr_requests_at, 1);
-  ASSERT_TRUE(composite_node_spec.parents().has_value());
-  ASSERT_TRUE(composite_node_spec.name().has_value());
-  EXPECT_NE(nullptr, strstr("example-device", composite_node_spec.name()->data()));
-  // First node is the primary node. In this case, it should be the platform device.
-  ASSERT_FALSE(composite_node_spec.parents()->empty());
+  auto pbus_node = env_.SyncCall(&EnvWrapper::pbus_nodes_at, 1);
+  ASSERT_TRUE(pbus_node.name().has_value());
+  ASSERT_NE(nullptr, strstr("example-device", pbus_node.name()->data()));
+  ASSERT_TRUE(pbus_node.properties().has_value());
 
-  auto& pbus_node = composite_node_spec.parents().value()[0];
-  AssertHasProperties(
-      {{{
-           .key = fuchsia_driver_framework::NodePropertyKey::WithStringValue(
-               bind_fuchsia_devicetree::FIRST_COMPATIBLE),
-           .value = fuchsia_driver_framework::NodePropertyValue::WithStringValue(
-               "fuchsia,sample-device"),
-       }},
-       {{
-           .key = fuchsia_driver_framework::NodePropertyKey::WithIntValue(BIND_PROTOCOL),
-           .value = fuchsia_driver_framework::NodePropertyValue::WithIntValue(
-               bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
-       }}},
-      pbus_node);
+  AssertHasProperties({{{
+                          .key = fuchsia_driver_framework::NodePropertyKey::WithStringValue(
+                              bind_fuchsia_devicetree::FIRST_COMPATIBLE),
+                          .value = fuchsia_driver_framework::NodePropertyValue::WithStringValue(
+                              "fuchsia,sample-device"),
+                      }}},
+                      *pbus_node.properties());
 }
 
 TEST_F(ManagerTest, TestMmioProperties) {

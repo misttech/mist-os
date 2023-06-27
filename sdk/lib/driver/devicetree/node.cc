@@ -51,6 +51,11 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
     return zx::ok();
   }
 
+  // Pass properties to pbus node directly if we are not adding a composite spec.
+  if (!composite_) {
+    pbus_node_.properties() = node_properties_;
+  }
+
   FDF_LOG(DEBUG, "Adding node '%.*s' to pbus.", (int)name().size(), name().data());
   fdf::Arena arena('PBUS');
   fidl::Arena fidl_arena;
@@ -64,38 +69,41 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
     return zx::error(result->error_value());
   }
 
-  // Construct the platform bus node.
-  fdf::ParentSpec platform_node;
-  platform_node.properties() = std::vector<fdf::NodeProperty>(node_properties_);
-  platform_node.properties().emplace_back(fdf::NodeProperty{{
-      .key = fdf::NodePropertyKey::WithIntValue(BIND_PROTOCOL),
-      .value = fdf::NodePropertyValue::WithIntValue(bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
-  }});
-  platform_node.bind_rules() = std::vector<fdf::BindRule>{
-      fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_VID,
-                              bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
-      fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_DID,
-                              bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE),
-      fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_INSTANCE_ID, id_),
-  };
+  // Add composite node spec if composite.
+  if (composite_) {
+    // Construct the platform bus node.
+    fdf::ParentSpec platform_node;
+    platform_node.properties() = std::vector<fdf::NodeProperty>(node_properties_);
+    platform_node.properties().emplace_back(fdf::NodeProperty{{
+        .key = fdf::NodePropertyKey::WithIntValue(BIND_PROTOCOL),
+        .value = fdf::NodePropertyValue::WithIntValue(bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+    }});
+    platform_node.bind_rules() = std::vector<fdf::BindRule>{
+        fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_VID,
+                                bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
+        fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_DID,
+                                bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE),
+        fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_INSTANCE_ID, id_),
+    };
 
-  // pbus node is always the primary parent for now.
-  parents_.insert(parents_.begin(), std::move(platform_node));
+    // pbus node is always the primary parent for now.
+    parents_.insert(parents_.begin(), std::move(platform_node));
 
-  fdf::CompositeNodeSpec group;
-  std::string name_final(name());
-  // '@' is not a valid character in Node names as per driver framework.
-  std::replace(name_final.begin(), name_final.end(), '@', '-');
-  group.name() = name_final;
-  group.parents() = std::move(parents_);
+    fdf::CompositeNodeSpec group;
+    std::string name_final(name());
+    // '@' is not a valid character in Node names as per driver framework.
+    std::replace(name_final.begin(), name_final.end(), '@', '-');
+    group.name() = name_final;
+    group.parents() = std::move(parents_);
 
-  auto devicegroup_result = mgr->AddSpec({std::move(group)});
-  if (devicegroup_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create composite node: %s",
-            devicegroup_result.error_value().FormatDescription().data());
-    return zx::error(devicegroup_result.error_value().is_framework_error()
-                         ? devicegroup_result.error_value().framework_error().status()
-                         : ZX_ERR_INVALID_ARGS);
+    auto devicegroup_result = mgr->AddSpec({std::move(group)});
+    if (devicegroup_result.is_error()) {
+      FDF_LOG(ERROR, "Failed to create composite node: %s",
+              devicegroup_result.error_value().FormatDescription().data());
+      return zx::error(devicegroup_result.error_value().is_framework_error()
+                           ? devicegroup_result.error_value().framework_error().status()
+                           : ZX_ERR_INVALID_ARGS);
+    }
   }
 
   return zx::ok();

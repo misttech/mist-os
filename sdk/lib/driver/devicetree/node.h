@@ -52,6 +52,10 @@ class Node {
   // This is a unique ID we use to match our device group with the correct
   // platform bus node. It is generated at runtime and not stable across boots.
   uint32_t id_;
+
+  // Boolean to indicate if a composite node spec needs to added.
+  // TODO(fxbug.dev/129706): Add proper support for composite.
+  bool composite_ = false;
 };
 
 }  // namespace fdf_devicetree
