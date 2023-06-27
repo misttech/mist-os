@@ -59,14 +59,14 @@ impl<'a> GetOperation<'a> {
         // If the response code is OK then this is the final body packet of the GET request.
         if *response.code() == ResponseCode::Ok {
             // The EndOfBody Header contains the user data.
-            return HeaderSet::from(response).get_body(true).map(|eob| (true, eob));
+            return HeaderSet::from(response).remove_body(true).map(|eob| (true, eob));
         }
 
         // Otherwise, a Continue means there are more body packets left.
         let mut headers =
             response.expect_code(OpCode::GetFinal, ResponseCode::Continue).map(HeaderSet::from)?;
         // The Body Header contains the user data.
-        headers.get_body(false).map(|b| (false, b))
+        headers.remove_body(false).map(|b| (false, b))
     }
 
     /// Makes a GET request with the final bit unset using the provided `headers`.
@@ -198,7 +198,7 @@ mod tests {
     #[fuchsia::test]
     fn get_operation() {
         let mut exec = fasync::TestExecutor::new();
-        let (manager, mut remote) = new_manager();
+        let (manager, mut remote) = new_manager(/* srm_supported */ false);
         let initial = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
         let mut operation = setup_get_operation(&manager, initial);
 
@@ -255,7 +255,7 @@ mod tests {
     #[fuchsia::test]
     fn get_operation_terminate_success() {
         let mut exec = fasync::TestExecutor::new();
-        let (manager, mut remote) = new_manager();
+        let (manager, mut remote) = new_manager(/* srm_supported */ false);
         let initial = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
         let mut operation = setup_get_operation(&manager, initial);
 
@@ -276,7 +276,7 @@ mod tests {
     #[fuchsia::test]
     fn get_operation_multiple_start_is_error() {
         let mut exec = fasync::TestExecutor::new();
-        let (manager, mut remote) = new_manager();
+        let (manager, mut remote) = new_manager(/* srm_supported */ false);
         let initial = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
         let mut operation = setup_get_operation(&manager, initial);
 
@@ -296,7 +296,7 @@ mod tests {
     #[fuchsia::test]
     fn get_operation_information_error() {
         let mut exec = fasync::TestExecutor::new();
-        let (manager, mut remote) = new_manager();
+        let (manager, mut remote) = new_manager(/* srm_supported */ false);
         let initial = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
         let mut operation = setup_get_operation(&manager, initial);
 
@@ -325,7 +325,7 @@ mod tests {
     #[fuchsia::test]
     fn get_operation_data_before_start_is_error() {
         let mut exec = fasync::TestExecutor::new();
-        let (manager, _remote) = new_manager();
+        let (manager, _remote) = new_manager(/* srm_supported */ false);
         let initial = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
         let operation = setup_get_operation(&manager, initial);
 
@@ -340,7 +340,7 @@ mod tests {
     #[fuchsia::test]
     fn get_operation_data_peer_disconnect_is_error() {
         let mut exec = fasync::TestExecutor::new();
-        let (manager, mut remote) = new_manager();
+        let (manager, mut remote) = new_manager(/* srm_supported */ false);
         let initial = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
         let mut operation = setup_get_operation(&manager, initial);
 
@@ -359,7 +359,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn get_operation_terminate_before_start_error() {
-        let (manager, _remote) = new_manager();
+        let (manager, _remote) = new_manager(/* srm_supported */ false);
         let initial = HeaderSet::from_header(Header::Name("bar".into())).unwrap();
         let operation = setup_get_operation(&manager, initial);
 

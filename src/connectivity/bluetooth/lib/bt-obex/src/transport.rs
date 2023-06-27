@@ -11,17 +11,44 @@ use tracing::{info, trace};
 use crate::error::{Error, PacketError};
 use crate::operation::{OpCode, ResponsePacket};
 
+/// The underlying communication protocol used for the OBEX transport.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum TransportType {
+    L2cap,
+    Rfcomm,
+}
+
+impl TransportType {
+    fn srm_supported(&self) -> bool {
+        match &self {
+            // Per GOEP Section 7.1, SRM can be used with the L2CAP transport.
+            Self::L2cap => true,
+            // Neither the OBEX nor GOEP specifications explicitly state that SRM cannot be used
+            // with the RFCOMM transport. However, all qualification tests and spec language
+            // suggest that SRM is to be used only on the L2CAP transport.
+            Self::Rfcomm => false,
+        }
+    }
+}
+
 /// Holds the underlying RFCOMM or L2CAP transport for an OBEX operation.
 #[derive(Debug)]
 pub struct ObexTransport<'a> {
     /// A mutable reference to the permit given to the operation.
     /// The L2CAP or RFCOMM connection to the remote peer.
     channel: RefMut<'a, Channel>,
+    /// The type of transport used in the OBEX connection.
+    type_: TransportType,
 }
 
 impl<'a> ObexTransport<'a> {
-    pub fn new(channel: RefMut<'a, Channel>) -> Self {
-        Self { channel }
+    pub fn new(channel: RefMut<'a, Channel>, type_: TransportType) -> Self {
+        Self { channel, type_ }
+    }
+
+    /// Returns true if this transport supports the Single Response Mode (SRM) feature.
+    pub fn srm_supported(&self) -> bool {
+        self.type_.srm_supported()
     }
 
     /// Encodes and sends the OBEX `data` to the remote peer.
@@ -60,17 +87,19 @@ impl<'a> ObexTransport<'a> {
 /// Provides a reservation system for acquiring the transport for an in-progress OBEX operation.
 #[derive(Debug)]
 pub struct ObexTransportManager {
-    /// Holds the underlying transport (e.g. RFCOMM or L2CAP).
+    /// Holds the underlying transport. The type of transport is indicated by the `type_` field.
     /// There can only be one operation outstanding at any time. A mutable reference to the
     /// `Channel` will be held by the `ObexTransport` during an ongoing operation and is
     /// assigned using `ObexTransportManager::try_new_operation`. On operation termination (e.g.
     /// `ObexTransport` is dropped), the `Channel` will be available for subsequent mutable access.
     channel: RefCell<Channel>,
+    /// The transport type (L2CAP or RFCOMM) for the `channel`.
+    type_: TransportType,
 }
 
 impl ObexTransportManager {
-    pub fn new(channel: Channel) -> Self {
-        Self { channel: RefCell::new(channel) }
+    pub fn new(channel: Channel, type_: TransportType) -> Self {
+        Self { channel: RefCell::new(channel), type_ }
     }
 
     fn new_permit(&self) -> Result<RefMut<'_, Channel>, Error> {
@@ -80,7 +109,7 @@ impl ObexTransportManager {
     pub fn try_new_operation(&self) -> Result<ObexTransport<'_>, Error> {
         // Only one operation can be outstanding at a time.
         let channel = self.new_permit()?;
-        Ok(ObexTransport::new(channel))
+        Ok(ObexTransport::new(channel, self.type_))
     }
 }
 
@@ -94,9 +123,11 @@ pub(crate) mod test_utils {
 
     use crate::operation::RequestPacket;
 
-    pub(crate) fn new_manager() -> (ObexTransportManager, Channel) {
+    /// Set `srm_supported` to true to build a transport that supports the OBEX SRM feature.
+    pub(crate) fn new_manager(srm_supported: bool) -> (ObexTransportManager, Channel) {
         let (local, remote) = Channel::create();
-        let manager = ObexTransportManager::new(local);
+        let type_ = if srm_supported { TransportType::L2cap } else { TransportType::Rfcomm };
+        let manager = ObexTransportManager::new(local, type_);
         (manager, remote)
     }
 
@@ -128,6 +159,16 @@ pub(crate) mod test_utils {
         let _ = channel.as_ref().write(&response_buf[..]).expect("write to channel success");
     }
 
+    #[track_caller]
+    pub fn expect_request<F>(exec: &mut fasync::TestExecutor, channel: &mut Channel, expectation: F)
+    where
+        F: FnOnce(RequestPacket),
+    {
+        let request_raw = expect_stream_item(exec, channel).expect("request");
+        let request = RequestPacket::decode(&request_raw[..]).expect("can decode request");
+        expectation(request);
+    }
+
     /// Expects a request packet on the `channel` and validates the contents with the provided
     /// `expectation`. Sends a `response` back on the channel.
     #[track_caller]
@@ -139,9 +180,7 @@ pub(crate) mod test_utils {
     ) where
         F: FnOnce(RequestPacket),
     {
-        let request_raw = expect_stream_item(exec, channel).expect("request");
-        let request = RequestPacket::decode(&request_raw[..]).expect("can decode request");
-        expectation(request);
+        expect_request(exec, channel, expectation);
         reply(channel, response)
     }
 
@@ -172,7 +211,7 @@ mod tests {
     #[fuchsia::test]
     fn transport_manager_new_operation() {
         let _exec = fasync::TestExecutor::new();
-        let (manager, _remote) = new_manager();
+        let (manager, _remote) = new_manager(/* srm_supported */ false);
 
         // Nothing should be in progress.
         assert_matches!(manager.new_permit(), Ok(_));
@@ -192,7 +231,7 @@ mod tests {
     #[fuchsia::test]
     fn send_and_receive() {
         let mut exec = fasync::TestExecutor::new();
-        let (manager, mut remote) = new_manager();
+        let (manager, mut remote) = new_manager(/* srm_supported */ false);
         let mut transport = manager.try_new_operation().expect("can start operation");
 
         // Local makes a request
@@ -219,7 +258,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn send_while_channel_closed_is_error() {
-        let (manager, remote) = new_manager();
+        let (manager, remote) = new_manager(/* srm_supported */ false);
         let transport = manager.try_new_operation().expect("can start operation");
         drop(remote);
 
@@ -233,7 +272,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn receive_while_channel_closed_is_error() {
-        let (manager, remote) = new_manager();
+        let (manager, remote) = new_manager(/* srm_supported */ false);
         let mut transport = manager.try_new_operation().expect("can start operation");
         drop(remote);
 

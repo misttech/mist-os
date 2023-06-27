@@ -112,6 +112,36 @@ impl From<&str> for MimeType {
 }
 
 decodable_enum! {
+    /// Value indicating support for the Single Response Mode (SRM) feature in OBEX. Used as part
+    /// of `Header::SingleResponseMode`.
+    /// Defined in OBEX 1.5 Section 2.2.23.
+    pub enum SingleResponseMode<u8, PacketError, Reserved> {
+        // A request to disable SRM for the current operation.
+        Disable = 0x00,
+        // A request to enable SRM for the current operation.
+        Enable = 0x01,
+        // Per GOEP 2.1.1 Section 4.6, the `Supported` SRM flag is not used.
+        // Supported = 0x02,
+    }
+}
+
+impl From<bool> for SingleResponseMode {
+    fn from(src: bool) -> SingleResponseMode {
+        if src {
+            SingleResponseMode::Enable
+        } else {
+            SingleResponseMode::Disable
+        }
+    }
+}
+
+impl From<SingleResponseMode> for Header {
+    fn from(src: SingleResponseMode) -> Header {
+        Header::SingleResponseMode(src)
+    }
+}
+
+decodable_enum! {
     /// The Header Encoding is the upper 2 bits of the Header Identifier (HI) and describes the type
     /// of payload included in the Header.
     /// Defined in OBEX 1.5 Section 2.1.
@@ -335,7 +365,7 @@ pub enum Header {
     DestName(ObexString),
     /// 4-byte bit mask.
     Permissions(u32),
-    SingleResponseMode(u8),
+    SingleResponseMode(SingleResponseMode),
     /// 1-byte quantity containing the parameters for the SRM session.
     SingleResponseModeParameters(u8),
     /// User defined Header type.
@@ -482,9 +512,12 @@ impl Encodable for Header {
                 let n = src.len();
                 buf[start_index..start_index + n].copy_from_slice(&src[..]);
             }
-            SessionSequenceNumber(v) | SingleResponseMode(v) | SingleResponseModeParameters(v) => {
+            SessionSequenceNumber(v) | SingleResponseModeParameters(v) => {
                 // Encode all 1-byte value headers.
                 buf[start_index] = *v;
+            }
+            SingleResponseMode(v) => {
+                buf[start_index] = v.into();
             }
             Type(mime_type) => {
                 let b = mime_type.to_be_bytes();
@@ -648,7 +681,9 @@ impl Decodable for Header {
             HeaderIdentifier::Permissions => {
                 Ok(Header::Permissions(u32::from_be_bytes(data[..].try_into().unwrap())))
             }
-            HeaderIdentifier::SingleResponseMode => Ok(Header::SingleResponseMode(buf[start_idx])),
+            HeaderIdentifier::SingleResponseMode => {
+                Ok(Header::SingleResponseMode(SingleResponseMode::try_from(buf[start_idx])?))
+            }
             HeaderIdentifier::SingleResponseModeParameters => {
                 Ok(Header::SingleResponseModeParameters(buf[start_idx]))
             }
@@ -1066,13 +1101,13 @@ mod tests {
     #[fuchsia::test]
     fn encode_valid_header_success() {
         // Encoding a 1-byte Header should succeed.
-        let srm = Header::SingleResponseMode(0x10);
+        let srm = Header::SingleResponseMode(SingleResponseMode::Disable);
         assert_eq!(srm.encoded_len(), 2);
         let mut buf = vec![0; srm.encoded_len()];
         srm.encode(&mut buf).expect("can encode");
         let expected_buf = [
             0x97, // Header ID = SRM,
-            0x10, // SRM = 0x10
+            0x00, // SRM = 0x00 (disable)
         ];
         assert_eq!(buf, expected_buf);
 

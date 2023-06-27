@@ -43,6 +43,10 @@ impl HeaderSet {
         self.headers.iter().find(|(header_id, _)| header_id == id).is_some()
     }
 
+    pub fn get(&self, id: &HeaderIdentifier) -> Option<&Header> {
+        self.headers.iter().find(|(header_id, _)| header_id == id).map(|(_, header)| header)
+    }
+
     #[cfg(test)]
     pub fn contains_headers(&self, ids: &Vec<HeaderIdentifier>) -> bool {
         for id in ids {
@@ -68,7 +72,7 @@ impl HeaderSet {
     /// Removes and returns the payload for the Body Header from the set.
     /// If `final_` is set, then the EndOfBody header payload is returned.
     /// Returns Error if the expected Header is not present in the collection.
-    pub fn get_body(&mut self, final_: bool) -> Result<Vec<u8>, Error> {
+    pub fn remove_body(&mut self, final_: bool) -> Result<Vec<u8>, Error> {
         if final_ {
             let Some(Header::EndOfBody(end_of_body)) = self.remove(&HeaderIdentifier::EndOfBody) else {
                 return Err(PacketError::data("missing end of body header").into());
@@ -132,6 +136,7 @@ impl Decodable for HeaderSet {
 mod tests {
     use super::*;
 
+    use crate::header::SingleResponseMode;
     use assert_matches::assert_matches;
 
     #[fuchsia::test]
@@ -156,30 +161,30 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn get_body_headers() {
+    fn remove_body_headers() {
         let mut headers =
             HeaderSet::from_headers(vec![Header::Body(vec![1]), Header::EndOfBody(vec![1, 2])])
                 .unwrap();
         assert!(headers.contains_header(&HeaderIdentifier::Body));
         assert!(headers.contains_header(&HeaderIdentifier::EndOfBody));
 
-        let eob = headers.get_body(true).expect("end of body exists");
+        let eob = headers.remove_body(true).expect("end of body exists");
         assert_eq!(eob, vec![1, 2]);
         // Trying to get it again is an Error since it no longer exists in the collection.
-        assert_matches!(headers.get_body(true), Err(Error::Packet(PacketError::Data(_))));
+        assert_matches!(headers.remove_body(true), Err(Error::Packet(PacketError::Data(_))));
 
-        let b = headers.get_body(false).expect("end of body exists");
+        let b = headers.remove_body(false).expect("end of body exists");
         assert_eq!(b, vec![1]);
         // Trying to get it again is an Error since it no longer exists in the collection.
-        assert_matches!(headers.get_body(false), Err(Error::Packet(PacketError::Data(_))));
+        assert_matches!(headers.remove_body(false), Err(Error::Packet(PacketError::Data(_))));
 
         // Body exists, but user wants EOB.
         let mut headers = HeaderSet::from_headers(vec![Header::Body(vec![1])]).unwrap();
-        assert_matches!(headers.get_body(true), Err(Error::Packet(PacketError::Data(_))));
+        assert_matches!(headers.remove_body(true), Err(Error::Packet(PacketError::Data(_))));
 
         // EOB exists, but user wants Body.
         let mut headers = HeaderSet::from_headers(vec![Header::EndOfBody(vec![1])]).unwrap();
-        assert_matches!(headers.get_body(false), Err(Error::Packet(PacketError::Data(_))));
+        assert_matches!(headers.remove_body(false), Err(Error::Packet(PacketError::Data(_))));
     }
 
     #[fuchsia::test]
@@ -206,12 +211,12 @@ mod tests {
             0x05, 0x00, 0x09, 0x00, 0x68, 0x00, 0x65, 0x00,
             0x00, // Description = "he" (String)
             0xd6, 0x00, 0x00, 0x00, 0x05, // Permissions = 5 (u32)
-            0x97, 0x01, // SRM = 1 (u8)
+            0x97, 0x01, // SRM = Enabled = 1 (u8)
         ];
         let headers = HeaderSet::decode(&buf[..]).expect("can decode into headers");
         let expected_body = Header::Description("he".into());
         let expected_permissions = Header::Permissions(5);
-        let expected_srm = Header::SingleResponseMode(1);
+        let expected_srm = Header::SingleResponseMode(SingleResponseMode::Enable);
         let expected_headers =
             HeaderSet::from_headers(vec![expected_body, expected_permissions, expected_srm])
                 .unwrap();

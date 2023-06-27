@@ -3,23 +3,87 @@
 // found in the LICENSE file.
 
 use fuchsia_bluetooth::types::Channel;
-use tracing::trace;
+use tracing::{trace, warn};
 
 pub use crate::client::get::GetOperation;
 pub use crate::client::put::PutOperation;
 use crate::error::Error;
-use crate::header::HeaderSet;
+use crate::header::{Header, HeaderIdentifier, HeaderSet, SingleResponseMode};
 use crate::operation::{
     OpCode, RequestPacket, ResponseCode, ResponsePacket, SetPathFlags, MAX_PACKET_SIZE,
     MIN_MAX_PACKET_SIZE,
 };
 use crate::transport::ObexTransportManager;
+pub use crate::transport::TransportType;
 
 /// Implements the OBEX PUT operation.
 mod put;
 
 /// Implements the OBEX GET operation.
 mod get;
+
+/// An interface for the Single Response Mode (SRM) feature for an OBEX client operation.
+pub(crate) trait SrmOperation {
+    const OPERATION_TYPE: OpCode;
+
+    /// Returns the current SRM mode.
+    fn srm_mode(&self) -> SingleResponseMode;
+
+    /// Sets SRM to the provided `mode`.
+    fn set_srm(&mut self, mode: SingleResponseMode);
+
+    /// Attempts to enable SRM for the operation by updating the provided `headers` with the SRM
+    /// header.
+    /// Returns Error if `headers` couldn't be updated with SRM, Ok otherwise.
+    fn try_enable_srm(&mut self, headers: &mut HeaderSet) -> Result<(), Error> {
+        if let Some(Header::SingleResponseMode(srm)) =
+            headers.get(&HeaderIdentifier::SingleResponseMode)
+        {
+            // Application requested SRM, but it is not supported by the transport.
+            if *srm == SingleResponseMode::Enable && self.srm_mode() == SingleResponseMode::Disable
+            {
+                return Err(Error::operation(Self::OPERATION_TYPE, "SRM not locally supported"));
+            }
+            // Otherwise, default to what the application prefers.
+            self.set_srm(*srm);
+            return Ok(());
+        }
+        // Application has no preference. Per GOEP Section 4.6, it is recommended to enable
+        // SRM by default if it is supported.
+        if self.srm_mode() == SingleResponseMode::Enable {
+            headers.add(SingleResponseMode::Enable.into())?;
+            trace!(operation = ?Self::OPERATION_TYPE, "Requesting to enable SRM");
+        }
+        Ok(())
+    }
+
+    /// Checks the provided response `headers` for the SRM flag and updates the local SRM state
+    /// for the operation.
+    fn check_response_for_srm(&mut self, headers: &HeaderSet) {
+        let srm_response = if let Some(Header::SingleResponseMode(srm)) =
+            headers.get(&HeaderIdentifier::SingleResponseMode)
+        {
+            *srm
+        } else {
+            // No SRM indication from peer defaults to disabled.
+            trace!(operation = ?Self::OPERATION_TYPE, "Response doesn't contain SRM header");
+            SingleResponseMode::Disable
+        };
+
+        trace!(current_status = ?self.srm_mode(), operation = ?Self::OPERATION_TYPE, "Peer responded with {srm_response:?}");
+        match (srm_response, self.srm_mode()) {
+            (SingleResponseMode::Enable, SingleResponseMode::Disable) => {
+                warn!("SRM stays disabled");
+            }
+            (SingleResponseMode::Disable, SingleResponseMode::Enable) => {
+                trace!("SRM is disabled");
+                self.set_srm(SingleResponseMode::Disable);
+            }
+            _ => {} // Otherwise, both sides agree on the SRM status.
+        }
+        trace!(status = ?self.srm_mode(), operation = ?Self::OPERATION_TYPE, "SRM status");
+    }
+}
 
 /// Returns the maximum packet size that will be used for the OBEX session.
 /// `transport_max` is the maximum size that the underlying transport (e.g. L2CAP, RFCOMM) supports.
@@ -43,9 +107,9 @@ pub struct ObexClient {
 }
 
 impl ObexClient {
-    pub fn new(channel: Channel) -> Self {
+    pub fn new(channel: Channel, type_: TransportType) -> Self {
         let max_packet_size = max_packet_size_from_transport(channel.max_tx_size());
-        let transport = ObexTransportManager::new(channel);
+        let transport = ObexTransportManager::new(channel, type_);
         Self { connected: false, max_packet_size, transport }
     }
 
@@ -209,7 +273,7 @@ mod tests {
     /// completion of the OBEX CONNECT procedure.
     fn new_obex_client(connected: bool) -> (ObexClient, Channel) {
         let (local, remote) = Channel::create();
-        let mut client = ObexClient::new(local);
+        let mut client = ObexClient::new(local, TransportType::Rfcomm);
         client.set_connected(connected);
         (client, remote)
     }
