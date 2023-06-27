@@ -16,32 +16,49 @@
 // Holds the buffers and semaphores associated with a fake test batch.
 class BatchData {
  public:
-  static BatchData Create(std::shared_ptr<MsdVsiContext> context, uint32_t num_resources,
-                          std::unique_ptr<MappedBatch>* out_mapped_batch) {
-    BatchData batch_data(num_resources);
-    *out_mapped_batch = batch_data.CreateBatch(context);
-    return batch_data;
-  }
-
- private:
-  static constexpr uint64_t kResourceSize = 4096;
-  static constexpr uint32_t kNumSignalSemaphores = 3;
-
-  BatchData(uint32_t num_resources) {
+  static std::pair<std::unique_ptr<MappedBatch>, std::unique_ptr<BatchData>> Create(
+      std::shared_ptr<MsdVsiContext> context, uint32_t num_resources) {
     auto driver = std::make_unique<MsdVsiDriver>();
+    if (!driver)
+      return {};
+
+    std::vector<std::unique_ptr<msd::MagmaSystemSemaphore>> signal_semaphores;
+    std::vector<std::unique_ptr<msd::MagmaSystemBuffer>> resources;
 
     for (unsigned int i = 0; i < num_resources; i++) {
       auto buffer = magma::PlatformBuffer::Create(kResourceSize, "test buffer");
-      resources_.emplace_back(msd::MagmaSystemBuffer::Create(driver.get(), std::move(buffer)));
+      if (!buffer)
+        return {};
+      resources.emplace_back(msd::MagmaSystemBuffer::Create(driver.get(), std::move(buffer)));
     }
 
     for (unsigned int i = 0; i < kNumSignalSemaphores; i++) {
       auto semaphore = magma::PlatformSemaphore::Create();
-      signal_semaphores_.emplace_back(
-          msd::MagmaSystemSemaphore::Create(driver.get(), std::move(semaphore)));
+      if (!semaphore)
+        return {};
+
+      uint32_t handle;
+      if (!semaphore->duplicate_handle(&handle))
+        return {};
+
+      signal_semaphores.emplace_back(msd::MagmaSystemSemaphore::Create(
+          driver.get(), zx::event(handle), semaphore->global_id(), /*flags=*/0));
     }
+
+    auto batch_data =
+        std::make_unique<BatchData>(std::move(signal_semaphores), std::move(resources));
+
+    return {batch_data->CreateBatch(context), std::move(batch_data)};
   }
 
+  static constexpr uint64_t kResourceSize = 4096;
+  static constexpr uint32_t kNumSignalSemaphores = 3;
+
+  BatchData(std::vector<std::unique_ptr<msd::MagmaSystemSemaphore>> signal_semaphores,
+            std::vector<std::unique_ptr<msd::MagmaSystemBuffer>> resources)
+      : signal_semaphores_(std::move(signal_semaphores)), resources_(std::move(resources)) {}
+
+ private:
   // Returns a new batch created from the BatchData.
   std::unique_ptr<MappedBatch> CreateBatch(std::shared_ptr<MsdVsiContext> context) {
     auto command_buffer = msd::magma_command_buffer{
@@ -156,11 +173,10 @@ void TestMsdVsiContext::TestSubmitBatches(uint32_t num_batches, uint32_t num_res
   mock_connection_owner_.SetSignalOnCompletion(num_batches, finished_semaphore);
 
   // Submit the batches and save the batch ids.
-  std::vector<BatchData> batch_data;
+  std::vector<std::unique_ptr<BatchData>> batch_data;
   std::vector<uint64_t> batch_ids;
   for (unsigned int i = 0; i < num_batches; i++) {
-    std::unique_ptr<MappedBatch> batch;
-    auto data = BatchData::Create(context_, num_resources_per_batch, &batch);
+    auto [batch, data] = BatchData::Create(context_, num_resources_per_batch);
     ASSERT_NE(batch, nullptr);
 
     ASSERT_EQ(batch->IsCommandBuffer(), num_resources_per_batch > 0);

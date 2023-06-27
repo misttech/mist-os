@@ -16,7 +16,7 @@ extern "C" {
 
 // LINT.IfChange(version)
 // This version should be incremented whenever the Magma API changes.
-#define MAGMA_API_VERSION 2
+#define MAGMA_API_VERSION 3
 // LINT.ThenChange()
 
 // LINT.IfChange
@@ -87,6 +87,8 @@ typedef uint32_t magma_cache_policy_t;
 #define MAGMA_DUMP_TYPE_NORMAL ((uint32_t)(1 << 0))
 
 #define MAGMA_PERF_COUNTER_RESULT_DISCONTINUITY ((uint32_t)(1 << 0))
+
+#define MAGMA_IMPORT_SEMAPHORE_ONE_SHOT ((uint64_t)(1 << 0))
 
 typedef uint32_t magma_format_t;
 

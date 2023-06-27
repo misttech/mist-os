@@ -189,7 +189,6 @@ void PrimaryFidlServer::ImportObject2(ImportObject2RequestView request,
   }
 
   uint64_t size = 0;
-
   if (object_type == fuchsia_gpu_magma::wire::ObjectType::kBuffer) {
     zx::unowned_vmo vmo(request->object.get());
     zx_status_t status = vmo->get_size(&size);
@@ -200,7 +199,59 @@ void PrimaryFidlServer::ImportObject2(ImportObject2RequestView request,
   }
   FlowControl(size);
 
-  if (!delegate_->ImportObject(std::move(request->object), *object_type, request->object_id))
+  if (!delegate_->ImportObject(std::move(request->object), /*flags=*/0, *object_type,
+                               request->object_id))
+    SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
+}
+
+void PrimaryFidlServer::ImportObject(ImportObjectRequestView request,
+                                     ImportObjectCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "ZirconConnection::ImportObject", "type",
+                 static_cast<uint32_t>(request->object_type()));
+  MAGMA_DLOG("ZirconConnection: ImportObject");
+
+  auto object_type = ValidateObjectType(request->object_type());
+  if (!object_type) {
+    SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
+    return;
+  }
+
+  zx::handle handle;
+  switch (*object_type) {
+    case fuchsia_gpu_magma::ObjectType::kEvent:
+      if (request->object().is_semaphore()) {
+        handle = std::move(request->object().semaphore());
+      }
+      break;
+    case fuchsia_gpu_magma::ObjectType::kBuffer:
+      if (request->object().is_buffer()) {
+        handle = std::move(request->object().buffer());
+      }
+      break;
+    default:
+      break;
+  }
+
+  if (!handle) {
+    MAGMA_DMESSAGE("Object type mismatch");
+    SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
+    return;
+  }
+
+  uint64_t flags = request->has_flags() ? static_cast<uint64_t>(request->flags()) : 0;
+  uint64_t size = 0;
+
+  if (object_type == fuchsia_gpu_magma::wire::ObjectType::kBuffer) {
+    zx::unowned_vmo vmo(handle.get());
+    zx_status_t status = vmo->get_size(&size);
+    if (status != ZX_OK) {
+      SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
+      return;
+    }
+  }
+  FlowControl(size);
+
+  if (!delegate_->ImportObject(std::move(handle), flags, *object_type, request->object_id()))
     SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
 }
 

@@ -42,7 +42,7 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   class Delegate {
    public:
     virtual ~Delegate() {}
-    virtual magma::Status ImportObject(zx::handle handle,
+    virtual magma::Status ImportObject(zx::handle handle, uint64_t flags,
                                        fuchsia_gpu_magma::wire::ObjectType object_type,
                                        uint64_t client_id) = 0;
     virtual magma::Status ReleaseObject(uint64_t object_id,
@@ -136,6 +136,8 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
  private:
   void ImportObject2(ImportObject2RequestView request,
                      ImportObject2Completer::Sync& _completer) override;
+  void ImportObject(ImportObjectRequestView request,
+                    ImportObjectCompleter::Sync& _completer) override;
   void ReleaseObject(ReleaseObjectRequestView request,
                      ReleaseObjectCompleter::Sync& _completer) override;
   void CreateContext(CreateContextRequestView request,

@@ -265,7 +265,7 @@ async_dispatcher_t* MagmaSystemConnection::GetAsyncDispatcher() {
   return notification_handler_->GetAsyncDispatcher();
 }
 
-magma::Status MagmaSystemConnection::ImportObject(zx::handle handle,
+magma::Status MagmaSystemConnection::ImportObject(zx::handle handle, uint64_t flags,
                                                   fuchsia_gpu_magma::wire::ObjectType object_type,
                                                   uint64_t client_id) {
   if (!client_id)
@@ -280,22 +280,19 @@ magma::Status MagmaSystemConnection::ImportObject(zx::handle handle,
       return ImportBuffer(std::move(handle), client_id);
 
     case fuchsia_gpu_magma::wire::ObjectType::kEvent: {
-      auto platform_sem = magma::PlatformSemaphore::Import(zx::event(std::move(handle)));
-      if (!platform_sem)
-        return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "failed to import platform semaphore");
-
-      platform_sem->set_local_id(client_id);
+      auto semaphore = MagmaSystemSemaphore::Create(device->driver(), zx::event(std::move(handle)),
+                                                    client_id, flags);
+      if (!semaphore)
+        return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "failed to import semaphore");
 
       auto iter = semaphore_map_.find(client_id);
       if (iter != semaphore_map_.end())
         return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "semaphore id %lu already imported",
                               client_id);
 
-      auto semaphore = MagmaSystemSemaphore::Create(device->driver(), std::move(platform_sem));
-      MAGMA_DASSERT(semaphore);
-
       semaphore_map_.insert(std::make_pair(client_id, std::move(semaphore)));
     } break;
+
     default:
       return MAGMA_DRET(MAGMA_STATUS_INVALID_ARGS);
   }

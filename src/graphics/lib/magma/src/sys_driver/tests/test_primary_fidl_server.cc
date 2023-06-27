@@ -164,7 +164,8 @@ class TestPlatformConnection {
 
     uint32_t handle;
     EXPECT_TRUE(buf->duplicate_handle(&handle));
-    EXPECT_EQ(client_connection_->ImportObject(handle, magma::PlatformObject::BUFFER, buf->id()),
+    EXPECT_EQ(client_connection_->ImportObject(handle, /*flags=*/0, magma::PlatformObject::BUFFER,
+                                               buf->id()),
               MAGMA_STATUS_OK);
     EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheck(1, buf->size());
@@ -177,7 +178,8 @@ class TestPlatformConnection {
 
     uint32_t handle;
     EXPECT_TRUE(buf->duplicate_handle(&handle));
-    EXPECT_EQ(client_connection_->ImportObject(handle, magma::PlatformObject::BUFFER, buf->id()),
+    EXPECT_EQ(client_connection_->ImportObject(handle, /*flags=*/0, magma::PlatformObject::BUFFER,
+                                               buf->id()),
               MAGMA_STATUS_OK);
     EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheck(1, buf->size());
@@ -190,7 +192,8 @@ class TestPlatformConnection {
 
     uint32_t handle;
     EXPECT_TRUE(buf->duplicate_handle(&handle));
-    EXPECT_EQ(client_connection_->ImportObject(handle, magma::PlatformObject::BUFFER, buf->id()),
+    EXPECT_EQ(client_connection_->ImportObject(handle, /*flags=*/0, magma::PlatformObject::BUFFER,
+                                               buf->id()),
               MAGMA_STATUS_OK);
     EXPECT_EQ(client_connection_->ReleaseObject(shared_data_->test_buffer_id,
                                                 magma::PlatformObject::BUFFER),
@@ -207,9 +210,9 @@ class TestPlatformConnection {
 
     uint32_t handle;
     EXPECT_TRUE(semaphore->duplicate_handle(&handle));
-    EXPECT_EQ(
-        client_connection_->ImportObject(handle, magma::PlatformObject::SEMAPHORE, semaphore->id()),
-        MAGMA_STATUS_OK);
+    EXPECT_EQ(client_connection_->ImportObject(handle, /*flags=*/0,
+                                               magma::PlatformObject::SEMAPHORE, semaphore->id()),
+              MAGMA_STATUS_OK);
     EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheckOneMessage();
   }
@@ -222,9 +225,9 @@ class TestPlatformConnection {
 
     uint32_t handle;
     EXPECT_TRUE(semaphore->duplicate_handle(&handle));
-    EXPECT_EQ(
-        client_connection_->ImportObject(handle, magma::PlatformObject::SEMAPHORE, semaphore->id()),
-        MAGMA_STATUS_OK);
+    EXPECT_EQ(client_connection_->ImportObject(handle, /*flags=*/0,
+                                               magma::PlatformObject::SEMAPHORE, semaphore->id()),
+              MAGMA_STATUS_OK);
     EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheckOneMessage();
   }
@@ -237,9 +240,9 @@ class TestPlatformConnection {
 
     uint32_t handle;
     EXPECT_TRUE(semaphore->duplicate_handle(&handle));
-    EXPECT_EQ(
-        client_connection_->ImportObject(handle, magma::PlatformObject::SEMAPHORE, semaphore->id()),
-        MAGMA_STATUS_OK);
+    EXPECT_EQ(client_connection_->ImportObject(handle, /*flags=*/0,
+                                               magma::PlatformObject::SEMAPHORE, semaphore->id()),
+              MAGMA_STATUS_OK);
     EXPECT_EQ(client_connection_->ReleaseObject(shared_data_->test_semaphore_id,
                                                 magma::PlatformObject::SEMAPHORE),
               MAGMA_STATUS_OK);
@@ -287,7 +290,8 @@ class TestPlatformConnection {
 
     uint32_t handle;
     EXPECT_TRUE(buf->duplicate_handle(&handle));
-    EXPECT_EQ(client_connection_->ImportObject(handle, magma::PlatformObject::BUFFER, buf->id()),
+    EXPECT_EQ(client_connection_->ImportObject(handle, /*flags=*/0, magma::PlatformObject::BUFFER,
+                                               buf->id()),
               MAGMA_STATUS_OK);
     EXPECT_EQ(client_connection_->MapBuffer(buf->id(), /*address=*/page_size() * 1000,
                                             /*offset=*/1u * page_size(),
@@ -485,7 +489,8 @@ class TestDelegate : public msd::PrimaryFidlServer::Delegate {
  public:
   TestDelegate(std::shared_ptr<SharedData> shared_data) : shared_data_(shared_data) {}
 
-  magma::Status ImportObject(zx::handle handle, fuchsia_gpu_magma::wire::ObjectType object_type,
+  magma::Status ImportObject(zx::handle handle, uint64_t flags,
+                             fuchsia_gpu_magma::wire::ObjectType object_type,
                              uint64_t object_id) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
     switch (object_type) {

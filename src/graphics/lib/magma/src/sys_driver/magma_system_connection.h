@@ -29,7 +29,8 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
 
   ~MagmaSystemConnection() override;
 
-  magma::Status ImportObject(zx::handle handle, fuchsia_gpu_magma::wire::ObjectType object_type,
+  magma::Status ImportObject(zx::handle handle, uint64_t flags,
+                             fuchsia_gpu_magma::wire::ObjectType object_type,
                              uint64_t client_id) override;
   magma::Status ReleaseObject(uint64_t object_id,
                               fuchsia_gpu_magma::wire::ObjectType object_type) override;

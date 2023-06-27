@@ -101,7 +101,7 @@ pub const SIG_ATOMIC_MAX: u32 = 2147483647;
 pub const SIZE_MAX: i32 = -1;
 pub const WINT_MIN: u32 = 0;
 pub const WINT_MAX: u32 = 4294967295;
-pub const MAGMA_API_VERSION: u32 = 2;
+pub const MAGMA_API_VERSION: u32 = 3;
 pub const _IOC_NRBITS: u32 = 8;
 pub const _IOC_TYPEBITS: u32 = 8;
 pub const _IOC_SIZEBITS: u32 = 14;
@@ -455,6 +455,16 @@ extern "C" {
     pub fn magma_connection_import_semaphore(
         connection: magma_connection_t,
         semaphore_handle: magma_handle_t,
+        semaphore_out: *mut magma_semaphore_t,
+        id_out: *mut magma_semaphore_id_t,
+    ) -> magma_status_t;
+}
+extern "C" {
+    #[doc = "\n \\brief Imports and takes ownership of the semaphore referred to by the given handle. Takes\n        ownership of |semaphore_handle| on both success and failure.\n \\param connection An open connection.\n \\param semaphore_handle A valid semaphore handle.\n \\param flags Pass MAGMA_IMPORT_SEMAPHORE_ONESHOT to prevent auto-reset after wait.\n \\param semaphore_out The returned semaphore.\n \\param id_out The id of the semaphore.\n"]
+    pub fn magma_connection_import_semaphore2(
+        connection: magma_connection_t,
+        semaphore_handle: magma_handle_t,
+        flags: u64,
         semaphore_out: *mut magma_semaphore_t,
         id_out: *mut magma_semaphore_id_t,
     ) -> magma_status_t;
@@ -831,6 +841,8 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_RELEASE_SEMAPHORE:
     virtio_magma_ctrl_type = 4131;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_SEMAPHORE:
     virtio_magma_ctrl_type = 4186;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_SEMAPHORE2:
+    virtio_magma_ctrl_type = 4187;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_PERFORM_BUFFER_OP:
     virtio_magma_ctrl_type = 4161;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_MAP_BUFFER: virtio_magma_ctrl_type =
@@ -908,6 +920,8 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_RELEASE_SEMAPHORE:
     virtio_magma_ctrl_type = 8227;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_SEMAPHORE:
     virtio_magma_ctrl_type = 8282;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_SEMAPHORE2:
+    virtio_magma_ctrl_type = 8283;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_PERFORM_BUFFER_OP:
     virtio_magma_ctrl_type = 8257;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_MAP_BUFFER: virtio_magma_ctrl_type =
@@ -1206,6 +1220,26 @@ pub struct virtio_magma_connection_import_semaphore_resp {
 }
 pub type virtio_magma_connection_import_semaphore_resp_t =
     virtio_magma_connection_import_semaphore_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct virtio_magma_connection_import_semaphore2_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub semaphore_handle: u32,
+    pub flags: u64,
+}
+pub type virtio_magma_connection_import_semaphore2_ctrl_t =
+    virtio_magma_connection_import_semaphore2_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct virtio_magma_connection_import_semaphore2_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub semaphore_out: u64,
+    pub id_out: u64,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_import_semaphore2_resp_t =
+    virtio_magma_connection_import_semaphore2_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct virtio_magma_connection_perform_buffer_op_ctrl {

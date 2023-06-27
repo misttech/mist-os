@@ -7,30 +7,29 @@
 #include "magma_util/macros.h"
 
 namespace msd {
-MagmaSystemSemaphore::MagmaSystemSemaphore(
-    std::unique_ptr<magma::PlatformSemaphore> platform_semaphore,
-    std::unique_ptr<msd::Semaphore> msd_semaphore_t)
-    : platform_semaphore_(std::move(platform_semaphore)),
-      msd_semaphore_(std::move(msd_semaphore_t)) {}
+MagmaSystemSemaphore::MagmaSystemSemaphore(uint64_t global_id,
+                                           std::unique_ptr<msd::Semaphore> msd_semaphore_t)
+    : global_id_(global_id), msd_semaphore_(std::move(msd_semaphore_t)) {}
 
-std::unique_ptr<MagmaSystemSemaphore> MagmaSystemSemaphore::Create(
-    msd::Driver* driver, std::unique_ptr<magma::PlatformSemaphore> platform_semaphore) {
-  if (!platform_semaphore)
-    return MAGMA_DRETP(nullptr, "null platform semaphore");
+std::unique_ptr<MagmaSystemSemaphore> MagmaSystemSemaphore::Create(msd::Driver* driver,
+                                                                   zx::event event,
+                                                                   uint64_t client_id,
+                                                                   uint64_t flags) {
+  if (flags)
+    return MAGMA_DRETP(nullptr, "semaphore flags not handled yet");
 
-  uint32_t handle;
-  if (!platform_semaphore->duplicate_handle(&handle))
-    return MAGMA_DRETP(nullptr, "failed to get duplicate handle");
+  uint64_t global_id = 0;
+  if (!magma::PlatformObject::IdFromHandle(event.get(), &global_id))
+    return MAGMA_DRETP(nullptr, "couldn't get global id");
 
   std::unique_ptr<msd::Semaphore> msd_semaphore;
-  magma_status_t status =
-      driver->ImportSemaphore(zx::event(handle), platform_semaphore->id(), &msd_semaphore);
+  magma_status_t status = driver->ImportSemaphore(std::move(event), client_id, &msd_semaphore);
 
   if (status != MAGMA_STATUS_OK)
-    return MAGMA_DRETP(nullptr, "msd_semaphore_import failed: %d", status);
+    return MAGMA_DRETP(nullptr, "ImportSemaphore failed: %d", status);
 
   return std::unique_ptr<MagmaSystemSemaphore>(
-      new MagmaSystemSemaphore(std::move(platform_semaphore), std::move(msd_semaphore)));
+      new MagmaSystemSemaphore(global_id, std::move(msd_semaphore)));
 }
 
 }  // namespace msd

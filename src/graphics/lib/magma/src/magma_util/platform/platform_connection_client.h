@@ -39,8 +39,8 @@ class PlatformConnectionClient {
                                                           uint64_t max_inflight_messages,
                                                           uint64_t max_inflight_bytes);
   // Imports an object for use in the system driver
-  virtual magma_status_t ImportObject(uint32_t handle, PlatformObject::Type object_type,
-                                      uint64_t object_id) = 0;
+  virtual magma_status_t ImportObject(uint32_t handle, uint64_t flags,
+                                      PlatformObject::Type object_type, uint64_t object_id) = 0;
 
   // Releases the connection's reference to the given object.
   virtual magma_status_t ReleaseObject(uint64_t object_id, PlatformObject::Type object_type) = 0;

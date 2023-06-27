@@ -41,6 +41,7 @@ Symbols:
   - { Name: magma_connection_get_notification_channel_handle, Type: Func }
   - { Name: magma_connection_import_buffer, Type: Func }
   - { Name: magma_connection_import_semaphore, Type: Func }
+  - { Name: magma_connection_import_semaphore2, Type: Func }
   - { Name: magma_connection_map_buffer, Type: Func }
   - { Name: magma_connection_perform_buffer_op, Type: Func }
   - { Name: magma_connection_read_notification_channel, Type: Func }

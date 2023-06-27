@@ -25,6 +25,8 @@ static_assert(static_cast<uint64_t>(MapFlags::kWrite) == MAGMA_MAP_FLAG_WRITE, "
 static_assert(static_cast<uint64_t>(MapFlags::kExecute) == MAGMA_MAP_FLAG_EXECUTE, "mismatch");
 static_assert(static_cast<uint64_t>(MapFlags::kGrowable) == MAGMA_MAP_FLAG_GROWABLE, "mismatch");
 static_assert(static_cast<uint64_t>(MapFlags::kVendorFlag0) == MAGMA_MAP_FLAG_VENDOR_0, "mismatch");
+using fuchsia_gpu_magma::wire::ImportFlags;
+static_assert(static_cast<uint64_t>(ImportFlags::kSemaphoreOneShot) == MAGMA_IMPORT_SEMAPHORE_ONE_SHOT, "mismatch");
 
 // clang-format on
 
@@ -156,25 +158,42 @@ static_assert(static_cast<uint32_t>(magma::PlatformObject::SEMAPHORE) ==
 static_assert(static_cast<uint32_t>(magma::PlatformObject::BUFFER) ==
               static_cast<uint32_t>(fuchsia_gpu_magma::wire::ObjectType::kBuffer));
 
-magma_status_t PrimaryWrapper::ImportObject(zx::handle handle,
+magma_status_t PrimaryWrapper::ImportObject(zx::handle handle, uint64_t flags,
                                             magma::PlatformObject::Type object_type,
                                             uint64_t object_id) {
   uint64_t size = 0;
 
-  if (object_type == magma::PlatformObject::BUFFER) {
-    zx::unowned_vmo vmo(handle.get());
-    zx_status_t status = vmo->get_size(&size);
-    if (status != ZX_OK)
-      return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "get_size failed: %d", status);
+  auto wire_object = fuchsia_gpu_magma::wire::Object();
+  switch (object_type) {
+    case magma::PlatformObject::SEMAPHORE:
+      wire_object = fuchsia_gpu_magma::wire::Object::WithSemaphore(zx::event(std::move(handle)));
+      break;
+    case magma::PlatformObject::BUFFER: {
+      zx::unowned_vmo vmo(handle.get());
+      zx_status_t status = vmo->get_size(&size);
+      if (status != ZX_OK)
+        return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "get_size failed: %d", status);
+      wire_object = fuchsia_gpu_magma::wire::Object::WithBuffer(zx::vmo(std::move(handle)));
+      break;
+    }
+    default:
+      return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Bad object type: %d", object_type);
   }
+
+  auto wire_object_type = static_cast<fuchsia_gpu_magma::wire::ObjectType>(object_type);
+  auto wire_flags = static_cast<fuchsia_gpu_magma::wire::ImportFlags>(flags);
+
+  fidl::Arena allocator;
+  auto builder = fuchsia_gpu_magma::wire::PrimaryImportObjectRequest::Builder(allocator);
+  builder.object(std::move(wire_object))
+      .object_type(wire_object_type)
+      .object_id(object_id)
+      .flags(wire_flags);
 
   std::lock_guard<std::mutex> lock(flow_control_mutex_);
   FlowControl(size);
 
-  auto wire_object_type = static_cast<fuchsia_gpu_magma::wire::ObjectType>(object_type);
-
-  zx_status_t status =
-      client_->ImportObject2(std::move(handle), wire_object_type, object_id).status();
+  zx_status_t status = client_->ImportObject(builder.Build()).status();
   if (status == ZX_OK) {
     UpdateFlowControl(size);
   }
@@ -498,10 +517,10 @@ class ZirconPlatformConnectionClient : public PlatformConnectionClient {
       : client_(std::move(channel), max_inflight_messages, max_inflight_bytes),
         notification_channel_(std::move(notification_channel)) {}
 
-  magma_status_t ImportObject(uint32_t handle, PlatformObject::Type object_type,
+  magma_status_t ImportObject(uint32_t handle, uint64_t flags, PlatformObject::Type object_type,
                               uint64_t object_id) override {
     DLOG("ZirconPlatformConnectionClient: ImportObject");
-    magma_status_t result = client_.ImportObject(zx::handle(handle), object_type, object_id);
+    magma_status_t result = client_.ImportObject(zx::handle(handle), flags, object_type, object_id);
 
     if (result != MAGMA_STATUS_OK)
       return DRET_MSG(result, "failed to write to channel");

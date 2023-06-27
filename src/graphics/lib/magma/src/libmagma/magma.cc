@@ -112,7 +112,7 @@ magma_status_t magma_connection_create_buffer(magma_connection_t connection, uin
 
   magma_status_t result =
       magma::PlatformConnectionClient::cast(connection)
-          ->ImportObject(handle, magma::PlatformObject::BUFFER, platform_buffer->id());
+          ->ImportObject(handle, /*flags=*/0, magma::PlatformObject::BUFFER, platform_buffer->id());
   if (result != MAGMA_STATUS_OK)
     return DRET_MSG(result, "ImportObject failed");
 
@@ -181,7 +181,7 @@ magma_status_t magma_connection_import_buffer(magma_connection_t connection, uin
 
   magma_status_t result =
       magma::PlatformConnectionClient::cast(connection)
-          ->ImportObject(handle, magma::PlatformObject::BUFFER, platform_buffer->id());
+          ->ImportObject(handle, /*flags=*/0, magma::PlatformObject::BUFFER, platform_buffer->id());
   if (result != MAGMA_STATUS_OK)
     return DRET_MSG(result, "ImportObject failed");
 
@@ -306,7 +306,7 @@ magma_status_t magma_connection_create_semaphore(magma_connection_t connection,
 
   magma_status_t result =
       magma::PlatformConnectionClient::cast(connection)
-          ->ImportObject(handle, magma::PlatformObject::SEMAPHORE, semaphore->id());
+          ->ImportObject(handle, /*flags=*/0, magma::PlatformObject::SEMAPHORE, semaphore->id());
   if (result != MAGMA_STATUS_OK)
     return DRET_MSG(result, "failed to ImportObject");
 
@@ -439,11 +439,22 @@ magma_status_t magma_connection_import_semaphore(magma_connection_t connection,
                                                  uint32_t semaphore_handle,
                                                  magma_semaphore_t* semaphore_out,
                                                  magma_semaphore_id_t* id_out) {
+  return magma_connection_import_semaphore2(connection, semaphore_handle, /*flags=*/0,
+                                            semaphore_out, id_out);
+}
+
+magma_status_t magma_connection_import_semaphore2(magma_connection_t connection,
+                                                  uint32_t semaphore_handle, uint64_t flags,
+                                                  magma_semaphore_t* semaphore_out,
+                                                  magma_semaphore_id_t* id_out) {
   auto platform_semaphore = magma::PlatformSemaphore::Import(semaphore_handle);
   if (!platform_semaphore)
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "PlatformSemaphore::Import failed");
 
   platform_semaphore->set_local_id(s_semaphore_id_generator.get());
+
+  if (flags)
+    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "flags not supported");
 
   uint32_t handle;
   if (!platform_semaphore->duplicate_handle(&handle))
@@ -451,7 +462,7 @@ magma_status_t magma_connection_import_semaphore(magma_connection_t connection,
 
   magma_status_t result =
       magma::PlatformConnectionClient::cast(connection)
-          ->ImportObject(handle, magma::PlatformObject::SEMAPHORE, platform_semaphore->id());
+          ->ImportObject(handle, flags, magma::PlatformObject::SEMAPHORE, platform_semaphore->id());
   if (result != MAGMA_STATUS_OK)
     return DRET_MSG(result, "ImportObject failed: %d", result);
 

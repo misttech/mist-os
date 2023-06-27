@@ -13,17 +13,17 @@
 namespace msd {
 class MagmaSystemSemaphore {
  public:
-  static std::unique_ptr<MagmaSystemSemaphore> Create(
-      msd::Driver* device, std::unique_ptr<magma::PlatformSemaphore> platform_semaphore);
+  static std::unique_ptr<MagmaSystemSemaphore> Create(msd::Driver* device, zx::event event,
+                                                      uint64_t client_id, uint64_t flags);
 
-  magma::PlatformSemaphore* platform_semaphore() { return platform_semaphore_.get(); }
+  uint64_t global_id() const { return global_id_; }
 
   msd::Semaphore* msd_semaphore() { return msd_semaphore_.get(); }
 
  private:
-  MagmaSystemSemaphore(std::unique_ptr<magma::PlatformSemaphore> platform_semaphore,
-                       std::unique_ptr<msd::Semaphore> msd_semaphore_t);
-  std::unique_ptr<magma::PlatformSemaphore> platform_semaphore_;
+  MagmaSystemSemaphore(uint64_t global_id, std::unique_ptr<msd::Semaphore> msd_semaphore_t);
+
+  uint64_t global_id_;
   std::unique_ptr<msd::Semaphore> msd_semaphore_;
 };
 

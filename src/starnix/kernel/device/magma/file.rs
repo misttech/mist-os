@@ -552,6 +552,38 @@ impl FileOps for MagmaFile {
                     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_SEMAPHORE as u32;
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_SEMAPHORE2 => {
+                let (control, mut response): (
+                    virtio_magma_connection_import_semaphore2_ctrl_t,
+                    virtio_magma_connection_import_semaphore2_resp_t,
+                ) = read_control_and_response(current_task, &command)?;
+                let connection = self.get_connection(control.connection)?;
+
+                let mut semaphore_out = 0;
+                let mut semaphore_id = 0;
+                let status = unsafe {
+                    magma_connection_import_semaphore2(
+                        connection.handle,
+                        control.semaphore_handle,
+                        control.flags,
+                        &mut semaphore_out,
+                        &mut semaphore_id,
+                    )
+                };
+                if status == MAGMA_STATUS_OK {
+                    self.semaphores.lock().insert(
+                        semaphore_out,
+                        Arc::new(MagmaSemaphore { connection, handle: semaphore_out }),
+                    );
+                }
+                response.result_return = status as u64;
+                response.semaphore_out = semaphore_out;
+                response.id_out = semaphore_id;
+
+                response.hdr.type_ =
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_SEMAPHORE2 as u32;
+                current_task.mm.write_object(UserRef::new(response_address), &response)
+            }
             virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_RELEASE_SEMAPHORE => {
                 let (control, mut response): (
                     virtio_magma_connection_release_semaphore_ctrl_t,

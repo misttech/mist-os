@@ -222,7 +222,7 @@ TEST_F(TestMagmaFidl, ImportReleaseBuffer) {
   }
 }
 
-TEST_F(TestMagmaFidl, ImportReleaseSemaphore) {
+TEST_F(TestMagmaFidl, ImportReleaseSemaphoreDeprecated) {
   uint64_t event_id;
 
   {
@@ -231,6 +231,40 @@ TEST_F(TestMagmaFidl, ImportReleaseSemaphore) {
     event_id = fsl::GetKoid(event.get());
     auto wire_result = primary_->ImportObject2(
         std::move(event), fuchsia_gpu_magma::wire::ObjectType::kEvent, event_id);
+    EXPECT_TRUE(wire_result.ok());
+    EXPECT_FALSE(CheckForUnbind());
+  }
+
+  {
+    auto wire_result =
+        primary_->ReleaseObject(event_id, fuchsia_gpu_magma::wire::ObjectType::kEvent);
+    EXPECT_TRUE(wire_result.ok());
+    EXPECT_FALSE(CheckForUnbind());
+  }
+
+  {
+    uint64_t kBadId = event_id + 1;
+    auto wire_result = primary_->ReleaseObject(kBadId, fuchsia_gpu_magma::wire::ObjectType::kEvent);
+    EXPECT_TRUE(wire_result.ok());
+    EXPECT_TRUE(CheckForUnbind());
+  }
+}
+
+TEST_F(TestMagmaFidl, ImportReleaseSemaphore) {
+  uint64_t event_id;
+
+  {
+    zx::event event;
+    ASSERT_EQ(ZX_OK, zx::event::create(0 /*options*/, &event));
+    event_id = fsl::GetKoid(event.get());
+
+    fidl::Arena allocator;
+    auto builder = fuchsia_gpu_magma::wire::PrimaryImportObjectRequest::Builder(allocator);
+    builder.object(fuchsia_gpu_magma::wire::Object::WithSemaphore(std::move(event)))
+        .object_id(event_id)
+        .object_type(fuchsia_gpu_magma::wire::ObjectType::kEvent);
+
+    auto wire_result = primary_->ImportObject(builder.Build());
     EXPECT_TRUE(wire_result.ok());
     EXPECT_FALSE(CheckForUnbind());
   }

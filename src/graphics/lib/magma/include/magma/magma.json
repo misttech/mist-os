@@ -1,6 +1,6 @@
 {
     "magma-interface": {
-        "next-free-ordinal": 91,
+        "next-free-ordinal": 92,
         "exports": [
             {
                 "ordinal": 46,
@@ -281,6 +281,39 @@
                         "name": "semaphore_handle",
                         "type": "magma_handle_t",
                         "description": "A valid semaphore handle."
+                    },
+                    {
+                        "name": "semaphore_out",
+                        "type": "magma_semaphore_t*",
+                        "description": "The returned semaphore."
+                    },
+                    {
+                        "name": "id_out",
+                        "type": "magma_semaphore_id_t*",
+                        "description": "The id of the semaphore."
+                    }
+                ]
+            },
+            {
+                "ordinal": 91,
+                "name": "magma_connection_import_semaphore2",
+                "type": "magma_status_t",
+                "description": "Imports and takes ownership of the semaphore referred to by the given handle. Takes ownership of |semaphore_handle| on both success and failure.",
+                "arguments": [
+                    {
+                        "name": "connection",
+                        "type": "magma_connection_t",
+                        "description": "An open connection."
+                    },
+                    {
+                        "name": "semaphore_handle",
+                        "type": "magma_handle_t",
+                        "description": "A valid semaphore handle."
+                    },
+                    {
+                        "name": "flags",
+                        "type": "uint64_t",
+                        "description": "Pass MAGMA_IMPORT_SEMAPHORE_ONESHOT to prevent auto-reset after wait."
                     },
                     {
                         "name": "semaphore_out",

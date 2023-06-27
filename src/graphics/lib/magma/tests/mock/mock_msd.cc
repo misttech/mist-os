@@ -78,8 +78,10 @@ MsdMockContext::~MsdMockContext() { connection_->DestroyContext(this); }
 magma_status_t MsdMockDriver::ImportSemaphore(zx::event handle, uint64_t client_id,
                                               std::unique_ptr<msd::Semaphore>* out) {
   auto semaphore = magma::PlatformSemaphore::Import(std::move(handle));
-  semaphore->set_local_id(client_id);
+  if (!semaphore)
+    return MAGMA_STATUS_INVALID_ARGS;
 
+  semaphore->set_local_id(client_id);
   *out = std::make_unique<MsdMockSemaphore>(std::move(semaphore));
   return MAGMA_STATUS_OK;
 }

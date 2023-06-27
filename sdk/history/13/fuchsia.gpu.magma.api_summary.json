@@ -212,6 +212,17 @@
         "name": "fuchsia.gpu.magma/IcdLoaderDevice"
     },
     {
+        "kind": "bits/member",
+        "name": "fuchsia.gpu.magma/ImportFlags.SEMAPHORE_ONE_SHOT",
+        "value": "1"
+    },
+    {
+        "kind": "bits",
+        "name": "fuchsia.gpu.magma/ImportFlags",
+        "strictness": "flexible",
+        "type": "uint64"
+    },
+    {
         "kind": "const",
         "name": "fuchsia.gpu.magma/MAX_ICD_COUNT",
         "type": "uint64",
@@ -257,6 +268,24 @@
     {
         "kind": "protocol",
         "name": "fuchsia.gpu.magma/Notification"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.gpu.magma/Object.buffer",
+        "ordinal": "2",
+        "type": "zx/Handle:VMO"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.gpu.magma/Object.semaphore",
+        "ordinal": "1",
+        "type": "zx/Handle:EVENT"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.gpu.magma/Object",
+        "resourceness": "resource",
+        "strictness": "flexible"
     },
     {
         "kind": "enum/member",
@@ -408,6 +437,12 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.gpu.magma/Primary.ImportObject",
+        "ordinal": "6870844291051000660",
+        "type": "(fuchsia.gpu.magma/PrimaryImportObjectRequest payload)"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.gpu.magma/Primary.ImportObject2",
         "ordinal": "8597077828117162816",
         "type": "(zx/Handle object,fuchsia.gpu.magma/ObjectType object_type,uint64 object_id)"
@@ -463,6 +498,35 @@
     {
         "kind": "protocol",
         "name": "fuchsia.gpu.magma/Primary"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.gpu.magma/PrimaryImportObjectRequest.flags",
+        "ordinal": "4",
+        "type": "fuchsia.gpu.magma/ImportFlags"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.gpu.magma/PrimaryImportObjectRequest.object",
+        "ordinal": "1",
+        "type": "fuchsia.gpu.magma/Object"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.gpu.magma/PrimaryImportObjectRequest.object_id",
+        "ordinal": "3",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.gpu.magma/PrimaryImportObjectRequest.object_type",
+        "ordinal": "2",
+        "type": "fuchsia.gpu.magma/ObjectType"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.gpu.magma/PrimaryImportObjectRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
