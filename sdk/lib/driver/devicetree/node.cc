@@ -83,7 +83,10 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
   parents_.insert(parents_.begin(), std::move(platform_node));
 
   fdf::CompositeNodeSpec group;
-  group.name() = name();
+  std::string name_final(name());
+  // '@' is not a valid character in Node names as per driver framework.
+  std::replace(name_final.begin(), name_final.end(), '@', '-');
+  group.name() = name_final;
   group.parents() = std::move(parents_);
 
   auto devicegroup_result = mgr->AddSpec({std::move(group)});
