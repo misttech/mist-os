@@ -60,8 +60,12 @@ pub mod route {
         channel::{mpsc, oneshot},
         sink::SinkExt as _,
     };
-    use net_types::ip::{
-        AddrSubnetEither, AddrSubnetError, IpAddr, IpAddress as _, IpVersion, Ipv4Addr, Ipv6Addr,
+    use net_types::{
+        ip::{
+            AddrSubnetEither, AddrSubnetError, IpAddr, IpAddress as _, IpVersion, Ipv4Addr,
+            Ipv6Addr,
+        },
+        SpecifiedAddress as _,
     };
 
     use crate::{
@@ -156,7 +160,7 @@ pub mod route {
         req: &RtnlMessage,
         // `true` for new address requests; `false` for delete address requests.
         is_new: bool,
-    ) -> Result<ExtractedAddressRequest, Errno> {
+    ) -> Result<Option<ExtractedAddressRequest>, Errno> {
         let kind = if is_new { "new" } else { "del" };
 
         let interface_id = match NonZeroU32::new(message.header.index) {
@@ -253,7 +257,14 @@ pub mod route {
 
                 let mut bytes = [0; BYTES as usize];
                 bytes.copy_from_slice(&address_bytes[..BYTES]);
-                IpAddr::V4(bytes.into())
+                let addr: Ipv4Addr = bytes.into();
+                if addr.is_specified() {
+                    IpAddr::V4(addr)
+                } else {
+                    // Linux treats adding the unspecified IPv4 address as a
+                    // no-op.
+                    return Ok(None);
+                }
             }
             AF_INET6 => {
                 const BYTES: usize = Ipv6Addr::BYTES as usize;
@@ -263,7 +274,14 @@ pub mod route {
 
                 let mut bytes = [0; BYTES];
                 bytes.copy_from_slice(&address_bytes[..BYTES]);
-                IpAddr::V6(bytes.into())
+                let addr: Ipv6Addr = bytes.into();
+                if addr.is_specified() {
+                    IpAddr::V6(bytes.into())
+                } else {
+                    // Linux returns this error when adding the unspecified IPv6
+                    // address.
+                    return Err(Errno::EADDRNOTAVAIL);
+                }
             }
             family => {
                 debug!(
@@ -286,10 +304,10 @@ pub mod route {
             }
         };
 
-        Ok(ExtractedAddressRequest {
+        Ok(Some(ExtractedAddressRequest {
             address_and_interface_id: interfaces::AddressAndInterfaceArgs { address, interface_id },
             addr_flags: addr_flags.unwrap_or_else(|| message.header.flags.into()),
-        })
+        }))
     }
 
     #[async_trait]
@@ -375,10 +393,7 @@ pub mod route {
                     client.send_unicast(netlink_packet::new_done(req_header))
                 }
                 NewAddress(ref message) => {
-                    let ExtractedAddressRequest {
-                        address_and_interface_id,
-                        addr_flags,
-                    } = match extract_if_id_and_addr_from_addr_message(
+                    let extracted_request = match extract_if_id_and_addr_from_addr_message(
                         message,
                         client,
                         &req,
@@ -389,37 +404,42 @@ pub mod route {
                             return client.send_unicast(netlink_packet::new_error(e, req_header));
                         }
                     };
-
-                    let (completer, waiter) = oneshot::channel();
-                    let add_subnet_route = addr_flags & IFA_F_NOPREFIXROUTE != IFA_F_NOPREFIXROUTE;
-                    interfaces_request_sink.send(interfaces::Request {
-                        args: interfaces::RequestArgs::Address(
-                            interfaces::AddressRequestArgs::New(
-                                interfaces::NewAddressArgs {
-                                    address_and_interface_id,
-                                    add_subnet_route,
-                                },
+                    let result = if let Some(ExtractedAddressRequest {
+                        address_and_interface_id,
+                        addr_flags,
+                    }) = extracted_request {
+                        let (completer, waiter) = oneshot::channel();
+                        let add_subnet_route = addr_flags & IFA_F_NOPREFIXROUTE != IFA_F_NOPREFIXROUTE;
+                        interfaces_request_sink.send(interfaces::Request {
+                            args: interfaces::RequestArgs::Address(
+                                interfaces::AddressRequestArgs::New(
+                                    interfaces::NewAddressArgs {
+                                        address_and_interface_id,
+                                        add_subnet_route,
+                                    },
+                                ),
                             ),
-                        ),
-                        sequence_number: req_header.sequence_number,
-                        client: client.clone(),
-                        completer,
-                    }).await.expect("interface event loop should never terminate");
-                    match waiter
-                        .await
-                        .expect("interfaces event loop should have handled the request"){
-                            Ok(()) => if expects_ack {
-                                client.send_unicast(netlink_packet::new_ack(req_header))
-                            },
-                            Err(e) => client.send_unicast(
-                                netlink_packet::new_error(e.into_errno(), req_header)),
+                            sequence_number: req_header.sequence_number,
+                            client: client.clone(),
+                            completer,
+                        }).await.expect("interface event loop should never terminate");
+                        waiter
+                            .await
+                            .expect("interfaces event loop should have handled the request")
+                    } else {
+                        Ok(())
+                    };
+
+                    match result {
+                        Ok(()) => if expects_ack {
+                            client.send_unicast(netlink_packet::new_ack(req_header))
+                        },
+                        Err(e) => client.send_unicast(
+                            netlink_packet::new_error(e.into_errno(), req_header)),
                     }
                 }
                 DelAddress(ref message) => {
-                    let ExtractedAddressRequest {
-                        address_and_interface_id,
-                        addr_flags: _,
-                    } = match extract_if_id_and_addr_from_addr_message(
+                    let extracted_request = match extract_if_id_and_addr_from_addr_message(
                         message,
                         client,
                         &req,
@@ -431,28 +451,36 @@ pub mod route {
                         }
                     };
 
-                    let (completer, waiter) = oneshot::channel();
-                    interfaces_request_sink.send(interfaces::Request {
-                        args: interfaces::RequestArgs::Address(
-                            interfaces::AddressRequestArgs::Del(
-                                interfaces::DelAddressArgs {
-                                    address_and_interface_id,
-                                },
+                    let result = if let Some(ExtractedAddressRequest {
+                        address_and_interface_id,
+                        addr_flags: _,
+                    }) = extracted_request {
+                        let (completer, waiter) = oneshot::channel();
+                        interfaces_request_sink.send(interfaces::Request {
+                            args: interfaces::RequestArgs::Address(
+                                interfaces::AddressRequestArgs::Del(
+                                    interfaces::DelAddressArgs {
+                                        address_and_interface_id,
+                                    },
+                                ),
                             ),
-                        ),
-                        sequence_number: req_header.sequence_number,
-                        client: client.clone(),
-                        completer,
-                    }).await.expect("interface event loop should never terminate");
-                    match waiter
-                        .await
-                        .expect("interfaces event loop should have handled the request") {
-                            Ok(()) => if expects_ack {
-                                client.send_unicast(netlink_packet::new_ack(req_header))
-                            },
-                            Err(e) => client.send_unicast(
-                                netlink_packet::new_error(e.into_errno(), req_header))
-                        }
+                            sequence_number: req_header.sequence_number,
+                            client: client.clone(),
+                            completer,
+                        }).await.expect("interface event loop should never terminate");
+                        waiter
+                            .await
+                            .expect("interfaces event loop should have handled the request")
+                    } else {
+                        Ok(())
+                    };
+                    match result {
+                        Ok(()) => if expects_ack {
+                            client.send_unicast(netlink_packet::new_ack(req_header))
+                        },
+                        Err(e) => client.send_unicast(
+                            netlink_packet::new_error(e.into_errno(), req_header))
+                    }
                 }
                 GetRoute(ref message) if is_dump => {
                     match message.header.address_family.into() {
@@ -1199,6 +1227,36 @@ mod test {
 
     /// Test RTM_NEWADDR and RTM_DELADDR
     // Add address tests cases.
+    #[test_case(
+        TestAddrCase {
+            expected_request_args: None,
+            ..valid_new_addr_request(
+                true,
+                net_addr_subnet!("0.0.0.0/0"),
+                interfaces::testutil::PPP_INTERFACE_ID,
+                Ok(()))
+        }; "new_v4_unspecified_address_zero_prefix_ok_ack")]
+    #[test_case(
+        TestAddrCase {
+            expected_request_args: None,
+            ..valid_new_addr_request(
+                false,
+                net_addr_subnet!("0.0.0.0/24"),
+                interfaces::testutil::PPP_INTERFACE_ID,
+                Ok(()))
+        }; "new_v4_unspecified_address_non_zero_prefix_ok_no_ack")]
+    #[test_case(
+        invalid_new_addr_request(
+            true,
+            net_addr_subnet!("::/0"),
+            interfaces::testutil::ETH_INTERFACE_ID,
+            Errno::EADDRNOTAVAIL); "new_v6_unspecified_address_zero_prefix_ack")]
+    #[test_case(
+        invalid_new_addr_request(
+            false,
+            net_addr_subnet!("::/64"),
+            interfaces::testutil::ETH_INTERFACE_ID,
+            Errno::EADDRNOTAVAIL); "new_v6_unspecified_address_non_zero_prefix_no_ack")]
     #[test_case(
         valid_new_addr_request(
             true,
