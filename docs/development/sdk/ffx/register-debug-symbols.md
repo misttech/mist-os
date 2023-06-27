@@ -61,10 +61,67 @@ SymbolIndex {
            require_authentication: false,
         },
     ],
+    debuginfod: []
 }
 ```
 
-## Manually register debug symbols {:#manually-register-debug-symbols}
+## Add a debuginfod symbol server {:#add-debuginfod-server}
+
+When working with third party binaries that are not built in the Fuchsia tree,
+you may be able to add a debuginfod server to fetch the symbols. Upstream
+distributions provide debuginfod servers, such as
+[debuginfod.debian.net](https://debuginfod.debian.net) or "federated" servers,
+such as [debuginfod.elfutils.org](https://debuginfod.elfutils.org) which will
+serve symbols from many different upstream sources. Check with your upstream
+source to find their debuginfod server, if they offer one. Often, these will be
+presented as environment variables, such as this:
+
+```none {:.devsite-disable-click-to-copy}
+export DEBUGINFOD_URLS="https://debuginfod.debian.net
+```
+
+To add a debuginfod server such as above to your symbol-index, use the following
+command:
+
+```posix-terminal
+ffx debug symbol-index add <URL>
+```
+
+Replace `URL` with the URL for the debuginfod server you would like to add.
+For example, to add Debian's debuginfod server, run the following command:
+
+```posix-terminal
+ffx debug symbol-index add https://debuginfod.debian.net
+```
+
+When the registration is successful, the command exits silently without output.
+Debugging tools will automatically query the server for symbols that cannot be
+found locally.
+
+If you want to verify the registration,
+see [List registered debug symbols](#list-registered-debug-symbols).
+
+## Remove a debuginfod symbol server {:#remove-debuginfod-server}
+
+To remove a debuginfod server from your global `symbol-index` configuration, run
+the following command:
+
+Note: Run `ffx debug symbol-index list` to check the registered servers in your
+global `symbol-index` configuration first. Then use the exact path as input to
+the command below.
+
+```posix-terminal
+ffx debug symbol-index remove <URL>
+```
+
+Replace `URL` with the URL for the debuginfod server you would like to remove.
+The example below removes the debian debuginfod server:
+
+```posix-terminal
+ffx debug symbol-index remove https://debuginfod.debian.net
+```
+
+## Manually register local debug symbols {:#manually-register-debug-symbols}
 
 Important: A registration of debug symbols is invoked automatically
 by other tools in a Fuchsia development environment. A manual registration
@@ -92,7 +149,7 @@ When the registration is successful, the command exits silently without output.
 If you want to verify the registration,
 see [List registered debug symbols](#list-registered-debug-symbols).
 
-## Remove registered debug symbols {:#remove-registered-debug-symbols}
+## Remove registered local debug symbols {:#remove-registered-debug-symbols}
 
 To remove debug symbols from your global `symbol-index` configuration, run the
 following command:

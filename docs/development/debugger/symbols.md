@@ -112,12 +112,9 @@ currently attached process and the corresponding symbol file if found.
 
 #### Symbol servers
 
-Zxdb can load symbols for prebuilt libraries from Google servers. This is how symbols arrive
-for SDK users for anything not built locally. See [Downloading
+Zxdb can load symbols for prebuilt libraries from Google servers or upstream debuginfod servers.
+This is how symbols arrive for SDK users for anything not built locally. See [Downloading
 symbols](attaching.md#downloading_symbols) for more.
-
-The most common problem for symbol servers is not being authenticated: run the debugger `auth`
-command to authenticate.
 
 For large binaries, symbols can be several gigabytes so the download process can take many minutes.
 The `sym-stat` command will display "Downloading..." during this time.
@@ -128,6 +125,39 @@ this directory:
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] get symbol-cache
 symbol-cache = /home/me/.fuchsia/debug/symbol-cache
+```
+
+When downloading symbols from prebuilt binaries fetched from upstream packages, the debuginfo may
+not have a corresponding ELF binary (depending on the server and the package). You may see errors
+such as this in zxdb:
+
+```none {:.devsite-disable-click-to-copy}
+...
+binary for build_id 26820458adaf5d95718fb502d170fe374ae3ee70 not found on 5 servers
+binary for build_id 53eaa845e9ca621f159b0622daae7387cdea1e97 not found on 5 servers
+binary for build_id f3fd699712aae08bbaae3191eedba514c766f9d2 not found on 5 servers
+binary for build_id 4286bd11475e673b194ee969f5f9e9759695e644 not found on 5 servers
+binary for build_id 2d28b51427b49abcd41dcf611f8f3aa6a2811734 not found on 5 servers
+binary for build_id 0401bd8da6edab3e45399d62571357ab12545133 not found on 5 servers
+...
+```
+
+Indicating the ELF binary file was not found on the debuginfod server(s). This means that ELF
+symbols will not be available for this particular binary, which is typically okay for most debugging
+scenarios. The most commonly used ELF specific symbols that would be unavailable in this case are
+PLT symbols.
+
+Use `sym-stat` to verify that DWARF information has been loaded (which is downloaded separately from
+the ELF symbols):
+
+```none {:.devsite-disable-click-to-copy}
+  libc.so.6
+    Base: 0x1c85fdc2000
+    Build ID: 0401bd8da6edab3e45399d62571357ab12545133
+    Symbols loaded: Yes
+    Symbol file: /home/me/.fuchsia/debug/symbol-cache/04/01bd8da6edab3e45399d62571357ab12545133.debug
+    Source files indexed: 1745
+    Symbols indexed: 10130
 ```
 
 #### ".build-id" directory symbol databases
@@ -216,7 +246,8 @@ This file can contain some global settings and also refer to other symbol-index 
 each build environment you are actively using will have a similar file that is included by reference
 from this global file. If you are switching between build environments and find symbols aren't
 loading, please make sure your environment is registered by checking the
-`ffx debug symbol-index list` command.
+`ffx debug symbol-index list` command. Typically, these are automatically inserted into the included
+list when you run any `ffx debug ...` subtool.
 
 ## Mismatched source lines
 

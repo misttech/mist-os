@@ -40,13 +40,14 @@ pub struct ListCommand {
 #[argh(
     subcommand,
     name = "add",
-    description = "add a path to the symbol index",
-    note = "Add a path to the symbol index. The path could be
+    description = "add a path or url to the symbol index",
+    note = "Add a path or a debuginfod server to the symbol index, e.g.,
   - A build-id directory, with an optional build directory.
   - An ids.txt file, with an optional build directory.
   - A file that ends with .symbol-index.json.
+  - https://debuginfod.debian.net
 
-Duplicated adding of the same path is a no-op, regardless of the optional
+Duplicated adding of the same path or url is a no-op, regardless of the optional
 build directory."
 )]
 pub struct AddCommand {
@@ -55,8 +56,8 @@ pub struct AddCommand {
     pub build_dir: Option<String>,
 
     #[argh(positional)]
-    /// the path to add
-    pub path: String,
+    /// the source to add
+    pub source: String,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -64,15 +65,16 @@ pub struct AddCommand {
     subcommand,
     name = "remove",
     description = "remove a path from the symbol index",
-    note = "Remove a path from the symbol index. The path could be
+    note = "Remove a path or a debuginfod server from the symbol index, e.g.,
   - A build-id directory.
   - An ids.txt file.
-  - A file that ends with .symbol-index.json."
+  - A file that ends with .symbol-index.json.
+  - https://debuginfod.debian.net"
 )]
 pub struct RemoveCommand {
     #[argh(positional)]
-    /// the path to remove
-    pub path: String,
+    /// the source to remove
+    pub source: String,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]

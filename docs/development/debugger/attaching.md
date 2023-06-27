@@ -196,30 +196,32 @@ ffx debug core upload_file_minidump-e71256ba30163a0.dmp
 
 #### Downloading symbols
 
-To tell zxdb to look for debug symbols for your core dump in a GCS URL and download those symbols
-automatically, run the following command, substituting the location of your symbols:
+Zxdb will automatically search servers registered in the [symbol-index][ffx-debug-symbol-index] for
+symbols that are not found in any locally configured symbol directories. You can see the complete
+list of symbol servers registered in your symbol-index with the following command:
 
-```posix-terminal {:.devsite-disable-click-to-copy}
-zxdb --symbol-server gs://my-bucket-name/namespace
+```posix-terminal
+ffx debug symbol-index list -a
 ```
 
-Most users should automatically have the option set, with the server pointed to a bucket containing
-symbols for all release builds.
+This will recursively traverse and resolve all symbol-index files that are included in the global
+symbol-index. For more information see [About symbol settings][about-symbol-settings]
 
-The first time you use the symbol server, you will have to authenticate using the `auth` command.
-The authentication flow will require you to complete part of the authentication in your browser.
+The servers that appear will be used to download symbol files and load them to the debugger
+asynchronously. For particularly large debuginfo files, you may see output like this from `sym-stat`
+in zxdb:
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] auth
-To authenticate, please supply an authentication token. You can retrieve a token from:
-
-https://accounts.google.com/o/oauth2/v2/< very long URL omitted >
-
-Once you've retrieved a token, run 'auth <token>'
-
-[zxdb] auth 4/hAF-pASODIFUASDIFUASODIUFSADF329827349872V6
-Successfully authenticated with gs://fuchsia-artifacts-release/debug
+[zxdb] sym-stat
+...
+    Base: 0xc37e9000
+    Build ID: ba17ef8c43bccf5fb6bf84f9a8d83d9cf3be8976 (Downloading...)
+    Symbols loaded: No
+...
 ```
+
+Which indicates that a download is in progress. Once the file is downloaded, zxdb will index the
+symbols from the newly downloaded file and debugging can continue.
 
 ### Debugging multiple processes
 
@@ -246,3 +248,8 @@ Or apply commands to a specific process (even if it’s not the default) with:
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] process 2 pause
 ```
+
+<!-- Reference links -->
+
+[ffx-debug-symbol-index]: ../sdk/ffx/register-debug-symbols.md
+[about-symbol-settings]: symbols.md#about_symbol_settings
