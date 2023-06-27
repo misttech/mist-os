@@ -97,7 +97,7 @@ impl<'a> OpenRequest<'a> {
     }
 
     async fn open_outgoing_directory(
-        mut open_options: OpenOptions<'a>,
+        open_options: OpenOptions<'a>,
         source: CapabilitySource,
         target: &Arc<ComponentInstance>,
     ) -> Result<(), OpenError> {
@@ -106,7 +106,7 @@ impl<'a> OpenRequest<'a> {
                 .await
                 .map_err(|e| OpenError::GetDefaultProviderError { err: Box::new(e) })?
         {
-            Some(provider)
+            provider
         } else {
             // Dispatch a CapabilityRouted event to get a capability provider
             let mutexed_provider = Arc::new(Mutex::new(None));
@@ -123,30 +123,21 @@ impl<'a> OpenRequest<'a> {
             target.hooks.dispatch(&event).await;
 
             let provider = mutexed_provider.lock().await.take();
-            provider
+            provider.ok_or(OpenError::CapabilityProviderNotFound)?
         };
 
-        if let Some(capability_provider) = capability_provider {
-            let source_instance = source
-                .source_instance()
-                .upgrade()
-                .map_err(|_| OpenError::SourceInstanceNotFound)?;
-            let task_scope = match source_instance {
-                ExtendedInstance::AboveRoot(top) => top.task_scope(),
-                ExtendedInstance::Component(component) => component.nonblocking_task_scope(),
-            };
-            capability_provider
-                .open(
-                    task_scope,
-                    open_options.flags,
-                    PathBuf::from(open_options.relative_path),
-                    &mut open_options.server_chan,
-                )
-                .await?;
-            Ok(())
-        } else {
-            Err(OpenError::CapabilityProviderNotFound)
-        }
+        let OpenOptions { flags, relative_path, mut server_chan } = open_options;
+
+        let source_instance =
+            source.source_instance().upgrade().map_err(|_| OpenError::SourceInstanceNotFound)?;
+        let task_scope = match source_instance {
+            ExtendedInstance::AboveRoot(top) => top.task_scope(),
+            ExtendedInstance::Component(component) => component.nonblocking_task_scope(),
+        };
+        capability_provider
+            .open(task_scope, flags, PathBuf::from(relative_path), &mut server_chan)
+            .await?;
+        Ok(())
     }
 
     async fn open_storage(
@@ -172,22 +163,18 @@ impl<'a> OpenRequest<'a> {
         .await
         .map_err(|e| ModelError::from(e))?;
 
+        let OpenOptions { flags, relative_path, server_chan } = open_options;
+
         // Open the storage with the provided flags, mode, relative_path and server_chan.
         // We don't clone the directory because we can't specify the mode or path that way.
-        let server_chan = channel::take_channel(open_options.server_chan);
+        let server_chan = channel::take_channel(server_chan);
 
         // If there is no relative path, assume it is the current directory. We use "."
         // because `fuchsia.io/Directory.Open` does not accept empty paths.
-        let relative_path =
-            if open_options.relative_path.is_empty() { "." } else { &open_options.relative_path };
+        let relative_path = if relative_path.is_empty() { "." } else { &relative_path };
 
         storage_dir_proxy
-            .open(
-                open_options.flags,
-                fio::ModeType::empty(),
-                relative_path,
-                ServerEnd::new(server_chan),
-            )
+            .open(flags, fio::ModeType::empty(), relative_path, ServerEnd::new(server_chan))
             .map_err(|err| {
                 let moniker = match &dir_source {
                     Some(r) => {

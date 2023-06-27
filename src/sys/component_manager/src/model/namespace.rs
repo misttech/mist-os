@@ -503,8 +503,8 @@ fn serve_and_install_svc_dirs(
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
         pseudo_dir.clone().open(
             ExecutionScope::new(),
-            // TODO(https://fxbug.dev/101092): remove RIGHT_READABLE svc_{for,from}_sys have been
-            // dismantled.
+            // TODO(https://fxbug.dev/129636): Remove RIGHT_READABLE when `opendir` no longer
+            // requires READABLE.
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             Path::dot(),
             server_end.into_channel().into(),

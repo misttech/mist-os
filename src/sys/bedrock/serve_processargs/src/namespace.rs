@@ -103,8 +103,8 @@ impl Namespace {
             let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
             dir.clone().open(
                 scope.clone(),
-                // TODO(https://fxbug.dev/101092): remove RIGHT_READABLE svc_{for,from}_sys have been
-                // dismantled.
+                // TODO(https://fxbug.dev/129636): Remove RIGHT_READABLE when `opendir` no longer
+                // requires READABLE.
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 vfs::path::Path::dot(),
                 server_end.into_channel().into(),
