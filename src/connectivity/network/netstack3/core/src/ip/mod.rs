@@ -498,9 +498,6 @@ impl IpLayerIpExt for Ipv6 {
 }
 
 /// The state context provided to the IP layer.
-// TODO(https://fxbug.dev/48578): Do not return references to state. Instead,
-// callers of methods on this trait should provide a callback that takes a state
-// reference.
 pub(crate) trait IpStateContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice> {
     type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + IpForwardingDeviceContext<I>
