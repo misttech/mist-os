@@ -5,11 +5,11 @@ use {
     anyhow::Error,
     blocking::Unblock,
     errors::ffx_bail,
-    fidl::Socket,
+    fidl::{endpoints::Proxy, Socket},
     fidl_fuchsia_audio_ffxdaemon::{
         AudioDaemonPlayRequest, AudioDaemonPlayResponse, AudioDaemonProxy, AudioDaemonRequest,
     },
-    futures::AsyncReadExt,
+    futures::{AsyncReadExt, FutureExt},
     std::borrow::BorrowMut,
     std::io,
     std::io::BufRead,
@@ -108,23 +108,35 @@ where
 pub async fn wait_for_keypress(
     canceler: fidl::endpoints::ClientEnd<fidl_fuchsia_audio_ffxdaemon::AudioDaemonCancelerMarker>,
 ) -> Result<(), std::io::Error> {
-    blocking::unblock(move || {
+    let stdin_waiter = blocking::unblock(move || {
         let mut line = String::new();
         let stdin = std::io::stdin();
         let mut locked = stdin.lock();
         let _ = locked.read_line(&mut line);
     })
-    .await;
+    .fuse();
+
     let proxy =
         canceler.into_proxy().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
-    proxy
-        .cancel()
-        .await
-        .and_then(|res| {
-            Ok(res.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e))))
-        })
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e)))?
+    let closed_fut = async {
+        let _ = proxy.on_closed().await;
+    }
+    .fuse();
+
+    futures::pin_mut!(closed_fut, stdin_waiter);
+    futures::select! {
+        _res = closed_fut => (),
+        _res = stdin_waiter => {
+            let _ = proxy.cancel().await.and_then(|res| {
+                Ok(res
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e))))
+            }).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e)))?;
+
+        }
+    };
+
+    Ok(())
 }
 
 pub mod tests {

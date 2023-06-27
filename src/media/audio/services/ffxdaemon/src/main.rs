@@ -5,7 +5,6 @@
 mod device;
 mod ring_buffer;
 mod socket;
-
 use fidl_fuchsia_audio_ffxdaemon::GainSettings;
 pub use ring_buffer::RingBuffer;
 
@@ -66,7 +65,6 @@ impl AudioDaemon {
                 stdout_local.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
             )?,
         };
-        socket.write_wav_header(duration, &format).await?;
 
         let capturer_proxy = Self::create_capturer_from_location(
             location,
@@ -104,6 +102,7 @@ impl AudioDaemon {
         let mut async_stderr_writer = fidl::AsyncSocket::from_socket(stderr_local)?;
         let mut async_stdout_writer = fidl::AsyncSocket::from_socket(stdout_local)?;
 
+        socket.write_wav_header(duration, &format).await?;
         let packet_fut = async {
             while let Some(event) = stream.try_next().await? {
                 if stop_signal.load(std::sync::atomic::Ordering::SeqCst) {
@@ -229,6 +228,16 @@ impl AudioDaemon {
 
                     audio_component.create_audio_capturer(server_end, false)?;
                     let capturer_proxy = client_end.into_proxy()?;
+
+                    // Check that connection to AudioCore is valid.
+                    let _ = match capturer_proxy.get_reference_clock().await {
+                        Ok(_) => Ok(()),
+                        Err(e) => {
+                            println!("{e}");
+                            Err(anyhow::anyhow!("Failed to get reference clock {e}"))
+                        }
+                    }?;
+
                     capturer_proxy.set_pcm_stream_type(&stream_type)?;
 
                     if let Some(gain_settings) = gain_settings {
@@ -576,18 +585,19 @@ impl AudioDaemon {
             }
         };
 
+        // Record command writes output message to stderr to avoid interfering with WAV file
+        // written to stdout.
         let mut stderr = fasync::Socket::from_socket(stderr_local)?;
-        let output_message = match result {
-            Ok(message) => message,
-            Err(e) => {
-                format!("Failed to record from device with error: {e}")
+        match result {
+            Ok(message) => {
+                let _ = stderr
+                    .write_all(message.as_bytes())
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to write to stderr: {e}"));
+                Ok(())
             }
-        };
-
-        stderr
-            .write_all(output_message.as_bytes())
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to write to stderr: {}", e))
+            Err(e) => Err(anyhow::anyhow!("Failed to record from device with error: {e}")),
+        }
     }
 
     async fn serve(&mut self, mut stream: AudioDaemonRequestStream) -> Result<(), Error> {

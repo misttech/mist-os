@@ -242,7 +242,6 @@ impl Device {
         cancel_server: Option<fidl::endpoints::ServerEnd<AudioDaemonCancelerMarker>>,
     ) -> Result<String, Error> {
         let mut socket = socket::Socket { socket: &mut data_socket };
-        socket.write_wav_header(duration, &format).await?;
 
         let supported_formats = self.stream_config_client.get_supported_formats().await?;
         if !format.is_supported_by(&supported_formats) {
@@ -299,6 +298,7 @@ impl Device {
         let mut buf = vec![format.silence_value(); bytes_per_wakeup_interval as usize];
         let stop_signal = std::sync::atomic::AtomicBool::new(false);
 
+        socket.write_wav_header(duration, &format).await?;
         let packet_fut = async {
             loop {
                 timer.next().await;
