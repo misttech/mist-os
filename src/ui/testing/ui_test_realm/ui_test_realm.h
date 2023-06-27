@@ -117,6 +117,7 @@ class UITestRealm {
   void ConfigureClientSubrealm();
   void ConfigureAccessibility();
   void RouteConfigData();
+  void ConfigureScenic();
   void ConfigureSceneOwner();
 
   // Helper method to route a set of services from the specified source to the

@@ -86,22 +86,6 @@ constexpr auto kSceneProviderName = "scene-provider";
 constexpr auto kSetUIAccessibility = "setui";
 constexpr auto kIntl = "intl";
 
-// Contents of config file used to allow scenic to use gfx.
-constexpr auto kUseGfxScenicConfig = R"(
-{
-  "flatland_enable_display_composition": false,
-  "i_can_haz_flatland": false
-}
-)";
-
-// Contents of config file used to force scenic to use flatland.
-constexpr auto kUseFlatlandScenicConfig = R"(
-{
-  "flatland_enable_display_composition": false,
-  "i_can_haz_flatland": true
-}
-)";
-
 // Set of low-level system services that components in the realm can consume
 // from parent (test_manager).
 std::vector<std::string> DefaultSystemServices() {
@@ -351,15 +335,6 @@ void UITestRealm::RouteConfigData() {
   auto config_directory_contents = component_testing::DirectoryContents();
   std::vector<Ref> targets;
 
-  // Override scenic's "i_can_haz_flatland" flag.
-  if (config_.use_flatland) {
-    config_directory_contents.AddFile("scenic_config", kUseFlatlandScenicConfig);
-    targets.push_back(ChildRef{kScenicName});
-  } else {
-    config_directory_contents.AddFile("scenic_config", kUseGfxScenicConfig);
-    targets.push_back(ChildRef{kScenicName});
-  }
-
   if (config_.use_scene_owner) {
     // Supply a default display rotation.
     config_directory_contents.AddFile("display_rotation", std::to_string(config_.display_rotation));
@@ -378,7 +353,7 @@ void UITestRealm::RouteConfigData() {
     auto display_pixel_density = kLowResolutionDisplayPixelDensity * config_.device_pixel_ratio;
     config_directory_contents.AddFile("display_pixel_density",
                                       std::to_string(display_pixel_density));
-
+    targets.push_back(ChildRef{kScenicName});
     targets.push_back(ChildRef{kSceneManagerName});
   }
 
@@ -386,6 +361,15 @@ void UITestRealm::RouteConfigData() {
     realm_builder_.RouteReadOnlyDirectory("config-data", std::move(targets),
                                           std::move(config_directory_contents));
   }
+}
+
+void UITestRealm::ConfigureScenic() {
+  // Load default config for Scenic, and override its "i_can_haz_flatland" flag.
+  realm_builder_.InitMutableConfigFromPackage(kScenicName);
+  realm_builder_.SetConfigValue(kScenicName, "flatland_enable_display_composition",
+                                ConfigValue::Bool(false));
+  realm_builder_.SetConfigValue(kScenicName, "i_can_haz_flatland",
+                                ConfigValue::Bool(config_.use_flatland));
 }
 
 void UITestRealm::ConfigureSceneOwner() {
@@ -421,6 +405,9 @@ void UITestRealm::Build() {
   // for gfx and flatland, so it would be unwieldy to create a separate static
   // declaration for every a11y configuration tested.
   ConfigureAccessibility();
+
+  // Override flatland flags in Scenic configuration.
+  ConfigureScenic();
 
   // Route config data directories to appropriate recipients (currently, scenic
   // and scene manager are the only use cases for config files.

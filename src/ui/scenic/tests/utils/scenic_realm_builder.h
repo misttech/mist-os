@@ -62,8 +62,6 @@ class ScenicRealmBuilder {
   // test_manager to the realm.
   ScenicRealmBuilder& Init(RealmBuilderArgs args);
 
-  std::string BuildScenicConfig(bool use_flatland);
-
   component_testing::RealmBuilder realm_builder_;
 };
 

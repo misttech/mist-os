@@ -29,6 +29,7 @@ using Protocol = component_testing::Protocol;
 using ChildRef = component_testing::ChildRef;
 using ParentRef = component_testing::ParentRef;
 using RealmBuilder = component_testing::RealmBuilder;
+using component_testing::ConfigValue;
 using component_testing::DirectoryContents;
 
 ScenicRealmBuilder::ScenicRealmBuilder(RealmBuilderArgs args)
@@ -37,11 +38,10 @@ ScenicRealmBuilder::ScenicRealmBuilder(RealmBuilderArgs args)
 }
 
 ScenicRealmBuilder& ScenicRealmBuilder::Init(RealmBuilderArgs args) {
-  // Route /config/data/scenic_config to scenic.
-  auto config_directory_contents = DirectoryContents();
-  config_directory_contents.AddFile("scenic_config", BuildScenicConfig(args.use_flatland));
-  realm_builder_.RouteReadOnlyDirectory("config-data", {ChildRef{.name = kScenic}},
-                                        std::move(config_directory_contents));
+  // Load default config for Scenic, and override its "i_can_haz_flatland" flag.
+  realm_builder_.InitMutableConfigFromPackage(kScenic);
+  realm_builder_.SetConfigValue(kScenic, "i_can_haz_flatland",
+                                ConfigValue::Bool(args.use_flatland));
 
   // Route the protocols required by the scenic subrealm from the test_manager.
   realm_builder_.AddRoute(
@@ -82,14 +82,5 @@ ScenicRealmBuilder& ScenicRealmBuilder::AddRealmProtocol(const ProtocolName& pro
 }
 
 RealmRoot ScenicRealmBuilder::Build() { return realm_builder_.Build(); }
-
-std::string ScenicRealmBuilder::BuildScenicConfig(bool use_flatland) {
-  std::ostringstream config;
-
-  config << "{"
-         << "   \"i_can_haz_flatland\" : " << std::boolalpha << use_flatland << "}";
-
-  return config.str();
-}
 
 }  // namespace integration_tests

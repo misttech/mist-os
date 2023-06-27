@@ -11,9 +11,7 @@ use {
     async_trait::async_trait,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_ui_composition as flatland, fidl_fuchsia_ui_pointerinjector as pointerinjector,
-    fuchsia_component_test::{
-        Capability, ChildOptions, DirectoryContents, RealmBuilder, RealmInstance, Ref, Route,
-    },
+    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     futures::lock::Mutex,
     rand::{rngs::SmallRng, SeedableRng},
     std::{sync::Arc, time::Duration},
@@ -87,15 +85,9 @@ impl FlatlandEnvironment {
             .unwrap();
 
         // Override scenic's "i_can_haz_flatland" flag.
-        builder
-            .read_only_directory(
-                "config-data",
-                vec![&scenic],
-                DirectoryContents::new()
-                    .add_file("scenic_config", r#"{ "i_can_haz_flatland": true }"#),
-            )
-            .await
-            .unwrap();
+        builder.init_mutable_config_from_package(&scenic).await.unwrap();
+        builder.set_config_value_bool(&scenic, "i_can_haz_flatland", true).await.unwrap();
+
         let realm_instance = Arc::new(builder.build().await.expect("Failed to create realm"));
         Self { args, realm_instance }
     }
