@@ -39,7 +39,7 @@ fuchsia_component("test") {
 fuchsia_test_package("archivist-stress-test") {
   deps = [
     ":actor",
-    "//src/diagnostics/archivist:archivist-for-embedding-v2",
+    "//src/diagnostics/archivist:archivist-for-embedding-bundle",
   ]
   test_components = [ ":test" ]
   test_specs = {

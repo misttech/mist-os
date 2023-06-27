@@ -192,7 +192,7 @@ fuchsia_package("pkg") {
     ":fxfs_backed_data_for_tests_cmp",
     ":test_manager_cmp",
     "debug_data_processor",
-    "//src/diagnostics/archivist:archivist-for-embedding-v2",
+    "//src/diagnostics/archivist:archivist-for-embedding-bundle",
     "//src/storage/memfs:memfs_component",
     "//src/sys/early_boot_instrumentation:early-boot-instrumentation",
   ]

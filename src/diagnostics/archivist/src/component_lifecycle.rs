@@ -20,9 +20,9 @@ pub fn take_lifecycle_request_stream() -> LifecycleRequestStream {
     LifecycleRequestStream::from_channel(async_chan)
 }
 
-/// Serves the Lifecycle protocol from the v2 component runtime used for controlled shutdown of the
-/// archivist in v2.
-pub(crate) fn serve_v2(
+/// Serves the Lifecycle protocol from the component runtime used for controlled shutdown of the
+/// archivist .
+pub(crate) fn serve(
     mut request_stream: LifecycleRequestStream,
 ) -> (fasync::Task<()>, oneshot::Receiver<()>) {
     let (stop_sender, stop_recv) = oneshot::channel();

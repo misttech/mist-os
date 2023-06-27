@@ -114,7 +114,7 @@ fuchsia_unittest_package("diagnostics-integration-test") {
     ":component-manager-inspect",
     ":parent",
     ":reporter",
-    "//src/diagnostics/archivist:archivist-for-embedding-v2",
+    "//src/diagnostics/archivist:archivist-for-embedding-bundle",
     "//src/sys/component_manager:component-manager-realm-builder-debug-cmp",
   ]
 }

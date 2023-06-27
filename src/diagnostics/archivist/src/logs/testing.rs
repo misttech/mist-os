@@ -295,7 +295,7 @@ impl LogReader for DefaultLogReader {
     }
 }
 
-// A LogReader that exercises the components v2 EventStream and CapabilityRequested event
+// A LogReader that exercises the components EventStream and CapabilityRequested event
 // code path for log attribution.
 pub struct EventStreamLogReader {
     log_manager: Arc<LogsRepository>,

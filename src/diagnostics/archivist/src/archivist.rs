@@ -177,7 +177,7 @@ impl Archivist {
     /// Archivist to stop ingesting new data and drain current data to clients.
     pub fn set_lifecycle_request_stream(&mut self, request_stream: LifecycleRequestStream) {
         debug!("Lifecycle listener initialized.");
-        let (t, r) = component_lifecycle::serve_v2(request_stream);
+        let (t, r) = component_lifecycle::serve(request_stream);
         self.lifecycle_task = Some(t);
         self.stop_recv = Some(r);
     }

@@ -34,7 +34,7 @@ fuchsia_test_package("archive-reader-integration-tests") {
   test_components = [ ":archive_reader_integration_test" ]
   deps = [
     ":driver",
-    "//src/diagnostics/archivist:archivist-for-embedding-v2",
+    "//src/diagnostics/archivist:archivist-for-embedding-bundle",
   ]
 }
 

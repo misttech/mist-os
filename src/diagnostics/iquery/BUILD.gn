@@ -203,7 +203,7 @@ fuchsia_test_package("iquery-tests") {
     "test/basic_component:basic_component_with_logs",
     "test/test_component",
     "test_data:goldens",
-    "//src/diagnostics/archivist:archivist-for-embedding-v2",
+    "//src/diagnostics/archivist:archivist-for-embedding-bundle",
   ]
 }
 

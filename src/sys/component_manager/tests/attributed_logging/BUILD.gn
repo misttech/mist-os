@@ -37,7 +37,7 @@ fuchsia_test_package("attributed-logging-test") {
   deps = [
     ":e2e-root-component",
     "components:all-components",
-    "//src/diagnostics/archivist:archivist-for-embedding-v2",
+    "//src/diagnostics/archivist:archivist-for-embedding-bundle",
     "//src/sys/component_manager:component-manager-realm-builder-debug-cmp",
   ]
 }

@@ -362,7 +362,7 @@ mod tests {
     use super::*;
 
     #[fuchsia::test]
-    fn convert_v2_moniker_for_diagnostics() {
+    fn convert_moniker_for_diagnostics() {
         let identifier = ComponentIdentifier::parse_from_moniker("./a").unwrap();
         assert_eq!(identifier.relative_moniker_for_selectors(), vec!["a"].into());
         assert_eq!(identifier.unique_key(), vec!["a"].into());

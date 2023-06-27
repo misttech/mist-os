@@ -186,18 +186,19 @@ fuchsia_component("component") {
   check_includes = false
 }
 
-fuchsia_component_manifest("archivist-for-embedding-v2-manifest") {
+fuchsia_component_manifest("archivist-for-embedding-manifest") {
   manifest = "meta/archivist-for-embedding.cml"
   component_name = "archivist-for-embedding"
 }
 
-fuchsia_component("archivist-for-embedding-v2-component") {
-  cm_label = ":archivist-for-embedding-v2-manifest"
+fuchsia_component("archivist-for-embedding-component") {
+  component_name = "archivist-for-embedding"
+  cm_label = ":archivist-for-embedding-manifest"
   deps = [ ":bin" ]
 }
 
 fuchsia_structured_config_values("archivist-embedded-config") {
-  cm_label = ":archivist-for-embedding-v2-manifest"
+  cm_label = ":archivist-for-embedding-manifest"
   values = embedded_config
 }
 
@@ -205,10 +206,16 @@ fuchsia_structured_config_rust_lib("archivist-config") {
   cm_label = ":root-manifest"
 }
 
-group("archivist-for-embedding-v2") {
+group("archivist-for-embedding-bundle") {
+  visibility = [
+    "//src/diagnostics/*",
+    "//src/lib/diagnostics/*",
+    "//src/sys/component_manager/tests/*",
+    "//src/sys/test_manager:*",
+  ]
   deps = [
     ":archivist-embedded-config",
-    ":archivist-for-embedding-v2-component",
+    ":archivist-for-embedding-component",
   ]
 }
 
@@ -224,7 +231,7 @@ fuchsia_package("archivist-for-embedding") {
     # TODO(crbug.com/1408597): Remove once the Chromium tests package the fakes.
     "//src/chromium:chromium_test_base_deps",
   ]
-  deps = [ ":archivist-for-embedding-v2" ]
+  deps = [ ":archivist-for-embedding-bundle" ]
 }
 
 rustc_fuzzer("convert_debuglog_to_log_message_fuzzer") {
