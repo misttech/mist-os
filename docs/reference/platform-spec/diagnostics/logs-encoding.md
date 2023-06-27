@@ -60,7 +60,7 @@ TimestampNanos = {64,127}
 
 Currently all records are expected to have type=9. This was chosen to mirror the [trace format] but
 may require a change before these records can be processed by tracing tools.
-Values for severity are defined in [/sdk/fidl/fuchsia.diagnostics.stream/source.fidl]
+Values for severity are defined in [/sdk/fidl/fuchsia.diagnostics/severity.fidl]
 
 ## Arguments
 
