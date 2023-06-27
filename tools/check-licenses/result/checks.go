@@ -126,7 +126,7 @@ func AllLicenseTextsMustBeRecognized() error {
 		}
 	}
 
-	b.WriteString("Found unrecognized license texts - please add the relevant license pattern(s) to //tools/check-licenses/license/patterns/* and have it(them) reviewed by the OSRB team:\n\n")
+	b.WriteString("Found unrecognized license texts - please add the relevant license pattern(s) to //tools/check-licenses/assets/patterns/* and have it(them) reviewed by the OSRB team:\n\n")
 
 	for _, p := range project.FilteredProjects {
 		for _, l := range p.LicenseFiles {
@@ -206,7 +206,12 @@ func AllLicensePatternUsagesMustBeApproved() error {
 
 	result := b.String()
 	if len(result) > 0 {
-		return fmt.Errorf("Encountered license texts that were not approved for usage:\n%v", result)
+		description := "\n\nIf a given project uses a license that is not globally approved (http://shortn/_hp7ShC5lIf),\n"
+		description = fmt.Sprintf("%sthen an allowlist entry must exist granting that project explicit privilege to use it.\n", description)
+		description = fmt.Sprintf("%sEncountered license texts that were not approved for usage:\n\n%v", description, result)
+		description = fmt.Sprintf("%s\nEither remove the projects / licenses, or add an allowlist entry", description)
+		description = fmt.Sprintf("%s\nto //tools/check-licenses/assets/allowlists/* and have it reviewed by the OSRB team.\n", description)
+		return fmt.Errorf("%s", description)
 	}
 	return nil
 }
