@@ -255,7 +255,7 @@ be visible to Driver Manager. These package labels are also considered to be in 
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:21
+From //products/common/bringup.gni:20
 
 **Overridden from the default:** `[]`
 
@@ -263,7 +263,7 @@ From //BUILD.gn:38
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:21
+From //products/common/bringup.gni:20
 
 **Overridden from the default:** `[]`
 
@@ -425,7 +425,7 @@ tree users don't set this anymore.
 
 **Current value (from the default):** `true`
 
-From //src/storage/blobfs/BUILD.gn:11
+From //src/storage/blobfs/BUILD.gn:12
 
 ### blobfs_maximum_runtime_bytes
 
@@ -445,7 +445,7 @@ The number of pager threads to spawn for blobfs.
 
 **Current value (from the default):** `2`
 
-From //src/storage/bin/blobfs/BUILD.gn:22
+From //src/storage/bin/blobfs/BUILD.gn:23
 
 ### blobfs_page_in_metrics_recording
 
@@ -455,7 +455,7 @@ metrics entries.
 
 **Current value (from the default):** `false`
 
-From //src/storage/blobfs/BUILD.gn:16
+From //src/storage/blobfs/BUILD.gn:17
 
 ### blobfs_product_maximum_bytes
 
@@ -4572,7 +4572,7 @@ From //build/config/BUILDCONFIG.gn:1422
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:22
+From //products/common/bringup.gni:21
 
 **Overridden from the default:** `[]`
 
@@ -4580,7 +4580,7 @@ From //BUILD.gn:39
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:22
+From //products/common/bringup.gni:21
 
 **Overridden from the default:** `[]`
 
@@ -4590,7 +4590,7 @@ From //BUILD.gn:39
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:25
+From //products/common/bringup.gni:24
 
 **Overridden from the default:** `[]`
 
@@ -4598,7 +4598,7 @@ From //BUILD.gn:47
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:25
+From //products/common/bringup.gni:24
 
 **Overridden from the default:** `[]`
 
@@ -4608,7 +4608,7 @@ From //BUILD.gn:47
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:28
+From //products/common/bringup.gni:27
 
 **Overridden from the default:** `[]`
 
@@ -4616,7 +4616,7 @@ From //BUILD.gn:56
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:28
+From //products/common/bringup.gni:27
 
 **Overridden from the default:** `[]`
 
@@ -4650,7 +4650,7 @@ From //BUILD.gn:73
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:31
+From //products/common/bringup.gni:30
 
 **Overridden from the default:** `[]`
 
@@ -4658,7 +4658,7 @@ From //BUILD.gn:65
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:31
+From //products/common/bringup.gni:30
 
 **Overridden from the default:** `[]`
 
@@ -4860,7 +4860,7 @@ they must be separated into their own list.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:19
+From //products/common/bringup.gni:18
 
 **Overridden from the default:** `[]`
 
@@ -4868,7 +4868,7 @@ From //build/images/args.gni:99
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:19
+From //products/common/bringup.gni:18
 
 **Overridden from the default:** `[]`
 
@@ -5597,7 +5597,7 @@ package flavors.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:33
+From //products/common/bringup.gni:32
 
 **Overridden from the default:** `[]`
 
@@ -5605,7 +5605,7 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:33
+From //products/common/bringup.gni:32
 
 **Overridden from the default:** `[]`
 
@@ -5824,7 +5824,7 @@ From //src/graphics/lib/magma/gnbuild/magma.gni:22
 
 A list of binary labels to include in ZBIs built for this product.
 
-**Current value for `target_cpu = "arm64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
+**Current value for `target_cpu = "arm64"`:** `["//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
 From //products/bringup.gni:14
 
@@ -5832,7 +5832,7 @@ From //products/bringup.gni:14
 
 From //build/product.gni:14
 
-**Current value for `target_cpu = "x64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
+**Current value for `target_cpu = "x64"`:** `["//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
 From //products/bringup.gni:14
 
@@ -7610,7 +7610,7 @@ an extension mechanism for SDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:35
+From //products/common/bringup.gni:34
 
 **Overridden from the default:** `[]`
 
@@ -7618,7 +7618,7 @@ From //BUILD.gn:89
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:35
+From //products/common/bringup.gni:34
 
 **Overridden from the default:** `[]`
 
