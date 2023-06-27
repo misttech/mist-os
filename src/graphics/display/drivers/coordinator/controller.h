@@ -59,7 +59,13 @@ class Controller : public DeviceType,
                    public ddk::DisplayCaptureInterfaceProtocol<Controller>,
                    public ddk::EmptyProtocol<ZX_PROTOCOL_DISPLAY_COORDINATOR> {
  public:
+  // Creates a new coordinator Controller device. It creates a new Inspector
+  // which will be solely owned by the Controller device.
   explicit Controller(zx_device_t* parent);
+
+  // Creates a new coordinator Controller device with an injected `inspector`.
+  // The `inspector` and inspect data may be duplicated and shared. 
+  Controller(zx_device_t* parent, inspect::Inspector inspector);
 
   Controller(const Controller&) = delete;
   Controller& operator=(const Controller&) = delete;

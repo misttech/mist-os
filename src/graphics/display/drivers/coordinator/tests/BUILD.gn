@@ -12,6 +12,7 @@ test("display-coordinator-unittests") {
     "eld-test.cc",
     "fence-test.cc",
     "image-test.cc",
+    "inspect-test.cc",
     "integration-test.cc",
     "layer-test.cc",
   ]

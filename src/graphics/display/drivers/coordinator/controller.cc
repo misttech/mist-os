@@ -998,8 +998,11 @@ void Controller::DdkRelease() {
   delete this;
 }
 
-Controller::Controller(zx_device_t* parent)
+Controller::Controller(zx_device_t* parent) : Controller(parent, inspect::Inspector{}) {}
+
+Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
     : DeviceType(parent),
+      inspector_(std::move(inspector)),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
       watchdog_("display-client-loop", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
                 loop_.dispatcher()) {
