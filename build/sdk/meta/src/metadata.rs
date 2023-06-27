@@ -6,17 +6,16 @@
 //! specific types such as a physical device spec, virtual device spec, product
 //! bundle, or product bundle container (with more to come).
 
-use crate::{
-    common::{ElementType, Envelope},
-    json::JsonObject,
-    physical_device::PhysicalDeviceV1,
-    product_bundle::ProductBundleV1,
-    product_bundle_container::{ProductBundleContainerV1, ProductBundleContainerV2},
-    virtual_device::VirtualDeviceV1,
-};
+use crate::common::{ElementType, Envelope};
+use crate::json::JsonObject;
+use crate::physical_device::PhysicalDeviceV1;
+use crate::product_bundle::ProductBundleV1;
+use crate::product_bundle_container::{ProductBundleContainerV1, ProductBundleContainerV2};
+use crate::virtual_device::VirtualDeviceV1;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, io::Read};
+use std::collections::HashMap;
+use std::io::Read;
 
 /// A unique schema identifier.
 #[derive(Debug)]
@@ -81,18 +80,6 @@ impl Metadata {
             Self::ProductBundleContainerV1(data) => &data.name[..],
             Self::ProductBundleContainerV2(data) => &data.name[..],
             Self::VirtualDeviceV1(data) => &data.name[..],
-        }
-    }
-
-    /// Returns self.name if self is a product bundle, otherwise
-    /// returns list of names of product bundles in self if self is a container,
-    /// otherwise empty list.
-    pub fn get_product_bundles(&self) -> Vec<&str> {
-        match self {
-            Metadata::ProductBundleV1(data) => vec![&data.name[..]],
-            Metadata::ProductBundleContainerV1(data) => data.get_product_bundles(),
-            Metadata::ProductBundleContainerV2(data) => data.get_product_bundles(),
-            _ => vec![],
         }
     }
 }
@@ -450,135 +437,5 @@ mod tests {
         "#;
         let result = from_reader(json.as_bytes());
         assert!(result.is_err(), "Expected to fail validation.");
-    }
-
-    #[test]
-    fn test_get_product_bundles() {
-        let json = r#"
-        {
-            "schema_id": "http://fuchsia.com/schemas/sdk/product_bundle-6320eef1.json",
-            "data": {
-                "name": "product_1",
-                "type": "product_bundle",
-                "device_refs": ["generic-x64"],
-                "images": [{
-                    "base_uri": "gs://fuchsia/development/0.20201216.2.1/images/generic-x64.tgz",
-                    "format": "tgz"
-                }],
-                "manifests": {
-                },
-                "packages": [{
-                    "format": "tgz",
-                    "repo_uri": "gs://fuchsia/development/0.20201216.2.1/packages/generic-x64.tar.gz"
-                }]
-            }
-        }
-        "#;
-        let metadata = from_reader(json.as_bytes()).unwrap();
-
-        let names = metadata.get_product_bundles();
-        assert_eq!(names, vec!["product_1".to_string()]);
-    }
-
-    #[test]
-    fn test_get_product_bundles_v2() {
-        let json = r#"
-        {
-            "schema_id": "http://fuchsia.com/schemas/sdk/product_bundle_container-32z5e391.json",
-            "data": {
-                "name": "fake-fuchsia-f1",
-                "type": "product_bundle_container",
-                "fms_entries": [
-                    {
-                        "name": "product_1",
-                        "type": "product_bundle",
-                        "device_refs": ["generic-x64"],
-                        "images": [{
-                            "base_uri": "gs://fuchsia/development/0.20201216.2.1/images/generic-x64.tgz",
-                            "format": "tgz"
-                        }],
-                        "manifests": {
-                        },
-                        "packages": [{
-                            "format": "tgz",
-                            "repo_uri": "gs://fuchsia/development/0.20201216.2.1/packages/generic-x64.tar.gz"
-                        }]
-                    },
-                    {
-                        "name": "product_2",
-                        "type": "product_bundle",
-                        "device_refs": ["generic-x64"],
-                        "images": [{
-                            "base_uri": "gs://fuchsia/development/0.20201216.2.1/images/generic-x64.tgz",
-                            "format": "tgz"
-                        }],
-                        "manifests": {
-                        },
-                        "packages": [{
-                            "format": "tgz",
-                            "repo_uri": "gs://fuchsia/development/0.20201216.2.1/packages/generic-x64.tar.gz"
-                        }]
-                    }
-                ]
-            }
-        }
-        "#;
-        let metadata = from_reader(json.as_bytes()).expect("metadata from reader");
-        let names = metadata.get_product_bundles();
-        assert_eq!(names, vec!["product_1".to_string(), "product_2".to_string()]);
-    }
-
-    #[test]
-    fn test_get_bundles_container_v1() {
-        let json = r#"
-        {
-            "schema_id": "http://fuchsia.com/schemas/sdk/product_bundle_container-76a5c104.json",
-            "data": {
-                "name": "fake-fuchsia-f1",
-                "type": "product_bundle_container",
-                "bundles": [
-                    {
-                        "data": {
-                            "name": "product_1",
-                            "type": "product_bundle",
-                            "device_refs": ["generic-x64"],
-                            "images": [{
-                                "base_uri": "gs://fuchsia/development/0.20201216.2.1/images/generic-x64.tgz",
-                                "format": "tgz"
-                            }],
-                            "manifests": {
-                            },
-                            "packages": [{
-                                "format": "tgz",
-                                "repo_uri": "gs://fuchsia/development/0.20201216.2.1/packages/generic-x64.tar.gz"
-                            }]
-                        },
-                        "schema_id": "product_bundle-6320eef1.json#/definitions/product_bundle"
-                    },
-                    {
-                        "data": {
-                            "name": "product_2",
-                            "type": "product_bundle",
-                            "device_refs": ["generic-x64"],
-                            "images": [{
-                                "base_uri": "gs://fuchsia/development/0.20201216.2.1/images/generic-x64.tgz",
-                                "format": "tgz"
-                            }],
-                            "manifests": {
-                            },
-                            "packages": [{
-                                "format": "tgz",
-                                "repo_uri": "gs://fuchsia/development/0.20201216.2.1/packages/generic-x64.tar.gz"
-                            }]
-                        },
-                        "schema_id": "product_bundle-6320eef1.json#/definitions/product_bundle"
-                    }
-                ]
-            }
-        }
-        "#;
-        let metadata = from_reader(json.as_bytes()).expect("metadata from reader");
-        let names = metadata.get_product_bundles();
-        assert_eq!(names, vec!["product_1".to_string(), "product_2".to_string()]);
     }
 }

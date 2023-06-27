@@ -677,7 +677,6 @@ mod tests {
     use super::*;
     use crate::pbms::CONFIG_METADATA;
     use ffx_config::ConfigLevel;
-    use sdk::{Sdk, SdkVersion};
     use serde_json;
     use std::{fs::File, io::Write};
     use tempfile::TempDir;
@@ -881,8 +880,8 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let pb_dir = make_pb_v2_in!(tmp, "fake.x64");
 
-        let _env = ffx_config::test_init().await.expect("create test config");
-        let sdk = Sdk::get_empty_sdk_with_version(SdkVersion::InTree);
+        let env = ffx_config::test_init().await.expect("create test config");
+        let sdk = env.context.get_sdk().await.expect("Loading configured sdk");
 
         // Load with passing a path directly
         let pb =
@@ -909,8 +908,8 @@ mod tests {
     async fn test_load_product_bundle_v2_invalid() {
         let tmp = TempDir::new().unwrap();
         let pb_dir = Utf8Path::from_path(tmp.path()).unwrap();
-        let _env = ffx_config::test_init().await.expect("create test config");
-        let sdk = Sdk::get_empty_sdk_with_version(SdkVersion::InTree);
+        let env = ffx_config::test_init().await.expect("create test config");
+        let sdk = env.context.get_sdk().await.expect("Loading configured sdk");
 
         // Load with passing a path directly
         let pb =

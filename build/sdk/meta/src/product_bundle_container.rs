@@ -5,13 +5,15 @@
 //! Representation of the sdk fms container which holds all the artifacts that
 //! make up a release of the Fuchsia SDK.
 
-use crate::{
-    common::{ElementType, Envelope},
-    json::{schema, JsonObject},
-    metadata::Metadata,
-    ProductBundleV1,
+use {
+    crate::{
+        common::{ElementType, Envelope},
+        json::{schema, JsonObject},
+        metadata::Metadata,
+        ProductBundleV1,
+    },
+    serde::{Deserialize, Serialize},
 };
-use serde::{Deserialize, Serialize};
 
 /// TODO(b/205780240): Remove this "data" wrapper.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -44,19 +46,6 @@ pub struct ProductBundleContainerV1 {
     /// A collection of product bundle instances (this may expand to more data
     /// types).
     pub bundles: Vec<WorkaroundProductBundleWrapper>,
-}
-
-impl ProductBundleContainerV1 {
-    pub fn get_product_bundles(&self) -> Vec<&str> {
-        let mut names: Vec<&str> = vec![];
-        for bundle in &self.bundles {
-            match bundle.data.kind {
-                ElementType::ProductBundle => names.push(bundle.data.name.as_str()),
-                _ => (),
-            }
-        }
-        names
-    }
 }
 
 impl JsonObject for Envelope<ProductBundleContainerV1> {
@@ -95,19 +84,6 @@ pub struct ProductBundleContainerV2 {
     /// A collection of FMS entries of various types including product bundles and virtual
     /// device specs.
     pub fms_entries: Vec<Metadata>,
-}
-
-impl ProductBundleContainerV2 {
-    pub fn get_product_bundles(&self) -> Vec<&str> {
-        let mut names: Vec<&str> = vec![];
-        for bundle in &self.fms_entries {
-            match bundle {
-                Metadata::ProductBundleV1(data) => names.push(data.name.as_str()),
-                _ => (),
-            }
-        }
-        names
-    }
 }
 
 impl JsonObject for Envelope<ProductBundleContainerV2> {
