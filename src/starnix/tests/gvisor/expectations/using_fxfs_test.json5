@@ -153,6 +153,10 @@
                 // sendfile_test - these tests hang
                 "SendFileTest.SendFileToPipe",
 
+                // socket_inet_loopback_isolated_test - these tests flake TODO(fxbug.dev/128640)
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/TCP",
+
                 // stat_test - these tests hang
                 "StatTest.LstatELOOPPath",
 
