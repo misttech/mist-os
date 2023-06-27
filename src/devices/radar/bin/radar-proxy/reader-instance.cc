@@ -8,11 +8,6 @@
 
 namespace radar {
 
-// TODO(fxbug.dev/100020): Remove this after all clients have switched to GetBurstProperties.
-void ReaderInstance::GetBurstSize(GetBurstSizeCompleter::Sync& completer) {
-  completer.Reply(parent_->burst_properties().size());
-}
-
 void ReaderInstance::GetBurstProperties(GetBurstPropertiesCompleter::Sync& completer) {
   completer.Reply(parent_->burst_properties());
 }

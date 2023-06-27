@@ -69,17 +69,12 @@ closed protocol RadarBurstReader {
     /// should use this size to create VMOs to be registered by the driver.
     ///
     /// - response `burst_size` the size of each radar burst in bytes.
-    // TODO(fxbug.dev/100020): Remove this when all users have been switched to
-    // `GetBurstProperties()`.
-    @transitional
+    @available(removed=14)
     strict GetBurstSize() -> (struct {
         burst_size uint32;
     });
 
     @available(added=12)
-    // TODO(fxbug.dev/100020): Remove @transitional when all servers implement
-    // this method.
-    @transitional
     strict GetBurstProperties() -> (struct {
         size uint32;
         period zx.Duration;
