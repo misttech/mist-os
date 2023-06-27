@@ -510,10 +510,6 @@ btf::_fail() {
   local format_string="$1"
   shift
 
-  if [[ "${format_string}" == "" ]]; then
-    format_string="${default_message}"
-  fi
-
   local func_offset=0
   local source_offset=0
   if [[ "${FUNCNAME[$((3 + _BTF_EVAL_OFFSET))]}" != "btf::_run_isolated_test" ]]; then
@@ -522,7 +518,12 @@ btf::_fail() {
   source_offset=$((func_offset + _BTF_EVAL_OFFSET))
   local called_function="${FUNCNAME[$((1 + func_offset))]}"
   local test_file_loc="${BASH_SOURCE[$((2 + source_offset))]#$BT_TEMP_DIR/}:${BASH_LINENO[$((1 + source_offset))]}"
-  printf "${_BTF_FAIL} ${test_file_loc}: (${called_function}) ${format_string}\n" "$@"
+  echo -n "${_BTF_FAIL} ${test_file_loc}: (${called_function}) "
+  if [[ "${format_string}" == "" ]]; then
+    echo "${default_message}"
+  else
+    printf "${format_string}\n" "$@"
+  fi
   : $((_btf_test_error_count++))
   return ${status}
 }
