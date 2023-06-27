@@ -18,25 +18,24 @@ namespace display {
 // static
 zx::result<> FakeDisplayCoordinatorConnector::CreateAndPublishService(
     std::shared_ptr<zx_device> mock_root, async_dispatcher_t* dispatcher,
+    const fake_display::FakeDisplayDeviceConfig& fake_display_device_config,
     component::OutgoingDirectory& outgoing) {
   return outgoing.AddProtocol<fuchsia_hardware_display::Provider>(
-      std::make_unique<FakeDisplayCoordinatorConnector>(std::move(mock_root), dispatcher));
+      std::make_unique<FakeDisplayCoordinatorConnector>(std::move(mock_root), dispatcher,
+                                                        fake_display_device_config));
 }
 
 FakeDisplayCoordinatorConnector::FakeDisplayCoordinatorConnector(
-    std::shared_ptr<zx_device> mock_root, async_dispatcher_t* dispatcher) {
+    std::shared_ptr<zx_device> mock_root, async_dispatcher_t* dispatcher,
+    const fake_display::FakeDisplayDeviceConfig& fake_display_device_config) {
   FX_DCHECK(dispatcher);
 
   auto sysmem = std::make_unique<display::GenericSysmemDeviceWrapper<display::SysmemProxyDevice>>(
       mock_root.get());
-  static constexpr fake_display::FakeDisplayDeviceConfig kDeviceConfig = {
-      .manual_vsync_trigger = false,
-      .no_buffer_access = false,
-  };
   state_ = std::shared_ptr<State>(
       new State{.dispatcher = dispatcher,
                 .fake_display_stack = std::make_unique<display::FakeDisplayStack>(
-                    std::move(mock_root), std::move(sysmem), kDeviceConfig)});
+                    std::move(mock_root), std::move(sysmem), fake_display_device_config)});
 }
 
 FakeDisplayCoordinatorConnector::~FakeDisplayCoordinatorConnector() {

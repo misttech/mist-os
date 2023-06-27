@@ -9,6 +9,7 @@
 #include <lib/trace-provider/provider.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/testing/fake-coordinator-connector/service.h"
 
 int main(int argc, const char** argv) {
@@ -25,10 +26,15 @@ int main(int argc, const char** argv) {
 
   FX_LOGS(INFO) << "Starting fake fuchsia.hardware.display.Provider service.";
 
+  static constexpr fake_display::FakeDisplayDeviceConfig kFakeDisplayDeviceConfig = {
+      .manual_vsync_trigger = false,
+      .no_buffer_access = false,
+  };
+
   std::shared_ptr<zx_device> mock_root = MockDevice::FakeRootParent();
   zx::result<> create_and_publish_service_result =
       display::FakeDisplayCoordinatorConnector::CreateAndPublishService(
-          mock_root, loop.dispatcher(), outgoing);
+          mock_root, loop.dispatcher(), kFakeDisplayDeviceConfig, outgoing);
   if (create_and_publish_service_result.is_error()) {
     FX_LOGS(ERROR) << "Cannot start display Provider server and publish service: "
                    << create_and_publish_service_result.status_string();

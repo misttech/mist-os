@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/testing/fake-coordinator-connector/service.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/lib/testing/predicates/status.h"
@@ -30,8 +31,12 @@ class FakeDisplayCoordinatorConnectorTest : public gtest::TestLoopFixture {
   void SetUp() override {
     TestLoopFixture::SetUp();
 
+    constexpr fake_display::FakeDisplayDeviceConfig kFakeDisplayDeviceConfig = {
+        .manual_vsync_trigger = false,
+        .no_buffer_access = false,
+    };
     coordinator_connector_ = std::make_unique<display::FakeDisplayCoordinatorConnector>(
-        MockDevice::FakeRootParent(), dispatcher());
+        MockDevice::FakeRootParent(), dispatcher(), kFakeDisplayDeviceConfig);
 
     zx::result<fidl::Endpoints<fuchsia_hardware_display::Provider>> provider_endpoints_result =
         fidl::CreateEndpoints<fuchsia_hardware_display::Provider>();
