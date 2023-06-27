@@ -447,14 +447,11 @@ magma_status_t magma_connection_import_semaphore2(magma_connection_t connection,
                                                   uint32_t semaphore_handle, uint64_t flags,
                                                   magma_semaphore_t* semaphore_out,
                                                   magma_semaphore_id_t* id_out) {
-  auto platform_semaphore = magma::PlatformSemaphore::Import(semaphore_handle);
+  auto platform_semaphore = magma::PlatformSemaphore::Import(semaphore_handle, flags);
   if (!platform_semaphore)
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "PlatformSemaphore::Import failed");
 
   platform_semaphore->set_local_id(s_semaphore_id_generator.get());
-
-  if (flags)
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "flags not supported");
 
   uint32_t handle;
   if (!platform_semaphore->duplicate_handle(&handle))

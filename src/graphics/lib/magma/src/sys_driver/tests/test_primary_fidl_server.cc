@@ -495,7 +495,7 @@ class TestDelegate : public msd::PrimaryFidlServer::Delegate {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
     switch (object_type) {
       case fuchsia_gpu_magma::wire::ObjectType::kEvent: {
-        auto semaphore = magma::PlatformSemaphore::Import(zx::event(std::move(handle)));
+        auto semaphore = magma::PlatformSemaphore::Import(zx::event(std::move(handle)), flags);
         if (!semaphore)
           return MAGMA_STATUS_INVALID_ARGS;
         EXPECT_EQ(object_id, shared_data_->test_semaphore_id);
@@ -845,7 +845,7 @@ struct CompleterContext {
 
     ASSERT_NE(handle, magma::PlatformHandle::kInvalidHandle);
 
-    auto semaphore = magma::PlatformSemaphore::Import(handle);
+    auto semaphore = magma::PlatformSemaphore::Import(handle, /*flags=*/0);
     ASSERT_TRUE(semaphore);
 
     EXPECT_EQ(context->wait_semaphore->id(), semaphore->id());

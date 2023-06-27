@@ -48,7 +48,7 @@ class Driver {
   virtual std::unique_ptr<Buffer> ImportBuffer(zx::vmo vmo, uint64_t client_id) { return {}; }
 
   // Creates a semaphore that owns the provided handle. Can be called on any thread.
-  virtual magma_status_t ImportSemaphore(zx::event handle, uint64_t client_id,
+  virtual magma_status_t ImportSemaphore(zx::event handle, uint64_t client_id, uint64_t flags,
                                          std::unique_ptr<Semaphore>* out) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }

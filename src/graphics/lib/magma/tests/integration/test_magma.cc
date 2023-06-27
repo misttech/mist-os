@@ -834,23 +834,64 @@ class TestConnection {
     test2->SemaphoreImport(handle, exported_id);
   }
 
-  void SemaphoreImport2(magma_handle_t handle, magma_semaphore_id_t exported_id) {
+  void SemaphoreImport2(magma_handle_t handle, magma_semaphore_id_t exported_id,
+                        bool one_shot = false) {
     ASSERT_TRUE(connection_);
 
     magma_semaphore_t semaphore;
     magma_semaphore_id_t id;
-    ASSERT_EQ(magma_connection_import_semaphore2(connection_, handle, /*flags=*/0, &semaphore, &id),
+    uint64_t flags = one_shot ? MAGMA_IMPORT_SEMAPHORE_ONE_SHOT : 0;
+    ASSERT_EQ(magma_connection_import_semaphore2(connection_, handle, flags, &semaphore, &id),
               MAGMA_STATUS_OK);
     EXPECT_NE(id, exported_id);
+
+    {
+      magma_poll_item_t item = {
+          .semaphore = semaphore,
+          .type = MAGMA_POLL_TYPE_SEMAPHORE,
+          .condition = MAGMA_POLL_CONDITION_SIGNALED,
+          .result = 0,
+      };
+      ASSERT_EQ(MAGMA_STATUS_TIMED_OUT, magma_poll(&item, /*count=*/1, /*timeout=*/0));
+    }
+
+    magma_semaphore_signal(semaphore);
+
+    {
+      magma_poll_item_t item = {
+          .semaphore = semaphore,
+          .type = MAGMA_POLL_TYPE_SEMAPHORE,
+          .condition = MAGMA_POLL_CONDITION_SIGNALED,
+          .result = 0,
+      };
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_poll(&item, /*count=*/1, /*timeout=*/0));
+    }
+
+    magma_semaphore_reset(semaphore);
+
+    {
+      magma_poll_item_t item = {
+          .semaphore = semaphore,
+          .type = MAGMA_POLL_TYPE_SEMAPHORE,
+          .condition = MAGMA_POLL_CONDITION_SIGNALED,
+          .result = 0,
+      };
+      if (one_shot) {
+        ASSERT_EQ(MAGMA_STATUS_OK, magma_poll(&item, /*count=*/1, /*timeout=*/0));
+      } else {
+        ASSERT_EQ(MAGMA_STATUS_TIMED_OUT, magma_poll(&item, /*count=*/1, /*timeout=*/0));
+      }
+    }
 
     magma_connection_release_semaphore(connection_, semaphore);
   }
 
-  static void SemaphoreImportExport2(TestConnection* test1, TestConnection* test2) {
+  static void SemaphoreImportExport2(TestConnection* test1, TestConnection* test2,
+                                     bool one_shot = false) {
     magma_handle_t handle;
     magma_semaphore_id_t exported_id;
     test1->SemaphoreExport(&handle, &exported_id);
-    test2->SemaphoreImport2(handle, exported_id);
+    test2->SemaphoreImport2(handle, exported_id, one_shot);
   }
 
   void ImmediateCommands() {
@@ -1542,7 +1583,13 @@ TEST_F(Magma, SemaphoreImportExport) {
 TEST_F(Magma, SemaphoreImportExport2) {
   TestConnection test1;
   TestConnection test2;
-  TestConnection::SemaphoreImportExport(&test1, &test2);
+  TestConnection::SemaphoreImportExport2(&test1, &test2);
+}
+
+TEST_F(Magma, SemaphoreImportExportOneShot) {
+  TestConnection test1;
+  TestConnection test2;
+  TestConnection::SemaphoreImportExport2(&test1, &test2, /*one_shot=*/true);
 }
 
 TEST_F(Magma, ImmediateCommands) { TestConnection().ImmediateCommands(); }

@@ -21,8 +21,8 @@ TEST(MsdSemaphore, ImportAndDestroy) {
   ASSERT_TRUE(semaphore->duplicate_handle(&duplicate_handle));
 
   std::unique_ptr<msd::Semaphore> msd_sem = nullptr;
-  EXPECT_EQ(MAGMA_STATUS_OK,
-            msd_driver->ImportSemaphore(zx::event(duplicate_handle), semaphore->id(), &msd_sem));
+  EXPECT_EQ(MAGMA_STATUS_OK, msd_driver->ImportSemaphore(zx::event(duplicate_handle),
+                                                         semaphore->id(), /*flags=*/0, &msd_sem));
 
   ASSERT_NE(msd_sem, nullptr);
 

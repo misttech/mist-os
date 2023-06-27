@@ -15,15 +15,13 @@ std::unique_ptr<MagmaSystemSemaphore> MagmaSystemSemaphore::Create(msd::Driver* 
                                                                    zx::event event,
                                                                    uint64_t client_id,
                                                                    uint64_t flags) {
-  if (flags)
-    return MAGMA_DRETP(nullptr, "semaphore flags not handled yet");
-
   uint64_t global_id = 0;
   if (!magma::PlatformObject::IdFromHandle(event.get(), &global_id))
     return MAGMA_DRETP(nullptr, "couldn't get global id");
 
   std::unique_ptr<msd::Semaphore> msd_semaphore;
-  magma_status_t status = driver->ImportSemaphore(std::move(event), client_id, &msd_semaphore);
+  magma_status_t status =
+      driver->ImportSemaphore(std::move(event), client_id, flags, &msd_semaphore);
 
   if (status != MAGMA_STATUS_OK)
     return MAGMA_DRETP(nullptr, "ImportSemaphore failed: %d", status);

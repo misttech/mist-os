@@ -38,9 +38,9 @@ std::unique_ptr<msd::Buffer> MsdArmDriver::ImportBuffer(zx::vmo vmo, uint64_t cl
   return std::make_unique<MsdArmAbiBuffer>(std::move(buffer));
 }
 
-magma_status_t MsdArmDriver::ImportSemaphore(zx::event handle, uint64_t client_id,
+magma_status_t MsdArmDriver::ImportSemaphore(zx::event handle, uint64_t client_id, uint64_t flags,
                                              std::unique_ptr<msd::Semaphore>* semaphore_out) {
-  auto semaphore = magma::PlatformSemaphore::Import(std::move(handle));
+  auto semaphore = magma::PlatformSemaphore::Import(std::move(handle), flags);
   if (!semaphore)
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "couldn't import semaphore handle");
 

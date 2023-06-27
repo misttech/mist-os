@@ -75,9 +75,9 @@ MsdMockBufferManager* MsdMockBufferManager::ScopedMockBufferManager::get() {
 
 MsdMockContext::~MsdMockContext() { connection_->DestroyContext(this); }
 
-magma_status_t MsdMockDriver::ImportSemaphore(zx::event handle, uint64_t client_id,
+magma_status_t MsdMockDriver::ImportSemaphore(zx::event handle, uint64_t client_id, uint64_t flags,
                                               std::unique_ptr<msd::Semaphore>* out) {
-  auto semaphore = magma::PlatformSemaphore::Import(std::move(handle));
+  auto semaphore = magma::PlatformSemaphore::Import(std::move(handle), flags);
   if (!semaphore)
     return MAGMA_STATUS_INVALID_ARGS;
 

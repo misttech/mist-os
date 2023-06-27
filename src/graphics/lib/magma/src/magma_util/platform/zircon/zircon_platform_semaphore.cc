@@ -78,14 +78,14 @@ std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Create() {
   if (!PlatformObject::IdFromHandle(event.get(), &koid))
     return DRETP(nullptr, "couldn't get koid from handle");
 
-  return std::make_unique<ZirconPlatformSemaphore>(std::move(event), koid);
+  return std::make_unique<ZirconPlatformSemaphore>(std::move(event), koid, /*flags=*/0);
 }
 
-std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Import(uint32_t handle) {
-  return Import(zx::event(handle));
+std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Import(uint32_t handle, uint64_t flags) {
+  return Import(zx::event(handle), flags);
 }
 
-std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Import(zx::event event) {
+std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Import(zx::event event, uint64_t flags) {
   zx_info_handle_basic_t info;
   zx_status_t status = event.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   if (status != ZX_OK)
@@ -94,7 +94,10 @@ std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Import(zx::event event) {
   if (info.type != ZX_OBJ_TYPE_EVENT)
     return DRETP(nullptr, "invalid object type: %d", info.type);
 
-  return std::make_unique<ZirconPlatformSemaphore>(std::move(event), info.koid);
+  if (flags & ~MAGMA_IMPORT_SEMAPHORE_ONE_SHOT)
+    return DRETP(nullptr, "unhandled flags 0x%lx", flags);
+
+  return std::make_unique<ZirconPlatformSemaphore>(std::move(event), info.koid, flags);
 }
 
 }  // namespace magma

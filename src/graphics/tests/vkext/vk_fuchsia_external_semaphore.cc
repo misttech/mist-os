@@ -363,7 +363,7 @@ bool VulkanTest::Exec(VulkanTest* t1, VulkanTest* t2, bool temporary) {
   // Import semaphores
   for (uint32_t i = 0; i < kSemaphoreCount; i++) {
     uint32_t flags = temporary ? VK_SEMAPHORE_IMPORT_TEMPORARY_BIT_KHR : 0;
-    exported.emplace_back(magma::PlatformSemaphore::Import(handle[i]));
+    exported.emplace_back(magma::PlatformSemaphore::Import(handle[i], /*flags=*/0));
     uint32_t import_handle;
     EXPECT_TRUE(exported.back()->duplicate_handle(&import_handle));
     VkImportSemaphoreZirconHandleInfoFUCHSIA import_info = {
@@ -398,7 +398,7 @@ bool VulkanTest::Exec(VulkanTest* t1, VulkanTest* t2, bool temporary) {
     }
 
     std::shared_ptr<magma::PlatformSemaphore> platform_semaphore_import =
-        magma::PlatformSemaphore::Import(handle[i]);
+        magma::PlatformSemaphore::Import(handle[i], /*flags=*/0);
 
     EXPECT_EQ(platform_semaphore_export->id(), platform_semaphore_import->id());
 

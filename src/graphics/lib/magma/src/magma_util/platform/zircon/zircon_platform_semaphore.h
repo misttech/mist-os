@@ -15,7 +15,8 @@ namespace magma {
 
 class ZirconPlatformSemaphore : public PlatformSemaphore {
  public:
-  ZirconPlatformSemaphore(zx::event event, uint64_t koid) : event_(std::move(event)), koid_(koid) {}
+  ZirconPlatformSemaphore(zx::event event, uint64_t koid, uint64_t flags)
+      : PlatformSemaphore(flags), event_(std::move(event)), koid_(koid) {}
 
   void set_local_id(uint64_t id) override {
     DASSERT(id);
@@ -32,10 +33,12 @@ class ZirconPlatformSemaphore : public PlatformSemaphore {
   bool duplicate_handle(zx::handle* handle_out) const override;
 
   void Reset() override {
-    event_.signal(zx_signal(), 0);
-    TRACE_DURATION("magma:sync", "semaphore reset", "id", koid_);
+    TRACE_DURATION("magma:sync", "semaphore reset", "id", koid_, "oneshot", is_one_shot());
     TRACE_FLOW_END("magma:sync", "semaphore signal", koid_);
     TRACE_FLOW_END("magma:sync", "semaphore wait async", koid_);
+    if (!is_one_shot()) {
+      event_.signal(zx_signal(), 0);
+    }
   }
 
   void Signal() override {

@@ -489,6 +489,8 @@ class TestMsdIntelDevice : public testing::Test {
 
   class FakeSemaphore : public magma::PlatformSemaphore {
    public:
+    FakeSemaphore() : magma::PlatformSemaphore(/*flags=*/0) {}
+
     void set_local_id(uint64_t id) override {}
 
     uint64_t id() const override { return 1; }
