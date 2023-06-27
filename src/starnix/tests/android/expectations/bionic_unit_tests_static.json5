@@ -249,6 +249,10 @@
                 "wctype.towlower_l",
                 "wctype.towupper",
                 "wctype.towupper_l",
+
+                // TODO(https://fxbug.dev/129654): Flaky on the bots - need to be investigated.
+                "pthread.pthread_getcpuclockid__clock_gettime",
+                "unistd*.sleep",
             ],
         },
     ],
