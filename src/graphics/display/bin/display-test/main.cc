@@ -11,9 +11,6 @@
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zircon-internal/align.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <zircon/process.h>
 #include <zircon/status.h>
@@ -24,6 +21,8 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string_view>

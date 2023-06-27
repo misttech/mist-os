@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_GOLDFISH_DISPLAY_RENDER_CONTROL_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_GOLDFISH_DISPLAY_RENDER_CONTROL_H_
 
-#include <fidl/fuchsia.hardware.goldfish.pipe/cpp/markers.h>
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <zircon/types.h>

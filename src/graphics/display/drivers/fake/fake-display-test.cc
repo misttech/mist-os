@@ -18,7 +18,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "fidl/fuchsia.sysmem/cpp/natural_types.h"
 #include "src/devices/sysmem/drivers/sysmem/device.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/fake/fake-display-stack.h"

@@ -15,8 +15,8 @@
 
 #include <ddktl/device.h>
 
-#include "common.h"
-#include "dsi.h"
+#include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/dsi.h"
 
 namespace amlogic_display {
 

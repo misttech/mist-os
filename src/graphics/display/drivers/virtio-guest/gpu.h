@@ -7,15 +7,14 @@
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
 #include <semaphore.h>
-#include <stdlib.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 
+#include <cstdlib>
 #include <memory>
 
 #include <ddktl/device.h>

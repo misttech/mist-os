@@ -5,13 +5,13 @@
 #include "src/graphics/display/drivers/intel-i915/pipe.h"
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
-#include <float.h>
 #include <lib/ddk/debug.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
-#include <math.h>
 
+#include <cfloat>
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <optional>

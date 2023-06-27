@@ -5,8 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_UTILS_H_
 #define SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_UTILS_H_
 
-#include <inttypes.h>
-
+#include <cinttypes>
 #include <cmath>
 
 static inline uint32_t interpolate(uint32_t max, int32_t cur_frame, int32_t period) {

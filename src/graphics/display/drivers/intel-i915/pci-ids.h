@@ -5,8 +5,9 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_PCI_IDS_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_PCI_IDS_H_
 
-#include <stdint.h>
 #include <zircon/assert.h>
+
+#include <cstdint>
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 

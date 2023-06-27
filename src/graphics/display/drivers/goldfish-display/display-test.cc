@@ -9,9 +9,9 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
 #include <lib/ddk/device.h>
-#include <stdio.h>
 
 #include <array>
+#include <cstdio>
 #include <memory>
 
 #include <fbl/alloc_checker.h>

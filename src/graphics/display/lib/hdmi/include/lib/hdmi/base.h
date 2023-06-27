@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_HDMI_INCLUDE_LIB_HDMI_BASE_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_HDMI_INCLUDE_LIB_HDMI_BASE_H_
 
-#include <stdint.h>
+#include <cstdint>
 
 class HdmiIpBase {
  public:

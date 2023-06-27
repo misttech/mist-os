@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/status.h>
 #include <zircon/types.h>
 
 #include <chrono>
@@ -12,8 +13,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "gmock/gmock.h"
-#include "lib/fidl/cpp/wire/status.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/testing/fake-coordinator-connector/service.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"

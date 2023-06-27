@@ -4,15 +4,16 @@
 
 #include "src/graphics/display/drivers/intel-i915/display-device.h"
 
-#include <float.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
-#include <math.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+
+#include <cfloat>
+#include <cmath>
 
 #include <ddktl/fidl.h>
 

@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "virtual-layer.h"
+#include "src/graphics/display/testing/client-utils/virtual-layer.h"
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fidl/fuchsia.images2/cpp/wire_types.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
-#include <math.h>
-#include <stdio.h>
 
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
 #include <iterator>
 
 #include <fbl/algorithm.h>
 
-#include "utils.h"
+#include "src/graphics/display/testing/client-utils/utils.h"
 
 namespace fhd = fuchsia_hardware_display;
 

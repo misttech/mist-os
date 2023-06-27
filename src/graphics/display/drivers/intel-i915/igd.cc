@@ -7,14 +7,14 @@
 #include <lib/device-protocol/pci.h>
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/result.h>
-#include <limits.h>
 #include <zircon/status.h>
+
+#include <climits>
 
 #include <hwreg/bitfields.h>
 
 #include "src/graphics/display/drivers/intel-i915/acpi-memory-region.h"
 #include "src/graphics/display/drivers/intel-i915/firmware-bridge.h"
-#include "src/graphics/display/drivers/intel-i915/intel-i915.h"
 
 namespace i915 {
 

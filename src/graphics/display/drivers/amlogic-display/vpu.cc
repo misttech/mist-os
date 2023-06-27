@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
 
 #include <lib/ddk/debug.h>
+#include <zircon/errors.h>
 
 #include <ddktl/device.h>
 
@@ -12,7 +13,6 @@
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
-#include "zircon/errors.h"
 
 namespace amlogic_display {
 

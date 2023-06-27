@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_EDID_TIMINGS_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_EDID_TIMINGS_H_
 
-#include <inttypes.h>
+#include <cinttypes>
 
 namespace edid {
 

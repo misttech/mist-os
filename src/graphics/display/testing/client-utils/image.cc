@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "image.h"
+#include "src/graphics/display/testing/client-utils/image.h"
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
@@ -14,8 +14,6 @@
 #include <lib/zx/event.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
-#include <stdio.h>
-#include <string.h>
 #include <zircon/assert.h>
 #include <zircon/process.h>
 #include <zircon/status.h>
@@ -24,11 +22,13 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <limits>
 
 #include <fbl/algorithm.h>
 
-#include "utils.h"
+#include "src/graphics/display/testing/client-utils/utils.h"
 
 static constexpr uint32_t kRenderPeriod = 120;
 

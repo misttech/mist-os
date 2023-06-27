@@ -7,9 +7,9 @@
 #include <lib/ddk/debug.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/align.h>
-#include <stdlib.h>
 
 #include <climits>
+#include <cstdlib>
 #include <limits>
 #include <memory>
 #include <utility>

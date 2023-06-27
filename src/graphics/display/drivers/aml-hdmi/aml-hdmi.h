@@ -15,9 +15,9 @@
 #include <lib/hdmi/base.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
-#include <string.h>
 
 #include <cstdint>
+#include <cstring>
 #include <optional>
 
 #include <ddktl/device.h>

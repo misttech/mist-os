@@ -11,13 +11,13 @@
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zircon-internal/align.h>
-#include <string.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/time.h>
 
 #include <cinttypes>
+#include <cstring>
 #include <memory>
 #include <optional>
 #include <utility>

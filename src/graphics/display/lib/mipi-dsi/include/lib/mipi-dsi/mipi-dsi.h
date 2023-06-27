@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_MIPI_DSI_MIPI_DSI_H_
-#define LIB_MIPI_DSI_MIPI_DSI_H_
+#ifndef SRC_GRAPHICS_DISPLAY_LIB_MIPI_DSI_INCLUDE_LIB_MIPI_DSI_MIPI_DSI_H_
+#define SRC_GRAPHICS_DISPLAY_LIB_MIPI_DSI_INCLUDE_LIB_MIPI_DSI_MIPI_DSI_H_
 
 #include <fidl/fuchsia.hardware.dsi/cpp/wire.h>
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/zx/result.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
 #include <unistd.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
 
 // Some of the constants here are from the MIPI Alliance Specification for
 // Display Serial Interface (DSI), which can be obtained from
@@ -104,4 +104,4 @@ class MipiDsi {
 
 }  // namespace mipi_dsi
 
-#endif  // LIB_MIPI_DSI_MIPI_DSI_H_
+#endif  // SRC_GRAPHICS_DISPLAY_LIB_MIPI_DSI_INCLUDE_LIB_MIPI_DSI_MIPI_DSI_H_

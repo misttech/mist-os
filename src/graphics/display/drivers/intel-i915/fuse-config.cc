@@ -4,10 +4,10 @@
 
 #include "src/graphics/display/drivers/intel-i915/fuse-config.h"
 
+#include <lib/ddk/debug.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/assert.h>
 
-#include "lib/ddk/debug.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 

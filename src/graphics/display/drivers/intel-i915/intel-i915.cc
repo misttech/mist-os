@@ -4,11 +4,10 @@
 
 #include "src/graphics/display/drivers/intel-i915/intel-i915.h"
 
-#include <assert.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
 #include <fuchsia/hardware/sysmem/c/banjo.h>
-#include <inttypes.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -24,16 +23,16 @@
 #include <lib/zx/time.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
 #include <algorithm>
+#include <cinttypes>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <future>
 #include <iterator>
 #include <limits>
@@ -44,8 +43,6 @@
 #include <fbl/auto_lock.h>
 #include <fbl/vector.h>
 
-#include "fidl/fuchsia.sysmem/cpp/markers.h"
-#include "fuchsia/hardware/display/controller/c/banjo.h"
 #include "src/graphics/display/drivers/intel-i915/clock/cdclk.h"
 #include "src/graphics/display/drivers/intel-i915/ddi.h"
 #include "src/graphics/display/drivers/intel-i915/display-device.h"

@@ -5,10 +5,9 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_EDID_EDID_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_EDID_EDID_H_
 
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <memory>
 #include <optional>
 #include <string>

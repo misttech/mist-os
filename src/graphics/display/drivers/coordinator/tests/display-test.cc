@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.display/cpp/markers.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire_test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>

@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_SYSMEM_DEVICE_WRAPPER_H_
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/sysmem/c/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 
 #include <type_traits>

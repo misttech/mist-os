@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "display.h"
+#include "src/graphics/display/drivers/goldfish-display/display.h"
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/goldfish/control/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/time.h>
@@ -14,6 +16,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fit/defer.h>
@@ -32,13 +35,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
-#include "fidl/fuchsia.sysmem/cpp/common_types.h"
-#include "fidl/fuchsia.sysmem/cpp/markers.h"
-#include "fidl/fuchsia.sysmem/cpp/natural_types.h"
-#include "fuchsia/hardware/display/controller/c/banjo.h"
-#include "lib/fidl/cpp/channel.h"
-#include "lib/fidl/cpp/wire/internal/transport_channel.h"
-#include "lib/fidl/cpp/wire/traits.h"
 #include "src/devices/lib/goldfish/pipe_headers/include/base.h"
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"

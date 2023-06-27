@@ -11,10 +11,10 @@
 #include <lib/zx/result.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
-#include <limits.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <limits>

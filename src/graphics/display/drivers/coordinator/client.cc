@@ -18,8 +18,6 @@
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
-#include <math.h>
-#include <string.h>
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -28,7 +26,9 @@
 
 #include <algorithm>
 #include <cinttypes>
+#include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <random>
 #include <type_traits>

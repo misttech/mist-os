@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <limits.h>
-#include <stddef.h>
-#include <stdint.h>
+#include <climits>
+#include <cstddef>
+#include <cstdint>
 
 #include "src/graphics/display/lib/edid/edid.h"
 

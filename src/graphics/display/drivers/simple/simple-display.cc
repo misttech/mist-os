@@ -4,7 +4,6 @@
 
 #include "simple-display.h"
 
-#include <assert.h>
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
@@ -17,15 +16,14 @@
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zbi-format/graphics.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <zircon/process.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
 #include <atomic>
+#include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <utility>
 

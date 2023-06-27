@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "display.h"
+#include "src/graphics/display/testing/client-utils/display.h"
 
-#include <math.h>
-#include <stdio.h>
 #include <zircon/syscalls.h>
 
 #include <array>
+#include <cmath>
+#include <cstdio>
 
 namespace fhd = fuchsia_hardware_display;
 

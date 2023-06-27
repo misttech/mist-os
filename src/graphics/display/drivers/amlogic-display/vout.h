@@ -13,9 +13,9 @@
 #include <lib/device-protocol/display-panel.h>
 #include <lib/zx/result.h>
 
-#include "clock.h"
-#include "dsi-host.h"
-#include "hdmi-host.h"
+#include "src/graphics/display/drivers/amlogic-display/clock.h"
+#include "src/graphics/display/drivers/amlogic-display/dsi-host.h"
+#include "src/graphics/display/drivers/amlogic-display/hdmi-host.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace amlogic_display {

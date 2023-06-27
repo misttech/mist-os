@@ -11,8 +11,6 @@
 #include <limits>
 #include <type_traits>
 
-#include "fuchsia/hardware/display/controller/c/banjo.h"
-
 namespace display {
 
 Transform ToTransform(fuchsia_hardware_display::wire::Transform transform_fidl) {

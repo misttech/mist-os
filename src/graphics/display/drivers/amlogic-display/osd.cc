@@ -4,13 +4,12 @@
 
 #include "src/graphics/display/drivers/amlogic-display/osd.h"
 
-#include <float.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/zx/clock.h>
+#include <lib/zx/pmt.h>
 #include <lib/zx/time.h>
-#include <math.h>
-#include <stdint.h>
+#include <lib/zx/vmar.h>
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -19,6 +18,7 @@
 #include <zircon/utc.h>
 
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <cstdint>
 
@@ -26,8 +26,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
-#include "lib/zx/pmt.h"
-#include "lib/zx/vmar.h"
 #include "src/graphics/display/drivers/amlogic-display/amlogic-display.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"

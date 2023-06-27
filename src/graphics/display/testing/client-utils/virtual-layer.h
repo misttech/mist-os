@@ -11,8 +11,8 @@
 #include <lib/zx/channel.h>
 #include <zircon/types.h>
 
-#include "display.h"
-#include "image.h"
+#include "src/graphics/display/testing/client-utils/display.h"
+#include "src/graphics/display/testing/client-utils/image.h"
 
 namespace testing {
 namespace display {

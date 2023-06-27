@@ -4,11 +4,10 @@
 
 #include "src/graphics/display/lib/edid/edid.h"
 
-#include <math.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <string.h>
-
+#include <cmath>
+#include <cstddef>
+#include <cstdio>
+#include <cstring>
 #include <iterator>
 #include <memory>
 

@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lib/mipi-dsi/mipi-dsi.h"
-
 #include <fidl/fuchsia.hardware.dsi/cpp/wire.h>
+#include <lib/mipi-dsi/mipi-dsi.h>
 
 #include <algorithm>
 #include <cstdint>

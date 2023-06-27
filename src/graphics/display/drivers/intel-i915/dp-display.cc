@@ -12,12 +12,12 @@
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
-#include <math.h>
-#include <string.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
 #include <algorithm>
+#include <cmath>
+#include <cstring>
 #include <iterator>
 #include <optional>
 #include <variant>

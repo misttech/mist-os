@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <inttypes.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
 #include <lib/ddk/device.h>
@@ -18,6 +17,7 @@
 #include <lib/zx/event.h>
 #include <zircon/assert.h>
 
+#include <cinttypes>
 #include <memory>
 
 namespace display {

@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_H_
 
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
-#include <fuchsia/hardware/display/clamprgb/c/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>

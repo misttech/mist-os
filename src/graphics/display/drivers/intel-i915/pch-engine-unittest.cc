@@ -6,9 +6,8 @@
 
 #include <lib/mmio/mmio-buffer.h>
 
+#include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
-
-#include "gtest/gtest.h"
 
 namespace i915 {
 

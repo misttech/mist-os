@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/aml-hdmi/aml-hdmi.h"
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/hdmi/base.h>
 
 #include <queue>
 
@@ -13,7 +14,6 @@
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
-#include "lib/hdmi/base.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace aml_hdmi {

@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/virtio-guest/gpu.h"
 
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
 #include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
@@ -11,10 +12,9 @@
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/fake-bti/bti.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <zircon/compiler.h>
 
-#include "fidl/fuchsia.hardware.sysmem/cpp/markers.h"
-#include "lib/fidl/cpp/wire/channel.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
 #define USE_GTEST

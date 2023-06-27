@@ -5,20 +5,20 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_IGD_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_IGD_H_
 
-#include <inttypes.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/zx/vmo.h>
-#include <stddef.h>
-#include <string.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
+#include <cinttypes>
+#include <cstddef>
+#include <cstring>
 #include <unordered_map>
 
 #include <hwreg/bitfields.h>
 
 #include "src/graphics/display/drivers/intel-i915/acpi-memory-region.h"
-#include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
+#include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 
 namespace i915 {
 // Various definitions from IGD OpRegion/Software SCI documentation.

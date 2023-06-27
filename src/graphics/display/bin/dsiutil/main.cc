@@ -7,14 +7,13 @@
 #include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/zx/channel.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <zircon/fidl.h>
 #include <zircon/types.h>
 
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 #include "src/lib/fxl/command_line.h"
 
