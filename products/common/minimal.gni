@@ -10,6 +10,8 @@ import("//products/common/bringup.gni")
 use_bringup_assembly = false
 bootfs_only = false
 
+include_shell_commands_package = true
+
 core_realm_shards = [
   "//src/connectivity/network:virtualization-core-shard",
   "//src/developer/memory/monitor:memory_monitor_core_shard",
@@ -49,6 +51,14 @@ legacy_base_package_labels += [
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/sys/full-resolver",  # This seems needed to run the session manager
+
+  # Tools to control the pkg subsystem are in the base package set by default
+  # so the software delivery system can be debugged and reconfigured without
+  # access to the full universe package set.
+  # Product configurations that lack an accessible shell environment should
+  # remove these tools from the base package set.
+  # TODO(fxbug.dev/80375): only include in eng builds
+  "//src/sys/pkg:tools",
 ]
 
 product_bootfs_labels += [

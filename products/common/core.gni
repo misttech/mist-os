@@ -57,13 +57,6 @@ legacy_base_package_labels += [
 # Add the cache storage manager.
 legacy_base_package_labels += [ "//src/sys/cache_manager" ]
 
-# Tools to control the pkg subsystem are in the base package set by default
-# so the software delivery system can be debugged and reconfigured without
-# access to the full universe package set.
-# Product configurations that lack an accessible shell environment should
-# remove these tools from the base package set.
-legacy_base_package_labels += [ "//src/sys/pkg:tools" ]
-
 # cargo-gnaw is currently part of all build graphs, but it should only
 # built by fx tooling
 legacy_base_package_labels += [ "//tools/cargo-gnaw:install-cargo-gnaw" ]
