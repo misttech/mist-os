@@ -69,7 +69,7 @@ async fn component_manager_namespace() {
         .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
         .unwrap();
 
-    let mut event_stream = component_events::events::EventStream::new_v2(proxy);
+    let mut event_stream = component_events::events::EventStream::new(proxy);
 
     // Unblock the component_manager.
     instance.start_component_tree().await.unwrap();

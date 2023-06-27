@@ -33,7 +33,7 @@ async fn scoped_instances(root_component: &'static str) {
         .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
         .unwrap();
 
-    let mut event_stream = EventStream::new_v2(proxy);
+    let mut event_stream = EventStream::new(proxy);
 
     instance.start_component_tree().await.unwrap();
 

@@ -33,7 +33,7 @@ async fn wait_for_clean_stop(cm: RealmInstance, moniker_to_wait_on: &str) {
     let proxy =
         cm.root.connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>().unwrap();
 
-    let mut event_stream = EventStream::new_v2(proxy);
+    let mut event_stream = EventStream::new(proxy);
 
     cm.start_component_tree().await.unwrap();
 
