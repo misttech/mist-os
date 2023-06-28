@@ -33,7 +33,7 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #      * ${target_name}_product_assembly: for image_assembly.json
 #      * ${target_name}_create_system: for images.json
 #
-#    NOTE: This template does not check this is the actual product image target
+#    NOTE: This template does NOT check this is the actual product image target
 #    used in `bazel_product_bundle_target`.
 #
 #    Type: label (from BUIDL.bazel)
@@ -46,10 +46,23 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #
 #      * ${target_name}_create_recovery_system: for images.json
 #
-#    NOTE: This template does not check this is the actual recovery image target
+#    NOTE: This template does NOT check this is the actual recovery image target
 #    used in `bazel_product_bundle_target`.
 #
 #    Type: label (from BUIDL.bazel)
+#
+#  bazel_size_checker_target (optional)
+#    The Bazel fuchsia_size_checker target for this product bundle.
+#
+#    When set, two extra sub_targets are provided to access outputs from Bazel
+#    size checker:
+#
+#      * ${target_name}_product_size_checker: for running product size checks
+#        and producing size_breakdown.txt and a visualization.
+#      * ${target_name}_size_report: for size_report.json and verbose_output.json
+#
+#    NOTE: This template does NOT check the provided size checker target matches
+#    the product bundle.
 #
 #  bazel_inputs_from_gn (required)
 #    The Bazel input targets (defined by bazel_input_xxx GN templates) used to
@@ -199,6 +212,82 @@ template("bazel_product_bundle") {
       ]
       directory_timestamp_outputs =
           [ "${_create_recovery_system_target}/images.json" ]
+    }
+  }
+
+  if (defined(invoker.bazel_size_checker_target)) {
+    _product_size_checker_target = "${target_name}_product_size_checker"
+    bazel_action(_product_size_checker_target) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                               "deps",
+                             ])
+
+      command = "build"
+      bazel_targets = [ invoker.bazel_size_checker_target + "_product" ]
+      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+      allow_directory_in_outputs = true
+
+      _visualization_path = "${_product_size_checker_target}/visualization"
+      _size_breakdown_path =
+          "${_product_size_checker_target}/size_breakdown.txt"
+      copy_outputs = [
+        {
+          bazel = "{{BAZEL_TARGET_OUT_PATH}}_visualization"
+          ninja = _visualization_path
+        },
+        {
+          bazel = "{{BAZEL_TARGET_OUT_PATH}}_size_breakdown.txt"
+          ninja = _size_breakdown_path
+        },
+      ]
+
+      metadata = {
+        product_size_checker_output = [
+          {
+            visualization =
+                rebase_path("${target_gen_dir}/${_visualization_path}",
+                            root_build_dir)
+            size_breakdown =
+                rebase_path("${target_gen_dir}/${_size_breakdown_path}",
+                            root_build_dir)
+          },
+        ]
+      }
+    }
+
+    _size_report_target = "${target_name}_size_report"
+    bazel_action(_size_report_target) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                               "deps",
+                             ])
+
+      command = "build"
+      bazel_targets = [ invoker.bazel_size_checker_target + "_aggregator" ]
+      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+
+      _size_report_path = "${_size_report_target}/size_report.json"
+      copy_outputs = [
+        {
+          bazel = "{{BAZEL_TARGET_OUT_PATH}}_size_report.json"
+          ninja = _size_report_path
+        },
+        {
+          bazel = "{{BAZEL_TARGET_OUT_PATH}}_verbose_output.json"
+          ninja = "${_size_report_target}/verbose_output.json"
+        },
+      ]
+
+      metadata = {
+        gerrit_size_reports =
+            [ rebase_path("${target_gen_dir}/${_size_report_path}",
+                          root_build_dir) ]
+      }
     }
   }
 
