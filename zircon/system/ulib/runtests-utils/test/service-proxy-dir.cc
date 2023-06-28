@@ -16,7 +16,6 @@
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
 #include "src/lib/storage/vfs/cpp/service.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
-#include "src/lib/storage/vfs/cpp/vmo_file.h"
 
 namespace fio = fuchsia_io;
 
@@ -57,12 +56,13 @@ TEST(ServiceProxyDirTest, Simple) {
 
   zx::result endpoints = fidl::CreateEndpoints<fio::Directory>();
   ASSERT_OK(endpoints.status_value());
+  auto& [client, server] = endpoints.value();
 
-  ASSERT_OK(vfs->ServeDirectory(std::move(dir), std::move(endpoints->server)));
+  ASSERT_OK(vfs->ServeDirectory(std::move(dir), std::move(server)));
   ASSERT_OK(loop.StartThread());
 
   Echo proxy_echo(kProxyEchoString);
-  auto proxy_dir = fbl::MakeRefCounted<runtests::ServiceProxyDir>(std::move(endpoints->client));
+  auto proxy_dir = fbl::MakeRefCounted<runtests::ServiceProxyDir>(std::move(client));
   proxy_dir->AddEntry(
       kProxyEchoString,
       fbl::MakeRefCounted<fs::Service>([&proxy_echo, dispatcher = loop.dispatcher()](
@@ -74,19 +74,20 @@ TEST(ServiceProxyDirTest, Simple) {
 
   zx::result proxy_endpoints = fidl::CreateEndpoints<fio::Directory>();
   ASSERT_OK(proxy_endpoints.status_value());
+  auto& [proxy_client, proxy_server] = proxy_endpoints.value();
 
-  ASSERT_OK(vfs->ServeDirectory(std::move(proxy_dir), std::move(proxy_endpoints->server)));
+  ASSERT_OK(vfs->ServeDirectory(std::move(proxy_dir), std::move(proxy_server)));
   ASSERT_OK(loop.StartThread());
 
   // First check the service served directly by the proxy.
   {
     zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
     ASSERT_OK(endpoints.status_value());
+    auto& [client, server] = endpoints.value();
 
-    ASSERT_OK(fidl::WireCall(proxy_endpoints->client)
-                  ->Open(fio::wire::OpenFlags::kRightReadable |
-                             fio::wire::OpenFlags::kRightWritable | fio::wire::OpenFlags::kDescribe,
-                         {}, fidl::StringView(kProxyEchoString), std::move(endpoints->server))
+    ASSERT_OK(fidl::WireCall(proxy_client)
+                  ->Open(fio::wire::OpenFlags::kDescribe, {}, fidl::StringView(kProxyEchoString),
+                         std::move(server))
                   .status());
 
     class EventHandler : public fidl::WireSyncEventHandler<fio::Node> {
@@ -106,12 +107,12 @@ TEST(ServiceProxyDirTest, Simple) {
     };
 
     EventHandler event_handler;
-    ASSERT_OK(event_handler.HandleOneEvent(endpoints->client));
+    ASSERT_OK(event_handler.HandleOneEvent(client));
     ASSERT_OK(event_handler.status());
 
-    const fidl::WireResult result = fidl::WireCall(fidl::UnownedClientEnd<fidl_test_echo::Echo>{
-                                                       endpoints->client.channel().borrow()})
-                                        ->EchoString(kTestString);
+    const fidl::WireResult result =
+        fidl::WireCall(fidl::UnownedClientEnd<fidl_test_echo::Echo>{client.channel().borrow()})
+            ->EchoString(kTestString);
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
     ASSERT_EQ(response.response.get(), kProxyEchoString);
@@ -121,11 +122,11 @@ TEST(ServiceProxyDirTest, Simple) {
   {
     zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
     ASSERT_OK(endpoints.status_value());
+    auto& [client, server] = endpoints.value();
 
-    ASSERT_OK(fidl::WireCall(proxy_endpoints->client)
-                  ->Open(fio::wire::OpenFlags::kRightReadable |
-                             fio::wire::OpenFlags::kRightWritable | fio::wire::OpenFlags::kDescribe,
-                         {}, fidl::StringView(kEchoString), std::move(endpoints->server))
+    ASSERT_OK(fidl::WireCall(proxy_client)
+                  ->Open(fio::wire::OpenFlags::kDescribe, {}, fidl::StringView(kEchoString),
+                         std::move(server))
                   .status());
 
     class EventHandler : public fidl::WireSyncEventHandler<fio::Node> {
@@ -145,12 +146,12 @@ TEST(ServiceProxyDirTest, Simple) {
     };
 
     EventHandler event_handler;
-    ASSERT_OK(event_handler.HandleOneEvent(endpoints->client));
+    ASSERT_OK(event_handler.HandleOneEvent(client));
     ASSERT_OK(event_handler.status());
 
-    const fidl::WireResult result = fidl::WireCall(fidl::UnownedClientEnd<fidl_test_echo::Echo>{
-                                                       endpoints->client.channel().borrow()})
-                                        ->EchoString(kTestString);
+    const fidl::WireResult result =
+        fidl::WireCall(fidl::UnownedClientEnd<fidl_test_echo::Echo>{client.channel().borrow()})
+            ->EchoString(kTestString);
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
     ASSERT_EQ(response.response.get(), kEchoString);
