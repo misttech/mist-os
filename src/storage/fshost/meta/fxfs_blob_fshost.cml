@@ -32,8 +32,8 @@
             protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
         },
         {
-            protocol: "fuchsia.fxfs.WriteBlob",
-            path: "/fs/blob/svc/fuchsia.fxfs.WriteBlob",
+            protocol: "fuchsia.fxfs.BlobCreator",
+            path: "/fs/blob/svc/fuchsia.fxfs.BlobCreator",
         },
     ],
     use: [
@@ -106,7 +106,7 @@
             from: "self",
         },
         {
-            protocol: "fuchsia.fxfs.WriteBlob",
+            protocol: "fuchsia.fxfs.BlobCreator",
             from: "self",
         },
     ],

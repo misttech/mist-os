@@ -75,7 +75,7 @@
             availability: "optional",
         },
         {
-            protocol: "fuchsia.fxfs.WriteBlob",
+            protocol: "fuchsia.fxfs.BlobCreator",
             availability: "optional",
         },
     ],

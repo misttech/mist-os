@@ -45,7 +45,7 @@ mod tests {
         let writer_client_end = blob_proxy
             .create(&hash.into(), false)
             .await
-            .expect("transport error on WriteBlob.Create")
+            .expect("transport error on BlobCreator.Create")
             .expect("failed to create blob");
         let writer = writer_client_end.into_proxy().unwrap();
         let mut blob_writer = BlobWriter::create(writer, data.len() as u64)
@@ -109,7 +109,7 @@ mod tests {
         let writer_client_end = blob_proxy
             .create(&hash.into(), false)
             .await
-            .expect("transport error on WriteBlob.Create")
+            .expect("transport error on BlobCreator.Create")
             .expect("failed to create blob");
         let writer = writer_client_end.into_proxy().unwrap();
 

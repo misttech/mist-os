@@ -1092,7 +1092,7 @@
             to: "#pkg-cache",
         },
         {
-            protocol: "fuchsia.fxfs.WriteBlob",
+            protocol: "fuchsia.fxfs.BlobCreator",
             from: "#fshost",
             to: "#pkg-cache",
             availability: "optional",

@@ -254,10 +254,10 @@
                 },
 
                 // TODO(https://fxbug.dev/107231): Fix when optional exposes are supported. Right
-                // now fshost only exposes fuchsia.fxfs.WriteBlob when fxblob is enabled.
+                // now fshost only exposes fuchsia.fxfs.BlobCreator when fxblob is enabled.
                 {
                     using_node: "/bootstrap/pkg-cache",
-                    capability: "fuchsia.fxfs.WriteBlob",
+                    capability: "fuchsia.fxfs.BlobCreator",
                     error: {
                         error: {
                             analyzer_model_error: {
@@ -265,12 +265,12 @@
                                     offer_from_child_expose_not_found: {
                                         child_moniker: "fshost",
                                         moniker: "/bootstrap",
-                                        capability_id: "fuchsia.fxfs.WriteBlob",
+                                        capability_id: "fuchsia.fxfs.BlobCreator",
                                     },
                                 },
                             },
                         },
-                        message: "`fuchsia.fxfs.WriteBlob` was not exposed to `/bootstrap` from child `#fshost`.",
+                        message: "`fuchsia.fxfs.BlobCreator` was not exposed to `/bootstrap` from child `#fshost`.",
                     },
                 },
                 {
