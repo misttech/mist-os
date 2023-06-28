@@ -214,7 +214,13 @@ fn create_socket_ops(
         SocketDomain::Unix => Ok(Box::new(UnixSocket::new(socket_type))),
         SocketDomain::Vsock => Ok(Box::new(VsockSocket::new(socket_type))),
         SocketDomain::Inet | SocketDomain::Inet6 => {
-            Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
+            // Follow Linux, and require CAP_NET_RAW to create raw sockets.
+            // See https://man7.org/linux/man-pages/man7/raw.7.html.
+            if socket_type == SocketType::Raw && !current_task.creds().has_capability(CAP_NET_RAW) {
+                error!(EPERM)
+            } else {
+                Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
+            }
         }
         SocketDomain::Netlink => {
             let netlink_family = NetlinkFamily::from_raw(protocol.as_raw());
