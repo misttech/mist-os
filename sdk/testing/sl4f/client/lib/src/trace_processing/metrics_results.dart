@@ -30,6 +30,7 @@ enum Unit {
 
   // Count-based units.
   count,
+  countSmallerIsBetter,
 
   // Power-based units.
   watts,
@@ -43,6 +44,7 @@ const _unitToCatapultConverterString = {
   Unit.framesPerSecond: 'frames/second',
   Unit.percent: 'percent',
   Unit.count: 'count',
+  Unit.countSmallerIsBetter: 'count_smallerIsBetter',
   Unit.watts: 'Watts',
 };
 

@@ -508,8 +508,8 @@ List<TestCaseResults> flutterFrameStatsMetricsProcessor(
         '${flutterAppName}_frame_time_discrepancy',
         Unit.milliseconds,
         [results.fpsResult.frameTimeDiscrepancy.toMillisecondsF()]),
-    TestCaseResults('${flutterAppName}_undisplayed_frame_count', Unit.count,
-        [results.undisplayedFrameCount.toDouble()]),
+    TestCaseResults('${flutterAppName}_undisplayed_frame_count',
+        Unit.countSmallerIsBetter, [results.undisplayedFrameCount.toDouble()]),
   ];
 }
 

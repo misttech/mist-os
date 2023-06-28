@@ -3655,6 +3655,10 @@
               "name": "count",
               "type": "EnumConstantDeclarationImpl"
             },
+            "countSmallerIsBetter": {
+              "name": "countSmallerIsBetter",
+              "type": "EnumConstantDeclarationImpl"
+            },
             "framesPerSecond": {
               "name": "framesPerSecond",
               "type": "EnumConstantDeclarationImpl"
