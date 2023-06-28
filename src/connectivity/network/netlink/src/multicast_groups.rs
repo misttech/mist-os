@@ -33,9 +33,8 @@
 use std::marker::PhantomData;
 
 use bit_set::BitSet;
-use tracing::warn;
 
-use crate::NETLINK_LOG_TAG;
+use crate::logging::log_warn;
 
 // Safe "as" conversion because u32::BITS (32) will fit into any usize.
 const U32_BITS_USIZE: usize = u32::BITS as usize;
@@ -204,8 +203,7 @@ impl<F: MulticastCapableNetlinkFamily> MulticastGroupMemberships<F> {
                 (Some(modern_group), true) => Mutation::Add(modern_group),
                 (Some(modern_group), false) => Mutation::Del(modern_group),
                 (None, true) => {
-                    warn!(
-                        tag = NETLINK_LOG_TAG,
+                    log_warn!(
                         "failed to join legacy groups ({:?}) because of invalid group: {:?}",
                         requested_groups,
                         legacy_group

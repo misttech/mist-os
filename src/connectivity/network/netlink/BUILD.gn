@@ -58,6 +58,7 @@ rustc_library("netlink") {
     "src/errors.rs",
     "src/interfaces.rs",
     "src/lib.rs",
+    "src/logging.rs",
     "src/messaging.rs",
     "src/multicast_groups.rs",
     "src/netlink_packet.rs",

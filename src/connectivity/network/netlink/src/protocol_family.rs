@@ -12,16 +12,15 @@ use std::fmt::Debug;
 // #![feature(async_fn_in_trait)] once it supports `Send` bounds. See
 // https://blog.rust-lang.org/inside-rust/2023/05/03/stabilizing-async-fn-in-trait.html.
 use async_trait::async_trait;
-use tracing::{debug, warn};
 
 use crate::{
     client::{ExternalClient, InternalClient},
+    logging::{log_debug, log_warn},
     messaging::Sender,
     multicast_groups::{
         InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
         MulticastCapableNetlinkFamily,
     },
-    NETLINK_LOG_TAG,
 };
 
 /// A type representing a Netlink Protocol Family.
@@ -166,9 +165,11 @@ pub mod route {
         let interface_id = match NonZeroU32::new(message.header.index) {
             Some(interface_id) => interface_id,
             None => {
-                debug!(
+                log_debug!(
                     "unspecified interface ID in address {} request from {}: {:?}",
-                    kind, client, req,
+                    kind,
+                    client,
+                    req,
                 );
                 return Err(Errno::EINVAL);
             }
@@ -182,9 +183,12 @@ pub mod route {
             AddressNla::Local(bytes) => local_bytes = Some(bytes),
             AddressNla::Flags(flags) => addr_flags = Some(*flags),
             nla => {
-                warn!(
+                log_warn!(
                     "unexpected Address NLA in {} request from {}: {:?}; req = {:?}",
-                    kind, client, nla, req,
+                    kind,
+                    client,
+                    nla,
+                    req,
                 );
             }
         });
@@ -231,7 +235,7 @@ pub mod route {
                 if local == address {
                     address
                 } else {
-                    debug!(
+                    log_debug!(
                     "got different `IFA_ADDRESS` and `IFA_LOCAL` values for {} address request from {}: {:?}",
                     kind, client, req,
                 );
@@ -240,9 +244,11 @@ pub mod route {
             }
             (Some(bytes), None) | (None, Some(bytes)) => bytes,
             (None, None) => {
-                debug!(
+                log_debug!(
                     "missing `IFA_ADDRESS` and `IFA_LOCAL` in address {} request from {}: {:?}",
-                    kind, client, req,
+                    kind,
+                    client,
+                    req,
                 );
                 return Err(Errno::EINVAL);
             }
@@ -284,9 +290,12 @@ pub mod route {
                 }
             }
             family => {
-                debug!(
+                log_debug!(
                     "invalid address family ({}) in address {} request from {}: {:?}",
-                    family, kind, client, req,
+                    family,
+                    kind,
+                    client,
+                    req,
                 );
                 return Err(Errno::EINVAL);
             }
@@ -299,7 +308,12 @@ pub mod route {
                 | AddrSubnetError::NotUnicastInSubnet
                 | AddrSubnetError::InvalidWitness,
             ) => {
-                debug!("invalid address in address {} request from {}: {:?}", kind, client, req);
+                log_debug!(
+                    "invalid address in address {} request from {}: {:?}",
+                    kind,
+                    client,
+                    req
+                );
                 return Err(Errno::EINVAL);
             }
         };
@@ -326,9 +340,10 @@ pub mod route {
             let req = match payload {
                 NetlinkPayload::InnerMessage(p) => p,
                 p => {
-                    warn!(
-                        tag = NETLINK_LOG_TAG,
-                        "Ignoring request from client {} with unexpected payload: {:?}", client, p
+                    log_warn!(
+                        "Ignoring request from client {} with unexpected payload: {:?}",
+                        client,
+                        p
                     );
                     return;
                 }
@@ -363,7 +378,7 @@ pub mod route {
                         AF_INET => Some(IpVersion::V4),
                         AF_INET6 => Some(IpVersion::V6),
                         family => {
-                            debug!(
+                            log_debug!(
                                 "invalid address family ({}) in address dump request from {}: {:?}",
                                 family, client, req,
                             );
@@ -497,7 +512,7 @@ pub mod route {
                             process_dump_for_routes_worker(v6_routes_request_sink, client, req_header).await;
                         },
                         family => {
-                            debug!("invalid address family ({}) in route dump request from {}: {:?}", family, client, req);
+                            log_debug!("invalid address family ({}) in route dump request from {}: {:?}", family, client, req);
                             client.send_unicast(
                                 netlink_packet::new_error(Errno::EINVAL, req_header));
                             return;
@@ -539,13 +554,13 @@ pub mod route {
                 // TODO(https://issuetracker.google.com/283134947): Implement DelRule.
                 | DelRule(_) => {
                     if expects_ack {
-                        warn!(
+                        log_warn!(
                             "Received unsupported NETLINK_ROUTE request; responding with an Ack: {:?}",
                             req,
                         );
                         client.send_unicast(netlink_packet::new_ack(req_header))
                     } else {
-                        warn!(
+                        log_warn!(
                             "Received unsupported NETLINK_ROUTE request that does not expect an Ack: {:?}",
                             req,
                         )
@@ -569,19 +584,19 @@ pub mod route {
                 // TODO(https://issuetracker.google.com/283134947): Implement GetRule.
                 | GetRule(_) => {
                     if is_dump {
-                        warn!(
+                        log_warn!(
                             "Received unsupported NETLINK_ROUTE DUMP request; responding with Done: {:?}",
                             req
                         );
                         client.send_unicast(netlink_packet::new_done(req_header))
                     } else if expects_ack {
-                        warn!(
+                        log_warn!(
                             "Received unsupported NETLINK_ROUTE GET request: responding with Ack {:?}",
                             req
                         );
                         client.send_unicast(netlink_packet::new_ack(req_header))
                     } else {
-                        warn!(
+                        log_warn!(
                             "Received unsupported NETLINK_ROUTE GET request that does not expect an Ack {:?}",
                             req
                         )

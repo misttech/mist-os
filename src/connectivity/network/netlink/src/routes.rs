@@ -24,18 +24,16 @@ use netlink_packet_route::{
     RTNLGRP_IPV6_ROUTE, RTN_UNICAST, RTPROT_UNSPEC, RT_SCOPE_UNIVERSE, RT_TABLE_UNSPEC,
 };
 use netlink_packet_utils::nla::Nla;
-use tracing::{debug, warn};
 
 use crate::{
     client::{ClientTable, InternalClient},
     errors::EventLoopError,
+    logging::{log_debug, log_warn},
     messaging::Sender,
     multicast_groups::ModernGroup,
     netlink_packet::UNSPECIFIED_SEQUENCE_NUMBER,
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
 };
-
-use crate::NETLINK_LOG_TAG;
 
 /// Arguments for an RTM_GETROUTE [`Request`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -230,7 +228,7 @@ impl<
         route_messages: &HashSet<NetlinkRouteMessage>,
         Request { args, sequence_number, mut client, completer }: Request<S>,
     ) {
-        debug!("handling request {args:?} from {client}");
+        log_debug!("handling request {args:?} from {client}");
 
         let result = match &args {
             RequestArgs::Route(RouteRequestArgs::Get(args)) => match args {
@@ -243,16 +241,18 @@ impl<
             },
         };
 
-        debug!("handled request {args:?} from {client} with result = {result:?}");
+        log_debug!("handled request {args:?} from {client} with result = {result:?}");
 
         match completer.send(result) {
             Ok(()) => (),
             Err(result) => {
                 // Not treated as a hard error because the socket may have been
                 // closed.
-                warn!(
+                log_warn!(
                     "failed to send result ({:?}) to {} after handling request {:?}",
-                    result, client, args
+                    result,
+                    client,
+                    args
                 )
             }
         }
@@ -344,17 +344,11 @@ impl NetlinkRouteMessage {
         match route.try_into() {
             Ok(route) => Some(route),
             Err(NetlinkRouteMessageConversionError::RouteActionNotForwarding) => {
-                warn!(
-                    tag = NETLINK_LOG_TAG,
-                    "Unexpected non-forwarding route in routing table: {:?}", route
-                );
+                log_warn!("Unexpected non-forwarding route in routing table: {:?}", route);
                 None
             }
             Err(NetlinkRouteMessageConversionError::InvalidInterfaceId(id)) => {
-                warn!(
-                    tag = NETLINK_LOG_TAG,
-                    "Invalid interface id found in routing table route: {:?}", id
-                );
+                log_warn!("Invalid interface id found in routing table route: {:?}", id);
                 None
             }
         }

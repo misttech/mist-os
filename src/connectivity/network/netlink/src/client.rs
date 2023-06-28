@@ -15,16 +15,15 @@ use std::{
 
 use derivative::Derivative;
 use netlink_packet_core::NetlinkMessage;
-use tracing::{debug, warn};
 
 use crate::{
+    logging::{log_debug, log_warn},
     messaging::Sender,
     multicast_groups::{
         InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
         MulticastGroupMemberships,
     },
     protocol_family::ProtocolFamily,
-    NETLINK_LOG_TAG,
 };
 
 /// A unique identifier for a client.
@@ -119,11 +118,10 @@ impl<F: ProtocolFamily> ExternalClient<F> {
     pub(crate) fn add_membership(&self, group: ModernGroup) -> Result<(), InvalidModernGroupError> {
         let res = self.inner.group_memberships.lock().unwrap().add_membership(group);
         match res {
-            Ok(()) => debug!(tag = NETLINK_LOG_TAG, "{} joined multicast group: {:?}", self, group),
-            Err(InvalidModernGroupError) => warn!(
-                tag = NETLINK_LOG_TAG,
-                "{} failed to join invalid multicast group: {:?}", self, group
-            ),
+            Ok(()) => log_debug!("{} joined multicast group: {:?}", self, group),
+            Err(InvalidModernGroupError) => {
+                log_warn!("{} failed to join invalid multicast group: {:?}", self, group)
+            }
         };
         res
     }
@@ -132,11 +130,10 @@ impl<F: ProtocolFamily> ExternalClient<F> {
     pub(crate) fn del_membership(&self, group: ModernGroup) -> Result<(), InvalidModernGroupError> {
         let res = self.inner.group_memberships.lock().unwrap().del_membership(group);
         match res {
-            Ok(()) => debug!(tag = NETLINK_LOG_TAG, "{} left multicast group: {:?}", self, group),
-            Err(InvalidModernGroupError) => warn!(
-                tag = NETLINK_LOG_TAG,
-                "{} failed to leave invalid multicast group: {:?}", self, group
-            ),
+            Ok(()) => log_debug!("{} left multicast group: {:?}", self, group),
+            Err(InvalidModernGroupError) => {
+                log_warn!("{} failed to leave invalid multicast group: {:?}", self, group)
+            }
         };
         res
     }
@@ -149,14 +146,10 @@ impl<F: ProtocolFamily> ExternalClient<F> {
         let res =
             self.inner.group_memberships.lock().unwrap().set_legacy_memberships(legacy_memberships);
         match res {
-            Ok(()) => debug!(
-                tag = NETLINK_LOG_TAG,
-                "{} updated multicast groups: {:?}", self, legacy_memberships
-            ),
-            Err(InvalidLegacyGroupsError) => warn!(
-                tag = NETLINK_LOG_TAG,
-                "{} failed to update multicast groups: {:?}", self, legacy_memberships
-            ),
+            Ok(()) => log_debug!("{} updated multicast groups: {:?}", self, legacy_memberships),
+            Err(InvalidLegacyGroupsError) => {
+                log_warn!("{} failed to update multicast groups: {:?}", self, legacy_memberships)
+            }
         };
         res
     }
@@ -216,8 +209,7 @@ impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> ClientTable<F, S> {
                 count
             }
         });
-        debug!(
-            tag = NETLINK_LOG_TAG,
+        log_debug!(
             "Notified {} {} clients of message for group {:?}: {:?}",
             count,
             F::NAME,

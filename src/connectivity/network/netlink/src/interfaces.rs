@@ -40,16 +40,15 @@ use netlink_packet_route::{
     ARPHRD_VOID, IFA_F_PERMANENT, IFA_F_TENTATIVE, IFF_LOOPBACK, IFF_LOWER_UP, IFF_RUNNING, IFF_UP,
     RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV6_IFADDR, RTNLGRP_LINK,
 };
-use tracing::{debug, error, warn};
 
 use crate::{
     client::{ClientTable, InternalClient},
     errors::EventLoopError,
+    logging::{log_debug, log_error, log_warn},
     messaging::Sender,
     multicast_groups::ModernGroup,
     netlink_packet::{errno::Errno, UNSPECIFIED_SEQUENCE_NUMBER},
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
-    NETLINK_LOG_TAG,
 };
 
 /// A handler for interface events.
@@ -158,9 +157,10 @@ fn map_existing_interface_terminal_error(
             // If the channel was closed, then we likely tried to get a control
             // chandle to an interface that does not exist.
             if !e.is_closed() {
-                error!(
+                log_error!(
                     "unexpected interface terminal error for interface ({:?}): {:?}",
-                    interface_id, e,
+                    interface_id,
+                    e,
                 )
             }
         }
@@ -187,7 +187,11 @@ fn map_existing_interface_terminal_error(
                 // was removed so just assume that the unrecognized reason is
                 // valid and return the same error as if it was removed with
                 // `PortClosed`/`User` reasons.
-                error!("unrecognized removal reason {:?} from interface {:?}", reason, interface_id)
+                log_error!(
+                    "unrecognized removal reason {:?} from interface {:?}",
+                    reason,
+                    interface_id
+                )
             }
         },
     }
@@ -224,9 +228,11 @@ fn respond_to_completer<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage
 
             // Not treated as a hard error because the socket may have been
             // closed.
-            debug!(
+            log_debug!(
                 "failed to send result ({:?}) to {} after handling {:?}",
-                result, client, request_for_log,
+                result,
+                client,
+                request_for_log,
             )
         }
     }
@@ -302,7 +308,7 @@ async fn set_link_address(
     {
         Ok(None) => {
             // The request succeeded but the interface has no address.
-            debug!("no MAC address for interface ({id:?})")
+            log_debug!("no MAC address for interface ({id:?})")
         }
         Ok(Some(mac)) => {
             let fnet::MacAddress { octets } = *mac;
@@ -312,7 +318,7 @@ async fn set_link_address(
             // We only get here if the interface has been removed after we
             // learned about it through the interfaces watcher. Do nothing as
             // a removed event should come for this interface shortly.
-            warn!("failed to get MAC address for interface ({id:?}) with not found error")
+            log_warn!("failed to get MAC address for interface ({id:?}) with not found error")
         }
     }
 }
@@ -448,7 +454,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             // request.
             let request_fut = match pending_address_request {
                 Some(_) => {
-                    debug!(
+                    log_debug!(
                         "not awaiting on request stream because of pending request: {:?}",
                         pending_address_request,
                     );
@@ -530,7 +536,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 };
 
                 if done {
-                    debug!("completed pending request; req = {pending_address_request_some:?}");
+                    log_debug!("completed pending request; req = {pending_address_request_some:?}");
 
                     let PendingAddressRequest { kind, address_and_interface_id, client, completer } =
                         pending_address_request_some;
@@ -543,7 +549,9 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     );
                 } else {
                     // Put the pending request back so that it can be handled later.
-                    debug!("pending request not done yet; req = {pending_address_request_some:?}");
+                    log_debug!(
+                        "pending request not done yet; req = {pending_address_request_some:?}"
+                    );
                     pending_address_request = Some(pending_address_request_some);
                 }
             }
@@ -590,10 +598,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
 
                 self.interfaces_handler.handle_new_link(&properties.name);
 
-                debug!(
-                    tag = NETLINK_LOG_TAG,
-                    "processed add/existing event for id {}", properties.id
-                );
+                log_debug!("processed add/existing event for id {}", properties.id);
             }
             fnet_interfaces_ext::UpdateResult::Changed {
                 previous:
@@ -629,10 +634,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         )
                     }
 
-                    debug!(
-                        tag = NETLINK_LOG_TAG,
-                        "processed interface link change event for id {}", id
-                    );
+                    log_debug!("processed interface link change event for id {}", id);
                 };
 
                 // The `is_some` check is not strictly necessary because
@@ -651,10 +653,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         );
                     }
 
-                    debug!(
-                        tag = NETLINK_LOG_TAG,
-                        "processed interface address change event for id {}", id
-                    );
+                    log_debug!("processed interface address change event for id {}", id);
                 }
             }
             fnet_interfaces_ext::UpdateResult::Removed(
@@ -679,10 +678,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
 
                 self.interfaces_handler.handle_deleted_link(&properties.name);
 
-                debug!(
-                    tag = NETLINK_LOG_TAG,
-                    "processed interface remove event for id {}", properties.id
-                );
+                log_debug!("processed interface remove event for id {}", properties.id);
             }
             fnet_interfaces_ext::UpdateResult::Existing { properties, state: _ } => {
                 return Err(InterfaceEventHandlerError::ExistingEventReceived(properties.clone()));
@@ -742,7 +738,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 asp_server_end,
             )
             .map_err(|e| {
-                warn!("error adding {address} to interface ({interface_id}): {e:?}");
+                log_warn!("error adding {address} to interface ({interface_id}): {e:?}");
                 map_existing_interface_terminal_error(e, interface_id)
             })?;
 
@@ -755,14 +751,20 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             // Likely failed because the address addition failed or it was
             // immediately removed. Don't fail just yet because we need to check
             // the assignment state & terminal error below.
-            warn!("error detaching ASP for {} on interface ({}): {:?}", address, interface_id, e)
+            log_warn!(
+                "error detaching ASP for {} on interface ({}): {:?}",
+                address,
+                interface_id,
+                e
+            )
         });
 
         match assignment_state_stream(asp).try_next().await {
             Ok(None) => {
-                warn!(
+                log_warn!(
                     "ASP state stream ended before update for {} on interface ({})",
-                    address, interface_id,
+                    address,
+                    interface_id,
                 );
 
                 // If the ASP stream ended without sending a state update, then
@@ -772,9 +774,11 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 Err(RequestError::UnrecognizedInterface)
             }
             Ok(Some(state)) => {
-                debug!(
+                log_debug!(
                     "{} added on interface ({}) with initial state = {:?}",
-                    address, interface_id, state,
+                    address,
+                    interface_id,
+                    state,
                 );
 
                 // We got an initial state update indicating that the address
@@ -782,9 +786,11 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 Ok(address_and_interface_id)
             }
             Err(e) => {
-                warn!(
+                log_warn!(
                     "error waiting for state update for {} on interface ({}): {:?}",
-                    address, interface_id, e,
+                    address,
+                    interface_id,
+                    e,
                 );
 
                 Err(match e {
@@ -808,9 +814,11 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         // If the channel is closed, assume a similar situation
                         // as `Ok(None)`.
                         if !e.is_closed() {
-                            error!(
+                            log_error!(
                                 "unexpected ASP error when adding {} on interface ({}): {:?}",
-                                address, interface_id, e,
+                                address,
+                                interface_id,
+                                e,
                             )
                         }
 
@@ -842,7 +850,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             self.get_interface_control(interface_id).ok_or(RequestError::UnrecognizedInterface)?;
 
         match control.remove_address(&mut address.into_ext()).await.map_err(|e| {
-            warn!("error removing {address} from interface ({interface_id}): {e:?}");
+            log_warn!("error removing {address} from interface ({interface_id}): {e:?}");
             map_existing_interface_terminal_error(e, interface_id)
         })? {
             Ok(did_remove) => {
@@ -857,7 +865,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 let e: fnet_interfaces_admin::ControlRemoveAddressError = e;
                 match e {
                     fnet_interfaces_admin::ControlRemoveAddressErrorUnknown!() => {
-                        error!(
+                        log_error!(
                             "unrecognized address removal error {:?} for address {} on interface ({})",
                             e, address, interface_id,
                         );
@@ -879,7 +887,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         &mut self,
         Request { args, sequence_number, mut client, completer }: Request<S>,
     ) -> Option<PendingAddressRequest<S>> {
-        debug!("handling request {args:?} from {client}");
+        log_debug!("handling request {args:?} from {client}");
 
         let result = match args {
             RequestArgs::Link(LinkRequestArgs::Get(args)) => match args {
@@ -954,7 +962,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             },
         };
 
-        debug!("handled request {args:?} from {client} with result = {result:?}");
+        log_debug!("handled request {args:?} from {client} with result = {result:?}");
         respond_to_completer(client, completer, result, args);
         None
     }
@@ -1039,7 +1047,7 @@ impl NetlinkLinkMessage {
         match interface_properties_to_link_message(properties, link_address) {
             Ok(o) => Some(o),
             Err(NetlinkLinkMessageConversionError::InvalidInterfaceId(id)) => {
-                warn!(tag = NETLINK_LOG_TAG, "Invalid interface id: {:?}", id);
+                log_warn!("Invalid interface id: {:?}", id);
                 None
             }
         }
@@ -1246,7 +1254,7 @@ fn addresses_optionally_from_interface_properties(
     match interface_properties_to_address_messages(properties) {
         Ok(o) => Some(o),
         Err(NetlinkAddressMessageConversionError::InvalidInterfaceId(id)) => {
-            warn!(tag = NETLINK_LOG_TAG, "Invalid interface id: {:?}", id);
+            log_warn!("Invalid interface id: {:?}", id);
             None
         }
     }

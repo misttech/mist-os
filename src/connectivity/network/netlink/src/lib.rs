@@ -14,6 +14,7 @@
 mod client;
 mod errors;
 pub mod interfaces;
+pub(crate) mod logging;
 pub mod messaging;
 pub mod multicast_groups;
 mod netlink_packet;
@@ -28,11 +29,11 @@ use futures::{
 };
 use net_types::ip::{Ipv4, Ipv6};
 use netlink_packet_route::RtnlMessage;
-use tracing::debug;
 
 use crate::{
     client::{ClientIdGenerator, ClientTable, InternalClient},
     errors::EventLoopError,
+    logging::log_debug,
     messaging::{Receiver, Sender, SenderReceiverProvider},
     protocol_family::{
         route::{NetlinkRoute, NetlinkRouteClient, NetlinkRouteRequestHandler},
@@ -279,7 +280,7 @@ fn spawn_client_request_handler<
             .fold(
                 FoldState { client, handler },
                 |FoldState { mut client, mut handler }, req| async {
-                    debug!(tag = NETLINK_LOG_TAG, "{} Received request: {:?}", client, req);
+                    log_debug!("{} Received request: {:?}", client, req);
                     handler.handle_request(req, &mut client).await;
                     FoldState { client, handler }
                 },
