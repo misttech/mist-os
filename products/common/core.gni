@@ -4,8 +4,6 @@
 
 import("//products/common/minimal.gni")
 
-include_shell_commands_package = true
-
 product_system_image_deps = []
 
 product_bootfs_labels += [
