@@ -445,6 +445,7 @@ template("assembled_system") {
       fvm_fastboot = "${outdir}/fvm.fastboot.blk"
     } else if (generate_fxfs) {
       fxfs = "${outdir}/fxfs.blk"
+      fxfs_sparse = "${outdir}/fxfs.sparse.blk"
     }
 
     base_package = "${outdir}/base/meta.far"
@@ -1132,7 +1133,10 @@ template("assembled_system") {
         }
       }
       if (generate_fxfs) {
-        outputs += [ files.fxfs ]
+        outputs += [
+          files.fxfs,
+          files.fxfs_sparse,
+        ]
       }
     }
 
@@ -1166,6 +1170,8 @@ template("assembled_system") {
           fvm_fastboot = {
           }
           fxfs = {
+          }
+          fxfs_sparse = {
           }
 
           if (defined(image_metadata_overrides)) {
@@ -1235,6 +1241,12 @@ template("assembled_system") {
               path = rebase_path(files.fxfs, root_build_dir)
               type = "blk"
               forward_variables_from(_image_overrides["fxfs"], "*")
+            },
+            {
+              name = "${image_name}.fxfs_sparse"
+              path = rebase_path(files.fxfs_sparse, root_build_dir)
+              type = "blk"
+              forward_variables_from(_image_overrides["fxfs_sparse"], "*")
             },
           ]
         }

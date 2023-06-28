@@ -9,7 +9,7 @@ use {
     futures::{try_join, SinkExt as _, StreamExt as _, TryStreamExt as _},
     fxfs::{
         errors::FxfsError,
-        filesystem::{Filesystem, FxFilesystem},
+        filesystem::{Filesystem, FxFilesystem, SyncOptions},
         object_handle::{GetProperties, WriteBytes},
         object_store::{
             directory::Directory, transaction::LockKey, volume::root_volume, DirectWriter,
@@ -47,12 +47,16 @@ type BlobsJsonOutput = Vec<BlobsJsonOutputEntry>;
 /// Generates an Fxfs image containing a blob volume with the blobs specified in `manifest_path`.
 /// Creates the block image at `output_image_path` and writes a blobs.json file to
 /// `json_output_path`.
-/// If `target_size` bytes is set, the image will be set to exactly this size (and an error is
+/// If `target_size` bytes is set, the raw image will be set to exactly this size (and an error is
 /// returned if the contents exceed that size).  If unset (or 0), the image will be truncated to
 /// twice the size of its contents, which is a heuristic that gives us roughly enough space for
 /// normal usage of the image.
+/// If `sparse_output_image_path` is set, an image will also be emitted in the Android sparse
+/// format, which is suitable for flashing via fastboot.  The sparse image's logical size and
+/// contents are identical to the raw image, but its actual size will likely be smaller.
 pub async fn make_blob_image(
     output_image_path: &str,
+    sparse_output_image_path: Option<&str>,
     manifest_path: &str,
     json_output_path: &str,
     target_size: Option<u64>,
@@ -101,6 +105,11 @@ pub async fn make_blob_image(
             e
         }
     })?;
+    filesystem
+        .sync(SyncOptions { flush_device: true, ..Default::default() })
+        .await
+        .context("Failed to flush")?;
+    let actual_length = filesystem.allocator().maximum_offset();
     filesystem.close().await?;
 
     if size == 0 {
@@ -108,6 +117,11 @@ pub async fn make_blob_image(
             std::fs::OpenOptions::new().read(true).write(true).open(output_image_path)?;
         let actual_size = output_image.metadata()?.len();
         output_image.set_len(actual_size * 2).context("Failed to resize image")?;
+    }
+
+    if let Some(sparse_path) = sparse_output_image_path {
+        create_sparse_image(sparse_path, output_image_path, actual_length)
+            .context("Failed to create sparse image")?;
     }
 
     let mut json_output = BufWriter::new(
@@ -136,6 +150,29 @@ fn parse_manifest(manifest_path: &str) -> Result<Vec<(Hash, PathBuf)>, Error> {
         blobs.push((hash, path_buf));
     }
     Ok(blobs)
+}
+
+fn create_sparse_image(
+    sparse_output_image_path: &str,
+    image_path: &str,
+    actual_length: u64,
+) -> Result<(), Error> {
+    let image = std::fs::OpenOptions::new()
+        .read(true)
+        .open(image_path)
+        .context(format!("Failed to open {:?}", image_path))?;
+    let full_length = image.metadata()?.len();
+    let mut output = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(sparse_output_image_path)
+        .context(format!("Failed to create {:?}", sparse_output_image_path))?;
+    sparse::SparseImageBuilder::default()
+        .add_chunk(sparse::DataSource::Reader(Box::new(image), actual_length))
+        .add_chunk(sparse::DataSource::Skip(full_length - actual_length))
+        .build(&mut output)
 }
 
 struct BlobToInstall {
