@@ -62,15 +62,34 @@ void DeviceHost::AddDevices(bool devfs_only, bool no_virtual_audio) {
     DetectDevices(devfs_only, no_virtual_audio);
     done.Signal();
   });
-  ASSERT_EQ(done.Wait(kAddAllDevicesTimeout), ZX_OK)
-      << "Deadlock in FidlThread::Create while creating 'AddVadAndDetectDevices' thread";
+  // If we hang indefinitely here, the test execution environment will eventually timeout.
+  done.Wait();
 }
 
-// Set up DeviceWatchers to detect input and output devices, run the initial enumeration of devfs,
-// add virtual_audio instances (optionally) and an a2dp instance (optionally).
+// Set up DeviceWatchers to detect audio devices.
+//
+// First, detect audio devices that were already in devfs when we started the detection process.
+//
+// Following this, (optionally) add any virtual_audio devices and rely on our previously-installed
+// device watchers to detect them. (NOTE: subsequent device arrivals/departures that happen outside
+// the control of this suite are treated as immediate failures.)
+//
+// We then (optionally) add an instance of the Bluetooth audio device library.
+//
+// Note that with the current design, we must keep the DeviceWatchers alive so that each device's
+// fuchsia_io::Directory is not dropped. This means that the DeviceWatcher callback might run after
+// this method exits. This requires us to use class member `device_enumeration_complete_` to signal
+// that these subsequent device-detection callbacks should trigger immediate failures instead of
+// treating this like another device to be tested.
 void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
-  DeviceType dev_type = DeviceType::BuiltIn;
-  bool initial_enumeration_done;
+  // This is guarded by `device_enumeration_complete_` which we set before we exit, but we give this
+  // variable static scope to avoid future issues.
+  static DeviceType dev_type = DeviceType::BuiltIn;
+
+  // Ensure that an initial devfs enumeration pass completes before creating the next watcher.
+  // This is only accessed by the idle_callback, which we explicitly await before we exit. Just in
+  // case the callback can subsequently run for some reason, we give this variable static scope.
+  static bool initial_enumeration_done;
 
   // Set up the device watchers. If any fail, automatically stop monitoring all device sources.
   // First, we add any preexisting ("built-in") devices.
@@ -78,54 +97,62 @@ void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
     initial_enumeration_done = false;
     auto watcher = fsl::DeviceWatcher::CreateWithIdleCallback(
         devnode.path,
-        [driver_type = devnode.driver_type, &dev_type, &dev_entries = device_entries()](
-            const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
+        [this, driver_type = devnode.driver_type](const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                                  const std::string& filename) {
+          ASSERT_FALSE(device_enumeration_complete_)
+              << "Unexpected audio device detection occurred after test suite configuration";
+
           FX_LOGS(TRACE) << "dir handle " << dir.channel().get() << " for '" << filename << "' ("
                          << dev_type << " " << driver_type << ")";
-          dev_entries.insert({dir, filename, driver_type, dev_type});
+          device_entries().insert({dir, filename, driver_type, dev_type});
         },
-        [&initial_enumeration_done]() { initial_enumeration_done = true; },
-        device_loop_.dispatcher());
+        []() { initial_enumeration_done = true; }, device_loop_.dispatcher());
 
     if (watcher == nullptr) {
       ASSERT_FALSE(watcher == nullptr)
           << "AudioDriver::TestBase failed creating DeviceWatcher for '" << devnode.path << "'.";
     }
-    device_watchers().emplace_back(std::move(watcher));
 
-    auto deadline = zx::clock::get_monotonic() + kDeviceWatcherTimeout;
-    while (!initial_enumeration_done && zx::clock::get_monotonic() < deadline) {
+    // If we hang indefinitely here, the test execution environment will eventually timeout.
+    while (!initial_enumeration_done) {
       device_loop_.RunUntilIdle();
     }
     ASSERT_TRUE(initial_enumeration_done)
         << "DeviceWatcher did not finish initial enumeration, for " << dev_type << "/"
         << devnode.driver_type;
+
+    // We must save this so each device's fidl::ClientEnd<fuchsia_io::Directory is not dropped.
+    device_watchers().emplace_back(std::move(watcher));
   }
 
   // Then, if enabled, enable virtual_audio instances and wait for their detection.
-  // By reusing the watchers we've already configured, we detect each device only once.
+  // By reusing the watchers we've already configured, we detect each preexisting device only once.
   if (!no_virtual_audio) {
     auto device_count = device_entries().size();
     dev_type = DeviceType::Virtual;
     AddVirtualDevices();
-    auto deadline = zx::clock::get_monotonic() + kDeviceWatcherTimeout;
-    while (device_entries().size() < device_count + 2 && zx::clock::get_monotonic() < deadline) {
+
+    // If we hang indefinitely here, the test execution environment will eventually timeout.
+    while (device_entries().size() < device_count + kNumVirtualAudioDevicesToAdd) {
       device_loop_.RunUntilIdle();
     }
-    ASSERT_GE(device_entries().size(), device_count + 2)
+    ASSERT_GE(device_entries().size(), device_count + kNumVirtualAudioDevicesToAdd)
         << "DeviceWatcher timed out, for " << dev_type << " devices";
   }
 
-  // And finally, unless expressly excluded, add a device entry for the a2dp-source output device
-  // driver, to validate admin functions even if AudioCore has connected to "real" audio drivers.
+  // If any subsequent device detections occur, we consider these errors.
+  device_enumeration_complete_ = true;
+
+  // And finally, unless expressly excluded, manually add a device entry for the Bluetooth audio
+  // library, to validate admin functions even if AudioCore has connected to "real" audio drivers.
   if (!devfs_only) {
     device_entries().insert({{}, "A2DP", DriverType::StreamConfigOutput, DeviceType::A2DP});
   }
 }
 
-// Optionally called during DetectDevices. Create virtual_audio instances -- StreamConfig input and
-// output, Dai input and output, and Composite -- using the default configuration settings
-// (which should pass all tests).
+// Optionally called during DetectDevices. Create virtual_audio instances (StreamConfig input and
+// output, Dai input and output, and Composite) using the default configuration settings (which
+// should pass all tests).
 void DeviceHost::AddVirtualDevices() {
   const std::string kControlNodePath =
       fxl::Concatenate({"/dev/", fuchsia::virtualaudio::CONTROL_NODE_NAME});

@@ -8,6 +8,8 @@
 #include <fuchsia/virtualaudio/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 
+#include <atomic>
+
 #include "src/lib/fsl/io/device_watcher.h"
 #include "src/media/audio/drivers/test/test_base.h"
 
@@ -28,10 +30,6 @@ class DeviceHost {
   zx_status_t QuitDeviceLoop();
 
  private:
-  // Use exaggerated timeouts to eliminate flakes on loaded CQ instances running debug builds.
-  static constexpr zx::duration kDeviceWatcherTimeout = zx::sec(1);
-  static constexpr zx::duration kAddAllDevicesTimeout = zx::sec(3);
-
   // Detect devfs-based audio devices, optionally adding device entries for a2dp and virtual_audio.
   void DetectDevices(bool devfs_only, bool no_virtual_audio);
 
@@ -48,6 +46,7 @@ class DeviceHost {
   std::set<DeviceEntry> device_entries_;
   std::vector<std::unique_ptr<fsl::DeviceWatcher>> device_watchers_;
 
+  static constexpr size_t kNumVirtualAudioDevicesToAdd = 5;
   fuchsia::virtualaudio::ControlSyncPtr controller_ = nullptr;
   fuchsia::virtualaudio::DevicePtr stream_config_output_ = nullptr;
   fuchsia::virtualaudio::DevicePtr stream_config_input_ = nullptr;
@@ -55,6 +54,7 @@ class DeviceHost {
   fuchsia::virtualaudio::DevicePtr dai_input_ = nullptr;
   fuchsia::virtualaudio::DevicePtr composite_ = nullptr;
   bool shutting_down_ = false;
+  std::atomic_bool device_enumeration_complete_ = false;
 };
 
 }  // namespace media::audio::drivers::test
