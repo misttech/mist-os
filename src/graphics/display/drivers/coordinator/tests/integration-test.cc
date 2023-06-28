@@ -551,19 +551,29 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
             primary_client->vsync_count());
 }
 
-TEST_F(IntegrationTest, ImportImage_InvalidCollection) {
+TEST_F(IntegrationTest, CreateLayer) {
   TestFidlClient client(sysmem_);
   ASSERT_TRUE(client.CreateChannel(display_fidl(), /*is_vc=*/false));
   ASSERT_TRUE(client.Bind(dispatcher()));
 
   fbl::AutoLock lock(client.mtx());
-  auto cl_reply = client.dc_->CreateLayer();
-  ASSERT_TRUE(cl_reply.ok());
-  ASSERT_OK(cl_reply.value().res);
-  // Importing an image from a non-existent collection should fail.
-  auto ii_reply =
-      client.dc_->ImportImage(client.displays_[0].image_config_, 0xffeeeedd, /* image_id= */ 1, 0);
-  ASSERT_NE(ii_reply.value().res, ZX_OK);
+  auto create_layer_reply = client.dc_->CreateLayer();
+  ASSERT_EQ(ZX_OK, create_layer_reply.status());
+  EXPECT_OK(create_layer_reply.value().res);
+}
+
+TEST_F(IntegrationTest, ImportImageWithInvalidBufferCollectionId) {
+  TestFidlClient client(sysmem_);
+  ASSERT_TRUE(client.CreateChannel(display_fidl(), /*is_vc=*/false));
+  ASSERT_TRUE(client.Bind(dispatcher()));
+
+  fbl::AutoLock lock(client.mtx());
+  const uint64_t buffer_collection_id = 0xffeeeedd;
+  const uint64_t image_id = 1;
+  fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
+      client.dc_->ImportImage(client.displays_[0].image_config_, buffer_collection_id, image_id,
+                              /*index=*/0);
+  EXPECT_NE(ZX_OK, import_image_reply.value().res);
 }
 
 TEST_F(IntegrationTest, ClampRgb) {
