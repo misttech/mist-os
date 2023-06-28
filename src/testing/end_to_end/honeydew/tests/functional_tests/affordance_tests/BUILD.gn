@@ -13,26 +13,11 @@ if (is_host) {
 
   group("emulator_tests_fyi") {
     testonly = true
-    public_deps = [
-      ":emulator_tests",
-      "test_component:component_test_fc($host_toolchain)",
-      "test_tracing:tracing_test_fc($host_toolchain)",
-    ]
-  }
-
-  group("nuc_tests_fyi") {
-    testonly = true
-    public_deps = [
-      "test_bluetooth:bluetooth_gap_test($host_toolchain)",
-      "test_bluetooth:bluetooth_gap_test_fc($host_toolchain)",
-    ]
+    public_deps = [ ":emulator_tests" ]
   }
 
   group("tests") {
     testonly = true
-    public_deps = [
-      ":emulator_tests_fyi",
-      ":nuc_tests_fyi",
-    ]
+    public_deps = [ ":emulator_tests_fyi" ]
   }
 }

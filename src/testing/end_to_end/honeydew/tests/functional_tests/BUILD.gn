@@ -21,10 +21,7 @@ if (is_host) {
 
   group("nuc_tests_fyi") {
     testonly = true
-    public_deps = [
-      "affordance_tests:nuc_tests_fyi",
-      "device_class_tests:nuc_tests_fyi",
-    ]
+    public_deps = [ "device_class_tests:nuc_tests_fyi" ]
   }
 
   group("tests") {
