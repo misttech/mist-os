@@ -25,16 +25,7 @@ use {
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::channel::oneshot,
-    pin_project::pin_project,
-    std::{
-        convert::TryInto as _,
-        default::Default,
-        future::Future,
-        pin::Pin,
-        sync::Arc,
-        task::{Context, Poll},
-    },
+    std::{convert::TryInto as _, default::Default, sync::Arc},
 };
 
 /// Return type for `BaseConnection::handle_request` and [`DerivedConnection::handle_request`].
@@ -102,34 +93,6 @@ where
     /// enough.
     seek: TraversalPosition,
 }
-
-/// Takes a stream and a shutdown receiver and creates a new stream that will terminate when the
-/// shutdown receiver is ready (and ignore any outstanding items in the original stream).
-#[pin_project]
-pub struct StreamWithShutdown<T: futures::Stream>(#[pin] T, #[pin] oneshot::Receiver<()>);
-
-impl<T: futures::Stream> futures::Stream for StreamWithShutdown<T> {
-    type Item = T::Item;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        let this = self.project();
-        if let Poll::Ready(Ok(())) = this.1.poll(cx) {
-            return Poll::Ready(None);
-        }
-        this.0.poll_next(cx)
-    }
-}
-
-pub trait WithShutdown {
-    fn with_shutdown(self, shutdown: oneshot::Receiver<()>) -> StreamWithShutdown<Self>
-    where
-        Self: futures::Stream + Sized,
-    {
-        StreamWithShutdown(self, shutdown)
-    }
-}
-
-impl<T: futures::Stream> WithShutdown for T {}
 
 impl<Connection> BaseConnection<Connection>
 where
