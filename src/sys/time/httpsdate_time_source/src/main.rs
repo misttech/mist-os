@@ -46,8 +46,6 @@ const RETRY_STRATEGY: RetryStrategy = RetryStrategy {
 const REQUEST_URI: &str = "https://clients3.google.com/generate_204";
 
 /// HttpsDate config, populated from build-time generated structured config.
-/// TODO(fxb/105777): Remove next line when PullSource support is implemented.
-#[allow(dead_code)]
 pub struct Config {
     https_timeout: zx::Duration,
     standard_deviation_bound_percentage: u8,
