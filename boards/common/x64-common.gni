@@ -57,6 +57,9 @@ board_driver_package_labels += [
   "//src/connectivity/wlan/drivers/wlanphy:wlanphy",
   "//src/devices/acpi:drivers",
   "//src/graphics/drivers/msd-intel-gen",
+
+  # Add the fake battery drive to devices without battery
+  "//src/power/fake-battery:fake-battery",
 ]
 
 board_package_labels += [
