@@ -68,7 +68,7 @@ source_set("driver_runner") {
 
 executable("driver_runner_test") {
   testonly = true
-  sources = [ "driver_runner_test.cc" ]
+  sources = [ "tests/driver_runner_test.cc" ]
 
   deps = [
     ":driver_runner",
@@ -117,7 +117,7 @@ fuchsia_unittest_component("bind-manager-test") {
 
 executable("composite_assembler_test") {
   testonly = true
-  sources = [ "composite_assembler_test.cc" ]
+  sources = [ "tests/composite_assembler_test.cc" ]
 
   deps = [
     ":driver_runner",
@@ -136,7 +136,7 @@ fuchsia_unittest_component("composite-assembler-test") {
 
 executable("composite_node_spec_v2_test") {
   testonly = true
-  sources = [ "composite_node_spec_v2_test.cc" ]
+  sources = [ "tests/composite_node_spec_v2_test.cc" ]
 
   deps = [
     ":driver_runner",
@@ -152,7 +152,7 @@ fuchsia_unittest_component("node-test") {
 
 executable("node_test") {
   testonly = true
-  sources = [ "node_test.cc" ]
+  sources = [ "tests/node_test.cc" ]
 
   deps = [
     ":driver_runner",
@@ -169,7 +169,7 @@ fuchsia_unittest_component("composite-node-spec-v2-test") {
 
 executable("node_removal_tracker_test") {
   testonly = true
-  sources = [ "node_removal_tracker_test.cc" ]
+  sources = [ "tests/node_removal_tracker_test.cc" ]
 
   deps = [
     ":driver_runner",
