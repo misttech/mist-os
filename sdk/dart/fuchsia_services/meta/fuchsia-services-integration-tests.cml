@@ -2,8 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "sys/component/realm_builder.shard.cml",
-        "syslog/client.shard.cml",
+    include: [ "syslog/client.shard.cml" ],
+    children: [
+        {
+            name: "server",
+            url: "#meta/fuchsia-services-foo-test-server.cm",
+        },
+    ],
+    use: [
+        {
+            protocol: "test.fuchsia.service.foo.Foo",
+            from: "#server",
+        },
     ],
 }

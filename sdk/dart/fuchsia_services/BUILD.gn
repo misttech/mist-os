@@ -61,12 +61,10 @@ dart_test_component("integration-test-component") {
     ":fuchsia_services",
     "test_support:test-foo-fidl_dart",
     "//sdk/dart/fidl",
-    "//sdk/dart/fuchsia_component_test:dart_realm_builder_deps",
     "//sdk/dart/fuchsia_logger",
     "//sdk/dart/fuchsia_vfs",
     "//sdk/dart/zircon",
     "//sdk/fidl/fuchsia.io:fuchsia.io_dart",
-    "//sdk/fidl/fuchsia.sys:fuchsia.sys_dart",
     "//third_party/dart-pkg/pub/test",
   ]
 }
