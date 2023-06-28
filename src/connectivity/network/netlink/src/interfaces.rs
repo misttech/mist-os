@@ -28,6 +28,7 @@ use fidl_fuchsia_net_root as fnet_root;
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
+use either::Either;
 use futures::{
     channel::{mpsc, oneshot},
     pin_mut, FutureExt as _, StreamExt as _, TryStreamExt as _,
@@ -61,16 +62,18 @@ pub trait InterfacesHandler: Send + Sync + 'static {
 }
 
 /// Arguments for an RTM_GETLINK [`Request`].
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum GetLinkArgs {
     /// Dump state for all the links.
     Dump,
-    // TODO(https://issuetracker.google.com/283134954): Support get requests w/
-    // filter.
+    /// Get the link with the provided name.
+    GetByName(String),
+    /// Get the link with the provided ID.
+    GetById(NonZeroU32),
 }
 
 /// [`Request`] arguments associated with links.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum LinkRequestArgs {
     /// RTM_GETLINK
     Get(GetLinkArgs),
@@ -122,7 +125,7 @@ pub(crate) enum AddressRequestArgs {
 }
 
 /// The argument(s) for a [`Request`].
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum RequestArgs {
     Link(LinkRequestArgs),
     Address(AddressRequestArgs),
@@ -707,6 +710,55 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         }))
     }
 
+    /// Handles a "RTM_GETLINK" request.
+    ///
+    /// The resulting "RTM_NEWLINK" messages will be sent directly to the
+    /// provided 'client'.
+    fn handle_get_link_request(
+        &self,
+        args: GetLinkArgs,
+        sequence_number: u32,
+        client: &mut InternalClient<NetlinkRoute, S>,
+    ) -> Result<(), RequestError> {
+        let (is_dump, interfaces_iter) = match args {
+            GetLinkArgs::Dump => {
+                let ifaces = self.interface_properties.values();
+                (true, Either::Left(ifaces))
+            }
+            GetLinkArgs::GetById(id) => {
+                let iface = self
+                    .interface_properties
+                    .get(&id.get().into())
+                    .ok_or(RequestError::UnrecognizedInterface)?;
+                (false, Either::Right(std::iter::once(iface)))
+            }
+            GetLinkArgs::GetByName(name) => {
+                let iface = self
+                    .interface_properties
+                    .values()
+                    .find(|fnet_interfaces_ext::PropertiesAndState { properties, state: _ }| {
+                        properties.name == name
+                    })
+                    .ok_or(RequestError::UnrecognizedInterface)?;
+                (false, Either::Right(std::iter::once(iface)))
+            }
+        };
+
+        interfaces_iter
+            .filter_map(
+                |fnet_interfaces_ext::PropertiesAndState {
+                     properties,
+                     state: InterfaceState { addresses: _, link_address, control: _ },
+                 }| {
+                    NetlinkLinkMessage::optionally_from(properties, link_address)
+                },
+            )
+            .for_each(|message| {
+                client.send_unicast(message.into_rtnl_new_link(sequence_number, is_dump))
+            });
+        Ok(())
+    }
+
     /// Handles a new address request.
     ///
     /// Returns the address and interface ID if the address was successfully
@@ -889,25 +941,10 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     ) -> Option<PendingAddressRequest<S>> {
         log_debug!("handling request {args:?} from {client}");
 
-        let result = match args {
-            RequestArgs::Link(LinkRequestArgs::Get(args)) => match args {
-                GetLinkArgs::Dump => {
-                    self.interface_properties
-                        .values()
-                        .filter_map(
-                            |fnet_interfaces_ext::PropertiesAndState {
-                                 properties,
-                                 state: InterfaceState { addresses: _, link_address, control: _ },
-                             }| {
-                                NetlinkLinkMessage::optionally_from(properties, link_address)
-                            },
-                        )
-                        .for_each(|message| {
-                            client.send_unicast(message.into_rtnl_new_link(sequence_number, true))
-                        });
-                    Ok(())
-                }
-            },
+        let result = match args.clone() {
+            RequestArgs::Link(LinkRequestArgs::Get(args)) => {
+                self.handle_get_link_request(args, sequence_number, &mut client)
+            }
             RequestArgs::Address(args) => match args {
                 AddressRequestArgs::Get(args) => match args {
                     GetAddressArgs::Dump { ip_version_filter } => {
@@ -2432,36 +2469,67 @@ mod tests {
         TestRequestResult { messages: expected_sink.take_messages(), waiter_results }
     }
 
+    #[test_case(
+        GetLinkArgs::Dump,
+        &[LO_INTERFACE_ID, ETH_INTERFACE_ID],
+        Ok(()); "dump")]
+    #[test_case(
+        GetLinkArgs::GetById(NonZeroU32::new(LO_INTERFACE_ID.try_into().unwrap()).unwrap()),
+        &[LO_INTERFACE_ID],
+        Ok(()); "id")]
+    #[test_case(
+        GetLinkArgs::GetById(NonZeroU32::new(WLAN_INTERFACE_ID.try_into().unwrap()).unwrap()),
+        &[],
+        Err(RequestError::UnrecognizedInterface); "id_not_found")]
+    #[test_case(
+        GetLinkArgs::GetByName(LO_NAME.to_string()),
+        &[LO_INTERFACE_ID],
+        Ok(()); "name")]
+    #[test_case(
+        GetLinkArgs::GetByName(WLAN_NAME.to_string()),
+        &[],
+        Err(RequestError::UnrecognizedInterface); "name_not_found")]
     #[fuchsia::test]
-    async fn test_get_link() {
+    async fn test_get_link(
+        args: GetLinkArgs,
+        expected_new_links: &[u64],
+        expected_result: Result<(), RequestError>,
+    ) {
+        let is_dump = match args {
+            GetLinkArgs::Dump => true,
+            GetLinkArgs::GetById(_) | GetLinkArgs::GetByName(_) => false,
+        };
+        let expected_messages = expected_new_links
+            .iter()
+            .map(|link_id| {
+                let msg = match *link_id {
+                    LO_INTERFACE_ID => create_netlink_link_message(
+                        LO_INTERFACE_ID,
+                        ARPHRD_LOOPBACK,
+                        ONLINE_IF_FLAGS | IFF_LOOPBACK,
+                        create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true, &LO_MAC),
+                    ),
+                    ETH_INTERFACE_ID => create_netlink_link_message(
+                        ETH_INTERFACE_ID,
+                        ARPHRD_ETHER,
+                        0,
+                        create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false, &ETH_MAC),
+                    ),
+                    _ => unreachable!("GetLink should only be tested with loopback and ethernet"),
+                };
+                SentMessage::unicast(msg.into_rtnl_new_link(TEST_SEQUENCE_NUMBER, is_dump))
+            })
+            .collect();
+
         assert_eq!(
             test_request(
-                [RequestArgs::Link(LinkRequestArgs::Get(GetLinkArgs::Dump))],
+                [RequestArgs::Link(LinkRequestArgs::Get(args))],
                 expect_only_get_mac_root_requests,
             )
             .await,
             TestRequestResult {
-                messages: vec![
-                    SentMessage::unicast(
-                        create_netlink_link_message(
-                            LO_INTERFACE_ID,
-                            ARPHRD_LOOPBACK,
-                            ONLINE_IF_FLAGS | IFF_LOOPBACK,
-                            create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true, &LO_MAC),
-                        )
-                        .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true)
-                    ),
-                    SentMessage::unicast(
-                        create_netlink_link_message(
-                            ETH_INTERFACE_ID,
-                            ARPHRD_ETHER,
-                            0,
-                            create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false, &ETH_MAC),
-                        )
-                        .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true)
-                    ),
-                ],
-                waiter_results: vec![Ok(())],
+                messages: expected_messages,
+                waiter_results: vec![expected_result],
             },
         )
     }

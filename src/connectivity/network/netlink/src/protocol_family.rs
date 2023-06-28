@@ -86,7 +86,7 @@ pub mod route {
             RTNLGRP_ND_USEROPT, RTNLGRP_NEIGH, RTNLGRP_NONE, RTNLGRP_NOP2, RTNLGRP_NOP4,
             RTNLGRP_NOTIFY, RTNLGRP_NSID, RTNLGRP_PHONET_IFADDR, RTNLGRP_PHONET_ROUTE, RTNLGRP_TC,
         },
-        RtnlMessage,
+        LinkMessage, RtnlMessage,
     };
 
     /// An implementation of the Netlink Route protocol family.
@@ -324,6 +324,34 @@ pub mod route {
         }))
     }
 
+    struct InvalidGetLinkRequest;
+
+    /// Constructs the appropriate [`GetLinkArgs`] for this GetLink request.
+    fn to_get_link_args(
+        link_msg: LinkMessage,
+        is_dump: bool,
+    ) -> Result<interfaces::GetLinkArgs, InvalidGetLinkRequest> {
+        // NB: In the case where the request is "malformed" and specifies
+        // multiple fields, Linux prefers the dump flag over the link index, and
+        // prefers the link index over the link_name.
+        if is_dump {
+            return Ok(interfaces::GetLinkArgs::Dump);
+        }
+        if let Ok(link_id) = <u32 as TryInto<NonZeroU32>>::try_into(link_msg.header.index) {
+            return Ok(interfaces::GetLinkArgs::GetById(link_id));
+        }
+        if let Some(name) = link_msg.nlas.into_iter().find_map(|nla| match nla {
+            netlink_packet_route::rtnl::link::nlas::Nla::IfName(name) => Some(name),
+            nla => {
+                log_debug!("ignoring unexpected NLA in GetLink request: {:?}", nla);
+                None
+            }
+        }) {
+            return Ok(interfaces::GetLinkArgs::GetByName(name));
+        }
+        return Err(InvalidGetLinkRequest);
+    }
+
     #[async_trait]
     impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>
         NetlinkFamilyRequestHandler<NetlinkRoute, S> for NetlinkRouteRequestHandler<S>
@@ -354,23 +382,35 @@ pub mod route {
 
             use RtnlMessage::*;
             match req {
-                GetLink(_) if is_dump => {
+                GetLink(link_msg) => {
                     let (completer, waiter) = oneshot::channel();
-                    interfaces_request_sink.send(interfaces::Request {
-                        args: interfaces::RequestArgs::Link(
-                            interfaces::LinkRequestArgs::Get(
-                                interfaces::GetLinkArgs::Dump,
-                            ),
-                        ),
+                    let args = match to_get_link_args(link_msg, is_dump) {
+                        Ok(args) => args,
+                        Err(InvalidGetLinkRequest) => {
+                            log_debug!("received invalid `GetLink` request from {}", client);
+                            client.send_unicast(
+                                netlink_packet::new_error(Errno::EINVAL, req_header));
+                            return;
+                        }
+                    };
+                    interfaces_request_sink.send(
+                        interfaces::Request{
+                        args: interfaces::RequestArgs::Link(interfaces::LinkRequestArgs::Get(args)),
                         sequence_number: req_header.sequence_number,
                         client: client.clone(),
                         completer,
                     }).await.expect("interface event loop should never terminate");
-                    waiter
+                    match waiter
                         .await
-                        .expect("interfaces event loop should have handled the request")
-                        .expect("link dump requests are infallible");
-                    client.send_unicast(netlink_packet::new_done(req_header))
+                        .expect("interfaces event loop should have handled the request") {
+                            Ok(()) => if is_dump {
+                                client.send_unicast(netlink_packet::new_done(req_header))
+                            } else if expects_ack {
+                                client.send_unicast(netlink_packet::new_ack(req_header))
+                            }
+                            Err(e) => client.send_unicast(
+                                netlink_packet::new_error(e.into_errno(), req_header)),
+                        }
                 }
                 GetAddress(ref message) if is_dump => {
                     let ip_version_filter = match message.header.family.into() {
@@ -573,8 +613,6 @@ pub mod route {
                 | GetNsId(_)
                 // TODO(https://issuetracker.google.com/285127384): Implement GetNeighbour.
                 | GetNeighbour(_)
-                // TODO(https://issuetracker.google.com/283134954): Implement GetLink.
-                | GetLink(_)
                 // TODO(https://issuetracker.google.com/283134032): Implement GetAddress.
                 | GetAddress(_)
                 // Non-dump GetRoute is not currently necessary for our use.
@@ -933,40 +971,120 @@ mod test {
         client_sink.take_messages()
     }
 
+    const FAKE_INTERFACE_ID: u32 = 1;
+    const FAKE_INTERFACE_NAME: &str = "interface";
+
     /// Test RTM_GETLINK.
     #[test_case(
         0,
+        0,
         None,
-        None; "no_flags")]
-    #[test_case(
-        NLM_F_ACK,
         None,
-        Some(ExpectedResponse::Ack); "ack_flag")]
+        Ok(()),
+        Some(ExpectedResponse::Error(Errno::EINVAL)); "no_specifiers")]
     #[test_case(
         NLM_F_DUMP,
+        0,
+        None,
         Some(interfaces::GetLinkArgs::Dump),
-        Some(ExpectedResponse::Done); "dump_flag")]
+        Ok(()),
+        Some(ExpectedResponse::Done); "dump")]
     #[test_case(
         NLM_F_DUMP | NLM_F_ACK,
+        0,
+        None,
         Some(interfaces::GetLinkArgs::Dump),
-        Some(ExpectedResponse::Done); "dump_and_ack_flags")]
+        Ok(()),
+        Some(ExpectedResponse::Done); "dump_with_ack")]
+    #[test_case(
+        NLM_F_DUMP,
+        FAKE_INTERFACE_ID,
+        None,
+        Some(interfaces::GetLinkArgs::Dump),
+        Ok(()),
+        Some(ExpectedResponse::Done); "dump_with_id")]
+    #[test_case(
+        NLM_F_DUMP,
+        FAKE_INTERFACE_ID,
+        Some(FAKE_INTERFACE_NAME),
+        Some(interfaces::GetLinkArgs::Dump),
+        Ok(()),
+        Some(ExpectedResponse::Done); "dump_with_id_and_name")]
+    #[test_case(
+        0,
+        FAKE_INTERFACE_ID,
+        None,
+        Some(interfaces::GetLinkArgs::GetById(NonZeroU32::new(FAKE_INTERFACE_ID).unwrap())),
+        Ok(()),
+        None; "id")]
+    #[test_case(
+        NLM_F_ACK,
+        FAKE_INTERFACE_ID,
+        None,
+        Some(interfaces::GetLinkArgs::GetById(NonZeroU32::new(FAKE_INTERFACE_ID).unwrap())),
+        Ok(()),
+        Some(ExpectedResponse::Ack); "id_with_ack")]
+    #[test_case(
+        0,
+        FAKE_INTERFACE_ID,
+        Some(FAKE_INTERFACE_NAME),
+        Some(interfaces::GetLinkArgs::GetById(NonZeroU32::new(FAKE_INTERFACE_ID).unwrap())),
+        Ok(()),
+        None; "id_with_name")]
+    #[test_case(
+        0,
+        0,
+        Some(FAKE_INTERFACE_NAME),
+        Some(interfaces::GetLinkArgs::GetByName(FAKE_INTERFACE_NAME.to_string())),
+        Ok(()),
+        None; "name")]
+    #[test_case(
+        NLM_F_ACK,
+        0,
+        Some(FAKE_INTERFACE_NAME),
+        Some(interfaces::GetLinkArgs::GetByName(FAKE_INTERFACE_NAME.to_string())),
+        Ok(()),
+        Some(ExpectedResponse::Ack); "name_with_ack")]
+    #[test_case(
+        0,
+        FAKE_INTERFACE_ID,
+        None,
+        Some(interfaces::GetLinkArgs::GetById(NonZeroU32::new(FAKE_INTERFACE_ID).unwrap())),
+        Err(interfaces::RequestError::UnrecognizedInterface),
+        Some(ExpectedResponse::Error(Errno::ENODEV)); "id_not_found")]
+    #[test_case(
+        0,
+        0,
+        Some(FAKE_INTERFACE_NAME),
+        Some(interfaces::GetLinkArgs::GetByName(FAKE_INTERFACE_NAME.to_string())),
+        Err(interfaces::RequestError::UnrecognizedInterface),
+        Some(ExpectedResponse::Error(Errno::ENODEV)); "name_not_found")]
     #[fuchsia::test]
     async fn test_get_link(
         flags: u16,
+        link_id: u32,
+        link_name: Option<&str>,
         expected_request_args: Option<interfaces::GetLinkArgs>,
+        interfaces_worker_result: Result<(), interfaces::RequestError>,
         expected_response: Option<ExpectedResponse>,
     ) {
         let header = header_with_flags(flags);
+        let mut link_message = LinkMessage::default();
+        link_message.header.index = link_id;
+        link_message.nlas = link_name
+            .map(|n| netlink_packet_route::rtnl::link::nlas::Nla::IfName(n.to_string()))
+            .into_iter()
+            .collect();
 
         pretty_assertions::assert_eq!(
             test_request(
                 NetlinkMessage::new(
                     header,
-                    NetlinkPayload::InnerMessage(RtnlMessage::GetLink(LinkMessage::default())),
+                    NetlinkPayload::InnerMessage(RtnlMessage::GetLink(link_message)),
                 ),
                 expected_request_args.map(|a| RequestAndResponse {
                     request: interfaces::RequestArgs::Link(interfaces::LinkRequestArgs::Get(a)),
-                    response: Ok(()),
+                    response: interfaces_worker_result,
                 }),
             )
             .await,

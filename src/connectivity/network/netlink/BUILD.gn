@@ -33,6 +33,7 @@ rustc_library("netlink") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:bit-set",
     "//third_party/rust_crates:derivative",
+    "//third_party/rust_crates:either",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:netlink-packet-core",
