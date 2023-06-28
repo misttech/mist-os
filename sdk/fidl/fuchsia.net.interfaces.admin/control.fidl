@@ -71,16 +71,14 @@ type Configuration = table {
 /// A credential passed into the `fuchsia.net.*` family of APIs to authenticate
 /// access to a particular interface. The Netstack only needs the ability to
 /// inspect the token's basic info when proving that the client is authorized
-/// to access a resource. The token will not be transferred/duplicated by the
-/// Netstack, so the set of Rights on the token is unimportant.
+/// to access a resource.
 type ProofOfInterfaceAuthorization = resource struct {
     /// The ID of the interface this credential is authenticating.
     interface_id fuchsia.net.InterfaceId;
-    /// The EVENTPAIR providing authentication over this interface.
-    /// TODO(fxrev.dev/129584): Update to `zx.Rights.NONE` to define the
-    /// minimum set of rights for this token. By default, this is interpreted
-    /// as `zx.Rights.SAME_RIGHTS`, which is discouraged.
-    token zx.Handle:<EVENTPAIR>;
+    /// The EVENTPAIR providing authentication over this interface. The token
+    /// only requires the `TRANSFER` right so that it can be sent to the
+    /// Netstack.
+    token zx.Handle:<EVENTPAIR, zx.Rights.TRANSFER>;
 };
 
 /// Provides control over an interface.

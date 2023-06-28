@@ -144,7 +144,7 @@ pub fn proof_from_grant(
     // problem cannot be easily resolved via userspace.
     fnet_interfaces_admin::ProofOfInterfaceAuthorization {
         interface_id: *interface_id,
-        token: token.duplicate_handle(Rights::NONE).unwrap(),
+        token: token.duplicate_handle(Rights::TRANSFER).unwrap(),
     }
 }
 
@@ -681,7 +681,8 @@ mod test {
     fn convert_proof_to_grant() {
         // The default EventPair has more Rights than the token within the Grant returned from
         // [`GetAuthorizationForInterface`], but can still be converted to be used in the
-        // [`ProofOfInterfaceAuthorization`], since only `zx::Rights::DUPLICATE` is required.
+        // [`ProofOfInterfaceAuthorization`], since only `zx::Rights::DUPLICATE` and
+        // `zx::Rights::TRANSFER` is required.
         let (event_pair, _) = fidl::EventPair::create();
         let grant = fnet_interfaces_admin::GrantForInterfaceAuthorization {
             interface_id: Default::default(),
@@ -691,6 +692,6 @@ mod test {
         let fnet_interfaces_admin::ProofOfInterfaceAuthorization { interface_id, token } =
             proof_from_grant(&grant);
         assert_eq!(interface_id, Default::default());
-        assert_matches!(token.basic_info(), Ok(info) if info.rights == Rights::NONE);
+        assert_matches!(token.basic_info(), Ok(info) if info.rights == Rights::TRANSFER);
     }
 }
