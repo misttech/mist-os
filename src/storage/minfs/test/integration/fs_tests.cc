@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.fs/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/vfs.h>
 #include <lib/zx/vmo.h>
@@ -108,37 +109,37 @@ void FillPartition(const TestFilesystem& fs, int fd, uint32_t max_remaining_bloc
 // Tests using MinfsFvmTest will only run with FVM.
 class MinfsFvmTest : public BaseFilesystemTest {
  public:
-  MinfsFvmTest(const TestFilesystemOptions& options = OptionsWithDescription("MinfsWithFvm"))
+  explicit MinfsFvmTest(
+      const TestFilesystemOptions& options = OptionsWithDescription("MinfsWithFvm"))
       : BaseFilesystemTest(options) {}
 
  protected:
-  // Get the FVM path from the RamDisk. fs().GetDevicePath() returns the partition path like
-  // "/dev/class/block/001" which isn't what we want.
-  fbl::unique_fd GetFvmFd() {
+  zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager>> GetVolumeManager() {
     // This expects to be set up with a RamDisk. The filesystem has some variants and this could be
     // on a RamNand, but then this code would need updating.
     storage::RamDisk* ram_disk = fs().GetRamDisk();
-    EXPECT_TRUE(ram_disk);
+    if (ram_disk == nullptr) {
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
 
     // Want something like "/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm"
     std::string fvm_path = ram_disk->path() + "/fvm";
-    fbl::unique_fd fd(open(fvm_path.c_str(), O_RDONLY));
-    EXPECT_TRUE(fd);
-    return fd;
+    return component::Connect<fuchsia_hardware_block_volume::VolumeManager>(fvm_path);
   }
 
   // Returns the GUID associated with the minfs partition inside FVM.
   zx::result<fuchsia_hardware_block_partition::wire::Guid> GetMinfsPartitionGuid() {
-    zx::result<std::string> device_path_or = fs().DevicePath();
-    EXPECT_TRUE(device_path_or.is_ok());
-    fbl::unique_fd fd(open(device_path_or->c_str(), O_RDONLY));
-    EXPECT_TRUE(fd);
+    zx::result<std::string> device_path = fs().DevicePath();
+    if (device_path.is_error()) {
+      return device_path.take_error();
+    }
+    zx::result partition =
+        component::Connect<fuchsia_hardware_block_partition::Partition>(device_path.value());
+    if (partition.is_error()) {
+      return partition.take_error();
+    }
 
-    fdio_cpp::UnownedFdioCaller caller(fd);
-    auto response =
-        fidl::WireCall(
-            fidl::UnownedClientEnd<fuchsia_hardware_block_partition::Partition>(caller.channel()))
-            ->GetInstanceGuid();
+    fidl::WireResult response = fidl::WireCall(partition.value())->GetInstanceGuid();
     if (response.status() != ZX_OK)
       return zx::error(response.status());
     if (response.value().status != ZX_OK)
@@ -147,14 +148,12 @@ class MinfsFvmTest : public BaseFilesystemTest {
   }
 
   zx::result<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> GetVolumeManagerInfo() {
-    fbl::unique_fd fvm_fd = GetFvmFd();
-    EXPECT_TRUE(fvm_fd);
+    zx::result volume_manager = GetVolumeManager();
+    if (volume_manager.is_error()) {
+      return volume_manager.take_error();
+    }
 
-    fdio_cpp::UnownedFdioCaller caller(fvm_fd.get());
-    auto response =
-        fidl::WireCall(fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager>(
-                           caller.borrow_channel()))
-            ->GetInfo();
+    fidl::WireResult response = fidl::WireCall(volume_manager.value())->GetInfo();
     if (response.status() != ZX_OK)
       return zx::error(response.status());
     if (response.value().status != ZX_OK)
@@ -163,27 +162,24 @@ class MinfsFvmTest : public BaseFilesystemTest {
   }
 
   zx_status_t SetPartitionLimit(uint64_t slice_limit) {
-    fbl::unique_fd fvm_fd = GetFvmFd();
-    EXPECT_TRUE(fvm_fd);
+    zx::result volume_manager = GetVolumeManager();
+    if (volume_manager.is_error()) {
+      return volume_manager.error_value();
+    }
 
     auto guid_or = GetMinfsPartitionGuid();
     EXPECT_TRUE(guid_or.is_ok());
 
-    fdio_cpp::UnownedFdioCaller caller(fvm_fd.get());
-    auto set_response =
-        fidl::WireCall(fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager>(
-                           caller.borrow_channel()))
-            ->SetPartitionLimit(*guid_or, slice_limit);
+    fidl::WireResult set_response =
+        fidl::WireCall(volume_manager.value())->SetPartitionLimit(*guid_or, slice_limit);
     if (set_response.status() != ZX_OK)
       return set_response.status();
     if (set_response.value().status != ZX_OK)
       return set_response.value().status;
 
     // Query the partition limit to make sure it worked.
-    auto get_response =
-        fidl::WireCall(fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager>(
-                           caller.borrow_channel()))
-            ->GetPartitionLimit(*guid_or);
+    fidl::WireResult get_response =
+        fidl::WireCall(volume_manager.value())->GetPartitionLimit(*guid_or);
     if (get_response.status() != ZX_OK)
       return get_response.status();
     if (get_response.value().status != ZX_OK)
@@ -279,7 +275,8 @@ void FillDirectory(const TestFilesystem& fs, int dir_fd, uint32_t max_blocks) {
     if (current_blocks > max_blocks) {
       ASSERT_EQ(unlinkat(dir_fd, path.c_str(), 0), 0);
       break;
-    } else if (current_blocks == max_blocks) {
+    }
+    if (current_blocks == max_blocks) {
       // Do just one entry per iteration for the last block.
       entries_per_iteration = 1;
     }
