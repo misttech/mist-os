@@ -18,9 +18,6 @@
                 // fallocate_test
                 "AllocateTest.Fallocate",
 
-                // fcntl_test
-                "FcntlLockTest.SetLockAcrossRename",
-
                 // fifo_test
                 "FifoTest.Fifo",
                 "FifoTest.FifoOpenRDWR",
@@ -35,10 +32,6 @@
                 "GetdentsTest/*.SmallDir",
                 "GetdentsTest/*.VerifyEntries",
                 "GetdentsTest/*.VerifyPadding",
-                "ReaddirTest.GoneAfterRenameCache",
-
-                // inotify_test
-                "InotifyTest.NotifyNoDeadlock",
 
                 // link_test
                 "LinkTest.AbsPathsNonDirFDsWithOpath",
@@ -61,23 +54,6 @@
                 // read_test
                 "ReadTest.PartialReadSIGSEGV",
 
-                // rename_test
-                "RenameTest.DirectoryDoesNotOverwriteNonemptyDirectory",
-                "RenameTest.DirectoryOverwritesDirectoryLinkCount",
-                "RenameTest.DirectoryOverwritesEmptyDirectory",
-                "RenameTest.DirectoryToChildDirectory",
-                "RenameTest.DirectoryToParentDirectory",
-                "RenameTest.DirectoryToSameDirectory",
-                "RenameTest.DirectoryWithOpenFdOverwritesEmptyDirectory",
-                "RenameTest.FileDoesNotOverwriteDirectory",
-                "RenameTest.FileOverwritesFile",
-                "RenameTest.FileToChildDirectory",
-                "RenameTest.FileToParentDirectory",
-                "RenameTest.FileToSameDirectory",
-                "RenameTest.FileWithOpenFd",
-                "RenameTest.RenameAfterWritableFDAndChmod",
-                "RenameTest.TargetIsAncestorOfSource",
-
                 // sendfile_test
                 "SendFileTest.SendTrivially",
                 "SendFileTest.SendTriviallyWithBothFilesReadWrite",
@@ -94,11 +70,6 @@
                 "StatTest.FstatatSymlinkDirWithTrailingSlash",
                 "StatTest.FstatatSymlinkDirWithTrailingSlashSameInode",
                 "StatTest.LstatSymlinkDir",
-                "StatTest.StatDoesntChangeAfterRename",
-
-                // stat_times_test
-                "StatTimesTest.FileRename",
-                "StatTimesTest.FileRenameOpenFD",
             ],
         },
         {

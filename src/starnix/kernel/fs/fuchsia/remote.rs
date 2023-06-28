@@ -49,6 +49,28 @@ impl FileSystemOps for RemoteFs {
     fn generate_node_ids(&self) -> bool {
         true
     }
+
+    fn rename(
+        &self,
+        _fs: &FileSystem,
+        old_parent: &FsNodeHandle,
+        old_name: &FsStr,
+        new_parent: &FsNodeHandle,
+        new_name: &FsStr,
+        _renamed: &FsNodeHandle,
+        _replaced: Option<&FsNodeHandle>,
+    ) -> Result<(), Errno> {
+        let Some(old_parent) = old_parent.downcast_ops::<RemoteNode>() else {
+            return error!(EXDEV);
+        };
+        let Some(new_parent) = new_parent.downcast_ops::<RemoteNode>() else {
+            return error!(EXDEV);
+        };
+        old_parent
+            .zxio
+            .rename(get_name_str(old_name)?, &new_parent.zxio, get_name_str(new_name)?)
+            .map_err(|status| from_status_like_fdio!(status))
+    }
 }
 
 impl RemoteFs {
