@@ -199,9 +199,9 @@ generated_file(_build_args_bzl_target) {
   # be a configuration argument for the build.
   if (authorized_ssh_keys_label != false) {
     contents +=
-        [ "authorized_ssh_keys_path = \"${authorized_ssh_keys_label}\"" ]
+        [ "authorized_ssh_keys_label = \"${authorized_ssh_keys_label}\"" ]
   } else {
-    contents += [ "authorized_ssh_keys_path = None" ]
+    contents += [ "authorized_ssh_keys_label = None" ]
   }
   outputs = [ _build_args_bzl_output ]
 }
