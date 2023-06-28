@@ -1422,8 +1422,6 @@ tools/arm64/fserve
 tools/arm64/fserve-meta.json
 tools/arm64/fssh
 tools/arm64/fssh-meta.json
-tools/arm64/fvdl
-tools/arm64/fvdl-meta.json
 tools/arm64/fvm
 tools/arm64/fvm-meta.json
 tools/arm64/merkleroot

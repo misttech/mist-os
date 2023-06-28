@@ -24,12 +24,6 @@ if (is_host) {
     sources = [ "src/main.rs" ]
   }
 
-  sdk_host_tool("fvdl_sdk") {
-    category = "partner"
-    output_name = "fvdl"
-    deps = [ ":bin" ]
-  }
-
   install_host_tools("host") {
     deps = [ ":bin" ]
     outputs = [ "fvdl" ]

@@ -223,7 +223,6 @@
 //tools/fidl/fidlgen_hlcpp:fidlgen_hlcpp_sdk
 //tools/fidl/fidlgen_rust:fidlgen_rust_sdk
 //tools/fidlcat:fidlcat_sdk
-//tools/fvdl:fvdl_sdk
 //tools/net/device-finder:device-finder_sdk
 //tools/sdk-tools/fpublish:fpublish_sdk
 //tools/sdk-tools/fserve:fserve_sdk
