@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/sshd_config.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/legacy_ninja_build_outputs.gni")
@@ -190,6 +191,17 @@ generated_file(_build_args_bzl_target) {
     contents += [ "use_vbmeta = True" ]
   } else {
     contents += [ "use_vbmeta = False" ]
+  }
+
+  # Pass the authorized_ssh_keys_path GN arg to bazel, if it was set in args.gn
+  #
+  # This can't be directly specified within Bazel rules as it's really meant to
+  # be a configuration argument for the build.
+  if (authorized_ssh_keys_label != false) {
+    contents +=
+        [ "authorized_ssh_keys_path = \"${authorized_ssh_keys_label}\"" ]
+  } else {
+    contents += [ "authorized_ssh_keys_path = None" ]
   }
   outputs = [ _build_args_bzl_output ]
 }

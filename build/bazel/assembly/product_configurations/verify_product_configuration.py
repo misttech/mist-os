@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import sys
+from typing import Any, Dict, List
 
 
 def file_sha1(path):
@@ -19,29 +20,85 @@ def file_sha1(path):
     return sha1.hexdigest()
 
 
+def normalize_file_in_config(
+        configuration: Dict[str, Any], item: str, root_dir: str) -> None:
+    """Replace an `item` (in "foo.bar.baz" format) in the `configuration` with
+    an item that contains the sha1 of the file referenced. The new item will be
+    suffixed with '_sha1'
+    '"""
+    # Split the item's path into a list of elements
+    path_elements = item.split(".")
+    node_path = path_elements[:-1]
+    item_name = path_elements[-1]
+
+    # Find the node (dict) that holds the item, or set it to None if not found.
+    config_node = configuration
+    for element in node_path:
+        if element in config_node and config_node[element] is not None:
+            config_node = config_node[element]
+        else:
+            # It's not here, so exit early.
+            return
+
+    if item_name in config_node and config_node[item_name] is not None:
+        # We've found the item to replace.
+        # Rebase the path from the build root.
+        file_path = os.path.join(root_dir, config_node[item_name])
+        # Replace it with the hash of the file.
+        config_node[f"{item_name}_sha1"] = file_sha1(file_path)
+        config_node.pop(item_name)
+
+
+def normalize_files_in_config(
+        configuration: Dict[str, Any], items: List[str], root_dir: str) -> None:
+    for item in items:
+        normalize_file_in_config(configuration, item, root_dir)
+
+
+def remove_empty_items(configuration: Dict[str, Any]) -> None:
+    """Remove all items (recursively) whose value is 'None'
+    """
+    items_to_remove = []
+    for (name, value) in configuration.items():
+        # If the value is None, or the dict is now empty, also remove it.
+        if value is None:
+            items_to_remove.append(name)
+
+        elif isinstance(value, Dict):
+            # if the value is a dict, then remove any None-value and empty dicts
+            # from it.
+            remove_empty_items(value)
+
+            # if it's now empty, remove the dict itself.
+            if len(value) == 0:
+                items_to_remove.append(name)
+
+    # Now remove the items, after iterating over them all.
+    for name in items_to_remove:
+        configuration.pop(name)
+
+
 def normalize_platform(config, root_dir):
     if "platform" not in config:
         return
 
     platform = config["platform"]
-    if "ui" in platform:
-        ui = platform["ui"]
-        if "sensor_config" in ui:
-            p = os.path.join(root_dir, ui["sensor_config"])
-            ui["sensor_config_sha1"] = file_sha1(p)
-            ui.pop("sensor_config")
 
-    # When unset, set config_data to empty list for consistency, to avoid noisy
-    # diff.
-    # TODO(fxbug.dev/100486): remove. This is being replaced by the equivalent
-    # diagnostics config.
-    if "additional_serial_log_tags" not in platform:
-        platform["additional_serial_log_tags"] = []
+    # These are platform config items which are paths to files, but paths will
+    # be different between GN and Bazel, so they need to be replaced with the
+    # hash of the file to make sure that they're actually the same contents.
+    #
+    # This uses .append() instead of just setting it to a list so that if forces
+    # the python auto-formatter to put one entry on each line, to reduce the
+    # likelihood of merge conflicts.
+    files_to_normalize = []
+    files_to_normalize.append("development_support.authorized_ssh_keys_path")
+    files_to_normalize.append("ui.sensor_config")
+    normalize_files_in_config(platform, files_to_normalize, root_dir)
 
-    if "diagnostics" not in platform:
-        platform["diagnostics"] = {}
-    if "additional_serial_log_components" not in platform["diagnostics"]:
-        platform["diagnostics"]["additional_serial_log_components"] = []
+    # Due to how some optional configs are routed to Bazel, there may be empty
+    # sections in the configuration, this removes them all (recursively).
+    remove_empty_items(platform)
 
 
 def normalize_product(

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/product_assembly_configuration.gni")
+import("//build/assembly/sshd_config.gni")
 import("//src/connectivity/network/use_netstack3.gni")
 
 assert(
@@ -28,16 +29,35 @@ _base_driver_packages = [
 ]
 
 # LINT.IfChange
+
+# This is the base platform configuration used by core
+platform_configuration_base = {
+  build_type = "eng"
+  input = {
+    supported_input_devices = [
+      "button",
+      "touchscreen",
+    ]
+  }
+
+  fonts = {
+    enabled = true
+  }
+
+  # If the 'authorized_ssh_keys_path' GN arg has been set, then pass that path
+  # as part of the platform configuration.
+  if (authorized_ssh_keys_path != false) {
+    development_support = {
+      authorized_ssh_keys_path =
+          rebase_path(authorized_ssh_keys_path, root_build_dir)
+    }
+  }
+}
+
 product_assembly_configuration("core") {
   testonly = true
   platform = {
-    build_type = "eng"
-    input = {
-      supported_input_devices = [
-        "button",
-        "touchscreen",
-      ]
-    }
+    forward_variables_from(platform_configuration_base, "*")
 
     # TODO(https://fxbug.dev/121811): Remove this as soon as the existing
     # Netstack3 CI builders have been transitioned to use the
@@ -46,10 +66,6 @@ product_assembly_configuration("core") {
       network = {
         force_netstack3 = use_netstack3
       }
-    }
-
-    fonts = {
-      enabled = true
     }
   }
   product = {
@@ -63,20 +79,12 @@ product_assembly_configuration("core") {
 product_assembly_configuration("core_with_netstack3") {
   testonly = true
   platform = {
-    build_type = "eng"
-    input = {
-      supported_input_devices = [
-        "button",
-        "touchscreen",
-      ]
-    }
+    forward_variables_from(platform_configuration_base, "*")
+
     connectivity = {
       network = {
         force_netstack3 = true
       }
-    }
-    fonts = {
-      enabled = true
     }
   }
   product = {

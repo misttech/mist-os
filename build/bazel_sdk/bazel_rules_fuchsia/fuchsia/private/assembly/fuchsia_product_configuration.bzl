@@ -61,7 +61,7 @@ def _fuchsia_product_configuration_impl(ctx):
             label_files = label.files.to_list()
             dictionary[key] = label_files[0].path
 
-    _walk_json(product_config, _replace_labels_visitor)
+    _walk_json(product_config, [_replace_labels_visitor])
 
     product = product_config.get("product", {})
     packages = {}
@@ -142,12 +142,12 @@ Do not use otherwise""",
     },
 )
 
-def _walk_json(json_dict, visit_node_func):
-    """Walks a json dictionary, applying the function `visit_node_func` on every node.
+def _walk_json(json_dict, visit_node_funcs):
+    """Walks a json dictionary, applying the functions in `visit_node_funcs` on every node.
 
     Args:
         json_dict: The dictionary to walk.
-        visit_node_func: A function that takes 3 arguments: dictionary, key, value.
+        visit_node_funcs: A function that takes 3 arguments: dictionary, key, value.
     """
     nodes_to_visit = []
 
@@ -172,7 +172,8 @@ def _walk_json(json_dict, visit_node_func):
         if not len(nodes_to_visit):
             break
         node = nodes_to_visit.pop()
-        visit_node_func(dictionary = node.dictionary, key = node.key, value = node.value)
+        for visit_node_func in visit_node_funcs:
+            visit_node_func(dictionary = node.dictionary, key = node.key, value = node.value)
         if type(node.value) == "dict":
             _enqueue_dictionary_children(node.value)
 
@@ -191,7 +192,7 @@ def fuchsia_product_configuration(
         name: Name of the rule.
         TODO(fxb/122898): Point to document instead of Rust definition
         json_config: product assembly json config, as a starlark dictionary.
-            Format of this JSON config can be found in this Rust definitions: 
+            Format of this JSON config can be found in this Rust definitions:
                //src/lib/assembly/config_schema/src/assembly_config.rs
 
             Key values that take file paths should be declared as a string with
@@ -227,7 +228,23 @@ def fuchsia_product_configuration(
             label = value[6:-1]
             extracted_raw_config_labels[label] = value
 
-    _walk_json(json_config, _extract_labels_visitor)
+    def _remove_none_values_visitor(dictionary, key, value):
+        """Remove keys with a value of None.
+
+        Some optional keys will necessarily be supplied as 'None' value instead
+        of being omitted entirely, because Bazel doesn't allow the use of top-
+        level 'if' statements, instead, they can only be used within the value
+        of an expression:
+
+          "foo": value if foo else None
+
+        However, we want to strip those 'None' values before generating the json
+        from the nested dicts.
+        """
+        if value == None:
+            dictionary.pop(key)
+
+    _walk_json(json_config, [_remove_none_values_visitor, _extract_labels_visitor])
 
     _fuchsia_product_configuration(
         name = name,
@@ -235,5 +252,5 @@ def fuchsia_product_configuration(
         raw_config_labels = extracted_raw_config_labels,
         base_packages = base_packages,
         cache_packages = cache_packages,
-        driver_packages = driver_packages
+        driver_packages = driver_packages,
     )

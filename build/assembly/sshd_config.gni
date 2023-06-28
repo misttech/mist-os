@@ -1,0 +1,30 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+declare_args() {
+  # Path to the file containing the authorized keys that are able to connect via
+  # ssh.  This is in the format used by Bazel, and by GN's labels, but not by
+  # GN's file path syntax:
+  #
+  #  authorized_ssh_keys_label = "//path/to/folder:file_name"
+  #
+  # To GN, this path _should_ be:
+  #
+  #  "//path/to/folder/file_name"
+  #
+  # But to pass it as a file to the Bazel build, we need to use the "label"
+  # syntax, which is going to be fixed up below.
+  authorized_ssh_keys_label = false
+}
+
+# Set the default value for the path to the file.
+authorized_ssh_keys_path = false
+
+# Convert the "label" syntax into a file-path syntax if a value was set.
+if (authorized_ssh_keys_label != false) {
+  _authorized_keys_dir = get_label_info(authorized_ssh_keys_label, "dir")
+  _authorized_keys_file = get_label_info(authorized_ssh_keys_label, "name")
+
+  authorized_ssh_keys_path = "${_authorized_keys_dir}/${_authorized_keys_file}"
+}

@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/product_assembly_configuration.gni")
+import("//build/assembly/sshd_config.gni")
 import("//build/board.gni")
 import("//build/images/paths.gni")
 import("//build/images/vboot/vboot.gni")
@@ -237,6 +238,12 @@ if (is_fuchsia) {
     platform = {
       build_type = "eng"
       feature_set_level = "utility"
+      if (authorized_ssh_keys_path != false) {
+        development_support = {
+          authorized_ssh_keys_path =
+              rebase_path(authorized_ssh_keys_path, root_build_dir)
+        }
+      }
     }
     product = {
     }
@@ -255,6 +262,12 @@ if (is_fuchsia) {
     platform = {
       build_type = "eng"
       feature_set_level = "utility"
+      if (authorized_ssh_keys_path != false) {
+        development_support = {
+          authorized_ssh_keys_path =
+              rebase_path(authorized_ssh_keys_path, root_build_dir)
+        }
+      }
     }
     product = {
     }
@@ -371,6 +384,12 @@ if (is_fuchsia) {
     platform = {
       build_type = "eng"
       feature_set_level = "utility"
+      if (authorized_ssh_keys_path != false) {
+        development_support = {
+          authorized_ssh_keys_path =
+              rebase_path(authorized_ssh_keys_path, root_build_dir)
+        }
+      }
     }
     product = {
     }

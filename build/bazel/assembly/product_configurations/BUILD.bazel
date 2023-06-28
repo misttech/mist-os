@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("@legacy_ninja_build_outputs//:build_args.bzl", "authorized_ssh_keys_path")
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "BUILD_TYPES",
@@ -35,6 +36,9 @@ fuchsia_product_configuration(
     json_config = {
         "platform": {
             "build_type": BUILD_TYPES.ENG,
+            "development_support": {
+                "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_path if authorized_ssh_keys_path else None,
+            },
             "fonts": {
                 "enabled": False,
             },
@@ -62,6 +66,9 @@ fuchsia_product_configuration(
     json_config = {
         "platform": {
             "build_type": BUILD_TYPES.ENG,
+            "development_support": {
+                "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_path if authorized_ssh_keys_path else None,
+            },
             "fonts": {
                 "enabled": True,
             },
