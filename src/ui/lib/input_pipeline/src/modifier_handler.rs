@@ -29,7 +29,7 @@ pub struct ModifierHandler {
     lock_state: RefCell<LockStateKeys>,
 
     /// The inventory of this handler's Inspect status.
-    _inspect_status: InputHandlerStatus,
+    pub inspect_status: InputHandlerStatus,
 }
 
 #[async_trait(?Send)]
@@ -38,13 +38,14 @@ impl UnhandledInputHandler for ModifierHandler {
         self: Rc<Self>,
         unhandled_input_event: UnhandledInputEvent,
     ) -> Vec<InputEvent> {
-        match unhandled_input_event {
+        match unhandled_input_event.clone() {
             UnhandledInputEvent {
                 device_event: InputDeviceEvent::Keyboard(mut event),
                 device_descriptor,
                 event_time,
                 trace_id: _,
             } => {
+                self.inspect_status.count_received_event(InputEvent::from(unhandled_input_event));
                 self.modifier_state.borrow_mut().update(event.get_event_type(), event.get_key());
                 self.lock_state.borrow_mut().update(event.get_event_type(), event.get_key());
                 event = event
@@ -76,7 +77,7 @@ impl ModifierHandler {
         Rc::new(Self {
             modifier_state: RefCell::new(ModifierState::new()),
             lock_state: RefCell::new(LockStateKeys::new()),
-            _inspect_status: inspect_status,
+            inspect_status,
         })
     }
 }
@@ -89,7 +90,7 @@ pub struct ModifierMeaningHandler {
     modifier_state: RefCell<ModifierState>,
 
     /// The inventory of this handler's Inspect status.
-    _inspect_status: InputHandlerStatus,
+    pub inspect_status: InputHandlerStatus,
 }
 
 impl ModifierMeaningHandler {
@@ -100,10 +101,7 @@ impl ModifierMeaningHandler {
             "modifier_meaning_handler",
             /* generates_events */ false,
         );
-        Rc::new(Self {
-            modifier_state: RefCell::new(ModifierState::new()),
-            _inspect_status: inspect_status,
-        })
+        Rc::new(Self { modifier_state: RefCell::new(ModifierState::new()), inspect_status })
     }
 }
 
@@ -113,7 +111,7 @@ impl UnhandledInputHandler for ModifierMeaningHandler {
         self: Rc<Self>,
         unhandled_input_event: UnhandledInputEvent,
     ) -> Vec<InputEvent> {
-        match unhandled_input_event {
+        match unhandled_input_event.clone() {
             UnhandledInputEvent {
                 device_event: InputDeviceEvent::Keyboard(mut event),
                 device_descriptor,
@@ -122,6 +120,7 @@ impl UnhandledInputHandler for ModifierMeaningHandler {
             } if event.get_key_meaning()
                 == Some(KeyMeaning::NonPrintableKey(NonPrintableKey::AltGraph)) =>
             {
+                self.inspect_status.count_received_event(InputEvent::from(unhandled_input_event));
                 // The "obvious" rewrite of this if and the match guard above is
                 // unstable, so doing it this way.
                 if let Some(key_meaning) = event.get_key_meaning() {
@@ -150,8 +149,10 @@ impl UnhandledInputHandler for ModifierMeaningHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::input_device::{InputDeviceDescriptor, InputDeviceEvent, InputEvent};
-    use crate::keyboard_binding::KeyboardEvent;
+    use crate::input_device::{Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent};
+    use crate::input_handler::InputHandler;
+    use crate::keyboard_binding::{self, KeyboardEvent};
+    use crate::testing_utilities;
     use fidl_fuchsia_input::Key;
     use fidl_fuchsia_ui_input3::{KeyEventType, LockState, Modifiers};
     use fuchsia_async as fasync;
@@ -366,6 +367,96 @@ mod tests {
                     events_received_count: 0u64,
                     events_handled_count: 0u64,
                     last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn modifier_handler_inspect_counts_events() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let modifier_handler = ModifierHandler::new(&fake_handlers_node);
+        let modifier_meaning_handler = ModifierMeaningHandler::new(&fake_handlers_node);
+        let device_descriptor =
+            InputDeviceDescriptor::Keyboard(keyboard_binding::KeyboardDeviceDescriptor {
+                keys: vec![Key::A, Key::B, Key::RightAlt],
+                ..Default::default()
+            });
+        let (_, event_time_u64) = testing_utilities::event_times();
+        let input_events = vec![
+            testing_utilities::create_keyboard_event_with_time(
+                Key::A,
+                fidl_fuchsia_ui_input3::KeyEventType::Pressed,
+                None,
+                event_time_u64,
+                &device_descriptor,
+                /* keymap= */ None,
+            ),
+            // Should not count received events that have already been handled.
+            testing_utilities::create_keyboard_event_with_handled(
+                Key::B,
+                fidl_fuchsia_ui_input3::KeyEventType::Pressed,
+                None,
+                event_time_u64,
+                &device_descriptor,
+                /* keymap= */ None,
+                /* key_meaning= */ None,
+                Handled::Yes,
+            ),
+            testing_utilities::create_keyboard_event_with_time(
+                Key::A,
+                fidl_fuchsia_ui_input3::KeyEventType::Released,
+                None,
+                event_time_u64,
+                &device_descriptor,
+                /* keymap= */ None,
+            ),
+            // Should not count non-keyboard input events.
+            testing_utilities::create_fake_input_event(event_time_u64),
+            // Only event that should be counted by ModifierMeaningHandler.
+            testing_utilities::create_keyboard_event_with_key_meaning(
+                Key::RightAlt,
+                fidl_fuchsia_ui_input3::KeyEventType::Pressed,
+                None,
+                event_time_u64,
+                &device_descriptor,
+                /* keymap= */ None,
+                /* key_meaning= */
+                Some(KeyMeaning::NonPrintableKey(NonPrintableKey::AltGraph)),
+            ),
+        ];
+
+        for input_event in input_events {
+            let _ = modifier_handler.clone().handle_input_event(input_event.clone()).await;
+            let _ = modifier_meaning_handler.clone().handle_input_event(input_event).await;
+        }
+
+        let last_event_timestamp: u64 = event_time_u64.into_nanos().try_into().unwrap();
+
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                modifier_handler: {
+                    events_received_count: 3u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: last_event_timestamp,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                },
+                modifier_meaning_handler: {
+                    events_received_count: 1u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: last_event_timestamp,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,

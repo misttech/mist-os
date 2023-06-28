@@ -98,7 +98,7 @@ pub struct DisplayOwnership {
     _display_ownership_task: Task<()>,
 
     /// The inventory of this handler's Inspect status.
-    _inspect_status: InputHandlerStatus,
+    inspect_status: InputHandlerStatus,
 
     /// The event processing loop will do an `unbounded_send(())` on this
     /// channel once at the end of each loop pass, in test configurations only.
@@ -181,7 +181,7 @@ impl DisplayOwnership {
             key_state: RefCell::new(KeyState::new()),
             display_ownership_change_receiver: RefCell::new(ownership_receiver),
             _display_ownership_task: display_ownership_task,
-            _inspect_status: inspect_status,
+            inspect_status,
             #[cfg(test)]
             loop_done: RefCell::new(_loop_done),
         })
@@ -230,8 +230,9 @@ impl DisplayOwnership {
                         continue;
                     }
                     match event.device_event {
-                        input_device::InputDeviceEvent::Keyboard(ref event) => {
-                            self.key_state.borrow_mut().update(event.get_event_type(), event.get_key());
+                        input_device::InputDeviceEvent::Keyboard(ref e) => {
+                            self.inspect_status.count_received_event(input_device::InputEvent::from(event.clone()));
+                            self.key_state.borrow_mut().update(e.get_event_type(), e.get_key());
                         },
                         _ => {},
                     }
@@ -550,6 +551,67 @@ mod tests {
                     events_received_count: 0u64,
                     events_handled_count: 0u64,
                     last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    async fn display_ownership_inspect_counts_events() {
+        let (test_event, handler_event) = EventPair::create();
+        let (test_sender, handler_receiver) = mpsc::unbounded::<InputEvent>();
+        let (handler_sender, _test_receiver) = mpsc::unbounded::<InputEvent>();
+        let (loop_done_sender, mut loop_done) = mpsc::unbounded::<()>();
+        let mut wrangler = DisplayWrangler::new(test_event);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let handler = DisplayOwnership::new_internal(
+            handler_event,
+            Some(loop_done_sender),
+            &fake_handlers_node,
+        );
+        let _task = fasync::Task::local(async move {
+            handler.handle_input_events(handler_receiver, handler_sender).await.unwrap();
+        });
+
+        // Gain the display, and press a key.
+        wrangler.set_owned();
+        loop_done.next().await;
+        test_sender
+            .unbounded_send(new_keyboard_input_event(Key::A, KeyEventType::Pressed))
+            .unwrap();
+        loop_done.next().await;
+
+        // Lose display.
+        wrangler.set_unowned();
+        loop_done.next().await;
+        test_sender
+            .unbounded_send(new_keyboard_input_event(Key::B, KeyEventType::Pressed))
+            .unwrap();
+        loop_done.next().await;
+
+        // Regain display
+        wrangler.set_owned();
+        loop_done.next().await;
+
+        // Key event after regaining.
+        test_sender
+            .unbounded_send(new_keyboard_input_event(Key::A, KeyEventType::Released))
+            .unwrap();
+        loop_done.next().await;
+
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                display_ownership: {
+                    events_received_count: 3u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 42u64,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,

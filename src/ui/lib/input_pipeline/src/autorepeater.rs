@@ -201,7 +201,7 @@ pub struct Autorepeater {
     _event_feeder: Task<()>,
 
     /// The inventory of this handler's Inspect status.
-    _inspect_status: InputHandlerStatus,
+    inspect_status: InputHandlerStatus,
 }
 
 impl Autorepeater {
@@ -269,7 +269,7 @@ impl Autorepeater {
             state: RefCell::new(Default::default()),
             settings,
             _event_feeder: event_feeder,
-            _inspect_status: inspect_status,
+            inspect_status,
         })
     }
 
@@ -282,9 +282,13 @@ impl Autorepeater {
             match event {
                 // Anything not a keyboard or any handled event gets forwarded as is.
                 AnyEvent::NonKeyboard(input_event) => unbounded_send_logged(&output, input_event)?,
-                AnyEvent::Keyboard(_, _, _, _) | AnyEvent::Timeout => {
+                AnyEvent::Keyboard(_, _, _, _) => {
+                    if let Ok(e) = event.clone().try_into() {
+                        self.inspect_status.count_received_event(e);
+                    }
                     self.process_event(event, &output).await?
                 }
+                AnyEvent::Timeout => self.process_event(event, &output).await?,
             }
         }
         // If we got to here, that means `src` was closed.
@@ -1522,5 +1526,96 @@ mod tests {
                 }
             }
         });
+    }
+
+    #[test]
+    fn autorepeat_inspect_counts_events() {
+        let mut executor = TestExecutor::new_with_fake_time();
+
+        let (input, receiver) = mpsc::unbounded();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let handler =
+            Autorepeater::new_with_settings(receiver, default_settings(), &fake_handlers_node);
+        let (sender, _output) = mpsc::unbounded();
+        let handler_task = Task::local(async move { handler.run(sender).await });
+
+        let main_fut = async move {
+            input
+                .unbounded_send(new_event(
+                    Key::A,
+                    KeyEventType::Pressed,
+                    Some(KeyMeaning::Codepoint('a' as u32)),
+                    0,
+                ))
+                .unwrap();
+
+            wait_for_millis(1600).await;
+
+            input
+                .unbounded_send(new_event(
+                    Key::B,
+                    KeyEventType::Pressed,
+                    Some(KeyMeaning::Codepoint('b' as u32)),
+                    0,
+                ))
+                .unwrap();
+
+            wait_for_millis(2000).await;
+
+            input
+                .unbounded_send(new_event(
+                    Key::A,
+                    KeyEventType::Released,
+                    Some(KeyMeaning::Codepoint('a' as u32)),
+                    0,
+                ))
+                .unwrap();
+
+            wait_for_millis(1000).await;
+
+            input
+                .unbounded_send(new_handled_event(
+                    Key::C,
+                    KeyEventType::Pressed,
+                    Some(KeyMeaning::Codepoint('c' as u32)),
+                    0,
+                ))
+                .unwrap();
+
+            input
+                .unbounded_send(new_event(
+                    Key::B,
+                    KeyEventType::Released,
+                    Some(KeyMeaning::Codepoint('b' as u32)),
+                    0,
+                ))
+                .unwrap();
+
+            wait_for_duration(SLACK_DURATION).await;
+
+            // Inspect should only count unhandled events received from driver, not generated
+            // autorepeat events or already handled input events.
+            fuchsia_inspect::assert_data_tree!(inspector, root: {
+                input_handlers_node: {
+                    autorepeater: {
+                        events_received_count: 4u64,
+                        events_handled_count: 0u64,
+                        last_received_timestamp_ns: 0u64,
+                        "fuchsia.inspect.Health": {
+                            status: "STARTING_UP",
+                            // Timestamp value is unpredictable and not relevant in this context,
+                            // so we only assert that the property is present.
+                            start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                        },
+                    }
+                }
+            });
+        };
+        let joined_fut = Task::local(async move {
+            let _r = futures::join!(handler_task, main_fut);
+        });
+        pin_mut!(joined_fut);
+        run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
     }
 }

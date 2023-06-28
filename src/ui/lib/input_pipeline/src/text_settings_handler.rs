@@ -31,7 +31,7 @@ pub struct TextSettingsHandler {
     autorepeat_settings: RefCell<Option<autorepeater::Settings>>,
 
     /// The inventory of this handler's Inspect status.
-    _inspect_status: InputHandlerStatus,
+    pub inspect_status: InputHandlerStatus,
 }
 
 #[async_trait(?Send)]
@@ -40,13 +40,15 @@ impl UnhandledInputHandler for TextSettingsHandler {
         self: Rc<Self>,
         unhandled_input_event: input_device::UnhandledInputEvent,
     ) -> Vec<input_device::InputEvent> {
-        match unhandled_input_event {
+        match unhandled_input_event.clone() {
             input_device::UnhandledInputEvent {
                 device_event: input_device::InputDeviceEvent::Keyboard(mut event),
                 device_descriptor,
                 event_time,
                 trace_id: _,
             } => {
+                self.inspect_status
+                    .count_received_event(input_device::InputEvent::from(unhandled_input_event));
                 let keymap_id = self.get_keymap_name();
                 tracing::debug!(
                     "text_settings_handler::Instance::handle_unhandled_input_event: keymap_id = {:?}",
@@ -87,7 +89,7 @@ impl TextSettingsHandler {
         Rc::new(Self {
             keymap_id: RefCell::new(initial_keymap),
             autorepeat_settings: RefCell::new(initial_autorepeat),
-            _inspect_status: inspect_status,
+            inspect_status,
         })
     }
 
@@ -169,6 +171,7 @@ mod tests {
     use super::*;
 
     use crate::input_device;
+    use crate::input_handler::InputHandler;
     use crate::keyboard_binding;
     use crate::testing_utilities;
     use fidl_fuchsia_input;
@@ -327,6 +330,81 @@ mod tests {
                     events_received_count: 0u64,
                     events_handled_count: 0u64,
                     last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn text_settings_handler_inspect_counts_events() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let text_settings_handler = TextSettingsHandler::new(None, None, &fake_handlers_node);
+        let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
+            keyboard_binding::KeyboardDeviceDescriptor {
+                keys: vec![finput::Key::A, finput::Key::B],
+                ..Default::default()
+            },
+        );
+        let (_, event_time_u64) = testing_utilities::event_times();
+        let input_events = vec![
+            testing_utilities::create_keyboard_event_with_time(
+                finput::Key::A,
+                fidl_fuchsia_ui_input3::KeyEventType::Pressed,
+                None,
+                event_time_u64,
+                &device_descriptor,
+                /* keymap= */ None,
+            ),
+            // Should not count received events that have already been handled.
+            testing_utilities::create_keyboard_event_with_handled(
+                finput::Key::B,
+                fidl_fuchsia_ui_input3::KeyEventType::Pressed,
+                None,
+                event_time_u64,
+                &device_descriptor,
+                /* keymap= */ None,
+                /* key_meaning= */ None,
+                input_device::Handled::Yes,
+            ),
+            testing_utilities::create_keyboard_event_with_time(
+                finput::Key::A,
+                fidl_fuchsia_ui_input3::KeyEventType::Released,
+                None,
+                event_time_u64,
+                &device_descriptor,
+                /* keymap= */ None,
+            ),
+            // Should not count non-keyboard input events.
+            testing_utilities::create_fake_input_event(event_time_u64),
+            testing_utilities::create_keyboard_event_with_time(
+                finput::Key::B,
+                fidl_fuchsia_ui_input3::KeyEventType::Pressed,
+                None,
+                event_time_u64,
+                &device_descriptor,
+                /* keymap= */ None,
+            ),
+        ];
+
+        for input_event in input_events {
+            let _ = text_settings_handler.clone().handle_input_event(input_event).await;
+        }
+
+        let last_event_timestamp: u64 = event_time_u64.into_nanos().try_into().unwrap();
+
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                text_settings_handler: {
+                    events_received_count: 3u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: last_event_timestamp,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,

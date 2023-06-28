@@ -59,7 +59,7 @@ pub struct ImeHandler {
     key_event_injector: fidl_ui_input3::KeyEventInjectorProxy,
 
     /// The inventory of this handler's Inspect status.
-    _inspect_status: InputHandlerStatus,
+    pub inspect_status: InputHandlerStatus,
 }
 
 #[async_trait(?Send)]
@@ -75,6 +75,9 @@ impl UnhandledInputHandler for ImeHandler {
                 event_time,
                 trace_id: _,
             } => {
+                self.inspect_status.count_received_event(input_device::InputEvent::from(
+                    unhandled_input_event.clone(),
+                ));
                 let key_event = create_key_event(&keyboard_device_event, event_time);
                 self.dispatch_key(key_event).await;
                 // Consume the input event.
@@ -108,7 +111,7 @@ impl ImeHandler {
             "ime_handler",
             /* generates_events */ false,
         );
-        let handler = ImeHandler { key_event_injector, _inspect_status: inspect_status };
+        let handler = ImeHandler { key_event_injector, inspect_status };
 
         Ok(Rc::new(handler))
     }
@@ -180,6 +183,7 @@ fn create_key_event(
 mod tests {
     use {
         super::*,
+        crate::input_handler::InputHandler,
         crate::keyboard_binding::{self, KeyboardEvent},
         crate::testing_utilities,
         assert_matches::assert_matches,
@@ -824,6 +828,84 @@ mod tests {
                     events_received_count: 0u64,
                     events_handled_count: 0u64,
                     last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn ime_handler_inspect_counts_events() {
+        let (proxy, _) = connect_to_key_event_injector();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let ime_handler = ImeHandler::new_handler(proxy, &fake_handlers_node)
+            .await
+            .expect("Failed to create ImeHandler.");
+        let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
+            keyboard_binding::KeyboardDeviceDescriptor {
+                keys: vec![fidl_input::Key::A, fidl_input::Key::B],
+                ..Default::default()
+            },
+        );
+        let (_, event_time_u64) = testing_utilities::event_times();
+        let input_events = vec![
+            testing_utilities::create_keyboard_event_with_time(
+                fidl_input::Key::A,
+                fidl_fuchsia_ui_input3::KeyEventType::Pressed,
+                None,
+                event_time_u64,
+                &device_descriptor,
+                /* keymap= */ None,
+            ),
+            // Should not count received events that have already been handled.
+            testing_utilities::create_keyboard_event_with_handled(
+                fidl_input::Key::B,
+                fidl_fuchsia_ui_input3::KeyEventType::Pressed,
+                None,
+                event_time_u64,
+                &device_descriptor,
+                /* keymap= */ None,
+                /* key_meaning= */ None,
+                input_device::Handled::Yes,
+            ),
+            testing_utilities::create_keyboard_event_with_time(
+                fidl_input::Key::A,
+                fidl_fuchsia_ui_input3::KeyEventType::Released,
+                None,
+                event_time_u64,
+                &device_descriptor,
+                /* keymap= */ None,
+            ),
+            // Should not count non-keyboard input events.
+            testing_utilities::create_fake_input_event(event_time_u64),
+            testing_utilities::create_keyboard_event_with_time(
+                fidl_input::Key::B,
+                fidl_fuchsia_ui_input3::KeyEventType::Pressed,
+                None,
+                event_time_u64,
+                &device_descriptor,
+                /* keymap= */ None,
+            ),
+        ];
+
+        for input_event in input_events {
+            let _ = ime_handler.clone().handle_input_event(input_event).await;
+        }
+
+        let last_event_timestamp: u64 = event_time_u64.into_nanos().try_into().unwrap();
+
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                ime_handler: {
+                    events_received_count: 3u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: last_event_timestamp,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,

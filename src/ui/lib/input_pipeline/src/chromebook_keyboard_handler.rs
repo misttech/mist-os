@@ -79,7 +79,7 @@ pub struct ChromebookKeyboardHandler {
     state: RefCell<Inner>,
 
     /// The inventory of this handler's Inspect status.
-    _inspect_status: InputHandlerStatus,
+    pub inspect_status: InputHandlerStatus,
 }
 
 #[derive(Debug, Default)]
@@ -112,15 +112,22 @@ impl UnhandledInputHandler for ChromebookKeyboardHandler {
         self: Rc<Self>,
         input_event: UnhandledInputEvent,
     ) -> Vec<InputEvent> {
-        match input_event {
+        match input_event.clone() {
             // Decorate a keyboard event with key meaning.
             UnhandledInputEvent {
                 device_event: InputDeviceEvent::Keyboard(event),
                 device_descriptor: InputDeviceDescriptor::Keyboard(ref keyboard_descriptor),
                 event_time,
                 trace_id,
-            } if is_chromebook_keyboard(&keyboard_descriptor.device_info) => self
-                .process_keyboard_event(event, keyboard_descriptor.clone(), event_time, trace_id),
+            } if is_chromebook_keyboard(&keyboard_descriptor.device_info) => {
+                self.inspect_status.count_received_event(InputEvent::from(input_event));
+                self.process_keyboard_event(
+                    event,
+                    keyboard_descriptor.clone(),
+                    event_time,
+                    trace_id,
+                )
+            }
             // Pass other events unchanged.
             _ => vec![InputEvent::from(input_event)],
         }
@@ -135,7 +142,7 @@ impl ChromebookKeyboardHandler {
             "chromebook_keyboard_handler",
             /* generates_events */ true,
         );
-        Rc::new(Self { state: RefCell::new(Default::default()), _inspect_status: inspect_status })
+        Rc::new(Self { state: RefCell::new(Default::default()), inspect_status })
     }
 
     /// Gets the next event time that is at least as large as event_time, and
@@ -934,6 +941,40 @@ mod tests {
                     events_received_count: 0u64,
                     events_handled_count: 0u64,
                     last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    async fn chromebook_keyboard_handler_inspect_counts_events() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let handler = ChromebookKeyboardHandler::new(&fake_handlers_node);
+        let events = new_key_sequence(
+            zx::Time::from_nanos(42),
+            &MATCHING_KEYBOARD_DESCRIPTOR,
+            Handled::No,
+            vec![
+                (Key::F1, KeyEventType::Pressed),
+                (Key::F1, KeyEventType::Released),
+                (Key::Down, KeyEventType::Pressed),
+                (Key::Down, KeyEventType::Released),
+            ],
+        );
+        let _ = run_all_events(&handler, events).await;
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                chromebook_keyboard_handler: {
+                    events_received_count: 4u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 45u64,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,

@@ -296,7 +296,7 @@ pub struct DeadKeysHandler {
     _data: icu_data::Loader,
 
     /// The inventory of this handler's Inspect status.
-    _inspect_status: InputHandlerStatus,
+    pub inspect_status: InputHandlerStatus,
 }
 
 /// This trait implementation allows the [Handler] to be hooked up into the input
@@ -328,7 +328,7 @@ impl DeadKeysHandler {
             // lossy.
             normalizer: unorm::UNormalizer::new_nfc().unwrap(),
             _data: icu_data,
-            _inspect_status: inspect_status,
+            inspect_status,
         };
         Rc::new(handler)
     }
@@ -337,13 +337,14 @@ impl DeadKeysHandler {
         self: Rc<Self>,
         unhandled_input_event: UnhandledInputEvent,
     ) -> Vec<InputEvent> {
-        match unhandled_input_event {
+        match unhandled_input_event.clone() {
             UnhandledInputEvent {
                 device_event: InputDeviceEvent::Keyboard(event),
                 device_descriptor,
                 event_time,
                 trace_id: _,
             } => {
+                self.inspect_status.count_received_event(InputEvent::from(unhandled_input_event));
                 let event = StoredEvent { event, device_descriptor, event_time };
                 // Separated into two statements to ensure the logs are not truncated.
                 tracing::debug!("state: {:?}", self.state.borrow());
@@ -763,6 +764,7 @@ mod tests {
     use super::*;
     use crate::testing_utilities;
     use fidl_fuchsia_input::Key;
+    use fidl_fuchsia_input_report::ConsumerControlButton;
     use fidl_fuchsia_ui_input3::{KeyEventType, KeyMeaning};
     use fuchsia_inspect;
     use fuchsia_zircon as zx;
@@ -1261,6 +1263,46 @@ mod tests {
             input_handlers_node: {
                 dead_keys_handler: {
                     events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
+    }
+
+    #[test]
+    fn dead_keys_handler_inspect_counts_events() {
+        let loader = icu_data::Loader::new().unwrap();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let handler = DeadKeysHandler::new(loader, &fake_handlers_node);
+
+        // Inspect should count unhandled key events and ignore irrelevent InputEvent types.
+        let events = vec![
+            new_event(Key::A, KeyEventType::Pressed, Some(KeyMeaning::Codepoint('A' as u32))),
+            UnhandledInputEvent::try_from(testing_utilities::create_consumer_controls_event(
+                vec![ConsumerControlButton::VolumeUp],
+                zx::Time::ZERO,
+                &testing_utilities::consumer_controls_device_descriptor(),
+            ))
+            .unwrap(),
+            new_event(Key::A, KeyEventType::Released, Some(KeyMeaning::Codepoint('A' as u32))),
+        ];
+        let _res: Vec<InputEvent> = events
+            .into_iter()
+            .map(|event| handler.clone().handle_unhandled_input_event_internal(event))
+            .flatten()
+            .collect();
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                dead_keys_handler: {
+                    events_received_count: 2u64,
                     events_handled_count: 0u64,
                     last_received_timestamp_ns: 0u64,
                     "fuchsia.inspect.Health": {
