@@ -841,6 +841,7 @@
                     "/core/sshd-host",
                     "/core/termina-guest-manager",
                     "/core/test_manager/devices-tests:**",
+                    "/core/test_manager/drm-tests:**",
                     "/core/test_manager/google-tests:**",
                     "/core/test_manager/system-tests:**",
                     "/core/test_manager/system-validation-tests:**",
