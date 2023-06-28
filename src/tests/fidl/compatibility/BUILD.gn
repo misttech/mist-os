@@ -43,35 +43,6 @@ fidl_compatibilty_test_impls = [
   "rust",
 ]
 
-# Gather the child definitions and capability offers for every possible proxy + server combination.
-test_component_cml_children = []
-test_component_cml_offers = []
-foreach(impl, fidl_compatibilty_test_impls) {
-  # Define proxy and server instances for this binding implementation.
-  test_component_cml_children += [
-    {
-      name = "${impl}_proxy"
-      url = "#meta/${impl}-impl.cml"
-    },
-    {
-      name = "${impl}_server"
-      url = "#meta/${impl}-impl.cml"
-    },
-  ]
-
-  # Enable logging for both the proxy and server instances of the given implementation.
-  test_component_cml_offers += [
-    {
-      protocol = [ "fuchsia.logger.LogSink" ]
-      from = "parent"
-      to = [
-        "#${impl}_proxy",
-        "#${impl}_server",
-      ]
-    },
-  ]
-}
-
 # Generate a test-running component for each category.
 test_component_labels = []
 foreach(test, fidl_compatibility_tests_categories) {
@@ -127,8 +98,6 @@ foreach(test, fidl_compatibility_tests_categories) {
             binary = "bin/$output"
             args = fidl_compatibilty_test_impls
           }
-          children = test_component_cml_children
-          offer = test_component_cml_offers
         },
       ]
     }
