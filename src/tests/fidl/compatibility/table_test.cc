@@ -393,7 +393,7 @@ int main(int argc, char** argv) {
   }
 
   testing::InitGoogleTest(&argc, argv);
-  assert(GetImplsUnderTest(argc, argv, &impls));
+  assert(GetImplsUnderTest(&impls));
 
   int r = RUN_ALL_TESTS();
   PrintSummary(summary);

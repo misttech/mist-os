@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fidl.test.compatibility/cpp/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
+
 #include <utility>
 
 #include <src/tests/fidl/compatibility/helpers.h>
@@ -9,9 +12,6 @@
 using namespace component_testing;
 
 namespace fidl_test_compatibility_helpers {
-
-// Helper text for how to invoke the proper compatibility test combination.
-constexpr char kUsage[] = ("Usage:\n  fidl_compatibility_test foo_impl bar_impl\n");
 
 AllowImplPair Exclude(std::initializer_list<const char*> substrings) {
   return [substrings](const std::string& proxy_url, const std::string& server_url) {
@@ -84,22 +84,23 @@ void ForSomeImpls(const Impls& impls, const AllowImplPair& allow, const TestBody
   }
 }
 
-bool GetImplsUnderTest(int argc, char** argv, Impls* out_impls) {
-  for (int i = 1; i < argc; i++) {
-    std::string impl(argv[i]);
-    std::string package_url;
-    if (impl.rfind("fuchsia-pkg://", 0) == 0) {
-      package_url = impl;
-    } else {
-      package_url = "fidl-compatibility-test-" + std::string(argv[i]) + "#meta/impl.cm";
-    }
-    out_impls->push_back(package_url);
+bool GetImplsUnderTest(Impls* out_impls) {
+  // TODO(fxbug.dev/126999): this should come from structured config.
+  zx::result client_end = component::Connect<fidl_test_compatibility::Config>();
+  FX_CHECK(client_end.is_ok());
+  fidl::SyncClient config(std::move(*client_end));
+  auto result = config->GetImpls();
+  FX_CHECK(result.is_ok()) << "Failed to get impls: " << result.error_value().status_string();
+  auto impls = result->impls();
+
+  for (size_t i = 0; i < impls.size(); i++) {
+    out_impls->push_back(impls[i]);
   }
 
   if (!out_impls->empty()) {
     return true;
   }
-  FX_CHECK(!out_impls->empty()) << "\n\n" << *argv << "\n\n" << kUsage;
+  FX_CHECK(!out_impls->empty());
   return false;
 }
 

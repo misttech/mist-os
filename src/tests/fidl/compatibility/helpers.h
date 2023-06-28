@@ -67,7 +67,7 @@ void ForSomeImpls(const Impls& impls, const AllowImplPair& allow, const TestBody
 
 // Parse the input args to build a list of binding implementations being tested. Returns false if no
 // viable implementation names are found in the passed in command line arguments.
-bool GetImplsUnderTest(int argc, char** argv, Impls* out_impls);
+bool GetImplsUnderTest(Impls* out_impls);
 
 // Mint a simple handle for test-case building purposes.
 zx::handle Handle();

@@ -14,9 +14,13 @@ fidl("fidl_import") {
 # The protocol used in the test.
 fidl("fidl_service") {
   name = "fidl.test.compatibility"
-  sources = [ "compatibility_service.test.fidl" ]
+  sources = [
+    "compatibility_service.test.fidl",
+    "config.fidl",
+  ]
   public_deps = [
     ":fidl_import",
+    "//sdk/fidl/fuchsia.url",
     "//zircon/vdso/zx",
   ]
   enable_hlcpp = true
