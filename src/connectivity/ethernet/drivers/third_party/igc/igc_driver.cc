@@ -448,7 +448,7 @@ void IgcDriver::IfSetPromisc(uint32_t flags) {
 bool IgcDriver::IsValidEthernetAddr(uint8_t* addr) {
   const char zero_addr[6] = {0, 0, 0, 0, 0, 0};
 
-  if ((addr[0] & 1) || (!bcmp(addr, zero_addr, kEtherAddrLen))) {
+  if ((addr[0] & 1) || (!memcmp(addr, zero_addr, kEtherAddrLen))) {
     return false;
   }
 
