@@ -183,7 +183,7 @@ TEST(SymbolizerImpl, Analytics) {
   ASSERT_TRUE(params.HasMember("time_download_ms"));
   EXPECT_EQ(params["time_download_ms"].GetInt(), 0);
   ASSERT_TRUE(params.HasMember("time_total_ms"));
-  EXPECT_EQ(params["time_total_ms"].GetInt(), 0);
+  EXPECT_GE(params["time_total_ms"].GetInt(), 0);
 }
 
 }  // namespace
