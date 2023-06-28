@@ -130,8 +130,10 @@ fn run_bind_test_specs<'a>(
     symbol_table: &SymbolTable,
     instructions: &Vec<SymbolicInstructionInfo<'a>>,
 ) -> Result<bool, TestError> {
+    println!("[----------]");
     for test in specs {
         let mut device_specification = DeviceSpecification::new();
+        println!("[ RUN      ] {}", test.name);
         for (key, value) in &test.device {
             device_specification
                 .add_property(&key, &value)
@@ -142,12 +144,17 @@ fn run_bind_test_specs<'a>(
             debug_from_device_specification(symbol_table, instructions, device_specification)
                 .map_err(TestError::DebuggerError)?;
         match (&test.expected, result) {
-            (ExpectedResult::Match, false) => return Ok(false),
-            (ExpectedResult::Abort, true) => return Ok(false),
+            (ExpectedResult::Match, false) | (ExpectedResult::Abort, true) => {
+                println!("[  FAILED  ] {}", test.name);
+                println!("[----------]");
+                return Ok(false);
+            }
             _ => (),
         }
+        println!("[       OK ] {}", test.name);
     }
-
+    println!("[  PASSED  ]");
+    println!("[----------]");
     Ok(true)
 }
 
@@ -170,8 +177,12 @@ fn run_composite_bind_test_specs(
         node_map.insert(node.name, node.instructions);
     }
 
+    println!("[==========]");
     for node_spec in specs {
+        println!("[ RUN      ] Test for composite node {}", node_spec.node);
         if !node_map.contains_key(&node_spec.node) {
+            println!("[  FAILED  ] {}", node_spec.node);
+            println!("[==========]");
             return Err(TestError::CompositeNodeMissing(node_spec.node.clone()));
         }
 
@@ -180,10 +191,14 @@ fn run_composite_bind_test_specs(
             &composite_bind.symbol_table,
             node_map.get(&node_spec.node).unwrap(),
         )? {
+            println!("[  FAILED  ] {}", node_spec.node);
+            println!("[==========]");
             return Ok(false);
         }
+        println!("[       OK ] {}", node_spec.node);
     }
-
+    println!("[  SUCCESS  ] ");
+    println!("[==========]");
     Ok(true)
 }
 
