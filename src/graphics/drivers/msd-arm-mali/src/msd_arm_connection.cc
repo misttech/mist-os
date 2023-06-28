@@ -197,6 +197,23 @@ bool MsdArmConnection::ExecuteAtom(
       MAGMA_LOG(WARNING, "Client %" PRIu64 ": Invalid atom flags 0x%x", client_id_, flags);
       return false;
     }
+    uint32_t set_slot_count = 0;
+    if (flags & kAtomFlagForceSlot0) {
+      slot = 0;
+      set_slot_count++;
+    }
+    if (flags & kAtomFlagForceSlot1) {
+      slot = 1;
+      set_slot_count++;
+    }
+    if (flags & kAtomFlagForceSlot2) {
+      slot = 2;
+      set_slot_count++;
+    }
+    if (set_slot_count > 1) {
+      MAGMA_LOG(WARNING, "Client %" PRIu64 ": Atom forced to %d slots", client_id_, set_slot_count);
+      return false;
+    }
 #if defined(ENABLE_PROTECTED_DEBUG_SWAP_MODE)
     flags ^= kAtomFlagProtected;
 #endif

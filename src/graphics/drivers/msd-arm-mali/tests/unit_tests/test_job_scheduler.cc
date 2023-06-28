@@ -118,6 +118,25 @@ class TestJobScheduler {
     EXPECT_FALSE(owner.gpu_active());
   }
 
+  void TestRunSlot2() {
+    TestOwner owner;
+    TestConnectionOwner connection_owner;
+    std::shared_ptr<MsdArmConnection> connection = MsdArmConnection::Create(0, &connection_owner);
+    EXPECT_EQ(0u, owner.run_list().size());
+    JobScheduler scheduler(&owner, 3);
+    auto atom1 = std::make_unique<MsdArmAtom>(connection, 1u, 2, 0, magma_arm_mali_user_data(), 0);
+    MsdArmAtom* atom1_ptr = atom1.get();
+    scheduler.EnqueueAtom(std::move(atom1));
+    EXPECT_EQ(0u, owner.run_list().size());
+
+    scheduler.TryToSchedule();
+    EXPECT_EQ(1u, owner.run_list().size());
+    EXPECT_EQ(atom1_ptr, owner.run_list()[0]);
+    EXPECT_TRUE(owner.gpu_active());
+    scheduler.JobCompleted(2, kArmMaliResultSuccess, 0u);
+    EXPECT_FALSE(owner.gpu_active());
+  }
+
   void TestCancelJob() {
     TestOwner owner;
     TestConnectionOwner connection_owner;
@@ -816,6 +835,8 @@ class TestJobScheduler {
 };
 
 TEST(JobScheduler, RunBasic) { TestJobScheduler().TestRunBasic(); }
+
+TEST(JobScheduler, RunSlot2) { TestJobScheduler().TestRunSlot2(); }
 
 TEST(JobScheduler, CancelJob) { TestJobScheduler().TestCancelJob(); }
 

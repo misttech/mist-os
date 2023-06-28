@@ -1249,7 +1249,7 @@ void MsdArmDevice::ExecuteAtomOnDevice(MsdArmAtom* atom, mali::RegisterIo* regis
                  atom->slot());
   TRACE_FLOW_STEP("magma", "atom", atom->trace_nonce());
 
-  DASSERT(atom->slot() < 2u);
+  DASSERT(atom->slot() <= 2u);
   bool dependencies_finished;
   atom->UpdateDependencies(&dependencies_finished);
   DASSERT(dependencies_finished);

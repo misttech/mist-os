@@ -9,7 +9,7 @@
 
 #include <cstdint>
 
-#define MAGMA_VENDOR_VERSION_ARM 2
+#define MAGMA_VENDOR_VERSION_ARM 3
 
 // These flags can be specified to magma_map_buffer.
 enum MagmaArmMaliGpuMapFlags {
@@ -31,6 +31,9 @@ enum AtomFlags {
   kAtomFlagRequireTiler = (1 << 2),
   kAtomFlagRequireCycleCounter = (1 << 3),
   kAtomFlagProtected = (1 << 4),  // Executes in protected mode.
+  kAtomFlagForceSlot0 = (1 << 5),
+  kAtomFlagForceSlot1 = (1 << 6),
+  kAtomFlagForceSlot2 = (1 << 7),
 
   // Atoms with this flag set are processed completely in the MSD and aren't
   // sent to hardware.

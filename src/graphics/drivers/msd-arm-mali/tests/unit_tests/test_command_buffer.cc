@@ -37,6 +37,21 @@ class Test {
     EXPECT_EQ(MAGMA_STATUS_OK, status.get());
   }
 
+  void TestValidSlot2() {
+    auto ctx = InitializeContext();
+    ASSERT_TRUE(ctx);
+
+    magma_arm_mali_atom atom[1];
+    atom[0].size = sizeof(atom[0]);
+    atom[0].atom_number = 1;
+    atom[0].flags = kAtomFlagForceSlot2;
+    atom[0].dependencies[0].atom_number = 0;
+    atom[0].dependencies[1].atom_number = 0;
+
+    magma::Status status = ctx->ExecuteImmediateCommands(sizeof(atom), &atom, 0, nullptr);
+    EXPECT_EQ(MAGMA_STATUS_OK, status.get());
+  }
+
   void TestValidLarger() {
     auto ctx = InitializeContext();
     ASSERT_TRUE(ctx);
@@ -254,6 +269,7 @@ TEST(CommandBuffer, TestInvalidSemaphoreImmediate) { ::Test().TestInvalidSemapho
 TEST(CommandBuffer, TestSemaphoreImmediate) { ::Test().TestSemaphoreImmediate(); }
 TEST(CommandBuffer, TestValidImmediate) { ::Test().TestValidImmediate(); }
 TEST(CommandBuffer, TestValidLarger) { ::Test().TestValidLarger(); }
+TEST(CommandBuffer, TestValidSlot2) { ::Test().TestValidSlot2(); }
 TEST(CommandBuffer, TestInvalidTooLarge) { ::Test().TestInvalidTooLarge(); }
 TEST(CommandBuffer, TestInvalidOverflow) { ::Test().TestInvalidOverflow(); }
 TEST(CommandBuffer, TestInvalidZeroSize) { ::Test().TestInvalidZeroSize(); }
