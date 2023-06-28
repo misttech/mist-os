@@ -413,22 +413,4 @@ mod tests {
 
         Ok(())
     }
-
-    #[test]
-    fn deserialize_invalid_absolute_moniker() {
-        let mut expected_index = gen_index(1);
-        let valid_moniker = "/a/b:b/c/b:b";
-        expected_index.instances[0].moniker =
-            Some(AbsoluteMoniker::parse_str(valid_moniker).unwrap());
-
-        let valid_json = serde_json::to_string(&expected_index).unwrap();
-        let invalid_json = valid_json.replace(&valid_moniker, "an invalid moniker!");
-
-        // serde doesn't carry over the inner error types, so we're we have to test against the error string.
-        assert!(serde_json::from_str::<Index>(&invalid_json)
-            .err()
-            .unwrap()
-            .to_string()
-            .starts_with("invalid moniker: an invalid moniker!"));
-    }
 }

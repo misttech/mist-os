@@ -245,8 +245,6 @@ mod tests {
         );
 
         assert!(under_test("").is_err(), "cannot be empty");
-        assert!(under_test("a:0").is_err(), "must start with root");
-        assert!(under_test("a:0/b:0").is_err(), "must start with root");
         assert!(under_test("//").is_err(), "path segments cannot be empty");
         assert!(under_test("/a:0/").is_err(), "path segments cannot be empty");
         assert!(under_test("/a:0//b:0").is_err(), "path segments cannot be empty");

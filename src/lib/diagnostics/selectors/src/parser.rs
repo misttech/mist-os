@@ -362,8 +362,9 @@ where
         '\\',
         tag(":"),
     );
+    // Monikers (the first part of a selector) can optionally be preceded by "/" or "./".
     let (rest, segments) = preceded(
-        opt(tag("/")),
+        opt(alt((tag("./"), tag("/")))),
         separated_nonempty_list(tag("/"), recognize(accepted_characters)),
     )(input)?;
     Ok((rest, ComponentSelector { segments: segments.into_iter().map(|s| s.into()).collect() }))
@@ -590,6 +591,16 @@ mod tests {
 
             // Component selectors can start with `/`
             let test_moniker_string = format!("/{test_string}");
+            let (_, selector) =
+                component_selector::<nom::error::VerboseError<&str>>(&test_moniker_string).unwrap();
+            assert_eq!(
+                expected_segments, selector.segments,
+                "For '{}', got: {:?}",
+                test_moniker_string, selector,
+            );
+
+            // Component selectors can start with `./`
+            let test_moniker_string = format!("./{test_string}");
             let (_, selector) =
                 component_selector::<nom::error::VerboseError<&str>>(&test_moniker_string).unwrap();
             assert_eq!(
