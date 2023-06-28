@@ -58,7 +58,6 @@ Path | Description
 [/src/lib/fidl/llcpp/tests/conformance/conformance_utils.h] | Runtime support for C++ wire types conformance tests.
 [/src/lib/fidl/rust/gidl_util] | Runtime support for Rust conformance tests.
 [/third_party/go/src/syscall/zx/fidl/fidl_test] | Runtime support for Go conformance tests.
-[/src/lib/fidl/dart/gidl] | Runtime support for Dart conformance tests.
 [/src/tests/benchmarks/fidl/benchmark_suite] | Benchmark definitions (`.fidl` and `.gidl` files).
 [/src/tests/benchmarks/fidl] | Runtime support for benchmarks.
 
@@ -758,7 +757,6 @@ fidl fmt --library my_library.fidl -i
 [/src/lib/fidl/llcpp/tests/conformance/conformance_utils.h]: /src/lib/fidl/llcpp/tests/conformance/conformance_utils.h
 [/src/lib/fidl/rust/gidl_util]: /src/lib/fidl/rust/gidl_util
 [/third_party/go/src/syscall/zx/fidl/fidl_test]: /third_party/go/src/syscall/zx/fidl/fidl_test
-[/src/lib/fidl/dart/gidl]: /src/lib/fidl/dart/gidl
 [/src/tests/benchmarks/fidl/benchmark_suite]: /src/tests/benchmarks/fidl/benchmark_suite
 [/src/tests/benchmarks/fidl]: /src/tests/benchmarks/fidl
 
