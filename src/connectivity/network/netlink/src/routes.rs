@@ -21,7 +21,7 @@ use net_types::ip::{Ip, IpAddress, IpVersion};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::{
     RouteHeader, RouteMessage, RtnlMessage, AF_INET, AF_INET6, RTNLGRP_IPV4_ROUTE,
-    RTNLGRP_IPV6_ROUTE, RTN_UNICAST, RTPROT_UNSPEC, RT_SCOPE_UNIVERSE, RT_TABLE_UNSPEC,
+    RTNLGRP_IPV6_ROUTE, RTN_UNICAST, RTPROT_UNSPEC, RT_SCOPE_UNIVERSE, RT_TABLE_MAIN,
 };
 use netlink_packet_utils::nla::Nla;
 
@@ -435,7 +435,7 @@ impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for NetlinkRouteMessage 
         //
         // length of source prefix
         // tos filter (type of service)
-        route_header.table = RT_TABLE_UNSPEC;
+        route_header.table = RT_TABLE_MAIN;
         route_header.protocol = RTPROT_UNSPEC;
         // Universe for routes with next_hop. Valid as long as route action
         // is forwarding.
@@ -565,6 +565,7 @@ mod tests {
         route_header.address_family = address_family;
         route_header.destination_prefix_length = destination_prefix_length;
         route_header.kind = RTN_UNICAST;
+        route_header.table = RT_TABLE_MAIN;
 
         let mut route_message = RouteMessage::default();
         route_message.header = route_header;
