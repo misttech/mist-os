@@ -23,6 +23,8 @@ per-file             set = olivernewman@google.com
 
 per-file             test = anmittal@google.com,crjohns@google.com,dworsham@google.com
 
+per-file             testgen = crjohns@google.com,dworsham@google.com,kjharland@google.com
+
 per-file go = olivernewman@google.com
 
 per-file symbolize = dangyi@google.com,frousseau@google.com
