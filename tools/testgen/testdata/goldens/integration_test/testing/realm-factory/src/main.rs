@@ -24,6 +24,7 @@ async fn main() -> Result<(), Error> {
 }
 
 async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
+    let mut task_group = fasync::TaskGroup::new();
     let mut factory = RealmFactoryImpl::new();
     let result: Result<(), Error> = async move {
         while let Ok(Some(request)) = stream.try_next().await {
@@ -36,13 +37,15 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                 RealmFactoryRequest::CreateRealm { realm_server, responder } => {
                     let realm = factory.create_realm().await?;
                     let request_stream = realm_server.into_stream()?;
-                    fasync::Task::spawn(async move {
+                    task_group.add(fasync::Task::spawn(async move {
                         realm_proxy::service::serve(realm, request_stream).await.unwrap();
-                    }).detach();
+                    }));
                     responder.send(Ok(()))?;
                 }
             }
         }
+
+        task_group.join().await;
         Ok(())
     }
     .await;
