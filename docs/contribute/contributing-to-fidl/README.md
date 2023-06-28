@@ -33,7 +33,6 @@ HLCPP (Old) | [/tools/fidl/fidlgen_hlcpp] | [/sdk/lib/fidl/cpp] | *(located alon
 New C++ | [/tools/fidl/fidlgen_cpp] | [/sdk/lib/fidl/cpp] | [/src/lib/fidl/llcpp] and [/src/lib/fidl/cpp]
 Go | [/tools/fidl/fidlgen_go] | [/third_party/go/src/syscall/zx/fidl](https://fuchsia.googlesource.com/third_party/go/+/main/src/syscall/zx/fidl) | *(located alongside runtime libraries)*
 Rust | [/tools/fidl/fidlgen_rust] | [/src/lib/fidl/rust] | *(located alongside runtime libraries)*
-Dart | [/tools/fidl/fidlgen_dart] | [/sdk/dart/fidl] | [/src/tests/fidl/dart_bindings_test]
 
 Note: The tests column refers to hand-written tests that exercise both the
 generated code and the runtime libraries. There are also other tests, like unit
@@ -752,7 +751,6 @@ fidl fmt --library my_library.fidl -i
 [/sdk/dart/fidl]: /sdk/dart/fidl
 [/src/lib/fidl/c]: /src/lib/fidl/c
 [/src/lib/fidl/llcpp]: /src/lib/fidl/llcpp
-[/src/tests/fidl/dart_bindings_test]: /src/tests/fidl/dart_bindings_test
 [/tools/fidl/lib/fidlgen]: /tools/fidl/lib/fidlgen
 
 [/tools/fidl/gidl]: /tools/fidl/gidl
