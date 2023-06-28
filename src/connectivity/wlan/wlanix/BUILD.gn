@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 fidl("fuchsia.wlan.wlanix") {
   sdk_category = "internal"
@@ -41,8 +40,4 @@ fuchsia_component("component") {
 
 fuchsia_package("wlanix") {
   deps = [ ":component" ]
-}
-
-core_shard("wlanix-core-shard") {
-  shard_file = "meta/wlanix.core_shard.cml"
 }
