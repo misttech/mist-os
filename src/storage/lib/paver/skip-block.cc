@@ -236,6 +236,4 @@ fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock> SkipBlockPartitionClient:
   return component::MaybeClone(partition_.client_end(), component::AssumeProtocolComposesNode);
 }
 
-fbl::unique_fd SkipBlockPartitionClient::block_fd() { return fbl::unique_fd(); }
-
 }  // namespace paver

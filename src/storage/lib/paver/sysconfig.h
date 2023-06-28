@@ -11,7 +11,7 @@
 namespace paver {
 
 // Specialized client for talking to sub-partitions of the sysconfig partition.
-class SysconfigPartitionClient final : public BlockDevicePartitionClient {
+class SysconfigPartitionClient final : public PartitionClient {
  public:
   SysconfigPartitionClient(::sysconfig::SyncClient client,
                            ::sysconfig::SyncClient::PartitionType partition)
@@ -23,8 +23,6 @@ class SysconfigPartitionClient final : public BlockDevicePartitionClient {
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) final;
   zx::result<> Trim() final;
   zx::result<> Flush() final;
-  fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() final;
-  fbl::unique_fd block_fd() final;
 
   // No copy, no move.
   SysconfigPartitionClient(const SysconfigPartitionClient&) = delete;

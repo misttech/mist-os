@@ -70,7 +70,6 @@ class PinecrestAbrClient : public PartitionClient {
   zx::result<size_t> GetPartitionSize() override { return client_->GetPartitionSize(); }
   zx::result<> Trim() override { return client_->Trim(); }
   zx::result<> Flush() override { return client_->Flush(); }
-  fbl::unique_fd block_fd() override { return client_->block_fd(); }
   zx::result<> Read(const zx::vmo& vmo, size_t size) override;
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) override;
 

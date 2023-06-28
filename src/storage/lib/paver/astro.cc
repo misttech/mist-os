@@ -378,12 +378,6 @@ zx::result<> AstroSysconfigPartitionClientBuffered::Flush() {
       [&](auto* ctx) { return zx::make_result(ctx->client_->Flush()); });
 }
 
-fidl::ClientEnd<fuchsia_hardware_block::Block> AstroSysconfigPartitionClientBuffered::GetChannel() {
-  return {};
-}
-
-fbl::unique_fd AstroSysconfigPartitionClientBuffered::block_fd() { return fbl::unique_fd(); }
-
 zx::result<size_t> Bl2PartitionClient::GetBlockSize() {
   // Technically this is incorrect, but we deal with alignment so this is okay.
   return zx::ok(kBl2Size);

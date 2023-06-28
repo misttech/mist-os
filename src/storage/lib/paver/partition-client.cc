@@ -366,8 +366,4 @@ zx::result<> PartitionCopyClient::Flush() {
   return zx::ok();
 }
 
-fidl::ClientEnd<block::Block> PartitionCopyClient::GetChannel() { return {}; }
-
-fbl::unique_fd PartitionCopyClient::block_fd() { return fbl::unique_fd(); }
-
 }  // namespace paver

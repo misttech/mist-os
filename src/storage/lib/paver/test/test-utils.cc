@@ -182,7 +182,3 @@ zx::result<> FakePartitionClient::Trim() {
 }
 
 zx::result<> FakePartitionClient::Flush() { return zx::ok(); }
-
-fidl::ClientEnd<fuchsia_hardware_block::Block> FakePartitionClient::GetChannel() { return {}; }
-
-fbl::unique_fd FakePartitionClient::block_fd() { return fbl::unique_fd(); }

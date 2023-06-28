@@ -687,6 +687,12 @@ zx::result<> AllocateEmptyPartitions(const fbl::unique_fd& devfs_root,
 zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
                                  std::unique_ptr<PartitionClient> partition_client,
                                  std::unique_ptr<fvm::ReaderInterface> payload) {
+  zx::result block_or = partition_client->GetBlockDevice();
+  if (block_or.is_error()) {
+    return block_or.take_error();
+  }
+  BlockDeviceClient& block = block_or.value().get();
+
   std::unique_ptr<fvm::SparseReader> reader;
   zx::result<> status = zx::ok();
   if (status = zx::make_result(fvm::SparseReader::Create(std::move(payload), &reader));
@@ -700,7 +706,7 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
   // Acquire an fd to the FVM, either by finding one that already
   // exists, or formatting a new one.
   fbl::unique_fd fvm_fd(
-      FvmPartitionFormat(devfs_root, partition_client->block_fd(), *hdr, BindOption::TryBind));
+      FvmPartitionFormat(devfs_root, block.block_fd(), *hdr, BindOption::TryBind));
   if (!fvm_fd) {
     ERROR("Couldn't find FVM partition\n");
     return zx::error(ZX_ERR_IO);
@@ -737,8 +743,7 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
   if (free_slices < requested_slices) {
     Warn("Not enough space to non-destructively pave",
          "Automatically reinitializing FVM; Expect data loss");
-    fvm_fd =
-        FvmPartitionFormat(devfs_root, partition_client->block_fd(), *hdr, BindOption::Reformat);
+    fvm_fd = FvmPartitionFormat(devfs_root, block.block_fd(), *hdr, BindOption::Reformat);
     if (!fvm_fd) {
       ERROR("Couldn't reformat FVM partition.\n");
       return zx::error(ZX_ERR_IO);

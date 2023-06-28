@@ -59,7 +59,6 @@ class FlashmapPartitionClient : public PartitionClient {
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) final;
   zx::result<> Trim() final { return zx::ok(); }
   zx::result<> Flush() final { return zx::ok(); }
-  fbl::unique_fd block_fd() final { return fbl::unique_fd(); }
 
  private:
   // Initialisation of state that might fail (i.e. getting area list and erase block size over

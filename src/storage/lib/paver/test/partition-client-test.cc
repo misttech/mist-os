@@ -27,7 +27,7 @@ using device_watcher::RecursiveWaitForFile;
 using driver_integration_test::IsolatedDevmgr;
 using paver::BlockWatcherPauser;
 
-class FakePartitionClient final : public paver::BlockDevicePartitionClient {
+class FakePartitionClient final : public paver::PartitionClient {
  public:
   explicit FakePartitionClient(size_t block_size, size_t partition_size)
       : block_size_(block_size), partition_size_(partition_size) {}
@@ -66,9 +66,6 @@ class FakePartitionClient final : public paver::BlockDevicePartitionClient {
     flush_called_ = true;
     return zx::make_result(result_);
   }
-
-  fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() final { return {}; }
-  fbl::unique_fd block_fd() final { return {}; }
 
   bool read_called() { return read_called_; }
   bool write_called() { return write_called_; }
@@ -194,8 +191,6 @@ TEST(PartitionCopyClientTest, GetChannelSinglePartition) {
   auto fake = std::make_unique<FakePartitionClient>(10, 100);
   partitions.push_back(std::move(fake));
   paver::PartitionCopyClient client(std::move(partitions));
-
-  ASSERT_FALSE(client.GetChannel().is_valid());
 }
 
 TEST(PartitionCopyClientTest, BlockFdSinglePartition) {
@@ -203,8 +198,6 @@ TEST(PartitionCopyClientTest, BlockFdSinglePartition) {
   auto fake = std::make_unique<FakePartitionClient>(10, 100);
   partitions.push_back(std::move(fake));
   paver::PartitionCopyClient client(std::move(partitions));
-
-  ASSERT_EQ(client.block_fd(), fbl::unique_fd());
 }
 
 TEST(PartitionCopyClientTest, ConstructMultiplePartitions) {
@@ -356,8 +349,6 @@ TEST(PartitionCopyClientTest, GetChannelMultiplePartitions) {
   partitions.push_back(std::move(fake));
   partitions.push_back(std::move(fake2));
   paver::PartitionCopyClient client(std::move(partitions));
-
-  ASSERT_FALSE(client.GetChannel().is_valid());
 }
 
 TEST(PartitionCopyClientTest, BlockFdMultilplePartition) {
@@ -367,8 +358,6 @@ TEST(PartitionCopyClientTest, BlockFdMultilplePartition) {
   partitions.push_back(std::move(fake));
   partitions.push_back(std::move(fake2));
   paver::PartitionCopyClient client(std::move(partitions));
-
-  ASSERT_EQ(client.block_fd(), fbl::unique_fd());
 }
 
 class FixedOffsetBlockPartitionClientTest : public zxtest::Test {

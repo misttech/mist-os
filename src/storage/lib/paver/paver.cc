@@ -112,29 +112,31 @@ bool CheckIfSame(PartitionClient* partition, const zx::vmo& vmo, size_t payload_
 zx::result<std::unique_ptr<PartitionClient>> GetFvmPartition(const DevicePartitioner& partitioner) {
   // FVM doesn't need content type support, use the default.
   const PartitionSpec spec(Partition::kFuchsiaVolumeManager);
-  auto status = partitioner.FindPartition(spec);
-  if (status.is_error()) {
-    if (status.status_value() != ZX_ERR_NOT_FOUND) {
-      ERROR("Failure looking for FVM partition: %s\n", status.status_string());
-      return status.take_error();
+  {
+    zx::result partition = partitioner.FindPartition(spec);
+    if (partition.is_ok()) {
+      LOG("FVM Partition already exists\n");
+      return partition;
     }
 
-    LOG("Could not find FVM Partition on device. Attemping to add new partition\n");
-
-    auto status = partitioner.AddPartition(spec);
-    if (status.is_error()) {
-      ERROR("Failure creating FVM partition: %s\n", status.status_string());
+    if (partition.status_value() != ZX_ERR_NOT_FOUND) {
+      ERROR("Failure looking for FVM partition: %s\n", partition.status_string());
+      return partition.take_error();
     }
-    return status;
   }
-  LOG("FVM Partition already exists\n");
-  return status.take_value();
+
+  LOG("Could not find FVM Partition on device. Attemping to add new partition\n");
+  zx::result partition = partitioner.AddPartition(spec);
+  if (partition.is_error()) {
+    ERROR("Failure creating FVM partition: %s\n", partition.status_string());
+  }
+  return partition;
 }
 
 zx::result<> FvmPave(const fbl::unique_fd& devfs_root, const DevicePartitioner& partitioner,
                      std::unique_ptr<fvm::ReaderInterface> payload) {
   LOG("Paving FVM partition.\n");
-  auto status = GetFvmPartition(partitioner);
+  zx::result status = GetFvmPartition(partitioner);
   if (status.is_error()) {
     return status.take_error();
   }
@@ -169,13 +171,18 @@ zx::result<zx::channel> FormatFvm(const fbl::unique_fd& devfs_root,
     return status.take_error();
   }
   std::unique_ptr<PartitionClient> partition = std::move(status.value());
+  zx::result block_or = partition->GetBlockDevice();
+  if (block_or.is_error()) {
+    return block_or.take_error();
+  }
+  BlockDeviceClient& block = block_or.value();
 
   fvm::SparseImage header = {};
   static_assert(PRODUCT_FVM_SLICE_SIZE > 0, "Invalid product FVM slice size.");
   header.slice_size = PRODUCT_FVM_SLICE_SIZE;
 
   fbl::unique_fd fvm_fd(
-      FvmPartitionFormat(devfs_root, partition->block_fd(), header, BindOption::Reformat));
+      FvmPartitionFormat(devfs_root, block.block_fd(), header, BindOption::Reformat));
   if (!fvm_fd) {
     ERROR("Couldn't format FVM partition\n");
     return zx::error(ZX_ERR_IO);
@@ -659,11 +666,16 @@ zx::result<> DataSinkImpl::WriteVolumes(
 
 zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager>>
 DataSinkImpl::WipeVolume() {
-  auto status = GetFvmPartition(*partitioner_);
+  zx::result status = GetFvmPartition(*partitioner_);
   if (status.is_error()) {
     return status.take_error();
   }
   std::unique_ptr<PartitionClient> partition = std::move(status.value());
+  zx::result block_or = partition->GetBlockDevice();
+  if (block_or.is_error()) {
+    return block_or.take_error();
+  }
+  BlockDeviceClient& block = block_or.value();
 
   // Bind the FVM driver to be in a well known state regarding races with block watcher.
   // The block watcher will attempt to bind the FVM driver automatically based on
@@ -673,7 +685,7 @@ DataSinkImpl::WipeVolume() {
   // eliminate the races at this point: assuming that the driver can load, either
   // this call or the block watcher will succeed (and the other one will fail),
   // but the driver will be loaded before moving on.
-  TryBindToFvmDriver(devfs_root_, partition->block_fd(), zx::sec(3));
+  TryBindToFvmDriver(devfs_root_, block.block_fd(), zx::sec(3));
 
   {
     auto status = partitioner_->WipeFvm();

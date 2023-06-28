@@ -118,12 +118,14 @@ zx::result<std::unique_ptr<PartitionClient>> NelsonPartitioner::GetBootloaderPar
     return tpl_block_size_status.take_error();
   }
   size_t block_size = tpl_block_size_status.value();
-  // Casting to |BlockDevicePartitionClient| is safe because all branches
-  // in |FindPartition| returns a block-device-based partition client.
-  auto tpl = std::make_unique<FixedOffsetBlockPartitionClient>(
-      static_cast<BlockDevicePartitionClient*>(tpl_status.value().get())->GetChannel(), 0,
-      kNelsonBL2Size / block_size);
+  zx::result block_or = tpl_status.value()->GetBlockDevice();
+  if (block_or.is_error()) {
+    return block_or.take_error();
+  }
+  BlockDeviceClient& block = block_or.value();
 
+  auto tpl = std::make_unique<FixedOffsetBlockPartitionClient>(block.GetChannel(), 0,
+                                                               kNelsonBL2Size / block_size);
   return zx::ok(std::make_unique<NelsonBootloaderPartitionClient>(std::move(boot_status.value()),
                                                                   std::move(tpl)));
 }
@@ -294,18 +296,6 @@ zx::result<> NelsonBootloaderPartitionClient::Flush() {
     return status.take_error();
   }
   return tpl_client_->Flush();
-}
-
-fidl::ClientEnd<fuchsia_hardware_block::Block> NelsonBootloaderPartitionClient::GetChannel() {
-  ERROR("GetChannel() is not supported for NelsonBootloaderPartitionClient\n");
-  ZX_ASSERT(false);
-  return {};
-}
-
-fbl::unique_fd NelsonBootloaderPartitionClient::block_fd() {
-  ERROR("block_fd() is not supported for NelsonBootloaderPartitionClient\n");
-  ZX_ASSERT(false);
-  return fbl::unique_fd();
 }
 
 zx::result<> NelsonBootloaderPartitionClient::Read(const zx::vmo& vmo, size_t size) {

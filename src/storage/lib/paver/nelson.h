@@ -68,7 +68,7 @@ class NelsonAbrClientFactory : public abr::ClientFactory {
       std::shared_ptr<paver::Context> context) final;
 };
 
-class NelsonBootloaderPartitionClient final : public BlockDevicePartitionClient {
+class NelsonBootloaderPartitionClient final : public PartitionClient {
  public:
   explicit NelsonBootloaderPartitionClient(
       std::unique_ptr<PartitionClient> emmc_boot_client,
@@ -81,8 +81,6 @@ class NelsonBootloaderPartitionClient final : public BlockDevicePartitionClient 
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) final;
   zx::result<> Trim() final;
   zx::result<> Flush() final;
-  fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() final;
-  fbl::unique_fd block_fd() final;
 
   // No copy, no move.
   NelsonBootloaderPartitionClient(const NelsonBootloaderPartitionClient&) = delete;

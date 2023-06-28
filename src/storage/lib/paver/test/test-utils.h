@@ -144,7 +144,7 @@ class FakeDevicePartitioner : public paver::DevicePartitioner {
 
 // Defines a PartitionClient that reads and writes to a partition backed by a VMO in memory.
 // Used for testing.
-class FakePartitionClient : public paver::BlockDevicePartitionClient {
+class FakePartitionClient : public paver::PartitionClient {
  public:
   FakePartitionClient(size_t block_count, size_t block_size);
   explicit FakePartitionClient(size_t block_count);
@@ -155,8 +155,6 @@ class FakePartitionClient : public paver::BlockDevicePartitionClient {
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) override;
   zx::result<> Trim() override;
   zx::result<> Flush() override;
-  fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() override;
-  fbl::unique_fd block_fd() override;
 
  protected:
   zx::vmo partition_;

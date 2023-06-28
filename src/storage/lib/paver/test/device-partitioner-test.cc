@@ -2266,7 +2266,6 @@ class TestPinecrestAbrClientBackend : public paver::PartitionClient {
   zx::result<size_t> GetPartitionSize() { return zx::ok(1); }
   zx::result<> Trim() { return zx::ok(); }
   zx::result<> Flush() { return zx::ok(); }
-  fbl::unique_fd block_fd() { return {}; }
   zx::result<> Read(const zx::vmo& vmo, size_t size) { return zx::ok(); }
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) { return zx::ok(); }
 };

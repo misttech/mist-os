@@ -51,8 +51,6 @@ class SkipBlockPartitionClient : public PartitionClient {
 
   fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock> GetChannel();
 
-  fbl::unique_fd block_fd() override;
-
   // No copy, no move.
   SkipBlockPartitionClient(const SkipBlockPartitionClient&) = delete;
   SkipBlockPartitionClient& operator=(const SkipBlockPartitionClient&) = delete;

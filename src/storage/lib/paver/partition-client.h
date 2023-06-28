@@ -22,6 +22,16 @@
 
 namespace paver {
 
+// This represents a block device.
+class BlockDeviceClient {
+ public:
+  // Returns a channel to the partition, when backed by a block device.
+  virtual fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() = 0;
+
+  // Returns a file descriptor representing the partition.
+  virtual fbl::unique_fd block_fd() = 0;
+};
+
 // Interface to synchronously read/write to a partition.
 class PartitionClient {
  public:
@@ -45,19 +55,22 @@ class PartitionClient {
   // Flushes all previous operations to persistent storage.
   virtual zx::result<> Flush() = 0;
 
-  // Returns a file descriptor representing the partition.
-  // Will return an invalid fd if underlying partition is not a block device.
-  virtual fbl::unique_fd block_fd() = 0;
+  // Attempt to get the underlying block client.
+  // Returns ZX_ERR_NOT_SUPPORTED if this partition is not a block device.
+  virtual zx::result<std::reference_wrapper<BlockDeviceClient>> GetBlockDevice() {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
 
   virtual ~PartitionClient() = default;
 };
 
 // A partition client that is backed by a channel that speaks
 // |fuchsia.hardware.block/Block|, or a protocol that composes the previous protocol.
-class BlockDevicePartitionClient : public PartitionClient {
+class BlockDevicePartitionClient : public PartitionClient, public BlockDeviceClient {
  public:
-  // Returns a channel to the partition, when backed by a block device.
-  virtual fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() = 0;
+  zx::result<std::reference_wrapper<BlockDeviceClient>> GetBlockDevice() override {
+    return zx::ok(std::reference_wrapper(*this));
+  }
 };
 
 class BlockPartitionClient final : public BlockDevicePartitionClient {
@@ -149,7 +162,7 @@ class FixedOffsetBlockPartitionClient final : public BlockDevicePartitionClient 
 
 // Specialized partition client which duplicates to multiple partitions, and attempts to read from
 // each.
-class PartitionCopyClient final : public BlockDevicePartitionClient {
+class PartitionCopyClient final : public PartitionClient {
  public:
   explicit PartitionCopyClient(std::vector<std::unique_ptr<PartitionClient>> partitions)
       : partitions_(std::move(partitions)) {}
@@ -160,8 +173,6 @@ class PartitionCopyClient final : public BlockDevicePartitionClient {
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) final;
   zx::result<> Trim() final;
   zx::result<> Flush() final;
-  fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() final;
-  fbl::unique_fd block_fd() final;
 
   // No copy, no move.
   PartitionCopyClient(const PartitionCopyClient&) = delete;

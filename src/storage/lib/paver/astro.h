@@ -76,7 +76,7 @@ class AstroAbrClientFactory : public abr::ClientFactory {
 };
 
 // Specialized astro sysconfig partition client built on SyncClientBuffered.
-class AstroSysconfigPartitionClientBuffered : public BlockDevicePartitionClient {
+class AstroSysconfigPartitionClientBuffered : public PartitionClient {
  public:
   AstroSysconfigPartitionClientBuffered(std::shared_ptr<Context> context,
                                         ::sysconfig::SyncClient::PartitionType partition)
@@ -88,8 +88,6 @@ class AstroSysconfigPartitionClientBuffered : public BlockDevicePartitionClient 
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) final;
   zx::result<> Trim() final;
   zx::result<> Flush() final;
-  fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() final;
-  fbl::unique_fd block_fd() final;
 
   // No copy, no move.
   AstroSysconfigPartitionClientBuffered(const AstroSysconfigPartitionClientBuffered&) = delete;
