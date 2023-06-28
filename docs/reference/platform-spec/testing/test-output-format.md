@@ -88,8 +88,8 @@ available in [examples/testing][example-output-dir].
 
 [RFC-0163][output-rfc]: RFC proposing this output.
 
-[example-output-dir]: /examples/testing/output-directory
-[example-test]: /examples/testing/src/stdout_test.rs
+[example-output-dir]: /examples/testing/tools/output-directory
+[example-test]: /examples/testing/tools/src/stdout_test.rs
 [ffx-test]: https://fuchsia.dev/reference/tools/sdk/ffx#run_3
 [schema-in-source]: /sdk/schema/ffx_test
 [schema-in-fuchsia-dev]: https://fuchsia.dev/schema/ffx_test/run_summary-8d1dd964.json
