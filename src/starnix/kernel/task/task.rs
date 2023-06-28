@@ -712,20 +712,17 @@ impl Task {
         let uts_ns;
         let no_new_privs;
         let seccomp_filters;
-        let robust_list_head;
-        {
-            let state = self.read();
-
-            no_new_privs = state.no_new_privs;
-            seccomp_filters = state.seccomp_filters.clone();
-            robust_list_head = UserAddress::NULL.into();
-        }
-        let child_signal_mask = self.read().signals.mask();
+        let robust_list_head = UserAddress::NULL.into();
+        let child_signal_mask;
 
         let TaskInfo { thread, thread_group, memory_manager } = {
             // Make sure to drop these locks ASAP to avoid inversion
             let thread_group_state = self.thread_group.write();
             let state = self.read();
+
+            no_new_privs = state.no_new_privs;
+            seccomp_filters = state.seccomp_filters.clone();
+            child_signal_mask = state.signals.mask();
 
             pid = pids.allocate_pid();
             command = self.command();
