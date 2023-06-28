@@ -86,15 +86,50 @@ impl IntegrationTestCmd {
 
         let templates = vec![
             ("tests/BUILD.gn", include_str!("../templates/integration_test/tests/BUILD.gn.hbrs")),
-            ("tests/meta/test-root.cml", include_str!("../templates/integration_test/tests/meta/test-root.cml.hbrs")),
-            ("tests/meta/test-suite.cml", include_str!("../templates/integration_test/tests/meta/test-suite.cml.hbrs")),
-            ("tests/src/main.rs", include_str!("../templates/integration_test/tests/src/main.rs.hbrs")),
-            ("testing/fidl/BUILD.gn", include_str!("../templates/integration_test/testing/fidl/BUILD.gn.hbrs")),
-            ("testing/fidl/realm_factory.test.fidl", include_str!("../templates/integration_test/testing/fidl/realm_factory.test.fidl.hbrs")),
-            ("testing/realm-factory/BUILD.gn", include_str!("../templates/integration_test/testing/realm-factory/BUILD.gn.hbrs")),
-            ("testing/realm-factory/meta/default.cml", include_str!("../templates/integration_test/testing/realm-factory/meta/default.cml.hbrs")),
-            ("testing/realm-factory/src/main.rs", include_str!("../templates/integration_test/testing/realm-factory/src/main.rs.hbrs")),
-            ("testing/realm-factory/src/realm_factory.rs", include_str!("../templates/integration_test/testing/realm-factory/src/realm_factory.rs.hbrs")),
+            (
+                "tests/meta/test-root.cml",
+                include_str!("../templates/integration_test/tests/meta/test-root.cml.hbrs"),
+            ),
+            (
+                "tests/meta/test-suite.cml",
+                include_str!("../templates/integration_test/tests/meta/test-suite.cml.hbrs"),
+            ),
+            (
+                "tests/src/main.rs",
+                include_str!("../templates/integration_test/tests/src/main.rs.hbrs"),
+            ),
+            (
+                "testing/fidl/BUILD.gn",
+                include_str!("../templates/integration_test/testing/fidl/BUILD.gn.hbrs"),
+            ),
+            (
+                "testing/fidl/realm_factory.test.fidl",
+                include_str!(
+                    "../templates/integration_test/testing/fidl/realm_factory.test.fidl.hbrs"
+                ),
+            ),
+            (
+                "testing/realm-factory/BUILD.gn",
+                include_str!("../templates/integration_test/testing/realm-factory/BUILD.gn.hbrs"),
+            ),
+            (
+                "testing/realm-factory/meta/default.cml",
+                include_str!(
+                    "../templates/integration_test/testing/realm-factory/meta/default.cml.hbrs"
+                ),
+            ),
+            (
+                "testing/realm-factory/src/main.rs",
+                include_str!(
+                    "../templates/integration_test/testing/realm-factory/src/main.rs.hbrs"
+                ),
+            ),
+            (
+                "testing/realm-factory/src/realm_factory.rs",
+                include_str!(
+                    "../templates/integration_test/testing/realm-factory/src/realm_factory.rs.hbrs"
+                ),
+            ),
         ];
 
         // Generate source code in a staging directory.

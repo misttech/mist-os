@@ -4,21 +4,21 @@
 
 use {
     anyhow::*,
-    {{ fidl_rust_crate_name }} as ftest,
+    {{ fidl_rust_crate_name }}::RealmOptions,
     fuchsia_component_test::{RealmBuilder, RealmInstance},
     tracing::info,
 };
 
 pub(crate) struct RealmFactory {
-    realm_options: Option<ftest::RealmOptions>,
+    realm_options: Option<RealmOptions>,
 }
 
 impl RealmFactory {
     pub fn new() -> Self {
-        Self { realm_options: Some(ftest::RealmOptions{ ..Default::default() }) }
+        Self { realm_options: Some(RealmOptions{ ..Default::default() }) }
     }
 
-    pub fn set_realm_options(&mut self, options: ftest::RealmOptions) -> Result<(), Error> {
+    pub fn set_realm_options(&mut self, options: RealmOptions) -> Result<(), Error> {
         match self.realm_options {
             None => bail!("the realm has already been created"),
             Some(_) => self.realm_options.replace(options),
@@ -32,7 +32,7 @@ impl RealmFactory {
     }
 }
 
-async fn build_realm(options: ftest::RealmOptions) -> Result<RealmInstance, Error> {
+async fn build_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
     info!("building the realm using options {:?}", options);
 
     let builder = RealmBuilder::new().await?;
