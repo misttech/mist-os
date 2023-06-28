@@ -1245,6 +1245,16 @@ Selects the Cobalt environment to send data to. Choices:
 
 From //src/cobalt/bin/app/BUILD.gn:15
 
+### comparison_diagnostics_dir
+
+When any of the {Rust,C++} {determinism,consistency} checks fail,
+copy the artifacts' difference-pairs to this directory for exporting
+from infra builds, and later inspection.
+
+**Current value (from the default):** `"//out/not-default/comparison-reports"`
+
+From //build/toolchain/rbe.gni:171
+
 ### compress_blobs
 
 Whether to compress the blobfs image.
