@@ -898,10 +898,21 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                         .await;
                     let _: NonZeroUsize = count.map_err(|err| handle_err("LookupIp", err))?;
                     let addrs = if sort_addresses {
-                        sort_preferred_addresses(addrs, &routes).await
+                        sort_preferred_addresses(addrs, &routes).await?
                     } else {
-                        Ok(addrs)
-                    }?;
+                        addrs
+                    };
+                    let addrs = if addrs.len() > fname::MAX_ADDRESSES.into() {
+                        warn!(
+                            "Lookup({}, {:?}): {} addresses, truncating to {}",
+                            hostname, options, addrs.len(), fname::MAX_ADDRESSES
+                        );
+                        let mut addrs = addrs;
+                        addrs.truncate(fname::MAX_ADDRESSES.into());
+                        addrs
+                    } else {
+                        addrs
+                    };
                     // Per RFC 1034 section 3.6.2:
                     //
                     //   If a CNAME RR is present at a node, no other data should be present; this
@@ -1348,12 +1359,13 @@ mod tests {
 
     struct MockResolver {
         config: ResolverConfig,
+        repeat: u16,
     }
 
     #[async_trait]
     impl ResolverLookup for MockResolver {
         fn new(config: ResolverConfig, _options: ResolverOpts) -> Self {
-            MockResolver { config }
+            Self { config, repeat: 1 }
         }
 
         async fn lookup<N: IntoName + Send>(
@@ -1361,6 +1373,8 @@ mod tests {
             name: N,
             record_type: RecordType,
         ) -> Result<lookup::Lookup, ResolveError> {
+            let Self { config: _, repeat } = self;
+
             let name = name.into_name()?;
             let host_name = name.to_utf8();
 
@@ -1386,10 +1400,11 @@ mod tests {
                 record_type => {
                     panic!("unexpected record type {:?}", record_type)
                 }
-            };
+            }
+            .into_iter();
 
+            let len = rdatas.len() * usize::from(*repeat);
             let records: Vec<Record> = rdatas
-                .into_iter()
                 .map(|rdata| {
                     Record::from_rdata(
                         Name::new(),
@@ -1399,6 +1414,8 @@ mod tests {
                         rdata,
                     )
                 })
+                .cycle()
+                .take(len)
                 .collect();
 
             if records.is_empty() {
@@ -1453,8 +1470,14 @@ mod tests {
         stats: Arc<QueryStats>,
     }
 
+    impl Default for TestEnvironment {
+        fn default() -> Self {
+            Self::new(1)
+        }
+    }
+
     impl TestEnvironment {
-        fn new() -> Self {
+        fn new(repeat: u16) -> Self {
             Self {
                 shared_resolver: SharedResolver::new(MockResolver {
                     config: ResolverConfig::from_parts(
@@ -1464,6 +1487,7 @@ mod tests {
                         // and IPV6_NAMESERVER.
                         NameServerConfigGroup::with_capacity(0),
                     ),
+                    repeat,
                 }),
                 config_state: Arc::new(dns::config::ServerConfigState::new()),
                 stats: Arc::new(QueryStats::new()),
@@ -1532,7 +1556,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_no_records_and_no_error() {
-        TestEnvironment::new()
+        TestEnvironment::default()
             .run_lookup(|proxy| async move {
                 let proxy = &proxy;
                 futures::stream::iter([(true, true), (true, false), (false, true)])
@@ -1562,8 +1586,38 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
+    async fn test_lookupip_remotehost_overflow() {
+        // We're returning two addresses, so we need each one to repeat only half as many times.
+        const REPEAT: u16 = fname::MAX_ADDRESSES / 2 + 1;
+        let expected = std::iter::empty()
+            .chain(std::iter::repeat(map_ip(IPV4_HOST)).take(REPEAT.into()))
+            .chain(std::iter::repeat(map_ip(IPV6_HOST)).take(REPEAT.into()))
+            .take(fname::MAX_ADDRESSES.into())
+            .collect::<Vec<_>>();
+        assert_eq!(expected.len(), usize::from(fname::MAX_ADDRESSES));
+        TestEnvironment::new(REPEAT)
+            .run_lookup(|proxy| async move {
+                assert_eq!(
+                    proxy
+                        .lookup_ip(
+                            REMOTE_IPV4_IPV6_HOST,
+                            &fname::LookupIpOptions {
+                                ipv4_lookup: Some(true),
+                                ipv6_lookup: Some(true),
+                                ..Default::default()
+                            }
+                        )
+                        .await
+                        .expect("lookup_ip"),
+                    Ok(fname::LookupResult { addresses: Some(expected), ..Default::default() })
+                );
+            })
+            .await;
+    }
+
+    #[fasync::run_singlethreaded(test)]
     async fn test_lookupip_remotehost_ipv4() {
-        TestEnvironment::new()
+        TestEnvironment::default()
             .run_lookup(|proxy| async move {
                 // IP Lookup IPv4 and IPv6 for REMOTE_IPV4_HOST.
                 assert_eq!(
@@ -1622,7 +1676,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_lookupip_remotehost_ipv6() {
-        TestEnvironment::new()
+        TestEnvironment::default()
             .run_lookup(|proxy| async move {
                 // IP Lookup IPv4 and IPv6 for REMOTE_IPV6_HOST.
                 assert_eq!(
@@ -1683,7 +1737,7 @@ mod tests {
     #[test_case(REMOTE_IPV6_HOST_ALIAS, REMOTE_IPV6_HOST; "ipv6")]
     #[fasync::run_singlethreaded(test)]
     async fn test_lookupip_remotehost_canonical_name(hostname: &str, expected: &str) {
-        TestEnvironment::new()
+        TestEnvironment::default()
             .run_lookup(|proxy| async move {
                 assert_matches!(
                     proxy
@@ -1706,7 +1760,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_lookupip_ip_literal() {
-        TestEnvironment::new()
+        TestEnvironment::default()
             .run_lookup(|proxy| async move {
                 let proxy = &proxy;
 
@@ -1757,7 +1811,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_lookup_hostname() {
-        TestEnvironment::new()
+        TestEnvironment::default()
             .run_lookup(|proxy| async move {
                 assert_eq!(
                     proxy
@@ -1775,7 +1829,7 @@ mod tests {
     // by the FIDL.
     #[fasync::run_singlethreaded(test)]
     async fn test_lookup_hostname_multi() {
-        TestEnvironment::new()
+        TestEnvironment::default()
             .run_lookup(|proxy| async move {
                 assert_eq!(
                     proxy
@@ -1791,7 +1845,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_set_server_names() {
-        let env = TestEnvironment::new();
+        let env = TestEnvironment::default();
 
         let to_server_configs = |socket_addr: SocketAddr| -> [NameServerConfig; 2] {
             [
@@ -1850,7 +1904,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_set_server_names_error() {
-        let env = TestEnvironment::new();
+        let env = TestEnvironment::default();
         // Assert that mock config has no servers originally.
         assert_eq!(env.shared_resolver.read().config.name_servers().to_vec(), vec![]);
 
@@ -1888,7 +1942,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_get_servers() {
-        let env = TestEnvironment::new();
+        let env = TestEnvironment::default();
         env.run_admin(|proxy| async move {
             let expect = &[NDP_SERVER, DHCP_SERVER, DHCPV6_SERVER, STATIC_SERVER];
             let () = proxy
@@ -1903,7 +1957,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_config_inspect() {
-        let env = TestEnvironment::new();
+        let env = TestEnvironment::default();
         let inspector = fuchsia_inspect::Inspector::default();
         let _config_state_node =
             add_config_state_inspect(inspector.root(), env.config_state.clone());
@@ -1955,7 +2009,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_query_stats_updated() {
-        let env = TestEnvironment::new();
+        let env = TestEnvironment::default();
         let inspector = fuchsia_inspect::Inspector::default();
         let _query_stats_inspect_node =
             add_query_stats_inspect(inspector.root(), env.stats.clone());
@@ -2781,7 +2835,7 @@ mod tests {
             };
             let () = responder.send(response).expect("failed to send Resolve FIDL response");
         };
-        TestEnvironment::new()
+        TestEnvironment::default()
             .run_lookup_with_routes_handler(
                 |proxy| async move {
                     // All arguments unset.

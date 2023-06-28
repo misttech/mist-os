@@ -179,7 +179,7 @@
         "kind": "table/member",
         "name": "fuchsia.net.name/LookupResult.addresses",
         "ordinal": "1",
-        "type": "vector<fuchsia.net/IpAddress>"
+        "type": "vector<fuchsia.net/IpAddress>:1024"
     },
     {
         "kind": "table",
@@ -238,6 +238,12 @@
         "kind": "union",
         "name": "fuchsia.net.name/Lookup_LookupIp_Result",
         "strictness": "strict"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.net.name/MAX_ADDRESSES",
+        "type": "uint16",
+        "value": "1024"
     },
     {
         "kind": "table/member",

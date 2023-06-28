@@ -274,6 +274,7 @@ int accept4(int fd, struct sockaddr* __restrict addr, socklen_t* __restrict addr
 __EXPORT
 int _getaddrinfo_from_dns(struct address buf[MAXADDRS], char canon[256], const char* name,
                           int family) {
+  static_assert(fnet_name::wire::kMaxAddresses == MAXADDRS);
   auto& name_lookup = get_client<fnet_name::Lookup>();
   if (name_lookup.is_error()) {
     errno = fdio_status_to_errno(name_lookup.status_value());

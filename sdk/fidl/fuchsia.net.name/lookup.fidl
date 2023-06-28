@@ -19,6 +19,13 @@ type LookupError = strict enum {
     INTERNAL_ERROR = 4;
 };
 
+/// Maximum number of addresses that can be returned by a lookup.
+// Chosen to match libc's MAXADDRS.
+//
+// TODO(https://fxbug.dev/89912): Remove this when the client can specify the
+// maximum number of addresses it can receive.
+const MAX_ADDRESSES uint16 = 1024;
+
 /// Provides name and address resolution.
 @discoverable
 closed protocol Lookup {
@@ -61,7 +68,7 @@ closed protocol Lookup {
             ///
             /// If sorting was requested, `addresses` is sorted in order of
             /// preference, most preferred destination address first.
-            1: addresses vector<fuchsia.net.IpAddress>:MAX;
+            1: addresses vector<fuchsia.net.IpAddress>:MAX_ADDRESSES;
             /// The canonical name of the requested hostname.
             ///
             /// Provided only if requested.
