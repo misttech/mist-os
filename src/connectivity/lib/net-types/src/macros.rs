@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assert_matches::assert_matches;
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{TokenStream as TokenStream2, TokenTree};
 use quote::{quote, ToTokens as _};
 use syn::{
     parse_quote, punctuated::Punctuated, spanned::Spanned, AngleBracketedGenericArguments,
@@ -41,12 +42,26 @@ fn impl_derive_generic_over_ip(ast: &syn::DeriveInput) -> TokenStream2 {
         }
     };
 
-    // Drop the first and last tokens, which should be '<' and '>'
-    let mut impl_generics = impl_generics.into_token_stream().into_iter().skip(1).peekable();
-    let impl_generics = core::iter::from_fn(|| {
-        impl_generics.next().and_then(|x| impl_generics.peek().is_some().then_some(x))
-    })
-    .collect::<TokenStream2>();
+    // Drop the first and last tokens, which should be '<' and '>', and the
+    // trailing comma if there is one.
+    let mut impl_generics = impl_generics.into_token_stream().into_iter();
+
+    let expect_trailing_angle_bracket = impl_generics.next().map_or(false, |first| {
+        assert_matches!(first, TokenTree::Punct(p) if p.as_char() == '<');
+        true
+    });
+    let mut impl_generics: Vec<_> = impl_generics.collect();
+    if expect_trailing_angle_bracket {
+        assert_matches!(impl_generics.pop(), Some(TokenTree::Punct(p)) if p.as_char() == '>');
+    }
+    match impl_generics.last() {
+        Some(TokenTree::Punct(p)) if p.as_char() == ',' => {
+            let _ = impl_generics.pop();
+        }
+        Some(_) | None => (),
+    }
+
+    let impl_generics = impl_generics.into_iter().collect::<TokenStream2>();
 
     match param {
         Some(to_replace) => {

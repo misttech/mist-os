@@ -3997,4 +3997,22 @@ mod macro_test {
         assert_ip_generic_is::<Generic<'static, Ipv6>, Ipv4, Generic<'static, Ipv4>>();
         assert_ip_generic_is::<Generic<'static, Ipv6>, Ipv6, Generic<'static, Ipv6>>();
     }
+
+    #[test]
+    fn type_with_params_list_with_trailing_comma() {
+        trait IpExtensionTraitWithVeryLongName {}
+        trait OtherIpExtensionTraitWithVeryLongName {}
+        trait LongNameToForceFormatterToBreakLineAndAddTrailingComma {}
+        // Regression test for https://fxbug.dev/129815
+        #[allow(dead_code)]
+        #[derive(GenericOverIp)]
+        struct Generic<
+            I: Ip
+                + IpExtensionTraitWithVeryLongName
+                + OtherIpExtensionTraitWithVeryLongName
+                + LongNameToForceFormatterToBreakLineAndAddTrailingComma,
+        > {
+            field: I::Addr,
+        }
+    }
 }
