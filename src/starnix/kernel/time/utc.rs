@@ -43,13 +43,14 @@ pub fn estimate_monotonic_deadline_from_utc(utc: zx::Time) -> zx::Time {
 pub async fn wait_for_utc_clock_to_start() {
     // Poll the clock first to see if CLOCK_STARTED is already asserted.
     // If it is, continue silently. Otherwise we'll log that we are waiting.
-    if UTC_CLOCK
-        .wait_handle(zx::Signals::CLOCK_STARTED, zx::Time::INFINITE_PAST)
-        .expect("UTC clock handle must be valid.")
-        .contains(zx::Signals::CLOCK_STARTED)
-    {
-        return;
+    match UTC_CLOCK.wait_handle(zx::Signals::CLOCK_STARTED, zx::Time::INFINITE_PAST) {
+        Ok(e) if e.contains(zx::Signals::CLOCK_STARTED) => return,
+        Ok(_) | Err(zx::Status::TIMED_OUT) => {}
+        Err(e) => {
+            log_warn!("Error fetching initial UTC clock value: {:?}", e);
+        }
     }
+
     log_warn!("Waiting for UTC clock to start.");
     let _ = fuchsia_async::OnSignals::new(&*UTC_CLOCK, zx::Signals::CLOCK_STARTED)
         .await
