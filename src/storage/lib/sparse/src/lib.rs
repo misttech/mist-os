@@ -65,27 +65,17 @@ image_checksum: {}",
 }
 
 impl SparseHeader {
-    fn new(
-        magic: u32,
-        major_version: u16,
-        minor_version: u16,
-        file_hdr_sz: u16,
-        chunk_hdr_sz: u16,
-        blk_sz: u32,
-        total_blks: u32,
-        total_chunks: u32,
-        image_checksum: u32,
-    ) -> SparseHeader {
+    fn new(blk_sz: u32, total_blks: u32, total_chunks: u32) -> SparseHeader {
         SparseHeader {
-            magic,
-            major_version,
-            minor_version,
-            file_hdr_sz,
-            chunk_hdr_sz,
+            magic: MAGIC,
+            major_version: MAJOR_VERSION,
+            minor_version: MINOR_VERSION,
+            file_hdr_sz: mem::size_of::<SparseHeader>() as u16,
+            chunk_hdr_sz: mem::size_of::<ChunkHeader>() as u16,
             blk_sz,
             total_blks,
             total_chunks,
-            image_checksum,
+            image_checksum: CHECKSUM, // Checksum verification unused
         }
     }
 }
@@ -265,15 +255,9 @@ impl SparseFile {
         writer: &mut W,
     ) -> Result<()> {
         let header = SparseHeader::new(
-            MAGIC,
-            MAJOR_VERSION,
-            MINOR_VERSION,
-            mem::size_of::<SparseHeader>() as u16, // File header size
-            mem::size_of::<ChunkHeader>() as u16,  // chunk header size
             BLK_SIZE.try_into().unwrap(),          // Size of the blocks
             self.total_blocks(),                   // Total blocks in this image
             self.chunks.len().try_into().unwrap(), // Total chunks in this image
-            CHECKSUM,                              // Checksum verification unused
         );
 
         let header_bytes: Vec<u8> = bincode::serialize(&header)?;
@@ -420,7 +404,7 @@ fn resparse(sparse_file: SparseFile, max_download_size: u64) -> Result<Vec<Spars
 /// * `dir` - Path to write the Sparse file(s).
 /// * `max_download_size` - Maximum size that can be downloaded by the device.
 #[tracing::instrument(skip(writer))]
-pub async fn build_sparse_files<W: Write>(
+pub fn build_sparse_files<W: Write>(
     writer: &mut W,
     name: &str,
     file_to_upload: &str,
@@ -506,7 +490,6 @@ pub async fn build_sparse_files<W: Write>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test::setup;
     use rand::{rngs::SmallRng, RngCore, SeedableRng};
     use std::{
         io,
@@ -523,9 +506,8 @@ mod test {
         15, 0, 0, 0, 49, 50, 51, 195, 202, 0, 0, 1, 0, 0, 0, 12, 0, 0, 0,
     ];
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_fill_into_bytes() -> Result<()> {
-        let (_, _) = setup();
+    #[test]
+    fn test_fill_into_bytes() -> Result<()> {
         let source = Vec::<u8>::new();
         let mut dest = Vec::<u8>::new();
 
@@ -536,8 +518,8 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_raw_into_bytes() -> Result<()> {
+    #[test]
+    fn test_raw_into_bytes() -> Result<()> {
         let source = Vec::<u8>::from(&b"12345"[..]);
         let mut dest = Vec::<u8>::new();
         let chunk = Chunk::Raw { start: 0, size: 10 };
@@ -548,8 +530,8 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_dont_care_into_bytes() -> Result<()> {
+    #[test]
+    fn test_dont_care_into_bytes() -> Result<()> {
         let source = Vec::<u8>::new();
         let mut dest = Vec::<u8>::new();
         let chunk = Chunk::DontCare { size: 5 };
@@ -560,8 +542,8 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_sparse_file_into_bytes() -> Result<()> {
+    #[test]
+    fn test_sparse_file_into_bytes() -> Result<()> {
         let source = Vec::<u8>::from(&b"123"[..]);
         let mut dest = Vec::<u8>::new();
         let mut chunks = Vec::<Chunk>::new();
@@ -586,15 +568,15 @@ mod test {
     ////////////////////////////////////////////////////////////////////////////
     // Tests for resparse
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_resparse_bails_on_too_small_size() -> Result<()> {
+    #[test]
+    fn test_resparse_bails_on_too_small_size() -> Result<()> {
         let sparse = SparseFile::new(Vec::<Chunk>::new());
         assert!(resparse(sparse, 4095).is_err());
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_resparse_splits() -> Result<()> {
+    #[test]
+    fn test_resparse_splits() -> Result<()> {
         let max_download_size = 4096 * 2;
         let temp_bytes = Chunk::Raw { start: 0, size: 4096 };
 
@@ -625,8 +607,8 @@ mod test {
     ////////////////////////////////////////////////////////////////////////////
     // Tests for add_sparse_chunk
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_add_sparse_chunk_adds_empty() -> Result<()> {
+    #[test]
+    fn test_add_sparse_chunk_adds_empty() -> Result<()> {
         let init_vec = Vec::<Chunk>::new();
         let mut res = init_vec.clone();
         add_sparse_chunk(&mut res, Chunk::Fill { start: 0, size: 1, value: 1 })?;
@@ -636,8 +618,8 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_add_sparse_chunk_fill() -> Result<()> {
+    #[test]
+    fn test_add_sparse_chunk_fill() -> Result<()> {
         // Test merge
         {
             let mut init_vec = Vec::<Chunk>::new();
@@ -682,8 +664,8 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_add_sparse_chunk_dont_care() -> Result<()> {
+    #[test]
+    fn test_add_sparse_chunk_dont_care() -> Result<()> {
         // Test they merge
         {
             let mut init_vec = Vec::<Chunk>::new();
@@ -710,8 +692,8 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_add_sparse_chunk_raw() -> Result<()> {
+    #[test]
+    fn test_add_sparse_chunk_raw() -> Result<()> {
         // Test they merge
         {
             let mut init_vec = Vec::<Chunk>::new();
@@ -738,8 +720,8 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_add_sparse_chunk_crc32() -> Result<()> {
+    #[test]
+    fn test_add_sparse_chunk_crc32() -> Result<()> {
         // Test they dont merge on same type (Crc32 is special)
         {
             let mut init_vec = Vec::<Chunk>::new();
@@ -770,8 +752,8 @@ mod test {
     // Integration
     //
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_roundtrip() -> Result<()> {
+    #[test]
+    fn test_roundtrip() -> Result<()> {
         // TODO(colnnelson): Add the simg2img binary to our test rollers
         if !cfg!(fastboot_integration) {
             return Ok(());
@@ -800,8 +782,7 @@ mod test {
             temp_path.to_str().unwrap(),
             std::env::temp_dir().as_path(),
             4096 * 2,
-        )
-        .await?;
+        )?;
 
         // Use simg2img to stitch them back together
         let (out_file, out_path) = NamedTempFile::new()?.into_parts();

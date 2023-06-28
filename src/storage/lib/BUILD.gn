@@ -11,6 +11,7 @@ group("tests") {
     "ftl-mtd:tests",
     "interval_tree:tests",
     "paver:tests",
+    "sparse:tests",
     "storage-metrics:tests",
     "watchdog:tests",
   ]

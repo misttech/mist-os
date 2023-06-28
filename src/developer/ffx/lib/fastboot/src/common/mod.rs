@@ -8,7 +8,6 @@ use crate::{
         file::*,
     },
     manifest::{from_in_tree, from_local_product_bundle, from_path, from_sdk},
-    sparse::build_sparse_files,
 };
 use anyhow::{anyhow, bail, Context, Error, Result};
 use async_trait::async_trait;
@@ -25,6 +24,7 @@ use fidl_fuchsia_developer_ffx::{
 use futures::{prelude::*, try_join};
 use pbms::is_local_product_bundle;
 use sdk::SdkVersion;
+use sparse::build_sparse_files;
 use std::{convert::Into, io::Write, path::PathBuf};
 use termion::{color, style};
 
@@ -279,8 +279,7 @@ async fn flash_partition_sparse<W: Write>(
         file_to_upload,
         std::env::temp_dir().as_path(),
         max_download_size,
-    )
-    .await?;
+    )?;
     for tmp_file_path in sparse_files {
         let tmp_file_name = tmp_file_path.to_str().unwrap();
         writeln!(writer, "For partition: {}, flashing sparse image file {}", name, tmp_file_name)?;
