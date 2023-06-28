@@ -4,7 +4,6 @@
 {
     include: [
         "//sdk/ctf/test_realm/meta/test-collection.shard.cml",
-        "//src/devices/testing/devices_test_realm.shard.cml",
         "//src/lib/vulkan/vulkan_test_realm.shard.cml",
         "//src/media/testing/drm_test_realm.shard.cml",
         "//src/media/testing/media_test_realm.shard.cml",
