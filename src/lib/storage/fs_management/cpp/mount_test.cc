@@ -12,6 +12,7 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/component/incoming/cpp/clone.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/vfs.h>
 #include <lib/syslog/cpp/macros.h>
@@ -133,7 +134,7 @@ TEST_F(MountTest, MountFsck) {
   }
 
   // Fsck shouldn't require any user input for a newly mkfs'd filesystem.
-  ASSERT_EQ(Fsck(ramdisk_path().c_str(), kDiskFormatMinfs, FsckOptions(), LaunchStdioSync), ZX_OK);
+  ASSERT_EQ(Fsck(ramdisk_path(), kDiskFormatMinfs, FsckOptions(), LaunchStdioSync), ZX_OK);
 }
 
 // Tests that setting read-only on the mount options works as expected.
@@ -270,19 +271,18 @@ TEST_F(PartitionOverFvmWithRamdiskCase, MkfsMinfsWithMinFvmSlices) {
   MkfsOptions options;
   size_t base_slices = 0;
   ASSERT_EQ(Mkfs(partition_path(), kDiskFormatMinfs, LaunchStdioSync, options), ZX_OK);
-  fbl::unique_fd partition_fd(open(partition_path(), O_RDONLY));
-  ASSERT_TRUE(partition_fd);
-  fdio_cpp::UnownedFdioCaller caller(partition_fd.get());
-  GetPartitionSliceCount(caller.borrow_as<fuchsia_hardware_block_volume::Volume>(), &base_slices);
+  zx::result volume = component::Connect<fuchsia_hardware_block_volume::Volume>(partition_path());
+  ASSERT_TRUE(volume.is_ok()) << volume.status_string();
+  GetPartitionSliceCount(volume.value(), &base_slices);
   options.fvm_data_slices += 10;
 
   ASSERT_EQ(Mkfs(partition_path(), kDiskFormatMinfs, LaunchStdioSync, options), ZX_OK);
   size_t allocated_slices = 0;
-  GetPartitionSliceCount(caller.borrow_as<fuchsia_hardware_block_volume::Volume>(),
-                         &allocated_slices);
+  GetPartitionSliceCount(volume.value(), &allocated_slices);
   EXPECT_GE(allocated_slices, base_slices + 10);
 
-  DiskFormat actual_format = DetectDiskFormat(caller.borrow_as<fuchsia_hardware_block::Block>());
+  DiskFormat actual_format = DetectDiskFormat(
+      fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(volume.value().channel().borrow()));
   ASSERT_EQ(actual_format, kDiskFormatMinfs);
 }
 
