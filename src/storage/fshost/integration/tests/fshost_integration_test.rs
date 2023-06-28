@@ -24,12 +24,17 @@ use {
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_fs::node::OpenError,
+    fuchsia_merkle::MerkleTreeBuilder,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::FutureExt,
 };
 
 #[cfg(feature = "fxblob")]
-use fidl_fuchsia_update_verify::{BlobfsVerifierMarker, VerifyOptions};
+use {
+    blob_writer::BlobWriter,
+    fidl_fuchsia_fxfs::BlobCreatorMarker,
+    fidl_fuchsia_update_verify::{BlobfsVerifierMarker, VerifyOptions},
+};
 
 mod migration;
 mod wipe_storage;
@@ -432,6 +437,82 @@ async fn set_volume_bytes_limit() {
     let data_volume_bytes_limit = data_volume_proxy.get_limit().await.unwrap().unwrap();
     assert_eq!(blob_volume_bytes_limit, BLOBFS_MAX_BYTES);
     assert_eq!(data_volume_bytes_limit, DATA_MAX_BYTES);
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
+async fn set_data_and_blob_max_bytes_zero() {
+    let mut builder = new_builder();
+    builder.fshost().set_config_value("data_max_bytes", 0).set_config_value("blobfs_max_bytes", 0);
+    builder.with_disk().format_volumes(volumes_spec());
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+    let flags =
+        fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+
+    let data_root = fixture.dir("data", flags);
+    let file = fuchsia_fs::directory::open_file(&data_root, "file", flags).await.unwrap();
+    fuchsia_fs::file::write(&file, "file contents!").await.unwrap();
+
+    let blob_contents = vec![0; 8192];
+    let mut builder = MerkleTreeBuilder::new();
+    builder.write(&blob_contents);
+    let hash = builder.finish().root();
+
+    let blob_root = fixture.dir("blob", flags);
+    let blob =
+        fuchsia_fs::directory::open_file(&blob_root, &format!("{}", hash), flags).await.unwrap();
+    blob.resize(blob_contents.len() as u64)
+        .await
+        .expect("FIDL call failed")
+        .expect("truncate failed");
+    fuchsia_fs::file::write(&blob, &blob_contents).await.unwrap();
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+#[cfg(feature = "fxblob")]
+async fn set_data_and_blob_max_bytes_zero_new_write_api() {
+    let mut builder = new_builder();
+    builder.fshost().set_config_value("data_max_bytes", 0).set_config_value("blobfs_max_bytes", 0);
+    builder.with_disk().format_volumes(volumes_spec());
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+    let flags =
+        fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+
+    let data_root = fixture.dir("data", flags);
+    let file = fuchsia_fs::directory::open_file(&data_root, "file", flags).await.unwrap();
+    fuchsia_fs::file::write(&file, "file contents!").await.unwrap();
+
+    let blob_contents = vec![0; 8192];
+    let mut builder = MerkleTreeBuilder::new();
+    builder.write(&blob_contents);
+    let hash = builder.finish().root();
+
+    let blob_proxy = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<BlobCreatorMarker>()
+        .expect("connect_to_protocol_at_exposed_dir failed");
+
+    let writer_client_end = blob_proxy
+        .create(&hash.into(), false)
+        .await
+        .expect("transport error on BlobCreator.Create")
+        .expect("failed to create blob");
+    let writer = writer_client_end.into_proxy().unwrap();
+    let mut blob_writer = BlobWriter::create(writer, blob_contents.len() as u64)
+        .await
+        .expect("failed to create BlobWriter");
+    blob_writer.write(&blob_contents).await.unwrap();
+
     fixture.tear_down().await;
 }
 

@@ -129,6 +129,7 @@ template("fshost_integration_test") {
       "//src/lib/storage/fs_management/rust:fs_management",
       "//src/lib/zircon/rust:fuchsia-zircon",
       "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
+      "//src/sys/pkg/lib/fuchsia-merkle",
       "//third_party/rust_crates:assert_matches",
       "//third_party/rust_crates:futures",
       "//third_party/rust_crates:tracing",
@@ -200,8 +201,10 @@ fshost_integration_test("fshost_integration_tests_fxfs_fxblob") {
     data_filesystem_format = "fxfs"
     use_disk_migration = false
   }
-  extra_deps =
-      [ "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust" ]
+  extra_deps = [
+    "//src/storage/lib/blob_writer:blob-writer",
+    "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
+  ]
 }
 
 fshost_integration_test("fshost_integration_tests_f2fs_no_zxcrypt") {

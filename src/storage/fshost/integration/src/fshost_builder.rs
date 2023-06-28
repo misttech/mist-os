@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    fidl_fuchsia_fshost as ffshost, fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
-    fidl_fuchsia_process as fprocess, fidl_fuchsia_update_verify as ffuv,
+    fidl_fuchsia_fshost as ffshost,
+    fidl_fuchsia_fxfs::BlobCreatorMarker,
+    fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_update_verify as ffuv,
     fuchsia_component_test::{Capability, ChildOptions, ChildRef, RealmBuilder, Ref, Route},
     std::collections::HashMap,
 };
@@ -91,6 +93,7 @@ impl FshostBuilder {
                     .capability(Capability::protocol::<ffshost::AdminMarker>())
                     .capability(Capability::protocol::<ffshost::BlockWatcherMarker>())
                     .capability(Capability::protocol::<ffuv::BlobfsVerifierMarker>())
+                    .capability(Capability::protocol::<BlobCreatorMarker>())
                     .capability(Capability::directory("blob").rights(fio::RW_STAR_DIR))
                     .capability(Capability::directory("data").rights(fio::RW_STAR_DIR))
                     .capability(Capability::directory("tmp").rights(fio::RW_STAR_DIR))

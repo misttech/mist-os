@@ -701,6 +701,9 @@ impl ServingMultiVolumeFilesystem {
     /// Sets the max byte limit for a volume. Fails if the volume is not mounted.
     pub async fn set_byte_limit(&self, volume: &str, byte_limit: u64) -> Result<(), Error> {
         ensure!(self.volumes.contains_key(volume), "Volume not mounted");
+        if byte_limit == 0 {
+            return Ok(());
+        }
         let path = format!("volumes/{}", volume);
         connect_to_named_protocol_at_dir_root::<fidl_fuchsia_fxfs::VolumeMarker>(
             self.exposed_dir.as_ref().unwrap(),
