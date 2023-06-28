@@ -177,7 +177,7 @@ pub async fn dir_contains<'a>(
     let dir = fuchsia_fs::directory::open_directory_no_describe(
         &root_proxy,
         path,
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::empty(),
     )
     .expect("Failed to open directory");
     let entries = fuchsia_fs::directory::readdir(&dir).await.expect("readdir failed");
@@ -193,12 +193,9 @@ pub async fn list_directory<'a>(root_proxy: &'a fio::DirectoryProxy) -> Vec<Stri
 }
 
 pub async fn list_sub_directory(parent: &fio::DirectoryProxy, path: &str) -> Vec<String> {
-    let sub_dir = fuchsia_fs::directory::open_directory_no_describe(
-        &parent,
-        path,
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .expect("Failed to open directory");
+    let sub_dir =
+        fuchsia_fs::directory::open_directory_no_describe(&parent, path, fio::OpenFlags::empty())
+            .expect("Failed to open directory");
     list_directory(&sub_dir).await
 }
 
@@ -228,7 +225,7 @@ pub async fn write_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str, 
     let file_proxy = fuchsia_fs::directory::open_file_no_describe(
         &root_proxy,
         path,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
     )
     .expect("Failed to open file.");
     let _: u64 = file_proxy

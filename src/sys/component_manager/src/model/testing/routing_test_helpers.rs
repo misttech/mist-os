@@ -427,7 +427,7 @@ impl RoutingTest {
             let dir_proxy = fuchsia_fs::directory::open_directory(
                 &self.test_dir_proxy,
                 &dir_path.to_str().unwrap(),
-                fuchsia_fs::OpenFlags::RIGHT_READABLE,
+                fuchsia_fs::OpenFlags::empty(),
             )
             .await
             .expect("failed to open directory");
@@ -442,7 +442,7 @@ impl RoutingTest {
         let dir_proxy = fuchsia_fs::directory::open_directory(
             &self.test_dir_proxy,
             path,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::OpenFlags::empty(),
         )
         .await
         .expect("failed to open directory");
@@ -955,7 +955,7 @@ impl RoutingTestModel for RoutingTest {
 
     async fn check_namespace_subdir_contents(&self, path: &str, expected: Vec<String>) {
         let dir_proxy =
-            fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::RIGHT_READABLE)
+            fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::empty())
                 .expect("failed to open directory");
         assert_eq!(list_directory(&dir_proxy).await, expected)
     }
@@ -1107,7 +1107,7 @@ pub mod capability_util {
             let subdir = fuchsia_fs::directory::create_directory_recursive(
                 root,
                 directory.to_str().ok_or(anyhow!("{:?} is not a valid UTF-8 string", path))?,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::OpenFlags::RIGHT_WRITABLE,
             )
             .await
             .map_err(|e| anyhow!(e).context(format!("failed to create subdirs for {:?}", path)))?;
@@ -1166,7 +1166,7 @@ pub mod capability_util {
         let res = fuchsia_fs::directory::open_directory(
             &test_dir_proxy,
             dir_path.to_str().unwrap(),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::OpenFlags::empty(),
         )
         .await
         .expect_err("open_directory shouldn't have succeeded");
@@ -1229,7 +1229,7 @@ pub mod capability_util {
         let service_dir = fuchsia_fs::directory::open_directory(
             &dir_proxy,
             path.basename(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+            fio::OpenFlags::empty(),
         )
         .await
         .expect("failed to open service dir");
@@ -1416,7 +1416,7 @@ pub mod capability_util {
         let instance_dir = fuchsia_fs::directory::open_directory(
             &service_dir,
             &instance,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::OpenFlags::empty(),
         )
         .await
         .expect("failed to open instance");
@@ -1541,12 +1541,11 @@ pub mod capability_util {
         let state = component.lock_state().await;
         match &*state {
             InstanceState::Resolved(resolved_instance_state) => {
-                let flags = fio::OpenFlags::RIGHT_READABLE
-                    | if directory {
-                        fio::OpenFlags::DIRECTORY
-                    } else {
-                        fio::OpenFlags::NOT_DIRECTORY
-                    };
+                let flags = if directory {
+                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY
+                } else {
+                    fio::OpenFlags::NOT_DIRECTORY
+                };
                 let vns_path = to_fvfs_path(path);
                 resolved_instance_state.get_exposed_dir().open(flags, vns_path, server_end);
             }

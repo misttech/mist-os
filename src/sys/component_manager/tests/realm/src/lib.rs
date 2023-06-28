@@ -84,7 +84,7 @@ pub async fn echo_server() {
         .open(
             "./echo_server",
             fsys::OpenDirType::PackageDir,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
             fio::ModeType::empty(),
             ".",
             server_end,
@@ -123,7 +123,7 @@ pub async fn echo_server() {
         .open(
             "./echo_server",
             fsys::OpenDirType::PackageDir,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
             fio::ModeType::empty(),
             ".",
             server_end,
@@ -161,7 +161,7 @@ pub async fn echo_server() {
         .open(
             "./echo_server",
             fsys::OpenDirType::ExposedDir,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
             fio::ModeType::empty(),
             ".",
             server_end,
@@ -190,7 +190,7 @@ pub async fn echo_server() {
         .open(
             "./echo_server",
             fsys::OpenDirType::NamespaceDir,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
             fio::ModeType::empty(),
             ".",
             server_end,
@@ -242,7 +242,7 @@ pub async fn echo_server() {
         .open(
             "./echo_server",
             fsys::OpenDirType::OutgoingDir,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
             fio::ModeType::empty(),
             "svc/fidl.examples.routing.echo.Echo",
             server_end,
@@ -259,7 +259,7 @@ pub async fn echo_server() {
         .open(
             "./echo_server",
             fsys::OpenDirType::RuntimeDir,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
             fio::ModeType::empty(),
             "elf",
             server_end,

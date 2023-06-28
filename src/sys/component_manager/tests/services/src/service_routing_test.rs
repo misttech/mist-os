@@ -69,7 +69,7 @@ async fn list_instances_test(test_type: TestType) {
     let service_dir = fuchsia_fs::directory::open_directory(
         branch.get_exposed_dir(),
         fexamples::BankAccountMarker::SERVICE_NAME,
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::empty(),
     )
     .await
     .expect("failed to open service dir");
@@ -96,7 +96,7 @@ async fn connect_to_instances_test(test_type: TestType) {
     let service_dir = fuchsia_fs::directory::open_directory(
         branch.get_exposed_dir(),
         fexamples::BankAccountMarker::SERVICE_NAME,
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::empty(),
     )
     .await
     .expect("failed to open service dir");
@@ -140,7 +140,7 @@ async fn create_destroy_instance_test(test_type: TestType) {
     let service_dir = fuchsia_fs::directory::open_directory(
         branch.get_exposed_dir(),
         fexamples::BankAccountMarker::SERVICE_NAME,
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::empty(),
     )
     .await
     .expect("failed to open service dir");

@@ -1013,9 +1013,7 @@ mod tests {
 
         dir.open(
             execution_scope,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
+            fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             ServerEnd::new(server_end.into_channel()),
         );
@@ -1246,7 +1244,7 @@ mod tests {
             let instance_dir = fuchsia_fs::directory::open_directory(
                 &dir_proxy,
                 instance_names.iter().next().expect("failed to get instance name"),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::OpenFlags::empty(),
             )
             .await
             .expect("failed to open collection dir");
@@ -1605,16 +1603,9 @@ mod tests {
             .expect("failed to create FilteredServiceProvider"),
         );
         let task_scope = TaskScope::new();
-        host.open(
-            task_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            PathBuf::new(),
-            &mut server_end,
-        )
-        .await
-        .expect("failed to serve");
+        host.open(task_scope.clone(), fio::OpenFlags::DIRECTORY, PathBuf::new(), &mut server_end)
+            .await
+            .expect("failed to serve");
 
         // Choose a value such that there is only room for a single entry.
         const MAX_BYTES: u64 = 20;
@@ -1693,16 +1684,9 @@ mod tests {
         );
 
         let task_scope = TaskScope::new();
-        host.open(
-            task_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            PathBuf::new(),
-            &mut server_end,
-        )
-        .await
-        .expect("failed to open path in filtered service directory.");
+        host.open(task_scope.clone(), fio::OpenFlags::DIRECTORY, PathBuf::new(), &mut server_end)
+            .await
+            .expect("failed to open path in filtered service directory.");
 
         // Choose a value such that there is only room for a single entry.
         const MAX_BYTES: u64 = 20;
@@ -1781,16 +1765,9 @@ mod tests {
         // expect that opening an instance that is filtered out
         let mut path_buf = PathBuf::new();
         path_buf.push("one");
-        host.open(
-            task_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            path_buf,
-            &mut server_end,
-        )
-        .await
-        .expect("failed to open path in filtered service directory.");
+        host.open(task_scope.clone(), fio::OpenFlags::DIRECTORY, path_buf, &mut server_end)
+            .await
+            .expect("failed to open path in filtered service directory.");
         assert_matches!(
             service_proxy.take_event_stream().next().await.unwrap(),
             Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FOUND, .. })

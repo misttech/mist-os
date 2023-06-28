@@ -241,7 +241,7 @@ async fn open_storage_root(
         dir_proxy = fuchsia_fs::directory::create_directory_recursive(
             &dir_proxy,
             subdir.to_str().ok_or(ModelError::path_is_not_utf8(subdir.clone()))?,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            FLAGS,
         )
         .await
         .map_err(|e| {
@@ -336,7 +336,7 @@ pub async fn open_isolated_storage(
     fuchsia_fs::directory::create_directory_recursive(
         &root_dir,
         storage_path.to_str().ok_or(ModelError::path_is_not_utf8(storage_path.clone()))?,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        FLAGS,
     )
     .await
     .map_err(|e| {
@@ -362,7 +362,7 @@ pub async fn open_isolated_storage_by_id(
     fuchsia_fs::directory::create_directory_recursive(
         &root_dir,
         storage_path.to_str().ok_or(ModelError::path_is_not_utf8(storage_path.clone()))?,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        FLAGS,
     )
     .await
     .map_err(|e| {

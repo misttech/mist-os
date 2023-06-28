@@ -64,7 +64,7 @@ async fn package_resolution() {
         fuchsia_fs::directory::open_directory_no_describe(
             &dir_proxy,
             "bin",
-            fio::OpenFlags::RIGHT_READABLE
+            fio::OpenFlags::empty(),
         )
         .unwrap(),
         1000,
@@ -83,7 +83,7 @@ async fn package_resolution() {
         fuchsia_fs::directory::open_directory_no_describe(
             &dir_proxy,
             "meta",
-            fio::OpenFlags::RIGHT_READABLE
+            fio::OpenFlags::empty(),
         )
         .unwrap(),
         1000,

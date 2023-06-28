@@ -1033,7 +1033,7 @@ mod tests {
             .open(
                 "./",
                 fsys::OpenDirType::OutgoingDir,
-                fio::OpenFlags::RIGHT_READABLE,
+                fio::OpenFlags::empty(),
                 fio::ModeType::empty(),
                 ".",
                 server_end,
@@ -1051,7 +1051,7 @@ mod tests {
             .open(
                 "./",
                 fsys::OpenDirType::RuntimeDir,
-                fio::OpenFlags::RIGHT_READABLE,
+                fio::OpenFlags::empty(),
                 fio::ModeType::empty(),
                 ".",
                 server_end,
@@ -1069,7 +1069,7 @@ mod tests {
             .open(
                 "./",
                 fsys::OpenDirType::PackageDir,
-                fio::OpenFlags::RIGHT_READABLE,
+                fio::OpenFlags::empty(),
                 fio::ModeType::empty(),
                 ".",
                 server_end,
@@ -1084,7 +1084,7 @@ mod tests {
             .open(
                 "./",
                 fsys::OpenDirType::ExposedDir,
-                fio::OpenFlags::RIGHT_READABLE,
+                fio::OpenFlags::empty(),
                 fio::ModeType::empty(),
                 ".",
                 server_end,

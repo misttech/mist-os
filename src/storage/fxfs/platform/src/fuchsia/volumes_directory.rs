@@ -958,7 +958,7 @@ mod tests {
             fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
         volumes_directory.directory_node().clone().open(
             ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
             Path::validate_and_split("encrypted").unwrap(),
             volume_server_end.into_channel().into(),
         );
@@ -1072,7 +1072,7 @@ mod tests {
             fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
         volumes_directory.directory_node().clone().open(
             ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
             Path::validate_and_split("encrypted").unwrap(),
             volume_server_end.into_channel().into(),
         );
@@ -1253,7 +1253,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::OpenFlags::empty(),
                 Path::validate_and_split(VOLUME_NAME).unwrap(),
                 volume_server_end.into_channel().into(),
             );
@@ -1336,7 +1336,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::OpenFlags::empty(),
                 Path::validate_and_split(name).unwrap(),
                 volume_server_end.into_channel().into(),
             );
