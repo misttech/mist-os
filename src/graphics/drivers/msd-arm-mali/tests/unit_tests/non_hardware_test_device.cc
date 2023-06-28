@@ -304,6 +304,7 @@ class TestNonHardwareMsdArmDevice {
       bool duplicate_handle(zx::handle* handle_out) const override {
         return real_semaphore_->duplicate_handle(handle_out);
       }
+      zx_signals_t GetZxSignal() const override { return real_semaphore_->GetZxSignal(); }
 #endif
 
      private:

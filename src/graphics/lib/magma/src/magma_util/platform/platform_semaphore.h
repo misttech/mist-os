@@ -6,7 +6,7 @@
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_PLATFORM_PLATFORM_SEMAPHORE_H_
 
 #if defined(__Fuchsia__)
-#include <lib/zx/event.h>
+#include <lib/zx/handle.h>
 #endif
 
 #include <memory>
@@ -45,12 +45,16 @@ class PlatformSemaphore : public PlatformObject {
   // Imports and takes ownership of |handle|.
   static std::unique_ptr<PlatformSemaphore> Import(uint32_t handle, uint64_t flags);
 #if defined(__Fuchsia__)
-  static std::unique_ptr<PlatformSemaphore> Import(zx::event event, uint64_t flags);
+  static std::unique_ptr<PlatformSemaphore> Import(zx::handle handle, uint64_t flags);
 #endif
 
   virtual ~PlatformSemaphore() {}
 
   bool is_one_shot() const { return flags_ & MAGMA_IMPORT_SEMAPHORE_ONE_SHOT; }
+
+#if defined(__Fuchsia__)
+  virtual zx_signals_t GetZxSignal() const = 0;
+#endif
 
   std::unique_ptr<PlatformSemaphore> Clone() {
     uint32_t handle;
@@ -81,6 +85,10 @@ class PlatformSemaphore : public PlatformObject {
   // Note that a port wait completion will not autoreset the semaphore.
   // On success returns true.
   virtual bool WaitAsync(PlatformPort* port, uint64_t key) = 0;
+
+  // Returns true if timestamps are supported; sets |timestamp_ns_out| to the time of the
+  // last status change.
+  virtual bool GetTimestamp(uint64_t* timestamp_ns_out) { return false; }
 
  private:
   uint64_t flags_;

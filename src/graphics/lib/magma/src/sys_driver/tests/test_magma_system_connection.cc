@@ -190,15 +190,6 @@ TEST(MagmaSystemConnection, BadSemaphoreImport) {
   constexpr uint32_t kBogusHandle = 0xabcd1234;
   EXPECT_FALSE(connection.ImportObject(zx::handle(kBogusHandle), /*flags=*/0,
                                        fuchsia_gpu_magma::wire::ObjectType::kEvent, 0));
-
-  auto buffer = magma::PlatformBuffer::Create(4096, "test");
-  ASSERT_TRUE(buffer);
-
-  zx::handle buffer_handle;
-  ASSERT_TRUE(buffer->duplicate_handle(&buffer_handle));
-
-  EXPECT_FALSE(connection.ImportObject(std::move(buffer_handle), /*flags=*/0,
-                                       fuchsia_gpu_magma::wire::ObjectType::kEvent, buffer->id()));
 }
 
 TEST(MagmaSystemConnection, BufferSharing) {

@@ -9,6 +9,7 @@
 #include "magma_util/short_macros.h"
 #include "platform_object.h"
 #include "zircon_platform_port.h"
+#include "zircon_vmo_semaphore.h"
 
 namespace magma {
 
@@ -82,22 +83,28 @@ std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Create() {
 }
 
 std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Import(uint32_t handle, uint64_t flags) {
-  return Import(zx::event(handle), flags);
+  return Import(zx::handle(handle), flags);
 }
 
-std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Import(zx::event event, uint64_t flags) {
+std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Import(zx::handle handle, uint64_t flags) {
   zx_info_handle_basic_t info;
-  zx_status_t status = event.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  zx_status_t status = handle.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   if (status != ZX_OK)
     return DRETP(nullptr, "couldn't get handle info %d", status);
-
-  if (info.type != ZX_OBJ_TYPE_EVENT)
-    return DRETP(nullptr, "invalid object type: %d", info.type);
 
   if (flags & ~MAGMA_IMPORT_SEMAPHORE_ONE_SHOT)
     return DRETP(nullptr, "unhandled flags 0x%lx", flags);
 
-  return std::make_unique<ZirconPlatformSemaphore>(std::move(event), info.koid, flags);
+  switch (info.type) {
+    case ZX_OBJ_TYPE_EVENT:
+      return std::make_unique<ZirconPlatformSemaphore>(zx::event(std::move(handle)), info.koid,
+                                                       flags);
+    case ZX_OBJ_TYPE_VMO:
+      return std::make_unique<ZirconVmoSemaphore>(zx::vmo(std::move(handle)), info.koid, flags);
+
+    default:
+      return DRETP(nullptr, "unexpected object type: %d", info.type);
+  }
 }
 
 }  // namespace magma

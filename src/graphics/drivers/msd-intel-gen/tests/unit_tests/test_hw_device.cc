@@ -499,6 +499,8 @@ class TestMsdIntelDevice : public testing::Test {
     bool duplicate_handle(uint32_t* handle_out) const override { return kEnableDeviceThread; }
 #if defined(__Fuchsia__)
     bool duplicate_handle(zx::handle* handle_out) const override { return kEnableDeviceThread; }
+
+    zx_signals_t GetZxSignal() const override { return ZX_EVENT_SIGNALED; }
 #endif
 
     void Signal() override {
