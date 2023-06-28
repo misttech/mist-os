@@ -116,14 +116,12 @@ class FailAllocateConnectionOwner : public FakeConnectionOwner {
   FailBusMapper bus_mapper_;
 };
 
-uint32_t g_test_data_size;
-magma_arm_mali_status g_status;
+std::vector<std::vector<uint8_t>> g_status;
 
 class TestNotificationHandler : public msd::testing::StubNotificationHandler {
   // msd::NotificationHandler implementation.
   void NotificationChannelSend(cpp20::span<uint8_t> data) override {
-    g_test_data_size = static_cast<uint32_t>(data.size());
-    memcpy(&g_status, data.data(), g_test_data_size);
+    g_status.push_back(std::vector<uint8_t>(data.begin(), data.end()));
   }
 };
 }  // namespace
@@ -468,17 +466,59 @@ class TestConnection {
 
     atom2.set_result_code(static_cast<ArmMaliResultCode>(20));
     connection->SendNotificationData(&atom2);
-    EXPECT_EQ(sizeof(g_status), g_test_data_size);
+    EXPECT_EQ(1u, g_status.size());
+    magma_arm_mali_status* status = reinterpret_cast<magma_arm_mali_status*>(g_status[0].data());
+    EXPECT_EQ(sizeof(*status), g_status[0].size());
 
-    EXPECT_EQ(7u, g_status.data.data[0]);
-    EXPECT_EQ(8u, g_status.data.data[1]);
-    EXPECT_EQ(20u, g_status.result_code);
-    EXPECT_EQ(5u, g_status.atom_number);
+    EXPECT_EQ(7u, status->data.data[0]);
+    EXPECT_EQ(8u, status->data.data[1]);
+    EXPECT_EQ(20u, status->result_code);
+    EXPECT_EQ(5u, status->atom_number);
 
     connection->SetNotificationCallback(nullptr);
     connection->SendNotificationData(&atom);
 
-    EXPECT_EQ(20u, g_status.result_code);
+    EXPECT_EQ(1u, g_status.size());
+  }
+
+  void CoalescedNotification() {
+    FakeConnectionOwner owner;
+    auto connection = MsdArmConnection::Create(0, &owner);
+    EXPECT_TRUE(connection);
+    TestNotificationHandler handler;
+    connection->SetNotificationCallback(&handler);
+
+    MsdArmAtom atom(connection, 0, 1, 5, magma_arm_mali_user_data{7, 8}, 0, kAtomFlagCoalesce);
+
+    atom.set_result_code(static_cast<ArmMaliResultCode>(10));
+    // Shouldn't do anything.
+    connection->SendNotificationData(&atom);
+
+    EXPECT_EQ(0u, g_status.size());
+
+    MsdArmAtom atom2(connection, 0, 1, 5, magma_arm_mali_user_data{7, 8}, 0);
+
+    atom2.set_result_code(static_cast<ArmMaliResultCode>(20));
+    connection->SendNotificationData(&atom2);
+    ASSERT_EQ(2u, g_status.size());
+    magma_arm_mali_status* status = reinterpret_cast<magma_arm_mali_status*>(g_status[0].data());
+    EXPECT_EQ(sizeof(*status), g_status[0].size());
+
+    EXPECT_EQ(7u, status->data.data[0]);
+    EXPECT_EQ(8u, status->data.data[1]);
+    EXPECT_EQ(10u, status->result_code);
+    EXPECT_EQ(5u, status->atom_number);
+
+    status = reinterpret_cast<magma_arm_mali_status*>(g_status[1].data());
+    EXPECT_EQ(sizeof(*status), g_status[1].size());
+    EXPECT_EQ(7u, status->data.data[0]);
+    EXPECT_EQ(8u, status->data.data[1]);
+    EXPECT_EQ(20u, status->result_code);
+    EXPECT_EQ(5u, status->atom_number);
+
+    connection->SetNotificationCallback(nullptr);
+    connection->SendNotificationData(&atom);
+    EXPECT_EQ(2u, g_status.size());
   }
 
   void DestructionNotification() {
@@ -492,18 +532,20 @@ class TestConnection {
 
     EXPECT_TRUE(owner.got_set_to_default_priority());
 
-    EXPECT_EQ(sizeof(g_status), g_test_data_size);
+    ASSERT_EQ(1u, g_status.size());
+    magma_arm_mali_status* status = reinterpret_cast<magma_arm_mali_status*>(g_status[0].data());
+    EXPECT_EQ(sizeof(*status), g_status[0].size());
 
-    EXPECT_EQ(0u, g_status.data.data[0]);
-    EXPECT_EQ(0u, g_status.data.data[1]);
-    EXPECT_EQ(0u, g_status.atom_number);
-    EXPECT_EQ(kArmMaliResultTerminated, g_status.result_code);
+    EXPECT_EQ(0u, status->data.data[0]);
+    EXPECT_EQ(0u, status->data.data[1]);
+    EXPECT_EQ(0u, status->atom_number);
+    EXPECT_EQ(kArmMaliResultTerminated, status->result_code);
 
     // Shouldn't do anything.
     MsdArmAtom atom(connection, 0, 1, 5, magma_arm_mali_user_data{7, 8}, 0);
     atom.set_result_code(static_cast<ArmMaliResultCode>(10));
     connection->SendNotificationData(&atom);
-    EXPECT_EQ(kArmMaliResultTerminated, g_status.result_code);
+    ASSERT_EQ(1u, g_status.size());
 
     connection->SetNotificationCallback(nullptr);
 
@@ -1299,6 +1341,11 @@ TEST(TestConnection, CommitLargeBuffer) {
 TEST(TestConnection, Notification) {
   TestConnection test;
   test.Notification();
+}
+
+TEST(TestConnection, CoalescedNotification) {
+  TestConnection test;
+  test.DestructionNotification();
 }
 
 TEST(TestConnection, DestructionNotification) {

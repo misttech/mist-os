@@ -956,8 +956,21 @@ void MsdArmConnection::SendNotificationData(MsdArmAtom* atom) {
   status.atom_number = atom->atom_number();
   status.data = atom->user_data();
 
-  notification_handler_->NotificationChannelSend(GetStatusSpan(&status));
-  notified_atom_count_++;
+  // Arbitrary limit to keep the max coalescing notifications list from growing forever.
+  constexpr size_t kMaxCoalescingNotifications = 16;
+
+  if ((atom->flags() & kAtomFlagCoalesce) &&
+      (coalescing_notifications_.size() < kMaxCoalescingNotifications)) {
+    coalescing_notifications_.push_back(status);
+  } else {
+    for (auto& notification : coalescing_notifications_) {
+      notification_handler_->NotificationChannelSend(GetStatusSpan(&notification));
+      notified_atom_count_++;
+    }
+    coalescing_notifications_.clear();
+    notification_handler_->NotificationChannelSend(GetStatusSpan(&status));
+    notified_atom_count_++;
+  }
 }
 
 void MsdArmConnection::MarkDestroyed() {

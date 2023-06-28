@@ -17,6 +17,7 @@
 #include <mutex>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 #include "magma_util/address_space_allocator.h"
 #include "magma_util/short_macros.h"
@@ -228,6 +229,7 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   std::atomic<uint32_t> context_count_{0};
   std::atomic<uint64_t> received_atom_count_{0};
   std::atomic<uint64_t> notified_atom_count_{0};
+  std::vector<magma_arm_mali_status> coalescing_notifications_ FIT_GUARDED(callback_lock_);
 
   std::shared_ptr<ConnectionPerfCountManager> perf_count_manager_;
 };
