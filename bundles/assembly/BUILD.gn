@@ -1269,6 +1269,28 @@ assembly_input_bundle("wlan_softmac_support") {
   ]
 }
 
+# WLAN support for interfacing with starnix.
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("wlan_wlanix") {
+  base_packages = [ "//src/connectivity/wlan/wlanix" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/connectivity/wlan/wlanix/meta/wlanix.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # Support for interactive debugging/development of platform audio
 #
 # feature_set_levels: minimal

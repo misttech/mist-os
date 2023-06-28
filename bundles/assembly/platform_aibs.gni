@@ -87,6 +87,7 @@ user_platform_aib_names =
       "wlan_contemporary_privacy_only_support",
       "wlan_fullmac_support",
       "wlan_softmac_support",
+      "wlan_wlanix",
 
       # Storage
       "fshost_common",

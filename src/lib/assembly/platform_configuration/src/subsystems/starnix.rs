@@ -19,6 +19,10 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
                 "Starnix is only supported in the default feature set level"
             );
             builder.platform_bundle("starnix_support");
+
+            if starnix_config.enable_android_support {
+                builder.platform_bundle("wlan_wlanix");
+            }
         }
         Ok(())
     }

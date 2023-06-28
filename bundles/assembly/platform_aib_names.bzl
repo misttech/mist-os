@@ -68,6 +68,7 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "wlan_fullmac_support",
     "wlan_legacy_privacy_support",
     "wlan_softmac_support",
+    "wlan_wlanix",
 ]
 USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64 = [
     # The following are not currently supported on RISC-V. They must be added

@@ -10,4 +10,6 @@ use serde::{Deserialize, Serialize};
 pub struct PlatformStarnixConfig {
     #[serde(default)]
     pub enabled: bool,
+    #[serde(default)]
+    pub enable_android_support: bool,
 }
