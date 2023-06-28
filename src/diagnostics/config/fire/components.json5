@@ -644,4 +644,14 @@
         label: "Update Committer",
         moniker: "core/system-update/system-update-committer",
     },
+    {
+        id: 235,
+        label: "Update Checker",
+        moniker: "core/system-update/system-update-checker",
+    },
+    {
+        id: 236,
+        label: "Update Checker",
+        moniker: "core/system-update/omaha-client-service",
+    },
 ]

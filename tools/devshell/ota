@@ -53,7 +53,7 @@ function needs-update {
 }
 
 function target-using-omaha-client {
-  [[ "$(ffx component show /core/system-update-checker)" == *"omaha-client-service"* ]]
+  [[ "$(ffx component select capability fuchsia.update.Manager)" == *"/core/system-update/omaha-client-service"* ]]
 }
 
 function main {

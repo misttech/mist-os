@@ -133,8 +133,8 @@ TEST_ota_update_failed() {
 
   local ffx="$(btf::make_installed_hosttools_mock ffx)"
   cat > "${ffx}.mock_side_effects" << "EOF"
-if [[ "$@" == "component show /core/system-update-checker" ]]; then
-  echo "/core/system-update-checker"
+if [[ "$@" == "ffx component select capability fuchsia.update.Manager" ]]; then
+  echo "/core/system-update/omaha-client-service"
 else
   echo "unknown command $@" 1>&2
   exit 1
