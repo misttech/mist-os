@@ -54,6 +54,7 @@ rustc_binary("starnix_kernel_bin") {
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
     "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",

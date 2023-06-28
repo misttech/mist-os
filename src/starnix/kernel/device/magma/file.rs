@@ -4,10 +4,14 @@
 
 #![allow(non_upper_case_globals)]
 
+use fidl_fuchsia_logger;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::HandleBased;
 use magma::*;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Once},
+};
 
 use super::{ffi::*, magma::*};
 use crate::{
@@ -110,12 +114,32 @@ pub struct MagmaFile {
 }
 
 impl MagmaFile {
+    pub fn init() {
+        // Enable the magma client library to emit logs for debug and error cases.
+        let (server_end, client_end) = zx::Channel::create();
+
+        let result = fuchsia_component::client::connect_channel_to_protocol::<
+            fidl_fuchsia_logger::LogSinkMarker,
+        >(server_end);
+
+        if result.is_ok() {
+            unsafe {
+                magma_initialize_logging(client_end.into_raw());
+            }
+        }
+    }
+
     pub fn new_file(
         _current_task: &CurrentTask,
         _dev: DeviceType,
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
+        static INIT: Once = Once::new();
+        INIT.call_once(|| {
+            Self::init();
+        });
+
         Ok(Box::new(Self {
             devices: Arc::new(Mutex::new(HashMap::new())),
             connections: Arc::new(Mutex::new(HashMap::new())),
