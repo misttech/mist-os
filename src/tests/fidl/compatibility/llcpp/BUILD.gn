@@ -25,8 +25,14 @@ executable("bin") {
   ]
 }
 
-fuchsia_component("llcpp-impl") {
-  manifest = "meta/llcpp-impl.cml"
-  deps = [ ":bin" ]
+fuchsia_component("impl") {
   testonly = true
+  manifest = "meta/impl.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("llcpp") {
+  testonly = true
+  package_name = "fidl-compatibility-test-llcpp"
+  deps = [ ":impl" ]
 }

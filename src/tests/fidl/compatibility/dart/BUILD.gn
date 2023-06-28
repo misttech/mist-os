@@ -19,8 +19,14 @@ dart_library("bin") {
   ]
 }
 
-dart_component("dart-impl") {
-  manifest = "meta/dart-impl.cml"
+dart_component("impl") {
+  manifest = "meta/impl.cml"
   main_package = "dart-impl"
   deps = [ ":bin" ]
+}
+
+fuchsia_package("dart") {
+  testonly = true
+  package_name = "fidl-compatibility-test-dart"
+  deps = [ ":impl" ]
 }

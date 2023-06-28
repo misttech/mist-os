@@ -121,14 +121,7 @@ foreach(test, fidl_compatibility_tests_categories) {
 
 fuchsia_test_package("fidl_compatibility_test_package") {
   package_name = "fidl-compatibility-test"
-  deps = [
-    "cpp:cpp-impl",
-    "dart:dart-impl",
-    "go:go-impl",
-    "hlcpp:hlcpp-impl",
-    "llcpp:llcpp-impl",
-    "rust:rust-impl",
-  ]
+  subpackages = fidl_compatibilty_test_impls
   test_components = test_component_labels
 }
 

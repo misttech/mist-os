@@ -24,7 +24,13 @@ executable("bin") {
   ]
 }
 
-fuchsia_component("hlcpp-impl") {
-  manifest = "meta/hlcpp-impl.cml"
+fuchsia_component("impl") {
+  manifest = "meta/impl.cml"
   deps = [ ":bin" ]
+}
+
+fuchsia_package("hlcpp") {
+  testonly = true
+  package_name = "fidl-compatibility-test-hlcpp"
+  deps = [ ":impl" ]
 }

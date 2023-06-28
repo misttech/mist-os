@@ -25,7 +25,14 @@ executable("bin") {
   ]
 }
 
-fuchsia_component("cpp-impl") {
-  manifest = "meta/cpp-impl.cml"
+fuchsia_component("impl") {
+  testonly = true
+  manifest = "meta/impl.cml"
   deps = [ ":bin" ]
+}
+
+fuchsia_package("cpp") {
+  testonly = true
+  package_name = "fidl-compatibility-test-cpp"
+  deps = [ ":impl" ]
 }

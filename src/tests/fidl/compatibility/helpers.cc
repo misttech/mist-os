@@ -29,7 +29,7 @@ AllowImplPair Exclude(std::initializer_list<const char*> substrings) {
 
 std::string ExtractShortName(const std::string& pkg_url) {
   std::string short_name;
-  re2::RE2::PartialMatch(pkg_url, "(fidl-compatibility-test#meta/)(.*)(-impl\\.cm)", nullptr,
+  re2::RE2::PartialMatch(pkg_url, "(fidl-compatibility-test-)(.*)(#meta/impl\\.cm)", nullptr,
                          &short_name);
   return short_name;
 }
@@ -91,8 +91,7 @@ bool GetImplsUnderTest(int argc, char** argv, Impls* out_impls) {
     if (impl.rfind("fuchsia-pkg://", 0) == 0) {
       package_url = impl;
     } else {
-      package_url = "fuchsia-pkg://fuchsia.com/fidl-compatibility-test#meta/" +
-                    std::string(argv[i]) + "-impl.cm";
+      package_url = "fidl-compatibility-test-" + std::string(argv[i]) + "#meta/impl.cm";
     }
     out_impls->push_back(package_url);
   }

@@ -24,7 +24,14 @@ rustc_binary("bin") {
   sources = [ "main.rs" ]
 }
 
-fuchsia_component("rust-impl") {
-  manifest = "meta/rust-impl.cml"
+fuchsia_component("impl") {
+  testonly = true
+  manifest = "meta/impl.cml"
   deps = [ ":bin" ]
+}
+
+fuchsia_package("rust") {
+  testonly = true
+  package_name = "fidl-compatibility-test-rust"
+  deps = [ ":impl" ]
 }
