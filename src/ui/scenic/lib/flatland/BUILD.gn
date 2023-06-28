@@ -58,6 +58,7 @@ source_set("flatland") {
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/ui/scenic/cpp:cpp",
+    "//src/lib/fsl",
     "//src/ui/scenic/lib/gfx:object_linker",
     "//src/ui/scenic/lib/gfx:validate_eventpair",
     "//src/ui/scenic/lib/scenic/util",

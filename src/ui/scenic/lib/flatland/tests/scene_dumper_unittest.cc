@@ -4,7 +4,10 @@
 
 #include "src/ui/scenic/lib/flatland/scene_dumper.h"
 
+#include <lib/ui/scenic/cpp/view_ref_pair.h>
+
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -12,7 +15,9 @@
 #include <gtest/gtest.h>
 
 #include "gtest/gtest-matchers.h"
+#include "lib/zx/eventpair.h"
 #include "sdk/lib/syslog/cpp/macros.h"
+#include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/lib/escher/geometry/types.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/allocation/id.h"
@@ -149,12 +154,14 @@ void ExpectTopologyNodeHasSameDepthLevel(flatland::TransformHandle node_a,
 }
 
 // Expect the specified node to be dumped with the specified name printed above.
-void ExpectNodeName(flatland::TransformHandle node, size_t node_line_number,
-                    const std::string& name, const std::vector<std::string>& line_dump) {
+void ExpectNodeNameAndKoid(flatland::TransformHandle node, size_t node_line_number,
+                           const std::string& name, zx_koid_t koid,
+                           const std::vector<std::string>& line_dump) {
   ASSERT_LT(node_line_number, line_dump.size());
   const auto node_index = ExpectNodeLineNumberAndGetIndex(node, node_line_number, line_dump);
   const auto name_index = ExpectNameLineNumberAndGetIndex(
-      std::string("(") + name + std::string(")"), node_line_number, line_dump);
+      std::string("(") + name + std::string(" koid:") + std::to_string(koid) + std::string(")"),
+      node_line_number, line_dump);
   EXPECT_GT(name_index, node_index);  // Name appears to right of node.
 }
 
@@ -372,11 +379,17 @@ TEST(SceneDumperTest, TopologyTreeWithNames) {
   };
 
   const std::string names[] = {"", "2_1_ABC", "3_0_DEF", "", "5_0_GHI"};
+  std::vector<zx_koid_t> koids;
 
   for (int i = 0; i < 5; i++) {
     auto uber_struct = std::make_unique<UberStruct>();
     uber_struct->local_topology = vectors[i];
     uber_struct->debug_name = names[i];
+    auto view_ref_pair = scenic::ViewRefPair::New();
+    uber_struct->view_ref =
+        std::make_shared<const fuchsia::ui::views::ViewRef>(std::move(view_ref_pair.view_ref));
+    koids.push_back(fsl::GetKoid(uber_struct->view_ref->reference.get()));
+    EXPECT_NE(0u, koids.back());
     uber_structs[vectors[i][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
 
@@ -408,9 +421,9 @@ TEST(SceneDumperTest, TopologyTreeWithNames) {
   ExpectTopologyNodeHasLessDepthLevel({1, 0}, 0, {5, 0}, 5, lines);
   ExpectTopologyNodeHasSameDepthLevel({2, 1}, 1, {5, 0}, 5, lines);
 
-  ExpectNodeName({2, 1}, 1, names[1], lines);
-  ExpectNodeName({3, 0}, 3, names[2], lines);
-  ExpectNodeName({5, 0}, 5, names[4], lines);
+  ExpectNodeNameAndKoid({2, 1}, 1, names[1], koids[1], lines);
+  ExpectNodeNameAndKoid({3, 0}, 3, names[2], koids[2], lines);
+  ExpectNodeNameAndKoid({5, 0}, 5, names[4], koids[4], lines);
 
   ExpectInstanceDumpCount(lines, 5);
   ExpectInstanceDump(1, names[0], lines);

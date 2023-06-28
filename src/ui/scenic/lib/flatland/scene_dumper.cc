@@ -8,6 +8,7 @@
 
 #include <sdk/lib/syslog/cpp/macros.h>
 
+#include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/flatland/global_image_data.h"
 #include "src/ui/scenic/lib/flatland/global_matrix_data.h"
@@ -52,7 +53,9 @@ void DumpTopology(const flatland::UberStruct::InstanceMap& snapshot,
     if (uber_struct_it != snapshot.end() && !parent_instance_ids.empty() &&
         transform.GetInstanceId() != parent_instance_ids.top() &&
         !uber_struct_it->second->debug_name.empty()) {
-      output << " <-- (" << uber_struct_it->second->debug_name << ")";
+      const auto& view_ref = uber_struct_it->second->view_ref;
+      output << " <-- (" << uber_struct_it->second->debug_name
+             << " koid:" << (view_ref ? fsl::GetKoid(view_ref->reference.get()) : 0) << ")";
     }
 
     // Newline.
