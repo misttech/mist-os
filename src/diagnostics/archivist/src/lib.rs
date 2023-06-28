@@ -21,7 +21,6 @@ mod inspect;
 pub mod logs;
 mod moniker_rewriter;
 mod pipeline;
-mod trie;
 mod utils;
 
 #[cfg(test)]

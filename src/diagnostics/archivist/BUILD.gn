@@ -132,7 +132,6 @@ rustc_library("lib") {
     "src/moniker_rewriter.rs",
     "src/pipeline.rs",
     "src/testing.rs",
-    "src/trie.rs",
     "src/utils.rs",
   ]
 }

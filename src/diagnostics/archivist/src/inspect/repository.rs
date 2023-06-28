@@ -12,13 +12,11 @@ use crate::{
         InspectArtifactsContainer, InspectHandle, UnpopulatedInspectDataContainer,
     },
     pipeline::Pipeline,
-    trie,
 };
 use async_lock::RwLock;
 use async_trait::async_trait;
 use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::{self, Selector};
-use flyweights::FlyStr;
 use fuchsia_async as fasync;
 use fuchsia_zircon::Koid;
 use futures::channel::{mpsc, oneshot};
@@ -46,7 +44,7 @@ impl InspectRepository {
         Self {
             pipelines,
             inner: RwLock::new(InspectRepositoryInner {
-                diagnostics_containers: trie::Trie::new(),
+                diagnostics_containers: HashMap::new(),
                 diagnostics_dir_closed_snd: snd,
                 _diagnostics_dir_closed_drain: fasync::Task::spawn(async move {
                     rcv.for_each_concurrent(None, |rx| rx).await
@@ -92,15 +90,15 @@ impl InspectRepository {
                         // Hold the lock while we remove and update pipelines.
                         let mut guard = this.inner.write().await;
 
-                        if let Some((_, container)) =
-                            guard.diagnostics_containers.get_mut(&identity_clone.unique_key())
+                        if let Some(container) =
+                            guard.diagnostics_containers.get_mut(&identity_clone)
                         {
                             if container.remove_handle(koid_to_remove) != 0 {
                                 return;
                             }
                         }
 
-                        guard.diagnostics_containers.remove(&identity_clone.unique_key());
+                        guard.diagnostics_containers.remove(&identity_clone);
 
                         for pipeline_weak in &this.pipelines {
                             if let Some(pipeline) = pipeline_weak.upgrade() {
@@ -142,16 +140,13 @@ impl InspectRepository {
 
 #[cfg(test)]
 impl InspectRepository {
-    pub(crate) async fn terminate_inspect(&self, identity: &ComponentIdentity) {
-        self.inner.write().await.diagnostics_containers.remove(&identity.unique_key());
+    pub(crate) async fn terminate_inspect(&self, identity: Arc<ComponentIdentity>) {
+        self.inner.write().await.diagnostics_containers.remove(&identity);
     }
 
     async fn has_match(&self, identity: &Arc<ComponentIdentity>) -> bool {
         let lock = self.inner.read().await;
-        lock.get_diagnostics_containers().iter().any(|(_key, val)| match val {
-            Some((actual_id, _)) => actual_id == identity,
-            _ => false,
-        })
+        lock.get_diagnostics_containers().get(identity).is_some()
     }
 
     /// Wait for data to appear for `identity`. Will run indefinitely if no data shows up.
@@ -194,13 +189,7 @@ impl InspectRepository {
         Fut: futures::Future<Output = ()>,
     {
         self.wait_for_artifact(identity).await;
-        if let Some((_, Some((_, container)))) =
-            self.inner.read().await.get_diagnostics_containers().iter().find(
-                |(_key, val)| match val {
-                    Some((actual_id, _)) => actual_id == identity,
-                    _ => false,
-                },
-            )
+        if let Some(container) = self.inner.read().await.get_diagnostics_containers().get(identity)
         {
             assertions(container).await;
             true
@@ -225,10 +214,7 @@ impl EventConsumer for InspectRepository {
 
 struct InspectRepositoryInner {
     /// All the diagnostics directories that we are tracking.
-    // Once we don't have v1 components the key would represent the moniker. For now, for
-    // simplciity, we maintain the ComponentIdentity inside as that one contains the instance id
-    // which would make the identity unique in v1.
-    diagnostics_containers: trie::Trie<FlyStr, (Arc<ComponentIdentity>, InspectArtifactsContainer)>,
+    diagnostics_containers: HashMap<Arc<ComponentIdentity>, InspectArtifactsContainer>,
 
     /// Tasks waiting for PEER_CLOSED signals on diagnostics directories are sent here.
     diagnostics_dir_closed_snd: mpsc::UnboundedSender<fasync::Task<()>>,
@@ -244,9 +230,7 @@ impl InspectRepositoryInner {
         identity: Arc<ComponentIdentity>,
         proxy_handle: impl Into<InspectHandle>,
     ) -> Option<oneshot::Receiver<Koid>> {
-        let unique_key: Vec<_> = identity.unique_key().into();
-        let diag_repo_entry_opt = self.diagnostics_containers.get_mut(&unique_key);
-
+        let mut diag_repo_entry_opt = self.diagnostics_containers.get_mut(&identity);
         match diag_repo_entry_opt {
             None => {
                 // An entry with no values implies that the somehow we observed the
@@ -255,10 +239,10 @@ impl InspectRepositoryInner {
                 // time encountering this moniker segment.
                 let (inspect_container, on_closed_fut) =
                     InspectArtifactsContainer::new(proxy_handle);
-                self.diagnostics_containers.set(unique_key, (identity, inspect_container));
+                self.diagnostics_containers.insert(identity, inspect_container);
                 Some(on_closed_fut)
             }
-            Some((_, ref mut artifacts_container)) => artifacts_container.push_handle(proxy_handle),
+            Some(ref mut artifacts_container) => artifacts_container.push_handle(proxy_handle),
         }
     }
 
@@ -268,12 +252,7 @@ impl InspectRepositoryInner {
         moniker_to_static_matcher_map: Option<HashMap<Moniker, Arc<HierarchyMatcher>>>,
     ) -> Vec<UnpopulatedInspectDataContainer> {
         let mut containers = vec![];
-        for (_, diagnostics_artifacts_container_opt) in self.diagnostics_containers.iter() {
-            let (identity, container) = match &diagnostics_artifacts_container_opt {
-                Some((identity, container)) => (identity, container),
-                None => continue,
-            };
-
+        for (identity, container) in self.diagnostics_containers.iter() {
             let optional_hierarchy_matcher = match &moniker_to_static_matcher_map {
                 Some(map) => {
                     match map.get(&identity.relative_moniker) {
@@ -317,14 +296,14 @@ impl InspectRepositoryInner {
 impl InspectRepositoryInner {
     pub(crate) async fn get(
         &self,
-        identity: &ComponentIdentity,
-    ) -> Option<&(Arc<ComponentIdentity>, InspectArtifactsContainer)> {
-        self.diagnostics_containers.get(&identity.unique_key())
+        identity: &Arc<ComponentIdentity>,
+    ) -> Option<&InspectArtifactsContainer> {
+        self.diagnostics_containers.get(identity)
     }
 
     pub(crate) fn get_diagnostics_containers(
         &self,
-    ) -> &trie::Trie<FlyStr, (Arc<ComponentIdentity>, InspectArtifactsContainer)> {
+    ) -> &HashMap<Arc<ComponentIdentity>, InspectArtifactsContainer> {
         &self.diagnostics_containers
     }
 }
@@ -373,31 +352,6 @@ mod tests {
             .await;
 
         assert!(inspect_repo.inner.read().await.get(&identity).await.is_some());
-    }
-
-    #[fuchsia::test]
-    async fn data_repo_updates_existing_entry_to_hold_inspect_data() {
-        let data_repo = Arc::new(InspectRepository::default());
-        let component_id = ComponentIdentifier::parse_from_moniker("./a/b/foo").unwrap();
-        let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
-        let (proxy, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("create directory proxy");
-
-        Arc::clone(&data_repo)
-            .handle(Event {
-                timestamp: zx::Time::get_monotonic(),
-                payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                    component: Arc::clone(&identity),
-                    directory: proxy,
-                }),
-            })
-            .await;
-
-        {
-            let guard = data_repo.inner.read().await;
-            let (identity, _) = guard.get(&identity).await.unwrap();
-            assert_eq!(identity.url, TEST_URL);
-        }
     }
 
     #[fuchsia::test]

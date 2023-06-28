@@ -14,13 +14,11 @@ use crate::{
         debuglog::{DebugLog, DebugLogBridge, KERNEL_IDENTITY},
         multiplex::{Multiplexer, MultiplexerHandle},
     },
-    trie,
 };
 use async_lock::{Mutex, RwLock};
 use async_trait::async_trait;
 use diagnostics_data::LogsData;
 use fidl_fuchsia_diagnostics::{self, LogInterestSelector, Selector, StreamMode};
-use flyweights::FlyStr;
 use fuchsia_async as fasync;
 use fuchsia_inspect as inspect;
 use fuchsia_trace as ftrace;
@@ -124,10 +122,9 @@ impl LogsRepository {
         }
         repo.logs_data_store
             .iter()
-            .filter_map(|(_, c)| c)
-            .map(|c| {
+            .map(|(identity, c)| {
                 let cursor = c.cursor(mode, parent_trace_id);
-                (Arc::clone(&c.identity), cursor)
+                (Arc::clone(identity), cursor)
             })
             .for_each(|(n, c)| {
                 mpx_handle.send(n, c);
@@ -153,7 +150,7 @@ impl LogsRepository {
         // Process messages from log sink.
         debug!("Log ingestion stopped.");
         let mut repo = self.mutable_state.write().await;
-        for container in repo.logs_data_store.iter().filter_map(|(_, v)| v) {
+        for container in repo.logs_data_store.values() {
             container.terminate();
         }
         repo.logs_multiplexers.terminate().await;
@@ -231,7 +228,7 @@ impl EventConsumer for LogsRepository {
 }
 
 pub struct LogsRepositoryState {
-    logs_data_store: trie::Trie<FlyStr, Arc<LogsArtifactsContainer>>,
+    logs_data_store: HashMap<Arc<ComponentIdentity>, Arc<LogsArtifactsContainer>>,
     inspect_node: inspect::Node,
 
     /// Receives the logger tasks. This will be taken once in wait for termination hence why it's
@@ -259,7 +256,7 @@ impl LogsRepositoryState {
     ) -> Self {
         Self {
             inspect_node: parent.create_child("log_sources"),
-            logs_data_store: trie::Trie::new(),
+            logs_data_store: HashMap::new(),
             logs_budget,
             log_receiver: Some(log_receiver),
             logs_multiplexers: MultiplexerBroker::new(),
@@ -274,13 +271,11 @@ impl LogsRepositoryState {
         &mut self,
         identity: Arc<ComponentIdentity>,
     ) -> Arc<LogsArtifactsContainer> {
-        let trie_key: Vec<_> = identity.unique_key().into();
-
-        match self.logs_data_store.get(&trie_key) {
+        match self.logs_data_store.get(&identity) {
             None => {
                 let container = Arc::new(
                     LogsArtifactsContainer::new(
-                        identity,
+                        Arc::clone(&identity),
                         self.interest_registrations.values().flat_map(|s| s.iter()),
                         &self.inspect_node,
                         self.logs_budget.handle(),
@@ -288,7 +283,7 @@ impl LogsRepositoryState {
                     .await,
                 );
                 self.logs_budget.add_container(Arc::clone(&container)).await;
-                self.logs_data_store.set(trie_key, Arc::clone(&container));
+                self.logs_data_store.insert(identity, Arc::clone(&container));
                 self.logs_multiplexers.send(&container).await;
                 container
             }
@@ -296,8 +291,8 @@ impl LogsRepositoryState {
         }
     }
 
-    async fn is_live(&self, identity: &ComponentIdentity) -> bool {
-        match self.logs_data_store.get(&identity.unique_key()) {
+    async fn is_live(&self, identity: &Arc<ComponentIdentity>) -> bool {
+        match self.logs_data_store.get(identity) {
             Some(container) => container.should_retain().await,
             None => false,
         }
@@ -312,26 +307,22 @@ impl LogsRepositoryState {
             self.interest_registrations.insert(connection_id, selectors).unwrap_or_default();
         // unwrap safe, we just inserted.
         let new_selectors = self.interest_registrations.get(&connection_id).unwrap();
-        for (_, data) in self.logs_data_store.iter() {
-            if let Some(logs_data) = data {
-                logs_data.update_interest(new_selectors.iter(), &previous_selectors).await;
-            }
+        for logs_data in self.logs_data_store.values() {
+            logs_data.update_interest(new_selectors.iter(), &previous_selectors).await;
         }
     }
 
     pub async fn finish_interest_connection(&mut self, connection_id: usize) {
         let selectors = self.interest_registrations.remove(&connection_id);
         if let Some(selectors) = selectors {
-            for (_, data) in self.logs_data_store.iter() {
-                if let Some(logs_data) = data {
-                    logs_data.reset_interest(&selectors).await;
-                }
+            for logs_data in self.logs_data_store.values() {
+                logs_data.reset_interest(&selectors).await;
             }
         }
     }
 
-    pub fn remove(&mut self, identity: &ComponentIdentity) {
-        self.logs_data_store.remove(&identity.unique_key());
+    pub fn remove(&mut self, identity: &Arc<ComponentIdentity>) {
+        self.logs_data_store.remove(identity);
     }
 }
 

@@ -1021,7 +1021,7 @@ mod tests {
 
         let test_batch_iterator_stats2 = Arc::new(test_accessor_stats.new_inspect_batch_iterator());
 
-        inspect_repo.terminate_inspect(identity.as_ref()).await;
+        inspect_repo.terminate_inspect(identity).await;
         {
             let result_json = read_snapshot(
                 Arc::clone(&inspect_repo),

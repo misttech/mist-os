@@ -51,40 +51,6 @@ impl From<Vec<String>> for Moniker {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct UniqueKey(Vec<FlyStr>);
-
-impl Deref for UniqueKey {
-    type Target = Vec<FlyStr>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl From<Vec<String>> for UniqueKey {
-    fn from(other: Vec<String>) -> UniqueKey {
-        UniqueKey(other.into_iter().map(FlyStr::from).collect())
-    }
-}
-
-impl From<Vec<&str>> for UniqueKey {
-    fn from(other: Vec<&str>) -> UniqueKey {
-        UniqueKey(other.into_iter().map(|s| s.into()).collect())
-    }
-}
-
-impl From<Vec<FlyStr>> for UniqueKey {
-    fn from(other: Vec<FlyStr>) -> UniqueKey {
-        UniqueKey(other)
-    }
-}
-
-impl From<UniqueKey> for Vec<FlyStr> {
-    fn from(other: UniqueKey) -> Vec<FlyStr> {
-        other.0
-    }
-}
-
 /// Event types that contain singleton data. When these events are cloned, their singleton data
 /// won't be cloned.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -201,18 +167,6 @@ impl ComponentIdentifier {
                 } else {
                     Moniker(segments.iter().map(|s| s.to_string().into()).collect())
                 }
-            }
-        }
-    }
-
-    pub fn unique_key(&self) -> UniqueKey {
-        match self {
-            Self::Moniker(segments) => {
-                let mut key = vec![];
-                for segment in segments {
-                    key.push(segment.to_string().into());
-                }
-                UniqueKey(key)
             }
         }
     }
@@ -345,29 +299,5 @@ impl TryFrom<fcomponent::Event> for Event {
         } else {
             Err(EventError::MissingField("Payload or header is missing"))
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[fuchsia::test]
-    fn convert_moniker_for_diagnostics() {
-        let identifier = ComponentIdentifier::parse_from_moniker("./a").unwrap();
-        assert_eq!(identifier.relative_moniker_for_selectors(), vec!["a"].into());
-        assert_eq!(identifier.unique_key(), vec!["a"].into());
-
-        let identifier = ComponentIdentifier::parse_from_moniker("./a/b").unwrap();
-        assert_eq!(identifier.relative_moniker_for_selectors(), vec!["a", "b"].into());
-        assert_eq!(identifier.unique_key(), vec!["a", "b"].into());
-
-        let identifier = ComponentIdentifier::parse_from_moniker("./a/coll:comp/b").unwrap();
-        assert_eq!(identifier.relative_moniker_for_selectors(), vec!["a", "coll:comp", "b"].into());
-        assert_eq!(identifier.unique_key(), vec!["a", "coll:comp", "b"].into());
-
-        let identifier = ComponentIdentifier::parse_from_moniker(".").unwrap();
-        assert_eq!(identifier.relative_moniker_for_selectors(), vec!["<root>"].into());
-        assert_eq!(identifier.unique_key(), vec!["<root>"].into());
     }
 }

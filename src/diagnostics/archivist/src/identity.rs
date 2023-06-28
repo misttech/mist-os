@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::events::types::{ComponentIdentifier, Moniker, UniqueKey};
+use crate::events::types::{ComponentIdentifier, Moniker};
 use diagnostics_message::MonikerWithUrl;
 use flyweights::FlyStr;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub struct ComponentIdentity {
     /// Relative moniker of the component that this artifacts container
     /// is representing.
@@ -39,18 +39,6 @@ impl ComponentIdentity {
             ComponentIdentifier::parse_from_moniker("./UNKNOWN").unwrap(),
             "fuchsia-pkg://UNKNOWN",
         )
-    }
-
-    /// In V1, a component topology is able to produce two components with
-    /// the same relative moniker. Because of this, we must, in some cases,
-    /// differentiate these components using instance ids. The unique key
-    /// is conceptually a relative moniker which preserves instance ids.
-    pub fn unique_key(&self) -> UniqueKey {
-        let mut key = self.relative_moniker.iter().cloned().collect::<Vec<_>>();
-        if let Some(instance_id) = &self.instance_id {
-            key.push(instance_id.into())
-        }
-        key.into()
     }
 }
 
