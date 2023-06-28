@@ -158,7 +158,9 @@ class CxxRemoteAction(object):
             )
 
         if self._main_args.fsatrace_path:
-            msg('Warning: Due to http://fxbug.dev/128947, remote fsatrace does not work with C++ mode as-is, because the fsatrace prefix confuses the re-client C++ input processor.  Automatically disabling --fsatrace-path.')
+            msg(
+                'Warning: Due to http://fxbug.dev/128947, remote fsatrace does not work with C++ mode as-is, because the fsatrace prefix confuses the re-client C++ input processor.  Automatically disabling --fsatrace-path.'
+            )
             self._main_args.fsatrace_path = None
 
         # check for required remote tools
@@ -398,7 +400,7 @@ class CxxRemoteAction(object):
     def _run_locally(self) -> int:
         if self.check_determinism:
             self.vmsg(
-                "Running the original compile command locally twice and comparing outputs."
+                "Running the original compile command (with -Wdate-time) locally twice and comparing outputs."
             )
             command = fuchsia.check_determinism_command(
                 exec_root=self.exec_root_rel,
@@ -406,6 +408,10 @@ class CxxRemoteAction(object):
                 command=self.original_compile_command,
                 label=self.label,
             )
+            # Both clang and gcc support -Wdate-time to catch nonreproducible
+            # builds.  This can induce a failure earlier, without having
+            # to build twice and compare.
+            command += ['-Wdate-time']
         else:
             self.vmsg("Running the original compile command locally.")
             command = self.original_compile_command
