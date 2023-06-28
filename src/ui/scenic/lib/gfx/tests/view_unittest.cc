@@ -78,13 +78,15 @@ class ViewTest : public SessionTest {
   std::shared_ptr<ViewLinker> view_linker_;
 };
 
-// TODO(fxbug.dev/24571): Only seems to die in debug builds.
-TEST_F(ViewTest, DISABLED_CreateViewWithBadTokenDies) {
+// This test exercises a DCHECK and thus only fails in a DEBUG build.
+#ifdef DEBUG
+TEST_F(ViewTest, CreateViewWithBadTokenDies) {
   EXPECT_DEATH_IF_SUPPORTED(Apply(scenic::NewCreateViewCmd(1, fuchsia::ui::views::ViewToken(), "")),
                             "");
   EXPECT_DEATH_IF_SUPPORTED(
       Apply(scenic::NewCreateViewHolderCmd(2, fuchsia::ui::views::ViewHolderToken(), "")), "");
 }
+#endif
 
 TEST_F(ViewTest, NullableDebugName) {
   auto [view_token, view_holder_token] = scenic::ViewTokenPair::New();
