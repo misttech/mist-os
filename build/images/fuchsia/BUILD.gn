@@ -196,30 +196,32 @@ if (is_fuchsia) {
     bootfs_labels = [ "//build/input:bootfs" ]
     bootfs_package_labels = product_bootfs_packages
 
-    # blobfs arguments
-    assembly_blob_layout_format = blob_layout_format
-    if (blobfs_product_minimum_inodes != false) {
-      blobfs_minimum_inodes = blobfs_product_minimum_inodes
-    } else if (blobfs_board_minimum_inodes != false) {
-      blobfs_minimum_inodes = blobfs_board_minimum_inodes
-    }
-    if (blobfs_product_minimum_data_bytes != false) {
-      blobfs_minimum_data_bytes = blobfs_product_minimum_data_bytes
-    } else if (blobfs_board_minimum_data_bytes != false) {
-      blobfs_minimum_data_bytes = blobfs_board_minimum_data_bytes
-    }
-    if (blobfs_product_maximum_bytes != false) {
-      blobfs_maximum_bytes = blobfs_product_maximum_bytes
-    } else if (blobfs_board_maximum_bytes != false) {
-      blobfs_maximum_bytes = blobfs_board_maximum_bytes
-    }
-    if (max_blob_contents_size != false) {
-      blobfs_maximum_contents_size = max_blob_contents_size
-    }
+    if (generate_fvm) {
+      # blobfs arguments
+      assembly_blob_layout_format = blob_layout_format
+      if (blobfs_product_minimum_inodes != false) {
+        blobfs_minimum_inodes = blobfs_product_minimum_inodes
+      } else if (blobfs_board_minimum_inodes != false) {
+        blobfs_minimum_inodes = blobfs_board_minimum_inodes
+      }
+      if (blobfs_product_minimum_data_bytes != false) {
+        blobfs_minimum_data_bytes = blobfs_product_minimum_data_bytes
+      } else if (blobfs_board_minimum_data_bytes != false) {
+        blobfs_minimum_data_bytes = blobfs_board_minimum_data_bytes
+      }
+      if (blobfs_product_maximum_bytes != false) {
+        blobfs_maximum_bytes = blobfs_product_maximum_bytes
+      } else if (blobfs_board_maximum_bytes != false) {
+        blobfs_maximum_bytes = blobfs_board_maximum_bytes
+      }
+      if (max_blob_contents_size != false) {
+        blobfs_maximum_contents_size = max_blob_contents_size
+      }
 
-    # fvm arguments
-    assembly_include_account_in_fvm = include_account_in_fvm
-    assembly_fvm_slice_size = fvm_slice_size
+      # fvm arguments
+      assembly_include_account_in_fvm = include_account_in_fvm
+      assembly_fvm_slice_size = fvm_slice_size
+    }
 
     # zbi arguments
     if (custom_signing_script != "") {
