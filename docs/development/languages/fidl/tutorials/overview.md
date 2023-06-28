@@ -28,7 +28,6 @@ at the [C++ bindings comparison][c-family].
   * [New C++ bindings][cpp]
   * [High Level C++ (HLCPP)][hlcpp]
   * [Rust][rust]
-  * [Dart][dart]
 
 <!-- xrefs -->
 [getting-started]: /docs/get-started/README.md
@@ -37,7 +36,6 @@ at the [C++ bindings comparison][c-family].
 [cpp]: cpp/README.md
 [hlcpp]: hlcpp/README.md
 [rust]: rust/README.md
-[dart]: dart/README.md
 [c]: /docs/development/languages/fidl/tutorials/tutorial-c.md
 [c-family]: /docs/development/languages/fidl/guides/c-family-comparison.md
 [examples]: /examples/fidl

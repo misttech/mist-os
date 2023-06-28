@@ -14,9 +14,6 @@ group("fidl") {
 
   if (current_cpu != "riscv64") {
     deps += [
-      # TODO(fxbug.dev/129033): Move above once Dart toolchain support RISC-V.
-      "dart:all",
-
       # The Go toolchain does not support RISC-V.
       "go:all",
     ]
@@ -35,9 +32,6 @@ group("tests") {
 
   if (current_cpu != "riscv64") {
     deps += [
-      # TODO(fxbug.dev/129033): Move above once Dart toolchain support RISC-V.
-      "dart:tests",
-
       # The Go toolchain does not support RISC-V.
       "go:tests",
     ]

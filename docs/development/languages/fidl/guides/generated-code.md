@@ -74,17 +74,6 @@ to this as the root directory. It is structured as follows:
                    ├── fidl.cc
                    └── fidl_test_base.h
 
-The exception is [Dart code](#dart), which is generated in the `dartlang`
-toolchain. For `fuchsia.io`, the root of the Dart output is
-`out/default/dartlang/gen/sdk/fidl/fuchsia.io`. The rest of this document refers
-to this as the Dart root directory. It is structured as follows:
-
-    out/default/dartlang/gen/sdk/fidl/fuchsia.io
-    └── fuchsia.io_package
-       └── lib
-          ├── fidl_async.dart
-          └── fidl_test.dart
-
 Many generated code paths seem to contain duplicate directory names, such as
 `.../fuchsia.io/fuchsia.io/...`. This occurs because FIDL libraries are usually
 defined in a directory named after the library, with a target named after the
@@ -164,24 +153,6 @@ following files:
     out/default/fidling/gen/sdk/fidl/fuchsia.io/fuchsia.io/hlcpp/fuchsia/io/cpp/fidl.h
     out/default/fidling/gen/sdk/fidl/fuchsia.io/fuchsia.io/hlcpp/fuchsia/io/cpp/fidl_test_base.h
 
-#### Dart {#dart}
-
-The Dart bindings are generating in the Dart root directory as
-`${target_name}/${library_name}_package`. For example, with `fuchsia.io`:
-
-    out/default/dartlang/gen/sdk/fidl/fuchsia.io/fuchsia.io_package
-
-Within the package, `lib/fidl_async.dart` contains the bindings code.
-`lib/fidl_test.dart` contains utilities for [testing][dart-testing].
-
-## Using fidlbolt
-
-For ad hoc examples or existing FIDL files, another option is to use the
-`fidlbolt` tool. By pasting the desired FIDL content into fidlbolt, it is
-possible to view the output for each binding, as well as for the JSON IR.
-`fidlbolt` also supports viewing libraries defined in the SDK, e.g. `library
-fuchsia.io;`, as well as importing them, e.g. `using fuchsia.io;`.
-
 ## Viewing generated documentation
 
 ### Rust
@@ -195,4 +166,3 @@ You can generate offline documentation with [`fx rustdoc`][rustdoc].
 [bindings-ref]: /docs/reference/fidl/bindings/overview.md
 [fidl-gn]: /build/fidl/fidl.gni
 [rustdoc]: /docs/development/languages/rust/fidl_crates.md#documentation
-[dart-testing]: /docs/reference/fidl/bindings/dart-bindings.md#test-scaffolding

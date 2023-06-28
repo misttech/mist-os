@@ -67,15 +67,6 @@ toc:
       path: /docs/development/languages/fidl/tutorials/rust/topics/request-pipelining.md
     - title: "Services"
       path: /docs/development/languages/fidl/tutorials/rust/topics/services.md
-  - title: "Dart"
-    section:
-    - title: "Overview"
-      path: /docs/development/languages/fidl/tutorials/dart/README.md
-    - title: "Getting started"
-      section:
-      - include: /docs/development/languages/fidl/tutorials/dart/basics/_toc.yaml
-    - title: "Request pipelining"
-      path: /docs/development/languages/fidl/tutorials/dart/topics/request-pipelining.md
 - title: "Examples"
   section:
   - title: "Overview"
