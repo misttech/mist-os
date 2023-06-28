@@ -518,10 +518,10 @@ pub fn create_filesystem(
         params: data.to_vec(),
     };
     let fs = match fs_type {
-        b"binder" => BinderFs::new_fs(task, options)?,
+        b"binder" => BinderFs::new_fs(kernel, options)?,
         b"bpf" => BpfFs::new_fs(kernel, options)?,
         b"devpts" => dev_pts_fs(kernel, options).clone(),
-        b"devtmpfs" => dev_tmp_fs(task).clone(),
+        b"devtmpfs" => dev_tmp_fs(kernel).clone(),
         b"fuse" => new_fuse_fs(task, options)?,
         b"proc" => proc_fs(kernel.clone(), options),
         b"selinuxfs" => selinux_fs(kernel, options).clone(),

@@ -8,29 +8,48 @@ use crate::{
     task::*,
     types::*,
 };
+use std::sync::Arc;
 
-pub fn dev_tmp_fs(task: &CurrentTask) -> &FileSystemHandle {
-    task.kernel().dev_tmp_fs.get_or_init(|| init_devtmpfs(task))
+pub fn dev_tmp_fs(kernel: &Arc<Kernel>) -> &FileSystemHandle {
+    kernel.dev_tmp_fs.get_or_init(|| init_devtmpfs(kernel))
 }
 
-fn init_devtmpfs(current_task: &CurrentTask) -> FileSystemHandle {
-    let fs = TmpFs::new_fs(current_task.kernel());
+fn init_devtmpfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
+    let fs = TmpFs::new_fs(kernel);
     let root = fs.root();
 
     // TODO(fxb/119437): Subscribe uevent to create dev nodes.
     let mkchr = |name, device_type| {
-        root.create_node(current_task, name, mode!(IFCHR, 0o666), device_type, FsCred::root())
-            .unwrap();
+        root.create_node(
+            kernel.kthreads.system_task(),
+            name,
+            mode!(IFCHR, 0o666),
+            device_type,
+            FsCred::root(),
+        )
+        .unwrap();
     };
 
     let mkblk = |name, device_type| {
-        root.create_node(current_task, name, mode!(IFBLK, 0o666), device_type, FsCred::root())
-            .unwrap();
+        root.create_node(
+            kernel.kthreads.system_task(),
+            name,
+            mode!(IFBLK, 0o666),
+            device_type,
+            FsCred::root(),
+        )
+        .unwrap();
     };
 
     let mkdir = |name| {
-        root.create_node(current_task, name, mode!(IFDIR, 0o755), DeviceType::NONE, FsCred::root())
-            .unwrap();
+        root.create_node(
+            kernel.kthreads.system_task(),
+            name,
+            mode!(IFDIR, 0o755),
+            DeviceType::NONE,
+            FsCred::root(),
+        )
+        .unwrap();
     };
 
     mkchr(b"kmsg", DeviceType::KMSG);
@@ -41,7 +60,8 @@ fn init_devtmpfs(current_task: &CurrentTask) -> FileSystemHandle {
     mkchr(b"urandom", DeviceType::URANDOM);
     mkchr(b"fuse", DeviceType::FUSE);
     mkchr(b"loop-control", DeviceType::LOOP_CONTROL);
-    root.create_symlink(current_task, b"fd", b"/proc/self/fd", FsCred::root()).unwrap();
+    root.create_symlink(kernel.kthreads.system_task(), b"fd", b"/proc/self/fd", FsCred::root())
+        .unwrap();
 
     // TODO(fxbug.dev/128697): These devtmpfs entries should be populated automatically by
     // the loop-control device once devtmpfs is integrated with kobjects.
@@ -75,7 +95,8 @@ fn init_devtmpfs(current_task: &CurrentTask) -> FileSystemHandle {
     // tty related nodes
     mkdir(b"pts");
     mkchr(b"tty", DeviceType::TTY);
-    root.create_symlink(current_task, b"ptmx", b"pts/ptmx", FsCred::root()).unwrap();
+    root.create_symlink(kernel.kthreads.system_task(), b"ptmx", b"pts/ptmx", FsCred::root())
+        .unwrap();
 
     mkchr(b"fb0", DeviceType::FB0);
     fs

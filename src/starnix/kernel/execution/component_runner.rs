@@ -155,7 +155,7 @@ pub async fn start_component(
     let executable = current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
     current_task.exec(executable, binary_path, argv, environ)?;
 
-    run_component_features(&component_features, &current_task, &mut start_info.outgoing_dir)
+    run_component_features(&component_features, &container.kernel, &mut start_info.outgoing_dir)
         .unwrap_or_else(|e| {
             log_error!("failed to set component features for {} - {:?}", url, e);
         });

@@ -11,9 +11,10 @@ use crate::{
         SpecialNode,
     },
     logging::log_warn,
-    task::CurrentTask,
+    task::Kernel,
     types::*,
 };
+use std::sync::Arc;
 
 use fidl_fuchsia_ui_composition as fuicomposition;
 
@@ -21,16 +22,15 @@ use fidl_fuchsia_ui_composition as fuicomposition;
 /// should be enabled on a per-component basis. We run this when we first
 /// make the container. When we start the component, we run the run_component_features
 /// function.
-pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result<(), Errno> {
+pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), Errno> {
     for entry in entries {
         match entry.as_str() {
             "binder" => {
                 // Creates the various binder drivers (/dev/binder, /dev/hwbinder, /dev/vndbinder).
-                create_binders(current_task)?;
+                create_binders(kernel)?;
             }
             "selinux_enabled" => {}
             "framebuffer" => {
-                let kernel = current_task.kernel();
                 let mut device_registry = kernel.device_registry.write();
 
                 // Add framebuffer and input devices in the kobject tree.
@@ -73,7 +73,7 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
             }
             "magma" => {
                 let magma_type = DeviceType::new(STARNIX_MAJOR, STARNIX_MINOR_MAGMA);
-                let mut device_registry = current_task.kernel().device_registry.write();
+                let mut device_registry = kernel.device_registry.write();
                 let starnix_class = device_registry.virtual_bus().get_or_create_child(
                     b"starnix",
                     KType::Class,
@@ -88,8 +88,8 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
                 device_registry.register_chrdev_major(StarnixDevice, STARNIX_MAJOR)?;
 
                 // TODO(fxb/119437): Remove after devtmpfs listens to uevent.
-                dev_tmp_fs(current_task).root().add_node_ops_dev(
-                    current_task,
+                dev_tmp_fs(kernel).root().add_node_ops_dev(
+                    kernel.kthreads.system_task(),
                     b"magma0",
                     mode!(IFCHR, 0o600),
                     magma_type,
@@ -109,13 +109,12 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
 /// Runs features requested by individual components
 pub fn run_component_features(
     entries: &Vec<String>,
-    current_task: &CurrentTask,
+    kernel: &Arc<Kernel>,
     outgoing_dir: &mut Option<fidl::endpoints::ServerEnd<fidl_fuchsia_io::DirectoryMarker>>,
 ) -> Result<(), Errno> {
     for entry in entries {
         match entry.as_str() {
             "framebuffer" => {
-                let kernel = current_task.kernel();
                 let (touch_source_proxy, touch_source_stream) =
                     fidl::endpoints::create_proxy().expect("failed to create TouchSourceProxy");
                 let view_bound_protocols = fuicomposition::ViewBoundProtocols {

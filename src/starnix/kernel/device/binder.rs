@@ -3814,35 +3814,46 @@ impl FsNodeOps for BinderFsDir {
 
 const BINDERS: &[&FsStr] = &[b"binder", b"hwbinder", b"vndbinder"];
 
-fn make_binder_nodes(current_task: &CurrentTask, dir: &DirEntryHandle) -> Result<(), Errno> {
-    let kernel = current_task.kernel();
+fn make_binder_nodes(kernel: &Kernel, dir: &DirEntryHandle) -> Result<(), Errno> {
     let mut registered_binders = kernel.binders.write();
     for name in BINDERS {
         let driver = BinderDriver::new();
         let dev = kernel.device_registry.write().register_dyn_chrdev(driver.clone())?;
-        dir.add_node_ops_dev(current_task, name, mode!(IFCHR, 0o600), dev, SpecialNode)?;
+        dir.add_node_ops_dev(
+            kernel.kthreads.system_task(),
+            name,
+            mode!(IFCHR, 0o600),
+            dev,
+            SpecialNode,
+        )?;
         registered_binders.insert(dev, driver);
     }
     let remote_dev = kernel.device_registry.write().register_dyn_chrdev(RemoteBinderDevice {})?;
-    dir.add_node_ops_dev(current_task, b"remote", mode!(IFCHR, 0o444), remote_dev, SpecialNode)?;
+    dir.add_node_ops_dev(
+        kernel.kthreads.system_task(),
+        b"remote",
+        mode!(IFCHR, 0o444),
+        remote_dev,
+        SpecialNode,
+    )?;
     Ok(())
 }
 
 impl BinderFs {
     pub fn new_fs(
-        current_task: &CurrentTask,
+        kernel: &Arc<Kernel>,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(current_task.kernel(), CacheMode::Permanent, BinderFs, options);
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, BinderFs, options);
         fs.set_root(BinderFsDir);
-        make_binder_nodes(current_task, fs.root())?;
+        make_binder_nodes(kernel, fs.root())?;
         Ok(fs)
     }
 }
 
-pub fn create_binders(current_task: &CurrentTask) -> Result<(), Errno> {
-    let fs = dev_tmp_fs(current_task);
-    make_binder_nodes(current_task, fs.root())
+pub fn create_binders(kernel: &Arc<Kernel>) -> Result<(), Errno> {
+    let fs = dev_tmp_fs(kernel);
+    make_binder_nodes(kernel, fs.root())
 }
 
 #[cfg(test)]

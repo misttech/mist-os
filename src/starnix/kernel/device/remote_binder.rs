@@ -970,7 +970,7 @@ mod tests {
             let dev = init_task.lookup_path_from_root(b"/dev").expect("lookup_path_from_root");
             dev.mount(
                 WhatToMount::Fs(
-                    BinderFs::new_fs(&init_task, FileSystemOptions::default()).expect("new_fs"),
+                    BinderFs::new_fs(&kernel, FileSystemOptions::default()).expect("new_fs"),
                 ),
                 MountFlags::empty(),
             )

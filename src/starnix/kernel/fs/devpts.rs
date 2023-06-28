@@ -694,7 +694,7 @@ mod tests {
     async fn test_open_tty() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel, Default::default());
-        let devfs = crate::fs::devtmpfs::dev_tmp_fs(&task);
+        let devfs = crate::fs::devtmpfs::dev_tmp_fs(&kernel);
 
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
         set_controlling_terminal(&task, &ptmx, false).expect("set_controlling_terminal");

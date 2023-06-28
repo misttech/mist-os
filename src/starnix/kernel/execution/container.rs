@@ -287,7 +287,7 @@ async fn create_container(
     mount_apexes(system_task, config)?;
 
     // Run all common features that were specified in the .cml.
-    run_features(&config.features, system_task)
+    run_features(&config.features, &kernel)
         .map_err(|e| anyhow!("Failed to initialize features: {:?}", e))?;
 
     let startup_file_path = if config.startup_file_path.is_empty() {
