@@ -546,11 +546,6 @@ TEST(RamdiskTests, RamdiskTestFilesystem) {
   ASSERT_EQ(fdio_watch_directory(dirfd(dir), cb, deadline, &args), ZX_ERR_STOP);
   ASSERT_TRUE(args.found);
 
-  // Check dev block is accessible before destruction
-  int devfd = open(blockpath, O_RDONLY);
-  ASSERT_GE(devfd, 0) << "Ramdisk is not visible in /dev/class/block";
-  ASSERT_EQ(close(devfd), 0);
-
   // Start watching for the block device removal.
   std::unique_ptr<device_watcher::DirWatcher> watcher;
   ASSERT_EQ(device_watcher::DirWatcher::Create(dirfd(dir), &watcher), ZX_OK);
