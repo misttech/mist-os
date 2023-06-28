@@ -5,6 +5,7 @@
 #ifndef SRC_UI_SCENIC_TESTS_UTILS_LOGGING_EVENT_LOOP_H_
 #define SRC_UI_SCENIC_TESTS_UTILS_LOGGING_EVENT_LOOP_H_
 
+#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/source_location.h>
 #include <lib/zx/time.h>
@@ -19,7 +20,18 @@ class RealLoopWrapper;
 
 /// `LoggingEventLoop` provides a subset of the `RealLoop` API, and adds logging.
 /// Feel free to expose more of the `RealLoop` API as needed.
-class LoggingEventLoop {
+///
+/// Note: the Google C++ style guide requires `public` inheritance. But
+/// 1. Public inheritance would allow callers to skip logging (by casting to the base
+///    class), and/or if this class doesn't override all the overloads of the base
+///    class (the overloads are complicated by `default` parameters), and
+/// 2. Composition won't work here, because the methods that `LoggingEventLoop`
+///    needs to call are `protected` in the base class.
+///
+/// It _is_ possible to meet this needs while satisfying the style guide. A helper
+/// class could inherit from `RealLoop`, and `LoggingEventLoop` could instantiate that
+/// class and forward calls to it. But that adds more code without a meaningful benefit.
+class LoggingEventLoop : private loop_fixture::RealLoop {
  protected:
   LoggingEventLoop();
   ~LoggingEventLoop();
@@ -34,9 +46,6 @@ class LoggingEventLoop {
                                  cpp20::source_location caller = cpp20::source_location::current());
 
   void RunLoopUntilIdle(cpp20::source_location caller = cpp20::source_location::current());
-
- private:
-  std::unique_ptr<internal::RealLoopWrapper> loop_;
 };
 
 }  // namespace integration_tests
