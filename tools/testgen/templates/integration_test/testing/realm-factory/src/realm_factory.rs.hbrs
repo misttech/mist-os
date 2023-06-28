@@ -9,11 +9,11 @@ use {
     tracing::info,
 };
 
-pub(crate) struct RealmFactoryImpl {
+pub(crate) struct RealmFactory {
     realm_options: Option<ftest::RealmOptions>,
 }
 
-impl RealmFactoryImpl {
+impl RealmFactory {
     pub fn new() -> Self {
         Self { realm_options: Some(ftest::RealmOptions{ ..Default::default() }) }
     }

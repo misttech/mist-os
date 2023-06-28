@@ -94,7 +94,7 @@ impl IntegrationTestCmd {
             ("testing/realm-factory/BUILD.gn", include_str!("../templates/integration_test/testing/realm-factory/BUILD.gn.hbrs")),
             ("testing/realm-factory/meta/default.cml", include_str!("../templates/integration_test/testing/realm-factory/meta/default.cml.hbrs")),
             ("testing/realm-factory/src/main.rs", include_str!("../templates/integration_test/testing/realm-factory/src/main.rs.hbrs")),
-            ("testing/realm-factory/src/realm_factory_impl.rs", include_str!("../templates/integration_test/testing/realm-factory/src/realm_factory_impl.rs.hbrs")),
+            ("testing/realm-factory/src/realm_factory.rs", include_str!("../templates/integration_test/testing/realm-factory/src/realm_factory.rs.hbrs")),
         ];
 
         // Generate source code in a staging directory.

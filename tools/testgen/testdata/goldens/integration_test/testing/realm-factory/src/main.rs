@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod realm_factory_impl;
-use crate::realm_factory_impl::*;
+mod realm_factory;
+use crate::realm_factory::*;
 
 use {
     anyhow::{Error, Result},
@@ -25,7 +25,7 @@ async fn main() -> Result<(), Error> {
 
 async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
     let mut task_group = fasync::TaskGroup::new();
-    let mut factory = RealmFactoryImpl::new();
+    let mut factory = RealmFactory::new();
     let result: Result<(), Error> = async move {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {

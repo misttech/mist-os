@@ -11,7 +11,7 @@ rustc_binary("bin") {
   name = "main"
   sources = [
     "src/main.rs",
-    "src/realm_factory_impl.rs",
+    "src/realm_factory.rs",
   ]
   deps = [
     "../fidl:test.examplecomponent_rust",
