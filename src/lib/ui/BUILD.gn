@@ -8,7 +8,6 @@ group("ui") {
   testonly = true
   deps = [
     "carnelian",
-    "fidl_fuchsia_ui_clipboard_ext",
     "fidl_fuchsia_ui_focus_ext",
     "fidl_fuchsia_ui_views_ext",
     "input-synthesis",
@@ -23,7 +22,6 @@ group("tests") {
   testonly = true
   public_deps = [
     "carnelian:carnelian-tests",
-    "fidl_fuchsia_ui_clipboard_ext:tests",
     "fidl_fuchsia_ui_focus_ext:tests",
     "fidl_fuchsia_ui_views_ext:tests",
     "flatland-frame-scheduling:tests",

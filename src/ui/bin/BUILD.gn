@@ -6,7 +6,6 @@ group("bin") {
   testonly = true
   deps = [
     "brightness_manager",
-    "clipboard",
     "scene_manager",
     "text:text_manager",
     "virtual_keyboard_manager",
@@ -18,7 +17,6 @@ group("tests") {
 
   deps = [
     "brightness_manager:tests",
-    "clipboard:tests",
     "scene_manager:scene_manager_tests",
     "terminal:tests",
     "text:tests",
