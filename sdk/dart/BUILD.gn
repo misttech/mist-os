@@ -111,7 +111,6 @@ group("tests") {
     # TODO: This target should just aggregate the top-level directories and
     # most of these dependencies should be in those subdirectories.
     "//examples:tests",
-    "//sdk/dart/fuchsia_component_test:tests",
     "//sdk/dart/fuchsia_services:fuchsia-services-integration-tests",
     "//sdk/dart/fuchsia_services:fuchsia_services_package_unittests",
     "//sdk/dart/fuchsia_services/test_support:fuchsia-services-foo-test-server",

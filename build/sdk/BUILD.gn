@@ -79,7 +79,6 @@ _sdk_versioned_source_sets_list = [
   "//zircon/system/ulib/zx",
 
   # dart_library() targets:
-  "//sdk/dart/fuchsia_component_test",
   "//sdk/dart/fuchsia_logger",
   "//sdk/dart/fuchsia_services",
   "//sdk/dart/fuchsia_vfs",
