@@ -11,11 +11,20 @@
         //   --system-image-path
     },
     capabilities: [
-        { protocol: "fuchsia.boot.Arguments" },
+        {
+            protocol: [
+                "fuchsia.boot.Arguments",
+                "fuchsia.boot.Items",
+            ],
+        },
     ],
     expose: [
         {
             protocol: "fuchsia.boot.Arguments",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.boot.Items",
             from: "self",
         },
     ],

@@ -7,16 +7,24 @@ import("access_ota_blob_as_executable/access_ota_blob_as_executable.gni")
 import("bad_signature_update/bad_signature_update.gni")
 
 if (is_fuchsia) {
-  # Filesystem host for base (v0) system.
-  fuchsia_test_component("fshost_v0-component") {
-    component_name = "fshost_v0"
+  fshost_component_and_config("fshost-minfs") {
+    component_name = "fshost"
+    testonly = true
+    options = {
+      data_filesystem_format = "minfs"
+    }
+  }
 
-    # Note: Test package must include all files designated by cmdline args in
-    # component manifest. See cml and source for details. These files are not
-    # included as explicit deps here because they vary across different
-    # packagings/configurations of the test.
-    manifest = "meta/fshost_v0.cml"
-    deps = [ "//src/security/tests/pkg_test/fshost:fshost-binary" ]
+  fshost_component_and_config("fshost-fxfs_blob") {
+    component_name = "fshost"
+    testonly = true
+    options = {
+      data_filesystem_format = "fxfs"
+      fxfs_blob = true
+
+      # TODO(fxbug.dev/122055): Don't give vmex to Fxfs.
+      fxfs_vmex = true
+    }
   }
 
   # Fake boot arguments for base (v0) system.
@@ -69,19 +77,57 @@ if (is_fuchsia) {
     pkg_server_key =
         "//src/sys/pkg/lib/fuchsia-pkg-testing/certs/test.fuchsia.com.rsa"
   }
+
+  access_ota_blob_as_executable("core_access_ota_blob_as_executable_fxblob") {
+    base_packages = [
+      "//src/security/tests/pkg_test/config:pkg_resolver_repository_config",
+    ]
+
+    use_fxfs_blob = true
+
+    # Inject config file for test component.
+    update_domain = "test.fuchsia.com"
+
+    # Configure compatible root cert, certchain, pkg_server private key.
+    root_ssl_cert = "//src/sys/pkg/lib/fuchsia-pkg-testing/certs/ca.cert"
+    pkg_server_certchain =
+        "//src/sys/pkg/lib/fuchsia-pkg-testing/certs/test.fuchsia.com.certchain"
+    pkg_server_key =
+        "//src/sys/pkg/lib/fuchsia-pkg-testing/certs/test.fuchsia.com.rsa"
+  }
+
+  bad_signature_update("core_bad_signature_update_fxblob") {
+    base_packages = [
+      "//src/security/tests/pkg_test/config:pkg_resolver_repository_config",
+    ]
+
+    use_fxfs_blob = true
+
+    # Inject config file for test component.
+    update_domain = "test.fuchsia.com"
+
+    # Configure compatible root cert, certchain, pkg_server private key.
+    root_ssl_cert = "//src/sys/pkg/lib/fuchsia-pkg-testing/certs/ca.cert"
+    pkg_server_certchain =
+        "//src/sys/pkg/lib/fuchsia-pkg-testing/certs/test.fuchsia.com.certchain"
+    pkg_server_key =
+        "//src/sys/pkg/lib/fuchsia-pkg-testing/certs/test.fuchsia.com.rsa"
+  }
 }
 
 group("tests") {
   testonly = true
-  deps = []
-  if (!fxfs_blob) {
-    # TODO(fxbug.dev/125808): Support Fxblob in this test.
-    deps += [ ":core_bad_signature_update-package($target_toolchain)" ]
-    if (!is_coverage) {
-      # TODO(https://fxbug.dev/112796): Re-enable this test in coverage when it no
-      # longer fails with coverage enabled.
-      deps +=
-          [ ":core_access_ota_blob_as_executable-package($target_toolchain)" ]
-    }
+  deps = [
+    ":core_bad_signature_update-package($target_toolchain)",
+    ":core_bad_signature_update_fxblob-package($target_toolchain)",
+  ]
+  if (!is_coverage) {
+    # TODO(https://fxbug.dev/112796): Re-enable this test in coverage when it no
+    # longer fails with coverage enabled.
+    deps += [
+      ":core_access_ota_blob_as_executable-package($target_toolchain)",
+      # TODO(fxbug.dev/129587): Fix issue with fxfs update package creation.
+      # ":core_access_ota_blob_as_executable_fxblob-package($target_toolchain)",
+    ]
   }
 }

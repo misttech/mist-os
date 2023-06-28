@@ -38,6 +38,12 @@ import("//src/security/tests/pkg_test/assemblies/build_info.gni")
 #     documentation of the `--length` parameter of the `fvm` binary host tool
 #     for details.
 #
+#   use_fxfs_blob (optional; default: false)
+#     [bool] If set to true, prompts assembled_system to generate an fxfs image
+#     with fxblob and sets fshost's configuration to fxfs with fxfs_blob = true.
+#     If set to false, prompts assembled_system to generate an fvm and sets fshost's
+#     configuration to use minfs as the data format.
+#
 #   Test asset packaging parameters:
 #
 #   packaged_assembly_directory (required):
@@ -174,9 +180,20 @@ template("assemble_security_pkg_test_system") {
 
   # Resource files with both `local` and `packaged` paths.
   if (current_toolchain == target_toolchain) {
-    fvm_blk_resource = {
-      local = "${directories.assembly_out}/fvm.blk"
-      packaged = "data/assemblies/${packaged_assembly_directory}/fvm.blk"
+    # fxfs_blob is pulled in via assembled_system.gni which includes generated_fshost_config.gni.
+    # assembled_system will generate either a fxfs.blk or fvm.blk depending on the fxfs_blob flag.
+    if (defined(invoker.use_fxfs_blob) && invoker.use_fxfs_blob) {
+      fs_file_name = "fxfs"
+    } else {
+      fs_file_name = "fvm"
+    }
+
+    # Filesystem image can be fxfs or fvm, but the test should only need to know that it's
+    # a filesystem image. fshost will figure out which one it is when it's loaded into a VMO
+    # and added to the isolated dev tree via RamdiskClient.
+    fs_blk_resource = {
+      local = "${directories.assembly_out}/${fs_file_name}.blk"
+      packaged = "data/assemblies/${packaged_assembly_directory}/fs.blk"
     }
     base_far_resource = {
       local = "${directories.assembly_out}/base/meta.far"
@@ -228,9 +245,18 @@ template("assemble_security_pkg_test_system") {
 
   # Main system assembly.
   assembled_system(labels.assembly) {
-    forward_variables_from(invoker, [ "fvm_truncate_to_length" ])
-    generate_fvm = !fxfs_blob
-    generate_fxfs = fxfs_blob
+    forward_variables_from(invoker,
+                           [
+                             "fvm_truncate_to_length",
+                             "assembly_fxfs_image_size_bytes",
+                           ])
+    if (defined(invoker.use_fxfs_blob)) {
+      use_fxfs_blob = invoker.use_fxfs_blob
+    } else {
+      use_fxfs_blob = false
+    }
+    generate_fvm = !use_fxfs_blob
+    generate_fxfs = use_fxfs_blob
     testonly = true
     product_assembly_config_label = "//build/assembly:default_product_config"
     board_name = invoker.board_name
@@ -333,8 +359,8 @@ template("assemble_security_pkg_test_system") {
       deps = [ ":${labels.assembly}" ]
       files = [
         {
-          source = fvm_blk_resource.local
-          dest = fvm_blk_resource.packaged
+          source = fs_blk_resource.local
+          dest = fs_blk_resource.packaged
         },
         {
           source = base_far_resource.local

@@ -26,6 +26,12 @@ template("bad_signature_update") {
   pkg_server_certchain = invoker.pkg_server_certchain
   pkg_server_key = invoker.pkg_server_key
 
+  if (defined(invoker.use_fxfs_blob)) {
+    use_fxfs_blob = invoker.use_fxfs_blob
+  } else {
+    use_fxfs_blob = false
+  }
+
   test_name = target_name
 
   # System assembly for base system version at start of test.
@@ -40,7 +46,11 @@ template("bad_signature_update") {
 
     # Calculated on local build from 2022-02-08. See equivalent
     # access_ota_blob_as_executable rule for details.
-    fvm_truncate_to_length = 57818014
+    if (use_fxfs_blob) {
+      assembly_fxfs_image_size_bytes = 57818014
+    } else {
+      fvm_truncate_to_length = 57818014
+    }
   }
 
   # System assembly for system version to OTA from package server.
@@ -101,7 +111,7 @@ template("bad_signature_update") {
           get_target_outputs(":${test_name}_v1_publish_archive")
       input = publish_archive_outputs[0]
 
-      output = "${target_out_dir}/poisoned_v1_tuf_repo.zip"
+      output = "${target_out_dir}/${test_name}_poisoned_v1_tuf_repo.zip"
 
       inputs = [ input ]
       outputs = [ output ]
@@ -143,6 +153,14 @@ template("bad_signature_update") {
     }
   }
 
+  # Specify production fshost component and config for test environment.
+  if (use_fxfs_blob) {
+    fshost_component =
+        [ "//src/security/tests/pkg_test/tests:fshost-fxfs_blob" ]
+  } else {
+    fshost_component = [ "//src/security/tests/pkg_test/tests:fshost-minfs" ]
+  }
+
   # Note: Despite being independent of template parameters, this target must
   # be templated because `fuchsia_test_package` requires that all
   # `test_components` be defined in the same build directory due to its use of
@@ -162,46 +180,46 @@ template("bad_signature_update") {
   fuchsia_test_package("${test_name}-package") {
     package_name = test_name
     test_components = [ ":${test_name}-component" ]
-    deps = [
-      # Package server configured to serve "v1" OTA update.
-      "//src/security/tests/pkg_test/tests:pkg_server-v1-component",
+    deps = fshost_component + [
+             # Package server configured to serve "v1" OTA update.
+             "//src/security/tests/pkg_test/tests:pkg_server-v1-component",
 
-      # Filesystem host for test system.
-      "//src/security/tests/pkg_test/tests:fshost_v0-component",
+             # Filesystem host dependency.
+             "//src/storage/testing:storage_driver_test_realm",
 
-      # Fake services for update flow.
-      "//src/security/tests/pkg_test/dns_resolver:security_pkg_dns_resolver-component",
-      "//src/security/tests/pkg_test/paver:security_pkg_paver-component",
-      "//src/security/tests/pkg_test/reboot:security_pkg_reboot-component",
+             # Fake services for update flow.
+             "//src/security/tests/pkg_test/dns_resolver:security_pkg_dns_resolver-component",
+             "//src/security/tests/pkg_test/paver:security_pkg_paver-component",
+             "//src/security/tests/pkg_test/reboot:security_pkg_reboot-component",
 
-      # Production SWD components.
-      "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
-      "//src/sys/pkg/bin/pkg-resolver:production-component-and-config",
-      "//src/sys/pkg/bin/system-update-committer:component",
-      "//src/sys/pkg/bin/system-updater:production-component-and-config",
+             # Production SWD components.
+             "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
+             "//src/sys/pkg/bin/pkg-resolver:production-component-and-config",
+             "//src/sys/pkg/bin/system-update-committer:component",
+             "//src/sys/pkg/bin/system-updater:production-component-and-config",
 
-      # Production network components for OTA update.
-      "//src/connectivity/network/netstack:component",
+             # Production network components for OTA update.
+             "//src/connectivity/network/netstack:component",
 
-      # Mock SWD component dependencies.
-      "//src/cobalt/bin/testing/mock_cobalt:component_v2",
-      "//src/security/tests/pkg_test/tests:fake_boot_arguments_v0-component",
+             # Mock SWD component dependencies.
+             "//src/cobalt/bin/testing/mock_cobalt:component_v2",
+             "//src/security/tests/pkg_test/tests:fake_boot_arguments_v0-component",
 
-      #
-      # Test resources that depend on template parameters:
-      #
+             #
+             # Test resources that depend on template parameters:
+             #
 
-      # General shared test resources.
-      ":${test_name}_test-resources",
+             # General shared test resources.
+             ":${test_name}_test-resources",
 
-      # System resources for bringing up v0 system.
-      ":${test_name}_v0_system_resources",
+             # System resources for bringing up v0 system.
+             ":${test_name}_v0_system_resources",
 
-      # Package server/update resources for delivering v1 OTA update.
-      ":${test_name}_v1-pkg_server-tls_resources",
-      ":${test_name}_poisoned_v1_tuf_repo_resources",
-      ":${test_name}_v1_update_package_resource",
-    ]
+             # Package server/update resources for delivering v1 OTA update.
+             ":${test_name}_v1-pkg_server-tls_resources",
+             ":${test_name}_poisoned_v1_tuf_repo_resources",
+             ":${test_name}_v1_update_package_resource",
+           ]
 
     # TODO(fxbug.dev/88453): Complete test dependency composition to eliminate
     # error logs:

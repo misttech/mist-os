@@ -6,6 +6,9 @@
         "//sdk/lib/inspect/client.shard.cml",
         "//sdk/lib/syslog/client.shard.cml",
         "//src/connectivity/network/meta/isolated-network-offers.shard.cml",
+        "//src/lib/storage/fs_management/client.shard.cml",
+        "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
+        "//src/storage/testing/meta/storage_test.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
         "sys/testing/system-test.shard.cml", // For fuchsia.kernel.VmexResource.
     ],
@@ -22,13 +25,6 @@
     // Note: Manifests including this shard must provide a program binary.
     children: [
         // Security package test-defined components.
-        {
-            name: "fshost",
-
-            // Test instantiated running system version "v0".
-            url: "#meta/fshost_v0.cm",
-            startup: "eager",
-        },
         {
             name: "pkg_server",
             url: "#meta/pkg_server.cm",
@@ -81,12 +77,21 @@
             name: "system-update-committer",
             url: "#meta/system-update-committer.cm",
         },
+
+        // Production fshost configured for test environment.
+        {
+            name: "fshost",
+            url: "#meta/fshost.cm",
+            startup: "eager",
+        },
     ],
     capabilities: [
         {
+            // backing_dir must match what's exposed by fshost
+            // See //src/storage/fshost/meta/base_fshost.cml.
             storage: "data",
             from: "#fshost",
-            backing_dir: "memfs",
+            backing_dir: "tmp",
             storage_id: "static_instance_id_or_moniker",
         },
     ],
@@ -132,14 +137,32 @@
     ],
     offer: [
         {
-            directory: "blob",
-            from: "parent",
+            directory: "blob-exec",
+            from: "#fshost",
+            as: "blob",
             to: "#pkg_server",
+        },
+        {
+            directory: "dev-topological",
+            from: "#storage_driver_test_realm",
+            to: "#fshost",
+        },
+        {
+            directory: "dev-class",
+            from: "#storage_driver_test_realm",
+            as: "dev-class-block",
+            to: "#fshost",
+            subdir: "block",
         },
         {
             storage: "tmp",
             from: "parent",
             to: "#pkg_server",
+        },
+        {
+            directory: "blob-exec",
+            from: "#fshost",
+            to: "#pkg-cache",
         },
         {
             directory: [
@@ -248,9 +271,15 @@
             protocol: "fuchsia.boot.Arguments",
             from: "#fake_boot_arguments",
             to: [
+                "#fshost",
                 "#pkg-cache",
                 "#pkg-resolver",
             ],
+        },
+        {
+            protocol: "fuchsia.boot.Items",
+            from: "#fake_boot_arguments",
+            to: [ "#fshost" ],
         },
         {
             protocol: "fuchsia.logger.LogSink",
@@ -315,6 +344,13 @@
                 "#system-update-committer",
                 "#system-updater",
             ],
+        },
+
+        // Lets fshost write to debuglog for better debugging purposes.
+        {
+            protocol: [ "fuchsia.boot.WriteOnlyLog" ],
+            from: "parent",
+            to: [ "#fshost" ],
         },
 
         // TODO(fxbug.dev/88453): Add production components or custom protocol
