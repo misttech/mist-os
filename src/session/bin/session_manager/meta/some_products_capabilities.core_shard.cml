@@ -277,6 +277,12 @@
             source_availability: "unknown",
         },
         {
+            protocol: "fuchsia.update.CommitStatusProvider",
+            from: "#system-update",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.wlan.wlanix.Wlanix",
             from: "#wlanix",
             to: "#session-manager",

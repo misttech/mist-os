@@ -132,6 +132,7 @@
                 "fuchsia.thermal.ClientStateConnector",
                 "fuchsia.tracing.perfetto.ProducerConnector",
                 "fuchsia.ultrasound.Factory",
+                "fuchsia.update.CommitStatusProvider",
                 "fuchsia.update.installer.Installer",
                 "fuchsia.weave.FactoryDataManager",
                 "fuchsia.weave.Provisioner",
