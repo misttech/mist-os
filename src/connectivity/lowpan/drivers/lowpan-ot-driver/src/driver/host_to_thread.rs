@@ -204,10 +204,15 @@ where
     }
 
     async fn on_netstack_packet_for_thread(&self, packet: Vec<u8>) -> Result<(), Error> {
-        if !self.intercept_from_host(packet.as_slice()).await {
-            trace!("Outbound packet handled internally, dropping.");
-            return Ok(());
-        }
+        match IpFormat::for_packet(&packet) {
+            IpFormat::Ipv4 => {}
+            _ => {
+                if !self.intercept_from_host(packet.as_slice()).await {
+                    trace!("Outbound packet handled internally, dropping.");
+                    return Ok(());
+                }
+            }
+        };
 
         let driver_state = self.driver_state.lock();
 
