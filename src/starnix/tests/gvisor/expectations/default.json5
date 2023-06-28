@@ -167,7 +167,6 @@
                 "Inotify.MknodGeneratesCreateEvent",
                 "Inotify.ControlEvents",
                 "Inotify.KernfsBasic",
-                "Inotify.OneShot",
                 "Inotify.ExcludeUnlinkInodeEvents",
                 "Inotify.ExcludeUnlinkDirectory",
                 "Inotify.ExcludeUnlink",

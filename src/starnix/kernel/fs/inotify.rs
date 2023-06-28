@@ -121,10 +121,26 @@ impl InotifyFileObject {
         Ok(())
     }
 
-    fn notify(&self, watch_id: WdNumber, event_mask: InotifyMask, cookie: u32, name: FsString) {
+    fn notify(
+        &self,
+        watch_id: WdNumber,
+        event_mask: InotifyMask,
+        cookie: u32,
+        name: FsString,
+        oneshot: bool,
+    ) {
         let mut state = self.state.lock();
         let event = InotifyEvent::new(watch_id, event_mask, cookie, name);
         state.events.push_back(event);
+        if oneshot {
+            state.watches.remove(&watch_id);
+            state.events.push_back(InotifyEvent::new(
+                watch_id,
+                InotifyMask::IGNORED,
+                0,
+                FsString::new(),
+            ));
+        }
     }
 
     fn available(&self) -> usize {
@@ -315,23 +331,35 @@ impl InotifyWatchers {
     /// Notifies all watchers that have the specified event mask.
     pub fn notify(&self, event_mask: InotifyMask, name: &FsString) {
         // Clone inotify references so that we don't hold watchers lock when notifying.
-        let mut watch_id_to_files: Vec<(WdNumber, Arc<FileObject>)> = vec![];
+        struct InotifyWatch {
+            watch_id: WdNumber,
+            file: Arc<FileObject>,
+            oneshot: bool,
+        }
+        let mut watches: Vec<InotifyWatch> = vec![];
         {
-            let watchers = self.watchers.lock();
-            for (inotify, watcher) in &(*watchers) {
+            let mut watchers = self.watchers.lock();
+            watchers.retain(|inotify, watcher| {
                 if watcher.mask.contains(event_mask) {
+                    let oneshot = watcher.mask.contains(InotifyMask::ONESHOT);
                     if let Some(file) = inotify.0.upgrade() {
-                        watch_id_to_files.push((watcher.watch_id, file.clone()));
+                        watches.push(InotifyWatch { watch_id: watcher.watch_id, file, oneshot });
+                        !oneshot
+                    } else {
+                        false
                     }
+                } else {
+                    true
                 }
-            }
+            });
         }
 
-        for (watch_id, file) in watch_id_to_files {
-            let inotify = file
+        for watch in watches {
+            let inotify = watch
+                .file
                 .downcast_file::<inotify::InotifyFileObject>()
                 .expect("failed to downcast to inotify");
-            inotify.notify(watch_id, event_mask, 0, name.clone());
+            inotify.notify(watch.watch_id, event_mask, 0, name.clone(), watch.oneshot);
         }
     }
 }
