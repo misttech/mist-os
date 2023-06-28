@@ -43,6 +43,8 @@
 #include "src/ui/scenic/lib/view_tree/scoped_observer_registry.h"
 #include "src/ui/scenic/lib/view_tree/view_ref_installed_impl.h"
 #include "src/ui/scenic/lib/view_tree/view_tree_snapshotter.h"
+#include "src/ui/scenic/scenic_structured_config.h"
+
 namespace scenic_impl {
 
 class DisplayInfoDelegate : public Scenic::GetDisplayInfoDelegateDeprecated {
@@ -62,34 +64,6 @@ class DisplayInfoDelegate : public Scenic::GetDisplayInfoDelegateDeprecated {
   std::shared_ptr<display::Display> display_ = nullptr;
 };
 
-// Values read from config file. Set to their default values.
-struct ConfigValues {
-  zx::duration min_predicted_frame_duration =
-      scheduling::DefaultFrameScheduler::kMinPredictedFrameDuration;
-#if defined(USE_FLATLAND_BY_DEFAULT)
-  bool i_can_haz_flatland = true;
-#else
-  bool i_can_haz_flatland = false;
-#endif  // USE_FLATLAND_BY_DEFAULT
-  bool enable_allocator_for_flatland = true;
-  bool pointer_auto_focus_on = true;
-#ifdef FLATLAND_ENABLE_DISPLAY_COMPOSITION
-  bool flatland_enable_display_composition = true;
-#else
-  // Uses the GPU/Vulkan compositor by default, instead of attempting to composite using the display
-  // coordinator.
-  bool flatland_enable_display_composition = false;
-#endif  // FLATLAND_DISABLE_DISPLAY_COMPOSITION
-  // TODO(fxb/76985): Remove these when we have proper multi-display support.
-  std::optional<uint64_t> i_can_haz_display_id;
-  std::optional<size_t> i_can_haz_display_mode;
-
-  // Angle in degrees by which the display is rotated in clockwise direction. This value is
-  // read from `/config/data/display_rotation`. Must be equal to the |display_rotation| config
-  // provided to the scene manager.
-  uint32_t display_rotation = 0;
-};
-
 class App {
  public:
   App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspect_node,
@@ -107,7 +81,7 @@ class App {
 
   async::Executor executor_;
   std::unique_ptr<sys::ComponentContext> app_context_;
-  const ConfigValues config_values_;
+  const scenic_structured_config::Config config_values_;
 
   std::shared_ptr<ShutdownManager> shutdown_manager_;
   metrics::MetricsImpl metrics_logger_;

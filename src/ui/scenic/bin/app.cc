@@ -8,6 +8,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <cstdint>
 #include <optional>
 
 #include "rapidjson/document.h"
@@ -43,70 +44,52 @@ static constexpr zx::duration kShutdownTimeout = zx::sec(1);
 // escher/profiling/timestamp_profiler.cc.
 static constexpr zx::duration kEscherCleanupRetryInterval{1'000'000};  // 1 millisecond
 
-enum TagType { INTEGER, BOOL };
+std::optional<uint64_t> GetDisplayId(scenic_structured_config::Config values) {
+  if (values.i_can_haz_display_id() < 0) {
+    return std::nullopt;
+  }
+  return values.i_can_haz_display_id();
+}
 
-/// ConfigValue holds a value for a given key.
-struct ConfigValue {
-  TagType tag;
-  union {
-    int int_val;
-    bool bool_val;
-  };
-};
+std::optional<uint64_t> GetDisplayMode(scenic_structured_config::Config values) {
+  if (values.i_can_haz_display_mode() < 0) {
+    return std::nullopt;
+  }
+  return values.i_can_haz_display_mode();
+}
 
-// Populates a ConfigValues struct by reading a config file.
-scenic_impl::ConfigValues GetConfig() {
-  scenic_impl::ConfigValues values;
-
+// Gets Scenic's structured config values and logs them.
+scenic_structured_config::Config GetConfig() {
   // Retrieve structured configuration
-  auto structured_config = scenic_structured_config::Config::TakeFromStartupHandle();
-  values.min_predicted_frame_duration =
-      zx::msec(structured_config.frame_scheduler_min_predicted_frame_duration_in_us());
-  values.i_can_haz_flatland = structured_config.i_can_haz_flatland();
-  values.enable_allocator_for_flatland = structured_config.enable_allocator_for_flatland();
-  values.pointer_auto_focus_on = structured_config.pointer_auto_focus();
-  values.flatland_enable_display_composition =
-      structured_config.flatland_enable_display_composition();
+  auto values = scenic_structured_config::Config::TakeFromStartupHandle();
 
-  if (structured_config.i_can_haz_display_id() < 0) {
-    values.i_can_haz_display_id = std::nullopt;
-  } else {
-    values.i_can_haz_display_id = structured_config.i_can_haz_display_id();
-  }
+  FX_LOGS(INFO) << "Scenic min_predicted_frame_duration(us): "
+                << values.frame_scheduler_min_predicted_frame_duration_in_us();
+  FX_LOGS(INFO) << "i_can_haz_flatland: " << values.i_can_haz_flatland();
+  FX_LOGS(INFO) << "enable_allocator_for_flatland: " << values.enable_allocator_for_flatland();
+  FX_LOGS(INFO) << "Scenic pointer auto focus: " << values.pointer_auto_focus();
+  FX_LOGS(INFO) << "flatland_enable_display_composition: "
+                << values.flatland_enable_display_composition();
+  FX_LOGS(INFO) << "Scenic i_can_haz_display_id: " << GetDisplayId(values).value_or(0);
+  FX_LOGS(INFO) << "Scenic i_can_haz_display_mode: " << GetDisplayMode(values).value_or(0);
 
-  if (structured_config.i_can_haz_display_mode() < 0) {
-    values.i_can_haz_display_mode = std::nullopt;
-  } else {
-    values.i_can_haz_display_mode = structured_config.i_can_haz_display_mode();
-  }
+  return values;
+}
 
-  // Get the display_rotation value from the config file.
+// Get Scenic's display rotation config value from its config file.
+uint64_t GetDisplayRotation() {
   if (std::string display_rotation_config;
       files::ReadFileToString("/config/data/display_rotation", &display_rotation_config)) {
-    if (int display_rotation = stoi(display_rotation_config); display_rotation >= 0) {
-      FX_CHECK(display_rotation < 360) << "Rotation should be less than 360 degrees.";
-      values.display_rotation = display_rotation;
-    } else {
-      FX_LOGS(WARNING)
-          << "Invalid value for display_rotation. Falling back to the default value 0.";
+    if (int rotation = stoi(display_rotation_config); rotation >= 0) {
+      FX_CHECK(rotation < 360) << "Rotation should be less than 360 degrees.";
+      return rotation;
     }
-
+    FX_LOGS(WARNING) << "Invalid value for display_rotation. Falling back to the default value 0.";
   } else {
     FX_LOGS(INFO)
         << "No config file found at /config/data/display_rotation, using default rotation value 0";
   }
-
-  FX_LOGS(INFO) << "Scenic min_predicted_frame_duration(us): "
-                << values.min_predicted_frame_duration.to_usecs();
-  FX_LOGS(INFO) << "i_can_haz_flatland: " << values.i_can_haz_flatland;
-  FX_LOGS(INFO) << "enable_allocator_for_flatland: " << values.enable_allocator_for_flatland;
-  FX_LOGS(INFO) << "Scenic pointer auto focus: " << values.pointer_auto_focus_on;
-  FX_LOGS(INFO) << "flatland_enable_display_composition: "
-                << values.flatland_enable_display_composition;
-  FX_LOGS(INFO) << "Scenic i_can_haz_display_id: " << values.i_can_haz_display_id.value_or(0);
-  FX_LOGS(INFO) << "Scenic i_can_haz_display_mode: " << values.i_can_haz_display_mode.value_or(0);
-
-  return values;
+  return 0;
 }
 
 #ifdef NDEBUG
@@ -176,11 +159,12 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
           async_get_default_dispatcher(),
           fidl::ClientEnd<fuchsia_io::Directory>(component::OpenServiceRoot()->TakeChannel())),
       inspect_node_(std::move(inspect_node)),
-      frame_scheduler_(std::make_unique<scheduling::WindowedFramePredictor>(
-                           config_values_.min_predicted_frame_duration,
-                           scheduling::DefaultFrameScheduler::kInitialRenderDuration,
-                           scheduling::DefaultFrameScheduler::kInitialUpdateDuration),
-                       inspect_node_.CreateChild("FrameScheduler"), &metrics_logger_),
+      frame_scheduler_(
+          std::make_unique<scheduling::WindowedFramePredictor>(
+              zx::msec(config_values_.frame_scheduler_min_predicted_frame_duration_in_us()),
+              scheduling::DefaultFrameScheduler::kInitialRenderDuration,
+              scheduling::DefaultFrameScheduler::kInitialUpdateDuration),
+          inspect_node_.CreateChild("FrameScheduler"), &metrics_logger_),
       image_pipe_updater_(std::make_shared<gfx::ImagePipeUpdater>(frame_scheduler_)),
       scenic_(
           app_context_.get(), inspect_node_, frame_scheduler_,
@@ -189,7 +173,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
               strong->Shutdown(kShutdownTimeout);
             }
           },
-          config_values_.i_can_haz_flatland),
+          config_values_.i_can_haz_flatland()),
       uber_struct_system_(std::make_shared<flatland::UberStructSystem>()),
       link_system_(
           std::make_shared<flatland::LinkSystem>(uber_struct_system_->GetNextInstanceId())),
@@ -197,7 +181,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
           async_get_default_dispatcher(), frame_scheduler_)),
       color_converter_(app_context_.get(),
                        /*set_color_conversion_values*/
-                       config_values_.i_can_haz_flatland
+                       config_values_.i_can_haz_flatland()
                            ? display::SetColorConversionFunc([this](const auto& coefficients,
                                                                     const auto& preoffsets,
                                                                     const auto& postoffsets) {
@@ -220,7 +204,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
                                }
                              }),
                        /*set_minimum_rgb*/
-                       config_values_.i_can_haz_flatland
+                       config_values_.i_can_haz_flatland()
                            ? display::SetMinimumRgbFunc([this](const uint8_t minimum_rgb) {
                                FX_DCHECK(flatland_compositor_);
                                flatland_compositor_->SetMinimumRgb(minimum_rgb);
@@ -286,8 +270,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
 
   // Instantiate DisplayManager and schedule a task to inject the display coordinator into it, once
   // it becomes available.
-  display_manager_.emplace(config_values_.i_can_haz_display_id,
-                           config_values_.i_can_haz_display_mode,
+  display_manager_.emplace(GetDisplayId(config_values_), GetDisplayMode(config_values_),
                            [this, completer = std::move(display_bridge.completer)]() mutable {
                              completer.complete_ok(display_manager_->default_display_shared());
                            });
@@ -427,7 +410,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
   // will be too early to do it here, since we're not yet aware of any displays nor the formats they
   // support.  It will probably be OK to warm the cache when a new display is plugged in, because
   // users don't expect plugging in a display to be completely jank-free.
-  if (config_values_.i_can_haz_flatland) {
+  if (config_values_.i_can_haz_flatland()) {
     // Warming the pipeline cache causes some non-Flatland tests to time out, so don't warm unless
     // |i_can_haz_flatland| is true.
     flatland_renderer->WarmPipelineCache();
@@ -444,7 +427,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     flatland_compositor_ = std::make_shared<flatland::DisplayCompositor>(
         async_get_default_dispatcher(), display_manager_->default_display_coordinator(),
         flatland_renderer, utils::CreateSysmemAllocatorSyncPtr("flatland::DisplayCompositor"),
-        config_values_.flatland_enable_display_composition);
+        config_values_.flatland_enable_display_composition());
   }
 
   // Flatland manager depends on compositor, and is required by engine.
@@ -503,9 +486,9 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     screen_capture_importers.push_back(screen_capture_buffer_collection_importer);
 
     std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> default_importers;
-    if (!config_values_.i_can_haz_flatland)
+    if (!config_values_.i_can_haz_flatland())
       default_importers.push_back(gfx_buffer_collection_importer);
-    if (config_values_.enable_allocator_for_flatland && flatland_compositor_)
+    if (config_values_.enable_allocator_for_flatland() && flatland_compositor_)
       default_importers.push_back(flatland_compositor_);
 
     allocator_ = std::make_shared<allocation::Allocator>(
@@ -575,7 +558,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
 
     // Capture flatland_manager since the primary display may not have been initialized yet.
     screenshot_manager_.emplace(
-        config_values_.i_can_haz_flatland, allocator_, flatland_renderer,
+        config_values_.i_can_haz_flatland(), allocator_, flatland_renderer,
         [this]() {
           auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering();
           return flatland_engine_->GetRenderables(*display);
@@ -585,7 +568,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
                                              escher_cleanup_);
         },
         std::move(screen_capture_importers), display_info_delegate_->GetDisplayDimensions(),
-        config_values_.display_rotation);
+        GetDisplayRotation());
 
     fit::function<void(fidl::InterfaceRequest<fuchsia::ui::composition::Screenshot>)> handler =
         fit::bind_member(&screenshot_manager_.value(),
@@ -605,7 +588,7 @@ void App::InitializeInput() {
   TRACE_DURATION("gfx", "App::InitializeInput");
   input_.emplace(app_context_.get(), inspect_node_,
                  /*request_focus*/
-                 [this, use_auto_focus = config_values_.pointer_auto_focus_on](zx_koid_t koid) {
+                 [this, use_auto_focus = config_values_.pointer_auto_focus()](zx_koid_t koid) {
                    if (!use_auto_focus)
                      return;
 
@@ -648,7 +631,7 @@ void App::InitializeHeartbeat(display::Display& display) {
     // If true, then we KNOW that GFX should *not* run. Workstation is true.
     // if false, then either system could legitimately run. This flag is false for tests and
     // GFX-based products.
-    if (!config_values_.i_can_haz_flatland) {
+    if (!config_values_.i_can_haz_flatland()) {
       subtrees_generator_callbacks.emplace_back(
           [this] { return engine_->scene_graph()->view_tree().Snapshot(); });
     }
@@ -697,7 +680,7 @@ void App::InitializeHeartbeat(display::Display& display) {
       /*update_sessions*/
       [this](auto& sessions_to_update, auto trace_id, auto fences_from_previous_presents) {
         TRACE_DURATION("gfx", "App update_sessions");
-        if (config_values_.i_can_haz_flatland) {
+        if (config_values_.i_can_haz_flatland()) {
           // Flatland doesn't pass release fences into the FrameScheduler. Instead, they are stored
           // in the FlatlandPresenter and pulled out by the flatland::Engine during rendering.
           FX_CHECK(fences_from_previous_presents.empty())
