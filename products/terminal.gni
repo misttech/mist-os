@@ -83,6 +83,7 @@ legacy_cache_package_labels +=
 # in the SDK.
 legacy_cache_package_labels += [
   "//src/tests/fidl/client_suite/harness",
+  "//src/tests/fidl/compatibility:packages",
   "//src/tests/fidl/server_suite/harness",
 ]
 

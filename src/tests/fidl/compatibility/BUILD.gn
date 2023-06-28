@@ -223,3 +223,11 @@ group("compatibility") {
     "//src/dart",
   ]
 }
+
+group("packages") {
+  testonly = true
+
+  # TODO(b/240154207): delete dart.
+  impl_packages = fidl_compatibilty_test_impls - [ "dart" ]
+  deps = impl_packages + test_harness_labels
+}
