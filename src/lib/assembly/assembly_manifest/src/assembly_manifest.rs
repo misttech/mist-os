@@ -91,14 +91,6 @@ pub enum Image {
         contents: BlobfsContents,
     },
 
-    /// Fxfs in the Android Sparse format.
-    FxfsSparse {
-        /// Path to the Fxfs image.
-        path: Utf8PathBuf,
-        /// Blob contents metadata.
-        contents: BlobfsContents,
-    },
-
     /// Qemu Kernel.
     QemuKernel(Utf8PathBuf),
 }
@@ -116,7 +108,6 @@ impl Image {
             Image::FVMSparseBlob(s) => s.as_path(),
             Image::FVMFastboot(s) => s.as_path(),
             Image::Fxfs { path, .. } => path.as_path(),
-            Image::FxfsSparse { path, .. } => path.as_path(),
             Image::QemuKernel(s) => s.as_path(),
         }
     }
@@ -134,7 +125,6 @@ impl Image {
             Image::FVMSparseBlob(s) => *s = source,
             Image::FVMFastboot(s) => *s = source,
             Image::Fxfs { path, .. } => *path = source,
-            Image::FxfsSparse { path, .. } => *path = source,
             Image::QemuKernel(s) => *s = source,
         }
     }
@@ -179,10 +169,6 @@ impl AssemblyManifest {
                     path: path_relative_from(path, &base_path)?,
                     contents: contents.relativize(&base_path)?,
                 }),
-                Image::FxfsSparse { path, contents } => images.push(Image::Fxfs {
-                    path: path_relative_from(path, &base_path)?,
-                    contents: contents.relativize(&base_path)?,
-                }),
             }
         }
         self.images = images;
@@ -223,10 +209,6 @@ impl AssemblyManifest {
                     contents: contents.derelativize(&manifest_dir)?,
                 }),
                 Image::Fxfs { path, contents } => images.push(Image::Fxfs {
-                    path: manifest_dir.as_ref().join(path),
-                    contents: contents.derelativize(&manifest_dir)?,
-                }),
-                Image::FxfsSparse { path, contents } => images.push(Image::Fxfs {
                     path: manifest_dir.as_ref().join(path),
                     contents: contents.derelativize(&manifest_dir)?,
                 }),
@@ -350,13 +332,6 @@ impl Serialize for Image {
             Image::Fxfs { path, contents } => ImageSerializeHelper {
                 partition_type: "fxfs-blk",
                 name: "storage-full",
-                path,
-                signed: None,
-                contents: Some(ImageContentsSerializeHelper::Blobfs(contents)),
-            },
-            Image::FxfsSparse { path, contents } => ImageSerializeHelper {
-                partition_type: "blk",
-                name: "fxfs.fastboot",
                 path,
                 signed: None,
                 contents: Some(ImageContentsSerializeHelper::Blobfs(contents)),
@@ -550,14 +525,6 @@ impl<'de> Deserialize<'de> for Image {
                 if let Some(contents) = helper.contents {
                     let ImageContentsDeserializeHelper::Blobfs(contents) = contents;
                     Ok(Image::Fxfs { path: helper.path, contents })
-                } else {
-                    Err(de::Error::missing_field("contents"))
-                }
-            }
-            ("blk", "fxfs.fastboot", None) => {
-                if let Some(contents) = helper.contents {
-                    let ImageContentsDeserializeHelper::Blobfs(contents) = contents;
-                    Ok(Image::FxfsSparse { path: helper.path, contents })
                 } else {
                     Err(de::Error::missing_field("contents"))
                 }

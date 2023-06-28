@@ -49,10 +49,7 @@ use {
         convert::TryInto,
         marker::PhantomData,
         ops::{Bound, Range},
-        sync::{
-            atomic::{AtomicU64, Ordering},
-            Arc, Mutex, Weak,
-        },
+        sync::{Arc, Mutex, Weak},
     },
 };
 
@@ -447,7 +444,6 @@ pub struct SimpleAllocator {
     inner: Mutex<Inner>,
     allocation_mutex: futures::lock::Mutex<()>,
     counters: Mutex<SimpleAllocatorCounters>,
-    maximum_offset: AtomicU64,
 }
 
 /// Tracks the different stages of byte allocations for an individual owner.
@@ -623,7 +619,6 @@ impl SimpleAllocator {
             }),
             allocation_mutex: futures::lock::Mutex::new(()),
             counters: Mutex::new(SimpleAllocatorCounters::default()),
-            maximum_offset: AtomicU64::new(0),
         }
     }
 
@@ -887,14 +882,6 @@ impl SimpleAllocator {
             }
             .boxed()
         });
-    }
-
-    /// Returns the offset of the first byte which has not been used by the allocator since its
-    /// creation.
-    /// NB: This does *not* take into account existing allocations.  This is only reliable when the
-    /// allocator was created from scratch, without any pre-existing allocations.
-    pub fn maximum_offset(&self) -> u64 {
-        self.maximum_offset.load(Ordering::Relaxed)
     }
 }
 
@@ -1366,7 +1353,6 @@ impl JournalingObject for SimpleAllocator {
                 inner.info.limit_bytes.remove(&owner_object_id);
             }
             Mutation::Allocator(AllocatorMutation::Allocate { device_range, owner_object_id }) => {
-                self.maximum_offset.fetch_max(device_range.end, Ordering::Relaxed);
                 let item = AllocatorItem {
                     key: AllocatorKey { device_range: device_range.into() },
                     value: AllocatorValue::Abs { count: 1, owner_object_id },

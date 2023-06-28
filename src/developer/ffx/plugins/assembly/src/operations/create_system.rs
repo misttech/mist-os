@@ -4,7 +4,7 @@
 
 use crate::base_package::{construct_base_package, BasePackage};
 use crate::fvm::construct_fvm;
-use crate::fxfs::{construct_fxfs, ConstructedFxfs};
+use crate::fxfs::construct_fxfs;
 use crate::vbmeta;
 use crate::zbi;
 
@@ -98,16 +98,10 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
     } else if let Some(fxfs_config) = fxfs_config {
         info!("Constructing Fxfs image <EXPERIMENTAL!>");
         if let Some(base_package) = &base_package {
-            let ConstructedFxfs { image_path, sparse_image_path, contents } =
+            let (path, contents) =
                 construct_fxfs(&outdir, &gendir, &image_assembly_config, base_package, fxfs_config)
                     .await?;
-            assembly_manifest.images.push(assembly_manifest::Image::Fxfs {
-                path: image_path,
-                contents: contents.clone(),
-            });
-            assembly_manifest
-                .images
-                .push(assembly_manifest::Image::FxfsSparse { path: sparse_image_path, contents });
+            assembly_manifest.images.push(assembly_manifest::Image::Fxfs { path, contents });
         }
     } else {
         info!("Skipping fvm creation");

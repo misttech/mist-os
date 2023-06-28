@@ -11,7 +11,6 @@ rustc_library("make-blob-image") {
     "//src/lib/fuchsia-async",
     "//src/lib/storage/storage_device",
     "//src/storage/fxfs:lib",
-    "//src/storage/lib/sparse",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bincode",

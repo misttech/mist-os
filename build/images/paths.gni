@@ -78,9 +78,6 @@ files = {
 
     if (fxfs_blob) {
       fxfs = "${assembly_outdir}/fxfs.blk"
-      if (supports_flashing_fxfs) {
-        fxfs_sparse = "${assembly_outdir}/fxfs.sparse.blk"
-      }
     } else {
       fvm = "${assembly_outdir}/fvm.blk"
       fvm_sparse = "${assembly_outdir}/fvm.sparse.blk"

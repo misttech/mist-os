@@ -62,7 +62,6 @@ impl FxfsBuilder {
         &self,
         gendir: impl AsRef<Utf8Path>,
         output: impl AsRef<Utf8Path>,
-        sparse_output: Option<impl AsRef<Utf8Path>>,
     ) -> Result<Utf8PathBuf> {
         // Delete the output file if it exists.
         let output = output.as_ref();
@@ -89,7 +88,6 @@ impl FxfsBuilder {
         let mut cleanup = Cleanup(Some(output.as_str().to_string()));
         fxfs_make_blob_image::make_blob_image(
             output.as_str(),
-            sparse_output.as_ref().map(|s| s.as_ref().as_str()),
             blob_manifest_path.as_str(),
             blobs_json_path.as_str(),
             self.size_bytes,
@@ -158,16 +156,13 @@ mod tests {
         let manifest = generate_test_manifest("package", filepath);
 
         let output_path = dir.join("fxfs.blk");
-        let sparse_output_path = dir.join("fxfs.sparse.blk");
         let output_path_clone = output_path.clone();
-        let sparse_output_path_clone = sparse_output_path.clone();
 
         let mut builder = FxfsBuilder::new();
         builder.set_size(32 * 1024 * 1024);
         builder.add_package(manifest).unwrap();
 
-        let blobs_json_path =
-            builder.build(&dir, output_path, Some(sparse_output_path)).await.unwrap();
+        let blobs_json_path = builder.build(&dir, output_path).await.unwrap();
         let actual_blobs_json = read_blobs_json(blobs_json_path).unwrap();
         let expected_blobs_json = vec![BlobJsonEntry {
             merkle: "1739e556c9f2800c6263d8926ae00652d3c9a008b7a5ee501719854fe55b3787".to_string(),
@@ -176,6 +171,5 @@ mod tests {
         assert_eq!(expected_blobs_json, actual_blobs_json);
 
         assert!(output_path_clone.exists());
-        assert!(sparse_output_path_clone.exists());
     }
 }

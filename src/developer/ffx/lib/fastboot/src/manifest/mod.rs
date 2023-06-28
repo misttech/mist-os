@@ -254,7 +254,7 @@ impl FlashManifestVersion {
 }
 
 /// Add a set of images from |manifest| to the |image_map|, assigning them to |slot|. This ignores
-/// all images other than the ZBI, VBMeta, and fastboot FVM/Fxfs.
+/// all images other than the ZBI, VBMeta, and fastboot FVM.
 fn add_images_to_map(
     image_map: &mut ImageMap,
     manifest: &Vec<AssemblyManifestImage>,
@@ -278,7 +278,7 @@ fn add_images_to_map(
                     slot_entry.insert(ImageType::FVM, path.to_string())
                 }
             }
-            assembly_manifest::Image::FxfsSparse { path, .. } => {
+            assembly_manifest::Image::Fxfs { path, .. } => {
                 if let Slot::R = slot {
                     // Recovery should not include fxfs, because it is embedded into the ZBI as a
                     // ramdisk.

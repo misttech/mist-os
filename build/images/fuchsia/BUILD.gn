@@ -73,7 +73,6 @@ if (is_fuchsia) {
     fvm_blob_sparse = "${outdir}/fvm.blob.sparse.blk"
     fvm_fastboot = "${outdir}/fvm.fastboot.blk"
     fxfs = "${outdir}/fxfs.blk"
-    fxfs_sparse = "${outdir}/fxfs.sparse.blk"
     packages_json = "${outdir}/packages.json"
     images_json = "${outdir}/images.json"
 
@@ -103,7 +102,6 @@ if (is_fuchsia) {
     recovery_fvm_blob_sparse = "${recovery_outdir}/fvm.blob.sparse.blk"
     recovery_fvm_fastboot = "${recovery_outdir}/fvm.fastboot.blk"
     recovery_fxfs = "${recovery_outdir}/fxfs.blk"
-    recovery_fxfs_sparse = "${recovery_outdir}/fxfs.sparse.blk"
     recovery_images_json = "${recovery_outdir}/images.json"
 
     esp_image_path = "${root_build_dir}/fuchsia.esp.blk"
@@ -358,10 +356,7 @@ if (is_fuchsia) {
     # Create lists of the files that are referenced by the assembly manifests.
     _assembly_contents = [ files.qemu_kernel ]
     if (fxfs_blob) {
-      _assembly_contents += [
-        files.fxfs,
-        files.fxfs_sparse,
-      ]
+      _assembly_contents += [ files.fxfs ]
     } else {
       _assembly_contents += [
         files.blobfs,
@@ -373,10 +368,7 @@ if (is_fuchsia) {
     _recovery_contents = [ files.qemu_kernel ]
     if (files.recovery_name != "zedboot") {
       if (fxfs_blob) {
-        _recovery_contents += [
-          files.recovery_fxfs,
-          files.recovery_fxfs_sparse,
-        ]
+        _recovery_contents += [ files.recovery_fxfs ]
       } else {
         _recovery_contents += [
           files.blobfs,
