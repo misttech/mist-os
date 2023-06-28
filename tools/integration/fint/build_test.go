@@ -167,6 +167,35 @@ func TestBuild(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name:       "failed build with determinism/consistency differences",
+			staticSpec: &fintpb.Static{},
+			contextSpec: &fintpb.Context{
+				ArtifactDir: artifactDir,
+			},
+			buildDirFiles: []string{
+				filepath.Join(comparisonDiagnosticsDirName, "dir", "foo.rlib.local"),
+				filepath.Join(comparisonDiagnosticsDirName, "dir", "foo.rlib.remote"),
+				filepath.Join("not", "in", "expected", "dir", "foo.rlib"),
+			},
+			runnerFunc: func(cmd []string, _ io.Writer) error {
+				return fmt.Errorf("failed to run command: %s", cmd)
+			},
+			expectedArtifacts: &fintpb.BuildArtifacts{
+				FailureSummary: unrecognizedFailureMsg + "\n",
+				DebugFiles: []*fintpb.DebugFile{
+					{
+						Path:       filepath.Join(buildDir, comparisonDiagnosticsDirName, "dir", "foo.rlib.local"),
+						UploadDest: filepath.Join(comparisonDiagnosticsDirName, "dir", "foo.rlib.local"),
+					},
+					{
+						Path:       filepath.Join(buildDir, comparisonDiagnosticsDirName, "dir", "foo.rlib.remote"),
+						UploadDest: filepath.Join(comparisonDiagnosticsDirName, "dir", "foo.rlib.remote"),
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
 			name:       "failed build with file access traces",
 			staticSpec: &fintpb.Static{},
 			contextSpec: &fintpb.Context{

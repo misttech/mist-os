@@ -12,6 +12,7 @@ import dataclasses
 import io
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import platform
@@ -50,6 +51,22 @@ def bool_golang_flag(value: str) -> bool:
         'false': False,
     }[value.lower()]
 
+def copy_preserve_subpath(src: Path, dest_dir: Path):
+    """Like copy(), but preserves the relative path of src in the destination.
+
+    Example: src='foo/bar/baz.txt', dest_dir='save/stuff/here' will result in
+      'save/stuff/here/foo/bar/baz.txt'
+
+    Args:
+      src: path to file, relative to working dir.
+      dest_dir: root directory to copy to (can be absolute or relative to
+        working dir).
+    """
+    assert not src.is_absolute(
+    ), f'source file to be copied should be relative, but got: {src}'
+    dest_subdir = dest_dir / src.parent
+    dest_subdir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest_subdir)
 
 # TODO: move this to library for abstract data operations
 def partition_sequence(seq: Sequence[Any],

@@ -129,7 +129,12 @@ FSATRACE_PATH = Path('prebuilt', 'fsatrace', 'fsatrace')
 _CHECK_DETERMINISM_SCRIPT = Path('build', 'tracer', 'output_cacher.py')
 
 
-def check_determinism_command(exec_root: Path, outputs: Sequence[Path], command: Sequence[Path] = None, label: str = None) -> Sequence[str]:
+def check_determinism_command(
+        exec_root: Path,
+        outputs: Sequence[Path],
+        command: Sequence[Path] = None,
+        miscomparison_export_dir: Path = None,
+        label: str = None) -> Sequence[str]:
     """Returns a command that checks for output determinism.
 
     The check runs locally twice, moving outputs out of the way temporarily,
@@ -147,6 +152,7 @@ def check_determinism_command(exec_root: Path, outputs: Sequence[Path], command:
         str(exec_root / _CHECK_DETERMINISM_SCRIPT),
     ] + ([f'--label={label}'] if label else []) + [
         '--check-repeatability',
+    ] + ([f'--miscomparison-export-dir={miscomparison_export_dir}'] if miscomparison_export_dir else []) + [
         '--outputs',
     ] + [str(p) for p in outputs] + ['--'] + (command or [])
 

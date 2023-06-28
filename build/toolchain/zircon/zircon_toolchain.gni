@@ -184,6 +184,8 @@ template("zircon_toolchain") {
         # "--fsatrace-path",
         # rebase_path("//prebuilt/fsatrace/fsatrace", root_build_dir),
         "--exec_strategy=remote",
+        "--miscomparison-export-dir",
+        rebase_path(comparison_diagnostics_dir, root_build_dir),
       ]
       _cxx_concurrent_jobs = concurrent_jobs.local
     } else if (cxx_rbe_check == "determinism") {
@@ -192,6 +194,8 @@ template("zircon_toolchain") {
       compiler_prefix_list += [
         "--local",
         "--check-determinism",
+        "--miscomparison-export-dir",
+        rebase_path(comparison_diagnostics_dir, root_build_dir),
       ]
       _cxx_concurrent_jobs = concurrent_jobs.local
     } else {

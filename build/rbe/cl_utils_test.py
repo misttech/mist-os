@@ -3,6 +3,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import contextlib
+import filecmp
 import os
 import subprocess
 import sys
@@ -55,6 +57,31 @@ class BoolGolangFlagTests(unittest.TestCase):
         for v in ('', 'maybe', 'true-ish', 'false-y'):
             with self.assertRaises(KeyError):
                 cl_utils.bool_golang_flag(v)
+
+@contextlib.contextmanager
+def chdir_cm(d: Path):
+    """FIXME: replace with contextlib.chdir(), once Python 3.11 is default."""
+    save_dir = os.getcwd()
+    os.chdir(d)  # could raise OSError
+    try:
+        yield
+    finally:
+        os.chdir(save_dir)
+
+class CopyPreserveSubpathTests(unittest.TestCase):
+
+    def test_subpath(self):
+        with tempfile.TemporaryDirectory() as td1:
+            tdp1 = Path(td1)
+            dest_dir = tdp1 / 'backups'
+            with chdir_cm(tdp1):  # working directory
+                srcdir = Path('aa/bb')
+                srcdir.mkdir(parents=True, exist_ok=True)
+                src_file = srcdir / 'c.txt'
+                src_file.write_text('hello\n')
+                cl_utils.copy_preserve_subpath(src_file, dest_dir)
+                dest_file = dest_dir / src_file
+                self.assertTrue(filecmp.cmp(src_file, dest_file, shallow=False))
 
 
 class PartitionSequenceTests(unittest.TestCase):

@@ -1044,6 +1044,72 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
         mock_remote_launch.assert_called_once()
         self.assertEqual(remote_command[-2:], base_command)
 
+    def test_local_remote_compare_found_diffs_exported_files(self):
+        # Checks that miscompared files are exported.
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        output = Path('hello.txt')
+        export_dir = Path('naughty/diffs')  # relative to working dir
+        export_dir_abs = working_dir / export_dir
+        base_command = ['touch', str(output)]
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(
+            ['--compare', f'--miscomparison-export-dir={export_dir}', '--'] +
+            base_command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            output_files=[output],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+        self.assertTrue(action.compare_with_local)
+        self.assertEqual(
+            action.miscomparison_export_dir, working_dir / export_dir)
+
+        unnamed_mocks = [
+            # we don't bother to check the call details of these mocks
+            mock.patch.object(Path, 'rename'),
+            mock.patch.object(Path, 'is_file', return_value=True),
+            # Pretend comparison finds differences
+            mock.patch.object(
+                remote_action, '_files_match', return_value=False),
+            mock.patch.object(remote_action, '_detail_diff'),
+        ]
+        with contextlib.ExitStack() as stack:
+            for m in unnamed_mocks:
+                stack.enter_context(m)
+
+            # both local and remote commands succeed
+            with mock.patch.object(remote_action.RemoteAction, '_run_locally',
+                                   return_value=0) as mock_local_launch:
+                with mock.patch.object(remote_action.RemoteAction,
+                                       '_run_maybe_remotely',
+                                       return_value=cl_utils.SubprocessResult(
+                                           0)) as mock_remote_launch:
+                    with mock.patch.object(
+                            remote_action.RemoteAction,
+                            '_compare_fsatraces') as mock_compare_traces:
+                        with mock.patch.object(
+                                cl_utils,
+                                'copy_preserve_subpath') as mock_export:
+                            exit_code = action.run_with_main_args(main_args)
+
+        remote_command = action.launch_command
+        self.assertEqual(exit_code, 1)  # remote success, but compare failure
+        mock_compare_traces.assert_not_called()
+        mock_local_launch.assert_called_once()
+        mock_remote_launch.assert_called_once()
+        self.assertEqual(remote_command[-2:], base_command)
+        # Make sure we copied the differences to the export dir
+        mock_export.assert_has_calls(
+            [
+                mock.call(output, export_dir_abs),
+                mock.call(Path(str(output) + '.remote'), export_dir_abs),
+            ],
+            any_order=True,
+        )
+
     def test_local_remote_compare_with_fsatrace_from_main_args(self):
         # Same as test_remote_fsatrace_from_main_args, but with --compare
         exec_root = Path('/home/project')
@@ -1147,6 +1213,59 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
             str(exec_root_rel / fuchsia._CHECK_DETERMINISM_SCRIPT),
             check_prefix)
         self.assertIn('--check-repeatability', check_prefix)
+        _, _, output_list = cl_utils.partition_sequence(
+            check_prefix, '--outputs')
+        self.assertEqual(output_list, [str(output)])
+        self.assertEqual(main_command, base_command)
+
+    def test_local_check_determinism_with_export(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        exec_root_rel = cl_utils.relpath(exec_root, start=working_dir)
+        output = Path('hello.txt')
+        base_command = ['touch', str(output)]
+        p = self._make_main_parser()
+        export_dir = Path('saved-diffs')  # relative to working dir
+        export_dir_abs = working_dir / export_dir
+        main_args, other = p.parse_known_args(
+            [
+                '--check-determinism',
+                '--local',
+                # request that differences be saved to an export dir
+                f'--miscomparison-export-dir={export_dir}',
+                '--'
+            ] + base_command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            output_files=[output],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+        self.assertTrue(action.remote_disable)
+        self.assertEqual(
+            action.miscomparison_export_dir, working_dir / export_dir)
+
+        with mock.patch.object(
+                cl_utils, 'subprocess_call',
+                return_value=cl_utils.SubprocessResult(0)) as mock_run:
+            exit_code = action.run_with_main_args(main_args)
+
+        self.assertEqual(exit_code, 0)
+        mock_run.assert_called_once()
+        args, kwargs = mock_run.call_args_list[0]
+        launch_command = args[0]
+        self.assertEqual(kwargs['cwd'], working_dir)
+        check_prefix, sep, main_command = cl_utils.partition_sequence(
+            launch_command, '--')
+        self.assertEqual(check_prefix[0], sys.executable)
+        self.assertIn(
+            str(exec_root_rel / fuchsia._CHECK_DETERMINISM_SCRIPT),
+            check_prefix)
+        self.assertIn('--check-repeatability', check_prefix)
+        # Make sure export dir argument is forwarded.
+        self.assertIn(
+            f'--miscomparison-export-dir={export_dir_abs}', check_prefix)
         _, _, output_list = cl_utils.partition_sequence(
             check_prefix, '--outputs')
         self.assertEqual(output_list, [str(output)])

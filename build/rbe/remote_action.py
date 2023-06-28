@@ -839,6 +839,7 @@ class RemoteAction(object):
         diagnose_nonzero: bool = False,
         compare_with_local: bool = False,
         check_determinism: bool = False,
+        miscomparison_export_dir: Path = None,
         post_remote_run_success_action: Callable[[], int] = None,
         remote_debug_command: Sequence[str] = None,
         always_download: Sequence[Path] = None,
@@ -868,6 +869,8 @@ class RemoteAction(object):
           verbose: if true, print more information about what is happening.
           compare_with_local: if true, also run locally and compare outputs.
           check_determinism: if true, compare outputs of two local executions.
+          miscomparison_export_dir: copy unexpected differences found by
+            --compare or --check-determinism to this directory, if given.
           save_temps: if true, keep around temporarily generated files after execution.
           label: build system identifier, for diagnostic messages.
           remote_log: "" means disabled.  Any other value, remote logging is
@@ -908,6 +911,7 @@ class RemoteAction(object):
         self._label = label
         self._compare_with_local = compare_with_local
         self._check_determinism = check_determinism
+        self._miscomparison_export_dir = miscomparison_export_dir
         self._options = (options or [])
         self._post_remote_run_success_action = post_remote_run_success_action
         self._remote_debug_command = remote_debug_command or []
@@ -1102,6 +1106,12 @@ class RemoteAction(object):
         return self._check_determinism
 
     @property
+    def miscomparison_export_dir(self) -> Optional[Path]:
+        if self._miscomparison_export_dir:
+            return self.working_dir / self._miscomparison_export_dir
+        return None
+
+    @property
     def diagnose_nonzero(self) -> bool:
         return self._diagnose_nonzero
 
@@ -1261,6 +1271,7 @@ class RemoteAction(object):
             exec_root=self.exec_root_rel,
             outputs=self.output_files_relative_to_working_dir,
             label=self.label,
+            miscomparison_export_dir=self.miscomparison_export_dir,
             # no command, just prefix
         )
         # TODO: The comparison script does not support directories yet.
@@ -1760,6 +1771,13 @@ class RemoteAction(object):
                     )
                 msg("------------------------------------")
 
+                # Optionally: copy differences to a location that other tools
+                # can pickup or upload.
+                export_dir = self.miscomparison_export_dir
+                if export_dir:
+                    cl_utils.copy_preserve_subpath(local_out, export_dir)
+                    cl_utils.copy_preserve_subpath(remote_out, export_dir)
+
             # Also compare file access traces, if available.
             if self._fsatrace_path:
                 diff_status = self._compare_fsatraces()
@@ -1970,6 +1988,14 @@ Otherwise, BASE will default to the first output file named.""",
         "In 'compare' mode, run both locally and remotely (sequentially) and compare outputs.  Exit non-zero (failure) if any of the outputs differs between the local and remote execution, even if those executions succeeded.  When used with --fsatrace-path, also compare file access traces.  No comparison is done with --local mode.",
     )
     main_group.add_argument(
+        "--miscomparison-export-dir",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help=
+        "When using --compare or --check-determinism, save unexpectedly different artifacts to this directory, preserving relative path under the working directory.",
+    ),
+    main_group.add_argument(
         "--diagnose-nonzero",
         action="store_true",
         default=False,
@@ -2053,6 +2079,7 @@ def remote_action_from_args(
         label=main_args.label,
         compare_with_local=main_args.compare,
         check_determinism=main_args.check_determinism,
+        miscomparison_export_dir=main_args.miscomparison_export_dir,
         save_temps=main_args.save_temps,
         remote_log=main_args.remote_log,
         fsatrace_path=main_args.fsatrace_path,

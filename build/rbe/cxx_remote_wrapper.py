@@ -378,6 +378,12 @@ class CxxRemoteAction(object):
         return self._main_args.check_determinism
 
     @property
+    def miscomparison_export_dir(self) -> Optional[Path]:
+        if self._main_args.miscomparison_export_dir:
+            return self.working_dir / self._main_args.miscomparison_export_dir
+        return None
+
+    @property
     def label(self) -> Optional[str]:
         return self._main_args.label
 
@@ -406,6 +412,7 @@ class CxxRemoteAction(object):
                 exec_root=self.exec_root_rel,
                 outputs=self._remote_output_files(),
                 command=self.original_compile_command,
+                miscomparison_export_dir=self.miscomparison_export_dir,
                 label=self.label,
             )
             # Both clang and gcc support -Wdate-time to catch nonreproducible

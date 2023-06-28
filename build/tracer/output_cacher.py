@@ -102,12 +102,23 @@ def ensure_file_exists(path: Path):
 
 def detail_diff(left: Path, right: Path):
     """Richer difference analysis."""
+    print(f"  {left} vs. {right}")
     subprocess.call(
         [
             _PROJECT_ROOT_REL / _DETAIL_DIFF_SCRIPT,
             str(left),
             str(right),
         ])
+
+
+# TODO: de-dupe this from cl_utils after moving this source file
+def copy_preserve_subpath(src: Path, dest_dir: Path):
+    """Like copy(), but preserves the relative path of src in the destination."""
+    assert not src.is_absolute(
+    ), f'source file to be copied should be relative, but got: {src}'
+    dest_subdir = dest_dir / src.parent
+    dest_subdir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest_subdir)
 
 
 def retry_file_op_once_with_delay(
@@ -352,6 +363,7 @@ class Action(object):
     def run_twice_and_compare_outputs(
             self,
             tempfile_transform: TempFileTransform,
+            diff_action: Callable[[Path, Path], Any],
             verbose: bool = False) -> int:
         """Runs a command twice, copying declared outputs in between.
 
@@ -364,6 +376,7 @@ class Action(object):
 
         Args:
           tempfile_transform: used to rename backup copies of outputs.
+          diff_action: action to run on files with differences.
           verbose: if True, print more diagnostics.
 
         Returns:
@@ -407,11 +420,16 @@ class Action(object):
             return rerun_retval
 
         return verify_files_match(
-            fileset=renamed_outputs, label=self.label, renamed=False)
+            fileset=renamed_outputs,
+            label=self.label,
+            renamed=False,
+            diff_action=diff_action,
+        )
 
     def run_twice_with_substitution_and_compare_outputs(
             self,
             tempfile_transform: TempFileTransform,
+            diff_action: Callable[[Path, Path], Any],
             verbose: bool = False) -> int:
         """Runs a command twice, the second time with renamed outputs, and compares.
 
@@ -420,6 +438,7 @@ class Action(object):
 
         Args:
           tempfile_transform: used to rename backup copies of outputs.
+          diff_action: action to run on files with differences.
           verbose: if True, print more diagnostics.
 
         Returns:
@@ -455,11 +474,19 @@ class Action(object):
             return rerun_retval
 
         return verify_files_match(
-            fileset=renamed_outputs, label=self.label, renamed=True)
+            fileset=renamed_outputs,
+            label=self.label,
+            renamed=True,
+            diff_action=diff_action,
+        )
 
 
 def verify_files_match(
-        fileset: Dict[Path, Path], label: str, renamed: bool) -> int:
+    fileset: Dict[Path, Path],
+    diff_action: Callable[[Path, Path], Any],
+    label: str,
+    renamed: bool,
+) -> int:
     """Compare outputs and report differences.
 
     Remove matching copies.
@@ -467,8 +494,10 @@ def verify_files_match(
     Args:
       fileset: {file: backup} key-value pairs of files to compare. Backup files
         that match are removed to save space, while the .keys() files are kept.
+      diff_action: action to run on files with differences, e.g. more
+        detailed diff analysis, copy files.
+      renamed: True if files to compare were renamed.
       label: An identifier for the action that was run, for diagnostics.
-
     Returns:
       exit code 0 if all files matched, else 1.
     """
@@ -496,10 +525,7 @@ def verify_files_match(
         )
 
         for orig, temp in different_files:
-            print(f"  {orig} vs. {temp}")
-            detail_diff(orig, temp)
-
-        # Keep around different outputs for analysis.
+            diff_action(orig, temp)
 
         # Note: Even though the original command succeeded, forcing this to
         # fail may influence tools that examine the freshness of outputs
@@ -588,6 +614,14 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         help=
         "When checking for repeatability: rename command-line outputs on the second run.",
     )
+    parser.add_argument(
+        "--miscomparison-export-dir",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help=
+        "When using --check-repeatability, save unexpectedly different artifacts to this directory, preserving relative path under the working directory.",
+    ),
 
     # Positional args are the command and arguments to run.
     parser.add_argument("command", nargs="*", help="The command to run")
@@ -595,6 +629,17 @@ def _main_arg_parser() -> argparse.ArgumentParser:
 
 
 _MAIN_ARG_PARSER = _main_arg_parser()
+
+
+def default_diff_action(
+        left: Path, right: Path, miscomparison_export_dir: Path = None):
+    # Run detailed analysis, using various binary dumps.
+    detail_diff(left, right)
+
+    # Keep around different outputs for analysis.
+    if miscomparison_export_dir:
+        copy_preserve_subpath(left, miscomparison_export_dir)
+        copy_preserve_subpath(right, miscomparison_export_dir)
 
 
 def main():
@@ -651,16 +696,26 @@ def main():
     #   in-place to their original locations if contents have not changed.
 
     if args.check_repeatability:
+
+        def _diff_action(left: Path, right: Path):
+            default_diff_action(left, right, args.miscomparison_export_dir)
+
         if args.rename_outputs:
-            # This check variant will find path-sensitive outputs,
+            # This check variant will find path-sensitive outputs
+            # (for example, outputs that contain their own path),
             # and nondeterminstic outputs.
             return action.run_twice_with_substitution_and_compare_outputs(
-                tempfile_transform=tempfile_transform, verbose=args.verbose)
+                tempfile_transform=tempfile_transform,
+                diff_action=_diff_action,
+                verbose=args.verbose)
         else:
             # This check will only find nondeterministic outputs.
             # For example, those affected by the current time.
             return action.run_twice_and_compare_outputs(
-                tempfile_transform=tempfile_transform, verbose=args.verbose)
+                tempfile_transform=tempfile_transform,
+                diff_action=_diff_action,
+                verbose=args.verbose,
+            )
 
     return action.run_cached(
         tempfile_transform=tempfile_transform,

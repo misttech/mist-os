@@ -258,6 +258,12 @@ class RustRemoteAction(object):
         return self._main_args.check_determinism
 
     @property
+    def miscomparison_export_dir(self) -> Optional[Path]:
+        if self._main_args.miscomparison_export_dir:
+            return self.working_dir / self._main_args.miscomparison_export_dir
+        return None
+
+    @property
     def local_only(self) -> bool:
         """If the conditions are not right for remote execution, disable,
         regardless of configuration.
@@ -815,6 +821,7 @@ class RustRemoteAction(object):
                 exec_root=self.exec_root_rel,
                 outputs=list(self._remote_output_files()),
                 command=command,
+                miscomparison_export_dir=self.miscomparison_export_dir,
                 label=self.label,
             )
 

@@ -3,9 +3,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import contextlib
+import filecmp
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -185,6 +188,65 @@ class EnsureFileExists(unittest.TestCase):
         mock_exists.assert_called()
         mock_sleep.assert_called()
         # just make sure no exception raised
+
+
+@contextlib.contextmanager
+def chdir_cm(d: Path):
+    """FIXME: replace with contextlib.chdir(), once Python 3.11 is default."""
+    save_dir = os.getcwd()
+    os.chdir(d)  # could raise OSError
+    try:
+        yield
+    finally:
+        os.chdir(save_dir)
+
+
+class CopyPreserveSubpathTests(unittest.TestCase):
+
+    def test_subpath(self):
+        with tempfile.TemporaryDirectory() as td1:
+            tdp1 = Path(td1)
+            dest_dir = tdp1 / 'backups'
+            with chdir_cm(tdp1):  # working directory
+                srcdir = Path('aa/bb')
+                srcdir.mkdir(parents=True, exist_ok=True)
+                src_file = srcdir / 'c.txt'
+                src_file.write_text('hello\n')
+                output_cacher.copy_preserve_subpath(src_file, dest_dir)
+                dest_file = dest_dir / src_file
+                self.assertTrue(filecmp.cmp(src_file, dest_file, shallow=False))
+
+
+class DefaultDiffActionTests(unittest.TestCase):
+
+    def test_no_copy(self):
+        file1 = Path('srcdir-x/file1.bin')
+        file2 = Path('srcdir-y/file2.bin')
+        with mock.patch.object(output_cacher, 'detail_diff') as mock_diff:
+            with mock.patch.object(output_cacher,
+                                   'copy_preserve_subpath') as mock_copy:
+                output_cacher.default_diff_action(file1, file2)
+
+        mock_diff.assert_called_with(file1, file2)
+        mock_copy.assert_not_called()
+
+    def test_with_copy(self):
+        file1 = Path('srcdir-x/file1.bin')
+        file2 = Path('srcdir-y/file2.bin')
+        export_dir = Path('bad/diffs')
+        with mock.patch.object(output_cacher, 'detail_diff') as mock_diff:
+            with mock.patch.object(output_cacher,
+                                   'copy_preserve_subpath') as mock_copy:
+                output_cacher.default_diff_action(
+                    file1, file2, miscomparison_export_dir=export_dir)
+
+        mock_diff.assert_called_with(file1, file2)
+        mock_copy.assert_has_calls(
+            [
+                mock.call(file1, export_dir),
+                mock.call(file2, export_dir),
+            ],
+            any_order=True)
 
 
 class MoveIfDifferentTests(unittest.TestCase):
@@ -384,7 +446,9 @@ class RunTwiceCompareTests(unittest.TestCase):
                             with mock.patch.object(time, "sleep") as mock_zzz:
                                 self.assertEqual(
                                     action.run_twice_and_compare_outputs(
-                                        transform), 1)
+                                        tempfile_transform=transform,
+                                        diff_action=output_cacher.detail_diff,
+                                    ), 1)
         mock_call.assert_called_once_with(["run.sh"])
         mock_match.assert_not_called()
         mock_exists.assert_not_called()
@@ -409,7 +473,10 @@ class RunTwiceCompareTests(unittest.TestCase):
                                                        "sleep") as mock_zzz:
                                     self.assertEqual(
                                         action.run_twice_and_compare_outputs(
-                                            transform), 0)
+                                            tempfile_transform=transform,
+                                            diff_action=output_cacher.
+                                            detail_diff,
+                                        ), 0)
         mock_call.assert_has_calls(
             [
                 mock.call(["run.sh", "in.put", "out.put"]),
@@ -441,7 +508,10 @@ class RunTwiceCompareTests(unittest.TestCase):
                                                        "sleep") as mock_zzz:
                                     self.assertEqual(
                                         action.run_twice_and_compare_outputs(
-                                            transform), 1)
+                                            tempfile_transform=transform,
+                                            diff_action=output_cacher.
+                                            detail_diff,
+                                        ), 1)
         mock_call.assert_has_calls(
             [
                 mock.call(["run.sh", "in.put", "out.put"]),
@@ -484,7 +554,10 @@ class RunTwiceCompareTests(unittest.TestCase):
                                                        "sleep") as mock_zzz:
                                     self.assertEqual(
                                         action.run_twice_and_compare_outputs(
-                                            transform), 1)
+                                            tempfile_transform=transform,
+                                            diff_action=output_cacher.
+                                            detail_diff,
+                                        ), 1)
         mock_call.assert_has_calls(
             [
                 mock.call(["run.sh", "in.put", "out.put", "out2.put"]),
@@ -522,7 +595,9 @@ class RunTwiceWithSubstitutionCompareTests(unittest.TestCase):
             with mock.patch.object(output_cacher, "files_match") as mock_match:
                 self.assertEqual(
                     action.run_twice_with_substitution_and_compare_outputs(
-                        transform), 1)
+                        tempfile_transform=transform,
+                        diff_action=output_cacher.detail_diff,
+                    ), 1)
         mock_call.assert_called_once_with(["run.sh"])
         mock_match.assert_not_called()
 
@@ -537,7 +612,9 @@ class RunTwiceWithSubstitutionCompareTests(unittest.TestCase):
                 with mock.patch.object(Path, "unlink") as mock_remove:
                     self.assertEqual(
                         action.run_twice_with_substitution_and_compare_outputs(
-                            transform), 0)
+                            tempfile_transform=transform,
+                            diff_action=output_cacher.detail_diff,
+                        ), 0)
         mock_call.assert_has_calls(
             [
                 mock.call(["run.sh", "in.put", "out.put"]),
@@ -558,7 +635,9 @@ class RunTwiceWithSubstitutionCompareTests(unittest.TestCase):
                 with mock.patch.object(os, "remove") as mock_remove:
                     self.assertEqual(
                         action.run_twice_with_substitution_and_compare_outputs(
-                            transform), 1)
+                            tempfile_transform=transform,
+                            diff_action=output_cacher.detail_diff,
+                        ), 1)
         mock_call.assert_has_calls(
             [
                 mock.call(["run.sh", "in.put", "out.put"]),
@@ -590,7 +669,9 @@ class RunTwiceWithSubstitutionCompareTests(unittest.TestCase):
                 with mock.patch.object(Path, "unlink") as mock_remove:
                     self.assertEqual(
                         action.run_twice_with_substitution_and_compare_outputs(
-                            transform), 1)
+                            tempfile_transform=transform,
+                            diff_action=output_cacher.detail_diff,
+                        ), 1)
         mock_call.assert_has_calls(
             [
                 mock.call(["run.sh", "in.put", "out.put", "out2.put"]),

@@ -46,6 +46,12 @@ const (
 	// arg in //build/config/clang/crash_diagnostics.gni.
 	clangCrashReportsDirName = "clang-crashreports"
 
+	// Name of the directory under the build directory containing copies
+	// of fails that failed comparison checks (e.g. local determinism,
+	// local vs. remote consistency).  This name is configured by
+	// `comparison_diagnostics_dir` in //build/toolchain/rbe.gni.
+	comparisonDiagnosticsDirName = "comparison-reports"
+
 	// Name of the directory within the build directory that will contain traces
 	// with files accesses after a build. By default only traces for targets with
 	// unexpected accesses are persisted after a build.
@@ -231,6 +237,14 @@ func buildImpl(
 					return err
 				}
 
+				compareDiagnosticsFiles, err := collectCompareDiagnosticsFiles(contextSpec.BuildDir)
+				if err != nil {
+					return err
+				}
+				if err := saveDebugFiles(compareDiagnosticsFiles); err != nil {
+					return err
+				}
+
 				traces, err := collectFileAccessTraces(contextSpec.BuildDir)
 				if err != nil {
 					return fmt.Errorf("collecting file access traces: %w", err)
@@ -384,6 +398,30 @@ func collectClangCrashReports(buildDir string) ([]string, error) {
 	}
 
 	return outputs, nil
+}
+
+// collectCompareDiagnosticsFiles lists absolute paths to files in the
+// comparison diffs directory, which can be populated by determinism
+// and consistency checks.
+func collectCompareDiagnosticsFiles(buildDir string) ([]string, error) {
+	var files []string
+	diagnosticsDir := filepath.Join(buildDir, comparisonDiagnosticsDirName)
+	if isDir, err := osmisc.IsDir(diagnosticsDir); err != nil || !isDir {
+		return nil, err
+	}
+	err := filepath.WalkDir(diagnosticsDir, func(path string, info fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
 }
 
 // collectFileAccessTraces finds access traces in the build directory, and

@@ -164,4 +164,9 @@ declare_args() {
   #       by running both and comparing results.
   #
   cxx_rbe_check = "none"
+
+  # When any of the {Rust,C++} {determinism,consistency} checks fail,
+  # copy the artifacts' difference-pairs to this directory for exporting
+  # from infra builds, and later inspection.
+  comparison_diagnostics_dir = "$root_build_dir/comparison-reports"
 }
