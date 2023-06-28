@@ -92,9 +92,7 @@ class HealthCheckServiceTest : public testing::Test {
   fidl::WireSyncClient<fuv::BlobfsVerifier> Client() {
     auto endpoints = fidl::CreateEndpoints<fuv::BlobfsVerifier>();
     EXPECT_EQ(endpoints.status_value(), ZX_OK);
-    EXPECT_EQ(setup_.vfs()->Serve(svc_, endpoints->server.TakeChannel(),
-                                  fs::VnodeConnectionOptions::ReadWrite()),
-              ZX_OK);
+    EXPECT_EQ(setup_.vfs()->Serve(svc_, endpoints->server.TakeChannel(), {}), ZX_OK);
     return fidl::WireSyncClient(std::move(endpoints->client));
   }
 
