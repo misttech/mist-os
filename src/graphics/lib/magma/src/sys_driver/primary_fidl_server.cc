@@ -19,6 +19,7 @@ std::optional<fuchsia_gpu_magma::ObjectType> ValidateObjectType(
   switch (fidl_type) {
     case fuchsia_gpu_magma::ObjectType::kBuffer:
     case fuchsia_gpu_magma::ObjectType::kEvent:
+    case fuchsia_gpu_magma::ObjectType::kSemaphore:
       return {fidl_type};
     default:
       return std::nullopt;
@@ -218,9 +219,11 @@ void PrimaryFidlServer::ImportObject(ImportObjectRequestView request,
 
   zx::handle handle;
   switch (*object_type) {
-    case fuchsia_gpu_magma::ObjectType::kEvent:
+    case fuchsia_gpu_magma::ObjectType::kSemaphore:
       if (request->object().is_semaphore()) {
         handle = std::move(request->object().semaphore());
+      } else if (request->object().is_vmo_semaphore()) {
+        handle = std::move(request->object().vmo_semaphore());
       }
       break;
     case fuchsia_gpu_magma::ObjectType::kBuffer:

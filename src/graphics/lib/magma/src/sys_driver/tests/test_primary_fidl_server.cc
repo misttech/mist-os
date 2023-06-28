@@ -414,6 +414,7 @@ class TestPlatformConnection {
                                    magma::PlatformHandle::Create(handle)));
 
     EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
+
     {
       std::unique_lock<std::mutex> lock(shared_data_->mutex);
       zx_info_handle_basic_t handle_info{};
@@ -494,8 +495,8 @@ class TestDelegate : public msd::PrimaryFidlServer::Delegate {
                              uint64_t object_id) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
     switch (object_type) {
-      case fuchsia_gpu_magma::wire::ObjectType::kEvent: {
-        auto semaphore = magma::PlatformSemaphore::Import(zx::event(std::move(handle)), flags);
+      case fuchsia_gpu_magma::wire::ObjectType::kSemaphore: {
+        auto semaphore = magma::PlatformSemaphore::Import(std::move(handle), flags);
         if (!semaphore)
           return MAGMA_STATUS_INVALID_ARGS;
         EXPECT_EQ(object_id, shared_data_->test_semaphore_id);
@@ -517,7 +518,7 @@ class TestDelegate : public msd::PrimaryFidlServer::Delegate {
                               fuchsia_gpu_magma::wire::ObjectType object_type) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
     switch (object_type) {
-      case fuchsia_gpu_magma::wire::ObjectType::kEvent: {
+      case fuchsia_gpu_magma::wire::ObjectType::kSemaphore: {
         EXPECT_EQ(object_id, shared_data_->test_semaphore_id);
         break;
       }

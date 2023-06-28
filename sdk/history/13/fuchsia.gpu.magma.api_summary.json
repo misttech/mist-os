@@ -282,6 +282,12 @@
         "type": "zx/Handle:EVENT"
     },
     {
+        "kind": "union/member",
+        "name": "fuchsia.gpu.magma/Object.vmo_semaphore",
+        "ordinal": "3",
+        "type": "zx/Handle:VMO"
+    },
+    {
         "kind": "union",
         "name": "fuchsia.gpu.magma/Object",
         "resourceness": "resource",
@@ -296,6 +302,11 @@
         "kind": "enum/member",
         "name": "fuchsia.gpu.magma/ObjectType.EVENT",
         "value": "10"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.gpu.magma/ObjectType.SEMAPHORE",
+        "value": "12"
     },
     {
         "kind": "enum",

@@ -285,7 +285,8 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
   }
 
   // Verifies independent presubmit queueing (pending wait semaphores) for multi engines.
-  void MemoryWriteEngineInterleavedPresubmitQueueing(int submit_count, int semaphore_count) {
+  void MemoryWriteEngineInterleavedPresubmitQueueing(int submit_count, int semaphore_count,
+                                                     bool use_vmo_semaphore = false) {
     ASSERT_EQ(submit_count % 2, 0);
 
     constexpr uint64_t kMapFlags =
@@ -340,7 +341,19 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
         magma_semaphore_t semaphore;
         magma_semaphore_id_t id;
 
-        EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore(connection_, &semaphore, &id));
+#if defined(__Fuchsia__)
+        if (use_vmo_semaphore) {
+          zx::vmo vmo;
+          ASSERT_EQ(ZX_OK, zx::vmo::create(1, /*options=*/0, &vmo));
+          ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_import_semaphore2(
+                                         connection_, vmo.release(),
+                                         MAGMA_IMPORT_SEMAPHORE_ONE_SHOT, &semaphore, &id));
+        } else
+#endif
+        {
+          ASSERT_EQ(MAGMA_STATUS_OK,
+                    magma_connection_create_semaphore(connection_, &semaphore, &id));
+        }
         submit.wait_semaphores.push_back(semaphore);
         submit.semaphore_ids.push_back(id);
       }
@@ -348,7 +361,19 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
         magma_semaphore_t semaphore;
         magma_semaphore_id_t id;
 
-        EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore(connection_, &semaphore, &id));
+#if defined(__Fuchsia__)
+        if (use_vmo_semaphore) {
+          zx::vmo vmo;
+          ASSERT_EQ(ZX_OK, zx::vmo::create(1, /*options=*/0, &vmo));
+          ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_import_semaphore2(
+                                         connection_, vmo.release(),
+                                         MAGMA_IMPORT_SEMAPHORE_ONE_SHOT, &semaphore, &id));
+        } else
+#endif
+        {
+          ASSERT_EQ(MAGMA_STATUS_OK,
+                    magma_connection_create_semaphore(connection_, &semaphore, &id));
+        }
         submit.signal_semaphores.push_back(semaphore);
         submit.semaphore_ids.push_back(id);
       }
@@ -631,6 +656,18 @@ TEST_P(TestMemoryWriteEngineInterleavedPresubmitQueueing, OneSemaphore) {
 
 TEST_P(TestMemoryWriteEngineInterleavedPresubmitQueueing, ManySemaphore) {
   MemoryWriteEngineInterleavedPresubmitQueueing(GetParam(), /* semaphore_count= */ 3);
+}
+
+TEST_P(TestMemoryWriteEngineInterleavedPresubmitQueueing, OneVmoSemaphore) {
+  constexpr bool kUseVmoSemaphore = true;
+  MemoryWriteEngineInterleavedPresubmitQueueing(GetParam(), /* semaphore_count= */ 1,
+                                                kUseVmoSemaphore);
+}
+
+TEST_P(TestMemoryWriteEngineInterleavedPresubmitQueueing, ManyVmoSemaphore) {
+  constexpr bool kUseVmoSemaphore = true;
+  MemoryWriteEngineInterleavedPresubmitQueueing(GetParam(), /* semaphore_count= */ 3,
+                                                kUseVmoSemaphore);
 }
 
 INSTANTIATE_TEST_SUITE_P(MemoryWriteEngineInterleavedPresubmitQueueing,

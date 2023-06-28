@@ -19,8 +19,8 @@ MsdIntelContext::HandleWaitContext::HandleWaitContext(
     : context_(context),
       id_(id),
       object_(std::move(object)),
-      semaphore_(std::move(semaphore)),
-      waiter_(this, object_.get(), ZX_EVENT_SIGNALED) {}
+      semaphore_(semaphore),
+      waiter_(this, object_.get(), semaphore->GetZxSignal()) {}
 
 void MsdIntelContext::HandleWaitContext::Handler(async_dispatcher_t* dispatcher,
                                                  async::WaitBase* wait, zx_status_t status,

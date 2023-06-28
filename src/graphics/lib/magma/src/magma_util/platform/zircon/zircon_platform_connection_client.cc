@@ -154,28 +154,43 @@ PrimaryWrapper::PrimaryWrapper(zx::channel channel, uint64_t max_inflight_messag
 }
 
 static_assert(static_cast<uint32_t>(magma::PlatformObject::SEMAPHORE) ==
-              static_cast<uint32_t>(fuchsia_gpu_magma::wire::ObjectType::kEvent));
+              static_cast<uint32_t>(fuchsia_gpu_magma::wire::ObjectType::kSemaphore));
 static_assert(static_cast<uint32_t>(magma::PlatformObject::BUFFER) ==
               static_cast<uint32_t>(fuchsia_gpu_magma::wire::ObjectType::kBuffer));
 
 magma_status_t PrimaryWrapper::ImportObject(zx::handle handle, uint64_t flags,
                                             magma::PlatformObject::Type object_type,
                                             uint64_t object_id) {
-  uint64_t size = 0;
+  zx_info_handle_basic_t info;
+  {
+    zx_status_t status =
+        handle.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+    if (status != ZX_OK)
+      return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Invalid handle");
+  }
 
+  uint64_t size = 0;
   auto wire_object = fuchsia_gpu_magma::wire::Object();
+
   switch (object_type) {
     case magma::PlatformObject::SEMAPHORE:
-      wire_object = fuchsia_gpu_magma::wire::Object::WithSemaphore(zx::event(std::move(handle)));
+      if (info.type == ZX_OBJ_TYPE_EVENT) {
+        wire_object = fuchsia_gpu_magma::wire::Object::WithSemaphore(zx::event(std::move(handle)));
+      } else if (info.type == ZX_OBJ_TYPE_VMO) {
+        wire_object = fuchsia_gpu_magma::wire::Object::WithVmoSemaphore(zx::vmo(std::move(handle)));
+      }
       break;
+
     case magma::PlatformObject::BUFFER: {
       zx::unowned_vmo vmo(handle.get());
       zx_status_t status = vmo->get_size(&size);
       if (status != ZX_OK)
         return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "get_size failed: %d", status);
+
       wire_object = fuchsia_gpu_magma::wire::Object::WithBuffer(zx::vmo(std::move(handle)));
       break;
     }
+
     default:
       return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Bad object type: %d", object_type);
   }

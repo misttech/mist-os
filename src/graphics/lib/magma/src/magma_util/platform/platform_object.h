@@ -14,7 +14,7 @@ namespace magma {
 
 class PlatformObject {
  public:
-  enum Type { SEMAPHORE = 10, BUFFER = 11 };
+  enum Type { BUFFER = 11, SEMAPHORE = 12 };
 
   // Sets an ID that is attached only to this PlatformObject instance, not the underlying
   // object. Can only be set once and must be non-zero.

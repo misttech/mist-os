@@ -30,11 +30,12 @@ std::unique_ptr<msd::Buffer> MsdIntelDriver::ImportBuffer(zx::vmo vmo, uint64_t 
   return std::make_unique<MsdIntelAbiBuffer>(std::move(buffer));
 }
 
-magma_status_t MsdIntelDriver::ImportSemaphore(zx::event event, uint64_t client_id, uint64_t flags,
+magma_status_t MsdIntelDriver::ImportSemaphore(zx::handle handle, uint64_t client_id,
+                                               uint64_t flags,
                                                std::unique_ptr<msd::Semaphore>* semaphore_out) {
-  auto semaphore = magma::PlatformSemaphore::Import(std::move(event), flags);
+  auto semaphore = magma::PlatformSemaphore::Import(std::move(handle), flags);
   if (!semaphore)
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "couldn't import event handle");
+    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "couldn't import handle");
 
   semaphore->set_local_id(client_id);
 

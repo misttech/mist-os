@@ -32,7 +32,7 @@ std::unique_ptr<msd::Buffer> MsdVsiDriver::ImportBuffer(zx::vmo vmo, uint64_t cl
   return std::make_unique<MsdVsiAbiBuffer>(std::move(buffer));
 }
 
-magma_status_t MsdVsiDriver::ImportSemaphore(zx::event handle, uint64_t client_id, uint64_t flags,
+magma_status_t MsdVsiDriver::ImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
                                              std::unique_ptr<msd::Semaphore>* semaphore_out) {
   auto semaphore = magma::PlatformSemaphore::Import(std::move(handle), flags);
   if (!semaphore)

@@ -12,7 +12,7 @@
 namespace msd {
 class MagmaSystemSemaphore {
  public:
-  static std::unique_ptr<MagmaSystemSemaphore> Create(msd::Driver* device, zx::event event,
+  static std::unique_ptr<MagmaSystemSemaphore> Create(msd::Driver* device, zx::handle handle,
                                                       uint64_t client_id, uint64_t flags);
 
   uint64_t global_id() const { return global_id_; }
