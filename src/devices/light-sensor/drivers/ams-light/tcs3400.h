@@ -107,7 +107,7 @@ class Tcs3400Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
   uint8_t atime_ = 1;
   uint8_t again_ = 1;
   bool isSaturated_ = false;
-  time_t lastSaturatedLog_ = 0;
+  zx::time lastSaturatedLog_ = zx::time::infinite_past();
   sync_completion_t next_reader_wait_;
   async::Loop loop_;
   input_report_reader::InputReportReaderManager<Tcs3400InputReport> readers_;

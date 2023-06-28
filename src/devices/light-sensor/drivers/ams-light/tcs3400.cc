@@ -27,7 +27,7 @@ constexpr zx_duration_t INTERRUPTS_HYSTERESIS = ZX_MSEC(100);
 constexpr uint8_t SAMPLES_TO_TRIGGER = 0x01;
 
 // Repeat saturated log line every two minutes
-constexpr uint16_t kSaturatedLogTimeSecs = 120;
+constexpr zx::duration kSaturatedLogTimeSecs = zx::sec(120);
 // Bright, not saturated values to return when saturated
 constexpr uint16_t kMaxSaturationRed = 21'067;
 constexpr uint16_t kMaxSaturationGreen = 20'395;
@@ -186,9 +186,9 @@ zx::result<Tcs3400InputReport> Tcs3400Device::ReadInputRpt() {
     report.blue = kMaxSaturationBlue;
     report.illuminance = kMaxSaturationClear;
     // log one message when saturation starts and then
-    if (!isSaturated_ || difftime(time(nullptr), lastSaturatedLog_) >= kSaturatedLogTimeSecs) {
+    if (!isSaturated_ || zx::clock::get_monotonic() - lastSaturatedLog_ >= kSaturatedLogTimeSecs) {
       zxlogf(INFO, "sensor is saturated");
-      time(&lastSaturatedLog_);
+      lastSaturatedLog_ = zx::clock::get_monotonic();
     }
   } else {
     uint8_t status_val;
@@ -204,9 +204,10 @@ zx::result<Tcs3400InputReport> Tcs3400Device::ReadInputRpt() {
       report.blue = kMaxSaturationBlue;
       report.illuminance = kMaxSaturationClear;
       saturatedReading = true;
-      if (!isSaturated_ || difftime(time(nullptr), lastSaturatedLog_) >= kSaturatedLogTimeSecs) {
+      if (!isSaturated_ ||
+          zx::clock::get_monotonic() - lastSaturatedLog_ >= kSaturatedLogTimeSecs) {
         zxlogf(INFO, "sensor is saturated via status register");
-        time(&lastSaturatedLog_);
+        lastSaturatedLog_ = zx::clock::get_monotonic();
       }
     }
     if (isSaturated_) {
