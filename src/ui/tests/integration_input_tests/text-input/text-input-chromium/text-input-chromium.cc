@@ -6,7 +6,6 @@
 // such as mouse-input-chromium.cc, virtual-keyboard-test.cc and other
 // similar efforts.
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>

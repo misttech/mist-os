@@ -10,7 +10,6 @@ import 'dart:async';
 import 'package:fidl/fidl.dart' show InterfaceRequest, MethodException;
 import 'package:fidl_fidl_test_compatibility/fidl_async.dart';
 import 'package:fidl_fidl_test_imported/fidl_async.dart' as imported;
-import 'package:fidl_fuchsia_sys/fidl_async.dart';
 import 'package:fuchsia_services/services.dart';
 
 class EchoImpl extends Echo {
