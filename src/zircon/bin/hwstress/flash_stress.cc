@@ -4,7 +4,6 @@
 
 #include "src/zircon/bin/hwstress/flash_stress.h"
 
-#include <fcntl.h>
 #include <fuchsia/device/cpp/fidl.h>
 #include <fuchsia/hardware/block/cpp/fidl.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
@@ -295,9 +294,10 @@ std::string TemporaryFvmPartition::GetPartitionPath() { return partition_path_; 
 // Start a stress test.
 bool StressFlash(StatusLine* logger, const CommandLineArgs& args, zx::duration duration) {
   // Access the FVM.
-  fbl::unique_fd fvm_fd(open(args.fvm_path.c_str(), O_RDONLY));
-  if (!fvm_fd) {
-    logger->Log("Error: Could not open FVM\n");
+  fbl::unique_fd fvm_fd;
+  if (zx_status_t status = fdio_open_fd(args.fvm_path.c_str(), 0, fvm_fd.reset_and_get_address());
+      status != ZX_OK) {
+    logger->Log("Error: Could not open FVM: %s\n", zx_status_get_string(status));
     return false;
   }
 
