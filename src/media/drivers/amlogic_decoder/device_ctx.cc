@@ -36,6 +36,8 @@ const char* GetRoleName(ThreadRole role) {
       return "fuchsia.media.drivers.amlogic-decoder.h264-core";
     case ThreadRole::kH264MultiStreamControl:
       return "fuchsia.media.drivers.amlogic-decoder.h264-stream-control";
+    case ThreadRole::kH264MultiResource:
+      return "fuchsia.media.drivers.amlogic-decoder.h264-resource";
     case ThreadRole::kVp9InputProcessing:
       return "fuchsia.media.drivers.amlogic-decoder.vp9-input-processing";
     case ThreadRole::kVp9StreamControl:

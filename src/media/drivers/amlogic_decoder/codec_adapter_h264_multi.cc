@@ -123,8 +123,11 @@ CodecAdapterH264Multi::CodecAdapterH264Multi(std::mutex& lock,
   device_->SetThreadProfile(zx::unowned_thread(thrd_get_zx_handle(thrd)),
                             ThreadRole::kH264MultiCore);
 
-  status = resource_loop_.StartThread("Resource loop");
+  status = resource_loop_.StartThread("Resource loop", &thrd);
   ZX_ASSERT(status == ZX_OK);
+
+  device_->SetThreadProfile(zx::unowned_thread(thrd_get_zx_handle(thrd)),
+                            ThreadRole::kH264MultiResource);
 }
 
 CodecAdapterH264Multi::~CodecAdapterH264Multi() {

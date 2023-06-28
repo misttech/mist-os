@@ -18,6 +18,7 @@ enum class ThreadRole {
   kVdec1Irq,
   kH264MultiCore,
   kH264MultiStreamControl,
+  kH264MultiResource,
   kVp9InputProcessing,
   kVp9StreamControl,
 };
