@@ -32,7 +32,7 @@ async fn start_nested_cm_and_wait_for_clean_stop(root_url: &str, moniker_to_wait
         .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
         .unwrap();
     proxy.wait_for_ready().await.unwrap();
-    let mut event_stream = EventStream::new_v2(proxy);
+    let mut event_stream = EventStream::new(proxy);
 
     instance.start_component_tree().await.unwrap();
 

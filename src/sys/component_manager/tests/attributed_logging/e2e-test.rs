@@ -45,7 +45,7 @@ async fn verify_routing_failure_messages() {
         .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
         .unwrap();
     proxy.wait_for_ready().await.unwrap();
-    let event_stream = EventStream::new_v2(proxy);
+    let event_stream = EventStream::new(proxy);
 
     let expected = EventSequence::new()
         .has_subset(

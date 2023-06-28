@@ -36,7 +36,7 @@ async fn destroy() {
         .unwrap();
     proxy.wait_for_ready().await.unwrap();
 
-    let event_stream = EventStream::new_v2(proxy);
+    let event_stream = EventStream::new(proxy);
 
     let expectation = EventSequence::new()
         .has_subset(
@@ -95,7 +95,7 @@ async fn destroy_and_recreate() {
         .unwrap();
     proxy.wait_for_ready().await.unwrap();
 
-    let event_stream = EventStream::new_v2(proxy);
+    let event_stream = EventStream::new(proxy);
 
     instance.start_component_tree().await.unwrap();
 
