@@ -14,6 +14,7 @@
 #include <lib/fdf/dispatcher.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls/object.h>
+#include <zircon/threads.h>
 
 #include <array>
 #include <cinttypes>
@@ -217,7 +218,19 @@ AmlogicSecureMemDevice::AmlogicSecureMemDevice(zx_device_t* device)
     : AmlogicSecureMemDeviceBase(device),
       fdf_dispatcher_(fdf_dispatcher_get_current_dispatcher()),
       receiver_(this, fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_)) {
-  sysmem_secure_mem_server_loop_.StartThread("sysmem_secure_mem_server_loop");
+  thrd_t thrd;
+  sysmem_secure_mem_server_loop_.StartThread("sysmem_secure_mem_server_loop", &thrd);
+
+  // Apply scheduler role to server thread.
+  const char* kRoleName = "fuchsia.devices.securemem.drivers.aml-securemem.server-loop";
+  const zx_status_t status =
+      device_set_profile_by_role(device, thrd_get_zx_handle(thrd), kRoleName, strlen(kRoleName));
+  if (status != ZX_OK) {
+    LOG(WARNING,
+        "Failed to apply role \"%s\" to dispatch thread: %s."
+        " Dispatch thread will run at default priority.",
+        kRoleName, zx_status_get_string(status));
+  }
 }
 
 zx_status_t AmlogicSecureMemDevice::CreateAndServeSysmemTee() {
