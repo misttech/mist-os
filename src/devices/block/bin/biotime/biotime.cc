@@ -2,30 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
-#include <lib/fdio/cpp/caller.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fit/defer.h>
-#include <lib/sync/completion.h>
 #include <lib/zircon-internal/xorshiftrand.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <threads.h>
 #include <unistd.h>
+#include <zircon/errors.h>
 #include <zircon/syscalls.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
 
-#include <atomic>
+#include <semaphore>
 
 #include <perftest/results.h>
 
 #include "src/devices/block/drivers/core/block-fifo.h"
 
-static uint64_t number(const char* str) {
+namespace {
+
+constexpr uint64_t kibi = 1024;
+
+uint64_t number(const char* str) {
   char* end;
   uint64_t n = strtoull(str, &end, 10);
 
@@ -33,21 +35,21 @@ static uint64_t number(const char* str) {
   switch (*end) {
     case 'G':
     case 'g':
-      m = 1024 * 1024 * 1024;
+      m = kibi * kibi * kibi;
       break;
     case 'M':
     case 'm':
-      m = 1024 * 1024;
+      m = kibi * kibi;
       break;
     case 'K':
     case 'k':
-      m = 1024;
+      m = kibi;
       break;
   }
   return m * n;
 }
 
-static void bytes_per_second(uint64_t bytes, uint64_t nanos) {
+void bytes_per_second(uint64_t bytes, uint64_t nanos) {
   double s = (static_cast<double>(nanos)) / (static_cast<double>(1000000000));
   double rate = (static_cast<double>(bytes)) / s;
 
@@ -62,14 +64,13 @@ static void bytes_per_second(uint64_t bytes, uint64_t nanos) {
   fprintf(stderr, "%g %s/s\n", rate, unit);
 }
 
-static void ops_per_second(uint64_t count, uint64_t nanos) {
+void ops_per_second(uint64_t count, uint64_t nanos) {
   double s = (static_cast<double>(nanos)) / (static_cast<double>(1000000000));
   double rate = (static_cast<double>(count)) / s;
   fprintf(stderr, "%g %s/s\n", rate, "ops");
 }
 
 using blkdev_t = struct {
-  int fd;
   zx::vmo vmo;
   zx::fifo fifo;
   fidl::ClientEnd<fuchsia_hardware_block::Session> session;
@@ -79,215 +80,197 @@ using blkdev_t = struct {
   fuchsia_hardware_block::wire::BlockInfo info;
 };
 
-static void blkdev_close(blkdev_t* blk) {
-  if (blk->fd >= 0) {
-    close(blk->fd);
+zx::result<blkdev_t> blkdev_open(const char* dev, size_t bufsz) {
+  zx::result channel = component::Connect<fuchsia_hardware_block::Block>(dev);
+  if (channel.is_error()) {
+    fprintf(stderr, "error: cannot open '%s': %s\n", dev, channel.status_string());
+    return channel.take_error();
   }
-  blk->vmo.reset();
-  blk->fifo.reset();
-  blk->session.reset();
-  memset(blk, 0, sizeof(blkdev_t));
-  blk->fd = -1;
-}
-
-static zx_status_t blkdev_open(int fd, const char* dev, size_t bufsz, blkdev_t* blk) {
-  memset(blk, 0, sizeof(blkdev_t));
-  blk->fd = fd;
-  blk->bufsz = bufsz;
-
-  auto cleanup = fit::defer([blk]() { blkdev_close(blk); });
-
-  fdio_cpp::UnownedFdioCaller caller(fd);
-  fidl::UnownedClientEnd channel = caller.borrow_as<fuchsia_hardware_block::Block>();
+  blkdev_t blk = {
+      .bufsz = bufsz,
+  };
 
   {
-    const fidl::WireResult result = fidl::WireCall(channel)->GetInfo();
+    const fidl::WireResult result = fidl::WireCall(channel.value())->GetInfo();
     if (!result.ok()) {
       fprintf(stderr, "error: cannot get block device info for '%s': %s\n", dev,
               result.FormatDescription().c_str());
-      return result.status();
+      return zx::error(result.status());
     }
     const fit::result response = result.value();
     if (response.is_error()) {
       fprintf(stderr, "error: cannot get block device info for '%s':%s\n", dev,
               zx_status_get_string(response.error_value()));
-      return response.error_value();
+      return zx::error(response.error_value());
     }
-    blk->info = response.value()->info;
+    blk.info = response.value()->info;
   }
 
   {
-    zx::result server = fidl::CreateEndpoints(&blk->session);
+    zx::result server = fidl::CreateEndpoints(&blk.session);
     if (server.is_error()) {
       fprintf(stderr, "error: cannot create server for '%s': %s\n", dev, server.status_string());
-      return server.status_value();
+      return zx::error(server.status_value());
     }
-    if (fidl::Status result = fidl::WireCall(channel)->OpenSession(std::move(server.value()));
+    if (fidl::Status result =
+            fidl::WireCall(channel.value())->OpenSession(std::move(server.value()));
         !result.ok()) {
       fprintf(stderr, "error: cannot open session for '%s': %s\n", dev,
               result.FormatDescription().c_str());
-      return result.status();
+      return zx::error(result.status());
     }
   }
 
   {
-    const fidl::WireResult result = fidl::WireCall(blk->session)->GetFifo();
+    const fidl::WireResult result = fidl::WireCall(blk.session)->GetFifo();
     if (!result.ok()) {
       fprintf(stderr, "error: cannot get fifo for '%s':%s\n", dev,
               result.FormatDescription().c_str());
-      return result.status();
+      return zx::error(result.status());
     }
     const fit::result response = result.value();
     if (response.is_error()) {
       fprintf(stderr, "error: cannot get fifo for '%s':%s\n", dev,
               zx_status_get_string(response.error_value()));
-      return response.error_value();
+      return zx::error(response.error_value());
     }
-    blk->fifo = std::move(response.value()->fifo);
+    blk.fifo = std::move(response.value()->fifo);
   }
 
-  if (zx_status_t status = zx::vmo::create(bufsz, 0, &blk->vmo); status != ZX_OK) {
+  if (zx_status_t status = zx::vmo::create(bufsz, 0, &blk.vmo); status != ZX_OK) {
     fprintf(stderr, "error: out of memory: %s\n", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
 
   zx::vmo dup;
-  if (zx_status_t status = blk->vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup); status != ZX_OK) {
+  if (zx_status_t status = blk.vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup); status != ZX_OK) {
     fprintf(stderr, "error: cannot duplicate handle: %s\n", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
 
-  const fidl::WireResult result = fidl::WireCall(blk->session)->AttachVmo(std::move(dup));
-  if (!result.ok()) {
-    fprintf(stderr, "error: cannot attach vmo for '%s':%s\n", dev,
-            result.FormatDescription().c_str());
-    return result.status();
+  {
+    const fidl::WireResult result = fidl::WireCall(blk.session)->AttachVmo(std::move(dup));
+    if (!result.ok()) {
+      fprintf(stderr, "error: cannot attach vmo for '%s':%s\n", dev,
+              result.FormatDescription().c_str());
+      return zx::error(result.status());
+    }
+    const fit::result response = result.value();
+    if (response.is_error()) {
+      fprintf(stderr, "error: cannot attach vmo for '%s':%s\n", dev,
+              zx_status_get_string(response.error_value()));
+      return zx::error(response.error_value());
+    }
+    blk.vmoid = response.value()->vmoid;
   }
-  const fit::result response = result.value();
-  if (response.is_error()) {
-    fprintf(stderr, "error: cannot attach vmo for '%s':%s\n", dev,
-            zx_status_get_string(response.error_value()));
-    return response.error_value();
-  }
-  blk->vmoid = response.value()->vmoid;
 
-  cleanup.cancel();
-  return ZX_OK;
+  return zx::ok(std::move(blk));
 }
 
 using bio_random_args_t = struct {
-  blkdev_t* blk;
+  blkdev_t& blk;
   size_t count;
   size_t xfer;
   uint64_t seed;
-  int max_pending;
   bool write;
   bool linear;
 
-  std::atomic<int> pending;
-  sync_completion_t signal;
+  mutable std::counting_semaphore<> sem;
 };
 
 std::atomic<reqid_t> next_reqid(0);
 
-static int bio_random_thread(void* arg) {
-  auto* a = reinterpret_cast<bio_random_args_t*>(arg);
+zx_status_t bio_random(const bio_random_args_t& a, uint64_t* _total, zx_duration_t* _res) {
+  size_t count = a.count;
+  zx::fifo& fifo = a.blk.fifo;
 
-  size_t off = 0;
-  size_t count = a->count;
-  size_t xfer = a->xfer;
+  zx_time_t t0 = zx_clock_get_monotonic();
 
-  size_t blksize = a->blk->info.block_size;
-  size_t blkcount = ((count * xfer) / blksize) - (xfer / blksize);
+  std::thread t([&a]() {
+    size_t off = 0;
+    size_t count = a.count;
+    size_t xfer = a.xfer;
 
-  rand64_t r64 = RAND63SEED(a->seed);
+    size_t blksize = a.blk.info.block_size;
+    size_t blkcount = ((count * xfer) / blksize) - (xfer / blksize);
 
-  zx::fifo& fifo = a->blk->fifo;
-  size_t dev_off = 0;
+    rand64_t r64 = RAND63SEED(a.seed);
 
-  while (count > 0) {
-    while (a->pending.load() == a->max_pending) {
-      sync_completion_wait(&a->signal, ZX_TIME_INFINITE);
-      sync_completion_reset(&a->signal);
-    }
+    zx::fifo& fifo = a.blk.fifo;
+    size_t dev_off = 0;
 
-    block_fifo_request_t req = {};
-    req.reqid = next_reqid.fetch_add(1);
-    req.vmoid = a->blk->vmoid.id;
-    req.command.opcode = a->write ? BLOCK_OPCODE_WRITE : BLOCK_OPCODE_READ;
-    req.command.flags = 0;
-    req.length = static_cast<uint32_t>(xfer);
-    req.vmo_offset = off;
+    while (count > 0) {
+      a.sem.acquire();
 
-    if (a->linear) {
-      req.dev_offset = dev_off;
-      dev_off += xfer;
-    } else {
-      req.dev_offset = (rand64(&r64) % blkcount) * blksize;
-    }
-    off += xfer;
-    if ((off + xfer) > a->blk->bufsz) {
-      off = 0;
-    }
+      block_fifo_request_t req = {
+          .command =
+              {
+                  .opcode = static_cast<uint8_t>(a.write ? BLOCK_OPCODE_WRITE : BLOCK_OPCODE_READ),
+                  .flags = 0,
+              },
+          .reqid = next_reqid.fetch_add(1),
+          .vmoid = a.blk.vmoid.id,
+          .length = static_cast<uint32_t>(xfer),
+          .vmo_offset = off,
+      };
 
-    req.length /= static_cast<uint32_t>(blksize);
-    req.dev_offset /= blksize;
-    req.vmo_offset /= blksize;
+      if (a.linear) {
+        req.dev_offset = dev_off;
+        dev_off += xfer;
+      } else {
+        req.dev_offset = (rand64(&r64) % blkcount) * blksize;
+      }
+      off += xfer;
+      if ((off + xfer) > a.blk.bufsz) {
+        off = 0;
+      }
+
+      req.length /= static_cast<uint32_t>(blksize);
+      req.dev_offset /= blksize;
+      req.vmo_offset /= blksize;
 
 #if 0
         fprintf(stderr, "IO tid=%u vid=%u op=%x len=%zu vof=%zu dof=%zu\n",
                 req.reqid, req.vmoid.id, req.opcode, req.length, req.vmo_offset, req.dev_offset);
 #endif
-    zx_status_t status = fifo.write(sizeof(req), &req, 1, nullptr);
-    if (status == ZX_ERR_SHOULD_WAIT) {
-      status = fifo.wait_one(ZX_FIFO_WRITABLE | ZX_FIFO_PEER_CLOSED, zx::time::infinite(), nullptr);
-      if (status != ZX_OK) {
-        fprintf(stderr, "failed waiting for fifo: %s\n", zx_status_get_string(status));
+      if (zx_status_t status = fifo.write(sizeof(req), &req, 1, nullptr); status != ZX_OK) {
+        if (status == ZX_ERR_SHOULD_WAIT) {
+          if (zx_status_t status = fifo.wait_one(ZX_FIFO_WRITABLE | ZX_FIFO_PEER_CLOSED,
+                                                 zx::time::infinite(), nullptr);
+              status != ZX_OK) {
+            fprintf(stderr, "failed waiting for fifo: %s\n", zx_status_get_string(status));
+            fifo.reset();
+            return -1;
+          }
+          continue;
+        }
+        fprintf(stderr, "error: failed writing to fifo: %s\n", zx_status_get_string(status));
         fifo.reset();
         return -1;
       }
-      continue;
+
+      count--;
     }
-    if (status != ZX_OK) {
-      fprintf(stderr, "error: failed writing to fifo: %s\n", zx_status_get_string(status));
-      fifo.reset();
-      return -1;
-    }
-
-    a->pending.fetch_add(1);
-    count--;
-  }
-  return 0;
-}
-
-static zx_status_t bio_random(bio_random_args_t* a, uint64_t* _total, zx_duration_t* _res) {
-  thrd_t t;
-  int r;
-
-  size_t count = a->count;
-  zx::fifo& fifo = a->blk->fifo;
-
-  zx_time_t t0 = zx_clock_get_monotonic();
-  thrd_create(&t, bio_random_thread, a);
+    return 0;
+  });
 
   auto cleanup = fit::defer([&fifo, &t]() {
-    int r;
     fifo.reset();
-    thrd_join(t, &r);
+    t.join();
   });
 
   while (count > 0) {
     block_fifo_response_t resp;
-    zx_status_t status = fifo.read(sizeof(resp), &resp, 1, nullptr);
-    if (status == ZX_ERR_SHOULD_WAIT) {
-      status = fifo.wait_one(ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED, zx::time::infinite(), nullptr);
-      if (status != ZX_OK) {
-        fprintf(stderr, "failed waiting for fifo: %s\n", zx_status_get_string(status));
-        return status;
+    if (zx_status_t status = fifo.read(sizeof(resp), &resp, 1, nullptr); status != ZX_OK) {
+      if (status == ZX_ERR_SHOULD_WAIT) {
+        if (zx_status_t status = fifo.wait_one(ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED,
+                                               zx::time::infinite(), nullptr);
+            status != ZX_OK) {
+          fprintf(stderr, "failed waiting for fifo: %s\n", zx_status_get_string(status));
+          return status;
+        }
+        continue;
       }
-      continue;
-    }
-    if (status != ZX_OK) {
       fprintf(stderr, "error: failed reading fifo: %s\n", zx_status_get_string(status));
       return status;
     }
@@ -297,21 +280,18 @@ static zx_status_t bio_random(bio_random_args_t* a, uint64_t* _total, zx_duratio
       return resp.status;
     }
     count--;
-    if (a->pending.fetch_sub(1) == a->max_pending) {
-      sync_completion_signal(&a->signal);
-    }
+    a.sem.release();
   }
 
   cleanup.cancel();
 
-  zx_time_t t1;
-  t1 = zx_clock_get_monotonic();
+  zx_time_t t1 = zx_clock_get_monotonic();
 
   fprintf(stderr, "waiting for thread to exit...\n");
-  thrd_join(t, &r);
+  t.join();
 
   *_res = zx_time_sub_time(t1, t0);
-  *_total = a->count * a->xfer;
+  *_total = a.count * a.xfer;
   return ZX_OK;
 }
 
@@ -353,11 +333,10 @@ void usage() {
     return -1;          \
   } while (0)
 
-int main(int argc, char** argv) {
-  blkdev_t blk;
+}  // namespace
 
+int main(int argc, char** argv) {
   bool live_dangerously = false;
-  bio_random_args_t a = {};
   bool opt_write = false;
   bool opt_linear = true;
   int opt_max_pending = 128;
@@ -365,8 +344,6 @@ int main(int argc, char** argv) {
   uint64_t opt_num_iter = 1;
   bool loop_forever = false;
 
-  a.blk = &blk;
-  a.seed = 7891263897612ULL;
   const char* output_file = nullptr;
 
   size_t total = 0;
@@ -424,7 +401,7 @@ int main(int argc, char** argv) {
   if (argc > 1) {
     error("error: unexpected arguments\n");
   }
-  if (a.write && !live_dangerously) {
+  if (opt_write && !live_dangerously) {
     error(
         "error: the option \"-live-dangerously\" is required when using"
         " \"-write\"\n");
@@ -432,20 +409,21 @@ int main(int argc, char** argv) {
   const char* device_filename = argv[0];
 
   do {
-    a.xfer = opt_xfer_size;
-    a.max_pending = opt_max_pending;
-    a.write = opt_write;
-    a.linear = opt_linear;
-    int fd = open(device_filename, O_RDONLY);
-    if (fd < 0) {
-      fprintf(stderr, "error: cannot open '%s'\n", device_filename);
+    zx::result dev = blkdev_open(device_filename, kibi * kibi * 8);
+    if (dev.is_error()) {
+      fprintf(stderr, "error: cannot open '%s': %s\n", device_filename, dev.status_string());
       return -1;
     }
-    if (blkdev_open(fd, device_filename, 8 * 1024 * 1024, &blk) != ZX_OK) {
-      return -1;
-    }
+    bio_random_args_t a = {
+        .blk = dev.value(),
+        .xfer = opt_xfer_size,
+        .seed = 7891263897612ULL,
+        .write = opt_write,
+        .linear = opt_linear,
+        .sem = std::counting_semaphore<>(opt_max_pending),
+    };
 
-    size_t devtotal = blk.info.block_count * blk.info.block_size;
+    size_t devtotal = a.blk.info.block_count * a.blk.info.block_size;
 
     // default to entire device
     if ((total == 0) || (total > devtotal)) {
@@ -455,7 +433,9 @@ int main(int argc, char** argv) {
 
     zx_duration_t res = 0;
     total = 0;
-    if (bio_random(&a, &total, &res) != ZX_OK) {
+    if (zx_status_t status = bio_random(a, &total, &res); status != ZX_OK) {
+      fprintf(stderr, "error: bio_random on '%s': %s\n", device_filename,
+              zx_status_get_string(status));
       return -1;
     }
 
@@ -474,7 +454,6 @@ int main(int argc, char** argv) {
         return 1;
       }
     }
-    blkdev_close(&blk);
   } while (loop_forever || (--opt_num_iter > 0));
 
   return 0;

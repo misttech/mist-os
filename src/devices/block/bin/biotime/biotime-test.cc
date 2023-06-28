@@ -21,23 +21,21 @@ namespace {
 void run_biotime(fbl::Vector<const char*>&& args) {
   ramdisk_client_t* ramdisk;
   ASSERT_OK(device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2d/ramctl"));
-  ASSERT_EQ(ramdisk_create(1024, 100, &ramdisk), ZX_OK);
-  auto cleanup = fit::defer([&] { EXPECT_EQ(ramdisk_destroy(ramdisk), 0); });
+  ASSERT_OK(ramdisk_create(1024, 100, &ramdisk));
+  auto cleanup = fit::defer([&] { EXPECT_OK(ramdisk_destroy(ramdisk)); });
 
   args.insert(0, "/pkg/bin/biotime");
   args.push_back(ramdisk_get_path(ramdisk));
   args.push_back(nullptr);  // fdio_spawn() wants a null-terminated array.
 
   zx::process process;
-  ASSERT_EQ(fdio_spawn(ZX_HANDLE_INVALID, FDIO_SPAWN_CLONE_ALL, args[0], args.data(),
-                       process.reset_and_get_address()),
-            ZX_OK);
+  ASSERT_OK(fdio_spawn(ZX_HANDLE_INVALID, FDIO_SPAWN_CLONE_ALL, args[0], args.data(),
+                       process.reset_and_get_address()));
 
   // Wait for the process to exit.
-  ASSERT_EQ(process.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), nullptr), ZX_OK);
+  ASSERT_OK(process.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), nullptr));
   zx_info_process_t proc_info;
-  ASSERT_EQ(process.get_info(ZX_INFO_PROCESS, &proc_info, sizeof(proc_info), nullptr, nullptr),
-            ZX_OK);
+  ASSERT_OK(process.get_info(ZX_INFO_PROCESS, &proc_info, sizeof(proc_info), nullptr, nullptr));
   ASSERT_EQ(proc_info.return_code, 0);
 }
 

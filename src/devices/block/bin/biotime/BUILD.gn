@@ -12,13 +12,9 @@ executable("biotime") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//sdk/lib/fdio",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fit",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fdio-caller",
-    "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/perftest",
-    "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",
   ]
 }
