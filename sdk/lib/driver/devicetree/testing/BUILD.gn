@@ -1,0 +1,30 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("testing") {
+  deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp_wire",
+    "//sdk/lib/device-watcher/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver_test_realm/realm_builder/cpp",
+    "//sdk/lib/fdio",
+    "//sdk/lib/syslog/cpp:cpp-macros",
+    "//sdk/lib/vfs/cpp",
+  ]
+
+  public_deps = [
+    "//sdk/lib/sys/component/cpp/testing:cpp",
+    "//sdk/lib/zbi-format",
+    "//src/devices/bus/drivers/platform",
+    "//zircon/system/ulib/zx",
+  ]
+
+  sources = [
+    "board-test-helper.cc",
+    "board-test-helper.h",
+  ]
+
+  testonly = true
+}

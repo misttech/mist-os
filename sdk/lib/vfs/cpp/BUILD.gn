@@ -80,6 +80,7 @@ sdk_source_set("cpp") {
     ":*",
     "//build/sdk:*",
     "//sdk/ctf/tests/pkg/svc:*",
+    "//sdk/lib/driver/devicetree/testing",
     "//sdk/lib/sys/cpp:*",
     "//sdk/lib/sys/cpp/testing:*",
     "//sdk/lib/sys/cpp/tests:*",

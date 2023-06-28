@@ -8,7 +8,10 @@ import("//build/test.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":devicetree-manager-test-package" ]
+  deps = [
+    ":devicetree-manager-test-package",
+    "examples/example-board:tests",
+  ]
 }
 
 source_set("devicetree") {
