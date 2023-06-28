@@ -13,7 +13,6 @@ group("bootfs-tests") {
     "//src/bringup/bin/svchost:crashsvc-test-bootfs-test",
     "//src/bringup/bin/sysinfo:sysinfo-bootfs-test",
     "//src/bringup/tests/bootfs_test:running-on-bootfs-test",
-    "//src/devices/block/bin/biotime:biotime-test-bootfs-test",
     "//src/devices/board/lib/smbios:smbios-bootfs-test",
     "//src/devices/sysmem/tests/sysmem:sysmem-bootfs-test-v1",
     "//src/devices/sysmem/tests/sysmem:sysmem-bootfs-test-v2",

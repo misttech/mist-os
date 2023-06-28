@@ -24,7 +24,7 @@ void run_biotime(fbl::Vector<const char*>&& args) {
   ASSERT_EQ(ramdisk_create(1024, 100, &ramdisk), ZX_OK);
   auto cleanup = fit::defer([&] { EXPECT_EQ(ramdisk_destroy(ramdisk), 0); });
 
-  args.insert(0, "/boot/bin/biotime");
+  args.insert(0, "/pkg/bin/biotime");
   args.push_back(ramdisk_get_path(ramdisk));
   args.push_back(nullptr);  // fdio_spawn() wants a null-terminated array.
 

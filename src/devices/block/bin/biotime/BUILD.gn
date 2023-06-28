@@ -2,8 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/test.gni")
-import("//build/testing/bootfs_test.gni")
+import("//src/storage/testing/driver_test_realm.gni")
 
 executable("biotime") {
   testonly = true
@@ -35,7 +36,16 @@ test("biotime-test") {
   ]
 }
 
-bootfs_test("biotime-test-bootfs-test") {
-  name = "biotime-test"
+storage_driver_test_realm_v2_component("biotime-test-component") {
   deps = [ ":biotime-test" ]
+}
+
+fuchsia_test_package("biotime-tests") {
+  test_components = [ ":biotime-test-component" ]
+  deps = [ ":biotime" ]
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [ ":biotime-tests" ]
 }
