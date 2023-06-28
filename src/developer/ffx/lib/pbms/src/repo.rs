@@ -301,7 +301,7 @@ where
     // Download the repository private keys.
     fetch_from_url(
         &repo_keys_uri.join("targets.json")?,
-        keys_dir.as_std_path(),
+        keys_dir.to_path_buf().into(),
         auth_flow,
         progress,
         ui,
@@ -312,7 +312,7 @@ where
 
     fetch_from_url(
         &repo_keys_uri.join("snapshot.json")?,
-        keys_dir.as_std_path(),
+        keys_dir.to_path_buf().into(),
         auth_flow,
         progress,
         ui,
@@ -323,7 +323,7 @@ where
 
     fetch_from_url(
         &repo_keys_uri.join("timestamp.json")?,
-        keys_dir.as_std_path(),
+        keys_dir.to_path_buf().into(),
         auth_flow,
         progress,
         ui,
@@ -429,7 +429,7 @@ where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
     I: structured_ui::Interface + Sync,
 {
-    fetch_from_url(&repo_uri, &local_dir, auth_flow, progress, ui, client)
+    fetch_from_url(&repo_uri, local_dir.to_path_buf(), auth_flow, progress, ui, client)
         .await
         .with_context(|| format!("downloading repo URI {}", repo_uri))
 }

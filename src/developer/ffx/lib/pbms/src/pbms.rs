@@ -55,7 +55,7 @@ where
     info.save(&output_dir.join("info"))?;
     tracing::debug!("Wrote 'info' file to {:?}", output_dir);
 
-    fetch_from_url(&repo, output_dir, auth_flow, progress, ui, client)
+    fetch_from_url(&repo, output_dir.to_path_buf(), auth_flow, progress, ui, client)
         .await
         .context("fetching product bundle by URL")?;
     Ok(())
@@ -366,7 +366,9 @@ where
 {
     tracing::debug!("fetch_by_format");
     match format {
-        "files" | "tgz" => fetch_from_url(uri, &local_dir, auth_flow, progress, ui, client).await,
+        "files" | "tgz" => {
+            fetch_from_url(uri, local_dir.to_path_buf(), auth_flow, progress, ui, client).await
+        }
         _ =>
         // The schema currently defines only "files" or "tgz" (see RFC-100).
         // This error could be a typo in the product bundle or a new image
@@ -388,7 +390,7 @@ where
 /// Currently: "pattern": "^(?:http|https|gs|file):\/\/"
 pub(crate) async fn fetch_from_url<F, I>(
     product_url: &url::Url,
-    local_dir: &Path,
+    local_dir: PathBuf,
     auth_flow: &AuthFlowChoice,
     progress: &F,
     ui: &I,
@@ -400,11 +402,11 @@ where
 {
     tracing::debug!("fetch_from_url {:?}", product_url);
     if product_url.scheme() == GS_SCHEME {
-        fetch_from_gcs(product_url.as_str(), local_dir, auth_flow, progress, ui, client)
+        fetch_from_gcs(product_url.as_str(), &local_dir, auth_flow, progress, ui, client)
             .await
             .context("Downloading from GCS.")?;
     } else if product_url.scheme() == "http" || product_url.scheme() == "https" {
-        fetch_from_web(product_url, local_dir, progress, ui)
+        fetch_from_web(product_url, &local_dir, progress, ui)
             .await
             .context("fetching from http(s)")?;
     } else if let Some(_) = &path_from_file_url(product_url) {
@@ -627,7 +629,7 @@ mod tests {
         let client = Client::initial().expect("creating client");
         fetch_from_url(
             &url,
-            &Path::new("unused"),
+            Path::new("unused").to_path_buf(),
             &AuthFlowChoice::Default,
             &|_d, _f| Ok(ProgressResponse::Continue),
             &ui,

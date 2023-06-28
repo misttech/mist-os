@@ -16,6 +16,7 @@ use ::gcs::{
 };
 use ::transfer_manifest::TransferManifest;
 use anyhow::{Context, Result};
+use futures::{StreamExt as _, TryStreamExt as _};
 use structured_ui;
 
 /// Download a set of files referenced in the `transfer_manifest_url`.
@@ -91,6 +92,7 @@ where
         ),
         _ => transfer_manifest_url[..url::Position::BeforePath].to_string(),
     };
+    let mut tasks = Vec::new();
     let transfer_entry_count = transfer_manifest.entries.len() as u64;
     for (i, transfer_entry) in transfer_manifest.entries.iter().enumerate() {
         // Avoid using base_url.join().
@@ -104,41 +106,46 @@ where
                 url::Url::parse(&format!("{}/{}", te_remote_dir, artifact_entry.name.as_str()))?;
 
             let local_file = te_local_dir.join(&artifact_entry.name);
-            let local_parent = local_file.parent().context("getting local parent")?;
+            let local_parent = local_file.parent().context("getting local parent")?.to_path_buf();
             async_fs::create_dir_all(&local_parent)
                 .await
                 .with_context(|| format!("creating local_parent {:?}", local_parent))?;
 
             tracing::debug!("Transfer {:?} to {:?}", remote_file, local_parent);
-            fetch_from_url(
-                &remote_file,
-                &local_parent,
-                auth_flow,
-                &|_, f| {
-                    // The directory progress is replaced because a transfer
-                    // manifest refers to specific files to copy (not
-                    // directories at time), so the directory progress is
-                    // always "1 of 1 files", which is not helpful.
-                    let section = ProgressState {
-                        name: &transfer_entry.remote.as_str(),
-                        at: i as u64 + 1,
-                        of: transfer_entry_count,
-                        units: "sections",
-                    };
-                    let directory = ProgressState {
-                        name: &remote_file.as_str(),
-                        at: k as u64,
-                        of: artifact_entry_count,
-                        units: "files",
-                    };
-                    progress(vec![section, directory, f])
-                },
-                ui,
-                client,
-            )
-            .await
-            .context("fetching from url")?;
+            tasks.push(async move {
+                fetch_from_url(
+                    &remote_file,
+                    local_parent,
+                    auth_flow,
+                    &|_, f| {
+                        // The directory progress is replaced because a transfer
+                        // manifest refers to specific files to copy (not
+                        // directories at time), so the directory progress is
+                        // always "1 of 1 files", which is not helpful.
+                        let section = ProgressState {
+                            name: &transfer_entry.remote.as_str(),
+                            at: i as u64 + 1,
+                            of: transfer_entry_count,
+                            units: "sections",
+                        };
+                        let directory = ProgressState {
+                            name: &remote_file.as_str(),
+                            at: k as u64,
+                            of: artifact_entry_count,
+                            units: "files",
+                        };
+                        progress(vec![section, directory, f])
+                    },
+                    ui,
+                    &client.clone(),
+                )
+                .await
+            })
         }
     }
+    let mut stream = futures::stream::iter(tasks.into_iter())
+        .buffer_unordered(std::thread::available_parallelism()?.get());
+
+    while let Some(()) = stream.try_next().await? {}
     Ok(())
 }
