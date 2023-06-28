@@ -259,8 +259,23 @@
             from: "parent",
             to: "#test_manager",
         },
+
+        // Needed for driver tests.
+        {
+            directory: [
+                "dev-class",
+                "dev-topological",
+            ],
+            from: "parent",
+            to: "#test_manager",
+        },
         {
             directory: "boot",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
+            protocol: "fuchsia.driver.development.DriverDevelopment",
             from: "parent",
             to: "#test_manager",
         },
@@ -345,6 +360,13 @@
             as: "dev-audio-output",
             to: "#test_manager",
             subdir: "audio-output",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-codec",
+            to: "#test_manager",
+            subdir: "codec",
         },
         {
             directory: "dev-class",
