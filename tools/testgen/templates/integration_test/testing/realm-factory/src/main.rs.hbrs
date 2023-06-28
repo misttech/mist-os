@@ -3,35 +3,51 @@
 // found in the LICENSE file.
 
 mod realm_factory_impl;
-mod realm_factory_server;
 use crate::realm_factory_impl::*;
-use crate::realm_factory_server::*;
 
 use {
     anyhow::{Error, Result},
-    {{ fidl_rust_crate_name }}::RealmFactoryRequestStream,
-    fidl_server::*,
+    {{ fidl_rust_crate_name }}::{RealmFactoryRequest, RealmFactoryRequestStream},
+    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
-    futures::StreamExt,
+    futures::{StreamExt, TryStreamExt},
+    tracing::*,
 };
-
-enum IncomingService {
-    RealmFactory(RealmFactoryRequestStream),
-}
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new();
-    fs.dir("svc").add_fidl_service(IncomingService::RealmFactory);
+    fs.dir("svc").add_fidl_service(|stream: RealmFactoryRequestStream| stream);
     fs.take_and_serve_directory_handle()?;
-    fs.for_each_concurrent(0, |service: IncomingService| async {
-        match service {
-            IncomingService::RealmFactory(stream) => {
-                let server = RealmFactoryServer::new(RealmFactoryImpl::new());
-                serve_async(stream, server).await.expect("serve RealmFactory");
-            }
-        };
-    })
-    .await;
+    fs.for_each_concurrent(0, serve_realm_factory).await;
     Ok(())
+}
+
+async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
+    let mut factory = RealmFactoryImpl::new();
+    let result: Result<(), Error> = async move {
+        while let Ok(Some(request)) = stream.try_next().await {
+            match request {
+                RealmFactoryRequest::SetRealmOptions { options, responder } => {
+                    factory.set_realm_options(options)?;
+                    responder.send(Ok(()))?;
+                }
+
+                RealmFactoryRequest::CreateRealm { realm_server, responder } => {
+                    let realm = factory.create_realm().await?;
+                    let request_stream = realm_server.into_stream()?;
+                    fasync::Task::spawn(async move {
+                        realm_proxy::service::serve(realm, request_stream).await.unwrap();
+                    }).detach();
+                    responder.send(Ok(()))?;
+                }
+            }
+        }
+        Ok(())
+    }
+    .await;
+
+    if let Err(err) = result {
+        error!("{:?}", err);
+    }
 }

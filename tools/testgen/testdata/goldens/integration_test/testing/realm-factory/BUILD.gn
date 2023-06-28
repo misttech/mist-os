@@ -12,18 +12,15 @@ rustc_binary("bin") {
   sources = [
     "src/main.rs",
     "src/realm_factory_impl.rs",
-    "src/realm_factory_server.rs",
   ]
   deps = [
     "../fidl:test.examplecomponent_rust",
-    "//src/lib/fidl_server",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]

@@ -18,7 +18,6 @@ if (is_host) {
     "templates/integration_test/testing/realm-factory/meta/default.cml.hbrs",
     "templates/integration_test/testing/realm-factory/src/main.rs.hbrs",
     "templates/integration_test/testing/realm-factory/src/realm_factory_impl.rs.hbrs",
-    "templates/integration_test/testing/realm-factory/src/realm_factory_server.rs.hbrs",
   ]
 
   rustc_binary("testgen") {
