@@ -1,0 +1,22 @@
+import /init.environ.rc
+import /system/etc/init/apexd.rc
+
+on early-init
+    # Ensure apex is setup so that binaries can link
+    mkdir /linkerconfig/bootstrap 0755
+    mkdir /linkerconfig/default 0755
+    write /linkerconfig/bootstrap/ld.config.txt \#
+    write /linkerconfig/default/ld.config.txt \#
+    chmod 644 /linkerconfig/bootstrap/ld.config.txt
+    chmod 644 /linkerconfig/default/ld.config.txt
+    mount none /linkerconfig/bootstrap /linkerconfig bind rec
+    start ueventd
+    exec_start apexd-bootstrap
+    update_linker_config
+    write /data/tmp/apex_init "1"
+
+service ueventd /system/bin/ueventd
+    class core
+    critical
+    seclabel u:r:ueventd:s0
+    shutdown critical

@@ -3,16 +3,17 @@
 // found in the LICENSE file.
 {
     program: {
-        apex_hack: [ "com.android.runtime" ],
+        apex_hack: [],
         features: [
             "binder",
+            "selinux_enabled",
             "test_data",
         ],
-        init: [],
-        kernel_cmdline: "androidboot.hardware=starnix",
+        init: [ "/system/bin/init" ],
+        kernel_cmdline: "androidboot.hardware=starnix androidboot.init_rc=/container/init.rc",
         mounts: [
             "/:remote_bundle:data/system",
-            "/vendor:remote_bundle:data/testcases",
+            "/oem:remote_bundle:data/testcases",
             "/data:remotefs:data",
             "/dev:devtmpfs",
             "/dev/shm:tmpfs",
@@ -25,6 +26,6 @@
         ],
         rlimits: [ "RLIMIT_NOFILE=131072" ],
         name: "bionic_test",
-        startup_file_path: "",
+        startup_file_path: "/data/tmp/apex_init",
     },
 }

@@ -17,3 +17,8 @@ ext4_to_pkg("testcases_image") {
   input = "//prebuilt/starnix/android-image-amd64/starnix_testcases.img"
   prefix = "data/testcases"
 }
+
+resource("minimal_init_rc") {
+  sources = [ "init.rc" ]
+  outputs = [ "data/init.rc" ]
+}

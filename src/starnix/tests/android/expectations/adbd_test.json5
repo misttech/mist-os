@@ -21,13 +21,6 @@
                 "io.WriteFdFmt",
                 "LocalSocketTest.read_from_closing_socket",
                 "sysdeps_poll.invalid_fd",
-                "ShellServiceTest.RawNoProtocolSubprocess",
-                "ShellServiceTest.PtyNoProtocolSubprocess",
-                "ShellServiceTest.RawShellProtocolSubprocess",
-                "ShellServiceTest.PtyShellProtocolSubprocess",
-                "ShellServiceTest.CloseClientStdin",
-                "ShellServiceTest.CloseStdinStdoutSubprocess",
-                "ShellServiceTest.CloseStderrSubprocess",
             ],
         },
         {
