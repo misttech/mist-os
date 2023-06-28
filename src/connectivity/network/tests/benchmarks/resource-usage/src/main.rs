@@ -239,7 +239,7 @@ impl ResourceUsage {
                 test_suite: suite.to_string(),
                 label: format!("{prefix}/Handles/Total"),
                 values: vec![total as f64],
-                unit: "count".to_string(),
+                unit: "count_smallerIsBetter".to_string(),
             },
         ];
         for (object_type, n) in counts.into_iter().enumerate() {
@@ -289,7 +289,7 @@ impl ResourceUsage {
                 test_suite: suite.to_string(),
                 label: format!("{prefix}/Handles/{name}"),
                 values: vec![n as f64],
-                unit: "count".to_string(),
+                unit: "count_smallerIsBetter".to_string(),
             });
         }
         results
