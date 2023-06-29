@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
@@ -20,19 +21,20 @@
 #include "src/ui/scenic/lib/gfx/util/time.h"
 
 namespace scenic_impl::gfx::test {
-struct ChannelPair {
-  zx::channel server;
-  zx::channel client;
-};
 
-ChannelPair CreateChannelPair() {
-  ChannelPair c;
-  FX_CHECK(ZX_OK == zx::channel::create(0, &c.server, &c.client));
-  return c;
+namespace {
+
+fidl::Endpoints<fuchsia_hardware_display::Coordinator> CreateCoordinatorEndpoints() {
+  zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> endpoints_result =
+      fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
+  FX_CHECK(endpoints_result.is_ok())
+      << "Failed to create endpoints: " << endpoints_result.status_string();
+  return std::move(endpoints_result.value());
 }
+
 class CompositorTest : public SessionTest {
  public:
-  CompositorTest() {}
+  CompositorTest() = default;
 
   void SetUp() override {
     SessionTest::SetUp();
@@ -86,11 +88,10 @@ class CompositorTest : public SessionTest {
 };
 
 TEST_F(CompositorTest, Validation) {
-  ChannelPair coordinator_channel = CreateChannelPair();
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator_endpoints =
+      CreateCoordinatorEndpoints();
 
-  display_manager()->BindDefaultDisplayCoordinator(
-      fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(
-          std::move(coordinator_channel.client)));
+  display_manager()->BindDefaultDisplayCoordinator(std::move(coordinator_endpoints.client));
 
   std::array<float, 3> preoffsets = {0, 0, 0};
   std::array<float, 9> matrix = {0.3, 0.6, 0.1, 0.3, 0.6, 0.1, 0.3, 0.6, 0.1};
@@ -101,8 +102,9 @@ TEST_F(CompositorTest, Validation) {
   ASSERT_TRUE(Apply(scenic::NewCreateDisplayCompositorCmd(CompositorId)));
 
   // Create a mock display coordinator that runs on a separate thread.
+  fidl::ServerEnd coordinator_server = std::move(coordinator_endpoints.server);
   std::thread server([&preoffsets, &matrix, &postoffsets,
-                      coordinator_channel = std::move(coordinator_channel.server)]() mutable {
+                      coordinator_server = std::move(coordinator_server)]() mutable {
     async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
     display::test::MockDisplayCoordinator mock_display_coordinator;
@@ -115,7 +117,7 @@ TEST_F(CompositorTest, Validation) {
           EXPECT_EQ(matrix, matrix_out);
           EXPECT_EQ(postoffsets, postoffsets_out);
         });
-    mock_display_coordinator.Bind(std::move(coordinator_channel));
+    mock_display_coordinator.Bind(coordinator_server.TakeChannel());
 
     // Waits for initial call to |SetOnVsyncCallback| by DisplayManager.
     mock_display_coordinator.WaitForMessage();
@@ -140,39 +142,38 @@ TEST_F(CompositorTest, Validation) {
 // Test to make sure that we can set the minimum RGB value for the display via the
 // standard GFX API, across a fidl channel.
 TEST_F(CompositorTest, ValidateMinimumRGB) {
-  ChannelPair coordinator_channel = CreateChannelPair();
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator_endpoints =
+      CreateCoordinatorEndpoints();
 
-  display_manager()->BindDefaultDisplayCoordinator(
-      fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(
-          std::move(coordinator_channel.client)));
+  display_manager()->BindDefaultDisplayCoordinator(std::move(coordinator_endpoints.client));
 
   // Create a mock display coordinator that runs on a separate thread.
   uint8_t minimum = 10;
-  std::thread server(
-      [&minimum, coordinator_channel = std::move(coordinator_channel.server)]() mutable {
-        async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  fidl::ServerEnd coordinator_server = std::move(coordinator_endpoints.server);
+  std::thread server([&minimum, coordinator_server = std::move(coordinator_server)]() mutable {
+    async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-        display::test::MockDisplayCoordinator mock_display_coordinator;
+    display::test::MockDisplayCoordinator mock_display_coordinator;
 
-        mock_display_coordinator.set_minimum_rgb_fn([&](uint8_t minimum_out) {
-          // Check that the display coordinator got the right value.
-          EXPECT_EQ(minimum, minimum_out);
-        });
-        mock_display_coordinator.Bind(std::move(coordinator_channel));
+    mock_display_coordinator.set_minimum_rgb_fn([&](uint8_t minimum_out) {
+      // Check that the display coordinator got the right value.
+      EXPECT_EQ(minimum, minimum_out);
+    });
+    mock_display_coordinator.Bind(coordinator_server.TakeChannel());
 
-        // Waits for initial call to |SetOnVsyncCallback| by DisplayManager.
-        mock_display_coordinator.WaitForMessage();
+    // Waits for initial call to |SetOnVsyncCallback| by DisplayManager.
+    mock_display_coordinator.WaitForMessage();
 
-        // Waits for a call to |SetDisplayMinimumRgb| by client.
-        EXPECT_EQ(0U, mock_display_coordinator.set_minimum_rgb_count());
-        mock_display_coordinator.WaitForMessage();
-        EXPECT_EQ(1U, mock_display_coordinator.set_minimum_rgb_count());
+    // Waits for a call to |SetDisplayMinimumRgb| by client.
+    EXPECT_EQ(0U, mock_display_coordinator.set_minimum_rgb_count());
+    mock_display_coordinator.WaitForMessage();
+    EXPECT_EQ(1U, mock_display_coordinator.set_minimum_rgb_count());
 
-        // Wait for |CheckConfig|.
-        EXPECT_EQ(0U, mock_display_coordinator.check_config_count());
-        mock_display_coordinator.WaitForMessage();
-        EXPECT_EQ(1U, mock_display_coordinator.check_config_count());
-      });
+    // Wait for |CheckConfig|.
+    EXPECT_EQ(0U, mock_display_coordinator.check_config_count());
+    mock_display_coordinator.WaitForMessage();
+    EXPECT_EQ(1U, mock_display_coordinator.check_config_count());
+  });
 
   EXPECT_TRUE(Apply(scenic::NewSetDisplayMinimumRgbCmdHACK(minimum)));
 
@@ -185,11 +186,11 @@ TEST_F(CompositorTestSimple, ColorConversionConfigChecking) {
   fuchsia::hardware::display::CoordinatorSyncPtr display_coordinator;
   display::test::MockDisplayCoordinator mock_display_coordinator;
 
-  ChannelPair coordinator_channel = CreateChannelPair();
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator_endpoints =
+      CreateCoordinatorEndpoints();
 
-  mock_display_coordinator.Bind(std::move(coordinator_channel.server));
-
-  display_coordinator.Bind(std::move(coordinator_channel.client));
+  mock_display_coordinator.Bind(coordinator_endpoints.server.TakeChannel());
+  display_coordinator.Bind(coordinator_endpoints.client.TakeChannel());
 
   ColorTransform transform;
 
@@ -229,5 +230,7 @@ TEST_F(CompositorTestSimple, ColorConversionConfigChecking) {
   EXPECT_EQ(check_config_call_count, 2U);
   EXPECT_TRUE(should_discard_config);
 }
+
+}  // namespace
 
 }  // namespace scenic_impl::gfx::test

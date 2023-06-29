@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/fit/defer.h>
@@ -248,10 +249,9 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     auto hdc_promise = display::GetCoordinator();
     executor_->schedule_task(hdc_promise.then(
         [this](fpromise::result<display::CoordinatorClientEnd, zx_status_t>& handles) {
-          // TODO(fxbug.dev/76183): Migrate DisplayManager to new C++ bindings.
-          display_manager_->BindDefaultDisplayCoordinator(
-              fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(
-                  handles.value().TakeChannel()));
+          ASSERT_TRUE(handles.is_ok())
+              << "Failed to get display coordinator:" << zx_status_get_string(handles.error());
+          display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value()));
         }));
 
     RunLoopUntil([this] { return display_manager_->default_display() != nullptr; });

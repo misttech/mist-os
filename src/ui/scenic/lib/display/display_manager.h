@@ -5,6 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_MANAGER_H_
 #define SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_MANAGER_H_
 
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/fit/function.h>
 
@@ -29,7 +30,7 @@ class DisplayManager {
   ~DisplayManager() = default;
 
   void BindDefaultDisplayCoordinator(
-      fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator> coordinator);
+      fidl::ClientEnd<fuchsia_hardware_display::Coordinator> coordinator);
 
   // Gets information about the default display.
   // May return null if there isn't one.

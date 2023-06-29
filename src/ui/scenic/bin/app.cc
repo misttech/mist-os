@@ -276,10 +276,9 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
                            });
   executor_.schedule_task(dc_handles_promise.then(
       [this](fpromise::result<::display::CoordinatorClientEnd, zx_status_t>& handles) {
-        // TODO(fxbug.dev/76183): Migrate DisplayManager to new C++ bindings.
-        display_manager_->BindDefaultDisplayCoordinator(
-            fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(
-                handles.value().TakeChannel()));
+        FX_CHECK(handles.is_ok()) << "Failed to get display coordinator:"
+                                  << zx_status_get_string(handles.error());
+        display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value()));
       }));
 
   // Schedule a task to finish initialization once all promises have been completed.

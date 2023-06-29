@@ -26,11 +26,11 @@ DisplayManager::DisplayManager(std::optional<uint64_t> i_can_haz_display_id,
       display_available_cb_(std::move(display_available_cb)) {}
 
 void DisplayManager::BindDefaultDisplayCoordinator(
-    fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator> coordinator) {
+    fidl::ClientEnd<fuchsia_hardware_display::Coordinator> coordinator) {
   FX_DCHECK(!default_display_coordinator_);
-  FX_DCHECK(coordinator);
+  FX_DCHECK(coordinator.is_valid());
   default_display_coordinator_ = std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
-  default_display_coordinator_->Bind(std::move(coordinator));
+  default_display_coordinator_->Bind(coordinator.TakeChannel());
   default_display_coordinator_listener_ =
       std::make_shared<display::DisplayCoordinatorListener>(default_display_coordinator_);
   default_display_coordinator_listener_->InitializeCallbacks(

@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/display/display_manager.h"
 
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/async/time.h>
 
@@ -20,15 +21,12 @@ namespace test {
 
 namespace {
 
-struct ChannelPair {
-  zx::channel server;
-  zx::channel client;
-};
-
-ChannelPair CreateChannelPair() {
-  ChannelPair c;
-  FX_CHECK(ZX_OK == zx::channel::create(0, &c.server, &c.client));
-  return c;
+fidl::Endpoints<fuchsia_hardware_display::Coordinator> CreateCoordinatorEndpoints() {
+  zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> endpoints_result =
+      fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
+  FX_CHECK(endpoints_result.is_ok())
+      << "Failed to create endpoints: " << endpoints_result.status_string();
+  return std::move(endpoints_result.value());
 }
 
 }  // namespace
@@ -67,17 +65,15 @@ TEST_F(DisplayManagerMockTest, DisplayVsyncCallback) {
   size_t num_vsync_display_received = 0;
   size_t num_vsync_acknowledgement = 0;
 
-  auto coordinator_channel = CreateChannelPair();
+  auto coordinator_channel = CreateCoordinatorEndpoints();
 
-  display_manager()->BindDefaultDisplayCoordinator(
-      fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(
-          std::move(coordinator_channel.client)));
+  display_manager()->BindDefaultDisplayCoordinator(std::move(coordinator_channel.client));
 
   display_manager()->SetDefaultDisplayForTests(
       std::make_shared<display::Display>(kDisplayId, kDisplayWidth, kDisplayHeight));
 
   display::test::MockDisplayCoordinator mock_display_coordinator;
-  mock_display_coordinator.Bind(std::move(coordinator_channel.server));
+  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel());
   mock_display_coordinator.set_acknowledge_vsync_fn(
       [&cookies_sent, &num_vsync_acknowledgement](uint64_t cookie) {
         ASSERT_TRUE(cookies_sent.find(cookie) != cookies_sent.end());

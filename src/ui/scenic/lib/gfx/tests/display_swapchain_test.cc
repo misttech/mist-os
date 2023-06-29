@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/gfx/swapchain/display_swapchain.h"
 
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/async/default.h>
 #include <lib/async/time.h>
@@ -65,10 +66,9 @@ class DisplaySwapchainTest : public Fixture {
     auto hdc_promise = ::display::GetCoordinator();
     executor_->schedule_task(hdc_promise.then(
         [this](fpromise::result<::display::CoordinatorClientEnd, zx_status_t>& handles) {
-          // TODO(fxbug.dev/76183): Migrate DisplayManager to new C++ bindings.
-          display_manager_->BindDefaultDisplayCoordinator(
-              fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(
-                  handles.value().TakeChannel()));
+          ASSERT_TRUE(handles.is_ok())
+              << "Failed to get display coordinator:" << zx_status_get_string(handles.error());
+          display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value()));
         }));
 
     RunLoopUntil([this] { return display_manager_->default_display() != nullptr; });
