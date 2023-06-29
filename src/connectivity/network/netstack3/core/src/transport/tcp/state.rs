@@ -52,6 +52,17 @@ const DEFAULT_MAX_SYNACK_RETRIES: NonZeroU8 = nonzero_ext::nonzero!(5_u8);
 /// Per RFC 9293 (https://tools.ietf.org/html/rfc9293#section-3.8.6.3):
 ///  ... in particular, the delay MUST be less than 0.5 seconds.
 const ACK_DELAY_THRESHOLD: Duration = Duration::from_millis(500);
+/// Per RFC 9293 Section 3.8.6.2.1:
+///  ... The override timeout should be in the range 0.1 - 1.0 seconds.
+/// Note that we pick the lower end of the range because this case should be
+/// rare and the installing a timer itself represents a high probability of
+/// receiver having reduced its window so that our MAX(SND.WND) is an
+/// overestimation, so we choose the value to avoid unnecessary delay.
+const SWS_PROBE_TIMEOUT: Duration = Duration::from_millis(100);
+/// Per RFC 9293 Section 3.8.6.2.2 and 3.8.6.2.1:
+///   where Fr is a fraction whose recommended value is 1/2,
+/// Note that we use the inverse since we want to avoid floating point.
+const SWS_BUFFER_FACTOR: u32 = 2;
 
 /// A helper trait for duration socket options that use 0 to indicate default.
 trait NonZeroDurationOptionExt {
@@ -458,6 +469,7 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                                     timer: None,
                                     congestion_control: CongestionControl::cubic_with_mss(smss),
                                     wnd_scale: snd_wnd_scale,
+                                    wnd_max: seg_wnd << WindowScale::default(),
                                 },
                                 rcv: Recv {
                                     buffer: rcv_buffer,
@@ -626,6 +638,7 @@ struct Send<I, S, const FIN_QUEUED: bool> {
     una: SeqNum,
     wnd: WindowSize,
     wnd_scale: WindowScale,
+    wnd_max: WindowSize,
     wl1: SeqNum,
     wl2: SeqNum,
     buffer: S,
@@ -697,6 +710,14 @@ enum SendTimer<I> {
     ///   SHOULD increase exponentially the interval between successive probes.
     /// So we choose a retransmission timer as its implementation.
     ZeroWindowProbe(RetransTimer<I>),
+    /// A timer installed to override silly window avoidance, when the receiver
+    /// reduces its buffer size to be below 1 MSS (should happen very rarely),
+    /// it's possible for the connection to make no progress if there is no such
+    /// timer. Per RFC 9293 Section 3.8.6.2.1:
+    ///   To avoid a resulting deadlock, it is necessary to have a timeout to
+    ///   force transmission of data, overriding the SWS avoidance algorithm.
+    ///   In practice, this timeout should seldom occur.
+    SWSProbe { at: I },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -735,6 +756,7 @@ impl<I: Instant> SendTimer<I> {
                 user_timeout_until: _,
                 remaining_retries: _,
             }) => *at,
+            SendTimer::SWSProbe { at } => *at,
         }
     }
 }
@@ -875,7 +897,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             Some(SendTimer::Retrans(timer)) | Some(SendTimer::ZeroWindowProbe(timer)) => {
                 timer.timed_out(now)
             }
-            None => false,
+            Some(SendTimer::SWSProbe { at: _ }) | None => false,
         }
     }
 
@@ -912,10 +934,12 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             timer,
             congestion_control,
             wnd_scale,
+            wnd_max: snd_wnd_max,
         } = self;
         let BufferLimits { capacity: _, len: readable_bytes } = buffer.limits();
         let mss = u32::from(congestion_control.mss());
         let mut zero_window_probe = false;
+        let mut override_sws = false;
         match timer {
             Some(SendTimer::Retrans(retrans_timer)) => {
                 if retrans_timer.at <= now {
@@ -965,6 +989,12 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     *timer = None;
                 }
             }
+            Some(SendTimer::SWSProbe { at }) => {
+                if *at <= now {
+                    override_sws = true;
+                    *timer = None;
+                }
+            }
             None => {}
         };
         // Find the sequence number for the next segment, we start with snd_nxt
@@ -1010,23 +1040,60 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 u32::try_from(readable.len()).unwrap_or(u32::MAX),
             );
             let has_fin = has_fin && bytes_to_send == can_send - u32::from(has_fin);
-            // Per RFC 9293 Section 3.7.4:
-            //   If there is unacknowledged data (i.e., SND.NXT > SND.UNA), then
-            //   the sending TCP endpoint buffers all user data (regardless of
-            //   the PSH bit) until the outstanding data has been acknowledged
-            //   or until the TCP endpoint can send a full-sized segment
-            //   (Eff.snd.MSS bytes).
-            // Note: There is one special case that isn't covered by the RFC:
-            // If the current segment would contain a FIN, then even if it's a
-            // small segment, there is no reason to wait for more - there won't
-            // be more as the application has indicated.
-            if *nagle_enabled && bytes_to_send < mss && !has_fin && snd_nxt.after(*snd_una) {
-                return None;
-            }
-            // Don't send a segment if there isn't any data to read, unless that
-            // segment would carry the FIN.
-            if bytes_to_send == 0 && !has_fin {
-                return None;
+            // If we have more bytes to send than a MSS (enough to send) or the
+            // segment is a FIN (no need to wait for more), don't hold off.
+            if bytes_to_send < mss && !has_fin {
+                if bytes_to_send == 0 {
+                    return None;
+                }
+                // First check if disallowed by nagle.
+                // Per RFC 9293 Section 3.7.4:
+                //   If there is unacknowledged data (i.e., SND.NXT > SND.UNA),
+                //   then the sending TCP endpoint buffers all user data
+                //   (regardless of the PSH bit) until the outstanding data has
+                //   been acknowledged or until the TCP endpoint can send a
+                //   full-sized segment (Eff.snd.MSS bytes).
+                if *nagle_enabled && snd_nxt.after(*snd_una) {
+                    return None;
+                }
+                // Otherwise check if disallowed by SWS avoidance.
+                // Per RFC 9293 Section 3.8.6.2.1:
+                //   Send data:
+                //   (1) if a maximum-sized segment can be sent, i.e., if:
+                //       min(D,U) >= Eff.snd.MSS;
+                //   (2) or if the data is pushed and all queued data can be
+                //       sent now, i.e., if:
+                //       [SND.NXT = SND.UNA and] PUSHed and D <= U
+                //       (the bracketed condition is imposed by the Nagle algorithm);
+                //   (3) or if at least a fraction Fs of the maximum window can
+                //       be sent, i.e., if:
+                //       [SND.NXT = SND.UNA and] min(D,U) >= Fs * Max(SND.WND);
+                //   (4) or if the override timeout occurs.
+                //   ... Here Fs is a fraction whose recommended value is 1/2
+                // Explanation:
+                // To simplify the conditions, we can ignore the brackets since
+                // those are controlled by the nagle algorithm and is handled by
+                // the block above. Also we consider all data as PUSHed so for
+                // example (2) is now simply `D <= U`. Mapping into the code
+                // context, `D` is `available` and `U` is `open_window`.
+                //
+                // The RFC says when to send data, negating it, we will get the
+                // condition for when to hold off sending segments, that is:
+                // - negate (2) we get D > U,
+                // - negate (1) and combine with D > U, we get U < Eff.snd.MSS,
+                // - negate (3) and combine with D > U, we get U < Fs * Max(SND.WND).
+                // If the overriding timer fired or we are in zero window
+                // probing phase, we override it to send data anyways.
+                if available > open_window
+                    && open_window < u32::min(mss, u32::from(*snd_wnd_max) / SWS_BUFFER_FACTOR)
+                    && !override_sws
+                    && !zero_window_probe
+                {
+                    if timer.is_none() {
+                        *timer = Some(SendTimer::SWSProbe { at: now.add(SWS_PROBE_TIMEOUT) })
+                    }
+                    return None;
+                }
             }
             let (seg, discarded) = Segment::with_data(
                 next_seg,
@@ -1065,7 +1132,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         //         current value of RTO).
         match timer {
             Some(SendTimer::Retrans(_)) | Some(SendTimer::ZeroWindowProbe(_)) => {}
-            Some(SendTimer::KeepAlive(_)) | None => {
+            Some(SendTimer::KeepAlive(_)) | Some(SendTimer::SWSProbe { at: _ }) | None => {
                 let user_timeout = user_timeout.get_or_default(DEFAULT_USER_TIMEOUT);
                 *timer = Some(SendTimer::Retrans(RetransTimer::new(
                     now,
@@ -1096,6 +1163,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             wnd: snd_wnd,
             wl1: snd_wl1,
             wl2: snd_wl2,
+            wnd_max,
             buffer,
             last_seq_ts,
             rtt_estimator,
@@ -1124,7 +1192,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     retrans_timer.rearm(now);
                 }
             }
-            Some(SendTimer::ZeroWindowProbe(_)) => {}
+            Some(SendTimer::ZeroWindowProbe(_)) | Some(SendTimer::SWSProbe { at: _ }) => {}
         }
         // Note: we rewind SND.NXT to SND.UNA on retransmission; if
         // `seg_ack` is after `snd.max`, it means the segment acks
@@ -1180,6 +1248,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 *snd_wnd = seg_wnd;
                 *snd_wl1 = seg_seq;
                 *snd_wl2 = seg_ack;
+                *wnd_max = seg_wnd.max(*wnd_max);
                 if seg_wnd != WindowSize::ZERO
                     && matches!(timer, Some(SendTimer::ZeroWindowProbe(_)))
                 {
@@ -1243,6 +1312,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             timer: _,
             congestion_control: _,
             wnd_scale: _,
+            wnd_max: _,
         } = self;
         buffer.request_capacity(size)
     }
@@ -1261,6 +1331,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             timer: _,
             congestion_control: _,
             wnd_scale: _,
+            wnd_max: _,
         } = self;
         buffer.target_capacity()
     }
@@ -1281,6 +1352,7 @@ impl<I: Instant, S: SendBuffer> Send<I, S, { FinQueued::NO }> {
             timer,
             congestion_control,
             wnd_scale,
+            wnd_max,
         } = self;
         Send {
             nxt,
@@ -1295,6 +1367,7 @@ impl<I: Instant, S: SendBuffer> Send<I, S, { FinQueued::NO }> {
             timer,
             congestion_control,
             wnd_scale,
+            wnd_max,
         }
     }
 }
@@ -1748,6 +1821,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                                     timer: None,
                                     congestion_control: CongestionControl::cubic_with_mss(*smss),
                                     wnd_scale: snd_wnd_scale,
+                                    wnd_max: seg_wnd << snd_wnd_scale,
                                 },
                                 rcv: Recv {
                                     buffer: rcv_buffer,
@@ -2315,6 +2389,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                         timer: None,
                         congestion_control: CongestionControl::cubic_with_mss(*smss),
                         wnd_scale: snd_wnd_scale,
+                        wnd_max: WindowSize::DEFAULT,
                     },
                     rcv: Recv {
                         buffer: rcv_buffer,
@@ -2981,6 +3056,7 @@ mod test {
                     max: ISS_2 + 1,
                     una: ISS_2 + 1,
                     wnd: WindowSize::DEFAULT,
+                    wnd_max: WindowSize::DEFAULT,
                     buffer: NullBuffer,
                     wl1: ISS_1 + 1,
                     wl2: ISS_2 + 1,
@@ -3028,6 +3104,7 @@ mod test {
                 max: ISS_2 + 1,
                 una: ISS_2 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: NullBuffer,
                 wl1: ISS_1 + 1,
                 wl2: ISS_2 + 1,
@@ -3107,6 +3184,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: NullBuffer,
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
@@ -3130,6 +3208,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: NullBuffer,
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
@@ -3161,6 +3240,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: NullBuffer,
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
@@ -3203,6 +3283,7 @@ mod test {
             max: ISS_1 + 1,
             una: ISS_1 + 1,
             wnd: WindowSize::DEFAULT,
+            wnd_max: WindowSize::DEFAULT,
             buffer: NullBuffer,
             wl1: ISS_2 + 1,
             wl2: ISS_1 + 1,
@@ -3265,6 +3346,7 @@ mod test {
             max: ISS_1 + 1,
             una: ISS_1 + 1,
             wnd: WindowSize::DEFAULT,
+            wnd_max: WindowSize::DEFAULT,
             buffer: RingBuffer::with_data(TEST_BYTES.len(), TEST_BYTES),
             wl1: ISS_2 + 1,
             wl2: ISS_1 + 1,
@@ -3378,6 +3460,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: NullBuffer,
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
@@ -3498,6 +3581,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: RingBuffer::default(),
                 wl1: ISS_2,
                 wl2: ISS_1 + 1,
@@ -3534,6 +3618,7 @@ mod test {
                 max: ISS_2 + 1,
                 una: ISS_2 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: RingBuffer::default(),
                 wl1: ISS_1 + 1,
                 wl2: ISS_2 + 1,
@@ -3697,6 +3782,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: RingBuffer::default(),
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
@@ -3725,6 +3811,7 @@ mod test {
                 max: ISS_2 + 1,
                 una: ISS_2 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: RingBuffer::default(),
                 wl1: ISS_1 + 1,
                 wl2: ISS_2 + 1,
@@ -3760,6 +3847,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::ZERO,
+                wnd_max: WindowSize::ZERO,
                 buffer: NullBuffer,
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
@@ -3872,6 +3960,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1,
                 wnd: WindowSize::ZERO,
+                wnd_max: WindowSize::ZERO,
                 buffer: send_buffer,
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -4099,6 +4188,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: send_buffer.clone(),
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -4145,6 +4235,7 @@ mod test {
                     max: ISS_1 + 1,
                     una: ISS_1 + 1,
                     wnd: WindowSize::DEFAULT,
+                    wnd_max: WindowSize::DEFAULT,
                     buffer: send_buffer,
                     wl1: ISS_2,
                     wl2: ISS_1,
@@ -4262,6 +4353,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: send_buffer.clone(),
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -4444,6 +4536,7 @@ mod test {
                 max: ISS_1 + 2,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: NullBuffer,
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -4493,6 +4586,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: send_buffer.clone(),
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -4611,6 +4705,7 @@ mod test {
                 max: ISS_1,
                 una: ISS_1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: NullBuffer,
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -4681,6 +4776,7 @@ mod test {
                 max: ISS_1,
                 una: ISS_1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: send_buffer,
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -4782,6 +4878,7 @@ mod test {
                 max: ISS_1,
                 una: ISS_1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: RingBuffer::default(),
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -4936,6 +5033,7 @@ mod test {
                 max: ISS_1,
                 una: ISS_1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer,
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -4995,6 +5093,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::ZERO,
+                wnd_max: WindowSize::ZERO,
                 buffer: send_buffer.clone(),
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -5090,6 +5189,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: send_buffer.clone(),
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -5208,6 +5308,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: send_buffer.clone(),
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -5283,6 +5384,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -5318,6 +5420,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -5451,6 +5554,7 @@ mod test {
                 max: ISS_1 + 1,
                 una: ISS_1 + 1,
                 wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 wl1: ISS_2,
                 wl2: ISS_1,
@@ -5784,6 +5888,7 @@ mod test {
             max: ISS_1 + 1,
             una: ISS_1 + 1,
             wnd: WindowSize::DEFAULT,
+            wnd_max: WindowSize::DEFAULT,
             wnd_scale: WindowScale::default(),
             wl1: ISS_1,
             wl2: ISS_2,
@@ -5819,7 +5924,7 @@ mod test {
     }
 
     #[test]
-    fn silly_window_avoidance() {
+    fn rcv_silly_window_avoidance() {
         const MULTIPLE: usize = 3;
         const CAP: usize = TEST_BYTES.len() * MULTIPLE;
         let mut rcv: Recv<FakeInstant, _> = Recv {
@@ -5849,5 +5954,154 @@ mod test {
         // buffer, advertise it.
         assert_eq!(rcv.buffer.read_with(|_| TEST_BYTES.len()), TEST_BYTES.len());
         assert_eq!(rcv.select_window(), WindowSize::new(TEST_BYTES.len() + 1).unwrap());
+    }
+
+    #[test]
+    fn snd_silly_window_avoidance() {
+        const CAP: usize = TEST_BYTES.len() * 2;
+        let mut snd: Send<FakeInstant, RingBuffer, false> = Send {
+            nxt: ISS_1 + 1,
+            max: ISS_1 + 1,
+            una: ISS_1 + 1,
+            wnd: WindowSize::new(CAP).unwrap(),
+            wnd_scale: WindowScale::default(),
+            wnd_max: WindowSize::DEFAULT,
+            wl1: ISS_1,
+            wl2: ISS_2,
+            buffer: RingBuffer::new(CAP),
+            last_seq_ts: None,
+            rtt_estimator: Estimator::default(),
+            timer: None,
+            congestion_control: CongestionControl::cubic_with_mss(Mss(NonZeroU16::new(
+                TEST_BYTES.len() as u16,
+            )
+            .unwrap())),
+        };
+
+        let mut clock = FakeInstantCtx::default();
+
+        // We enqueue two copies of TEST_BYTES.
+        assert_eq!(snd.buffer.enqueue_data(TEST_BYTES), TEST_BYTES.len());
+        assert_eq!(snd.buffer.enqueue_data(TEST_BYTES), TEST_BYTES.len());
+
+        // The first copy should be sent out since the receiver has the space.
+        assert_eq!(
+            snd.poll_send(
+                ISS_2 + 1,
+                WindowSize::DEFAULT,
+                u32::MAX,
+                clock.now(),
+                &SocketOptions::default(),
+            ),
+            Some(Segment::data(
+                ISS_1 + 1,
+                ISS_2 + 1,
+                UnscaledWindowSize::from(u16::MAX),
+                SendPayload::Contiguous(TEST_BYTES),
+            )),
+        );
+
+        assert_eq!(
+            snd.process_ack(
+                ISS_2 + 1,
+                ISS_1 + 1 + TEST_BYTES.len(),
+                UnscaledWindowSize::from(0),
+                true,
+                ISS_2 + 1,
+                WindowSize::DEFAULT,
+                clock.now(),
+                &KeepAlive::default(),
+            ),
+            None
+        );
+
+        // Now that we received a zero window, we should start probing for the
+        // window reopening.
+        assert_eq!(
+            snd.poll_send(
+                ISS_2 + 1,
+                WindowSize::DEFAULT,
+                u32::MAX,
+                clock.now(),
+                &SocketOptions::default(),
+            ),
+            None
+        );
+
+        assert_eq!(
+            snd.timer,
+            Some(SendTimer::ZeroWindowProbe(RetransTimer::new(
+                clock.now(),
+                snd.rtt_estimator.rto(),
+                DEFAULT_USER_TIMEOUT,
+                DEFAULT_MAX_RETRIES,
+            )))
+        );
+
+        clock.sleep(Duration::from_millis(100));
+
+        assert_eq!(
+            snd.poll_send(
+                ISS_2 + 1,
+                WindowSize::DEFAULT,
+                u32::MAX,
+                clock.now(),
+                &SocketOptions::default(),
+            ),
+            Some(Segment::data(
+                ISS_1 + 1 + TEST_BYTES.len(),
+                ISS_2 + 1,
+                UnscaledWindowSize::from(u16::MAX),
+                SendPayload::Contiguous(&TEST_BYTES[..1]),
+            ))
+        );
+
+        // Now the receiver sends back a window update, but not enough for a
+        // full MSS.
+        assert_eq!(
+            snd.process_ack(
+                ISS_2 + 1,
+                ISS_1 + 1 + TEST_BYTES.len() + 1,
+                UnscaledWindowSize::from(3),
+                true,
+                ISS_2 + 1,
+                WindowSize::DEFAULT,
+                clock.now(),
+                &KeepAlive::default(),
+            ),
+            None
+        );
+
+        // We would then transition into SWS avoidance.
+        assert_eq!(
+            snd.poll_send(
+                ISS_2 + 1,
+                WindowSize::DEFAULT,
+                u32::MAX,
+                clock.now(),
+                &SocketOptions::default(),
+            ),
+            None,
+        );
+        assert_eq!(snd.timer, Some(SendTimer::SWSProbe { at: clock.now().add(SWS_PROBE_TIMEOUT) }));
+        clock.sleep(SWS_PROBE_TIMEOUT);
+
+        // After the overriding timeout, we should push out whatever the
+        // receiver is willing to receive.
+        assert_eq!(
+            snd.poll_send(
+                ISS_2 + 1,
+                WindowSize::DEFAULT,
+                u32::MAX,
+                clock.now(),
+                &SocketOptions::default(),
+            ),
+            Some(Segment::data(
+                ISS_1 + 1 + TEST_BYTES.len() + 1,
+                ISS_2 + 1,
+                UnscaledWindowSize::from(u16::MAX),
+                SendPayload::Contiguous(&TEST_BYTES[1..4]),
+            ))
+        );
     }
 }
