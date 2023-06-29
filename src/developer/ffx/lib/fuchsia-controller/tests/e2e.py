@@ -34,6 +34,10 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
         """This test simply ensures passing a target does not cause an error."""
         _ctx = Context(target="foo")
 
+    def test_context_creation_duplicate_target_raises_exception(self):
+        with self.assertRaises(RuntimeError):
+            _ctx = Context(target="foo", config={"target.default": "bar"})
+
     def test_context_creation_no_args(self):
         _ctx = Context()
 

@@ -47,6 +47,15 @@ std::pair<std::unique_ptr<ffx_config_t[]>, Py_ssize_t> build_config(PyObject *co
     PyErr_SetString(PyExc_TypeError, TYPE_ERROR);
     return std::make_pair(nullptr, 0);
   }
+  PyObject *maybe_target = PyDict_GetItem(config, PyUnicode_FromString("target.default"));
+  if (target && maybe_target) {
+    PyErr_Format(
+        PyExc_RuntimeError,
+        "Context `target` parameter set to '%s', but "
+        "config also contains 'target.default' value set to '%s'. You must only specify one",
+        target, PyUnicode_AsUTF8(maybe_target));
+    return std::make_pair(nullptr, 0);
+  }
   Py_ssize_t config_len = PyDict_Size(config);
   if (config_len < 0) {
     return std::make_pair(nullptr, 0);
