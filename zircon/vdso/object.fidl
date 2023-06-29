@@ -54,8 +54,8 @@ closed protocol Object {
     /// [timer slack] policy.
     ///
     ///   * **ZX_TIME_INFINITE** is a special value meaning wait forever.
-    ///   * 0 (or any value before the current time in **ZX_CLOCK_MONOTONIC**) will
-    ///     query the current value of the signal(s).
+    ///   * **ZX_TIME_INFINITE_PAST** (or any value before the current time in
+    ///     **ZX_CLOCK_MONOTONIC**) will query the current value of the signal(s).
     ///
     /// ## Rights
     ///
