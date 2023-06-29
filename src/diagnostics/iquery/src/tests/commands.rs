@@ -140,19 +140,6 @@ async fn list_files_all() {
     .await;
 }
 
-#[fuchsia::test]
-async fn log() {
-    let test = TestBuilder::new().await.add_basic_component_with_logs("basic").await.start().await;
-
-    test.assert(AssertionParameters {
-        command: IqueryCommand::Logs,
-        golden_basename: "log",
-        iquery_args: vec!["--accessor", "archivist:expose:fuchsia.diagnostics.ArchiveAccessor"],
-        opts: vec![AssertionOption::Retry],
-    })
-    .await;
-}
-
 // Selectors command
 
 #[fuchsia::test]

@@ -17,8 +17,6 @@ use std::{fmt, fs, path::Path};
 
 pub const BASIC_COMPONENT_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm";
-pub const BASIC_COMPONENT_WITH_LOGS_URL: &'static str =
-    "fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component_with_logs.cm";
 pub const TEST_COMPONENT_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/iquery-tests#meta/test_component.cm";
 
@@ -33,11 +31,6 @@ impl TestBuilder {
 
     pub async fn add_basic_component(mut self, name: &str) -> Self {
         self.add_child(name, BASIC_COMPONENT_URL).await;
-        self
-    }
-
-    pub async fn add_basic_component_with_logs(mut self, name: &str) -> Self {
-        self.add_child(name, BASIC_COMPONENT_WITH_LOGS_URL).await;
         self
     }
 
@@ -76,7 +69,6 @@ pub enum IqueryCommand {
     List,
     ListAccessors,
     ListFiles,
-    Logs,
     Selectors,
     Show,
 }
@@ -87,7 +79,6 @@ impl fmt::Display for IqueryCommand {
             Self::List => "list",
             Self::ListAccessors => "list-accessors",
             Self::ListFiles => "list-files",
-            Self::Logs => "logs",
             Self::Selectors => "selectors",
             Self::Show => "show",
         };

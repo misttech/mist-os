@@ -16,9 +16,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
   ]
 
   sources = [ "main.rs" ]
@@ -27,11 +25,5 @@ rustc_binary("bin") {
 fuchsia_component("basic_component") {
   testonly = true
   manifest = "meta/basic_component.cml"
-  deps = [ ":bin" ]
-}
-
-fuchsia_component("basic_component_with_logs") {
-  testonly = true
-  manifest = "meta/basic_component_with_logs.cml"
   deps = [ ":bin" ]
 }

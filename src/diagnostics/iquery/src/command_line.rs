@@ -17,7 +17,6 @@ pub enum SubCommand {
     ListFiles(ListFilesCommand),
     Selectors(SelectorsCommand),
     Show(ShowCommand),
-    Logs(LogsCommand),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -59,6 +58,6 @@ impl Command for CommandLine {
     type Result = String;
 
     async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
-        execute_and_format!(self, provider, [List, ListAccessors, ListFiles, Logs, Selectors, Show])
+        execute_and_format!(self, provider, [List, ListAccessors, ListFiles, Selectors, Show])
     }
 }

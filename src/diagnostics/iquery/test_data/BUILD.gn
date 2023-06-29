@@ -13,7 +13,6 @@ test_names = [
   "list_no_dups",
   "list_test",
   "list_with_url",
-  "log",
   "selectors_archive",
   "selectors_filter_test",
   "selectors_test",

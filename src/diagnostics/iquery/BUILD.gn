@@ -53,7 +53,6 @@ iquery_sources = [
   "src/commands/list.rs",
   "src/commands/list_accessors.rs",
   "src/commands/list_files.rs",
-  "src/commands/logs.rs",
   "src/commands/mod.rs",
   "src/commands/selectors.rs",
   "src/commands/show.rs",
@@ -184,8 +183,6 @@ rustc_test("iquery_test") {
     "test_data/show_test_with_file_root_inspect.text",
     "test_data/show_test_with_file_glob.json",
     "test_data/show_test_with_file_glob.text",
-    "test_data/log.json",
-    "test_data/log.text",
   ]
 }
 
@@ -200,7 +197,6 @@ fuchsia_test_package("iquery-tests") {
   test_components = [ ":iquery-test" ]
   deps = [
     "test/basic_component",
-    "test/basic_component:basic_component_with_logs",
     "test/test_component",
     "test_data:goldens",
     "//src/diagnostics/archivist:archivist-for-embedding-bundle",
