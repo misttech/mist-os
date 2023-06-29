@@ -154,7 +154,7 @@ def generate_handle_command(magma):
       FX_LOGS(ERROR) << "MAGMA command (" << command_type << ") response descriptor not writable";
       return ZX_ERR_INVALID_ARGS;
     }
-    if (!device_fd_.is_valid()) {
+    if (!device_path_.has_value()) {
       auto response_header = reinterpret_cast<virtio_magma_ctrl_hdr_t*>(response_desc.addr);
       response_header->type = VIRTIO_MAGMA_RESP_ERR_HOST_DISCONNECTED;
       chain.Return();
@@ -251,8 +251,7 @@ def main():
                 header += generate_generic_method(method, True) + '\n'
             header += generate_handle_command(magma) + '\n'
             header += ' protected:\n'
-            header += '  std::string device_path_;\n'
-            header += '  fbl::unique_fd device_fd_;\n'
+            header += '  std::optional<std::string> device_path_;\n'
             header += '};\n'
             header += guards(False) + '\n'
             dest.write(header)

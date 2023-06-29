@@ -5,7 +5,6 @@
 #include "src/virtualization/bin/vmm/device/virtio_magma/virtio_magma.h"
 
 #include <dirent.h>
-#include <fcntl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/directory.h>
@@ -82,21 +81,17 @@ void VirtioMagma::Start(
     return;
   }
 
-  for (auto entry = readdir(dir); entry != nullptr && !device_fd_.is_valid();
-       entry = readdir(dir)) {
+  for (auto entry = readdir(dir); entry != nullptr; entry = readdir(dir)) {
     if (strcmp(entry->d_name, ".") == 0) {
       continue;
     }
     device_path_ = std::string(kDeviceDir) + "/" + entry->d_name;
-    device_fd_ = fbl::unique_fd(open(device_path_.c_str(), O_RDONLY));
-    if (!device_fd_.is_valid()) {
-      FX_LOGS(WARNING) << "Failed to open device at " << device_path_ << ": " << strerror(errno);
-    }
+    break;
   }
 
   closedir(dir);
 
-  if (!device_fd_.is_valid()) {
+  if (!device_path_.has_value()) {
     FX_LOGS(ERROR) << "Failed to open any devices in " << kDeviceDir << ".";
     deferred.cancel();
     callback(ZX_ERR_NOT_FOUND);
@@ -261,12 +256,17 @@ zx_status_t VirtioMagma::Handle_device_query(VirtioDescriptor* request_desc,
 
 zx_status_t VirtioMagma::Handle_device_import(const virtio_magma_device_import_ctrl_t* request,
                                               virtio_magma_device_import_resp_t* response) {
+  if (!device_path_.has_value()) {
+    return ZX_ERR_BAD_STATE;
+  }
   zx::channel server_handle, client_handle;
-  zx_status_t status = zx::channel::create(0u, &server_handle, &client_handle);
-  if (status != ZX_OK)
+  if (zx_status_t status = zx::channel::create(0u, &server_handle, &client_handle);
+      status != ZX_OK) {
     return status;
-  status = fdio_service_connect(device_path_.c_str(), server_handle.release());
-  if (status != ZX_OK) {
+  }
+  if (zx_status_t status =
+          fdio_service_connect(device_path_.value().c_str(), server_handle.release());
+      status != ZX_OK) {
     LOG_VERBOSE("fdio_service_connect failed %d", status);
     return status;
   }
@@ -530,7 +530,7 @@ zx_status_t VirtioMagma::Handle_connection_import_buffer(
   ImageInfoWithToken info;
   zx::vmo vmo;
 
-  InitFromVirtioImage(*image.get(), &vmo, &info);
+  InitFromVirtioImage(*image, &vmo, &info);
 
   {
     virtio_magma_connection_import_buffer_ctrl_t request_copy = *request;
