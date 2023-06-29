@@ -1212,33 +1212,78 @@ assembly_input_bundle("netstack3") {
 
 # WLAN base support
 #
-# feature_set_levels: minimal
+# feature_set_levels: utility, minimal
 # build-types: all
 #
+# Not included in utility + user by default, but otherwise is included.
 assembly_input_bundle("wlan_base") {
   base_packages = [
     "//src/connectivity/location/regulatory_region",
     "//src/connectivity/wlan/wlancfg",
   ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/connectivity/wlan/wlancfg/meta/wlancfg.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 # WLAN support for WEP and WPA
 #
-# feature_set_levels: minimal
+# feature_set_levels: utility, minimal
 # build-types: all
 #
+# Not included in utility + user by default, but otherwise is included.
 assembly_input_bundle("wlan_legacy_privacy_support") {
   base_packages = [ "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-legacy-privacy" ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/connectivity/wlan/wlandevicemonitor/meta/wlandevicemonitor.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 # WLAN support for WPA2 and later
 #
-# feature_set_levels: minimal
+# feature_set_levels: utility, minimal
 # build-types: all
 #
+# Not included in utility + user by default, but otherwise is included.
 assembly_input_bundle("wlan_contemporary_privacy_only_support") {
   base_packages =
       [ "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor" ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/connectivity/wlan/wlandevicemonitor/meta/wlandevicemonitor.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 # WLAN support for drivers that provide their own MAC

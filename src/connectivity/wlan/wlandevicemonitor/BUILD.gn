@@ -147,6 +147,7 @@ fuchsia_test_package("wlandevicemonitor-tests") {
   }
 }
 
-core_shard("wlandevicemonitor-core-shard") {
-  shard_file = "meta/wlandevicemonitor.core_shard.cml"
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("wlandevicemonitor-core-shard") {
 }

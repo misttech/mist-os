@@ -69,9 +69,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
 
             let has_fullmac = context.board_info.provides_feature("fuchsia::wlan_fullmac");
             let has_softmac = context.board_info.provides_feature("fuchsia::wlan_softmac");
-            if context.feature_set_level == &FeatureSupportLevel::Minimal
-                && (has_fullmac || has_softmac)
-            {
+            if has_fullmac || has_softmac {
                 builder.platform_bundle("wlan_base");
                 // Some products require legacy security types to be supported.
                 // Otherwise, they are disabled by default.

@@ -88,12 +88,7 @@ if (is_fuchsia) {
   core_realm_network_aib_pkgs = [
     # Newtorking itself
     "//src/connectivity/network:for_transition",
-    "//src/connectivity/wlan/wlancfg:for_transition",
     "//src/security/bin/root_ssl_certificates:for_transition",
-  ]
-  core_realm_network_aib_shards = [
-    "//src/connectivity/wlan/wlancfg:wlancfg-core-shard",
-    "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-core-shard",
   ]
   core_realm_eng_aib_pkgs = [
     # Enable ffx support.
@@ -123,7 +118,7 @@ if (is_fuchsia) {
   ]
 
   _core_realm_deps =
-      core_realm_aib_shards + core_realm_network_aib_shards + [
+      core_realm_aib_shards + [
         "//src/diagnostics/realm:core_shard",
         "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
         "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
@@ -154,11 +149,10 @@ if (is_fuchsia) {
   }
 
   recovery_packages = board_recovery_package_labels + core_realm_aib_pkgs +
-                      core_realm_network_aib_pkgs + [
+                      core_realm_network_aib_pkgs +
+                      [
                         ":build-info-recovery",
-                        "//src/connectivity/location/regulatory_region:regulatory_region",
                         "//src/connectivity/network/netcfg:config-default",
-                        "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-legacy-privacy",
                         "//src/recovery/factory_reset",
                         "//src/recovery/system:system_recovery",
                         "//src/sys/core:component_id_index_no_restrict_storage",
@@ -244,6 +238,11 @@ if (is_fuchsia) {
               rebase_path(authorized_ssh_keys_path, root_build_dir)
         }
       }
+      connectivity = {
+        wlan = {
+          legacy_privacy_support = true
+        }
+      }
     }
     product = {
     }
@@ -266,6 +265,11 @@ if (is_fuchsia) {
         development_support = {
           authorized_ssh_keys_path =
               rebase_path(authorized_ssh_keys_path, root_build_dir)
+        }
+      }
+      connectivity = {
+        wlan = {
+          legacy_privacy_support = true
         }
       }
     }
@@ -388,6 +392,11 @@ if (is_fuchsia) {
         development_support = {
           authorized_ssh_keys_path =
               rebase_path(authorized_ssh_keys_path, root_build_dir)
+        }
+      }
+      connectivity = {
+        wlan = {
+          legacy_privacy_support = true
         }
       }
     }

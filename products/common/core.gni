@@ -16,8 +16,6 @@ product_bootfs_labels += [
 
 core_realm_shards += [
   "//src/connectivity/bluetooth/tools/bt-snoop:bt-snoop-core-shard",
-  "//src/connectivity/wlan/wlancfg:wlancfg-core-shard",
-  "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-core-shard",
   "//src/media/audio/audio_core:core_shard",
   "//src/media/sounds/soundplayer:core_shard",
   "//src/settings/service:setui_service_core_shard",
