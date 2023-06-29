@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display;
 
+/// Type of the internal value in [`fuchsia.hardware.display/LayerId`].
+alias LayerIdValue = uint64;
+
 /// Identifies a layer resource owned by a Display Coordinator client.
 ///
 /// [`fuchsia.hardware.display/INVALID_DISP_ID`] represents an invalid value.
@@ -14,7 +17,9 @@ library fuchsia.hardware.display;
 /// connection. The identifier of a layer destroyed via
 /// [`fuchsia.hardware.display/Coordinator.DestroyLayer`] can be reused in a
 /// subsequent [`fuchsia.hardware.display/Coordinator.CreateLayer`] call.
-alias LayerIdValue = uint64;
+type LayerId = struct {
+    value LayerIdValue;
+};
 
 // Rotations are applied counter-clockwise, and are applied before reflections.  Note: this doesn't
 // affect the output region on the physical display; use the layer's `dest_frame` for that.  In

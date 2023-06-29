@@ -14,14 +14,20 @@
 
 namespace display {
 
-// More useful representation of `fuchsia.hardware.display/LayerIdValue`.
+// More useful representation of `fuchsia.hardware.display/LayerId`.
 //
 // See `DriverLayerId` for the type used at the interface between the display
 // coordinator and the display drivers.
 DEFINE_STRONG_INT(LayerId, uint64_t);
 
+constexpr inline LayerId ToLayerId(fuchsia_hardware_display::wire::LayerId fidl_layer_id) {
+  return LayerId(fidl_layer_id.value);
+}
 constexpr inline LayerId ToLayerId(uint64_t fidl_layer_id_value) {
   return LayerId(fidl_layer_id_value);
+}
+constexpr inline fuchsia_hardware_display::wire::LayerId ToFidlLayerId(LayerId layer_id) {
+  return {.value = layer_id.value()};
 }
 constexpr inline uint64_t ToFidlLayerIdValue(LayerId layer_id) { return layer_id.value(); }
 
