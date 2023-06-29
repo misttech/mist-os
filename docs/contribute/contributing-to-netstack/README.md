@@ -303,7 +303,7 @@ fx set core.x64 --with //src/connectivity/network:tests
 If you're working on changes that affect `fdio` and `third_party/go`, add:
 
 ```
---with //sdk/lib/fdio:tests --with //third_party/go:go_stdlib_tests
+--with //sdk/lib/fdio:tests --with //third_party/go:tests
 ```
 
 [getting_started]: /docs/get-started
