@@ -112,4 +112,5 @@ executable("camera_device_unittest_bin") {
 fuchsia_unittest_package("camera_device_unittest") {
   manifest = "meta/camera_device_unittest.cml"
   deps = [ ":camera_device_unittest_bin" ]
+  test_type = "system"
 }

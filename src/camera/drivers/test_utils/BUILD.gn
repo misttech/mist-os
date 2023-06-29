@@ -111,4 +111,5 @@ fuchsia_unittest_package("button_checker_unittest") {
       sherlock_env,
     ]
   }
+  test_type = "system"
 }
