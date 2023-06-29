@@ -28,6 +28,7 @@ from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth import \
     bluetooth_gap as bluetooth_gap_interface
 from honeydew.interfaces.device_classes import affordances_capable
+from honeydew.transports import ffx as ffx_transport
 from honeydew.utils import properties
 
 _FidlEndpoint = collections.namedtuple("_FidlEndpoint", ["moniker", "protocol"])
@@ -227,18 +228,39 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         """Creates the fuchsia-controller context and any long-lived proxies.
 
         Raises:
-            fuchsia_controller.ZxStatus: On FIDL communication failure.
+            errors.FuchsiaControllerError: On FIDL communication failure.
         """
         try:
-            self._ctx = fuchsia_controller.Context(target=self.device_name)
+            target: str = self.device_name
 
+            ffx_config: custom_types.FFXConfig = ffx_transport.get_config()
+
+            # To run Fuchsia-Controller in isolation
+            isolate_dir: Optional[fuchsia_controller.IsolateDir] = \
+                ffx_config.isolate_dir
+
+            # To collect Fuchsia-Controller logs
+            config: Dict[str, str] = {}
+            if ffx_config.logs_dir:
+                config["log.dir"] = ffx_config.logs_dir
+                config["log.level"] = "debug"
+
+            config["daemon.autostart"] = "false"
+
+            self._ctx = fuchsia_controller.Context(
+                config=config, isolate_dir=isolate_dir, target=target)
+        except Exception as err:  # pylint: disable=broad-except
+            raise errors.FuchsiaControllerError(
+                "Failed to create Fuchsia-Controller context") from err
+
+        try:
             # TODO(fxb/128575): Make connect_remote_control_proxy() work, or
             # remove it.
             self._rcs_proxy = fd_remotecontrol.RemoteControl.Client( \
                     _connect_device_proxy(self._ctx, "RemoteControl"))
         except fuchsia_controller.ZxStatus as status:
             raise errors.FuchsiaControllerError(
-                "Fuchsia Controller FIDL Error") from status
+                "Failed to create RemoteControl proxy") from status
 
     def _context_destroy(self) -> None:
         """Destroys the fuchsia-controller context and any long-lived proxies,

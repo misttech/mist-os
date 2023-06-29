@@ -45,6 +45,13 @@ _MOCK_DEVICE_PROPERTIES: Dict[str, Dict[str, Any]] = {
         },
 }
 
+_MOCK_ARGS: Dict[str, Any] = {
+    "ffx_config":
+        custom_types.FFXConfig(
+            isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
+            logs_dir="/tmp/logs"),
+}
+
 
 def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom test name function method."""
@@ -73,18 +80,27 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "check_connection",
         autospec=True)
     @mock.patch("fuchsia_controller_py.Context", autospec=True)
+    @mock.patch.object(
+        fuchsia_device.ffx_transport,
+        "get_config",
+        return_value=_MOCK_ARGS["ffx_config"],
+        autospec=True)
     def setUp(
-            self, mock_fc_context, mock_ssh_check_connection,
-            mock_ffx_check_connection) -> None:
+            self, mock_ffx_get_config, mock_fc_context,
+            mock_ssh_check_connection, mock_ffx_check_connection) -> None:
         super().setUp()
 
         self.fd_obj = fuchsia_device.FuchsiaDevice(
             device_name=_INPUT_ARGS["device_name"],
             ssh_private_key=_INPUT_ARGS["ssh_private_key"])
 
+        mock_ffx_get_config.assert_called_once()
+        mock_fc_context.assert_called_once_with(
+            config=mock.ANY,
+            isolate_dir=_MOCK_ARGS["ffx_config"].isolate_dir,
+            target=self.fd_obj.device_name)
         mock_ffx_check_connection.assert_called_once_with(self.fd_obj.ffx)
         mock_ssh_check_connection.assert_called_once_with(self.fd_obj.ssh)
-        mock_fc_context.assert_called()
 
     def test_device_is_a_fuchsia_device(self) -> None:
         """Test case to make sure DUT is a fuchsia device"""
@@ -225,11 +241,23 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
     @mock.patch.object(
         fuchsia_device.FuchsiaDevice, "health_check", autospec=True)
     @mock.patch("fuchsia_controller_py.Context", autospec=True)
-    def test_on_device_boot(self, mock_fc_context, mock_health_check) -> None:
+    @mock.patch.object(
+        fuchsia_device.ffx_transport,
+        "get_config",
+        return_value=_MOCK_ARGS["ffx_config"],
+        autospec=True)
+    def test_on_device_boot(
+            self, mock_ffx_get_config, mock_fc_context,
+            mock_health_check) -> None:
         """Testcase for FuchsiaDevice._on_device_boot()"""
         # pylint: disable=protected-access
         self.fd_obj.on_device_boot()
-        mock_fc_context.assert_called()
+
+        mock_ffx_get_config.assert_called_once()
+        mock_fc_context.assert_called_once_with(
+            config=mock.ANY,
+            isolate_dir=_MOCK_ARGS["ffx_config"].isolate_dir,
+            target=self.fd_obj.device_name)
         mock_health_check.assert_called()
 
     @parameterized.expand(

@@ -163,6 +163,20 @@ class FfxCliTests(unittest.TestCase):
         with self.assertRaises(errors.FfxCommandError):
             ffx.setup(logs_dir="/tmp/ffx_logs_2/")
 
+    def test_ffx_get_config(self) -> None:
+        """Test case for ffx.get_config()."""
+        # Ensure ffx.get_config() will return valid FFXConfig when called after
+        # ffx.setup()
+        ffx.setup(logs_dir="/tmp/ffx_logs/")
+        ffx_config = ffx.get_config()
+        self.assertEqual(ffx_config.logs_dir, "/tmp/ffx_logs/")
+
+        # Ensure ffx.get_config() will return empty FFXConfig when called after
+        # ffx.close()
+        ffx.close()
+        ffx_config = ffx.get_config()
+        self.assertEqual(ffx_config, custom_types.FFXConfig())
+
     def test_ffx_close(self) -> None:
         """Test case for ffx.close()."""
         ffx.close()

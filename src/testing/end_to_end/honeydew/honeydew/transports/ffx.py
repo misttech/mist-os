@@ -6,10 +6,10 @@
 
 import json
 import logging
-from shutil import rmtree
 import subprocess
-import tempfile
 from typing import Any, Dict, Iterable, List, Optional, Type
+
+import fuchsia_controller_py as fuchsia_controller
 
 from honeydew import custom_types
 from honeydew import errors
@@ -27,7 +27,7 @@ _TIMEOUTS: Dict[str, float] = {
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_ISOLATE_DIR: Optional[str] = None
+_ISOLATE_DIR: Optional[fuchsia_controller.IsolateDir] = None
 _LOGS_DIR: Optional[str] = None
 
 
@@ -60,13 +60,10 @@ def setup(logs_dir: str) -> None:
     if _ISOLATE_DIR or _LOGS_DIR:
         raise errors.FfxCommandError("setup has already been called once.")
 
-    if _ISOLATE_DIR is None:
-        _ISOLATE_DIR = tempfile.mkdtemp()
+    _ISOLATE_DIR = fuchsia_controller.IsolateDir()
+    _LOGGER.debug("ffx isolation dir is: '%s'", _ISOLATE_DIR.directory())
 
-    if _LOGS_DIR is None:
-        _LOGS_DIR = logs_dir
-
-    _LOGGER.debug("ffx isolation dir is: '%s'", _ISOLATE_DIR)
+    _LOGS_DIR = logs_dir
     _LOGGER.debug("ffx logs dir is '%s'", _LOGS_DIR)
 
 
@@ -79,14 +76,18 @@ def close() -> None:
     global _ISOLATE_DIR
     global _LOGS_DIR
 
-    try:
-        _LOGGER.debug("Deleting ffx isolation dir: '%s'", _ISOLATE_DIR)
-        rmtree(str(_ISOLATE_DIR))
-    except FileNotFoundError:
-        pass
-
+    # Setting `_ISOLATE_DIR = None` will delete the `_ISOLATE_DIR.directory()`
     _ISOLATE_DIR = None
     _LOGS_DIR = None
+
+
+def get_config() -> custom_types.FFXConfig:
+    """Returns the FFX configuration information.
+
+    Returns:
+        custom_types.FFXConfig
+    """
+    return custom_types.FFXConfig(isolate_dir=_ISOLATE_DIR, logs_dir=_LOGS_DIR)
 
 
 class FFX:
@@ -416,7 +417,7 @@ class FFX:
 
         # To run FFX in isolation mode
         if _ISOLATE_DIR:
-            ffx_args.extend(["--isolate-dir", _ISOLATE_DIR])
+            ffx_args.extend(["--isolate-dir", _ISOLATE_DIR.directory()])
 
         # To collect FFX logs
         if _LOGS_DIR:

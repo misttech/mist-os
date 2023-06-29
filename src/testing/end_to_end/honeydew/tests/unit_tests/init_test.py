@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Set, Type
 import unittest
 from unittest import mock
 
+import fuchsia_controller_py as fuchsia_controller
 from parameterized import parameterized
 
 import honeydew
@@ -23,6 +24,13 @@ from honeydew.device_classes.sl4f import \
     generic_fuchsia_device as sl4f_generic_fuchsia_device
 from honeydew.device_classes.sl4f import x64 as sl4f_x64
 from honeydew.interfaces.device_classes import fuchsia_device
+
+_MOCK_ARGS: Dict[str, Any] = {
+    "ffx_config":
+        custom_types.FFXConfig(
+            isolate_dir=fuchsia_controller.IsolateDir(),
+            logs_dir="/tmp/logs"),
+}
 
 
 def _custom_test_name_func(testcase_func, _, param) -> str:
@@ -151,11 +159,15 @@ class InitTests(unittest.TestCase):
         autospec=True)
     @mock.patch("fuchsia_controller_py.Context", autospec=True)
     @mock.patch(
+        "honeydew.transports.ffx.get_config",
+        return_value=_MOCK_ARGS["ffx_config"],
+        autospec=True)
+    @mock.patch(
         "honeydew._get_device_class",
         return_value=fc_generic_fuchsia_device.GenericFuchsiaDevice,
         autospec=True)
     def test_create_device_return_fc_default_device(
-            self, mock_get_device_class, mock_fc_context,
+            self, mock_get_device_class, mock_ffx_get_config, mock_fc_context,
             mock_ssh_check_connection, mock_ffx_check_connection) -> None:
         """Test case for honeydew.create_device() where it returns
         Fuchsia-Controller based default fuchsia device object."""
@@ -167,7 +179,11 @@ class InitTests(unittest.TestCase):
             fc_generic_fuchsia_device.GenericFuchsiaDevice)
 
         mock_get_device_class.assert_called()
-        mock_fc_context.assert_called()
+        mock_ffx_get_config.assert_called_once()
+        mock_fc_context.assert_called_once_with(
+            config=mock.ANY,
+            isolate_dir=_MOCK_ARGS["ffx_config"].isolate_dir,
+            target="fuchsia-emulator")
         mock_ssh_check_connection.assert_called()
         mock_ffx_check_connection.assert_called()
 
@@ -181,9 +197,13 @@ class InitTests(unittest.TestCase):
         autospec=True)
     @mock.patch("fuchsia_controller_py.Context", autospec=True)
     @mock.patch(
+        "honeydew.transports.ffx.get_config",
+        return_value=_MOCK_ARGS["ffx_config"],
+        autospec=True)
+    @mock.patch(
         "honeydew._get_device_class", return_value=fc_x64.X64, autospec=True)
     def test_create_device_return_fc_specific_device(
-            self, mock_get_device_class, mock_fc_context,
+            self, mock_get_device_class, mock_ffx_get_config, mock_fc_context,
             mock_ssh_check_connection, mock_ffx_check_connection) -> None:
         """Test case for honeydew.create_device() where it returns a
         Fuchsia-Controller based specific fuchsia device object."""
@@ -195,7 +215,11 @@ class InitTests(unittest.TestCase):
             fc_x64.X64)
 
         mock_get_device_class.assert_called()
-        mock_fc_context.assert_called()
+        mock_ffx_get_config.assert_called_once()
+        mock_fc_context.assert_called_once_with(
+            config=mock.ANY,
+            isolate_dir=_MOCK_ARGS["ffx_config"].isolate_dir,
+            target="fuchsia-1234")
         mock_ssh_check_connection.assert_called()
         mock_ffx_check_connection.assert_called()
 

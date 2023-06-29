@@ -6,9 +6,12 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import enum
 import ipaddress
 from typing import NamedTuple, Optional, Union
+
+import fuchsia_controller_py as fuchsia_controller
 
 
 class LEVEL(enum.Enum):
@@ -110,3 +113,15 @@ class Sl4fServerAddress(NamedTuple):
     """
     ip: str
     port: int
+
+
+@dataclass
+class FFXConfig:
+    """Dataclass that holds FFX config information.
+
+    Args:
+        isolate_dir: FFX isolation directory
+        logs_dir: FFX logs directory
+    """
+    isolate_dir: Optional[fuchsia_controller.IsolateDir] = None
+    logs_dir: Optional[str] = None

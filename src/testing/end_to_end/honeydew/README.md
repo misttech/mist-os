@@ -104,6 +104,12 @@ HoneyDew:
 >>> logging.basicConfig(level=logging.INFO)
 
 >>> import honeydew
+
+# Setup HoneyDew to run using isolated FFX and collect the logs
+# Call this first prior to calling any other HoneyDew API
+>>> from honeydew.transports import ffx
+>>> ffx.setup(logs_dir="/tmp/foo/logs")
+
 # honeydew.create_device() will look for a specific Fuchsia device class implementation that matches the device type specified and if it finds, it returns that specific device type object, else returns GenericFuchsiaDevice object.
 # In below examples,
 #   * "fuchsia-54b2-038b-6e90" is a x64 device whose implementation is present in HoneyDew. Hence returning honeydew.device_classes.x64.X64 object.
@@ -207,6 +213,9 @@ INFO:honeydew.device_classes.fuchsia_device_base:Snapshot file has been saved @ 
 ```python
 >>> emu.close()
 >>> del emu
+
+# call this in the end
+>>> ffx.close()
 ```
 
 ## HoneyDew code guidelines
