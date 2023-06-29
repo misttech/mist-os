@@ -530,7 +530,7 @@ impl RemoteControlService {
             moniker,
             protocol_name.clone(),
             server_end,
-            io::OpenFlags::RIGHT_READABLE,
+            io::OpenFlags::empty(),
             lifecycle,
             query,
         )
