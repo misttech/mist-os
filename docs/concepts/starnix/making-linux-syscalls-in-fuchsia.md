@@ -30,12 +30,10 @@ and `starnix_kernel`.
 
 Each Linux program is loaded into a separate Zircon process and each Linux
 thread runs in a dedicated Zircon thread. However, all the Zircon processes in a
-container share the same `starnix_kernel` instance – a container (conceptually
-analogous to a [Linux container][linux-container]{:.external} or virtual machine)
-is the combination of `starnix_kernel` and the disk images used when running a
-collection of Linux processes. This shared `starnix_kernel` instance manages all
-the state of the Linux programs in the container, such as file descriptor tables,
-a global virtual filesystem, and a table of running threads.
+[Starnix container][starnix-container] share the same `starnix_kernel` instance.
+This shared `starnix_kernel` instance manages all the state of the Linux programs
+in the container, such as file descriptor tables, a global virtual filesystem,
+and a table of running threads.
 
 For more information on the state shared between the Zircon processes
 that run the `starnix_kernel`, see the restricted mode [RFC][rfc] and
@@ -134,6 +132,6 @@ loop {
 [shareable-state]: https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/kernel/object/include/object/shareable_process_state.h
 [starnix-runner]: /docs/concepts/components/v2/starnix.md
 [starnix-readme]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/starnix/kernel/README.md
-[linux-container]: https://en.wikipedia.org/wiki/LXC
 [restricted-enter]: /docs/reference/syscalls/restricted_enter.md
 [restricted-bind-state]: /docs/reference/syscalls/restricted_bind_state.md
+[starnix-container]: /docs/concepts/starnix/starnix-container.md

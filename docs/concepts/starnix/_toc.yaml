@@ -8,3 +8,5 @@
 toc:
 - title: "Making Linux syscalls in Fuchsia"
   path: /docs/concepts/starnix/making-linux-syscalls-in-fuchsia.md
+- title: "Starnix container"
+  path: /docs/concepts/starnix/starnix-container.md
