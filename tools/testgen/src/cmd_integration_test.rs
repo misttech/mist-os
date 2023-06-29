@@ -92,6 +92,9 @@ impl IntegrationTestCmd {
         if !component_manifest.exists() {
             bail!("{} does not exist.", self.component_manifest.display());
         }
+        if !component_manifest.extension().is_some_and(|x| x == "cml") {
+            bail!("component manifest must be a .cml file");
+        }
 
         info!("Generating an integration test at {}", test_root.display());
 
