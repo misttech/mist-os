@@ -519,6 +519,7 @@ mod tests {
                     "coll".into(),
                     &child_decl,
                     fcomponent::CreateChildArgs::default(),
+                    false,
                 )
                 .await
                 .expect("failed to add child");

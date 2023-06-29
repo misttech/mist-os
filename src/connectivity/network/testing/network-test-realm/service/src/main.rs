@@ -423,6 +423,7 @@ async fn create_child(
                 | fcomponent::Error::ResourceUnavailable
                 // Variants that are not returned by the `CreateChild` method.
                 | fcomponent::Error::AccessDenied
+                | fcomponent::Error::InstanceAlreadyStarted
                 | fcomponent::Error::InstanceCannotStart
                 | fcomponent::Error::InstanceNotFound
                 | fcomponent::Error::Internal
@@ -477,6 +478,7 @@ async fn destroy_child(
             // method.
             | fcomponent::Error::AccessDenied
             | fcomponent::Error::InstanceAlreadyExists
+            | fcomponent::Error::InstanceAlreadyStarted
             | fcomponent::Error::InstanceCannotResolve
             | fcomponent::Error::InstanceCannotUnresolve
             | fcomponent::Error::InstanceCannotStart

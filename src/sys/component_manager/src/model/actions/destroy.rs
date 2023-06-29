@@ -107,7 +107,7 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), DestroyAct
         let actions = component.lock_actions().await;
         vec![
             wait(actions.wait(ResolveAction::new())),
-            wait(actions.wait(StartAction::new(StartReason::Debug))),
+            wait(actions.wait(StartAction::new(StartReason::Debug, None, vec![], vec![]))),
             task_shutdown,
         ]
     };
@@ -510,7 +510,10 @@ pub mod tests {
                 on_terminate: None,
                 config_overrides: None,
             };
-            assert!(resolved_state.add_child_no_discover(&component_root, &child, None).is_ok());
+            assert!(resolved_state
+                .add_child_no_discover(&component_root, &child, None)
+                .await
+                .is_ok());
         }
         let mut event_stream = setup_destroy_waits_test_event_stream(
             &test,

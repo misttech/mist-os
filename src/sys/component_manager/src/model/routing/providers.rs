@@ -50,10 +50,15 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 .upgrade()
                 .map_err(|_| ComponentProviderError::SourceInstanceNotFound)?;
             source
-                .start(&StartReason::AccessCapability {
-                    target: self.target.abs_moniker.clone(),
-                    name: self.name.clone(),
-                })
+                .start(
+                    &StartReason::AccessCapability {
+                        target: self.target.abs_moniker.clone(),
+                        name: self.name.clone(),
+                    },
+                    None,
+                    vec![],
+                    vec![],
+                )
                 .await?;
 
             let event = Event::new(

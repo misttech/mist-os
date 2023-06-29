@@ -1325,7 +1325,7 @@ mod tests {
 
         // Test that starting an instance results in the collection service directory adding the
         // relevant instances.
-        foo_component.start(&StartReason::Eager).await.unwrap();
+        foo_component.start(&StartReason::Eager, None, vec![], vec![]).await.unwrap();
         let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(entries.len(), 1);
 
@@ -1336,7 +1336,7 @@ mod tests {
             .expect("failed to find baz instance");
 
         // Test with second collection
-        baz_component.start(&StartReason::Eager).await.unwrap();
+        baz_component.start(&StartReason::Eager, None, vec![], vec![]).await.unwrap();
         let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(entries.len(), 3);
     }

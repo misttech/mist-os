@@ -141,6 +141,11 @@ type CreateChildArgs = resource table {
     /// the child component is being created must specify
     /// `ComponentDecl.allowed_offers = STATIC_AND_DYNAMIC`.
     2: dynamic_offers vector<fuchsia.component.decl.Offer>:MAX_DYNAMIC_OFFER_COUNT;
+
+    /// The controller for this component, which may be used to influence the
+    /// component's lifecycle.
+    @available(added=14)
+    3: controller server_end:Controller;
 };
 
 /// A protocol to iterate over the list of children in a realm.

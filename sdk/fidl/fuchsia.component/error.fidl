@@ -33,4 +33,7 @@ type Error = strict enum {
     RESOURCE_NOT_FOUND = 12;
     /// Failed to unresolve the component.
     INSTANCE_CANNOT_UNRESOLVE = 13;
+    /// The component instance has already been started.
+    @available(added=14)
+    INSTANCE_ALREADY_STARTED = 14;
 };

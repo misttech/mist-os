@@ -727,6 +727,12 @@ impl Into<fsys::StopError> for StopActionError {
     }
 }
 
+impl Into<fcomponent::Error> for StopActionError {
+    fn into(self) -> fcomponent::Error {
+        fcomponent::Error::Internal
+    }
+}
+
 #[cfg(test)]
 impl PartialEq for StopActionError {
     fn eq(&self, other: &Self) -> bool {
@@ -840,6 +846,9 @@ pub enum NamespacePopulateError {
 
     #[error("{0}")]
     InstanceNotInInstanceIdIndex(#[source] RoutingError),
+
+    #[error("failed to add additional namespace entries because they conflict with paths for used capabilities")]
+    ConflictBetweenUsesAndAdditionalEntries,
 }
 
 impl NamespacePopulateError {
@@ -847,6 +856,7 @@ impl NamespacePopulateError {
         match self {
             Self::ClonePkgDirFailed(_) => zx::Status::IO,
             Self::InstanceNotInInstanceIdIndex(e) => e.as_zx_status(),
+            Self::ConflictBetweenUsesAndAdditionalEntries { .. } => zx::Status::INVALID_ARGS,
         }
     }
 }

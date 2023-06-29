@@ -130,6 +130,7 @@ rustc_library("lib") {
     "src/directory_ready_notifier.rs",
     "src/elf_runner.rs",
     "src/framework/binder.rs",
+    "src/framework/controller.rs",
     "src/framework/lifecycle_controller.rs",
     "src/framework/mod.rs",
     "src/framework/pkg_dir.rs",

@@ -211,7 +211,7 @@ async fn open_storage_root(
     if let Some(dir_source_component) = storage_source_info.storage_provider.as_ref() {
         // TODO(fxbug.dev/50716): This should be StartReason::AccessCapability, but we haven't
         // plumbed in all the details needed to use it.
-        dir_source_component.start(&StartReason::StorageAdmin).await?;
+        dir_source_component.start(&StartReason::StorageAdmin, None, vec![], vec![]).await?;
         let path = full_backing_directory_path
             .to_str()
             .ok_or_else(|| ModelError::path_is_not_utf8(full_backing_directory_path.clone()))?;

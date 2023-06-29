@@ -48,7 +48,6 @@ impl GlobalPolicyCheckerTest<ComponentInstance> for GlobalPolicyCheckerTestForCm
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::default()),
             Arc::new(Hooks::new()),
-            None,
             false,
         )
     }

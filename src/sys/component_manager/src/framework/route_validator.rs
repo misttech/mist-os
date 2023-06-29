@@ -1268,13 +1268,13 @@ mod tests {
                 .look_up(&format!("/coll:{}", name).as_str().try_into().unwrap())
                 .await
                 .unwrap();
-            child.start(&StartReason::Debug).await.unwrap();
+            child.start(&StartReason::Debug, None, vec![], vec![]).await.unwrap();
         }
 
         // Open the service directory from `target` so that it gets instantiated.
         {
             let target = model.look_up(&"/target".try_into().unwrap()).await.unwrap();
-            target.start(&StartReason::Debug).await.unwrap();
+            target.start(&StartReason::Debug, None, vec![], vec![]).await.unwrap();
             let ns = mock_runner.get_namespace("test:///target_resolved").unwrap();
             let mut ns = ns.lock().await;
             // /pkg and /svc

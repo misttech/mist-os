@@ -619,7 +619,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -691,7 +690,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -751,7 +749,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -811,7 +808,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -876,7 +872,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -890,7 +885,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_one)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -949,7 +943,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -1008,7 +1001,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -1050,7 +1042,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -1109,7 +1100,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -1123,7 +1113,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_one)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -1192,7 +1181,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -1206,7 +1194,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_one)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -1220,7 +1207,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_two)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -1302,7 +1288,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -1316,7 +1301,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&realm)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -1330,7 +1314,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_one)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -1344,7 +1327,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_two)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 
@@ -1360,7 +1342,6 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_three)),
             Arc::new(Hooks::new()),
-            None,
             false,
         );
 

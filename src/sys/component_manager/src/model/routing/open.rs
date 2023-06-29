@@ -279,10 +279,15 @@ impl<'a> OpenRequest<'a> {
                 };
 
                 source_component_instance
-                    .start(&StartReason::AccessCapability {
-                        target: target.abs_moniker.clone(),
-                        name: capability.source_name().clone(),
-                    })
+                    .start(
+                        &StartReason::AccessCapability {
+                            target: target.abs_moniker.clone(),
+                            name: capability.source_name().clone(),
+                        },
+                        None,
+                        vec![],
+                        vec![],
+                    )
                     .await?;
 
                 // If there is an existing collection service directory, provide it.

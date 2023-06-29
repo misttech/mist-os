@@ -15,6 +15,7 @@ group("tests") {
     "capability_provider_vfs_compliance:tests",
     "collections:collections_integration_test",
     "component-time:tests",
+    "controller:tests",
     "crash_introspect:tests",
     "destruction:destruction_integration_test",
     "diagnostics:tests",

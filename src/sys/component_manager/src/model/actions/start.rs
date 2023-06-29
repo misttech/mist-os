@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 use {
+    crate::framework::controller,
     crate::model::{
         actions::{Action, ActionKey},
         component::{
             ComponentInstance, ExecutionState, InstanceState, Package, Runtime, StartReason,
         },
-        error::{StartActionError, StructuredConfigError},
+        error::{NamespacePopulateError, StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
         namespace::IncomingNamespace,
     },
@@ -21,8 +22,9 @@ use {
         Vmo,
     },
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_sys2 as fsys,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, fuchsia_zircon as zx,
+    futures::lock::Mutex,
     moniker::AbsoluteMoniker,
     std::sync::Arc,
     tracing::warn,
@@ -31,11 +33,24 @@ use {
 /// Starts a component instance.
 pub struct StartAction {
     start_reason: StartReason,
+    execution_controller_task: Mutex<Option<controller::ExecutionControllerTask>>,
+    numbered_handles: Mutex<Option<Vec<fprocess::HandleInfo>>>,
+    additional_namespace_entries: Mutex<Option<Vec<fcrunner::ComponentNamespaceEntry>>>,
 }
 
 impl StartAction {
-    pub fn new(start_reason: StartReason) -> Self {
-        Self { start_reason }
+    pub fn new(
+        start_reason: StartReason,
+        execution_controller_task: Option<controller::ExecutionControllerTask>,
+        numbered_handles: Vec<fprocess::HandleInfo>,
+        additional_namespace_entries: Vec<fcrunner::ComponentNamespaceEntry>,
+    ) -> Self {
+        Self {
+            start_reason,
+            execution_controller_task: Mutex::new(execution_controller_task),
+            numbered_handles: Mutex::new(Some(numbered_handles)),
+            additional_namespace_entries: Mutex::new(Some(additional_namespace_entries)),
+        }
     }
 }
 
@@ -43,7 +58,17 @@ impl StartAction {
 impl Action for StartAction {
     type Output = Result<fsys::StartResult, StartActionError>;
     async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
-        do_start(component, &self.start_reason).await
+        do_start(
+            component,
+            &self.start_reason,
+            self.execution_controller_task.lock().await.take(),
+            self.numbered_handles.lock().await.take().expect("StartAction was run twice"),
+            self.additional_namespace_entries.lock().await.take().expect(
+                "StartAction was run
+                 twice",
+            ),
+        )
+        .await
     }
 
     fn key(&self) -> ActionKey {
@@ -60,6 +85,9 @@ struct StartContext {
 async fn do_start(
     component: &Arc<ComponentInstance>,
     start_reason: &StartReason,
+    execution_controller_task: Option<controller::ExecutionControllerTask>,
+    numbered_handles: Vec<fprocess::HandleInfo>,
+    additional_namespace_entries: Vec<fcrunner::ComponentNamespaceEntry>,
 ) -> Result<fsys::StartResult, StartActionError> {
     // Pre-flight check: if the component is already started, or was shut down, return now. Note
     // that `start` also performs this check before scheduling the action here. We do it again
@@ -95,6 +123,9 @@ async fn do_start(
                 &component_info.decl,
                 component_info.config,
                 start_reason.clone(),
+                execution_controller_task,
+                numbered_handles,
+                additional_namespace_entries,
             )
             .await?;
 
@@ -223,6 +254,9 @@ async fn make_execution_runtime(
     decl: &cm_rust::ComponentDecl,
     config: Option<ConfigFields>,
     start_reason: StartReason,
+    execution_controller_task: Option<controller::ExecutionControllerTask>,
+    numbered_handles: Vec<fprocess::HandleInfo>,
+    additional_namespace_entries: Vec<fcrunner::ComponentNamespaceEntry>,
 ) -> Result<
     (
         Runtime,
@@ -249,7 +283,10 @@ async fn make_execution_runtime(
     let (outgoing_dir_client, outgoing_dir_server) = zx::Channel::create();
     let (runtime_dir_client, runtime_dir_server) = zx::Channel::create();
     let mut namespace = IncomingNamespace::new(package);
-    let ns = namespace.populate(component, decl).await.map_err(|err| {
+    let original_ns = namespace.populate(component, decl).await.map_err(|err| {
+        StartActionError::NamespacePopulateError { moniker: component.abs_moniker.clone(), err }
+    })?;
+    let ns = merge_namespace_entries(original_ns, additional_namespace_entries).map_err(|err| {
         StartActionError::NamespacePopulateError { moniker: component.abs_moniker.clone(), err }
     })?;
 
@@ -293,8 +330,8 @@ async fn make_execution_runtime(
         runtime_dir_client,
         Some(controller),
         start_reason,
+        execution_controller_task,
     );
-    let numbered_handles = component.numbered_handles.lock().await.take();
     let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
     let start_info = fcrunner::ComponentStartInfo {
         resolved_url: Some(url),
@@ -302,13 +339,40 @@ async fn make_execution_runtime(
         ns: Some(ns),
         outgoing_dir: Some(ServerEnd::new(outgoing_dir_server)),
         runtime_dir: Some(ServerEnd::new(runtime_dir_server)),
-        numbered_handles,
+        numbered_handles: if numbered_handles.is_empty() { None } else { Some(numbered_handles) },
         encoded_config,
         break_on_start: Some(break_on_start_left),
         ..Default::default()
     };
 
     Ok((runtime, start_info, controller_server, break_on_start_right))
+}
+
+fn merge_namespace_entries(
+    original_entries: Vec<fcrunner::ComponentNamespaceEntry>,
+    mut additional_entries: Vec<fcrunner::ComponentNamespaceEntry>,
+) -> Result<Vec<fcrunner::ComponentNamespaceEntry>, NamespacePopulateError> {
+    let mut output = vec![];
+    for original_entry in original_entries {
+        let mut conflicts_exist = false;
+        for additional_entry in &additional_entries {
+            conflicts_exist |=
+                namespace_paths_conflict(&original_entry.path, &additional_entry.path);
+        }
+        if conflicts_exist {
+            return Err(NamespacePopulateError::ConflictBetweenUsesAndAdditionalEntries);
+        }
+        output.push(original_entry);
+    }
+    output.append(&mut additional_entries);
+    Ok(output)
+}
+
+fn namespace_paths_conflict(path_1: &Option<String>, path_2: &Option<String>) -> bool {
+    match (path_1.as_ref(), path_2.as_ref()) {
+        (Some(p1), Some(p2)) => p1.starts_with(p2) || p2.starts_with(p1),
+        _ => false,
+    }
 }
 
 #[cfg(test)]
@@ -371,7 +435,12 @@ mod tests {
             )])
             .await;
 
-        match ActionSet::register(child.clone(), StartAction::new(StartReason::Debug)).await {
+        match ActionSet::register(
+            child.clone(),
+            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+        )
+        .await
+        {
             Err(StartActionError::InstanceShutDown { moniker: m }) => {
                 assert_eq!(AbsoluteMoniker::try_from(vec![TEST_CHILD_NAME]).unwrap(), m);
             }
@@ -402,9 +471,12 @@ mod tests {
 
         {
             let timestamp = zx::Time::get_monotonic();
-            ActionSet::register(child.clone(), StartAction::new(StartReason::Debug))
-                .await
-                .expect("failed to start child");
+            ActionSet::register(
+                child.clone(),
+                StartAction::new(StartReason::Debug, None, vec![], vec![]),
+            )
+            .await
+            .expect("failed to start child");
             let execution = child.lock_execution().await;
             let runtime = execution.runtime.as_ref().expect("child runtime is unexpectedly empty");
             assert!(runtime.timestamp > timestamp);
@@ -420,9 +492,12 @@ mod tests {
 
         {
             let timestamp = zx::Time::get_monotonic();
-            ActionSet::register(child.clone(), StartAction::new(StartReason::Debug))
-                .await
-                .expect("failed to start child");
+            ActionSet::register(
+                child.clone(),
+                StartAction::new(StartReason::Debug, None, vec![], vec![]),
+            )
+            .await
+            .expect("failed to start child");
             let execution = child.lock_execution().await;
             let runtime = execution.runtime.as_ref().expect("child runtime is unexpectedly empty");
             assert!(runtime.timestamp > timestamp);
@@ -435,9 +510,12 @@ mod tests {
 
         {
             let timestamp = zx::Time::get_monotonic();
-            ActionSet::register(child.clone(), StartAction::new(StartReason::Debug))
-                .await
-                .expect("failed to start child");
+            ActionSet::register(
+                child.clone(),
+                StartAction::new(StartReason::Debug, None, vec![], vec![]),
+            )
+            .await
+            .expect("failed to start child");
             let execution = child.lock_execution().await;
             let runtime = execution.runtime.as_ref().expect("child runtime is unexpectedly empty");
             assert!(runtime.timestamp > timestamp);
@@ -458,9 +536,12 @@ mod tests {
         modified_decl.children.push(ChildDeclBuilder::new().name("foo").build());
         resolver.add_component(TEST_CHILD_NAME, modified_decl.clone());
 
-        ActionSet::register(child.clone(), StartAction::new(StartReason::Debug))
-            .await
-            .expect("failed to start child");
+        ActionSet::register(
+            child.clone(),
+            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+        )
+        .await
+        .expect("failed to start child");
 
         let resolved_decl = get_resolved_decl(&child).await;
         assert_ne!(resolved_decl, modified_decl);
@@ -521,7 +602,8 @@ mod tests {
         // Check for already_started:
         {
             let mut es = ExecutionState::new();
-            es.runtime = Some(Runtime::start_from(None, None, None, None, StartReason::Debug));
+            es.runtime =
+                Some(Runtime::start_from(None, None, None, None, StartReason::Debug, None));
             assert!(!es.is_shut_down());
             assert_matches!(
                 should_return_early(&InstanceState::New, &es, &m),
@@ -544,16 +626,22 @@ mod tests {
         let (_test_harness, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
 
         assert_eq!(
-            ActionSet::register(child.clone(), StartAction::new(StartReason::Debug))
-                .await
-                .expect("failed to start child"),
+            ActionSet::register(
+                child.clone(),
+                StartAction::new(StartReason::Debug, None, vec![], vec![])
+            )
+            .await
+            .expect("failed to start child"),
             fsys::StartResult::Started
         );
 
         assert_eq!(
-            ActionSet::register(child.clone(), StartAction::new(StartReason::Debug))
-                .await
-                .expect("failed to start child"),
+            ActionSet::register(
+                child.clone(),
+                StartAction::new(StartReason::Debug, None, vec![], vec![])
+            )
+            .await
+            .expect("failed to start child"),
             fsys::StartResult::AlreadyStarted
         );
     }

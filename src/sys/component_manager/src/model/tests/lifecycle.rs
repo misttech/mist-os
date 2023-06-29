@@ -130,14 +130,20 @@ async fn bind_concurrent() {
     let system_component = model.find(&vec!["system"].try_into().unwrap()).await.unwrap();
     let first_start = {
         let mut actions = system_component.lock_actions().await;
-        actions.register_no_wait(&system_component, StartAction::new(StartReason::Debug))
+        actions.register_no_wait(
+            &system_component,
+            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+        )
     };
 
     // While the first start is paused, simulate a second start by explicitly scheduling a second
     // Start action. This should just be deduplicated to the first start by the action system.
     let second_start = {
         let mut actions = system_component.lock_actions().await;
-        actions.register_no_wait(&system_component, StartAction::new(StartReason::Debug))
+        actions.register_no_wait(
+            &system_component,
+            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+        )
     };
 
     // Unblock the start hook, then check the result of both starts.

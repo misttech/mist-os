@@ -9,7 +9,8 @@ use {
         ServerEnd, ServiceMarker, ServiceProxy,
     },
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_test as ftest,
-    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
+    fuchsia_async as fasync,
     fuchsia_component::DEFAULT_SERVICE_INSTANCE,
     fuchsia_fs, fuchsia_zircon as zx,
     futures::{channel::oneshot, future::BoxFuture, lock::Mutex, select, FutureExt, TryStreamExt},
@@ -39,6 +40,7 @@ impl MemberOpener for DirectoryProtocolImpl {
 /// components.
 pub struct LocalComponentHandles {
     namespace: HashMap<String, fio::DirectoryProxy>,
+    numbered_handles: HashMap<u32, zx::Handle>,
 
     stop_notifier: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 
@@ -50,6 +52,7 @@ pub struct LocalComponentHandles {
 impl LocalComponentHandles {
     fn new(
         fidl_namespace: Vec<fcrunner::ComponentNamespaceEntry>,
+        fidl_numbered_handles: Vec<fprocess::HandleInfo>,
         outgoing_dir: ServerEnd<fio::DirectoryMarker>,
     ) -> Result<(Self, Arc<Mutex<Option<oneshot::Sender<()>>>>), Error> {
         let stop_notifier = Arc::new(Mutex::new(None));
@@ -64,7 +67,21 @@ impl LocalComponentHandles {
                     .expect("failed to convert handle to proxy"),
             );
         }
-        Ok((Self { namespace, outgoing_dir, stop_notifier: stop_notifier.clone() }, stop_notifier))
+        let numbered_handles =
+            fidl_numbered_handles.into_iter().map(|h| (h.id, h.handle)).collect::<HashMap<_, _>>();
+        Ok((
+            Self {
+                namespace,
+                numbered_handles,
+                outgoing_dir,
+                stop_notifier: stop_notifier.clone(),
+            },
+            stop_notifier,
+        ))
+    }
+
+    pub fn take_numbered_handle(&mut self, id: u32) -> Option<zx::Handle> {
+        self.numbered_handles.remove(&id)
     }
 
     /// Registers a new stop notifier for this component. If this function is called, then realm
@@ -286,18 +303,12 @@ impl LocalComponentRunner {
         while let Some(req) = runner_request_stream.try_next().await? {
             match req {
                 fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
-                    if let Some(numbered_handles) = start_info.numbered_handles.as_ref() {
-                        if !numbered_handles.is_empty() {
-                            return Err(format_err!(
-                                "realm builder runner does not support numbered handles"
-                            ));
-                        }
-                    }
                     let program = start_info
                         .program
                         .ok_or(format_err!("program is missing from start_info"))?;
                     let namespace =
                         start_info.ns.ok_or(format_err!("namespace is missing from start_info"))?;
+                    let numbered_handles = start_info.numbered_handles.unwrap_or_default();
                     let outgoing_dir = start_info
                         .outgoing_dir
                         .ok_or(format_err!("outgoing_dir is missing from start_info"))?;
@@ -312,7 +323,7 @@ impl LocalComponentRunner {
                         .ok_or(format_err!("no such local component: {:?}", local_component_name))?
                         .clone();
                     let (component_handles, stop_notifier) =
-                        LocalComponentHandles::new(namespace, outgoing_dir)?;
+                        LocalComponentHandles::new(namespace, numbered_handles, outgoing_dir)?;
 
                     let mut controller_request_stream = controller.into_stream()?;
                     self.execution_scope.spawn(async move {
@@ -408,6 +419,7 @@ mod tests {
         let (_, outgoing_dir) = create_proxy().unwrap();
         let handles = LocalComponentHandles {
             namespace: HashMap::new(),
+            numbered_handles: HashMap::new(),
             outgoing_dir,
             stop_notifier: Arc::new(Mutex::new(None)),
         };

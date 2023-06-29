@@ -167,7 +167,7 @@ impl Model {
                 protocol to start the root component."
             );
         } else {
-            if let Err(e) = self.root.start(&StartReason::Root).await {
+            if let Err(e) = self.root.start(&StartReason::Root, None, vec![], vec![]).await {
                 // If we fail to start the root, but the root is being shutdown, that's ok. The
                 // system is tearing down, so it doesn't matter any more if we never got everything
                 // started that we wanted to.
@@ -188,7 +188,7 @@ impl Model {
         reason: &StartReason,
     ) -> Result<Arc<ComponentInstance>, ModelError> {
         let component = self.look_up(abs_moniker).await?;
-        component.start(reason).await?;
+        component.start(reason, None, vec![], vec![]).await?;
         Ok(component)
     }
 }

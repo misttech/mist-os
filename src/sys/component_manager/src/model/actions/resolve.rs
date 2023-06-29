@@ -181,9 +181,12 @@ pub mod tests {
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
 
         // Start it again then shut it down.
-        ActionSet::register(component_a.clone(), StartAction::new(StartReason::Debug))
-            .await
-            .unwrap();
+        ActionSet::register(
+            component_a.clone(),
+            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+        )
+        .await
+        .unwrap();
         ActionSet::register(component_a.clone(), ShutdownAction::new()).await.unwrap();
 
         // Error to resolve a shut-down component.

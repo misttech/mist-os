@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    crate::framework::controller,
     crate::model::{
         actions::{
             shutdown, start, ActionSet, DestroyChildAction, DiscoverAction, ResolveAction,
@@ -103,6 +104,9 @@ pub enum StartReason {
     Root,
     /// Storage administration is occurring on this component.
     StorageAdmin,
+    /// Indicates that this component is starting because the client of a
+    /// `fuchsia.component.Controller` connection has called `Start()`
+    Controller,
 }
 
 impl fmt::Display for StartReason {
@@ -119,6 +123,8 @@ impl fmt::Display for StartReason {
                 StartReason::Eager => "Instance is an eager child".to_string(),
                 StartReason::Root => "Instance is the root".to_string(),
                 StartReason::StorageAdmin => "Storage administration on instance".to_string(),
+                StartReason::Controller =>
+                    "Instructed to start with the fuchsia.component.Controller protocol".to_string(),
             }
         )
     }
@@ -340,10 +346,6 @@ pub struct ComponentInstance {
     pub abs_moniker: AbsoluteMoniker,
     /// The hooks scoped to this instance.
     pub hooks: Arc<Hooks>,
-    /// Numbered handles to pass to the component on startup. These handles
-    /// should only be present for components that run in collections with a
-    /// `SingleRun` durability.
-    pub numbered_handles: Mutex<Option<Vec<fprocess::HandleInfo>>>,
     /// Whether to persist isolated storage data of this component instance after it has been
     /// destroyed.
     pub persistent_storage: bool,
@@ -387,7 +389,6 @@ impl ComponentInstance {
             context,
             WeakExtendedInstance::AboveRoot(component_manager_instance),
             Arc::new(Hooks::new()),
-            None,
             false,
         )
     }
@@ -404,7 +405,6 @@ impl ComponentInstance {
         context: Arc<ModelContext>,
         parent: WeakExtendedInstance,
         hooks: Arc<Hooks>,
-        numbered_handles: Option<Vec<fprocess::HandleInfo>>,
         persistent_storage: bool,
     ) -> Arc<Self> {
         let abs_moniker = instanced_moniker.without_instance_ids();
@@ -424,7 +424,6 @@ impl ComponentInstance {
             hooks,
             nonblocking_task_scope: TaskScope::new(),
             blocking_task_scope: TaskScope::new(),
-            numbered_handles: Mutex::new(numbered_handles),
             persistent_storage,
         })
     }
@@ -564,6 +563,7 @@ impl ComponentInstance {
         collection_name: String,
         child_decl: &ChildDecl,
         child_args: fcomponent::CreateChildArgs,
+        numbered_handles_are_present: bool,
     ) -> Result<fdecl::Durability, AddDynamicChildError> {
         match child_decl.startup {
             fdecl::StartupMode::Lazy => {}
@@ -580,10 +580,17 @@ impl ComponentInstance {
             })?
             .clone();
 
-        if let Some(handles) = &child_args.numbered_handles {
-            if !handles.is_empty() && collection_decl.durability != fdecl::Durability::SingleRun {
-                return Err(AddDynamicChildError::NumberedHandleNotInSingleRunCollection);
-            }
+        // Numbered handles which are to be given to a component in a single run collection are
+        // provided to the component as part of the start action. We want to disallow numbered
+        // handles being provided at component creation time for components not in a single run
+        // collection, but the collection decl isn't looked up until this point.
+        //
+        // The `numbered_handles_are_present` bool is thus used here to denote if an error should
+        // be returned when the collection is not single run.
+        if numbered_handles_are_present
+            && collection_decl.durability != fdecl::Durability::SingleRun
+        {
+            return Err(AddDynamicChildError::NumberedHandleNotInSingleRunCollection);
         }
 
         if !collection_decl.allow_long_names && child_decl.name.len() > cm_types::MAX_NAME_LENGTH {
@@ -600,8 +607,8 @@ impl ComponentInstance {
                 self,
                 child_decl,
                 Some(&collection_decl),
-                child_args.numbered_handles,
                 child_args.dynamic_offers,
+                child_args.controller,
             )
             .await?;
         discover_fut.await?;
@@ -717,6 +724,11 @@ impl ComponentInstance {
                         exit_listener.await;
                     }
 
+                    if let Some(execution_controller_task) =
+                        runtime.execution_controller_task.as_mut()
+                    {
+                        execution_controller_task.set_stop_status(ret.component_exit_status);
+                    }
                     ret.component_exit_status
                 } else {
                     zx::Status::PEER_CLOSED
@@ -917,6 +929,9 @@ impl ComponentInstance {
     pub async fn start(
         self: &Arc<Self>,
         reason: &StartReason,
+        execution_controller_task: Option<controller::ExecutionControllerTask>,
+        numbered_handles: Vec<fprocess::HandleInfo>,
+        additional_namespace_entries: Vec<fcrunner::ComponentNamespaceEntry>,
     ) -> Result<fsys::StartResult, StartActionError> {
         // Skip starting a component instance that was already started. It's important to bail out
         // here so we don't waste time starting eager children more than once.
@@ -927,7 +942,16 @@ impl ComponentInstance {
                 return res;
             }
         }
-        ActionSet::register(self.clone(), StartAction::new(reason.clone())).await?;
+        ActionSet::register(
+            self.clone(),
+            StartAction::new(
+                reason.clone(),
+                execution_controller_task,
+                numbered_handles,
+                additional_namespace_entries,
+            ),
+        )
+        .await?;
 
         let eager_children: Vec<_> = {
             let state = self.lock_state().await;
@@ -967,7 +991,9 @@ impl ComponentInstance {
         let f = async move {
             let futures: Vec<_> = instances_to_bind
                 .iter()
-                .map(|component| async move { component.start(&StartReason::Eager).await })
+                .map(|component| async move {
+                    component.start(&StartReason::Eager, None, vec![], vec![]).await
+                })
                 .collect();
             join_all(futures)
                 .await
@@ -1485,16 +1511,12 @@ impl ResolvedInstanceState {
         component: &Arc<ComponentInstance>,
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
-        numbered_handles: Option<Vec<fidl_fuchsia_process::HandleInfo>>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
+        controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
     ) -> Result<BoxFuture<'static, Result<(), DiscoverActionError>>, AddChildError> {
-        let child = self.add_child_internal(
-            component,
-            child,
-            collection,
-            numbered_handles,
-            dynamic_offers,
-        )?;
+        let child = self
+            .add_child_internal(component, child, collection, dynamic_offers, controller)
+            .await?;
         // We can dispatch a Discovered event for the component now that it's installed in the
         // tree, which means any Discovered hooks will capture it.
         let mut actions = child.lock_actions().await;
@@ -1506,25 +1528,25 @@ impl ResolvedInstanceState {
     /// Like `add_child`, but doesn't register a `Discover` action, and therefore
     /// doesn't return a future to wait for.
     #[cfg(test)]
-    pub fn add_child_no_discover(
+    pub async fn add_child_no_discover(
         &mut self,
         component: &Arc<ComponentInstance>,
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
     ) -> Result<(), AddChildError> {
-        self.add_child_internal(component, child, collection, None, None).map(|_| ())
+        self.add_child_internal(component, child, collection, None, None).await.map(|_| ())
     }
 
-    fn add_child_internal(
+    async fn add_child_internal(
         &mut self,
         component: &Arc<ComponentInstance>,
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
-        numbered_handles: Option<Vec<fidl_fuchsia_process::HandleInfo>>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
+        controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
     ) -> Result<Arc<ComponentInstance>, AddChildError> {
         assert!(
-            (numbered_handles.is_none() && dynamic_offers.is_none()) || collection.is_some(),
+            (dynamic_offers.is_none()) || collection.is_some(),
             "setting numbered handles or dynamic offers for static children",
         );
         let dynamic_offers =
@@ -1558,9 +1580,19 @@ impl ResolvedInstanceState {
             component.context.clone(),
             WeakExtendedInstance::Component(WeakComponentInstance::from(component)),
             component.hooks.clone(),
-            numbered_handles,
             component.persistent_storage_for_child(collection),
         );
+        if let Some(controller) = controller {
+            if let Ok(stream) = controller.into_stream() {
+                child
+                    .nonblocking_task_scope()
+                    .add_task(controller::run_controller(
+                        WeakComponentInstance::new(&child),
+                        stream,
+                    ))
+                    .await;
+            }
+        }
         self.children.insert(child_moniker, child.clone());
         self.dynamic_offers.extend(dynamic_offers.into_iter());
         Ok(child)
@@ -1712,6 +1744,10 @@ pub struct Runtime {
     /// should only be used for the server_end of the `fuchsia.component.Binder`
     /// connection.
     binder_server_ends: Vec<zx::Channel>,
+
+    /// This stores the hook for notifying an ExecutionController about stop events for this
+    /// component.
+    execution_controller_task: Option<controller::ExecutionControllerTask>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -1754,6 +1790,7 @@ impl Runtime {
         runtime_dir: Option<fio::DirectoryProxy>,
         controller: Option<fcrunner::ComponentControllerProxy>,
         start_reason: StartReason,
+        execution_controller_task: Option<controller::ExecutionControllerTask>,
     ) -> Self {
         let timestamp = zx::Time::get_monotonic();
         Runtime {
@@ -1765,6 +1802,7 @@ impl Runtime {
             exit_listener: None,
             binder_server_ends: vec![],
             start_reason,
+            execution_controller_task,
         }
     }
 
@@ -3118,7 +3156,6 @@ pub mod tests {
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstanceInterface::AboveRoot(Weak::new()),
             Arc::new(Hooks::new()),
-            None,
             false,
         )
     }

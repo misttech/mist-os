@@ -10,6 +10,7 @@ fidl("fuchsia.component") {
   sources = [
     "binder.fidl",
     "constants.fidl",
+    "controller.fidl",
     "error.fidl",
     "events.fidl",
     "overview.fidl",
