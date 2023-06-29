@@ -961,10 +961,7 @@ pub fn sys_capget(
     }
 
     let header = current_task.mm.read_object(user_header)?;
-    let target_task: Arc<Task> = match header.pid {
-        0 => current_task.task_arc_clone(),
-        pid => current_task.get_task(pid).ok_or_else(|| errno!(EINVAL))?,
-    };
+    let target_task = get_task_or_current(current_task, header.pid)?;
 
     let (permitted, effective, inheritable) = {
         let creds = &target_task.creds();
@@ -1001,11 +998,10 @@ pub fn sys_capset(
     user_data: UserRef<__user_cap_data_struct>,
 ) -> Result<(), Errno> {
     let header = current_task.mm.read_object(user_header)?;
-    let target_task: Arc<Task> = match header.pid {
-        0 => current_task.task_arc_clone(),
-        pid if pid == current_task.id => current_task.task_arc_clone(),
-        _pid => return error!(EINVAL),
-    };
+    if header.pid != 0 && header.pid != current_task.id {
+        return error!(EINVAL);
+    }
+    let target_task = get_task_or_current(current_task, header.pid)?;
 
     let (new_permitted, new_effective, new_inheritable) = match header.version {
         _LINUX_CAPABILITY_VERSION_3 => {
