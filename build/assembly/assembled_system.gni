@@ -7,7 +7,6 @@ import("//build/assembly/generated_image_assembly_config.gni")
 import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
 import("//build/assembly/legacy_assembly_input_bundle.gni")
-import("//build/bazel/assembly/bazel_assembly_images_config_inputs.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//bundles/assembly/platform_aibs.gni")
 
@@ -394,7 +393,6 @@ template("assembled_system") {
       }
     }
 
-    bazel_images_config_inputs = "${namespace}.bazel_images_config_inputs"
     bazel_legacy_aib = "${namespace}.bazel_legacy_aib"
     partial_image_assembly_config_for_validations =
         "${namespace}.validation_image_assembly_config"
@@ -832,16 +830,6 @@ template("assembled_system") {
       second = _images_config_file
       display_text_diff_on_failure = true
     }
-  }
-
-  bazel_assembly_images_config_inputs(labels.bazel_images_config_inputs) {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
-    images_config = files.images_config
-    images_config_target = labels.images_config
   }
 
   check_production_tag = false

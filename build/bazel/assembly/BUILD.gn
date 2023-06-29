@@ -16,10 +16,8 @@ if (is_fuchsia) {
       bazel_product_bundle_target = "//build/bazel/assembly:minimal.x64"
       bazel_product_image_target =
           "//build/bazel/assembly:product_image_minimal.x64"
-      bazel_inputs_from_gn = [
-        "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-        "//build/images/fuchsia:fuchsia.bazel_images_config_inputs",
-      ]
+      bazel_inputs_from_gn =
+          [ "//build/images/fuchsia:fuchsia.bazel_legacy_aib" ]
     }
   }
 

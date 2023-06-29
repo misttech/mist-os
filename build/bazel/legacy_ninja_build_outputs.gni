@@ -52,15 +52,9 @@ if (size_checker_input != {
 
 _assembly_deps = [ "//build/images/zedboot:zedboot.bazel_legacy_aib" ]
 if (use_bringup_assembly) {
-  _assembly_deps += [
-    "//build/images/bringup:bringup.bazel_images_config_inputs",
-    "//build/images/bringup:bringup.bazel_legacy_aib",
-  ]
+  _assembly_deps += [ "//build/images/bringup:bringup.bazel_legacy_aib" ]
 } else {
-  _assembly_deps += [
-    "//build/images/fuchsia:fuchsia.bazel_images_config_inputs",
-    "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-  ]
+  _assembly_deps += [ "//build/images/fuchsia:fuchsia.bazel_legacy_aib" ]
 }
 gn_labels_for_bazel_inputs += _assembly_deps
 

@@ -21,20 +21,6 @@ package(default_visibility = [
     "//vendor/google:__subpackages__",
 ])
 
-filegroup(
-    name = "fuchsia_key_and_metadata",
-    srcs = [
-        "@legacy_ninja_build_outputs//:fuchsia.bazel_images_config_inputs/key.pem",
-        "@legacy_ninja_build_outputs//:fuchsia.bazel_images_config_inputs/key_metadata.bin",
-    ] if use_vbmeta else [],
-)
-
-fuchsia_images_configuration(
-    name = "fuchsia",
-    images_config = "@legacy_ninja_build_outputs//:fuchsia.bazel_images_config_inputs/images_config.json",
-    images_config_extra_files = ":fuchsia_key_and_metadata",
-)
-
 fuchsia_images_configuration(
     name = "fuchsia_x64",
     fvm_slice_size = "8388608",

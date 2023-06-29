@@ -72,7 +72,6 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #
 #    For example:
 #
-#      * //build/images/fuchsia:fuchsia.bazel_images_config_inputs
 #      * //build/images/fuchsia:fuchsia.legacy_aib_bazel_inputs
 #
 #    Type: list(label)

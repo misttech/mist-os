@@ -12,7 +12,7 @@ load(
 fuchsia_product_image(
     name = "product_image_minimal.x64",
     board_config = "//boards:x64",
-    image = "//build/bazel/assembly/images_configurations:fuchsia",
+    image = "//build/bazel/assembly/images_configurations:fuchsia_x64",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = "//build/bazel/assembly/product_configurations:minimal",

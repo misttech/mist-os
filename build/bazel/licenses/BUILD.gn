@@ -32,10 +32,7 @@ group("all_bazel_inputs") {
 
   if (fuchsia_zbi_testonly) {
     # Remove fuchsia_zbi_testonly=true targets. See fxb/126949#c18 for why that is ok.
-    deps -= [
-      "//build/images/fuchsia:fuchsia.bazel_images_config_inputs",
-      "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-    ]
+    deps -= [ "//build/images/fuchsia:fuchsia.bazel_legacy_aib" ]
   }
 }
 
