@@ -26,7 +26,6 @@ pub const VULKAN_TESTS_COLLECTION: &'static str = "vulkan-tests";
 pub const CHROMIUM_TESTS_COLLECTION: &'static str = "chromium-tests";
 pub const CHROMIUM_SYSTEM_TESTS_COLLECTION: &'static str = "chromium-system-tests";
 pub const DRM_TESTS_COLLECTION: &'static str = "drm-tests";
-pub const MEDIA_TESTS_COLLECTION: &'static str = "media-tests";
 pub const GOOGLE_TESTS_COLLECTION: &'static str = "google-tests";
 pub const SYSTEM_VALIDATION_COLLECTION: &'static str = "system-validation-tests";
 
@@ -38,7 +37,6 @@ lazy_static! {
         ("cts", CTS_TESTS_COLLECTION),
         ("drm", DRM_TESTS_COLLECTION),
         ("google", GOOGLE_TESTS_COLLECTION),
-        ("media", MEDIA_TESTS_COLLECTION),
         ("starnix", STARNIX_TESTS_COLLECTION),
         ("system", SYSTEM_TESTS_COLLECTION),
         ("system-validation", SYSTEM_VALIDATION_COLLECTION),

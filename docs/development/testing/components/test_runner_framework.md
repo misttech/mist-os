@@ -684,7 +684,6 @@ Possible values of `fuchsia.test.type`:
 | `chromium-system` | Chromium system test realm |
 | `cts` | [CTF test realm] |
 | `google` | Google test realm |
-| `media` | Media test realm |
 | `system-validation` | system validation apps test realm |
 
 ## Restricted logs
