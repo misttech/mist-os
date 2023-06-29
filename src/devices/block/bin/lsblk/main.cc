@@ -3,16 +3,12 @@
 // found in the LICENSE file.
 
 #include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
 #include <inttypes.h>
-#include <lib/component/incoming/cpp/clone.h>
-#include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/io.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/zx/vmo.h>
@@ -34,64 +30,43 @@
 #include <gpt/guid.h>
 #include <pretty/hexdump.h>
 
+#include "src/lib/fxl/strings/string_printf.h"
 #include "src/storage/lib/storage-metrics/block-metrics.h"
-
-#define DEV_BLOCK "/dev/class/block"
-#define DEV_SKIP_BLOCK "/dev/class/skip-block"
 
 namespace fuchsia_block = fuchsia_hardware_block;
 namespace fuchsia_partition = fuchsia_hardware_block_partition;
 namespace fuchsia_skipblock = fuchsia_hardware_skipblock;
 
-static char* size_to_cstring(char* str, size_t maxlen, uint64_t size) {
+namespace {
+
+constexpr char DEV_BLOCK[] = "/dev/class/block";
+constexpr char DEV_SKIP_BLOCK[] = "/dev/class/skip-block";
+
+char* size_to_cstring(char* str, size_t maxlen, uint64_t size) {
+  constexpr size_t kibi = 1024;
   const char* unit;
   uint64_t div;
-  if (size < 1024) {
+  if (size < kibi) {
     unit = "";
     div = 1;
-  } else if (size >= 1024 && size < 1024 * 1024) {
+  } else if (size >= kibi && size < kibi * kibi) {
     unit = "K";
-    div = 1024;
-  } else if (size >= 1024 * 1024 && size < 1024 * 1024 * 1024) {
+    div = kibi;
+  } else if (size >= kibi * kibi && size < kibi * kibi * kibi) {
     unit = "M";
-    div = 1024 * 1024;
-  } else if (size >= 1024 * 1024 * 1024 && size < 1024llu * 1024 * 1024 * 1024) {
+    div = kibi * kibi;
+  } else if (size >= kibi * kibi * kibi && size < kibi * kibi * kibi * kibi) {
     unit = "G";
-    div = 1024 * 1024 * 1024;
+    div = kibi * kibi * kibi;
   } else {
     unit = "T";
-    div = 1024llu * 1024 * 1024 * 1024;
+    div = kibi * kibi * kibi * kibi;
   }
   snprintf(str, maxlen, "%" PRIu64 "%s", size / div, unit);
   return str;
 }
 
-using blkinfo_t = struct blkinfo {
-  char path[128];
-  char topo[1024];
-  char label[fuchsia_partition::wire::kNameLength + 1];
-  char sizestr[6];
-};
-
-static void populate_topo_path(fidl::UnownedClientEnd<fuchsia_device::Controller> client,
-                               blkinfo_t* info) {
-  size_t path_len;
-
-  auto resp = fidl::WireCall(client)->GetTopologicalPath();
-
-  if (resp.status() != ZX_OK || resp->is_error()) {
-    strcpy(info->topo, "UNKNOWN");
-    return;
-  }
-
-  path_len = resp->value()->path.size();
-  auto& r = *resp->value();
-  memcpy(info->topo, r.path.data(), r.path.size());
-
-  info->topo[path_len] = '\0';
-}
-
-static int cmd_list_blk() {
+int cmd_list_blk() {
   struct dirent* de;
   DIR* dir = opendir(DEV_BLOCK);
   if (!dir) {
@@ -100,52 +75,71 @@ static int cmd_list_blk() {
   }
   auto cleanup = fit::defer([&dir]() { closedir(dir); });
 
-  blkinfo_t info;
   printf("%-3s %-4s %-16s %-20s %-6s %s\n", "ID", "SIZE", "TYPE", "LABEL", "FLAGS", "DEVICE");
 
   while ((de = readdir(dir)) != nullptr) {
     if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")) {
       continue;
     }
-    memset(&info, 0, sizeof(blkinfo_t));
-    snprintf(info.path, sizeof(info.path), "%s/%s", DEV_BLOCK, de->d_name);
-    fbl::unique_fd fd(open(info.path, O_RDONLY));
-    if (!fd) {
-      fprintf(stderr, "Error opening %s\n", info.path);
+    std::string device_path = fxl::StringPrintf("%s/%s", DEV_BLOCK, de->d_name);
+    std::string controller_path = device_path + "/device_controller";
+
+    std::string topological_path;
+    {
+      zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
+      if (controller.is_error()) {
+        fprintf(stderr, "Error opening %s: %s\n", controller_path.c_str(),
+                controller.status_string());
+        continue;
+      }
+      fidl::WireResult result = fidl::WireCall(controller.value())->GetTopologicalPath();
+      if (!result.ok()) {
+        fprintf(stderr, "Error getting topological path for %s: %s\n", controller_path.c_str(),
+                result.status_string());
+        continue;
+      }
+      fit::result response = result.value();
+      if (response.is_error()) {
+        fprintf(stderr, "Error getting topological path for %s: %s\n", controller_path.c_str(),
+                zx_status_get_string(response.error_value()));
+        continue;
+      }
+      topological_path = response.value()->path.get();
+    }
+
+    zx::result device = component::Connect<fuchsia_partition::Partition>(device_path);
+    if (device.is_error()) {
+      fprintf(stderr, "Error opening %s: %s\n", device_path.c_str(), device.status_string());
       continue;
     }
-    fdio_cpp::FdioCaller caller(std::move(fd));
 
-    populate_topo_path(caller.borrow_as<fuchsia_device::Controller>(), &info);
-
+    char sizestr[6] = {};
     fuchsia_block::wire::BlockInfo block_info;
-    if (const fidl::WireResult result =
-            fidl::WireCall(caller.borrow_as<fuchsia_block::Block>())->GetInfo();
-        result.ok()) {
-      if (const fit::result response = result.value(); response.is_ok()) {
-        block_info = response.value()->info;
-        size_to_cstring(info.sizestr, sizeof(info.sizestr),
-                        block_info.block_size * block_info.block_count);
+    {
+      if (const fidl::WireResult result = fidl::WireCall(device.value())->GetInfo(); result.ok()) {
+        if (const fit::result response = result.value(); response.is_ok()) {
+          block_info = response.value()->info;
+          size_to_cstring(sizestr, sizeof(sizestr), block_info.block_size * block_info.block_count);
+        }
       }
     }
 
     std::string type;
-    auto guid_resp =
-        fidl::WireCall(caller.borrow_as<fuchsia_partition::Partition>())->GetTypeGuid();
-    if (guid_resp.ok() && guid_resp.value().status == ZX_OK && guid_resp.value().guid) {
-      type = gpt::KnownGuid::TypeDescription(guid_resp.value().guid->value.data());
+    std::string label;
+    {
+      if (const fidl::WireResult result = fidl::WireCall(device.value())->GetTypeGuid();
+          result.ok()) {
+        if (const fidl::WireResponse response = result.value(); response.status == ZX_OK) {
+          type = gpt::KnownGuid::TypeDescription(response.guid->value.data());
+        }
+      }
+      if (const fidl::WireResult result = fidl::WireCall(device.value())->GetName(); result.ok()) {
+        if (const fidl::WireResponse response = result.value(); response.status == ZX_OK) {
+          label = response.name.get();
+        }
+      }
     }
 
-    auto name_resp = fidl::WireCall(caller.borrow_as<fuchsia_partition::Partition>())->GetName();
-    if (name_resp.ok() && name_resp.value().status == ZX_OK) {
-      size_t truncated_name_len = name_resp.value().name.size() <= sizeof(info.label) - 1
-                                      ? name_resp.value().name.size()
-                                      : sizeof(info.label) - 1;
-      strncpy(info.label, name_resp.value().name.begin(), truncated_name_len);
-      info.label[truncated_name_len] = '\0';
-    } else {
-      info.label[0] = '\0';
-    }
     char flags[20] = {0};
     if (block_info.flags & fuchsia_block::wire::Flag::kReadonly) {
       strlcat(flags, "RO ", sizeof(flags));
@@ -156,54 +150,73 @@ static int cmd_list_blk() {
     if (block_info.flags & fuchsia_block::wire::Flag::kBootpart) {
       strlcat(flags, "BP ", sizeof(flags));
     }
-    printf("%-3s %4s %-16s %-20s %-6s %s\n", de->d_name, info.sizestr, type.c_str(), info.label,
-           flags, info.topo);
+    printf("%-3s %4s %-16s %-20s %-6s %s\n", de->d_name, sizestr, type.c_str(), label.c_str(),
+           flags, topological_path.c_str());
   }
   return 0;
 }
 
-static int cmd_list_skip_blk() {
+int cmd_list_skip_blk() {
   struct dirent* de;
   DIR* dir = opendir(DEV_SKIP_BLOCK);
   if (!dir) {
     fprintf(stderr, "Error opening %s\n", DEV_SKIP_BLOCK);
     return -1;
   }
-  blkinfo_t info;
   while ((de = readdir(dir)) != nullptr) {
     if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")) {
       continue;
     }
-    memset(&info, 0, sizeof(blkinfo_t));
-    snprintf(info.path, sizeof(info.path), "%s/%s", DEV_SKIP_BLOCK, de->d_name);
-    fbl::unique_fd fd(open(info.path, O_RDONLY));
-    if (!fd) {
-      fprintf(stderr, "Error opening %s\n", info.path);
-      continue;
-    }
-    fdio_cpp::FdioCaller caller(std::move(fd));
+    std::string device_path = fxl::StringPrintf("%s/%s", DEV_SKIP_BLOCK, de->d_name);
+    std::string controller_path = device_path + "/device_controller";
 
-    populate_topo_path(caller.borrow_as<fuchsia_device::Controller>(), &info);
+    std::string topological_path;
+    {
+      zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
+      if (controller.is_error()) {
+        fprintf(stderr, "Error opening %s: %s\n", controller_path.c_str(),
+                controller.status_string());
+        continue;
+      }
+      fidl::WireResult result = fidl::WireCall(controller.value())->GetTopologicalPath();
+      if (!result.ok()) {
+        fprintf(stderr, "Error getting topological path for %s: %s\n", controller_path.c_str(),
+                result.status_string());
+        continue;
+      }
+      fit::result response = result.value();
+      if (response.is_error()) {
+        fprintf(stderr, "Error getting topological path for %s: %s\n", controller_path.c_str(),
+                zx_status_get_string(response.error_value()));
+        continue;
+      }
+      topological_path = response.value()->path.get();
+    }
 
     std::string type;
-    auto result =
-        fidl::WireCall(caller.borrow_as<fuchsia_skipblock::SkipBlock>())->GetPartitionInfo();
-    if (result.ok() && result.value().status == ZX_OK) {
-      size_to_cstring(info.sizestr, sizeof(info.sizestr),
-                      result.value().partition_info.block_size_bytes *
-                          result.value().partition_info.partition_block_count);
-      type = gpt::KnownGuid::TypeDescription(result.value().partition_info.partition_guid.data());
+    {
+      zx::result device = component::Connect<fuchsia_skipblock::SkipBlock>(device_path);
+      if (device.is_error()) {
+        fprintf(stderr, "Error opening %s: %s\n", device_path.c_str(), device.status_string());
+        continue;
+      }
+      if (const fidl::WireResult result = fidl::WireCall(device.value())->GetPartitionInfo();
+          result.ok()) {
+        if (const fidl::WireResponse response = result.value(); response.status == ZX_OK) {
+          type = gpt::KnownGuid::TypeDescription(response.partition_info.partition_guid.data());
+        }
+      }
     }
 
-    printf("%-3s %4s %-16s %-20s %-6s %s\n", de->d_name, info.sizestr, type.c_str(), "", "",
-           info.topo);
+    printf("%-3s %4sr%-16s %-20s %-6s %s\n", de->d_name, "", type.c_str(), "", "",
+           topological_path.c_str());
   }
   closedir(dir);
   return 0;
 }
 
-static int try_read_skip_blk(const fidl::UnownedClientEnd<fuchsia_skipblock::SkipBlock>& skip_block,
-                             off_t offset, size_t count) {
+int try_read_skip_blk(const fidl::UnownedClientEnd<fuchsia_skipblock::SkipBlock>& skip_block,
+                      off_t offset, size_t count) {
   // check that count and offset are aligned to block size
   const fidl::WireResult result = fidl::WireCall(skip_block)->GetPartitionInfo();
   if (!result.ok()) {
@@ -267,25 +280,10 @@ static int try_read_skip_blk(const fidl::UnownedClientEnd<fuchsia_skipblock::Ski
   return 0;
 }
 
-static int cmd_read_blk(const char* dev, off_t offset, size_t count) {
-  fbl::unique_fd fd(open(dev, O_RDONLY));
-  if (!fd) {
-    fprintf(stderr, "Error opening %s: %s\n", dev, strerror(errno));
-    return -1;
-  }
-  fdio_cpp::UnownedFdioCaller caller(fd);
-
-  // Try querying for block info on a new channel.
-  // lsblk also supports reading from skip block devices, but guessing the "wrong" type
-  // of FIDL protocol will close the communication channel.
-  //
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  //
-  // TODO(https://fxbug.dev/113512): Remove this.
-  zx::result block = component::Clone(caller.borrow_as<fuchsia_block::Block>(),
-                                      component::AssumeProtocolComposesNode);
+int cmd_read_blk(const char* dev, off_t offset, size_t count) {
+  zx::result block = component::Connect<fuchsia_block::Block>(dev);
   if (block.is_error()) {
-    fprintf(stderr, "Error cloning %s: %s\n", dev, block.status_string());
+    fprintf(stderr, "Error connecting to %s: %s\n", dev, block.status_string());
     return -1;
   }
 
@@ -297,7 +295,12 @@ static int cmd_read_blk(const char* dev, off_t offset, size_t count) {
   }
   const fit::result response = result.value();
   if (response.is_error()) {
-    if (try_read_skip_blk(caller.borrow_as<fuchsia_skipblock::SkipBlock>(), offset, count) < 0) {
+    zx::result skip_block = component::Connect<fuchsia_skipblock::SkipBlock>(dev);
+    if (skip_block.is_error()) {
+      fprintf(stderr, "Error connecting to %s: %s\n", dev, skip_block.status_string());
+      return -1;
+    }
+    if (try_read_skip_blk(skip_block.value(), offset, count) < 0) {
       fprintf(stderr, "Error getting block size for %s\n", dev);
       return -1;
     }
@@ -313,6 +316,11 @@ static int cmd_read_blk(const char* dev, off_t offset, size_t count) {
     fprintf(stderr, "Offset must be a multiple of blksize=%" PRIu64 "\n", blksize);
     return -1;
   }
+
+  // Using an fd to read from block devices has been broken for a very long time.
+  //
+  // TODO(https://fxbug.dev/129846): Read from the block device without using an fd.
+  fbl::unique_fd fd;
 
   // read the data
   std::unique_ptr<uint8_t[]> buf(new uint8_t[count]);
@@ -333,15 +341,13 @@ static int cmd_read_blk(const char* dev, off_t offset, size_t count) {
   return 0;
 }
 
-static int cmd_stats(const char* dev, bool clear) {
-  fbl::unique_fd fd(open(dev, O_RDONLY));
-  if (!fd) {
-    fprintf(stderr, "Error opening %s\n", dev);
+int cmd_stats(const char* dev, bool clear) {
+  zx::result block = component::Connect<fuchsia_block::Block>(dev);
+  if (block.is_error()) {
+    fprintf(stderr, "Error connecting to %s: %s\n", dev, block.status_string());
     return -1;
   }
-  fdio_cpp::FdioCaller caller(std::move(fd));
-  const fidl::WireResult result =
-      fidl::WireCall(caller.borrow_as<fuchsia_block::Block>())->GetStats(clear);
+  const fidl::WireResult result = fidl::WireCall(block.value())->GetStats(clear);
   if (!result.ok()) {
     fprintf(stderr, "Error getting stats for %s: %s\n", dev, result.FormatDescription().c_str());
     return -1;
@@ -356,6 +362,8 @@ static int cmd_stats(const char* dev, bool clear) {
   metrics.Dump(stdout);
   return 0;
 }
+
+}  // namespace
 
 int main(int argc, const char** argv) {
   int rc = 0;
