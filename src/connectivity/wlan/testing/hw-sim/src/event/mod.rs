@@ -59,6 +59,7 @@ mod convert;
 mod extract;
 mod filter;
 
+pub mod branch;
 pub mod buffered;
 
 use {
@@ -213,6 +214,18 @@ pub trait Handler<S, E> {
         H2: Handler<S, E, Output = Self::Output>,
     {
         TryOr { handler: self, or: handler }
+    }
+
+    /// Combines the handler's output with [`try_or`] over `Unmatched`.
+    ///
+    /// This adapter terminates a chain of `try` combinators such that the last handler's output is
+    /// tried and, if it is unmatched or an error, `Unmatched` is returned.
+    fn try_or_unmatched(self) -> TryOrUnmatched<Self>
+    where
+        Self: Sized,
+        Self::Output: Try,
+    {
+        TryOrUnmatched { handler: self }
     }
 
     /// Provides context for fallible outputs (like `Result`s).
@@ -426,6 +439,23 @@ where
 }
 
 #[derive(Debug)]
+pub struct TryOrUnmatched<H> {
+    handler: H,
+}
+
+impl<H, S, E> Handler<S, E> for TryOrUnmatched<H>
+where
+    H: Handler<S, E>,
+    H::Output: Try,
+{
+    type Output = H::Output;
+
+    fn call(&mut self, state: &mut S, event: &E) -> Handled<Self::Output> {
+        self.handler.call(state, event).try_or_else(|| Handled::Unmatched)
+    }
+}
+
+#[derive(Debug)]
 pub struct Context<H, C, O, D> {
     handler: H,
     context: C,
@@ -615,7 +645,7 @@ impl<T> Handled<T> {
         F: FnOnce() -> Self,
     {
         match self {
-            Handled::Matched(output) => match output.branch() {
+            Handled::Matched(inner) => match inner.branch() {
                 ControlFlow::Continue(output) => Handled::Matched(Try::from_output(output)),
                 ControlFlow::Break(_) => f(),
             },
