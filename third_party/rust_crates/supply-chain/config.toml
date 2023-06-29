@@ -110,15 +110,6 @@ audit-as-crates-io = false
 [policy.tracing-core]
 audit-as-crates-io = false
 
-[policy.type_hash]
-audit-as-crates-io = false
-
-[policy.type_hash_core]
-audit-as-crates-io = false
-
-[policy.type_hash_macros]
-audit-as-crates-io = false
-
 [policy.valico]
 audit-as-crates-io = false
 
@@ -131,7 +122,7 @@ audit-as-crates-io = false
 [policy.web-sys]
 audit-as-crates-io = false
 
-[policy.wepoll-sys]
+[policy.wepoll-ffi]
 audit-as-crates-io = false
 
 [policy.winapi]
