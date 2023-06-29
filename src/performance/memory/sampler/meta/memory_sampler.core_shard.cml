@@ -1,0 +1,24 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "memory_sampler",
+            url: "fuchsia-pkg://fuchsia.com/memory_sampler#meta/memory_sampler.cm",
+        },
+    ],
+    use: [
+        {
+            protocol: [ "fuchsia.memory.sampler.Sampler" ],
+            from: "#memory_sampler",
+        },
+    ],
+    offer: [
+        {
+            storage: "cache",
+            from: "self",
+            to: "#memory_sampler",
+        },
+    ],
+}
