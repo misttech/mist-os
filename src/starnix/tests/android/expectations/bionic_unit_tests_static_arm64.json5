@@ -1,0 +1,20 @@
+// Copyright 2023 The Fuchsia Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// This file contains arm64 specific test expectations.
+{
+  actions: [
+    {
+      include: "bionic_unit_tests_static.json5",
+    },
+    {
+      type: "skip",
+      matchers: [
+        // This test is a benchmark of the clock() function which runs too slowly sometimes on the
+        // arm64 qemu bots.
+        "time.clock",
+      ],
+    },
+  ]
+}
