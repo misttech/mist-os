@@ -8,7 +8,7 @@ import("//build/rust/rustc_binary.gni")
 rustc_binary("bin") {
   testonly = true
   edition = "2021"
-  name = "main"
+  name = "example_component_realm_factory"
   sources = [
     "src/main.rs",
     "src/realm_factory.rs",

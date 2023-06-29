@@ -9,7 +9,7 @@
     ],
     program: {
         runner: "elf",
-        binary: "bin/main",
+        binary: "bin/example_component_realm_factory",
     },
     capabilities: [
         { protocol: "test.examplecomponent.RealmFactory" },

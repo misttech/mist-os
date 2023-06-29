@@ -9,7 +9,7 @@
     ],
     program: {
         runner: "elf",
-        binary: "bin/main",
+        binary: "bin/{{ realm_factory_binary_name }}",
     },
     capabilities: [
         { protocol: "{{ fidl_library_name }}.RealmFactory" },

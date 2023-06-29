@@ -78,6 +78,9 @@ pub(crate) struct IntegrationTestCmd {
 ///       the FIDL library in .fidl files.
 ///       Example FIDL usage: `library {{ fidl_library_name }};`
 ///
+///   realm_factory_binary_name
+///       The name of the generated test realm factory binary name.
+///
 impl IntegrationTestCmd {
     pub async fn run(&self, _: &flags::Flags) -> Result<(), Error> {
         let test_root = self.test_root.clone();
@@ -98,6 +101,8 @@ impl IntegrationTestCmd {
         template_vars.insert("component_name", component_name.clone());
         template_vars.insert("test_binary_name", var_test_binary_name(&component_name));
         template_vars.insert("test_package_name", var_test_package_name(&component_name));
+        template_vars
+            .insert("realm_factory_binary_name", var_realm_factory_binary_name(&component_name));
         // TODO(127973): Add back support for C++
         template_vars.insert("fidl_rust_crate_name", var_fidl_rust_crate_name(&component_name));
         template_vars.insert("fidl_library_name", var_fidl_library_name(&component_name));
@@ -130,6 +135,11 @@ impl IntegrationTestCmd {
         dir_copy(tmp_dir.path(), &test_root)?;
         Ok(())
     }
+}
+
+fn var_realm_factory_binary_name(component_name: &str) -> String {
+    let binary_name = format!("{}_realm_factory", component_name);
+    sanitize_binary_name(&binary_name)
 }
 
 fn var_test_binary_name(component_name: &str) -> String {
