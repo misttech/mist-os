@@ -239,30 +239,29 @@ async def read_and_decode(chan: fc.FidlChannel):
                 EVENT_LOOP_PENDING_READS.pop(loop)
         HANDLE_READY_QUEUES.pop(channel_number)
 
-    # Attempt to read the handle, re-trying if the first read required a wait.
+    # Attempt to read the handle, re-trying until we no longer need to wait.
     read_result = None
-    try:
-        read_result = do_read()
-    except fc.ZxStatus as e:
-        if e.args[0] != fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
-            raise e
+    while read_result is None:
+        try:
+            read_result = do_read()
+        except fc.ZxStatus as e:
+            zx_status: typing.Optional[int] = \
+                e.args[0] if len(e.args) > 0 else None
+            if zx_status != fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
+                # The read has failed so we must clear out the pending reads map
+                # and the ready queue.
+                pending_reads_cleanup(loop, channel_number)
+                raise e
 
-        # Handle was not ready for reading yet, wait for the it to be ready
-        # before trying again.
-        queued_chan_no = await ready_queue.get()
-        assert channel_number == queued_chan_no
+            # Handle was not ready for reading yet, wait for the it to be ready
+            # before trying again.
+            queued_chan_no = await ready_queue.get()
+            assert channel_number == queued_chan_no
 
-        # Waiting is finished, so attempt the read again.  If this second read
-        # raises any exceptions they will be propagated outwards.
-        read_result = do_read()
-    finally:
-        # Always want to clear out pending reads map and the ready queue, even
-        # if there is an exception (as PEER_CLOSED, for example, will always
-        # notify the handle).
-        #
-        # Because this is in the finally block, it will always run, even if
-        # `do_read` was successful above.
-        pending_reads_cleanup(loop, channel_number)
+    # Once we have had a successful read, we must clear out the pending reads
+    # map and the ready queue.
+    pending_reads_cleanup(loop, channel_number)
+
     return read_result
 
 
