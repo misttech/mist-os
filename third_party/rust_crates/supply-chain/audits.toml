@@ -137,6 +137,12 @@ Issues:
 - https://github.com/nix-rust/nix/pull/1993
 """
 
+[[audits.pin-project-lite]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["ub-risk-1", "safe-to-deploy"]
+version = "0.2.9"
+notes = "Reviewed on https://fxrev.dev/824504"
+
 [[audits.rayon]]
 who = [
     "Adam Perry <adamperry@google.com>",
