@@ -39,6 +39,7 @@ executable("focus-input-test-bin") {
 fuchsia_test_component("focus-input-test-component") {
   manifest = "meta/focus-input-test.cml"
   deps = [ ":focus-input-test-bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("focus-input-test") {

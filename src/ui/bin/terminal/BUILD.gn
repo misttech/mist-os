@@ -147,6 +147,7 @@ fuchsia_test_component("terminal_tests_component") {
     "//src/lib/zircon/rust:exit_with_code_util",
     "//zircon/third_party/uapp/dash",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("terminal_tests") {

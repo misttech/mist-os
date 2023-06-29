@@ -154,11 +154,11 @@ executable("web-semantics-test-bin") {
   ]
 }
 
-fuchsia_component("web-semantics-test-component") {
+fuchsia_test_component("web-semantics-test-component") {
   restricted_features = [ "allow_non_hermetic_packages" ]
-  testonly = true
   manifest = "meta/web-semantics-test.cml"
   deps = [ ":web-semantics-test-bin" ]
+  test_type = "system"
 }
 
 # The web engine requires a font provider for any test that attempts

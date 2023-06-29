@@ -6,7 +6,6 @@
         "//src/graphics/display/bin/coordinator-connector/meta/display_coordinator_connector.shard.cml",
         "//src/sys/test_runners/gtest/default.shard.cml",
         "inspect/client.shard.cml",
-        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
         "vulkan/client.shard.cml",
     ],

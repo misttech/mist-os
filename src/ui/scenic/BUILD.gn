@@ -125,6 +125,7 @@ fuchsia_unittest_package("flatland_display_compositor_pixeltests") {
       vim3_env,
     ]
   }
+  test_type = "system"
 }
 
 fuchsia_unittest_package(
@@ -263,6 +264,7 @@ fuchsia_unittest_package("scenic_unittests") {
 fuchsia_unittest_package("scenic_util_tests") {
   manifest = "meta/scenic_util_tests.cml"
   deps = [ "lib/scenic/util/tests:unittests" ]
+  test_type = "system"
 }
 
 fuchsia_unittest_package("scenic_utils_unittests") {

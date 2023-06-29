@@ -9,7 +9,6 @@
 
         // system-test is needed to access fuchsia.sysmem.Allocator
         // and fuchsia.vulkan.loader.Loader.
-        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {

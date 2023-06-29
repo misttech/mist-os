@@ -60,11 +60,11 @@ rustc_test("factory_reset_handler_test") {
   ]
 }
 
-fuchsia_component("factory-reset-handler-test-component") {
-  testonly = true
+fuchsia_test_component("factory-reset-handler-test-component") {
   component_name = "factory_reset_handler_test"
   manifest = "meta/factory-reset-handler-test.cml"
   deps = [ ":factory_reset_handler_test" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("factory-reset-handler-test") {

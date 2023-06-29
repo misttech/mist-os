@@ -74,6 +74,7 @@ fuchsia_test_component("web_runner_pixel_test_component") {
     "//src/ui/tests/integration_graphics_tests/web-pixel-tests/chromium_pixel_client:chromium_pixel_client_default_config",
     "//src/ui/tests/integration_graphics_tests/web-pixel-tests/http_server:http_server_component",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("web_runner_pixel_test") {

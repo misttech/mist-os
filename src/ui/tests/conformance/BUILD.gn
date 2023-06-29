@@ -41,6 +41,7 @@ fuchsia_test_component("touch-conformance-test-component") {
   testonly = true
   component_name = "touch-conformance-test"
   manifest = "meta/touch-conformance-test.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("touch-conformance-test") {
@@ -92,6 +93,7 @@ fuchsia_test_component("mouse-conformance-test-component") {
   testonly = true
   component_name = "mouse-conformance-test"
   manifest = "meta/mouse-conformance-test.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("mouse-conformance-test") {

@@ -25,11 +25,11 @@ executable("touchpad-test-bin") {
   ]
 }
 
-fuchsia_component("touchpad-test-component") {
-  testonly = true
+fuchsia_test_component("touchpad-test-component") {
   deps = [ ":touchpad-test-bin" ]
   component_name = "touchpad-test"
   manifest = "meta/touchpad-test.cml"
+  test_type = "system"
 }
 
 fhcp_test_package("touchpad-test-pkg") {

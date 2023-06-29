@@ -82,6 +82,7 @@ fuchsia_test_component("gfx-a11y-view-test-component") {
   testonly = true
   manifest = "meta/gfx-a11y-view-test.cml"
   deps = [ ":gfx-a11y-view-test-bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("gfx-a11y-view-test") {
@@ -132,6 +133,7 @@ fuchsia_test_component("gfx-scene-integration-test-component") {
   testonly = true
   manifest = "meta/gfx-scene-integration-test.cml"
   deps = [ ":gfx-scene-integration-test-bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("gfx-scene-integration-test") {
@@ -178,6 +180,7 @@ fuchsia_test_component("flatland-a11y-view-test-component") {
   testonly = true
   manifest = "meta/flatland-a11y-view-test.cml"
   deps = [ ":flatland-a11y-view-test-bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("flatland-a11y-view-test") {
@@ -226,6 +229,7 @@ fuchsia_test_component("flatland-scene-integration-test-component") {
   testonly = true
   manifest = "meta/flatland-scene-integration-test.cml"
   deps = [ ":flatland-scene-integration-test-bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("flatland-scene-integration-test") {

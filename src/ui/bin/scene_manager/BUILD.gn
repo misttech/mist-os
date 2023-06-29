@@ -103,6 +103,7 @@ icu_fuchsia_package("scene_manager") {
 
 fuchsia_unittest_package("scene_manager_tests") {
   deps = [ ":scene_manager_bin_test" ]
+  test_type = "system"
 }
 
 fuchsia_structured_config_rust_lib("input_config_lib") {

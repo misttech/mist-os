@@ -56,4 +56,5 @@ fuchsia_unittest_package("mediabuttons-integration-tests") {
       },
     ]
   }
+  test_type = "system"
 }

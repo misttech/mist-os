@@ -52,6 +52,7 @@ fuchsia_test_component("web-touch-input-test-component") {
   testonly = true
   manifest = "meta/web-touch-input-test.cml"
   deps = [ ":web-touch-input-test-bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("web-touch-input-test") {

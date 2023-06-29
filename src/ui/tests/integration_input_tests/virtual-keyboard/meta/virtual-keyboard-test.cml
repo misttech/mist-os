@@ -6,7 +6,6 @@
         "//src/chromium/web_engine/meta/shards/test/launch_context_provider.shard.cml",
         "//src/sys/test_runners/gtest/default.shard.cml",
         "sys/component/realm_builder.shard.cml",
-        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {

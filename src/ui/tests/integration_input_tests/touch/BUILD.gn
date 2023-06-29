@@ -59,6 +59,7 @@ fuchsia_test_component("touch-input-test-component") {
   testonly = true
   manifest = "meta/touch-input-test.cml"
   deps = [ ":touch-input-test-bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("touch-input-test") {
@@ -124,9 +125,9 @@ executable("pointerinjector-config-test-bin") {
 }
 
 fuchsia_test_component("pointerinjector-config-test-component") {
-  testonly = true
   manifest = "meta/pointerinjector-config-test.cml"
   deps = [ ":pointerinjector-config-test-bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("pointerinjector-config-test") {
