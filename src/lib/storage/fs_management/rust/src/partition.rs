@@ -100,7 +100,7 @@ pub async fn find_partition_in(
 /// An error isn't necessarily an issue - we might be using a matcher that wants a type guid,
 /// but the device we are currently checking doesn't implement get_type_guid. The error message may
 /// help debugging why no partition was matched but should generally be considered recoverable.
-async fn partition_matches_with_proxy(
+pub async fn partition_matches_with_proxy(
     controller_proxy: &ControllerProxy,
     matcher: &PartitionMatcher,
 ) -> Result<bool, Error> {

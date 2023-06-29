@@ -15,8 +15,9 @@ use {
         watcher,
     },
     anyhow::{anyhow, Context, Error},
+    device_watcher::recursive_wait_and_open,
     fidl::endpoints::{Proxy, RequestStream, ServerEnd},
-    fidl_fuchsia_device::ControllerProxy,
+    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
     fidl_fuchsia_fshost as fshost,
     fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy},
     fidl_fuchsia_hardware_block_volume::VolumeManagerMarker,
@@ -25,7 +26,9 @@ use {
     fs_management::{
         filesystem,
         format::DiskFormat,
-        partition::{find_partition, fvm_allocate_partition, PartitionMatcher},
+        partition::{
+            find_partition, fvm_allocate_partition, partition_matches_with_proxy, PartitionMatcher,
+        },
         Blobfs, F2fs, Fxfs, Minfs,
     },
     fuchsia_async as fasync,
@@ -77,6 +80,25 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
         .map_err(zx::Status::from_raw)
         .context("fvm get_topo_path returned error")?;
 
+    // Call VolumeManager::GetInfo in order to ensure all partition entries are visible. This
+    // allows us to enumerate the partitions without needing a timeout.
+    //
+    // TODO(https://fxbug.dev/126961): Right now, we rely on get_info() completing to ensure that
+    // fvm child partitions are visible in devfs. This should be revised when DF supports another
+    // way of safely enumerating child partitions.
+    let fvm_dir =
+        fuchsia_fs::directory::open_in_namespace(&fvm_path, fuchsia_fs::OpenFlags::empty())?;
+    let fvm_volume_manager_proxy = recursive_wait_and_open::<VolumeManagerMarker>(&fvm_dir, "/fvm")
+        .await
+        .context("failed to connect to the VolumeManager")?;
+    zx::ok(fvm_volume_manager_proxy.get_info().await.context("transport error on get_info")?.0)
+        .context("get_info failed")?;
+
+    let fvm_dir = fuchsia_fs::directory::open_in_namespace(
+        &format!("{fvm_path}/fvm"),
+        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+    )?;
+
     let data_matcher = PartitionMatcher {
         type_guids: Some(vec![constants::DATA_TYPE_GUID]),
         labels: Some(data_partition_names()),
@@ -85,9 +107,27 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
         ..Default::default()
     };
 
-    find_partition(data_matcher, FIND_PARTITION_DURATION)
-        .await
-        .context("Failed to find data partition")
+    // We can't use find_partition because it looks in /dev/class/block and we can't be sure that
+    // it will show up there yet (the block driver is bound after fvm has published its
+    // volumes). Instead, we enumerate the topological path directory whose entries should be
+    // present thanks to calling get_info above.
+    for entry in fuchsia_fs::directory::readdir(&fvm_dir).await? {
+        // This will wait for the block entry to show up.
+        let proxy =
+            recursive_wait_and_open::<ControllerMarker>(&fvm_dir, &format!("{}/block", entry.name))
+                .await
+                .context("opening partition path")?;
+        match partition_matches_with_proxy(&proxy, &data_matcher).await {
+            Ok(true) => {
+                return Ok(proxy);
+            }
+            Ok(false) => {}
+            Err(error) => {
+                tracing::info!(?error, "Failure in partition match. Transient device?");
+            }
+        }
+    }
+    Err(anyhow!("Data partition not found"))
 }
 
 #[link(name = "fvm")]

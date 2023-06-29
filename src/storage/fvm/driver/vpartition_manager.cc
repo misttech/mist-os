@@ -403,19 +403,21 @@ zx_status_t VPartitionManager::Load() {
   });
   zxlogf(INFO, "Loaded %lu partitions, slice size=%zu", device_count, slice_size_);
 
-  // Signal that all entries have now been bound, and respond to any outstanding GetInfo request.
-  std::optional<GetInfoCompleter::Async> get_info_request;
+  // Signal that all entries have now been bound, and respond to any outstanding GetInfo requests.
+  std::optional<std::vector<GetInfoCompleter::Async>> get_info_requests;
   {
     fbl::AutoLock lock(&lock_);
-    partitions_ready_ = true;
-    get_info_request = std::move(get_info_request_);
+    using std::swap;
+    swap(get_info_requests, get_info_requests_);
   }
-  if (get_info_request.has_value()) {
-    ZX_DEBUG_ASSERT(get_info_request->is_reply_needed());
-    fidl::Arena allocator;
-    fidl::ObjectView<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> info(allocator);
-    GetInfoInternal(info.get());
-    get_info_request->Reply(ZX_OK, info);
+  if (get_info_requests) {
+    for (auto& request : *get_info_requests) {
+      ZX_DEBUG_ASSERT(request.is_reply_needed());
+      fidl::Arena allocator;
+      fidl::ObjectView<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> info(allocator);
+      GetInfoInternal(info.get());
+      request.Reply(ZX_OK, info);
+    }
   }
 
   dump_header.cancel();
@@ -882,14 +884,8 @@ void VPartitionManager::GetInfo(GetInfoCompleter::Sync& completer) {
   // child partitions in devfs, as long as the VPartitionManager has already been made visible.
   {
     fbl::AutoLock lock(&lock_);
-    if (!partitions_ready_) {
-      if (get_info_request_.has_value()) {
-        // Only one outstanding request is supported currently, can support more if required.
-        zxlogf(ERROR, "Only one GetInfo request can be issued before partitions are ready.");
-        completer.Close(ZX_ERR_BAD_STATE);
-        return;
-      }
-      get_info_request_ = completer.ToAsync();
+    if (get_info_requests_) {
+      get_info_requests_->push_back(completer.ToAsync());
       return;  // Respond to the request when all child devices have been bound.
     }
   }
