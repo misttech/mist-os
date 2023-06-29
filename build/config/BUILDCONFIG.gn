@@ -556,7 +556,11 @@ default_rust_proc_macro_configs = default_shared_library_configs + [
 # See also: docs/concepts/testing/coverage.md
 #
 # [START e2e_test_libs]
-e2e_test_libs = [ "//sdk/testing/sl4f/client" ]
+e2e_test_libs = [
+  "//sdk/testing/sl4f/client",
+  "//third_party/mobly($host_toolchain)",
+  "//src/testing/end_to_end/honeydew($host_toolchain)",
+]
 if (is_linux) {
   e2e_test_libs += [
     "//tools/emulator($host_toolchain)",
@@ -570,6 +574,8 @@ if (is_linux) {
 e2e_lib_unit_tests = [
   "//sdk/testing/sl4f/client:tests",
   "//tools/emulator:tests",
+  "//src/testing/end_to_end/honeydew/tests/unit_tests:tests",
+  "//src/testing/end_to_end/mobly_driver/tests/unit_tests:tests",
 ]
 
 # Apply that default list to the binary target types.

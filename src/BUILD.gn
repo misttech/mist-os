@@ -62,6 +62,7 @@ group("e2e_tests") {
   deps = [
     "connectivity:e2e_tests",
     "recovery:e2e_tests",
+    "testing:e2e_tests",
     "tests",
     "//src/storage/lib/paver/e2e_tests",
     "//src/sys/pkg:e2e_tests",

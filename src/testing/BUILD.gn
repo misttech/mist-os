@@ -16,8 +16,6 @@ group("tests") {
 
   deps = [
     "catapult_converter:tests",
-    "end_to_end/honeydew/tests/unit_tests:tests",
-    "end_to_end/mobly_driver:tests",
     "fuzzing:tests",
     "host-target-testing:tests",
     "loadbench:tests",
@@ -25,4 +23,10 @@ group("tests") {
     "sl4f:tests",
     "sl4f_ffx/server:tests",
   ]
+}
+
+group("e2e_tests") {
+  testonly = true
+
+  deps = [ "end_to_end/mobly_driver/tests/functional_tests:tests" ]
 }
