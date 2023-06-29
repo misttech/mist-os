@@ -103,6 +103,7 @@ fuchsia_test_component("unittest_component") {
   component_name = "virtio_magma_unittests"
   deps = [ ":unittests_bin" ]
   manifest = "meta/virtio_magma_unittests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("virtio_magma_unittests") {

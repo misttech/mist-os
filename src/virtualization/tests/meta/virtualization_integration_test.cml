@@ -6,7 +6,6 @@
         "//src/sys/test_runners/gtest/default.shard.cml",
         "//src/sys/test_runners/tmp_storage.shard.cml",
         "sys/component/realm_builder.shard.cml",
-        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
         "trace/use.shard.cml",
         "vulkan/client.shard.cml",

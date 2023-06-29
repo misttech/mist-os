@@ -68,6 +68,7 @@ fuchsia_test_component("vmm_launcher_tests_component") {
     ":vmm_launcher",
     ":vmm_launcher_test_bin",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("vmm_launcher_tests") {

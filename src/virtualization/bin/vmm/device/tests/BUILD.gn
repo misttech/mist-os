@@ -73,6 +73,7 @@ template("device_test") {
                            [
                              "restricted_features",
                              "manifest",
+                             "test_type",
                            ])
     component_name = test_name
     deps = [ ":${bin_name}" ]
@@ -188,6 +189,7 @@ device_test("virtio_gpu_device_tests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "system"
 }
 
 device_test("virtio_input_device_tests") {
@@ -251,6 +253,7 @@ device_test("virtio_magma_device_tests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "system"
 }
 
 device_test("virtio_net_device_tests") {

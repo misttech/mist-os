@@ -173,6 +173,7 @@ fuchsia_test_component("server_daemon_test_cmp") {
   ]
   component_name = "server_daemon_test"
   manifest = "meta/server_daemon_test.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("guest_interaction_tests") {

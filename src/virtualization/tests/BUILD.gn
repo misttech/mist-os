@@ -128,6 +128,7 @@ fuchsia_test_component("virtualization_core_tests_cmp") {
     ":virtualization_core_tests",
   ]
   manifest = "meta/virtualization_core_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("virtualization_core_tests_pkg") {
@@ -165,6 +166,7 @@ fuchsia_test_component("virtualization_shutdown_tests_cmp") {
     ":virtualization_shutdown_tests",
   ]
   manifest = "meta/virtualization_shutdown_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("virtualization_shutdown_tests_pkg") {
@@ -206,6 +208,7 @@ fuchsia_test_component("virtualization_balloon_tests_cmp") {
     ":virtualization_balloon_tests",
   ]
   manifest = "meta/virtualization_balloon_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("virtualization_balloon_tests_pkg") {
@@ -245,6 +248,7 @@ fuchsia_test_component("virtualization_block_tests_cmp") {
     ":virtualization_block_tests",
   ]
   manifest = "meta/virtualization_block_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("virtualization_block_tests_pkg") {
@@ -285,6 +289,7 @@ fuchsia_test_component("virtualization_gpu_tests_cmp") {
     ":virtualization_gpu_tests",
   ]
   manifest = "meta/virtualization_gpu_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("virtualization_gpu_tests_pkg") {
@@ -322,6 +327,7 @@ fuchsia_test_component("virtualization_input_tests_cmp") {
     ":virtualization_input_tests",
   ]
   manifest = "meta/virtualization_input_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("virtualization_input_tests_pkg") {
@@ -361,6 +367,7 @@ fuchsia_test_component("virtualization_net_tests_cmp") {
     ":virtualization_net_tests",
   ]
   manifest = "meta/virtualization_net_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("virtualization_net_tests_pkg") {
@@ -400,6 +407,7 @@ fuchsia_test_component("virtualization_sound_tests_cmp") {
     ":virtualization_sound_tests",
   ]
   manifest = "meta/virtualization_sound_tests.cml"
+  test_type = "system"
 }
 
 audio_core_test_package("virtualization_sound_tests_pkg") {
@@ -441,6 +449,7 @@ fuchsia_test_component("virtualization_vsock_tests_cmp") {
     ":virtualization_vsock_tests",
   ]
   manifest = "meta/virtualization_vsock_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("virtualization_vsock_tests_pkg") {
@@ -482,6 +491,7 @@ fuchsia_test_component("virtualization_mem_tests_cmp") {
     ":virtualization_mem_tests",
   ]
   manifest = "meta/virtualization_mem_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("virtualization_mem_tests_pkg") {
@@ -601,6 +611,7 @@ fuchsia_test_component("virtualization_magma_tests_cmp") {
     ":virtualization_magma_tests",
   ]
   manifest = "meta/virtualization_magma_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("virtualization_magma_tests_pkg") {
@@ -637,6 +648,7 @@ fuchsia_test_component("termina_container_tests_cmp") {
     ":test_images",
   ]
   manifest = "meta/termina_container_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("termina_container_tests_pkg") {
