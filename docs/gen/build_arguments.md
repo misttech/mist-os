@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1882
+From //build/config/BUILDCONFIG.gn:1888
 
 ### allow_legacy_data_partition_names
 
@@ -3156,7 +3156,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:114
+From //build/bazel/legacy_ninja_build_outputs.gni:108
 
 ### extra_package_labels
 
@@ -3171,7 +3171,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1617
+From //build/config/BUILDCONFIG.gn:1623
 
 ### extra_vbmeta_descriptors
 
@@ -4601,7 +4601,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1422
+From //build/config/BUILDCONFIG.gn:1428
 
 ### legacy_base_driver_package_labels
 
@@ -7564,7 +7564,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"pU3MVOQHs05LMl61t6N6Bz0Zxf7JvGK9k36vHBIcslcC"`
+**Current value (from the default):** `"dblnU3tEhEv7oy3yIm63PMqD3dsqu8htntNrnj3hkd0C"`
 
 From //build/rust/config.gni:32
 
@@ -7767,7 +7767,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1872
+From //build/config/BUILDCONFIG.gn:1878
 
 ### select_variant_canonical
 
@@ -7777,7 +7777,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1877
+From //build/config/BUILDCONFIG.gn:1883
 
 ### select_variant_shortcuts
 
@@ -7835,7 +7835,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1663
+From //build/config/BUILDCONFIG.gn:1669
 
 ### size_checker_input
 
@@ -8273,7 +8273,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1647
+From //build/config/BUILDCONFIG.gn:1653
 
 ### universe_package_labels
 
