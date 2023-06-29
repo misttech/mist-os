@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use either::Either;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 
 /// A specific implementation of a test variant.
+#[derive(Clone, Debug)]
 struct Implementation {
     type_name: syn::Path,
     suffix: &'static str,
@@ -44,73 +46,58 @@ fn permutations_over_type_generics(
     variants: &[Variant<'_>],
     type_generics: &[&syn::TypeParam],
 ) -> Vec<TestVariation> {
-    // Generate the permutations by substituting implementations for generics
-    // with a recursive depth-first search.
-    fn do_permutation(
-        variants: &[Variant<'_>],
-        type_generics: &[&syn::TypeParam],
-        suffix: String,
-        params: &mut Vec<syn::Path>,
-        generics: &mut Vec<syn::TypeParam>,
-        test_variations: &mut Vec<TestVariation>,
-    ) {
-        let (first_generic, rest_generics) = match type_generics.split_first() {
-            Some(split) => split,
-            None => {
-                test_variations.push(TestVariation {
-                    params: params.clone(),
-                    generics: generics.clone(),
-                    suffix,
-                });
-                return;
-            }
-        };
-
-        let variants_for_first_generic: Option<&Variant<'_>> =
-            first_generic.bounds.iter().find_map(|b| {
-                let t = match b {
-                    syn::TypeParamBound::Trait(t) => t,
-                    syn::TypeParamBound::Lifetime(_) => return None,
-                };
-                variants.iter().find(|v| v.trait_bound == t.path)
-            });
-        match variants_for_first_generic {
-            None => {
-                // This parameter is not related to a test variation, keep the
-                // parameter in the generated function.
-                params.push(syn::Path::from(syn::PathSegment::from(first_generic.ident.clone())));
-                generics.push((*first_generic).clone());
-                do_permutation(variants, rest_generics, suffix, params, generics, test_variations);
-                let _: Option<_> = params.pop();
-                let _: Option<_> = generics.pop();
-            }
-            Some(Variant { trait_bound: _, implementations }) => {
-                for Implementation { type_name, suffix: s } in *implementations {
-                    params.push(type_name.clone());
-                    do_permutation(
-                        variants,
-                        rest_generics,
-                        format!("{}_{}", suffix, *s),
-                        params,
-                        generics,
-                        test_variations,
-                    );
-                    let _: Option<_> = params.pop();
-                }
-            }
-        }
+    if type_generics.is_empty() {
+        return vec![TestVariation::default()];
     }
 
-    let mut test_variations = Vec::new();
-    do_permutation(
-        variants,
-        &type_generics,
-        String::new(),
-        &mut Vec::new(),
-        &mut Vec::new(),
-        &mut test_variations,
-    );
-    test_variations
+    let find_implementations = |type_param: &syn::TypeParam| -> Option<&[Implementation]> {
+        let trait_bound = type_param.bounds.iter().find_map(|b| match b {
+            syn::TypeParamBound::Lifetime(_) => None,
+            syn::TypeParamBound::Trait(t) => Some(t),
+        })?;
+        variants.iter().find_map(|Variant { trait_bound: t, implementations }| {
+            (t == &trait_bound.path).then_some(*implementations)
+        })
+    };
+
+    #[derive(Clone, Debug)]
+    enum Piece<'a> {
+        PassThroughGeneric(&'a syn::TypeParam),
+        Instantiated(&'a Implementation),
+    }
+    let piece_iterators = type_generics.into_iter().map(|type_param| {
+        // If there are multiple implementations, produce an iterator that
+        // will yield them all. Otherwise produce an iterator that will
+        // yield the generic parameter once.
+        match find_implementations(type_param) {
+            None => Either::Left(std::iter::once(Piece::PassThroughGeneric(*type_param))),
+            Some(implementations) => Either::Right(
+                implementations
+                    .into_iter()
+                    .map(|implementation| Piece::Instantiated(implementation)),
+            ),
+        }
+    });
+
+    itertools::Itertools::multi_cartesian_product(piece_iterators)
+        .map(|pieces| {
+            let (mut params, mut generics, mut name_pieces) = (Vec::new(), Vec::new(), vec![""]);
+            for piece in pieces {
+                match piece {
+                    Piece::Instantiated(Implementation { type_name, suffix }) => {
+                        params.push(type_name.clone());
+                        name_pieces.push(*suffix);
+                    }
+                    Piece::PassThroughGeneric(type_param) => {
+                        params.push(type_param.ident.clone().into());
+                        generics.push(type_param.clone());
+                    }
+                }
+            }
+            let suffix = name_pieces.join("_");
+            TestVariation { params, generics, suffix }
+        })
+        .collect()
 }
 
 fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStream {
