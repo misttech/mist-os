@@ -163,7 +163,6 @@ class FuchsiaTaskPublish(FuchsiaTask):
         # Ensure repository.
         if (args.repo_path / 'repository').is_dir():
             print(f'Using existing repo: {args.repo_path}')
-            return
         else:
             print(f'Creating a new repository: {args.repo_path}')
             run(args.pm, 'newrepo', '-vt', '-repo', args.repo_path)
