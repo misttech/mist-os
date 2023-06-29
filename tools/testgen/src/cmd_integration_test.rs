@@ -18,6 +18,24 @@ use {
     walkdir::{DirEntry, WalkDir},
 };
 
+struct TemplateFile {
+    filename: &'static str,
+    contents: &'static str,
+}
+
+/// Creates a `TemplateFile` from the filename $file.
+/// TemplateFile::filename is set to $file and TemplateFile::contents is the contents
+/// of the handlebars template at the path ../templates/integration_test/$file.hbrs
+/// relative to this file.
+macro_rules! hbrs_template_file {
+    ($file:expr) => {
+        TemplateFile {
+            filename: $file,
+            contents: include_str!(concat!("../templates/integration_test/", $file, ".hbrs")),
+        }
+    };
+}
+
 /// Generates an integration test for a Fuchsia component.
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "integration_test")]
@@ -84,62 +102,26 @@ impl IntegrationTestCmd {
         template_vars.insert("fidl_rust_crate_name", var_fidl_rust_crate_name(&component_name));
         template_vars.insert("fidl_library_name", var_fidl_library_name(&component_name));
 
-        let templates = vec![
-            ("tests/BUILD.gn", include_str!("../templates/integration_test/tests/BUILD.gn.hbrs")),
-            (
-                "tests/meta/test-root.cml",
-                include_str!("../templates/integration_test/tests/meta/test-root.cml.hbrs"),
-            ),
-            (
-                "tests/meta/test-suite.cml",
-                include_str!("../templates/integration_test/tests/meta/test-suite.cml.hbrs"),
-            ),
-            (
-                "tests/src/main.rs",
-                include_str!("../templates/integration_test/tests/src/main.rs.hbrs"),
-            ),
-            (
-                "testing/fidl/BUILD.gn",
-                include_str!("../templates/integration_test/testing/fidl/BUILD.gn.hbrs"),
-            ),
-            (
-                "testing/fidl/realm_factory.test.fidl",
-                include_str!(
-                    "../templates/integration_test/testing/fidl/realm_factory.test.fidl.hbrs"
-                ),
-            ),
-            (
-                "testing/realm-factory/BUILD.gn",
-                include_str!("../templates/integration_test/testing/realm-factory/BUILD.gn.hbrs"),
-            ),
-            (
-                "testing/realm-factory/meta/default.cml",
-                include_str!(
-                    "../templates/integration_test/testing/realm-factory/meta/default.cml.hbrs"
-                ),
-            ),
-            (
-                "testing/realm-factory/src/main.rs",
-                include_str!(
-                    "../templates/integration_test/testing/realm-factory/src/main.rs.hbrs"
-                ),
-            ),
-            (
-                "testing/realm-factory/src/realm_factory.rs",
-                include_str!(
-                    "../templates/integration_test/testing/realm-factory/src/realm_factory.rs.hbrs"
-                ),
-            ),
+        let templates: Vec<TemplateFile> = vec![
+            hbrs_template_file!("tests/BUILD.gn"),
+            hbrs_template_file!("tests/meta/test-root.cml"),
+            hbrs_template_file!("tests/meta/test-suite.cml"),
+            hbrs_template_file!("tests/src/main.rs"),
+            hbrs_template_file!("testing/fidl/BUILD.gn"),
+            hbrs_template_file!("testing/fidl/realm_factory.test.fidl"),
+            hbrs_template_file!("testing/realm-factory/BUILD.gn"),
+            hbrs_template_file!("testing/realm-factory/meta/default.cml"),
+            hbrs_template_file!("testing/realm-factory/src/main.rs"),
+            hbrs_template_file!("testing/realm-factory/src/realm_factory.rs"),
         ];
 
         // Generate source code in a staging directory.
         // This prevents making destructive changes when code gen fails.
         let tmp_dir = TempDir::new()?;
         let code_generator = CodeGenerator::new();
-        for template in templates {
-            let output_path = tmp_dir.path().join(template.0);
-            let template_code = template.1.clone();
-            let code = code_generator.generate(&template_code, &template_vars)?;
+        for TemplateFile { filename, contents } in templates {
+            let code = code_generator.generate(&contents, &template_vars)?;
+            let output_path = tmp_dir.path().join(filename);
             file_write(output_path, &code)?;
         }
 
