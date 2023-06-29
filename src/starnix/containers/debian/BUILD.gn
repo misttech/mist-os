@@ -15,9 +15,7 @@ ext4_to_pkg("system_image") {
   } else if (target_cpu == "arm64") {
     input = "//prebuilt/starnix/linux-arm64/arm64_system.img"
   } else if (target_cpu == "riscv64") {
-    # Define a nonexistent but valid value to allow GN to complete.
-    # TODO(fxbug.dev/128554): Add a RISC-V image.
-    input = "//see_fxbug_dev_128554"
+    input = "//prebuilt/starnix/linux-riscv64/riscv64_system.img"
   } else {
     assert(false, "Unsupported CPU architecture.")
   }
