@@ -7,9 +7,7 @@
 
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
-#include <lib/zx/time.h>
 
-#include <cstdint>
 #include <deque>
 #include <memory>
 #include <unordered_map>
@@ -49,21 +47,6 @@ using allocation::BufferCollectionUsage;
 class DisplayCompositor final : public allocation::BufferCollectionImporter,
                                 public std::enable_shared_from_this<DisplayCompositor> {
  public:
-  // Describes the result of RenderFrame().  If it succeeds it is either by showing client images
-  // directly on the display, or by first using the GPU to composite them into a single image.
-  enum class RenderFrameResult { kDirectToDisplay, kGpuComposition, kFailure };
-  // Args which can be passed to customize RenderFrame() behavior in tests.  The default values are
-  // the ones used in production.
-  struct RenderFrameTestArgs {
-    bool force_gpu_composition = false;
-
-    // This is a workaround so that RenderFrame() can provide a default value, while still allowing
-    // callers to use aggregate initialization syntax.  Adding a default constructor would sacrifice
-    // this ability.  See:
-    // https://stackoverflow.com/questions/53408962/try-to-understand-compiler-error-message-default-member-initializer-required-be
-    static RenderFrameTestArgs Default() { return {}; }
-  };
-
   // TODO(fxbug.dev/66807): The DisplayCompositor has multiple parts of its code where usage of the
   // display coordinator is protected by locks, because of the multithreaded environment of
   // flatland. Ideally, we'd want the DisplayCompositor to have sole ownership of the display
@@ -106,17 +89,11 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Generates frame and presents it to display.  This may involve directly scanning out client
   // images, or it may involve first using the GPU to composite (some of) these images into a single
   // image which is then scanned out.
-  //
-  // |args| can be used to customize behavior in tests.  Production code should omit this arg; the
-  // default values are correct for production use cases.
-  //
   // Only called from the main thread.
-  RenderFrameResult RenderFrame(
-      uint64_t frame_number, zx::time presentation_time,
-      const std::vector<RenderData>& render_data_list, std::vector<zx::event> release_fences,
-      scheduling::FramePresentedCallback callback,
-      // Allows customization of behavior for tests.  Default values are used in production.
-      RenderFrameTestArgs test_args = RenderFrameTestArgs::Default()) FXL_LOCKS_EXCLUDED(lock_);
+  void RenderFrame(uint64_t frame_number, zx::time presentation_time,
+                   const std::vector<RenderData>& render_data_list,
+                   std::vector<zx::event> release_fences,
+                   scheduling::FramePresentedCallback callback) FXL_LOCKS_EXCLUDED(lock_);
 
   // Register a new display to the DisplayCompositor, which also generates the render targets to be
   // presented on the display when compositing on the GPU. If |num_render_targets| is 0, this
