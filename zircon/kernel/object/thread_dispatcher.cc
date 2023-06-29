@@ -136,16 +136,17 @@ zx_status_t ThreadDispatcher::set_name(const char* name, size_t len) {
   return ZX_OK;
 }
 
-void ThreadDispatcher::get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
+zx_status_t ThreadDispatcher::get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
   canary_.Assert();
 
   memset(out_name, 0, ZX_MAX_NAME_LEN);
 
   Guard<CriticalMutex> thread_guard{get_lock()};
   if (core_thread_ == nullptr) {
-    return;
+    return ZX_ERR_BAD_STATE;
   }
   strlcpy(out_name, core_thread_->name(), ZX_MAX_NAME_LEN);
+  return ZX_OK;
 }
 
 // start a thread

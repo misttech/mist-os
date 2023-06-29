@@ -192,14 +192,18 @@ class Dispatcher : private fbl::RefCountedUpgradeable<Dispatcher>,
   virtual bool is_waitable() const = 0;
 
   // get_name() will return a null-terminated name of ZX_MAX_NAME_LEN - 1 or fewer
-  // characters.  For objects that don't have names it will be "".
-  virtual void get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
-    memset(out_name, 0, ZX_MAX_NAME_LEN);
+  // characters in |out_name|.
+  // Returns ZX_ERR_WRONG_TYPE for object types that don't have ZX_PROP_NAME.
+  [[nodiscard]] virtual zx_status_t get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
+    return ZX_ERR_WRONG_TYPE;
   }
 
   // set_name() will truncate to ZX_MAX_NAME_LEN - 1 and ensure there is a
-  // terminating null
-  virtual zx_status_t set_name(const char* name, size_t len) { return ZX_ERR_NOT_SUPPORTED; }
+  // terminating null.
+  // Returns ZX_ERR_WRONG_TYPE for object types that don't have ZX_PROP_NAME.
+  [[nodiscard]] virtual zx_status_t set_name(const char* name, size_t len) {
+    return ZX_ERR_WRONG_TYPE;
+  }
 
   struct DeleterListTraits {
     static fbl::SinglyLinkedListNodeState<Dispatcher*>& node_state(Dispatcher& obj) {

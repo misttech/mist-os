@@ -248,8 +248,9 @@ void ProcessDispatcher::on_zero_handles() {
   FinishDeadTransition();
 }
 
-void ProcessDispatcher::get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
+zx_status_t ProcessDispatcher::get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
   name_.get(ZX_MAX_NAME_LEN, out_name);
+  return ZX_OK;
 }
 
 zx_status_t ProcessDispatcher::set_name(const char* name, size_t len) {

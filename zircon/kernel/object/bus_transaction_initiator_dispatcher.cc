@@ -120,10 +120,11 @@ zx_status_t BusTransactionInitiatorDispatcher::set_name(const char* name, size_t
   return name_.set(name, len);
 }
 
-void BusTransactionInitiatorDispatcher::get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
+zx_status_t BusTransactionInitiatorDispatcher::get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
   // The kernel implementation of fbl::Name is protected using an internal
   // spinlock.  No need for any special locks here.
   name_.get(ZX_MAX_NAME_LEN, out_name);
+  return ZX_OK;
 }
 
 void BusTransactionInitiatorDispatcher::AddPmoLocked(PinnedMemoryTokenDispatcher* pmt) {

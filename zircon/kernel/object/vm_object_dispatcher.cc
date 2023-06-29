@@ -92,9 +92,10 @@ void VmObjectDispatcher::OnZeroChild() { UpdateState(0, ZX_VMO_ZERO_CHILDREN); }
 
 void VmObjectDispatcher::OnOneChild() { UpdateState(ZX_VMO_ZERO_CHILDREN, 0); }
 
-void VmObjectDispatcher::get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
+zx_status_t VmObjectDispatcher::get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
   canary_.Assert();
   vmo_->get_name(out_name, ZX_MAX_NAME_LEN);
+  return ZX_OK;
 }
 
 zx_status_t VmObjectDispatcher::set_name(const char* name, size_t len) {

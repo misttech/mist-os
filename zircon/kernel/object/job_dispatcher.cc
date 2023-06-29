@@ -695,10 +695,11 @@ fbl::RefPtr<JobDispatcher> JobDispatcher::LookupJobById(zx_koid_t koid) {
   return found_job;  // Null if not found.
 }
 
-void JobDispatcher::get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
+zx_status_t JobDispatcher::get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
   canary_.Assert();
 
   name_.get(ZX_MAX_NAME_LEN, out_name);
+  return ZX_OK;
 }
 
 zx_status_t JobDispatcher::set_name(const char* name, size_t len) {

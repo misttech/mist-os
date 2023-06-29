@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/zx/stream.h>
+#include <lib/zx/vmo.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -195,6 +197,25 @@ TEST(Property, SocketBuffer) {
   EXPECT_EQ(info.tx_buf_size, 0u, "");
 
   zx_handle_close_many(sockets, 2);
+}
+
+TEST(Property, NameWrongType) {
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
+
+  zx::stream stream;
+  ASSERT_OK(zx::stream::create(0, vmo, 0, &stream));
+
+  // Stream does not have a name property, so we cannot get/set it.
+  char name[ZX_MAX_NAME_LEN];
+  ASSERT_EQ(ZX_ERR_WRONG_TYPE, stream.get_property(ZX_PROP_NAME, name, sizeof(name)));
+  ASSERT_EQ(ZX_ERR_WRONG_TYPE, stream.set_property(ZX_PROP_NAME, name, sizeof(name)));
+  ASSERT_EQ(ZX_ERR_WRONG_TYPE, stream.get_property(ZX_PROP_NAME, name, sizeof(name)));
+
+  // VMO has a stream property, so we can successfully get/set it.
+  ASSERT_OK(vmo.get_property(ZX_PROP_NAME, name, sizeof(name)));
+  ASSERT_OK(vmo.set_property(ZX_PROP_NAME, name, sizeof(name)));
+  ASSERT_OK(vmo.get_property(ZX_PROP_NAME, name, sizeof(name)));
 }
 
 }  // namespace
