@@ -672,7 +672,7 @@ explicitly mark itself to run in the legacy realm as shown below.
 The shard includes following facet in the manifest file:
 
 ```json5
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/starnix/testing/starnix_test.shard.cml" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/starnix/tests/starnix_test.shard.cml" %}
 ```
 
 Possible values of `fuchsia.test.type`:
