@@ -224,14 +224,14 @@ class FakeRadarDevice : public fidl::WireServer<BurstReader> {
 
   void SendBurst(uint32_t vmo_id) {
     fuchsia_hardware_radar::wire::Burst burst = {.vmo_id = vmo_id};
-    auto request = fuchsia_hardware_radar::wire::RadarBurstReaderOnBurst2Request::WithBurst(
+    auto request = fuchsia_hardware_radar::wire::RadarBurstReaderOnBurstRequest::WithBurst(
         fidl::ObjectView<fuchsia_hardware_radar::wire::Burst>::FromExternal(&burst));
-    [[maybe_unused]] auto call_result = fidl::WireSendEvent(*server_)->OnBurst2(request);
+    [[maybe_unused]] auto call_result = fidl::WireSendEvent(*server_)->OnBurst(request);
   }
 
   void SendBurstError(StatusCode status) {
-    auto request = fuchsia_hardware_radar::wire::RadarBurstReaderOnBurst2Request::WithError(status);
-    [[maybe_unused]] auto call_result = fidl::WireSendEvent(*server_)->OnBurst2(request);
+    auto request = fuchsia_hardware_radar::wire::RadarBurstReaderOnBurstRequest::WithError(status);
+    [[maybe_unused]] auto call_result = fidl::WireSendEvent(*server_)->OnBurst(request);
   }
 
   async::Loop loop_;
