@@ -120,6 +120,11 @@ TEST(FcntlLockTest, ChangeLockTypeInMiddleOfAnotherLock) {
 }
 
 TEST(FcntlLockTest, CloneFiles) {
+  // TODO(fxbug.dev/129749): Find out why this test does not work on host in CQ
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP() << "This test does not work on Linux in CQ";
+  }
+
   // Do all the test in another process, as it will requires closing the parent
   // process before the child one.
   ForkHelper helper;

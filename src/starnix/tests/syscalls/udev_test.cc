@@ -81,7 +81,10 @@ std::vector<std::string_view> split_string(std::string_view str) {
   return ::testing::AssertionSuccess();
 }
 
-TEST(UdevTest, Connect) { ASSERT_TRUE(GetUdevSocket().is_valid()); }
+TEST(UdevTest, Connect) {
+  // Assume starnix always has udevsocket.
+  ASSERT_TRUE(!test_helper::IsStarnix() || GetUdevSocket().is_valid());
+}
 
 TEST(UdevTest, AddDevMapper) {
   if (getuid() != 0) {

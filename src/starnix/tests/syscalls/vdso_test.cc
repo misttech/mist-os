@@ -65,7 +65,13 @@ TEST(VdsoTest, AtSysinfoEhdrPresent) {
 }
 
 TEST_F(VdsoProcTest, VdsoMappingCannotBeSplit) {
+  // TODO(fxbug.dev/129749): Find out why this test does not work on host in CQ
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP() << "This test does not work on Linux in CQ";
+  }
+
   const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+
   // This test will be disabled in Starnix until their vDSO grows to more than one page.
   if (vdso_size_ == page_size) {
     GTEST_SKIP() << "Need more than one vdso page to split it";
@@ -75,7 +81,8 @@ TEST_F(VdsoProcTest, VdsoMappingCannotBeSplit) {
 
   // We cannot unmap one page of the vdso.
   helper.RunInForkedProcess([&] {
-    EXPECT_NE(munmap(vdso_base_, page_size), 0);
+    EXPECT_NE(munmap(vdso_base_, page_size), 0)
+        << "vdso: base " << vdso_base_ << " size " << vdso_size_ << " page size: " << page_size;
     EXPECT_EQ(errno, EINVAL);
   });
   EXPECT_TRUE(helper.WaitForChildren());

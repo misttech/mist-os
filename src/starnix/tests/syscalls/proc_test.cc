@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include "src/starnix/tests/syscalls/proc_test_base.h"
+#include "src/starnix/tests/syscalls/test_helper.h"
 
 class ProcUptimeTest : public ProcTestBase {
  protected:
@@ -115,6 +116,10 @@ class ProcSysNetTest : public ProcTestBase,
  protected:
   void SetUp() override {
     ProcTestBase::SetUp();
+    // Required to open the path below for writing.
+    if (!test_helper::HasSysAdmin()) {
+      GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+    }
 
     fd.reset();
 

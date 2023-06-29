@@ -12,7 +12,6 @@
 #include <thread>
 
 #include <gtest/gtest.h>
-#include <linux/capability.h>
 #include <linux/filter.h>
 #include <linux/seccomp.h>
 
@@ -29,14 +28,6 @@ constexpr uint32_t kFilteredSyscall = __NR_arch_specific_syscall + 15;
 #endif
 
 #define ARRAY_SIZE(x) (sizeof((x)) / sizeof((x[0])))
-
-bool HasSysAdmin() {
-  struct __user_cap_header_struct header = {_LINUX_CAPABILITY_VERSION_3, 0};
-  struct __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3] = {};
-  syscall(__NR_capget, &header, &caps);
-
-  return (caps[CAP_TO_INDEX(CAP_SYS_ADMIN)].effective & CAP_TO_MASK(CAP_SYS_ADMIN)) != 0;
-}
 
 void exit_with_failure_code() {
   if (testing::Test::HasFatalFailure() || testing::Test::HasNonfatalFailure()) {
@@ -67,6 +58,7 @@ void install_filter_block(uint32_t syscall_nr, uint32_t action) {
 
 TEST(SeccompTest, RetTrapBypassesIgn) {
   ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
   helper.ExpectSignal(SIGSYS);
   helper.RunInForkedProcess([] {
     std::thread t([]() {
@@ -85,6 +77,7 @@ TEST(SeccompTest, RetTrapBypassesIgn) {
 // Test to ensure strict mode works.
 TEST(SeccompTest, Strict) {
   ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
   helper.ExpectSignal(SIGKILL);
   helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
@@ -106,6 +99,7 @@ TEST(SeccompTest, Strict) {
 // Cannot change from Filtered to Strict
 TEST(SeccompTest, FilterToStrictErrors) {
   ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     ASSERT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
 
@@ -127,6 +121,7 @@ TEST(SeccompTest, FilterToStrictErrors) {
 // with seccomp(SET_MODE_STRICT)
 TEST(SeccompTest, BadArgs) {
   ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
     EXPECT_EQ(-1, prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, NULL, NULL, NULL));
@@ -148,12 +143,17 @@ TEST(SeccompTest, BadArgs) {
 // Test to attempt to install filter without the right caps.
 TEST(SeccompTest, BadNoNewPrivs) {
   // Skip this test if we are root.
-  if (HasSysAdmin()) {
-    GTEST_SKIP() << "Skipped perms test because running as root";
+  if (test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Skipped privs test because running as root";
   }
 
   ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
+    // Running in locked down mode with no new privs already set - skip.
+    if (prctl(PR_GET_NO_NEW_PRIVS, 0, 0, 0, 0) == 1) {
+      GTEST_SKIP() << "Skipped privs test because privs already set";
+    }
     sock_filter filter[] = {
         // A = seccomp_data.nr
         BPF_STMT(BPF_LD | BPF_ABS | BPF_W, offsetof(struct seccomp_data, nr)),
@@ -173,6 +173,7 @@ TEST(SeccompTest, BadNoNewPrivs) {
 
 TEST(SeccompTest, FilterMax4KMinOne) {
   ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
     constexpr uint64_t too_big = BPF_MAXINSNS + 1;
@@ -203,6 +204,7 @@ TEST(SeccompTest, FilterMax4KMinOne) {
 // that as an upper bound.
 TEST(SeccompTest, FilterMaxTotalInsns) {
   ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     const int kFilterSize = BPF_MAXINSNS;
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
@@ -227,6 +229,7 @@ TEST(SeccompTest, FilterMaxTotalInsns) {
 // aligned to a 32-bit boundary and not exceed sizeof(seccomp_data)
 TEST(SeccompTest, FilterAccessInBounds) {
   ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
 
@@ -247,6 +250,7 @@ TEST(SeccompTest, FilterAccessInBounds) {
 
 TEST(SeccompTest, RetKillProcess) {
   ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
   helper.ExpectSignal(SIGSYS);
   helper.RunInForkedProcess([] {
     std::thread t([]() {
@@ -261,6 +265,7 @@ TEST(SeccompTest, RetKillProcess) {
 
 TEST(SeccompTest, KillProcessOnBadRetAction) {
   ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
   helper.ExpectSignal(SIGSYS);
   helper.RunInForkedProcess([] {
     std::thread t([]() {
@@ -275,6 +280,7 @@ TEST(SeccompTest, KillProcessOnBadRetAction) {
 
 TEST(SeccompTest, PrctlGetSeccomp) {
   ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
   helper.ExpectSignal(SIGSYS);
   helper.RunInForkedProcess([] {
     std::thread t([]() {
@@ -320,6 +326,7 @@ TEST(SeccompTest, GetActionAvail) {
 
 TEST(SeccompTest, ErrnoIsMaxFFF) {
   ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
 
@@ -335,6 +342,7 @@ TEST(SeccompTest, ErrnoIsMaxFFF) {
 // spawned from thread A.
 TEST(SeccompTest, TsyncEsrch) {
   ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     std::mutex m;
     std::condition_variable cv;

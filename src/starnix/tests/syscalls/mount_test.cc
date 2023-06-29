@@ -5,6 +5,8 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <ftw.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/mount.h>
 #include <unistd.h>
 
@@ -322,6 +324,10 @@ class ProcMountsTest : public ProcTestBase {
 };
 
 TEST_F(ProcMountsTest, Basic) {
+  // This test assumes the mounts are very specific, so is too brittle to run on Linux.
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP() << "ProcMountsTest::Basic can not be run on Linux, skipping.";
+  }
   EXPECT_THAT(read_mounts(), IsSupersetOf({
                                  "data/system / remote_bundle rw 0 0",
                                  "none /dev tmpfs rw 0 0",
@@ -330,20 +336,28 @@ TEST_F(ProcMountsTest, Basic) {
 }
 
 TEST_F(ProcMountsTest, MountAdded) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+  }
+
   auto before_mounts = read_mounts();
 
-  std::string mp = tmp_ + "/foo";
-  ASSERT_THAT(mkdir(mp.c_str(), 0777), SyscallSucceeds());
-  ASSERT_THAT(mount("testtmp", mp.c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
+  const char dir_template[] = "/foo.XXXXXX";
+  size_t len = tmp_.length() + strlen(dir_template) + 1;
+  auto mp = std::unique_ptr<char[]>(new char[len]);
+  snprintf(mp.get(), len, "%s%s", tmp_.c_str(), dir_template);
+  ASSERT_NE(mkdtemp(mp.get()), nullptr);
+  ASSERT_THAT(chmod(mp.get(), 0777), SyscallSucceeds());
+  ASSERT_THAT(mount("testtmp", mp.get(), "tmpfs", 0, nullptr), SyscallSucceeds());
 
   auto expected_mounts = before_mounts;
-  std::string mount = "testtmp " + mp + " tmpfs rw 0 0";
+  std::string mount = "testtmp " + std::string(mp.get()) + " tmpfs rw 0 0";
   expected_mounts.push_back(mount);
   EXPECT_THAT(read_mounts(), UnorderedElementsAreArray(expected_mounts));
 
   // Clean-up.
-  ASSERT_THAT(umount(mp.c_str()), SyscallSucceeds());
-  ASSERT_THAT(rmdir(mp.c_str()), SyscallSucceeds());
+  ASSERT_THAT(umount(mp.get()), SyscallSucceeds());
+  ASSERT_THAT(rmdir(mp.get()), SyscallSucceeds());
 
   EXPECT_THAT(read_mounts(), UnorderedElementsAreArray(before_mounts));
 }

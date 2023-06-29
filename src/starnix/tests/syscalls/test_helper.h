@@ -4,11 +4,15 @@
 #ifndef SRC_STARNIX_TESTS_SYSCALLS_TEST_HELPER_H_
 #define SRC_STARNIX_TESTS_SYSCALLS_TEST_HELPER_H_
 
+#include <stdint.h>
 #include <unistd.h>
 
 #include <functional>
 #include <optional>
 #include <string_view>
+#include <vector>
+
+#include <gtest/gtest.h>
 
 #include "syscall_matchers.h"
 
@@ -44,20 +48,28 @@ class ForkHelper {
   ~ForkHelper();
 
   // Wait for all children of the current process, and return true if all exited
-  // with a 0 status.
-  bool WaitForChildren();
+  // with a 0 status or with the expected signal.
+  testing::AssertionResult WaitForChildren();
 
   // For the current process and execute the given |action| inside the child,
   // then exit with a status equals to the number of failed expectation and
   // assertion. Return immediately with the pid of the child.
   pid_t RunInForkedProcess(std::function<void()> action);
 
-  // Checks for process termination by the given signal, instead of expecting
+  // If called, checks for process termination by the given signal, instead of expecting
   // the forked process to terminate normally.
   void ExpectSignal(int signum);
 
+  // If called, only waits for the children explicitly forked by the ForkHelper, instead
+  // of waiting for all children.
+  void OnlyWaitForForkedChildren();
+
  private:
+  std::vector<pid_t> child_pids_;
+  bool only_wait_for_child_pids_;
   int death_signum_;
+
+  ::testing::AssertionResult WaitForChildrenInternal(int death_signum);
 };
 
 // Helper class to handle tests that needs to clone processes.
@@ -181,5 +193,18 @@ struct MemoryMapping {
 };
 
 std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_view maps);
+
+namespace test_helper {
+
+// Returns true if running with sysadmin capabilities.
+bool HasSysAdmin();
+
+// Returns true if running with the given capability.
+bool HasCapability(uint32_t cap);
+
+// Returns true if running on Starnix.  This is likely only necessary when there are known bugs.
+bool IsStarnix();
+
+}  // namespace test_helper
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_TEST_HELPER_H_

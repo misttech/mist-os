@@ -205,6 +205,10 @@ constexpr gid_t kNonOwnerGid = 65533;
 class UtimensatTest : public ::testing::Test {
  protected:
   void SetUp() {
+    if (!test_helper::HasSysAdmin()) {
+      GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+    }
+
     char dir_template[] = "/tmp/XXXXXX";
     ASSERT_NE(mkdtemp(dir_template), nullptr)
         << "failed to create test folder: " << std::strerror(errno);
@@ -222,8 +226,12 @@ class UtimensatTest : public ::testing::Test {
   }
 
   void TearDown() {
-    ASSERT_EQ(remove(test_file_.c_str()), 0);
-    ASSERT_EQ(remove(test_folder_.c_str()), 0);
+    if (test_file_.length() != 0) {
+      ASSERT_EQ(remove(test_file_.c_str()), 0);
+    }
+    if (test_folder_.length() != 0) {
+      ASSERT_EQ(remove(test_folder_.c_str()), 0);
+    }
   }
 
   // test folder owned by kOwnerUid, perms 0o777
@@ -266,7 +274,6 @@ bool change_ids(uid_t user, gid_t group) {
 }
 
 TEST_F(UtimensatTest, OwnerCanAlwaysSetTime) {
-  ASSERT_EQ(geteuid(), 0u) << "This test needs to run as root";
   ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);
 
   // File owner can change time to now even without write perms.
@@ -291,7 +298,6 @@ TEST_F(UtimensatTest, OwnerCanAlwaysSetTime) {
 }
 
 TEST_F(UtimensatTest, NonOwnerWithWriteAccessCanOnlySetTimeToNow) {
-  ASSERT_EQ(geteuid(), 0u) << "This test needs to run as root";
   ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);
 
   // Non file owner cannot change time to now without write perms.
@@ -323,7 +329,6 @@ TEST_F(UtimensatTest, NonOwnerWithWriteAccessCanOnlySetTimeToNow) {
 }
 
 TEST_F(UtimensatTest, NonOwnerWithCapabilitiesCanSetTime) {
-  ASSERT_EQ(geteuid(), 0u) << "This test needs to run as root";
   ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);
 
   // Non file owner without write permissions can set the time to now with
@@ -388,8 +393,6 @@ TEST_F(UtimensatTest, NonOwnerWithCapabilitiesCanSetTime) {
 }
 
 TEST_F(UtimensatTest, CanSetOmitTimestampsWithoutPermissions) {
-  ASSERT_EQ(geteuid(), 0u) << "This test needs to run as root";
-
   // Non file owner without write permissions and without the CAP_DAC_OVERRIDE or
   // CAP_FOWNER capability can set the timestamps to UTIME_OMIT.
   ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);

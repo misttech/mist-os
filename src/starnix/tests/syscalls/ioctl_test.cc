@@ -12,6 +12,8 @@
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
+#include "src/starnix/tests/syscalls/test_helper.h"
+
 namespace {
 
 constexpr char kLoopbackIfName[] = "lo";
@@ -41,6 +43,15 @@ class IoctlInvalidTest : public IoctlTest,
 TEST_P(IoctlInvalidTest, InvalidRequest) {
   const auto [req, family, name, data, expected_errno] = GetParam();
 
+  // TODO(fxbug.dev/129749): This test does not work because SIOCGIFADDR with
+  // any family value returns 0.  Need to find out why.
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP() << "IoctlInvalidTests do not work on Linux yet";
+  }
+  if (req == SIOCSIFADDR && !test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "SIOCSIFADDR requires root, skipping...";
+  }
+
   ifreq ifr;
   ifr.ifr_addr = {.sa_family = family}, ifr.ifr_addr.sa_data[0] = data;
   strncpy(ifr.ifr_name, name, IFNAMSIZ);
@@ -57,7 +68,7 @@ INSTANTIATE_TEST_SUITE_P(IoctlInvalidTest, IoctlInvalidTest,
                                  .family = AF_INET,
                                  .name = kUnknownIfName,
                                  .data = 0,
-                                 .expected_errno = ENOENT,
+                                 .expected_errno = test_helper::IsStarnix() ? ENOENT : ENODEV,
                              },
                              IoctlInvalidTestCase{
                                  .req = SIOCGIFADDR,
@@ -109,6 +120,9 @@ void SetIfAddr(fbl::unique_fd& fd, in_addr_t addr) {
 }
 
 TEST_F(IoctlTest, SIOCSIFADDR_Success) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "SIOCSIFADDR requires root, skipping...";
+  }
   ASSERT_NO_FATAL_FAILURE(SetIfAddr(fd, INADDR_ANY));
   ASSERT_NO_FATAL_FAILURE(SetIfAddr(fd, INADDR_LOOPBACK));
 }

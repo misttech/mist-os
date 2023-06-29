@@ -50,6 +50,10 @@ int OpenMainTerminal(int additional_flags = 0) {
 }
 
 TEST(JobControl, BackgroundProcessGroupDoNotUpdateOnDeath) {
+  // Assume starnix always has /dev/ptmx mapped in.
+  if (!test_helper::IsStarnix() && access("/dev/ptmx", F_OK) == -1) {
+    GTEST_SKIP() << "Pseudoterminal not available, skipping...";
+  }
   ForkHelper helper;
 
   IgnoreSignal(SIGTTOU);
@@ -110,7 +114,16 @@ TEST(JobControl, OrphanedProcessGroupsReceivesSignal) {
   });
 }
 
-TEST(Pty, SigWinch) {
+class Pty : public testing::Test {
+  void SetUp() {
+    // Assume starnix always has /dev/ptmx mapped in.
+    if (!test_helper::IsStarnix() && access("/dev/ptmx", F_OK) == -1) {
+      GTEST_SKIP() << "Pseudoterminal not available, skipping...";
+    }
+  }
+};
+
+TEST_F(Pty, SigWinch) {
   ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
@@ -170,7 +183,7 @@ ssize_t FullRead(int fd, char* buf, size_t count) {
   return result;
 }
 
-TEST(Pty, OpenDevTTY) {
+TEST_F(Pty, OpenDevTTY) {
   ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
@@ -195,7 +208,7 @@ TEST(Pty, OpenDevTTY) {
   });
 }
 
-TEST(Pty, ioctl_TCSETSF) {
+TEST_F(Pty, ioctl_TCSETSF) {
   ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
@@ -213,7 +226,7 @@ void FullWrite(int fd, const char* buffer, ssize_t size) {
   ASSERT_EQ(write(fd, buffer, size), size);
 }
 
-TEST(Pty, EndOfFile) {
+TEST_F(Pty, EndOfFile) {
   ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
@@ -259,7 +272,7 @@ TEST(Pty, EndOfFile) {
   });
 }
 
-TEST(Pty, EchoModes) {
+TEST_F(Pty, EchoModes) {
   ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
@@ -305,7 +318,7 @@ TEST(Pty, EchoModes) {
   });
 }
 
-TEST(Pty, SendSignals) {
+TEST_F(Pty, SendSignals) {
   ForkHelper helper;
 
   std::map<int, char> signal_and_control_character;
@@ -369,7 +382,7 @@ TEST(Pty, SendSignals) {
   }
 }
 
-TEST(Pty, CloseMainTerminal) {
+TEST_F(Pty, CloseMainTerminal) {
   ForkHelper helper;
   helper.RunInForkedProcess([&] {
     IgnoreSignal(SIGHUP);
@@ -393,7 +406,7 @@ TEST(Pty, CloseMainTerminal) {
   });
 }
 
-TEST(Pty, CloseReplicaTerminal) {
+TEST_F(Pty, CloseReplicaTerminal) {
   ForkHelper helper;
   helper.RunInForkedProcess([&] {
     // Create a new session here, and associate it with the new terminal.
@@ -418,7 +431,7 @@ TEST(Pty, CloseReplicaTerminal) {
   });
 }
 
-TEST(Pty, DetectReplicaClosing) {
+TEST_F(Pty, DetectReplicaClosing) {
   ForkHelper helper;
   helper.RunInForkedProcess([&] {
     // Create a new session here, and associate it with the new terminal.

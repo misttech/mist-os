@@ -34,7 +34,11 @@ constexpr char kOverlayFsPath[] = "OVERLAYFS_PATH";
 
 class FuseTest : public ::testing::Test {
  public:
-  void SetUp() override {}
+  void SetUp() override {
+    if (!test_helper::HasSysAdmin()) {
+      GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
+    }
+  }
 
   void TearDown() override {
     if (base_dir_) {
@@ -65,10 +69,6 @@ class FuseTest : public ::testing::Test {
   }
 
   testing::AssertionResult Mount() {
-    if (getuid() != 0) {
-      return testing::AssertionFailure()
-             << "Unable to run without CAP_SYS_ADMIN (please run as root)";
-    }
     if (access(GetOverlayFsPath().c_str(), R_OK | X_OK) != 0) {
       return testing::AssertionFailure()
              << "Unable to find fuse binary at: " << GetOverlayFsPath() << "(set OVERLAYFS_PATH)";

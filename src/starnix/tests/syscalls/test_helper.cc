@@ -7,72 +7,95 @@
 #include <sched.h>
 #include <signal.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <time.h>
 
 #include <gtest/gtest.h>
+#include <linux/capability.h>
 
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 
-namespace {
-::testing::AssertionResult WaitForChildrenInternal(int death_signum) {
+::testing::AssertionResult ForkHelper::WaitForChildrenInternal(int death_signum) {
   ::testing::AssertionResult result = ::testing::AssertionSuccess();
-  for (;;) {
+  while (!only_wait_for_child_pids_ || !child_pids_.empty()) {
     int wstatus;
-    if (wait(&wstatus) == -1) {
+    pid_t pid;
+    if ((pid = wait(&wstatus)) == -1) {
       if (errno == EINTR) {
         continue;
       }
       if (errno == ECHILD) {
-        // No more child, reaping is done.
+        // No more children, reaping is done.
         return result;
       }
       // Another error is unexpected.
       result = ::testing::AssertionFailure()
                << "wait error: " << strerror(errno) << "(" << errno << ")";
     }
-    if (death_signum == 0) {
-      if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != 0) {
-        result = ::testing::AssertionFailure()
-                 << "wait_status: WIFEXITED(wstatus) = " << WIFEXITED(wstatus)
-                 << ", WEXITSTATUS(wstatus) = " << WEXITSTATUS(wstatus)
-                 << ", WTERMSIG(wstatus) = " << WTERMSIG(wstatus);
+    bool check_result = !only_wait_for_child_pids_;
+    if (!check_result) {
+      auto it = child_pids_.begin();
+      while (it != child_pids_.end()) {
+        if (*it == pid) {
+          check_result = true;
+          it = child_pids_.erase(it);
+        } else {
+          ++it;
+        }
       }
-    } else {
-      if (!WIFSIGNALED(wstatus) || WTERMSIG(wstatus) != death_signum) {
-        result = ::testing::AssertionFailure()
-                 << "wait_status: WIFSIGNALED(wstatus) = " << WIFSIGNALED(wstatus)
-                 << ", WEXITSTATUS(wstatus) = " << WEXITSTATUS(wstatus)
-                 << ", WTERMSIG(wstatus) = " << WTERMSIG(wstatus);
+    }
+
+    if (check_result) {
+      if (death_signum == 0) {
+        if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != 0) {
+          result = ::testing::AssertionFailure()
+                   << "wait_status: WIFEXITED(wstatus) = " << WIFEXITED(wstatus)
+                   << ", WEXITSTATUS(wstatus) = " << WEXITSTATUS(wstatus)
+                   << ", WTERMSIG(wstatus) = " << WTERMSIG(wstatus);
+        }
+      } else {
+        if (!WIFSIGNALED(wstatus) || WTERMSIG(wstatus) != death_signum) {
+          result = ::testing::AssertionFailure()
+                   << "wait_status: WIFSIGNALED(wstatus) = " << WIFSIGNALED(wstatus)
+                   << ", WEXITSTATUS(wstatus) = " << WEXITSTATUS(wstatus)
+                   << ", WTERMSIG(wstatus) = " << WTERMSIG(wstatus);
+        }
       }
     }
   }
+  return result;
 }
 
-}  // namespace
-
-ForkHelper::ForkHelper() : death_signum_(0) {
+ForkHelper::ForkHelper() : only_wait_for_child_pids_(false), death_signum_(0) {
   // Ensure that all children will ends up being parented to the process that
   // created the helper.
   prctl(PR_SET_CHILD_SUBREAPER, 1);
 }
 
 ForkHelper::~ForkHelper() {
-  // Wait for all remaining children, and ensure non failed.
+  // Wait for all remaining children, and ensure none failed.
   EXPECT_TRUE(WaitForChildrenInternal(death_signum_)) << ": at least a child had a failure";
 }
 
+void ForkHelper::OnlyWaitForForkedChildren() { only_wait_for_child_pids_ = true; }
+
 void ForkHelper::ExpectSignal(int signum) { death_signum_ = signum; }
 
-bool ForkHelper::WaitForChildren() { return WaitForChildrenInternal(death_signum_); }
+testing::AssertionResult ForkHelper::WaitForChildren() {
+  return WaitForChildrenInternal(death_signum_);
+}
 
 pid_t ForkHelper::RunInForkedProcess(std::function<void()> action) {
   pid_t pid = SAFE_SYSCALL(fork());
   if (pid != 0) {
+    child_pids_.push_back(pid);
     return pid;
   }
   action();
@@ -215,3 +238,22 @@ std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_vie
   }
   return std::nullopt;
 }
+
+namespace test_helper {
+
+bool HasCapability(uint32_t cap) {
+  struct __user_cap_header_struct header = {_LINUX_CAPABILITY_VERSION_3, 0};
+  struct __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3] = {};
+  syscall(__NR_capget, &header, &caps);
+
+  return (caps[CAP_TO_INDEX(cap)].effective & CAP_TO_MASK(cap)) != 0;
+}
+
+bool HasSysAdmin() { return HasCapability(CAP_SYS_ADMIN); }
+
+bool IsStarnix() {
+  struct utsname buf;
+  return uname(&buf) == 0 && strcmp(buf.release, "starnix") == 0;
+}
+
+}  // namespace test_helper

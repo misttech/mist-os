@@ -15,6 +15,7 @@
 TEST(AbortTest, Abort) {
   ForkHelper helper;
   helper.ExpectSignal(SIGABRT);
+  helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] { abort(); });
   ASSERT_TRUE(helper.WaitForChildren());
 }
@@ -22,6 +23,7 @@ TEST(AbortTest, Abort) {
 TEST(AbortTest, AbortFromChildThread) {
   ForkHelper helper;
   helper.ExpectSignal(SIGABRT);
+  helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     volatile bool done = false;
     std::thread child_thread([] { abort(); });
