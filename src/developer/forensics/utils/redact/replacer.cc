@@ -264,19 +264,29 @@ constexpr std::string_view kMacPattern{
 
 constexpr re2::LazyRE2 kOui = MakeLazyRE2(R"(^((?:[0-9a-fA-F]{1,2}(?:[\.:-])){3}))");
 
-std::string RedactMac(RedactionIdCache& cache, const std::string& match) {
-  const int id = cache.GetId(match);
-
+std::string GetOui(const std::string& match) {
   std::string oui;
   if (!re2::RE2::PartialMatch(match, *kOui, &oui)) {
     oui = "regex error";
   }
+  return oui;
+}
 
+std::string RedactMac(RedactionIdCache& cache, const std::string& match) {
+  const int id = cache.GetId(match);
+  const std::string oui = GetOui(match);
   return fxl::StringPrintf("%s<REDACTED-MAC: %d>", oui.c_str(), id);
+}
+
+std::string RedactMacNoHash(RedactionIdCache& _cache, const std::string& match) {
+  const std::string oui = GetOui(match);
+  return fxl::StringPrintf("%s<REDACTED-MAC>", oui.c_str());
 }
 
 }  // namespace
 
 Replacer ReplaceMac() { return FunctionBasedReplacer(kMacPattern, RedactMac); }
+
+Replacer ReplaceMacNoHash() { return FunctionBasedReplacer(kMacPattern, RedactMacNoHash); }
 
 }  // namespace forensics

@@ -110,7 +110,7 @@ Redactor::Redactor(const int starting_id, inspect::UintProperty cache_size,
       .Add(ReplaceMac())
       .AddJsonReplacer(ReplaceIPv4())
       .AddJsonReplacer(ReplaceIPv6())
-      .AddJsonReplacer(ReplaceMac())
+      .AddJsonReplacer(ReplaceMacNoHash())
       .AddTextReplacer(kUrlPattern, "<REDACTED-URL>")
       .AddTextReplacer(kEmailPattern, "<REDACTED-EMAIL>")
       .AddTextReplacer(kUuidPattern, "<REDACTED-UUID>")

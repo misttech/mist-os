@@ -38,6 +38,9 @@ Replacer ReplaceIPv6();
 // "REDACTED-MAC:"
 Replacer ReplaceMac();
 
+// Constructs a Replacer that substitutes all instances of MAC addresses with a string like
+// "REDACTED-MAC", which does not include a salted hash of the original address.
+Replacer ReplaceMacNoHash();
 }  // namespace forensics
 
 #endif  // SRC_DEVELOPER_FORENSICS_UTILS_REDACT_REPLACER_H_

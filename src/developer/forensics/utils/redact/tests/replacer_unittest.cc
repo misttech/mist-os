@@ -327,5 +327,13 @@ TEST(MacReplacerTest, ReplaceMac) {
             "MAC address: 00:0a:95:<REDACTED-MAC: 1> 12:34:95:<REDACTED-MAC: 2>");
 }
 
+TEST(MacReplacerTest, ReplaceMacNoHash) {
+  RedactionIdCache cache(inspect::UintProperty{});
+  Replacer replacer = ReplaceMacNoHash();
+  ASSERT_NE(replacer, nullptr);
+
+  std::string text = "MAC address: 00:0a:95:9F:68:16 12:34:95:9F:68:16";
+  EXPECT_EQ(replacer(cache, text), "MAC address: 00:0a:95:<REDACTED-MAC> 12:34:95:<REDACTED-MAC>");
+}
 }  // namespace
 }  // namespace forensics
