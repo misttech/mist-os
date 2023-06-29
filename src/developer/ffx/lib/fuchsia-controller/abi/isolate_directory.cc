@@ -3,6 +3,12 @@
 // found in the LICENSE file.
 #include "isolate_directory.h"
 
+#include <cerrno>
+#include <cstdlib>
+#include <filesystem>
+#include <string>
+#include <system_error>
+
 #include "mod.h"
 
 namespace isolate {
@@ -18,10 +24,37 @@ void IsolateDir_dealloc(IsolateDir *self) {
 int IsolateDir_init(IsolateDir *self, PyObject *args, PyObject *kwds) {  // NOLINT
   static const char *kwlist[] = {"dir", nullptr};
   const char *dir_cstr = nullptr;
-  if (!PyArg_ParseTupleAndKeywords(args, kwds, "s", const_cast<char **>(kwlist), &dir_cstr)) {
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "|z", const_cast<char **>(kwlist), &dir_cstr)) {
     return -1;
   }
-  self->dir = std::filesystem::path(dir_cstr);
+
+  // If the user didn't specify their own directory, randomly generate a temporary one
+  const char *error_format_str = "Error when creating isolate directory %s: %s";
+  if (dir_cstr == nullptr) {
+    std::filesystem::path tmp_dir_path = std::filesystem::temp_directory_path() / "fctemp.XXXXXX";
+
+    // Guarantee the temporary directory is created.
+    // mkdtemp modifies its parameter in-place, so use it to create a
+    // filesystem::path before it goes out of scope
+    std::string tmp_dir_str = tmp_dir_path.string();
+    if (mkdtemp(tmp_dir_str.data()) == nullptr) {
+      const char *error_str = strerror(errno);
+      PyErr_Format(PyExc_IOError, error_format_str, tmp_dir_str.c_str(), error_str);
+      return -1;
+    }
+    self->dir = std::filesystem::path(tmp_dir_str);
+  } else {
+    std::filesystem::path tmp_path = std::filesystem::path(dir_cstr);
+
+    // Guarantee the directory is created.
+    std::error_code err;
+    if (!std::filesystem::create_directory(tmp_path, err)) {
+      PyErr_Format(PyExc_IOError, error_format_str, tmp_path.c_str(), err.message().c_str());
+      return -1;
+    }
+    self->dir = std::move(tmp_path);
+  }
+
   return 0;
 }
 
@@ -31,7 +64,7 @@ PyObject *IsolateDir_directory(IsolateDir *self, PyObject *Py_UNUSED(arg)) {
 
 PyMethodDef IsolateDir_methods[] = {
     {"directory", reinterpret_cast<PyCFunction>(IsolateDir_directory), METH_NOARGS,
-     "Returns a string representing the directory to which this IsolateDir points. It may or may not have been created."},
+     "Returns a string representing the directory to which this IsolateDir points. The IsolateDir will create it upon initialization."},
     {nullptr, nullptr, 0, nullptr}};
 
 DES_MIX PyTypeObject IsolateDirType = {
@@ -43,6 +76,7 @@ DES_MIX PyTypeObject IsolateDirType = {
     .tp_dealloc = reinterpret_cast<destructor>(IsolateDir_dealloc),
     .tp_doc =
         "Fuchsia controller Isolate Directory. Represents an Isolate Directory path to be used by the fuchsia controller Context object. This object cleans up the Isolate Directory (if it exists) once it goes out of scope.",
+    .tp_methods = IsolateDir_methods,
     .tp_init = reinterpret_cast<initproc>(IsolateDir_init),
     .tp_new = PyType_GenericNew,
 };

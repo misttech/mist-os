@@ -12,19 +12,15 @@ from fuchsia_controller_py import Context, IsolateDir
 
 class EndToEnd(unittest.IsolatedAsyncioTestCase):
 
-    @classmethod
-    def setUpClass(self):
-        path = os.getenv("TEST_UNDECLARED_OUTPUTS_DIR")
-        if path:
-            self.isolation_path = os.path.join(path, "isolate")
-        else:
-            tmpdir = tempfile.mkdtemp()
-            self.isolation_path = str(tmpdir)
-
     def _make_ctx(self):
+        isolation_path = None
+        tmp_path = os.getenv("TEST_UNDECLARED_OUTPUTS_DIR")
+        if tmp_path:
+            isolation_path = os.path.join(tmp_path, "isolate")
+
         return Context(
             config={"sdk.root": "."},
-            isolate_dir=IsolateDir(self.isolation_path))
+            isolate_dir=IsolateDir(dir=isolation_path))
 
     async def test_echo_daemon(self):
         ctx = self._make_ctx()

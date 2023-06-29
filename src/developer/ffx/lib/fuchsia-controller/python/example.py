@@ -18,7 +18,7 @@ async def echo():
 
 
 async def target_info_multi_target_isolated():
-    isolate = IsolateDir("/tmp/foo/bar")
+    isolate = IsolateDir()  # Will create a random tmpdir
     ctx = Context(
         config={"sdk.root": "."}, isolate_dir=isolate, target="emu-one")
     ctx2 = Context(
