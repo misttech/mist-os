@@ -11,6 +11,7 @@
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <stdint.h>
+#include <zircon/types.h>
 
 #include <optional>
 #include <string>
@@ -36,7 +37,7 @@ class Directory : public Node {
   ~Directory() override;
 
   // |Node| implementation
-  zx_status_t Lookup(const std::string& name, Node** out_node) const override;
+  zx_status_t Lookup(std::string_view name, Node** out_node) const override;
 
   void Describe(fuchsia::io::NodeInfoDeprecated* out_info) override;
 

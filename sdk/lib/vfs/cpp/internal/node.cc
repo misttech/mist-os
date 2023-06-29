@@ -24,7 +24,7 @@ constexpr fuchsia::io::OpenFlags kCommonAllowedFlags =
 
 namespace internal {
 
-bool IsValidName(const std::string& name) {
+bool IsValidName(std::string_view name) {
   return name != "." && name != ".." && name.length() <= NAME_MAX &&
          name.find('/') == std::string::npos;
 }
@@ -113,7 +113,7 @@ zx_status_t Node::ValidateFlags(fuchsia::io::OpenFlags flags) const {
   return ZX_OK;
 }
 
-zx_status_t Node::Lookup(const std::string& name, Node** out_node) const {
+zx_status_t Node::Lookup(std::string_view name, Node** out_node) const {
   ZX_ASSERT(!IsDirectory());
   return ZX_ERR_NOT_DIR;
 }

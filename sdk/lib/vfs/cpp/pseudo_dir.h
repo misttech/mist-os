@@ -6,9 +6,14 @@
 #define LIB_VFS_CPP_PSEUDO_DIR_H_
 
 #include <lib/vfs/cpp/internal/directory.h>
+#include <lib/vfs/cpp/internal/node.h>
+#include <zircon/compiler.h>
+#include <zircon/types.h>
 
+#include <functional>
 #include <map>
 #include <mutex>
+#include <string_view>
 
 namespace vfs {
 
@@ -74,7 +79,7 @@ class PseudoDir : public vfs::internal::Directory {
   bool IsEmpty() const;
 
   // |Directory| implementation:
-  zx_status_t Lookup(const std::string& name, vfs::internal::Node** out_node) const final;
+  zx_status_t Lookup(std::string_view name, vfs::internal::Node** out_node) const final;
 
   zx_status_t Readdir(uint64_t offset, void* data, uint64_t len, uint64_t* out_offset,
                       uint64_t* out_actual) override;
@@ -128,7 +133,7 @@ class PseudoDir : public vfs::internal::Directory {
   std::map<uint64_t, std::unique_ptr<Entry>> entries_by_id_ __TA_GUARDED(mutex_);
 
   // for lookup
-  std::map<std::string, Entry*> entries_by_name_ __TA_GUARDED(mutex_);
+  std::map<std::string, Entry*, std::less<>> entries_by_name_ __TA_GUARDED(mutex_);
 };
 
 }  // namespace vfs

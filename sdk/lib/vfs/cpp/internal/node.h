@@ -10,10 +10,12 @@
 #include <lib/fidl/cpp/binding.h>
 #include <limits.h>
 
+#include <string_view>
+
 namespace vfs {
 namespace internal {
 
-bool IsValidName(const std::string& name);
+bool IsValidName(std::string_view name);
 
 class Connection;
 
@@ -87,7 +89,7 @@ class Node {
   // |IsDirectory| is false, else throws error with |ZX_ASSERT|.
   //
   // All directory types which are not remote should implement this method.
-  virtual zx_status_t Lookup(const std::string& name, Node** out_node) const;
+  virtual zx_status_t Lookup(std::string_view name, Node** out_node) const;
 
   // Return true if |Node| is a remote node.
   virtual bool IsRemote() const { return false; }

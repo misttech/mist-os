@@ -6,11 +6,16 @@
 #define LIB_VFS_CPP_COMPOSED_SERVICE_DIR_H_
 
 #include <fuchsia/io/cpp/fidl.h>
+#include <lib/vfs/cpp/internal/node.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
 #include <lib/vfs/cpp/service.h>
+#include <zircon/types.h>
 
+#include <functional>
 #include <map>
+#include <memory>
 #include <string>
+#include <string_view>
 
 namespace vfs {
 
@@ -29,7 +34,7 @@ class ComposedServiceDir : public vfs::internal::Directory {
   //
   // |vfs::internal::Node| Implementations:
   //
-  zx_status_t Lookup(const std::string& name, vfs::internal::Node** out_node) const final;
+  zx_status_t Lookup(std::string_view name, vfs::internal::Node** out_node) const final;
 
   zx_status_t GetAttr(fuchsia::io::NodeAttributes* out_attributes) const final;
 
@@ -46,7 +51,7 @@ class ComposedServiceDir : public vfs::internal::Directory {
   // good way in the present context to know whether these service entries
   // actually match an existing service, and since the present object must own
   // these entries, we keep them around until the present object gets deleted.
-  mutable std::map<std::string, std::unique_ptr<vfs::Service>> fallback_services_;
+  mutable std::map<std::string, std::unique_ptr<vfs::Service>, std::less<>> fallback_services_;
 
   // Disallow copy and assignment.
   ComposedServiceDir(const ComposedServiceDir&) = delete;

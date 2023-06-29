@@ -27,7 +27,7 @@ zx_status_t LazyDir::GetAttr(fuchsia::io::NodeAttributes* out_attributes) const 
   return ZX_OK;
 }
 
-zx_status_t LazyDir::Lookup(const std::string& name, Node** out_node) const {
+zx_status_t LazyDir::Lookup(std::string_view name, Node** out_node) const {
   LazyEntryVector entries;
   GetContents(&entries);
   for (const auto& entry : entries) {

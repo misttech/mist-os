@@ -71,7 +71,7 @@ zx_status_t PseudoDir::RemoveEntry(const std::string& name, Node* node) {
   return ZX_OK;
 }
 
-zx_status_t PseudoDir::Lookup(const std::string& name, vfs::internal::Node** out_node) const {
+zx_status_t PseudoDir::Lookup(std::string_view name, vfs::internal::Node** out_node) const {
   std::lock_guard<std::mutex> guard(mutex_);
 
   auto search = entries_by_name_.find(name);

@@ -11,7 +11,7 @@ namespace vfs {
 
 ComposedServiceDir::ComposedServiceDir() : root_(std::make_unique<vfs::PseudoDir>()) {}
 
-ComposedServiceDir::~ComposedServiceDir() {}
+ComposedServiceDir::~ComposedServiceDir() = default;
 
 void ComposedServiceDir::set_fallback(fidl::InterfaceHandle<fuchsia::io::Directory> fallback_dir) {
   fallback_dir_ = fallback_dir.TakeChannel();
@@ -31,7 +31,7 @@ zx_status_t ComposedServiceDir::Readdir(uint64_t offset, void* data, uint64_t le
   return root_->Readdir(offset, data, len, out_offset, out_actual);
 }
 
-zx_status_t ComposedServiceDir::Lookup(const std::string& name, vfs::internal::Node** out) const {
+zx_status_t ComposedServiceDir::Lookup(std::string_view name, vfs::internal::Node** out) const {
   zx_status_t status = root_->Lookup(name, out);
   if (status == ZX_OK) {
     return status;
@@ -47,7 +47,7 @@ zx_status_t ComposedServiceDir::Lookup(const std::string& name, vfs::internal::N
             fdio_service_connect_at(dir->get(), name.c_str(), request.release());
           });
       *out = service.get();
-      fallback_services_[name] = std::move(service);
+      fallback_services_[std::string(name)] = std::move(service);
     }
   } else {
     return ZX_ERR_NOT_FOUND;

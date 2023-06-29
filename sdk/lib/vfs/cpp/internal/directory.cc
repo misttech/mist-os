@@ -26,7 +26,7 @@ void Directory::Describe(fuchsia::io::NodeInfoDeprecated* out_info) {
   out_info->set_directory(fuchsia::io::DirectoryObject());
 }
 
-zx_status_t Directory::Lookup(const std::string& name, Node** out_node) const {
+zx_status_t Directory::Lookup(std::string_view name, Node** out_node) const {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
@@ -129,8 +129,8 @@ zx::result<Directory::LookupPathResult> Directory::LookupPath(std::string_view p
       });
     }
     path = walk_path_result.remaining_path;
-    if (zx_status_t status = current_node->Lookup(
-            std::string(walk_path_result.current_node_name.value()), &current_node);
+    if (zx_status_t status =
+            current_node->Lookup(walk_path_result.current_node_name.value(), &current_node);
         status != ZX_OK) {
       return zx::error(status);
     }

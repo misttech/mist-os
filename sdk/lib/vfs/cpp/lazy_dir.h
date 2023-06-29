@@ -6,6 +6,10 @@
 #define LIB_VFS_CPP_LAZY_DIR_H_
 
 #include <lib/vfs/cpp/internal/directory.h>
+#include <lib/vfs/cpp/internal/node.h>
+#include <zircon/types.h>
+
+#include <string_view>
 
 namespace vfs {
 
@@ -52,7 +56,7 @@ class LazyDir : public vfs::internal::Directory {
   // |Node| implementations:
   zx_status_t GetAttr(fuchsia::io::NodeAttributes* out_attributes) const override;
 
-  zx_status_t Lookup(const std::string& name, Node** out_node) const final;
+  zx_status_t Lookup(std::string_view name, Node** out_node) const final;
 
  protected:
   // Get the contents of the directory in an output vector.
