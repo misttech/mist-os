@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembly_input_bundle.gni")
+import("//build/assembly/generated_image_assembly_config.gni")
 import("//build/assembly/package_manifests_list.gni")
 import("//build/dist/distribution_manifest.gni")
 import("//build/python/python_action.gni")
@@ -16,12 +17,19 @@ import("//build/python/python_action.gni")
 #
 # Parameters:
 #
-#   image_assembly_label [required]
-#     [label] GN label for the image assembly to use as a basis for the "legacy"
-#     assembly input bundle.
-#
 #   bundle_name [optional; default: legacy]
 #     [string] A different name for the bundle, if not the name of the target.
+#
+#   kernel_zbi (optional; default: "//zircon/kernel")
+#     [label] Label of the zircon kernel to use.  This needs to use the `images`
+#     metadata key to provide the `path` and `name` fields (see the
+#     build_api_module("images")` in `//BUILD.gn`).  The default value is most likely
+#     the correct one.  This should only be overridden in special circumstances.
+#
+#   kernel_image_name (optional; default: "kernel")
+#     [string] The image name of the 'kernel_zbi' as seen in images.json. This is used
+#     as an override, that in conjunction with 'kernel_zbi' allows selecting a custom zbi
+#     image as the kernel zbi.
 #
 #   bundles_dir [optional; default: target_out_dir]
 #     [GN file path] path to a dir to use instead of $target_out_dir as the
@@ -45,23 +53,72 @@ import("//build/python/python_action.gni")
 #   core_realm_definition [optional]
 #     [label] The GN label of a `core_realm_definition()` template
 #
+#   non_assembly_fshost_label [optional]
+#     [label] The GN label of a fshost component and config to add to bootfs
+#     when assembly is not generating it.
+#
+#   system_image_deps (optional)
+#     [list of labels] The objects installed in the system image.
+#
+#   supports_blobs [required]
+#     [bool] Whether blobs are supported on this product.
+#
+#   base_packages [required]
+#     [list of labels] The set of base packages.
+#
+#   meta_packages [required]
+#     [list of labels] The set of meta packages.
+#
+#   cache_packages [required]
+#     [list of labels] The set of cache packages.
+#
+#   universe_packages [required]
+#     [list of labels] The set of universe packages.
+#
+#   additional_boot_args [required]
+#     [list of strings] Boot args to pass to the kernel.
+#
+#   bootfs_labels [required]
+#     [list of labels] The set of labels to walk to find bootfs files.
+#
 template("legacy_assembly_input_bundle") {
   assert(
       current_toolchain == default_toolchain,
       "The legacy assembly input bundle can only be created in the default toolchain")
 
+  assert(defined(invoker.supports_blobs), "Need to define supports_blobs")
+  assert(defined(invoker.base_packages), "Need to define base_packages")
+  assert(defined(invoker.meta_packages), "Need to define meta_packages")
+  assert(defined(invoker.cache_packages), "Need to define cache_packages")
+  assert(defined(invoker.universe_packages), "Need to define universe_packages")
+  assert(defined(invoker.additional_boot_args),
+         "Need to define additional_boot_args")
+  assert(defined(invoker.bootfs_labels), "Need to define bootfs_labels")
+
   forward_variables_from(invoker,
                          [
-                           "image_assembly_label",
                            "bundles_dir",
                            "bundle_name",
                            "create_package",
                            "create_package_archive",
                          ])
 
-  assert(defined(image_assembly_label),
-         "The image assembly configuration must be specified for: " +
-             get_label_info(target_name, "label_with_toolchain"))
+  kernel_zbi = "//zircon/kernel"
+  if (defined(invoker.kernel_zbi)) {
+    kernel_zbi = invoker.kernel_zbi
+  }
+
+  kernel_name = "kernel"
+  if (defined(invoker.kernel_image_name)) {
+    kernel_name = invoker.kernel_image_name
+  }
+
+  system_image_deps = []
+  if (defined(invoker.system_image_deps) && invoker.supports_blobs) {
+    system_image_deps += invoker.system_image_deps
+  } else {
+    not_needed(invoker, [ "system_image_deps" ])
+  }
 
   if (!defined(bundles_dir)) {
     bundles_dir = target_out_dir
@@ -71,9 +128,9 @@ template("legacy_assembly_input_bundle") {
     bundle_name = "legacy"
   }
 
-  include_config_data = true
+  _include_config_data = true
   if (defined(invoker.include_config_data)) {
-    include_config_data = invoker.include_config_data
+    _include_config_data = invoker.include_config_data
   }
 
   _base_driver_packages = []
@@ -92,14 +149,12 @@ template("legacy_assembly_input_bundle") {
   }
 
   labels = {
-    # Extract the assembly label's dir and name components:
-    image_assembly_name = get_label_info(image_assembly_label, "name")
-    image_assembly_dir = get_label_info(image_assembly_label, "target_out_dir")
+    image_assembly_config = "${target_name}.generated_image_assembly_config"
 
     # Compute the assembly config and config_data labels that are generated within
     # generated_image_assembly_config()
     assemble_system_config_data =
-        "${image_assembly_label}.config-data_config_package_entries"
+        "${image_assembly_config}.config-data_config_package_entries"
 
     # The AIB itself
     assembly_input_bundle = "$target_name.bundle"
@@ -121,9 +176,8 @@ template("legacy_assembly_input_bundle") {
 
   files = {
     image_assembly_config =
-        "${labels.image_assembly_dir}/${labels.image_assembly_name}.json"
-
-    assemble_system_config_data_entries = "${labels.image_assembly_dir}/${labels.image_assembly_name}.config-data_config_package_entries"
+        "$target_out_dir/${labels.image_assembly_config}.json"
+    assemble_system_config_data_entries = "$target_out_dir/${labels.image_assembly_config}.config-data_config_package_entries"
 
     # Outputs
 
@@ -301,6 +355,63 @@ template("legacy_assembly_input_bundle") {
   create_package = create_package_archive ||
                    (defined(invoker.create_package) && invoker.create_package)
 
+  generated_image_assembly_config(labels.image_assembly_config) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "include_component_id_index",
+                           ])
+
+    kernel_image = kernel_zbi
+    kernel_image_name = kernel_name
+
+    base_packages = []
+    if (invoker.supports_blobs) {
+      base_packages = invoker.base_packages
+      base_packages += invoker.meta_packages
+      cache_packages = invoker.cache_packages
+    } else {
+      not_needed(invoker, [ "meta_packages" ])
+    }
+
+    include_config_data = _include_config_data
+    config_data_packages = invoker.base_packages + invoker.universe_packages +
+                           invoker.cache_packages
+
+    boot_args = invoker.additional_boot_args
+
+    # Search for BootFS packages in these targets.
+    bootfs_package_labels = []
+    if (defined(invoker.bootfs_package_labels)) {
+      bootfs_package_labels += invoker.bootfs_package_labels
+    }
+
+    # Search for BootFS files in these targets.
+    bootfs_labels = invoker.bootfs_labels
+
+    bootfs_labels += [ kernel_image ]
+    if (defined(invoker.non_assembly_fshost_label)) {
+      bootfs_labels += [ invoker.non_assembly_fshost_label ]
+    }
+
+    # Only builds which support blobs need base-resolver.
+    if (invoker.supports_blobs) {
+      bootfs_labels += [ "//src/sys/base-resolver:bootfs" ]
+    }
+
+    extra_base_deps = system_image_deps
+
+    # Search for the Kernel cmdline in the BootFS dependencies.
+    cmdline_deps = invoker.bootfs_labels
+    if (defined(invoker.cmdline_deps)) {
+      cmdline_deps += invoker.cmdline_deps
+    }
+    if (defined(invoker.cmdline)) {
+      cmdline = invoker.cmdline
+    }
+  }
+
   # Run the script that creates the out-of-tree-usable Assembly Input Bundle from
   # an Image Assembly product configuration and the config_data package entries
   # that go with it.
@@ -364,7 +475,7 @@ template("legacy_assembly_input_bundle") {
     deps = [
       ":${labels.base_driver_package_list}",
       ":${labels.driver_package_component_files}",
-      image_assembly_label,
+      ":${labels.image_assembly_config}",
     ]
 
     if (_shell_command_packages != []) {
@@ -398,13 +509,13 @@ template("legacy_assembly_input_bundle") {
       ]
     }
 
-    if (include_config_data) {
+    if (_include_config_data) {
       args += [
         "--config-data-entries",
         rebase_path(files.assemble_system_config_data_entries, root_build_dir),
       ]
       inputs += [ files.assemble_system_config_data_entries ]
-      deps += [ labels.assemble_system_config_data ]
+      deps += [ ":${labels.assemble_system_config_data}" ]
     }
 
     metadata = {

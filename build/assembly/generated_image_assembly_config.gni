@@ -98,11 +98,6 @@ template("generated_image_assembly_config") {
     config_data_packages += invoker.config_data_packages
   }
 
-  _meta_packages = []
-  if (defined(invoker.meta_packages)) {
-    _meta_packages += invoker.meta_packages
-  }
-
   kernel_image_name = invoker.kernel_image_name
 
   # Labels used in this file.
@@ -162,7 +157,8 @@ template("generated_image_assembly_config") {
     component_id_index_dep = [ ":${target_name}.component_id_index_config" ]
     component_id_index_config_data_dep =
         [ ":${target_name}.component_id_index_config-config-data" ]
-    _meta_packages += component_id_index_dep
+  } else {
+    not_needed([ "component_id_index_config_data_dep" ])
   }
 
   include_config_data = true
@@ -179,7 +175,6 @@ template("generated_image_assembly_config") {
       package_name = "config-data"
       deps = config_data_packages + component_id_index_config_data_dep
     }
-    _meta_packages += [ ":${labels.config_data}" ]
   }
 
   bootfs_labels += component_id_index_dep

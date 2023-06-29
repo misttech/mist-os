@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/generated_image_assembly_config.gni")
 import("//build/assembly/legacy_assembly_input_bundle.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/python/python_action.gni")
@@ -123,24 +122,21 @@ template("test_assembly_config") {
     #
     # NOTE: This action should only be performed in the target toolchain
     outdir = "$target_out_dir/outdir"
-    generated_image_assembly_config("image.legacy_image_assembly_config") {
-      testonly = true
-
-      # NOTE: legacy_assembly_input_bundle assumes this file path
-      kernel_image = "//zircon/kernel"
-      kernel_image_name = "kernel"
-      base_packages = base_packages_param
-    }
 
     # NOTE: This action should only be performed in the target toolchain
     legacy_assembly_input_bundle("input_bundle") {
       testonly = true
-
-      # NOTE: this internally generates the above target name and path
-      image_assembly_label = ":image.legacy_image_assembly_config"
       bundles_dir = outdir
       include_config_data = false
       forward_variables_from(invoker, [ "core_realm_definition" ])
+
+      supports_blobs = true
+      base_packages = base_packages_param
+      meta_packages = []
+      cache_packages = []
+      universe_packages = []
+      additional_boot_args = []
+      bootfs_labels = []
     }
 
     # This is an action rather than a host test because enumerating all the inputs to assembly

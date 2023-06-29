@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/compare_json_list.gni")
-import("//build/assembly/generated_image_assembly_config.gni")
 import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
 import("//build/assembly/legacy_assembly_input_bundle.gni")
@@ -318,16 +317,6 @@ template("assembled_system") {
            "must_exist scope has required field cmdline_deps")
   }
 
-  kernel_zbi = "//zircon/kernel"
-  if (defined(invoker.kernel_zbi)) {
-    kernel_zbi = invoker.kernel_zbi
-  }
-
-  kernel_name = "kernel"
-  if (defined(invoker.kernel_image_name)) {
-    kernel_name = invoker.kernel_image_name
-  }
-
   fvm_tool_target = "//src/storage/bin/fvm($host_toolchain)"
   fvm_tool_path = get_label_info(fvm_tool_target, "root_out_dir")
   fvm_tool_path += "/fvm"
@@ -357,8 +346,6 @@ template("assembled_system") {
     meta_packages_group = "${namespace}.meta_packages"
     all_packages_group = "${namespace}.packages"
     legacy_assembly_input_bundle = "${namespace}.legacy_input_bundle"
-    generated_config_for_legacy_bundle =
-        "${namespace}.legacy_image_assembly_config"
     image_assembly_inputs = "${namespace}.image_assembly_inputs"
     images_config = "${namespace}.images_config"
     images_config_matches = "${namespace}.images_config_matches"
@@ -394,8 +381,6 @@ template("assembled_system") {
     }
 
     bazel_legacy_aib = "${namespace}.bazel_legacy_aib"
-    partial_image_assembly_config_for_validations =
-        "${namespace}.validation_image_assembly_config"
     validation_legacy_aib =
         "${namespace}.validation_legacy_assembly_input_bundle"
 
@@ -518,13 +503,6 @@ template("assembled_system") {
     _base_driver_packages = invoker.base_driver_packages
   }
 
-  system_image_deps = []
-  if (defined(invoker.system_image_deps) && _supports_blobs) {
-    system_image_deps += invoker.system_image_deps
-  } else {
-    not_needed(invoker, [ "system_image_deps" ])
-  }
-
   ramdisk_in_zbi = false
   if (defined(invoker.ramdisk_fvm_in_zbi)) {
     ramdisk_in_zbi = invoker.ramdisk_fvm_in_zbi && _supports_blobs
@@ -534,9 +512,9 @@ template("assembled_system") {
         (invoker.ramdisk_in_zbi && _supports_blobs) || ramdisk_in_zbi
   }
 
-  additional_boot_args = []
+  _additional_boot_args = []
   if (defined(invoker.additional_boot_args)) {
-    additional_boot_args = invoker.additional_boot_args
+    _additional_boot_args = invoker.additional_boot_args
   }
 
   use_assembly_fshost =
@@ -616,60 +594,6 @@ template("assembled_system") {
   #######
   # Build the images using the Image Assembler.
   #
-
-  generated_image_assembly_config(labels.generated_config_for_legacy_bundle) {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                             "include_component_id_index",
-                             "include_config_data",
-                           ])
-
-    kernel_image = kernel_zbi
-    kernel_image_name = kernel_name
-
-    base_packages = []
-    if (_supports_blobs) {
-      base_packages = _base_packages
-      base_packages += _meta_packages
-      cache_packages = _cache_packages
-    }
-
-    config_data_packages = _base_packages + _universe_packages + _cache_packages
-
-    boot_args = additional_boot_args
-
-    # Search for BootFS packages in these targets.
-    bootfs_package_labels = []
-    if (defined(invoker.bootfs_package_labels)) {
-      bootfs_package_labels += invoker.bootfs_package_labels
-    }
-
-    # Search for BootFS files in these targets.
-    bootfs_labels = invoker.bootfs_labels
-
-    bootfs_labels += [ kernel_image ]
-    if (!use_assembly_fshost) {
-      bootfs_labels += [ ":${labels.fshost}" ]
-    }
-
-    # Only builds which support blobs need base-resolver.
-    if (_supports_blobs) {
-      bootfs_labels += [ "//src/sys/base-resolver:bootfs" ]
-    }
-
-    extra_base_deps = system_image_deps
-
-    # Search for the Kernel cmdline in the BootFS dependencies.
-    cmdline_deps = invoker.bootfs_labels
-    if (defined(invoker.cmdline_deps)) {
-      cmdline_deps += invoker.cmdline_deps
-    }
-    if (defined(invoker.cmdline)) {
-      cmdline = invoker.cmdline
-    }
-  }
 
   generated_images_config(labels.images_config) {
     forward_variables_from(invoker,
@@ -777,30 +701,28 @@ template("assembled_system") {
   }
 
   if (defined(_must_exist)) {
-    generated_image_assembly_config(
-        labels.partial_image_assembly_config_for_validations) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                               "include_component_id_index",
-                             ])
-      include_config_data = true
-      forward_variables_from(_must_exist, [ "base_packages" ])
-      kernel_image = kernel_zbi
-      kernel_image_name = kernel_name
-      config_data_packages = _must_exist.base_packages + _universe_packages +
-                             _must_exist.cache_packages
-    }
-
     legacy_assembly_input_bundle(labels.validation_legacy_aib) {
       forward_variables_from(invoker,
                              [
                                "testonly",
                                "visibility",
+                               "include_component_id_index",
+                               "kernel_zbi",
+                               "kernel_image_name",
+                               "bootfs_package_labels",
+                               "bootfs_labels",
+                               "system_image_deps",
+                               "cmdline_deps",
+                               "cmdline",
                              ])
-      image_assembly_label =
-          ":${labels.partial_image_assembly_config_for_validations}"
+      include_config_data = true
+      supports_blobs = _supports_blobs
+      base_packages = _must_exist.base_packages
+      meta_packages = []
+      cache_packages = _must_exist.cache_packages
+      universe_packages = _universe_packages
+      additional_boot_args = []
+
       bundle_name = "must_exist"
 
       bundles_dir = files.outdir
@@ -837,15 +759,22 @@ template("assembled_system") {
     check_production_tag = invoker.check_production_tag
   }
 
-  # Create the legacy assembly input bundle for the above-generated image
-  # assembly configuration.
+  # Create the legacy assembly input bundle.
   legacy_assembly_input_bundle(labels.legacy_assembly_input_bundle) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
+                             "include_component_id_index",
+                             "include_config_data",
+                             "kernel_zbi",
+                             "kernel_image_name",
+                             "bootfs_package_labels",
+                             "bootfs_labels",
+                             "system_image_deps",
+                             "cmdline_deps",
+                             "cmdline",
                            ])
-    image_assembly_label = ":${labels.generated_config_for_legacy_bundle}"
     bundles_dir = files.outdir
     include_config_data = _supports_blobs
     create_package = defined(invoker.create_legacy_aib_package) &&
@@ -865,6 +794,18 @@ template("assembled_system") {
     if (include_shell_commands) {
       shell_command_packages =
           _base_packages + _universe_packages + _cache_packages
+    }
+
+    supports_blobs = _supports_blobs
+    base_packages = _base_packages
+    meta_packages = _meta_packages
+    cache_packages = _cache_packages
+    universe_packages = _universe_packages
+    additional_boot_args = _additional_boot_args
+
+    # TODO: move fshost into the legacy bundle template.
+    if (!use_assembly_fshost) {
+      non_assembly_fshost_label = ":${labels.fshost}"
     }
   }
 
@@ -1420,7 +1361,6 @@ template("assembled_system") {
     # public_deps is used, so that the outputs of these dependencies are
     # available to external targets.
     public_deps = [
-      ":${labels.generated_config_for_legacy_bundle}",
       ":${labels.image_assembler}",
       ":${labels.images_config}",
     ]
@@ -1431,10 +1371,7 @@ template("assembled_system") {
       public_deps += [ ":${labels.images_config_matches}" ]
     }
     if (defined(_must_exist)) {
-      public_deps += [
-        ":${labels.partial_image_assembly_config_for_validations}",
-        ":${labels.validation_legacy_aib}",
-      ]
+      public_deps += [ ":${labels.validation_legacy_aib}" ]
     }
 
     metadata = {
