@@ -42,12 +42,12 @@ fn str_to_syn_path(path: &str) -> syn::Path {
     syn::Path { leading_colon: None, segments }
 }
 
-fn permutations_over_type_generics(
-    variants: &[Variant<'_>],
-    type_generics: &[&syn::TypeParam],
-) -> Vec<TestVariation> {
+fn permutations_over_type_generics<'a>(
+    variants: &'a [Variant<'a>],
+    type_generics: &'a [&'a syn::TypeParam],
+) -> impl Iterator<Item = TestVariation> + 'a {
     if type_generics.is_empty() {
-        return vec![TestVariation::default()];
+        return Either::Right(std::iter::once(TestVariation::default()));
     }
 
     let find_implementations = |type_param: &syn::TypeParam| -> Option<&[Implementation]> {
@@ -79,25 +79,23 @@ fn permutations_over_type_generics(
         }
     });
 
-    itertools::Itertools::multi_cartesian_product(piece_iterators)
-        .map(|pieces| {
-            let (mut params, mut generics, mut name_pieces) = (Vec::new(), Vec::new(), vec![""]);
-            for piece in pieces {
-                match piece {
-                    Piece::Instantiated(Implementation { type_name, suffix }) => {
-                        params.push(type_name.clone());
-                        name_pieces.push(*suffix);
-                    }
-                    Piece::PassThroughGeneric(type_param) => {
-                        params.push(type_param.ident.clone().into());
-                        generics.push(type_param.clone());
-                    }
+    Either::Left(itertools::Itertools::multi_cartesian_product(piece_iterators).map(|pieces| {
+        let (mut params, mut generics, mut name_pieces) = (Vec::new(), Vec::new(), vec![""]);
+        for piece in pieces {
+            match piece {
+                Piece::Instantiated(Implementation { type_name, suffix }) => {
+                    params.push(type_name.clone());
+                    name_pieces.push(*suffix);
+                }
+                Piece::PassThroughGeneric(type_param) => {
+                    params.push(type_param.ident.clone().into());
+                    generics.push(type_param.clone());
                 }
             }
-            let suffix = name_pieces.join("_");
-            TestVariation { params, generics, suffix }
-        })
-        .collect()
+        }
+        let suffix = name_pieces.join("_");
+        TestVariation { params, generics, suffix }
+    }))
 }
 
 fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStream {
@@ -255,12 +253,13 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
         .chain(args.iter().cloned())
     };
 
-    let permutations = permutations_over_type_generics(variants, &type_generics);
+    let mut permutations = permutations_over_type_generics(variants, &type_generics).peekable();
+    let first_permutation = permutations.next().expect("at least one permutation");
 
     // If we're not emitting any variants we're aware of, just re-emit the
     // function with its name passed in as the first argument.
-    if permutations.len() == 1 {
-        let TestVariation { params: _, generics, suffix } = &permutations[0];
+    if permutations.peek().is_none() {
+        let TestVariation { params: _, generics, suffix } = first_permutation;
         // Suffix should be empty for single permutation.
         assert_eq!(suffix, "");
         let args = make_args(name.to_string());
@@ -276,25 +275,26 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
         return result;
     }
 
-    let mut impls = Vec::new();
     // Generate the list of test variations we will generate.
     //
-    // The initial variation has no replacements or suffix.
-    for TestVariation { params, generics, suffix } in permutations {
-        // We don't need to add an "_" between the name and the suffix here as the suffix
-        // will start with one.
-        let test_name_str = format!("{}{}", name.to_string(), suffix);
-        let test_name = syn::Ident::new(&test_name_str, Span::call_site());
-        let args = make_args(test_name_str);
+    // Glue the first permutation back on so it gets included in the output.
+    let impls = std::iter::once(first_permutation).chain(permutations).map(
+        |TestVariation { params, generics, suffix }| {
+            // We don't need to add an "_" between the name and the suffix here as the suffix
+            // will start with one.
+            let test_name_str = format!("{}{}", name.to_string(), suffix);
+            let test_name = syn::Ident::new(&test_name_str, Span::call_site());
+            let args = make_args(test_name_str);
 
-        impls.push(quote! {
-            #(#impl_attrs)*
-            #[fuchsia_async::run_singlethreaded(test)]
-            async fn #test_name < #(#generics),* > ( #(#impl_inputs),* ) #output #where_clause {
-                #name :: < #(#params),* > ( #(#args),* ).await
+            quote! {
+                #(#impl_attrs)*
+                #[fuchsia_async::run_singlethreaded(test)]
+                async fn #test_name < #(#generics),* > ( #(#impl_inputs),* ) #output #where_clause {
+                    #name :: < #(#params),* > ( #(#args),* ).await
+                }
             }
-        });
-    }
+        },
+    );
 
     let result = quote! {
         #item
@@ -594,5 +594,6 @@ mod tests {
             ],
             &generics,
         )
+        .collect()
     }
 }
