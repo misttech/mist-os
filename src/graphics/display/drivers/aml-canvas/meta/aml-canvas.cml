@@ -13,6 +13,7 @@
         colocate: "true",
         compat: "driver/aml-canvas.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        default_dispatcher_scheduler_role: "fuchsia.graphics.display.drivers.aml-canvas.device",
         fallback: "false",
     },
     capabilities: [
