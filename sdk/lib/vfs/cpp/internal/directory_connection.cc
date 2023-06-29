@@ -78,8 +78,7 @@ void DirectoryConnection::SetAttr(fuchsia::io::NodeAttributeFlags flags,
 
 void DirectoryConnection::Open(fuchsia::io::OpenFlags flags, fuchsia::io::ModeType mode,
                                std::string path, fidl::InterfaceRequest<fuchsia::io::Node> object) {
-  vn_->Open(flags, this->flags(), mode, path.data(), path.length(), object.TakeChannel(),
-            binding_.dispatcher());
+  vn_->Open(flags, this->flags(), mode, path, object.TakeChannel(), binding_.dispatcher());
 }
 
 void DirectoryConnection::Unlink(std::string name, fuchsia::io::UnlinkOptions options,

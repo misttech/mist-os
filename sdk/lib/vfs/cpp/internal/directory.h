@@ -8,9 +8,13 @@
 
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/vfs/cpp/internal/node.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/result.h>
 #include <stdint.h>
 
+#include <optional>
 #include <string>
+#include <string_view>
 
 namespace vfs {
 
@@ -50,34 +54,36 @@ class Directory : public Node {
   //
   // Called from |fuchsia.io.Directory#Open|.
   void Open(fuchsia::io::OpenFlags open_flags, fuchsia::io::OpenFlags parent_flags,
-            fuchsia::io::ModeType mode, const char* path, size_t path_len, zx::channel request,
+            fuchsia::io::ModeType mode, std::string_view path, zx::channel request,
             async_dispatcher_t* dispatcher);
 
   // Validates passed path
   //
-  // Returns |ZX_ERR_INVALID_ARGS| if path_len is more than |NAME_MAX| or if
+  // Returns |false| if |path| is longer than |NAME_MAX| or if
   // |path| starts with ".." or "/".
-  // Returns |ZX_OK| on valid path.
-  static zx_status_t ValidatePath(const char* path, size_t path_len);
+  // Returns |true| on valid path.
+  static bool ValidatePath(std::string_view path);
 
-  // Walks provided path to find the first node name in |path| and then
-  // sets |out_path| and |out_len| to correct position in |path| beyond current
-  // node name and sets |out_key| to node name.
+  struct WalkPathResult {
+    std::optional<std::string_view> current_node_name;
+    std::string_view remaining_path;
+  };
+
+  // Walks provided path to find the first node name in |path| and returns
+  // remaining path and current node name if not self.
   //
-  // Calls |ValidatePath| and returns |status| on error.
-  // Sets |out_is_self| to true if path is empty or '.' or './'
+  // Calls |ValidatePath| and returns |ZX_ERR_INVALID_ARGS| on failure.
   //
-  // Supports paths like 'a/./b//.'
-  // Supports repetitive '/'
-  // Doesn't support 'a/../a/b'
+  // Supports paths like "a/./b//."
+  // Supports repetitive "/"
+  // Doesn't support "a/../a/b"
   //
   // eg:
-  // path ="a/b/c/d", out_path would be "b/c/d"
-  // path =".", out_path would be ""
-  // path ="./", out_path would be ""
-  // path ="a/b/", out_path would be "b/"
-  static zx_status_t WalkPath(const char* path, size_t path_len, const char** out_path,
-                              size_t* out_len, std::string* out_key, bool* out_is_self);
+  // path ="a/b/c/d", |WalkPathResult::remaining_path| would be "b/c/d"
+  // path =".", |WalkPathResult::remaining_path| would be empty
+  // path ="./", |WalkPathResult::remaining_path| would be empty
+  // path ="a/b/", |WalkPathResult::remaining_path| would be "b/"
+  static zx::result<WalkPathResult> WalkPath(std::string_view path);
 
   // |Node| implementation
   zx_status_t GetAttr(fuchsia::io::NodeAttributes* out_attributes) const override;
@@ -92,20 +98,29 @@ class Directory : public Node {
   fuchsia::io::OpenFlags GetAllowedFlags() const override;
   fuchsia::io::OpenFlags GetProhibitiveFlags() const override;
 
+  struct LookupPathResult {
+    Node& node;
+    std::string_view remaining_path;
+    bool is_dir;
+  };
+
   // Walks |path| until the node corresponding to |path| is found, or a remote
-  // filesystem was encountered during traversal. In the latter case,
-  // this function will return an intermediate node, on which |IsRemote| returns
-  // true, and will set |out_path| and |out_len| to be the remaining path.
+  // filesystem was encountered during traversal. In the latter case, this
+  // function will return an intermediate node, on which |IsRemote| returns
+  // true, and will return the remaining path.
   //
-  // For example: if path is /a/b/c/d/f/g and c is a remote node, it will return
-  // c in |out_node|, "d/f/g" in |out_path| and |out_len|.
+  // For example: if path is "a/b/c/d/f/g" and c is a remote node, it will return
+  // {
+  //   node: c,
+  //   remaining_path: "d/f/g",
+  //   is_dir: false,
+  // }
   //
-  // Sets |out_is_dir| to true if path has '/' or '/.' at the end.
+  // |is_dir| is true if path has '/' or '/.' at the end.
   //
   // Calls |WalkPath| in loop and returns status on error. Returns
   // |ZX_ERR_NOT_DIR| if an intermediate component of |path| is not a directory.
-  zx_status_t LookupPath(const char* path, size_t path_len, bool* out_is_dir, Node** out_node,
-                         const char** out_path, size_t* out_len);
+  zx::result<LookupPathResult> LookupPath(std::string_view path);
 };
 
 }  // namespace internal
