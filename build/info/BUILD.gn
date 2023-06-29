@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/board.gni")
 import("//build/components/fuchsia_package.gni")
@@ -25,6 +26,16 @@ if (current_toolchain == default_toolchain) {
     ]
     script = "gen-latest-commit-date.sh"
     args = rebase_path([ "//integration/" ] + outputs, root_build_dir)
+  }
+
+  resource("minimum_utc_stamp") {
+    sources = [ build_info_files.minimum_utc_stamp ]
+    outputs = [ "config/build_info/minimum_utc_stamp" ]
+    deps = [ ":latest-commit-date" ]
+  }
+
+  bootfs_files_for_assembly("bootfs") {
+    deps = [ ":minimum_utc_stamp" ]
   }
 
   bazel_input_resource("build_info_version") {

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/component/component_id_index.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
@@ -11,6 +12,16 @@ group("tests") {
   testonly = true
 
   deps = [ ":core_proxy_integration_test" ]
+}
+
+resource("config") {
+  visibility = [ ":*" ]
+  sources = [ "config/core.profiles" ]
+  outputs = [ "config/profiles/core.profiles" ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":config" ]
 }
 
 # This index contains component ID entries for components whose source-code

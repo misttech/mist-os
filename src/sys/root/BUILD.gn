@@ -2,8 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components/fuchsia_component.gni")
 
 fuchsia_component("root") {
+  visibility = [ ":*" ]
   manifest = "root.cml"
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":root" ]
 }

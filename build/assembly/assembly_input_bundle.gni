@@ -67,27 +67,6 @@ import("//build/python/python_action.gni")
 #    cause an error like:
 #      "no dependency provides the input <package_name>/bootfs_files.json"
 #
-#  bootfs_files [optional]
-#    [list, scopes] A list of scopes, defining each bootfs_file and the source,
-#    label, and destination required to add it in bootfs using assembly.
-#
-#    Example w/ source-files:
-#      bootfs_files = [
-#        {
-#          source = "gn/path/to/source/file"
-#          destination = "bin/bar"  # path within bootfs
-#        }
-#      ]
-#
-#    Example w/ build-output:
-#      bootfs_files = [
-#        {
-#          label = "//optional/label/creating/source/file"
-#          source = "gn/path/to/source/file"
-#          destination = "bin/bar"  # path within bootfs
-#        }
-#      ]
-#
 #  config_data_labels [optional]
 #    [list, GN labels] A list of GN labels of config_data_for_assembly() targets
 #    to include in the config_data provided by this AIB.
@@ -235,10 +214,8 @@ template("assembly_input_bundle") {
 
     bazel_inputs = "${target_name}_bazel_inputs"
 
-    bootfs_files = "${target_name}.bootfs_files_list"
     config_data = "${target_name}.config_data_list"
     config_data_with_verification = "${target_name}.group_with.config_data"
-    bootfs_files_with_verification = "${target_name}.group_with.bootfs_files"
     kernel_cmdline = "${target_name}.kernel_cmdline"
     shell_commands_list = "${target_name}.shell_commands.list"
     compiled_packages = "${target_name}.compiled_packages"
@@ -276,10 +253,6 @@ template("assembly_input_bundle") {
     # AIBs.
     excluded_files = "${_gen_files}/excluded_files.list"
 
-    # The output path for the generated file which collects bootfs_files from
-    # the invoking scope
-    bootfs_files = "${assembly_input_bundle_dir}.bootfs_files_list"
-
     # The output path for the generated file which collects config_data from
     # the invoking scope
     config_data = "${assembly_input_bundle_dir}.config_data_list"
@@ -311,56 +284,6 @@ template("assembly_input_bundle") {
   creation_deps = []
   if (defined(invoker.deps)) {
     creation_deps += invoker.deps
-  }
-
-  # Splits bootfs_files inputs from the invoker into:
-  # 1) group_with_inputs deps / sources and
-  # 2) generated_file contents
-  if (defined(invoker.bootfs_files)) {
-    bootfs_files_contents = []
-    _bootfs_files_deps = []
-    _bootfs_files_sources = []
-    foreach(definition, invoker.bootfs_files) {
-      assert(defined(definition.source),
-             "bootfs_files definitions must include source")
-      assert(defined(definition.destination),
-             "bootfs_files definitions must include destination")
-      if (defined(definition.label)) {
-        _bootfs_files_deps += [ definition.label ]
-      }
-
-      _bootfs_files_sources += [ definition.source ]
-      bootfs_files_contents += [
-        {
-          source = rebase_path(definition.source, root_build_dir)
-          destination = definition.destination
-        },
-      ]
-    }
-
-    group_with_inputs(labels.bootfs_files_with_verification) {
-      deps = _bootfs_files_deps
-      sources = _bootfs_files_sources
-    }
-
-    generated_file(labels.bootfs_files) {
-      forward_variables_from(invoker, [ "testonly" ])
-      contents = bootfs_files_contents
-      outputs = [ "${files.bootfs_files}" ]
-      output_conversion = "json"
-    }
-
-    creation_deps += [
-      ":${labels.bootfs_files_with_verification}",
-      ":${labels.bootfs_files}",
-    ]
-
-    creation_args += [
-      "--bootfs-files-list",
-      rebase_path(files.bootfs_files, root_build_dir),
-    ]
-
-    creation_inputs += [ files.bootfs_files ]
   }
 
   # Convert the list of config_data_labels into a set of config_data_entry.json
