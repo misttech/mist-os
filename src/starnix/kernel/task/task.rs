@@ -10,7 +10,7 @@ use std::{
     convert::TryFrom,
     ffi::CString,
     fmt,
-    sync::{atomic::Ordering, Arc},
+    sync::{atomic::Ordering, Arc, Weak},
 };
 
 use crate::{
@@ -414,7 +414,7 @@ pub struct Task {
     /// For vfork and clone() with CLONE_VFORK, this is set when the task exits or calls execve().
     /// It allows the calling task to block until the fork has been completed. Only populated
     /// when created with the CLONE_VFORK flag.
-    vfork_event: Option<zx::Event>,
+    vfork_event: Option<Arc<zx::Event>>,
 
     /// Variable that can tell you whether there are currently seccomp
     /// filters without holding a lock
@@ -451,7 +451,7 @@ impl Task {
         abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
         exit_signal: Option<Signal>,
         signal_mask: SigSet,
-        vfork_event: Option<zx::Event>,
+        vfork_event: Option<Arc<zx::Event>>,
         priority: u8,
         uts_ns: UtsNamespaceHandle,
         no_new_privs: bool,
@@ -791,8 +791,11 @@ impl Task {
         };
 
         // Only create the vfork event when the caller requested CLONE_VFORK.
-        let vfork_event =
-            if flags & (CLONE_VFORK as u64) != 0 { Some(zx::Event::create()) } else { None };
+        let vfork_event = if flags & (CLONE_VFORK as u64) != 0 {
+            Some(Arc::new(zx::Event::create()))
+        } else {
+            None
+        };
 
         let child = CurrentTask::new(Self::new(
             pid,
@@ -875,12 +878,13 @@ impl Task {
 
     /// Blocks the caller until the task has exited or executed execve(). This is used to implement
     /// vfork() and clone(... CLONE_VFORK, ...). The task musy have created with CLONE_EXECVE.
-    pub fn wait_for_execve(&self) -> Result<(), Errno> {
-        self.vfork_event
-            .as_ref()
-            .unwrap()
-            .wait_handle(zx::Signals::USER_0, zx::Time::INFINITE)
-            .map_err(|status| from_status_like_fdio!(status))?;
+    pub fn wait_for_execve(&self, task_to_wait: Weak<Task>) -> Result<(), Errno> {
+        let event = task_to_wait.upgrade().and_then(|t| t.vfork_event.clone());
+        if let Some(event) = event {
+            event
+                .wait_handle(zx::Signals::USER_0, zx::Time::INFINITE)
+                .map_err(|status| from_status_like_fdio!(status))?;
+        }
         Ok(())
     }
 

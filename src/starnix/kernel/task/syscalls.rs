@@ -49,12 +49,12 @@ pub fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, 
         new_task.registers.set_thread_pointer_register(args.tls);
     }
 
-    let task_ref = new_task.task.clone(); // Keep reference for later waiting.
+    let task_ref = Arc::downgrade(&new_task.task); // Keep reference for later waiting.
 
     execute_task(new_task, |_| {});
 
     if args.flags & (CLONE_VFORK as u64) != 0 {
-        task_ref.wait_for_execve()?;
+        current_task.wait_for_execve(task_ref)?;
     }
     Ok(tid)
 }
