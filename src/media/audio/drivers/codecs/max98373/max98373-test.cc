@@ -57,12 +57,13 @@ class Max98373Test : public zxtest::Test {
     fidl_servers_loop_.StartThread("fidl-servers");
 
     fake_root_ = MockDevice::FakeRootParent();
+    fake_gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState, fake_gpio::WriteState{.value = 0});
     fidl::ClientEnd codec_reset = fake_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
     ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Max98373Codec>(
         GetI2cClient(), std::move(codec_reset), fake_root_.get()));
     ASSERT_EQ(1,
               fake_gpio_.SyncCall(
-                  &fake_gpio::FakeGpio::GetCurrentWriteValue));  // Reset, set to 0 and then to 1.
+                  &fake_gpio::FakeGpio::GetWriteValue));  // Reset, set to 0 and then to 1.
     auto* child_dev = fake_root_->GetLatestChild();
     auto codec = child_dev->GetDeviceContext<Max98373Codec>();
     zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();

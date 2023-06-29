@@ -15,23 +15,40 @@ namespace fake_gpio {
 // Contains information specific to when a GPIO has been configured for
 // output.
 struct WriteState {
-  // Values that the GPIO has been set to output in chronological order.
-  std::vector<uint8_t> values;
+  // Value that the GPIO has been set to output.
+  uint8_t value;
+
+  bool operator==(const WriteState& other) const;
 };
 
 // Contains information specific to when a GPIO has been configured for input.
 struct ReadState {
   fuchsia_hardware_gpio::GpioFlags flags;
+
+  bool operator==(const ReadState& other) const;
 };
 
 // Contains information specific to when a GPIO has been configured to perform
 // an alternative function.
 struct AltFunctionState {
   uint64_t function;
+
+  bool operator==(const AltFunctionState& other) const;
 };
 
 // Represents every possible state of a GPIO.
 using State = std::variant<WriteState, ReadState, AltFunctionState>;
+
+template <typename T>
+bool operator==(const T& state1, const State& state2) {
+  const T* alternative = std::get_if<T>(&state2);
+  return alternative != nullptr && state1 == *alternative;
+}
+
+template <typename T>
+bool operator==(const State& state1, const T& state2) {
+  return state2 == state1;
+}
 
 class FakeGpio;
 
@@ -58,14 +75,9 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   // isn't `AltFunction.`
   uint64_t GetAltFunction() const;
 
-  // Get the write values set by `ConfigOut` and `Write` in chronological
-  // order. Does not included values written before the gpio was last
-  // configured to output. Will fail if the current state isn't `Write`.
-  std::vector<uint8_t> GetWriteValues() const;
-
-  // Get the current value being written by the gpio. Will fail if the current
-  // state isn't `Write`.
-  uint8_t GetCurrentWriteValue() const;
+  // Get the value being written by the gpio. Will fail if the current state
+  // isn't `Write`.
+  uint8_t GetWriteValue() const;
 
   // Get the read flags set by `ConfigIn`. Will fail if the current state isn't
   // `Read`.
@@ -80,17 +92,16 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   // Set the current state to `state`.
   void SetCurrentState(State state);
 
+  // Return the states the gpio has been set to in chronological order.
+  std::vector<State> GetStateLog();
+
   // Serve the gpio FIDL protocol on the current dispatcher and return a client
   // end that can communicate with the server.
   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> Connect();
 
  private:
-  // If the current state isn't `Write` then make it so. Then return the
-  // current state which should be `Write`.
-  WriteState& EnsureCurrentStateIsWrite();
-
   // Contains the states that the gpio has been set to in chronological order.
-  std::vector<State> states_;
+  std::vector<State> state_log_;
 
   // Callback that provides the value to respond to `Read` requests with.
   ReadCallback read_callback_;

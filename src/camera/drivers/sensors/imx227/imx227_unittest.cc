@@ -224,24 +224,24 @@ class Imx227DeviceTest : public zxtest::Test {
     dut_.emplace(fake_parent_.get(), std::move(clk24_client.value()),
                  std::move(gpio_vana_enable_client), std::move(gpio_vdig_enable_client),
                  std::move(gpio_cam_rst_client));
-    ASSERT_EQ(0, mock_gpio_vana_enable_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
-    ASSERT_EQ(0, mock_gpio_vdig_enable_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
-    ASSERT_EQ(1, mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
+    ASSERT_EQ(0, mock_gpio_vana_enable_.SyncCall(&fake_gpio::FakeGpio::GetWriteValue));
+    ASSERT_EQ(0, mock_gpio_vdig_enable_.SyncCall(&fake_gpio::FakeGpio::GetWriteValue));
+    ASSERT_EQ(1, mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::GetWriteValue));
     fake_parent_->AddProtocol(ZX_PROTOCOL_CAMERA_SENSOR2, dut().proto()->ops, &dut_);
     dut().ExpectCameraSensor2Init();
     ASSERT_OK(dut().CameraSensor2Init());
     ASSERT_TRUE(mock_clk24_.SyncCall(&FakeClockServer::enabled));
-    ASSERT_EQ(1, mock_gpio_vana_enable_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
-    ASSERT_EQ(1, mock_gpio_vdig_enable_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
-    ASSERT_EQ(0, mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
+    ASSERT_EQ(1, mock_gpio_vana_enable_.SyncCall(&fake_gpio::FakeGpio::GetWriteValue));
+    ASSERT_EQ(1, mock_gpio_vdig_enable_.SyncCall(&fake_gpio::FakeGpio::GetWriteValue));
+    ASSERT_EQ(0, mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::GetWriteValue));
   }
 
   void TearDown() override {
     dut().ExpectDeInit();
     ASSERT_OK(dut().CameraSensor2DeInit());
-    ASSERT_EQ(0, mock_gpio_vana_enable_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
-    ASSERT_EQ(0, mock_gpio_vdig_enable_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
-    ASSERT_EQ(1, mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::GetCurrentWriteValue));
+    ASSERT_EQ(0, mock_gpio_vana_enable_.SyncCall(&fake_gpio::FakeGpio::GetWriteValue));
+    ASSERT_EQ(0, mock_gpio_vdig_enable_.SyncCall(&fake_gpio::FakeGpio::GetWriteValue));
+    ASSERT_EQ(1, mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::GetWriteValue));
     ASSERT_FALSE(mock_clk24_.SyncCall(&FakeClockServer::enabled));
     ASSERT_NO_FATAL_FAILURE(dut().VerifyAll());
   }
@@ -282,10 +282,10 @@ TEST_F(Imx227DeviceTest, Sanity) {}
 
 TEST_F(Imx227DeviceTest, ResetCycleOnAndOff) {
   dut().CycleReset();
-  auto write_values = mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::GetWriteValues);
-  ASSERT_TRUE(write_values.size() >= 2);
-  ASSERT_EQ(1, write_values[write_values.size() - 2]);
-  ASSERT_EQ(0, write_values[write_values.size() - 1]);
+  std::vector states = mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+  ASSERT_GE(states.size(), 2);
+  ASSERT_EQ(fake_gpio::WriteState{.value = 1}, states[states.size() - 2]);
+  ASSERT_EQ(fake_gpio::WriteState{.value = 0}, states[states.size() - 1]);
 }
 
 TEST_F(Imx227DeviceTest, GetSensorId) {

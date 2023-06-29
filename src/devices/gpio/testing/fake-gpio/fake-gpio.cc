@@ -10,6 +10,14 @@
 
 namespace fake_gpio {
 
+bool WriteState::operator==(const WriteState& other) const { return value == other.value; }
+
+bool ReadState::operator==(const ReadState& other) const { return flags == other.flags; }
+
+bool AltFunctionState::operator==(const AltFunctionState& other) const {
+  return function == other.function;
+}
+
 zx::result<uint8_t> DefaultReadCallback(FakeGpio& gpio) { return zx::error(ZX_ERR_NOT_SUPPORTED); }
 
 FakeGpio::FakeGpio() : read_callback_(DefaultReadCallback) {
@@ -32,34 +40,38 @@ void FakeGpio::GetInterrupt(GetInterruptRequestView request,
 
 void FakeGpio::SetAltFunction(SetAltFunctionRequestView request,
                               SetAltFunctionCompleter::Sync& completer) {
-  states_.emplace_back(AltFunctionState{.function = request->function});
+  state_log_.emplace_back(AltFunctionState{.function = request->function});
   completer.ReplySuccess();
 }
 
 void FakeGpio::ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) {
-  if (states_.empty() || !std::holds_alternative<ReadState>(states_.back())) {
-    states_.emplace_back(ReadState{.flags = request->flags});
+  if (state_log_.empty() || !std::holds_alternative<ReadState>(state_log_.back())) {
+    state_log_.emplace_back(ReadState{.flags = request->flags});
   } else {
-    auto& state = std::get<ReadState>(states_.back());
+    auto& state = std::get<ReadState>(state_log_.back());
     state.flags = request->flags;
   }
   completer.ReplySuccess();
 }
 
 void FakeGpio::ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) {
-  auto& state = EnsureCurrentStateIsWrite();
-  state.values.emplace_back(request->initial_value);
+  state_log_.emplace_back(WriteState{.value = request->initial_value});
   completer.ReplySuccess();
 }
 
 void FakeGpio::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
-  auto& state = EnsureCurrentStateIsWrite();
-  state.values.emplace_back(request->value);
+  // Gpio must be configured to output in order to be written to.
+  if (state_log_.empty() || !std::holds_alternative<WriteState>(state_log_.back())) {
+    completer.ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
+
+  state_log_.emplace_back(WriteState{.value = request->value});
   completer.ReplySuccess();
 }
 
 void FakeGpio::Read(ReadCompleter::Sync& completer) {
-  ZX_ASSERT(std::holds_alternative<ReadState>(states_.back()));
+  ZX_ASSERT(std::holds_alternative<ReadState>(state_log_.back()));
   auto response = read_callback_(*this);
   if (response.is_ok()) {
     completer.ReplySuccess(response.value());
@@ -69,23 +81,18 @@ void FakeGpio::Read(ReadCompleter::Sync& completer) {
 }
 
 uint64_t FakeGpio::GetAltFunction() const {
-  const auto& state = std::get<AltFunctionState>(states_.back());
+  const auto& state = std::get<AltFunctionState>(state_log_.back());
   return state.function;
 }
 
-std::vector<uint8_t> FakeGpio::GetWriteValues() const {
-  const auto& state = std::get<WriteState>(states_.back());
-  return state.values;
-}
-
-uint8_t FakeGpio::GetCurrentWriteValue() const {
-  const auto& state = std::get<WriteState>(states_.back());
-  ZX_ASSERT(!state.values.empty());
-  return state.values.back();
+uint8_t FakeGpio::GetWriteValue() const {
+  ZX_ASSERT(!state_log_.empty());
+  const auto& state = std::get<WriteState>(state_log_.back());
+  return state.value;
 }
 
 fuchsia_hardware_gpio::GpioFlags FakeGpio::GetReadFlags() const {
-  const auto& state = std::get<ReadState>(states_.back());
+  const auto& state = std::get<ReadState>(state_log_.back());
   return state.flags;
 }
 
@@ -97,7 +104,9 @@ void FakeGpio::SetReadCallback(ReadCallback read_callback) {
   read_callback_ = std::move(read_callback);
 }
 
-void FakeGpio::SetCurrentState(State state) { states_.push_back(std::move(state)); }
+void FakeGpio::SetCurrentState(State state) { state_log_.push_back(std::move(state)); }
+
+std::vector<State> FakeGpio::GetStateLog() { return state_log_; }
 
 fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> FakeGpio::Connect() {
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_gpio::Gpio>();
@@ -105,13 +114,6 @@ fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> FakeGpio::Connect() {
   bindings_.AddBinding(async_get_default_dispatcher(), std::move(endpoints->server), this,
                        fidl::kIgnoreBindingClosure);
   return std::move(endpoints->client);
-}
-
-WriteState& FakeGpio::EnsureCurrentStateIsWrite() {
-  if (states_.empty() || !std::holds_alternative<WriteState>(states_.back())) {
-    states_.emplace_back(WriteState());
-  }
-  return std::get<WriteState>(states_.back());
 }
 
 }  // namespace fake_gpio
