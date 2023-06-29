@@ -19,7 +19,7 @@ use crate::{
 };
 use anyhow::{format_err, Error};
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use std::sync::Arc;
+use std::{os::unix::thread::JoinHandleExt, sync::Arc};
 
 extern "C" {
     /// The function which enters restricted mode. This function never technically returns, instead
@@ -52,6 +52,10 @@ extern "C" {
 
     /// Sets the process handle used to create new threads, for the current thread.
     fn thrd_set_zx_process(handle: zx::sys::zx_handle_t) -> zx::sys::zx_handle_t;
+
+    // Gets the thread handle underlying a specific thread.
+    // In C the 'thread' parameter is thrd_t which on Fuchsia is the same as pthread_t.
+    fn thrd_get_zx_handle(thread: u64) -> zx::sys::zx_handle_t;
 
     /// breakpoint_for_module_changes is a single breakpoint instruction that is used to notify
     /// the debugger about the module changes.
@@ -169,13 +173,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
     set_zx_name(&fuchsia_runtime::thread_self(), current_task.command().as_bytes());
     set_current_task_info(current_task);
 
-    // The task does not yet have a thread associated with it, so associate it with this thread.
-    let task = current_task.task.clone();
-    {
-        let mut thread = current_task.thread.write();
-        *thread = Some(fuchsia_runtime::thread_self().duplicate(zx::Rights::SAME_RIGHTS).unwrap());
-    }
-
     // This is the pointer that is passed to `restricted_enter`.
     let restricted_return_ptr = restricted_return as *const ();
 
@@ -269,7 +266,8 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                 current_task.registers =
                     zx::sys::zx_thread_state_general_regs_t::from(&restricted_exception.state)
                         .into();
-                let exception_result = task.process_exception(&restricted_exception.exception);
+                let exception_result =
+                    current_task.process_exception(&restricted_exception.exception);
                 process_completed_exception(current_task, exception_result);
             }
             zx::sys::ZX_RESTRICTED_REASON_KICK => {
@@ -336,9 +334,13 @@ where
     let process_handle = current_task.thread_group.process.raw_handle();
     let old_process_handle = unsafe { thrd_set_zx_process(process_handle) };
 
+    let task = current_task.task.clone();
+    // Hold a lock on the task's thread slot until we have a chance to initialize it.
+    let mut task_thread_guard = task.thread.write();
+
     // Spawn the process' thread. Note, this closure ends up executing in the process referred to by
     // `process_handle`.
-    std::thread::spawn(move || {
+    let join_handle = std::thread::spawn(move || {
         let run_result = match run_task(&mut current_task) {
             Err(error) => {
                 log_warn!("Died unexpectedly from {:?}! treating as SIGKILL", error);
@@ -353,6 +355,12 @@ where
         current_task.signal_vfork();
         task_complete(run_result);
     });
+
+    // Set the task's thread handle
+    let pthread = join_handle.as_pthread_t();
+    let raw_thread_handle =
+        unsafe { zx::Unowned::<'_, zx::Thread>::from_raw_handle(thrd_get_zx_handle(pthread)) };
+    *task_thread_guard = Some(raw_thread_handle.duplicate(zx::Rights::SAME_RIGHTS).unwrap());
 
     // Reset the process handle used to create threads.
     unsafe {
