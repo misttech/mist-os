@@ -255,6 +255,9 @@ fn extract_blob_contents(assembly_manifest: &AssemblyManifest) -> Option<&Blobfs
             Image::Fxfs { contents, .. } => {
                 return Some(contents);
             }
+            Image::FxfsSparse { contents, .. } => {
+                return Some(contents);
+            }
             _ => {}
         }
     }

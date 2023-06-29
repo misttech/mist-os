@@ -40,7 +40,7 @@ template("bad_signature_update") {
 
     # Calculated on local build from 2022-02-08. See equivalent
     # access_ota_blob_as_executable rule for details.
-    fvm_truncate_to_length = 57818014
+    fvm_truncate_to_length = 57819136
   }
 
   # System assembly for system version to OTA from package server.

@@ -12,14 +12,24 @@ use assembly_manifest::BlobfsContents;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::HashMap;
 
-/// Constructs an Fxfs image.  Returns the image path and the blob contents in the image.
+pub struct ConstructedFxfs {
+    /// The path to the raw Fxfs image, which can be mounted and used directly.
+    pub image_path: Utf8PathBuf,
+    /// The path to the Fxfs image in the Android Sparse format, which can be used for flashing and
+    /// paving.
+    pub sparse_image_path: Utf8PathBuf,
+    /// A description of all blob contents in the Fxfs images.
+    pub contents: BlobfsContents,
+}
+
+/// Constructs an Fxfs image containing all requested base packages.
 pub async fn construct_fxfs(
     outdir: impl AsRef<Utf8Path>,
     gendir: impl AsRef<Utf8Path>,
     image_config: &ImageAssemblyConfig,
     base_package: &BasePackage,
     fxfs_config: &Fxfs,
-) -> Result<(Utf8PathBuf, BlobfsContents)> {
+) -> Result<ConstructedFxfs> {
     let mut contents = BlobfsContents::default();
     let mut fxfs_builder = FxfsBuilder::new();
     if let Some(size) = fxfs_config.size_bytes {
@@ -38,9 +48,12 @@ pub async fn construct_fxfs(
     fxfs_builder.add_package_from_path(&base_package.manifest_path)?;
 
     // Build the fxfs and store the merkle to size map.
-    let fxfs_path = outdir.as_ref().join("fxfs.blk");
-    let blobs_json_path =
-        fxfs_builder.build(gendir, &fxfs_path).await.context("Failed to build the Fxfs image")?;
+    let image_path = outdir.as_ref().join("fxfs.blk");
+    let sparse_image_path = outdir.as_ref().join("fxfs.sparse.blk");
+    let blobs_json_path = fxfs_builder
+        .build(gendir, &image_path, Some(&sparse_image_path))
+        .await
+        .context("Failed to build the Fxfs image")?;
     let merkle_size_map = assembly_fxfs::read_blobs_json(blobs_json_path)
         .map(|blobs_json| {
             blobs_json
@@ -56,12 +69,12 @@ pub async fn construct_fxfs(
         contents.add_cache_package(package_manifest_path, &merkle_size_map)?;
     }
     contents.add_base_package(&base_package.manifest_path, &merkle_size_map)?;
-    Ok((fxfs_path, contents))
+    Ok(ConstructedFxfs { image_path, sparse_image_path, contents })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::construct_fxfs;
+    use super::{construct_fxfs, ConstructedFxfs};
     use crate::base_package::construct_base_package;
     use assembly_config_schema::ImageAssemblyConfig;
     use assembly_images_config::Fxfs;
@@ -155,13 +168,14 @@ mod tests {
 
         let size_byteses = vec![None, Some(32 * 1024 * 1024)];
         for size_bytes in size_byteses {
-            let (image_path, blobs) =
+            let ConstructedFxfs { image_path, sparse_image_path, contents: blobs } =
                 construct_fxfs(dir, dir, &image_config, &base_package, &Fxfs { size_bytes })
                     .await
                     .unwrap();
 
             // Ensure something was created.
             assert!(image_path.exists());
+            assert!(sparse_image_path.exists());
             if let Some(size) = size_bytes {
                 assert_eq!(size, std::fs::metadata(image_path).unwrap().len());
             }
