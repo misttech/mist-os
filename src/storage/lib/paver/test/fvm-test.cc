@@ -6,6 +6,7 @@
 
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/driver-integration-test/fixture.h>
+#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/zx/result.h>
@@ -219,7 +220,11 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
   }
 
   std::array<uint8_t, fvm::kGuidSize> blobfs_guid = GUID_BLOB_VALUE;
-  ASSERT_OK(paver::WipeAllFvmPartitionsWithGuid(fvm_part2, blobfs_guid.data()));
+
+  // TODO(http://fxbug.dev/112484): Remove this as it relies on multiplexing.
+  fdio_cpp::UnownedFdioCaller fvm_caller(fvm_part2);
+  ASSERT_OK(paver::WipeAllFvmPartitionsWithGuid(fvm_caller.borrow_as<fuchsia_device::Controller>(),
+                                                blobfs_guid.data()));
 
   // Check we can still open the first ramdisk's blobfs:
   {

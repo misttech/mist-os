@@ -56,27 +56,6 @@ using fuchsia_hardware_block_volume::wire::VolumeManagerInfo;
 // TODO(aarongreen): Replace this with a value supplied by ulib/zxcrypt.
 constexpr size_t kZxcryptExtraSlices = 1;
 
-// TODO(http://fxbug.dev/112484): Remove this as it relies on multiplexing.
-// Looks up the topological path of a device.
-// |buf| is the buffer the path will be written to.  |buf_len| is the total
-// capcity of the buffer, including space for a null byte.
-// Upon success, |buf| will contain the null-terminated topological path.
-zx_status_t GetTopoPathFromFd(const fbl::unique_fd& fd, char* buf, size_t buf_len) {
-  fdio_cpp::UnownedFdioCaller caller(fd.get());
-  auto resp = fidl::WireCall(caller.borrow_as<fuchsia_device::Controller>())->GetTopologicalPath();
-  if (!resp.ok()) {
-    return resp.status();
-  }
-  if (resp->is_error()) {
-    return resp->error_value();
-  }
-
-  auto& response = *resp->value();
-  strncpy(buf, response.path.data(), std::min(buf_len, response.path.size()));
-  buf[response.path.size()] = '\0';
-  return ZX_OK;
-}
-
 zx::result<std::string> GetTopoPath(fidl::UnownedClientEnd<fuchsia_device::Controller> controller) {
   fidl::Result result = fidl::Call(controller)->GetTopologicalPath();
   if (result.is_error()) {
@@ -94,15 +73,13 @@ zx::result<std::string> GetTopoPath(fidl::UnownedClientEnd<fuchsia_device::Contr
 // FVM, not, for example, a GPT or MBR.
 //
 // |out| is true if |fd| is a VPartition, else false.
-zx_status_t FvmIsVirtualPartition(const fbl::unique_fd& fd, bool* out) {
-  char path[PATH_MAX];
-  zx_status_t status = GetTopoPathFromFd(fd, path, sizeof(path));
-  if (status != ZX_OK) {
-    return ZX_ERR_IO;
+zx::result<bool> FvmIsVirtualPartition(
+    fidl::UnownedClientEnd<fuchsia_device::Controller> controller) {
+  zx::result path = GetTopoPath(controller);
+  if (path.is_error()) {
+    return path.take_error();
   }
-
-  *out = strstr(path, "fvm") != nullptr;
-  return ZX_OK;
+  return zx::ok(path.value().find("fvm") != std::string::npos);
 }
 
 // Describes the state of a partition actively being written
@@ -396,24 +373,24 @@ zx::result<zxcrypt::VolumeManager> ZxcryptCreate(PartitionInfo* part) {
   return zx::ok(std::move(zxcrypt_manager));
 }
 
-// Returns |ZX_OK| if |partition_fd| is a child of |fvm_fd|.
-zx_status_t FvmPartitionIsChild(const fbl::unique_fd& fvm_fd, const fbl::unique_fd& partition_fd) {
-  char fvm_path[PATH_MAX];
-  char part_path[PATH_MAX];
-  if (zx_status_t status = GetTopoPathFromFd(fvm_fd, fvm_path, sizeof(fvm_path)); status != ZX_OK) {
-    ERROR("Couldn't get topological path of FVM\n");
-    return status;
+zx::result<bool> FvmPartitionIsChild(fidl::UnownedClientEnd<fuchsia_device::Controller> partition,
+                                     fidl::UnownedClientEnd<fuchsia_device::Controller> fvm) {
+  zx::result fvm_path = GetTopoPath(fvm);
+  if (fvm_path.is_error()) {
+    ERROR("Couldn't get topological path of FVM: %s\n", fvm_path.status_string());
+    return fvm_path.take_error();
   }
-  if (zx_status_t status = GetTopoPathFromFd(partition_fd, part_path, sizeof(part_path));
-      status != ZX_OK) {
-    ERROR("Couldn't get topological path of partition\n");
-    return status;
+  zx::result partition_path = GetTopoPath(partition);
+  if (partition_path.is_error()) {
+    ERROR("Couldn't get topological path of partition: %s\n", partition_path.status_string());
+    return partition_path.take_error();
   }
-  if (strncmp(fvm_path, part_path, strlen(fvm_path)) != 0) {
-    ERROR("Partition does not exist within FVM\n");
-    return ZX_ERR_BAD_STATE;
+  if (*fvm_path != *partition_path) {
+    ERROR("Partition does not exist within FVM: partition='%s' fvm='%s'\n", partition_path->c_str(),
+          fvm_path->c_str());
+    return zx::ok(false);
   }
-  return ZX_OK;
+  return zx::ok(true);
 }
 
 void RecommendWipe(const char* problem) {
@@ -443,7 +420,11 @@ zx_status_t PreProcessPartitions(const fbl::unique_fd& fvm_fd,
       return ZX_ERR_IO;
     }
 
-    zx_status_t status = WipeAllFvmPartitionsWithGuid(fvm_fd, parts[p].pd->type);
+    // TODO(http://fxbug.dev/112484): Remove this as it relies on multiplexing.
+    fdio_cpp::UnownedFdioCaller fvm_caller(fvm_fd);
+
+    zx_status_t status = WipeAllFvmPartitionsWithGuid(
+        fvm_caller.borrow_as<fuchsia_device::Controller>(), parts[p].pd->type);
     if (status != ZX_OK) {
       ERROR("Failure wiping old partitions matching this GUID\n");
       return status;
@@ -624,37 +605,44 @@ struct FvmPartition {
 
 // Deletes all partitions within the FVM with a type GUID matching |type_guid|
 // until there are none left.
-zx_status_t WipeAllFvmPartitionsWithGuid(const fbl::unique_fd& fvm_fd, const uint8_t type_guid[]) {
-  char fvm_topo_path[PATH_MAX] = {0};
-  if (zx_status_t status = GetTopoPathFromFd(fvm_fd, fvm_topo_path, sizeof(fvm_topo_path));
-      status != ZX_OK) {
-    ERROR("Couldn't get topological path of FVM!\n");
-    return status;
+zx_status_t WipeAllFvmPartitionsWithGuid(fidl::UnownedClientEnd<fuchsia_device::Controller> fvm,
+                                         const uint8_t type_guid[]) {
+  zx::result fvm_topo_path = GetTopoPath(fvm);
+  if (fvm_topo_path.is_error()) {
+    ERROR("Couldn't get topological path of FVM! %s\n", fvm_topo_path.status_string());
+    return fvm_topo_path.error_value();
   }
 
   fs_management::PartitionMatcher matcher{
       .type_guids = {uuid::Uuid(&type_guid[0])},
-      .parent_device = fvm_topo_path,
+      .parent_device = fvm_topo_path->c_str(),
   };
   for (;;) {
-    zx::result old_part_or = fs_management::OpenPartition(matcher, false, nullptr);
-    if (old_part_or.is_error()) {
-      if (old_part_or.error_value() == ZX_ERR_NOT_FOUND) {
+    zx::result old_partition = fs_management::OpenPartition(matcher, /* wait=*/false);
+    if (old_partition.is_error()) {
+      if (old_partition.error_value() == ZX_ERR_NOT_FOUND) {
         return ZX_OK;
       }
-      return old_part_or.error_value();
+      return old_partition.error_value();
     }
-    fbl::unique_fd old_part = std::move(old_part_or.value());
-    bool is_vpartition;
-    if (FvmIsVirtualPartition(old_part, &is_vpartition) != ZX_OK) {
-      ERROR("Couldn't confirm old vpartition type\n");
+    zx::result is_vpartition = FvmIsVirtualPartition(*old_partition);
+    if (is_vpartition.is_error()) {
+      ERROR("Couldn't confirm old vpartition type: %s\n", is_vpartition.status_string());
       return ZX_ERR_IO;
     }
-    if (FvmPartitionIsChild(fvm_fd, old_part) != ZX_OK) {
-      RecommendWipe("Streaming a partition type which also exists outside the target FVM");
-      return ZX_ERR_BAD_STATE;
+
+    if (zx::result result = FvmPartitionIsChild(fvm, *old_partition); result.is_ok()) {
+      if (!result.value()) {
+        RecommendWipe("Streaming a partition type which also exists outside the target FVM");
+        return ZX_ERR_BAD_STATE;
+      }
+    } else {
+      std::string error = std::string("Failed to check if partition type is a child of the FVM: ") +
+                          result.status_string();
+      RecommendWipe(error.c_str());
+      return result.error_value();
     }
-    if (!is_vpartition) {
+    if (!is_vpartition.value()) {
       RecommendWipe("Streaming a partition type which also exists in a GPT");
       return ZX_ERR_BAD_STATE;
     }
@@ -662,8 +650,17 @@ zx_status_t WipeAllFvmPartitionsWithGuid(const fbl::unique_fd& fvm_fd, const uin
     // We're paving a partition that already exists within the FVM: let's
     // destroy it before we pave anew.
 
-    fdio_cpp::UnownedFdioCaller partition_connection(old_part.get());
-    auto result = fidl::WireCall(partition_connection.borrow_as<volume::Volume>())->Destroy();
+    zx::result volume_endpoints = fidl::CreateEndpoints<volume::Volume>();
+    if (volume_endpoints.is_error()) {
+      return volume_endpoints.error_value();
+    }
+    auto& [volume, volume_server] = volume_endpoints.value();
+    if (fidl::OneWayError status =
+            fidl::WireCall(*old_partition)->ConnectToDeviceFidl(volume_server.TakeChannel());
+        !status.ok()) {
+      return status.status();
+    }
+    fidl::WireResult result = fidl::WireCall(volume)->Destroy();
     zx_status_t status = result.ok() ? result.value().status : result.status();
     if (status != ZX_OK) {
       ERROR("Couldn't destroy partition: %s\n", zx_status_get_string(status));

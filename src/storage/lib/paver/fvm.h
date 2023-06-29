@@ -65,7 +65,8 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
 zx_status_t FvmUnbind(const fbl::unique_fd& devfs_root, const char* device);
 
 // Exposed for unit testing only.
-zx_status_t WipeAllFvmPartitionsWithGuid(const fbl::unique_fd& fvm_fd, const uint8_t type_guid[]);
+zx_status_t WipeAllFvmPartitionsWithGuid(fidl::UnownedClientEnd<fuchsia_device::Controller> fvm,
+                                         const uint8_t type_guid[]);
 
 }  // namespace paver
 
