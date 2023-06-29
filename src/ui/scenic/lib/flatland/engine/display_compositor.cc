@@ -634,7 +634,8 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
     }
 
     if (display_engine_data.vmo_count == 0) {
-      FX_LOGS(WARNING) << "No VMOs were created when creating display.";
+      FX_LOGS(WARNING) << "No VMOs were created when creating display " << render_data.display_id
+                       << ".";
       return false;
     }
     const uint32_t curr_vmo = display_engine_data.curr_vmo;
@@ -659,7 +660,7 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
       if (status != ZX_OK) {
         FX_DCHECK(status == ZX_ERR_TIMED_OUT) << "unexpected status: " << status;
         FX_LOGS(ERROR)
-            << "flatland::DisplayCompositor::RenderFrame rendering into in-use backbuffer";
+            << "flatland::DisplayCompositor::PerformGpuComposition rendering into in-use backbuffer";
       }
     }
 
@@ -718,10 +719,10 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
   return true;
 }
 
-void DisplayCompositor::RenderFrame(const uint64_t frame_number, const zx::time presentation_time,
-                                    const std::vector<RenderData>& render_data_list,
-                                    std::vector<zx::event> release_fences,
-                                    scheduling::FramePresentedCallback callback) {
+DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
+    const uint64_t frame_number, const zx::time presentation_time,
+    const std::vector<RenderData>& render_data_list, std::vector<zx::event> release_fences,
+    scheduling::FramePresentedCallback callback, RenderFrameTestArgs test_args) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::RenderFrame");
   std::scoped_lock lock(lock_);
@@ -730,7 +731,8 @@ void DisplayCompositor::RenderFrame(const uint64_t frame_number, const zx::time 
   // don't need to, because this requires a round-trip to the display coordinator.
   // Note: SetRenderDatasOnDisplay() failing indicates hardware failure to do display composition.
   const bool fallback_to_gpu_composition =
-      !enable_display_composition_ || !SetRenderDatasOnDisplay(render_data_list) || !CheckConfig();
+      !enable_display_composition_ || test_args.force_gpu_composition ||
+      !SetRenderDatasOnDisplay(render_data_list) || !CheckConfig();
 
   if (fallback_to_gpu_composition) {
     // Discard only if we have attempted to SetRenderDatasOnDisplay() and have an unapplied config.
@@ -741,7 +743,7 @@ void DisplayCompositor::RenderFrame(const uint64_t frame_number, const zx::time 
 
     if (!PerformGpuComposition(frame_number, presentation_time, render_data_list,
                                std::move(release_fences), std::move(callback))) {
-      return;
+      return RenderFrameResult::kFailure;
     }
   } else {
     // CC was successfully applied to the config so we update the state machine.
@@ -764,6 +766,9 @@ void DisplayCompositor::RenderFrame(const uint64_t frame_number, const zx::time 
   // version of ApplyConfig2(), which latter proved to be infeasible for some drivers to implement.
   const auto& config_stamp = ApplyConfig();
   pending_apply_configs_.push_back({.config_stamp = config_stamp, .frame_number = frame_number});
+
+  return fallback_to_gpu_composition ? RenderFrameResult::kGpuComposition
+                                     : RenderFrameResult::kDirectToDisplay;
 }
 
 bool DisplayCompositor::SetRenderDatasOnDisplay(const std::vector<RenderData>& render_data_list) {
