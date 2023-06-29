@@ -60,10 +60,10 @@ rustc_test("driver") {
   inputs = [ "src/test_private_key.pem" ]
 }
 
-fuchsia_component("omaha-client-test-root") {
+fuchsia_test_component("omaha-client-test-root") {
   component_name = "test_root"
-  testonly = true
   manifest = "meta/test_root.cml"
+  test_type = "system"
 }
 
 fuchsia_component("omaha-client-test-driver") {

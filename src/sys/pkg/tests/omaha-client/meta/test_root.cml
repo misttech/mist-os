@@ -2,12 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "//src/connectivity/network/meta/isolated-network.shard.cml",
-
-        // Depends on root ssl certificate which is a system capability.
-        "sys/testing/system-test.shard.cml",
-    ],
+    include: [ "//src/connectivity/network/meta/isolated-network.shard.cml" ],
     children: [
         {
             name: "test_driver",

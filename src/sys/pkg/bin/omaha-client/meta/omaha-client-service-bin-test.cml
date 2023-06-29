@@ -4,9 +4,6 @@
 {
     include: [
         "//src/connectivity/network/meta/isolated-network.shard.cml",
-
-        // Depends on config_data which is a system capability.
-        "sys/testing/system-test.shard.cml",
         "syslog/offer.shard.cml",
     ],
     children: [

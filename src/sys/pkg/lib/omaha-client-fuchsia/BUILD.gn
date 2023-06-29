@@ -64,6 +64,7 @@ fuchsia_unittest_package("omaha-client-fuchsia-tests") {
     "//src/sys/pkg/bin/fake-channel-control:fake-channel-control",
     "//src/sys/stash:stash2_v2",
   ]
+  test_type = "system"
 }
 
 group("tests") {

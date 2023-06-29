@@ -95,11 +95,13 @@ rustc_test("bin_test") {
   sources = [ "src/integration_test.rs" ]
 }
 
-fuchsia_component("system-update-configurator-integration-test-cmp") {
-  testonly = true
+fuchsia_test_component("system-update-configurator-integration-test-cmp") {
   component_name = "system-update-configurator-integration-test"
   manifest = "meta/system-update-configurator-integration-test.cml"
   deps = [ ":bin_test" ]
+
+  # Depends on config_data which is a system capability.
+  test_type = "system"
 }
 
 fuchsia_component("tee-manager-test-cmp") {

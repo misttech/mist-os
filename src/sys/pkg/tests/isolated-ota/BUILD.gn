@@ -44,6 +44,9 @@ fuchsia_test_component("isolated-ota-integration-test") {
   testonly = true
   manifest = "meta/isolated-ota-integration-test.cml"
   deps = [ ":driver" ]
+
+  # Depends on root ssl certificate which is currently a system capability.
+  test_type = "system"
 }
 
 fuchsia_test_package("isolated-ota-integration-tests") {
