@@ -54,7 +54,10 @@ fuchsia_unittest_package("memory_sampler_tests") {
 
 group("tests") {
   testonly = true
-  deps = [ ":memory_sampler_tests" ]
+  deps = [
+    ":memory_sampler_tests",
+    "instrumentation/tests:memory_sampler_instrumentation_tests",
+  ]
 }
 
 core_shard("core_shard") {
