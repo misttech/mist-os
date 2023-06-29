@@ -6,10 +6,18 @@ use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use process_builder::{elf_load, elf_parse};
 use std::{
     ffi::{CStr, CString},
+    mem::size_of,
     sync::Arc,
 };
 
-use crate::{fs::FileHandle, logging::*, mm::*, task::*, types::*, vmex_resource::VMEX_RESOURCE};
+use crate::{
+    fs::FileHandle,
+    logging::*,
+    mm::{vmo::round_up_to_system_page_size, *},
+    task::*,
+    types::*,
+    vmex_resource::VMEX_RESOURCE,
+};
 
 #[derive(Debug)]
 struct StackResult {
@@ -20,6 +28,22 @@ struct StackResult {
     argv_end: UserAddress,
     environ_start: UserAddress,
     environ_end: UserAddress,
+}
+
+const RANDOM_SEED_BYTES: usize = 16;
+
+fn get_initial_stack_size(
+    path: &CStr,
+    argv: &Vec<CString>,
+    environ: &Vec<CString>,
+    auxv: &Vec<(u32, u64)>,
+) -> usize {
+    argv.iter().map(|x| x.as_bytes_with_nul().len()).sum::<usize>()
+        + environ.iter().map(|x| x.as_bytes_with_nul().len()).sum::<usize>()
+        + path.to_bytes_with_nul().len()
+        + RANDOM_SEED_BYTES
+        + (argv.len() + 1 + environ.len() + 1) * size_of::<*const u8>()
+        + auxv.len() * 2 * size_of::<u64>()
 }
 
 fn populate_initial_stack(
@@ -57,7 +81,7 @@ fn populate_initial_stack(
     let execfn_addr = stack_pointer;
     write_stack(path.to_bytes_with_nul(), execfn_addr)?;
 
-    let mut random_seed = [0; 16];
+    let mut random_seed = [0; RANDOM_SEED_BYTES];
     zx::cprng_draw(&mut random_seed);
     stack_pointer -= random_seed.len();
     let random_seed_addr = stack_pointer;
@@ -382,26 +406,6 @@ pub fn load_executable(
         entry_elf.headers.file_header().entry.wrapping_add(entry_elf.vaddr_bias),
     );
 
-    // TODO(tbodt): implement MAP_GROWSDOWN and then reset this to 1 page. The current value of
-    // this is based on adding 0x1000 each time a segfault appears.
-    let stack_size: usize = 0xf0000;
-    let stack_vmo = Arc::new(zx::Vmo::create(stack_size as u64).map_err(|_| errno!(ENOMEM))?);
-    stack_vmo
-        .as_ref()
-        .set_name(CStr::from_bytes_with_nul(b"[stack]\0").unwrap())
-        .map_err(impossible_error)?;
-    let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
-    let stack_base = current_task.mm.map(
-        DesiredAddress::Any,
-        Arc::clone(&stack_vmo),
-        0,
-        stack_size,
-        prot_flags,
-        MappingOptions::empty(),
-        MappingName::Stack,
-    )?;
-    let stack = stack_base + (stack_size - 8);
-
     let vdso_base = if let Some(vdso_vmo) = &current_task.kernel().vdso.vmo {
         let vmo_size = vdso_vmo.get_size().map_err(|_| errno!(EINVAL))?;
         let prot_flags = ProtectionFlags::READ | ProtectionFlags::EXEC;
@@ -431,7 +435,6 @@ pub fn load_executable(
 
     let auxv = {
         let creds = current_task.creds();
-
         vec![
             (AT_UID, creds.uid as u64),
             (AT_EUID, creds.euid as u64),
@@ -451,6 +454,31 @@ pub fn load_executable(
             (AT_SECURE, 0),
         ]
     };
+
+    // TODO(tbodt): implement MAP_GROWSDOWN and then reset this to 1 page. The current value of
+    // this is based on adding 0x1000 each time a segfault appears.
+    let stack_size: usize = round_up_to_system_page_size(
+        get_initial_stack_size(original_path, &resolved_elf.argv, &resolved_elf.environ, &auxv)
+            + 0xf0000,
+    )
+    .expect("stack is too big");
+    let stack_vmo = Arc::new(zx::Vmo::create(stack_size as u64).map_err(|_| errno!(ENOMEM))?);
+    stack_vmo
+        .as_ref()
+        .set_name(CStr::from_bytes_with_nul(b"[stack]\0").unwrap())
+        .map_err(impossible_error)?;
+    let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
+    let stack_base = current_task.mm.map(
+        DesiredAddress::Any,
+        Arc::clone(&stack_vmo),
+        0,
+        stack_size,
+        prot_flags,
+        MappingOptions::empty(),
+        MappingName::Stack,
+    )?;
+    let stack = stack_base + (stack_size - 8);
+
     let stack = populate_initial_stack(
         &stack_vmo,
         original_path,

@@ -1215,7 +1215,6 @@
                 "testsf_s6",
                 "tgkill02",
                 "tgkill03",
-                "thp01",
                 "thp02",
                 "thp03",
                 "thp04",
@@ -1439,9 +1438,6 @@
                 "fs_fill",
                 "timerfd_settime02",
                 "sigrelse01",
-
-                // Panics the kernel.
-                "thp01",
 
                 // Tests reach unexpected Abort
                 "clock_gettime01",
