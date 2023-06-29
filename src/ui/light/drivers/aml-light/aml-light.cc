@@ -50,10 +50,14 @@ zx_status_t LightDevice::SetSimpleValue(bool value) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  zx_status_t status = ZX_OK;
-  if ((status = gpio_.Write(value)) != ZX_OK) {
-    zxlogf(ERROR, "GPIO write failed");
-    return status;
+  fidl::WireResult result = gpio_->Write(value);
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to gpio: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to write to gpio: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
 
   value_ = value;
@@ -235,10 +239,13 @@ zx_status_t AmlLight::Init() {
     auto* config = &configs.value()[i];
     char* name = names.value()[i].name;
 
-    ddk::GpioProtocolClient gpio(fragments[count].device);
-    if (!gpio.is_valid()) {
-      zxlogf(ERROR, "could not get gpio protocol: %d", status);
-      return status;
+    const auto& gpio_fragment_name = fragments[count].name;
+    zx::result gpio = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+        parent(), gpio_fragment_name);
+    if (gpio.is_error()) {
+      zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", gpio_fragment_name,
+             gpio.status_string());
+      return gpio.status_value();
     }
     count++;
 
@@ -252,9 +259,9 @@ zx_status_t AmlLight::Init() {
       fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm(std::move(client_end.value()));
 
       count++;
-      lights_.emplace_back(name, gpio, std::move(pwm), pwm_period);
+      lights_.emplace_back(name, std::move(gpio.value()), std::move(pwm), pwm_period);
     } else {
-      lights_.emplace_back(name, gpio, std::nullopt, pwm_period);
+      lights_.emplace_back(name, std::move(gpio.value()), std::nullopt, pwm_period);
     }
 
     if ((status = lights_.back().Init(config->init_on)) != ZX_OK) {

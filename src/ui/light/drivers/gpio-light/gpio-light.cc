@@ -61,12 +61,21 @@ void GpioLight::GetCurrentSimpleValue(GetCurrentSimpleValueRequestView request,
     return;
   }
 
-  uint8_t value;
-  if (gpios_[request->index].Read(&value) != ZX_OK) {
+  fidl::WireResult result = gpios_[request->index]->Read();
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send Read request to gpio %u: %s", request->index,
+           result.status_string());
     completer.ReplyError(fuchsia_hardware_light::wire::LightError::kFailed);
-  } else {
-    completer.ReplySuccess(value);
+    return;
   }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to read gpio %u: %s", request->index,
+           zx_status_get_string(result->error_value()));
+    completer.ReplyError(fuchsia_hardware_light::wire::LightError::kFailed);
+    return;
+  }
+
+  completer.ReplySuccess(result.value()->value);
 }
 
 void GpioLight::SetSimpleValue(SetSimpleValueRequestView request,
@@ -76,11 +85,21 @@ void GpioLight::SetSimpleValue(SetSimpleValueRequestView request,
     return;
   }
 
-  if (gpios_[request->index].Write(request->value) != ZX_OK) {
+  fidl::WireResult result = gpios_[request->index]->Write(request->value);
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to gpio %u: %s", request->index,
+           result.status_string());
     completer.ReplyError(fuchsia_hardware_light::wire::LightError::kFailed);
-  } else {
-    completer.ReplySuccess();
+    return;
   }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to write to gpio %u: %s", request->index,
+           zx_status_get_string(result->error_value()));
+    completer.ReplyError(fuchsia_hardware_light::wire::LightError::kFailed);
+    return;
+  }
+
+  completer.ReplySuccess();
 }
 
 void GpioLight::GetCurrentBrightnessValue(GetCurrentBrightnessValueRequestView request,
@@ -147,22 +166,27 @@ zx_status_t GpioLight::Init() {
   }
 
   fbl::AllocChecker ac;
-  auto* gpios = new (&ac) ddk::GpioProtocolClient[gpio_count_];
+  auto* gpios = new (&ac) fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>[gpio_count_];
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
   gpios_.reset(gpios, gpio_count_);
 
   for (uint32_t i = 0; i < gpio_count_; i++) {
-    auto* gpio = &gpios_[i];
-    auto status = device_get_protocol(fragments[i + 1].device, ZX_PROTOCOL_GPIO, gpio);
-    if (status != ZX_OK) {
-      return status;
+    const auto& gpio_fragment_name = fragments[i + 1].name;
+    zx::result gpio_client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+        parent(), gpio_fragment_name);
+    if (gpio_client.is_error()) {
+      zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", gpio_fragment_name,
+             gpio_client.status_string());
+      return gpio_client.status_value();
     }
-    status = gpio->ConfigOut(0);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "gpio-light: ConfigOut failed for gpio %u", i);
-      return status;
+    gpios_[i].Bind(std::move(gpio_client.value()));
+    fidl::WireResult result = gpios_[i]->ConfigOut(0);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to configure gpio %s to output: %s", gpio_fragment_name,
+             result.status_string());
+      return result.status();
     }
   }
 

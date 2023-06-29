@@ -5,8 +5,8 @@
 #ifndef SRC_UI_LIGHT_DRIVERS_GPIO_LIGHT_GPIO_LIGHT_H_
 #define SRC_UI_LIGHT_DRIVERS_GPIO_LIGHT_GPIO_LIGHT_H_
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.light/cpp/wire.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <threads.h>
 
 #include <ddktl/device.h>
@@ -84,7 +84,7 @@ class GpioLight : public GpioLightType, public ddk::EmptyProtocol<ZX_PROTOCOL_LI
     char name[kNameLength];
   };
 
-  fbl::Array<ddk::GpioProtocolClient> gpios_;
+  fbl::Array<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpios_;
   std::vector<name_t> names_;
   uint32_t gpio_count_;
 };

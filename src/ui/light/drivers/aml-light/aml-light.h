@@ -5,9 +5,9 @@
 #ifndef SRC_UI_LIGHT_DRIVERS_AML_LIGHT_AML_LIGHT_H_
 #define SRC_UI_LIGHT_DRIVERS_AML_LIGHT_AML_LIGHT_H_
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.light/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <threads.h>
 
@@ -19,7 +19,6 @@
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/array.h>
 #include <soc/aml-common/aml-pwm-regs.h>
-
 namespace aml_light {
 
 using fuchsia_hardware_light::Light;
@@ -32,10 +31,13 @@ using AmlLightType = ddk::Device<AmlLight, ddk::Messageable<Light>::Mixin>;
 
 class LightDevice {
  public:
-  LightDevice(std::string name, ddk::GpioProtocolClient gpio,
+  LightDevice(std::string name, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio,
               std::optional<fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>> pwm,
               zx::duration pwm_period)
-      : name_(std::move(name)), gpio_(gpio), pwm_(std::move(pwm)), pwm_period_(pwm_period) {}
+      : name_(std::move(name)),
+        gpio_(std::move(gpio)),
+        pwm_(std::move(pwm)),
+        pwm_period_(pwm_period) {}
 
   zx_status_t Init(bool init_on);
 
@@ -50,7 +52,7 @@ class LightDevice {
 
  private:
   std::string name_;
-  ddk::GpioProtocolClient gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_;
   std::optional<fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>> pwm_;
 
   double value_ = 0;

@@ -35,7 +35,7 @@ fuchsia_driver("aml-light-driver") {
       [ "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_wire" ]
   deps = [
     ":aml_light_bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_cpp_wire",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
@@ -64,12 +64,12 @@ test("aml-light-test") {
   ]
   deps = [
     ":aml_light_bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp_mock",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_wire",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/lib/amlogic",
     "//src/devices/testing/no_ddk",
     "//src/lib/ddk",

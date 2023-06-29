@@ -128,14 +128,15 @@ zx_status_t Astro::LightInit() {
   }
 
   auto amber_led_gpio_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_s905d2::GPIOAO_PIN_ID_PIN_11),
   };
 
   auto amber_led_gpio_properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                         bind_fuchsia_hardware_gpio::FUNCTION_GPIO_AMBER_LED),
   };
