@@ -273,12 +273,6 @@ group("default-images") {
       ]
     }
 
-    # Size checkers and elf_sizes.json are implemented in Bazel directly, so we
-    # don't need to include GN targets.
-    if (size_checker_input != {
-        }) {
-      deps += [ "size_checker:run_product_size_checker" ]
-    }
     if (!bootfs_only) {
       if (!use_bringup_assembly) {
         deps += [ ":record_filesystem_sizes" ]
@@ -300,9 +294,19 @@ group("default-images") {
 
   if (size_checker_input != {
       }) {
-    # Size checks only make sense when use_bringup_assembly is false, since
-    # they require system images in addition to the ZBI.
-    deps += [ "size_checker:size_report.json" ]
+    if (use_bazel_images_only) {
+      deps += [
+        "${bazel_product_bundle_target}_product_size_checker",
+        "${bazel_product_bundle_target}_size_report",
+      ]
+    } else {
+      # Size checks only make sense when use_bringup_assembly is false, since
+      # they require system images in addition to the ZBI.
+      deps += [
+        "size_checker:run_product_size_checker",
+        "size_checker:size_report.json",
+      ]
+    }
   }
 
   if (enable_netboot) {
