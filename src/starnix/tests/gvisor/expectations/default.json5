@@ -664,11 +664,16 @@
                 "NetdeviceTest.InterfaceFlags",
 
                 // socket_netlink_route_test
-                "NetlinkRouteTest.GetLinkDump",
+                // These fail because Netlink `Done` message are malformed:
+                // TODO(https://github.com/rust-netlink/netlink-packet-core/issues/11):
+                // Expect pass once fixed in-tree.
                 "NetlinkRouteTest.AddAndRemoveAddr",
+                "NetlinkRouteTest.GetAddrDump",
+                "NetlinkRouteTest.GetLinkByIndex",
+                "NetlinkRouteTest.GetLinkByName",
+                "NetlinkRouteTest.GetLinkDump",
                 "NetlinkRouteTest.GetRouteDump",
-                "NetlinkRouteTest.RecvmsgTrunc",
-                "NetlinkRouteTest.RecvmsgTruncPeek",
+                "NetlinkRouteTest.SpliceFromPipe",
 
                 // socket_netlink_uevent
                 "NetlinkUeventTest.AttachFilter",
@@ -851,21 +856,28 @@
                 "Inotify.ReadWithTooSmallBufferFails",
                 "Inotify.BlockingReadOnInotifyFd",
                 "Inotify.EpollNoDeadlock",
-                "NetlinkRouteTest.MsgHdrMsgUnsuppType",
-                "NetlinkRouteTest.ControlMessageIgnored",
-                "NetlinkRouteTest.GetAddrDump",
-                "NetlinkRouteTest.RecvmsgTrunc",
+
+                // This test hangs because Netlink sockets do not support the
+                // "MSG_PEEK" flag on reads.
                 "NetlinkRouteTest.RecvmsgTruncPeek",
-                "NetlinkRouteTest.GetLinkByIndexNotFound",
-                "NetlinkRouteTest.GetLinkByNameNotFound",
-                "NetlinkRouteTest.RemoveLinkByIndexNotFound",
-                "NetlinkRouteTest.RemoveLinkByNameNotFound",
+
+                // This test hangs because Netlink sockets do not ignore control
+                // messages, and instead discard them as malformed.
+                "NetlinkRouteTest.ControlMessageIgnored",
+
+                // This test hangs because "RTM_F_LOOKUP_TABLE" is not supported.
                 "NetlinkRouteTest.GetRouteRequest",
-                "NetlinkRouteTest.GetLinkByIndex",
-                "NetlinkRouteTest.GetLinkByName",
+
+                // This test hangs because sending a request of unsupported type
+                // should result in receiving a Netlink error message. The
+                // current implementation returns an error to the write without
+                // putting an error in the socket's recv buffer.
+                "NetlinkRouteTest.MsgHdrMsgUnsuppType",
+
+                // These tests hang because "RTM_DELLINK" is not supported.
+                "NetlinkRouteTest.RemoveLinkByNameNotFound",
                 "NetlinkRouteTest.RemoveLoopbackByName",
                 "NetlinkRouteTest.RemoveLoopbackByIndex",
-                "NetlinkRouteTest.SpliceFromPipe",
 
                 // These tests assume 2+ Inotify events are returned and crashes otherwise.
                 "Inotify.MoveGeneratesEvents",
@@ -901,8 +913,6 @@
                 "SigtimedwaitTest.NullTimeoutReturnsEINTR",
                 "AddressFamily/SendFileTest.SendMultiple/*",
                 "AddressFamily/SendFileTest.Shutdown/*",
-                "NetlinkRouteTest.LookupAll",
-                "NetlinkRouteTest.MsgHdrMsgTrunc",
                 "BindToDeviceTest/BindToDeviceDistributionTest.Tcp/*",
                 "BindToDeviceTest/BindToDeviceDistributionTest.Udp/*",
                 "BlockingTCPSockets/BlockingStreamSocketPairTest.SendMsgTooLarge/*",
