@@ -9,10 +9,12 @@ executable("tests_bin") {
   output_name = "memory_sampler_instrumentation_tests"
 
   sources = [
+    "poisson_sampler_tests.cc",
     "recorder_tests.cc",
     "scoped_reentrancy_guard_tests.cc",
   ]
   deps = [
+    "..:poisson_sampler",
     "..:recorder",
     "..:scoped_reentrancy_guard",
     "//sdk/fidl/fuchsia.memory.sampler:fuchsia.memory.sampler_cpp",

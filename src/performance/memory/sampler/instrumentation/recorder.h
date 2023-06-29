@@ -8,8 +8,12 @@
 #include <fidl/fuchsia.memory.sampler/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 
+#include <unordered_set>
+
 #include <fbl/macros.h>
 #include <fbl/mutex.h>
+
+#include "poisson_sampler.h"
 
 namespace memory_sampler {
 
@@ -26,17 +30,16 @@ class Recorder {
   DISALLOW_COPY_ASSIGN_AND_MOVE(Recorder);
   // Returns a reference to the singleton object, initializing (and
   // blocking) it if necessary.
-  static Recorder* Get();
+  static Recorder *Get();
   // Returns a pointer to the singleton object if it is initialized;
   // returns nullptr otherwise.
-  static Recorder* GetIfReady();
-
-  // Records an allocation's address and size and communicates it to
-  // the profiler. Does not allocate.
-  void RecordAllocation(uint64_t address, uint64_t size) __TA_EXCLUDES(&lock_);
-  // Records a deallocation's address and communicates it to the
-  // profiler. Does not allocate.
-  void ForgetAllocation(uint64_t address) __TA_EXCLUDES(&lock_);
+  static Recorder *GetIfReady();
+  // Decides whether to discard or sample this allocation, and acts
+  // appropriately.
+  void MaybeRecordAllocation(void *address, size_t size) __TA_EXCLUDES(&lock_);
+  // Decides whether to discard or sample this deallocation, and acts
+  // appropriately.
+  void MaybeForgetAllocation(void *address) __TA_EXCLUDES(&lock_);
   // Collects the module layout of the current process and
   // communicates it to the profiler.
   void SetModulesInfo();
@@ -45,15 +48,28 @@ class Recorder {
   // singleton interface, and supports providing a custom FIDL
   // client. It does not perform any of the initialisations handled by
   // the singleton interface. This should not be used outside of tests.
-  static Recorder CreateRecorderForTesting(
-      fidl::SyncClient<fuchsia_memory_sampler::Sampler> client);
+  static Recorder CreateRecorderForTesting(fidl::SyncClient<fuchsia_memory_sampler::Sampler> client,
+                                           std::function<PoissonSampler &()> get_poisson_sampler);
+
+  // The average count of bytes allocated between two samples.
+  static constexpr size_t kSamplingIntervalBytes = static_cast<size_t>(128 * 1024);
 
  private:
-  explicit Recorder(fidl::SyncClient<fuchsia_memory_sampler::Sampler> client);
+  Recorder(fidl::SyncClient<fuchsia_memory_sampler::Sampler> client,
+           std::function<PoissonSampler &()> get_poisson_sampler);
   // Initializes the singleton into statically-allocated storage.
   static void InitSingletonOnce();
   fbl::Mutex lock_;
   fidl::SyncClient<fuchsia_memory_sampler::Sampler> client_ __TA_GUARDED(&lock_);
+  std::unordered_set<void *> recorded_allocations_ __TA_GUARDED(&lock_);
+  std::function<PoissonSampler &()> GetPoissonSampler;
+
+  // Records an allocation's address and size and communicates it to
+  // the profiler.
+  void RecordAllocation(void *address, size_t size) __TA_EXCLUDES(&lock_);
+  // Records a deallocation's address and communicates it to the
+  // profiler.
+  void ForgetAllocation(void *address) __TA_EXCLUDES(&lock_);
 };
 }  // namespace memory_sampler
 

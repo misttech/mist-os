@@ -9,6 +9,7 @@ source_set("recorder") {
   ]
   public = [ "recorder.h" ]
   public_deps = [
+    ":poisson_sampler",
     "//sdk/fidl/fuchsia.memory.sampler:fuchsia.memory.sampler_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/elf-search",
@@ -20,6 +21,14 @@ source_set("recorder") {
 source_set("scoped_reentrancy_guard") {
   sources = [ "scoped_reentrancy_guard.h" ]
   public = [ "scoped_reentrancy_guard.h" ]
+}
+
+source_set("poisson_sampler") {
+  sources = [
+    "poisson_sampler.cc",
+    "poisson_sampler.h",
+  ]
+  public = [ "poisson_sampler.h" ]
 }
 
 shared_library("lib") {

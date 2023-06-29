@@ -11,9 +11,17 @@
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 
+#include <cstdint>
+#include <limits>
+
 #include <gtest/gtest.h>
 #include <src/lib/testing/loop_fixture/test_loop_fixture.h>
 #include <src/performance/memory/sampler/instrumentation/recorder.h>
+
+namespace memory_sampler {
+namespace {
+void* const kTestAddress = reinterpret_cast<void*>(0x1000);
+constexpr size_t kTestSize = 100;
 
 class SamplerImpl : public fidl::testing::WireTestBase<fuchsia_memory_sampler::Sampler> {
  public:
@@ -22,26 +30,50 @@ class SamplerImpl : public fidl::testing::WireTestBase<fuchsia_memory_sampler::S
       : binding_(fidl::BindServer(dispatcher, std::move(server_end), this)) {}
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    std::cerr << "Not implemented: " << name << std::endl;
+    std::cerr << "Not implemented: " << name << '\n';
   }
 
  private:
   fidl::ServerBindingRef<fuchsia_memory_sampler::Sampler> binding_;
 };
 
-TEST(RecorderTest, RecordAllocation) {
-  static constexpr uint64_t kTestAddress = 0x1000;
-  static constexpr uint64_t kTestSize = 100;
+PoissonSampler& GetSamplerThatAlwaysSamples() {
+  class SampleIntervalGenerator : public PoissonSampler::SampleIntervalGenerator {
+   public:
+    size_t GetNextSampleInterval(size_t) override { return 1; }
+  };
+
+  static PoissonSampler sampler{1, std::make_unique<SampleIntervalGenerator>()};
+  return sampler;
+}
+
+PoissonSampler& GetSamplerThatNeverSamples() {
+  class SamplerIntervalGenerator : public PoissonSampler::SampleIntervalGenerator {
+   public:
+    size_t GetNextSampleInterval(size_t) override { return std::numeric_limits<size_t>::max(); }
+  };
+  static PoissonSampler sampler{1, std::make_unique<SamplerIntervalGenerator>()};
+  return sampler;
+}
+
+TEST(RecorderTest, MaybeRecordAllocation) {
   static constexpr size_t kMeaningfulStackTraceLength = 1U;
 
+  // Sampler server that verifies the expected allocation was recorded.
   class Sampler : public SamplerImpl {
+   public:
     using SamplerImpl::SamplerImpl;
     void RecordAllocation(fuchsia_memory_sampler::wire::SamplerRecordAllocationRequest* request,
                           RecordAllocationCompleter::Sync& completer) override {
-      EXPECT_EQ(kTestAddress, request->address);
+      called_ = true;
+      EXPECT_EQ(reinterpret_cast<uint64_t>(kTestAddress), request->address);
       EXPECT_EQ(kTestSize, request->size);
       EXPECT_LE(kMeaningfulStackTraceLength, request->stack_trace.stack_frames().count());
     }
+    ~Sampler() override { EXPECT_TRUE(called_); }
+
+   private:
+    bool called_ = false;
   };
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
@@ -50,23 +82,29 @@ TEST(RecorderTest, RecordAllocation) {
   Sampler sampler{dispatcher, std::move(endpoints->server)};
 
   auto recorder = memory_sampler::Recorder::CreateRecorderForTesting(
-      fidl::SyncClient{std::move(endpoints->client)});
-  recorder.RecordAllocation(0x1000, 100);
+      fidl::SyncClient{std::move(endpoints->client)}, GetSamplerThatAlwaysSamples);
+  recorder.MaybeRecordAllocation(kTestAddress, kTestSize);
 
   loop.RunUntilIdle();
 }
 
 TEST(RecorderTest, ForgetAllocation) {
-  static constexpr uint64_t kTestAddress = 0x1000;
   static constexpr size_t kMeaningfulStackTraceLength = 1U;
 
+  // Sampler server that verifies that the expected deallocation was recorded.
   class Sampler : public SamplerImpl {
+   public:
     using SamplerImpl::SamplerImpl;
     void RecordDeallocation(fuchsia_memory_sampler::wire::SamplerRecordDeallocationRequest* request,
                             RecordAllocationCompleter::Sync& completer) override {
-      EXPECT_EQ(kTestAddress, request->address);
+      called_ = true;
+      EXPECT_EQ(reinterpret_cast<uint64_t>(kTestAddress), request->address);
       EXPECT_LE(kMeaningfulStackTraceLength, request->stack_trace.stack_frames().count());
     }
+    ~Sampler() override { EXPECT_TRUE(called_); }
+
+   private:
+    bool called_ = false;
   };
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
@@ -75,8 +113,9 @@ TEST(RecorderTest, ForgetAllocation) {
   Sampler sampler{dispatcher, std::move(endpoints->server)};
 
   auto recorder = memory_sampler::Recorder::CreateRecorderForTesting(
-      fidl::SyncClient{std::move(endpoints->client)});
-  recorder.ForgetAllocation(0x1000);
+      fidl::SyncClient{std::move(endpoints->client)}, GetSamplerThatAlwaysSamples);
+  recorder.MaybeRecordAllocation(kTestAddress, kTestSize);
+  recorder.MaybeForgetAllocation(kTestAddress);
 
   loop.RunUntilIdle();
 }
@@ -90,10 +129,14 @@ TEST(RecorderTest, SetModulesInfo) {
     zx_object_get_property(process, ZX_PROP_NAME, process_name, ZX_MAX_NAME_LEN);
   }
 
+  // Sampler server that verifies the expected process info was
+  // communicated.
   class Sampler : public SamplerImpl {
+   public:
     using SamplerImpl::SamplerImpl;
     void SetProcessInfo(fuchsia_memory_sampler::wire::SamplerSetProcessInfoRequest* request,
                         RecordAllocationCompleter::Sync& completer) override {
+      called_ = true;
       EXPECT_EQ(std::string_view{process_name}, request->process_name().get());
 
       EXPECT_LE(kMeaningfulModuleMapLength, request->module_map().count());
@@ -108,6 +151,10 @@ TEST(RecorderTest, SetModulesInfo) {
       EXPECT_NE(0U, segment.relative_address());
       EXPECT_NE(0U, segment.size());
     }
+    ~Sampler() override { EXPECT_TRUE(called_); }
+
+   private:
+    bool called_ = false;
   };
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
@@ -116,8 +163,77 @@ TEST(RecorderTest, SetModulesInfo) {
   Sampler sampler{dispatcher, std::move(endpoints->server)};
 
   auto recorder = memory_sampler::Recorder::CreateRecorderForTesting(
-      fidl::SyncClient{std::move(endpoints->client)});
+      fidl::SyncClient{std::move(endpoints->client)}, GetSamplerThatAlwaysSamples);
   recorder.SetModulesInfo();
 
   loop.RunUntilIdle();
 }
+
+TEST(RecorderTest, SampledAllocationCausesSampledDeallocation) {
+  // Sampler server that verifies that both the expected allocation
+  // and corresponding deallocation occurred.
+  class Sampler : public SamplerImpl {
+   public:
+    using SamplerImpl::SamplerImpl;
+    void RecordAllocation(fuchsia_memory_sampler::wire::SamplerRecordAllocationRequest* request,
+                          RecordAllocationCompleter::Sync& completer) override {
+      if (request->address == reinterpret_cast<uint64_t>(kTestAddress))
+        allocation_registered_ = true;
+    }
+    void RecordDeallocation(fuchsia_memory_sampler::wire::SamplerRecordDeallocationRequest* request,
+                            RecordDeallocationCompleter::Sync& completer) override {
+      if (request->address == reinterpret_cast<uint64_t>(kTestAddress))
+        deallocation_registered_ = true;
+    }
+
+    ~Sampler() override {
+      EXPECT_TRUE(allocation_registered_);
+      EXPECT_TRUE(deallocation_registered_);
+    }
+
+   private:
+    bool allocation_registered_ = false;
+    bool deallocation_registered_ = false;
+  };
+
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  async_dispatcher_t* dispatcher = loop.dispatcher();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_memory_sampler::Sampler>();
+  Sampler sampler{dispatcher, std::move(endpoints->server)};
+
+  auto recorder = memory_sampler::Recorder::CreateRecorderForTesting(
+      fidl::SyncClient{std::move(endpoints->client)}, GetSamplerThatAlwaysSamples);
+
+  recorder.MaybeRecordAllocation(kTestAddress, kTestSize);
+  recorder.MaybeForgetAllocation(kTestAddress);
+  loop.RunUntilIdle();
+}
+
+TEST(RecorderTest, MaybeForgetAllocationIsNoOpIfAllocationWasNotSampled) {
+  // Sampler server that verifies no deallocation was ever recorded.
+  class Sampler : public SamplerImpl {
+   public:
+    using SamplerImpl::SamplerImpl;
+    void RecordDeallocation(fuchsia_memory_sampler::wire::SamplerRecordDeallocationRequest* request,
+                            RecordDeallocationCompleter::Sync& completer) override {
+      FAIL();
+    }
+  };
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  async_dispatcher_t* dispatcher = loop.dispatcher();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_memory_sampler::Sampler>();
+  Sampler sampler{dispatcher, std::move(endpoints->server)};
+
+  auto recorder = memory_sampler::Recorder::CreateRecorderForTesting(
+      fidl::SyncClient{std::move(endpoints->client)}, GetSamplerThatNeverSamples);
+
+  // Initial forget while having never recorded.
+  recorder.MaybeForgetAllocation(kTestAddress);
+  // Does not record.
+  recorder.MaybeRecordAllocation(kTestAddress, kTestSize);
+  // Forget after maybe recording, but actually not recording.
+  recorder.MaybeForgetAllocation(kTestAddress);
+  loop.RunUntilIdle();
+}
+}  // namespace
+}  // namespace memory_sampler

@@ -15,17 +15,28 @@
 #include <zircon/syscalls/object.h>
 
 #include <atomic>
-#include <mutex>
-#include <optional>
+#include <cstdint>
+#include <vector>
 
 #include <fbl/auto_lock.h>
+
+#include "poisson_sampler.h"
 
 namespace {
 // Note: The destructor is never called. This is on purpose.
 std::atomic<memory_sampler::Recorder*> singleton;
 
 // Threshold for truncating overly long stack frames.
-constexpr std::size_t kMaxStackFramesLength = 512;
+constexpr size_t kMaxStackFramesLength = 512;
+
+// Note: this implementation currently relies on `thread_local` to
+// track the allocated bytes and thresholds, which means that each
+// thread implements a different Poisson process.
+memory_sampler::PoissonSampler& GetNonDeterministicPoissonSampler() {
+  thread_local memory_sampler::PoissonSampler sampler{
+      memory_sampler::Recorder::kSamplingIntervalBytes};
+  return sampler;
+}
 }  // namespace
 
 namespace memory_sampler {
@@ -35,7 +46,9 @@ void Recorder::InitSingletonOnce() {
   alignas(Recorder) static std::byte storage[sizeof(Recorder)];
   auto result = component::Connect<fuchsia_memory_sampler::Sampler>();
   ZX_ASSERT(result.is_ok());
-  auto* recorder = new (storage) Recorder(fidl::SyncClient{std::move(result.value())});
+  auto* recorder = new (storage)
+      Recorder(fidl::SyncClient{std::move(result.value())}, GetNonDeterministicPoissonSampler);
+
   recorder->SetModulesInfo();
 
   // Only set the singleton once all allocations are done, to avoid a deadlock.
@@ -50,58 +63,64 @@ Recorder* Recorder::Get() {
 
 Recorder* Recorder::GetIfReady() { return singleton.load() == nullptr ? nullptr : Get(); }
 
-void Recorder::RecordAllocation(uint64_t address, uint64_t size) {
+// Profiling every single allocation has a large impact on the
+// performance of the instrumented process. Sampling allocation
+// profilers work around this issue by sampling a subset of the
+// allocations, reducing the overhead while hopefully capturing enough
+// relevant data to be useful.
+void Recorder::MaybeRecordAllocation(void* address, size_t size) {
+  if (!GetPoissonSampler().ShouldSampleAllocation(size))
+    return;
+
+  // Store the address of the allocation.
+  {
+    fbl::AutoLock lock(&lock_);
+    recorded_allocations_.emplace(address);
+  }
+
+  RecordAllocation(address, size);
+}
+
+void Recorder::RecordAllocation(void* address, size_t size) {
   // Collect a stack trace.
   uint64_t pc_buffer[kMaxStackFramesLength]{0};
   const size_t count = __sanitizer_fast_backtrace(pc_buffer, kMaxStackFramesLength);
-
-  // Initialize some FIDL storage for an allocation-less FIDL call.
-  fidl::WireTableFrame<fuchsia_memory_sampler::wire::StackTrace> stack_frames_storage;
-  auto stack_trace_builder = fuchsia_memory_sampler::wire::StackTrace::ExternalBuilder(
-      fidl::ObjectView<fidl::WireTableFrame<fuchsia_memory_sampler::wire::StackTrace>>::
-          FromExternal(&stack_frames_storage));
-
-  // Write the stack trace to the storage.
-  auto stack_frames_view = fidl::VectorView<uint64_t>::FromExternal(pc_buffer, count);
-  stack_trace_builder.stack_frames(
-      fidl::ObjectView<fidl::VectorView<uint64_t>>::FromExternal(&stack_frames_view));
-  auto stack_trace = stack_trace_builder.Build();
-
-  // Perform the FIDL call.
   {
-    fidl::SyncClientBuffer<fuchsia_memory_sampler::Sampler::RecordAllocation> request_buffer;
     fbl::AutoLock lock(&lock_);
-    auto result =
-        client_.wire().buffer(request_buffer.view())->RecordAllocation(address, stack_trace, size);
-    ZX_ASSERT(result.ok());
+    auto result = client_->RecordAllocation(
+        {{.address = reinterpret_cast<uint64_t>(address),
+          .stack_trace = {{.stack_frames = std::vector<uint64_t>(pc_buffer, pc_buffer + count)}},
+          .size = size}});
+
+    ZX_ASSERT(result.is_ok());
   }
 }
 
-void Recorder::ForgetAllocation(uint64_t address) {
+void Recorder::MaybeForgetAllocation(void* address) {
+  {
+    fbl::AutoLock lock(&lock_);
+    auto allocation = recorded_allocations_.find(address);
+    if (allocation == recorded_allocations_.end()) {
+      return;
+    }
+    recorded_allocations_.erase(allocation);
+  }
+
+  ForgetAllocation(address);
+}
+
+void Recorder::ForgetAllocation(void* address) {
   // Collect a stack trace.
   uint64_t pc_buffer[kMaxStackFramesLength]{0};
   const size_t count = __sanitizer_fast_backtrace(pc_buffer, kMaxStackFramesLength);
 
-  // Initialize some FIDL storage for an allocation-less FIDL call.
-  fidl::WireTableFrame<fuchsia_memory_sampler::wire::StackTrace> stack_frames_storage;
-  auto stack_trace_builder = fuchsia_memory_sampler::wire::StackTrace::ExternalBuilder(
-      fidl::ObjectView<fidl::WireTableFrame<fuchsia_memory_sampler::wire::StackTrace>>::
-          FromExternal(&stack_frames_storage));
-
-  // Write the stack trace to the storage.
-  auto stack_frames_view = fidl::VectorView<uint64_t>::FromExternal(pc_buffer, count);
-  stack_trace_builder.stack_frames(
-      fidl::ObjectView<fidl::VectorView<uint64_t>>::FromExternal(&stack_frames_view));
-  auto stack_trace = stack_trace_builder.Build();
-
-  // Perform the FIDL call.
   {
-    fidl::SyncClientBuffer<fuchsia_memory_sampler::Sampler::RecordDeallocation> request_buffer;
     fbl::AutoLock lock(&lock_);
 
-    auto result =
-        client_.wire().buffer(request_buffer.view())->RecordDeallocation(address, stack_trace);
-    ZX_ASSERT(result.ok());
+    auto result = client_->RecordDeallocation(
+        {{.address = reinterpret_cast<uint64_t>(address),
+          .stack_trace = {{.stack_frames = std::vector<uint64_t>(pc_buffer, pc_buffer + count)}}}});
+    ZX_ASSERT(result.is_ok());
   }
 }
 
@@ -154,12 +173,13 @@ void Recorder::SetModulesInfo() {
   }
 }
 
-Recorder::Recorder(fidl::SyncClient<fuchsia_memory_sampler::Sampler> client)
-    : client_(std::move(client)) {}
+Recorder::Recorder(fidl::SyncClient<fuchsia_memory_sampler::Sampler> client,
+                   std::function<PoissonSampler&()> get_poisson_sampler)
+    : client_(std::move(client)), GetPoissonSampler(std::move(get_poisson_sampler)) {}
 
 Recorder Recorder::CreateRecorderForTesting(
-    fidl::SyncClient<fuchsia_memory_sampler::Sampler> client) {
-  return Recorder{std::move(client)};
+    fidl::SyncClient<fuchsia_memory_sampler::Sampler> client,
+    std::function<PoissonSampler&()> get_poisson_sampler) {
+  return Recorder{std::move(client), std::move(get_poisson_sampler)};
 }
-
 }  // namespace memory_sampler

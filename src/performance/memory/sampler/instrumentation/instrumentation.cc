@@ -20,7 +20,7 @@ extern "C" {
 // Scudo's contract. We use a `ScopedReentrancyGuard` to prevent
 // unbounded recursion when allocating, which seems sufficient in
 // practice.
-__attribute__((visibility("default"))) void __scudo_allocate_hook(void* ptr, unsigned int size) {
+__attribute__((visibility("default"))) void __scudo_allocate_hook(void* ptr, size_t size) {
   if (memory_sampler::ScopedReentrancyGuard::WouldReenter())
     return;
   memory_sampler::ScopedReentrancyGuard guard;
@@ -28,7 +28,7 @@ __attribute__((visibility("default"))) void __scudo_allocate_hook(void* ptr, uns
   auto* recorder = memory_sampler::Recorder::GetIfReady();
   if (recorder == nullptr)
     return;
-  recorder->RecordAllocation(reinterpret_cast<uint64_t>(ptr), size);
+  recorder->MaybeRecordAllocation(ptr, size);
 }
 // Registers a callback to be called by the Scudo allocator whenever
 // it serves a deallocation.
@@ -44,6 +44,6 @@ __attribute__((visibility("default"))) void __scudo_deallocate_hook(void* ptr) {
   auto* recorder = memory_sampler::Recorder::GetIfReady();
   if (recorder == nullptr)
     return;
-  recorder->ForgetAllocation(reinterpret_cast<uint64_t>(ptr));
+  recorder->MaybeForgetAllocation(ptr);
 }
 }
