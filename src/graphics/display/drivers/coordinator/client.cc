@@ -266,7 +266,7 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
   // Client instances will be responsible for translating between driver-side
   // and client-side IDs.
   LayerId layer_id(driver_layer_id.value());
-  completer.Reply(ZX_OK, ToFidlLayerId(layer_id));
+  completer.Reply(ZX_OK, ToFidlLayerIdValue(layer_id));
 }
 
 void Client::DestroyLayer(DestroyLayerRequestView request,
@@ -762,7 +762,7 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
   const CaptureImageId capture_image_id = next_capture_image_id_++;
   capture_image->id = capture_image_id;
   capture_images_.insert(std::move(capture_image));
-  completer.ReplySuccess(ToFidlCaptureImageId(capture_image_id));
+  completer.ReplySuccess(ToFidlCaptureImageIdValue(capture_image_id));
 }
 
 void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter::Sync& completer) {
@@ -1023,12 +1023,12 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
         }
       }
 
-      const uint64_t fidl_display_id = ToFidlDisplayId(display_config.id);
+      const uint64_t fidl_display_id = ToFidlDisplayIdValue(display_config.id);
 
       // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
       // client-side ID will have to be looked up in a map.
       LayerId layer_id(layer_node.layer->id.value());
-      const uint64_t fidl_layer_id = ToFidlLayerId(layer_id);
+      const uint64_t fidl_layer_id = ToFidlLayerIdValue(layer_id);
 
       for (uint8_t i = 0; i < 32; i++) {
         if (err & (1 << i)) {
@@ -1204,7 +1204,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     }
 
     fhd::wire::Info info;
-    info.id = ToFidlDisplayId(config->id);
+    info.id = ToFidlDisplayIdValue(config->id);
 
     const fbl::Vector<edid::timing_params>* edid_timings;
     const display_params_t* params;
@@ -1281,7 +1281,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     if (display) {
       display->pending_layers_.clear();
       display->current_layers_.clear();
-      fidl_removed_display_ids.push_back(ToFidlDisplayId(display->id));
+      fidl_removed_display_ids.push_back(ToFidlDisplayIdValue(display->id));
     }
   }
 
@@ -1685,7 +1685,7 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
     vsync_msg_t v = buffered_vsync_messages_.front();
     buffered_vsync_messages_.pop();
     event_sending_result = handler_.binding_state().SendEvents([&](auto&& endpoint) {
-      return fidl::WireSendEvent(endpoint)->OnVsync(ToFidlDisplayId(v.display_id), v.timestamp,
+      return fidl::WireSendEvent(endpoint)->OnVsync(ToFidlDisplayIdValue(v.display_id), v.timestamp,
                                                     ToFidlConfigStamp(v.config_stamp), 0);
     });
     if (!event_sending_result.ok()) {
@@ -1698,7 +1698,7 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
 
   // Send the latest vsync event
   event_sending_result = handler_.binding_state().SendEvents([&](auto&& endpoint) {
-    return fidl::WireSendEvent(endpoint)->OnVsync(ToFidlDisplayId(display_id), timestamp,
+    return fidl::WireSendEvent(endpoint)->OnVsync(ToFidlDisplayIdValue(display_id), timestamp,
                                                   ToFidlConfigStamp(client_stamp), cookie);
   });
   if (!event_sending_result.ok()) {

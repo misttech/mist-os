@@ -46,11 +46,12 @@ TEST(DisplayIdTest, EqualityForDifferentValues) {
   EXPECT_NE(kInvalidDisplayId, kTwo);
 }
 
-TEST(DisplayIdTest, ToFidlDisplayId) {
-  EXPECT_EQ(1u, ToFidlDisplayId(kOne));
-  EXPECT_EQ(2u, ToFidlDisplayId(kTwo));
-  EXPECT_EQ(kLargeIdValue, ToFidlDisplayId(kLargeId));
-  EXPECT_EQ(fuchsia_hardware_display::wire::kInvalidDispId, ToFidlDisplayId(kInvalidDisplayId));
+TEST(DisplayIdTest, ToFidlDisplayIdValue) {
+  EXPECT_EQ(1u, ToFidlDisplayIdValue(kOne));
+  EXPECT_EQ(2u, ToFidlDisplayIdValue(kTwo));
+  EXPECT_EQ(kLargeIdValue, ToFidlDisplayIdValue(kLargeId));
+  EXPECT_EQ(fuchsia_hardware_display::wire::kInvalidDispId,
+            ToFidlDisplayIdValue(kInvalidDisplayId));
 }
 
 TEST(DisplayIdTest, ToBanjoDisplayId) {
@@ -74,11 +75,11 @@ TEST(DisplayIdTest, ToDisplayIdWithBanjoValue) {
   EXPECT_EQ(kInvalidDisplayId, ToDisplayId(INVALID_DISPLAY_ID));
 }
 
-TEST(DisplayIdTest, FidlConversionRoundtrip) {
-  EXPECT_EQ(kOne, ToDisplayId(ToFidlDisplayId(kOne)));
-  EXPECT_EQ(kTwo, ToDisplayId(ToFidlDisplayId(kTwo)));
-  EXPECT_EQ(kLargeId, ToDisplayId(ToFidlDisplayId(kLargeId)));
-  EXPECT_EQ(kInvalidDisplayId, ToDisplayId(ToFidlDisplayId(kInvalidDisplayId)));
+TEST(DisplayIdTest, FidlDisplayIdValueConversionRoundtrip) {
+  EXPECT_EQ(kOne, ToDisplayId(ToFidlDisplayIdValue(kOne)));
+  EXPECT_EQ(kTwo, ToDisplayId(ToFidlDisplayIdValue(kTwo)));
+  EXPECT_EQ(kLargeId, ToDisplayId(ToFidlDisplayIdValue(kLargeId)));
+  EXPECT_EQ(kInvalidDisplayId, ToDisplayId(ToFidlDisplayIdValue(kInvalidDisplayId)));
 }
 
 TEST(DisplayIdTest, BanjoConversionRoundtrip) {

@@ -46,11 +46,11 @@ TEST(ImageIdTest, EqualityForDifferentValues) {
   EXPECT_NE(kInvalidImageId, kTwo);
 }
 
-TEST(ImageIdTest, ToFidlImageId) {
-  EXPECT_EQ(1u, ToFidlImageId(kOne));
-  EXPECT_EQ(2u, ToFidlImageId(kTwo));
-  EXPECT_EQ(kLargeIdValue, ToFidlImageId(kLargeId));
-  EXPECT_EQ(fuchsia_hardware_display::wire::kInvalidDispId, ToFidlImageId(kInvalidImageId));
+TEST(ImageIdTest, ToFidlImageIdValue) {
+  EXPECT_EQ(1u, ToFidlImageIdValue(kOne));
+  EXPECT_EQ(2u, ToFidlImageIdValue(kTwo));
+  EXPECT_EQ(kLargeIdValue, ToFidlImageIdValue(kLargeId));
+  EXPECT_EQ(fuchsia_hardware_display::wire::kInvalidDispId, ToFidlImageIdValue(kInvalidImageId));
 }
 
 TEST(ImageIdTest, ToImageIdWithFidlValue) {
@@ -60,11 +60,11 @@ TEST(ImageIdTest, ToImageIdWithFidlValue) {
   EXPECT_EQ(kInvalidImageId, ToImageId(fuchsia_hardware_display::wire::kInvalidDispId));
 }
 
-TEST(ImageIdTest, FidlConversionRoundtrip) {
-  EXPECT_EQ(kOne, ToImageId(ToFidlImageId(kOne)));
-  EXPECT_EQ(kTwo, ToImageId(ToFidlImageId(kTwo)));
-  EXPECT_EQ(kLargeId, ToImageId(ToFidlImageId(kLargeId)));
-  EXPECT_EQ(kInvalidImageId, ToImageId(ToFidlImageId(kInvalidImageId)));
+TEST(ImageIdTest, FidlImageIdValueConversionRoundtrip) {
+  EXPECT_EQ(kOne, ToImageId(ToFidlImageIdValue(kOne)));
+  EXPECT_EQ(kTwo, ToImageId(ToFidlImageIdValue(kTwo)));
+  EXPECT_EQ(kLargeId, ToImageId(ToFidlImageIdValue(kLargeId)));
+  EXPECT_EQ(kInvalidImageId, ToImageId(ToFidlImageIdValue(kInvalidImageId)));
 }
 
 }  // namespace

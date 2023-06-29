@@ -17,8 +17,10 @@ namespace display {
 // More useful representation of `fuchsia.hardware.display/ImageIdValue`.
 DEFINE_STRONG_INT(ImageId, uint64_t);
 
-constexpr inline ImageId ToImageId(uint64_t fidl_image_id) { return ImageId(fidl_image_id); }
-constexpr inline uint64_t ToFidlImageId(ImageId image_id) { return image_id.value(); }
+constexpr inline ImageId ToImageId(uint64_t fidl_image_id_value) {
+  return ImageId(fidl_image_id_value);
+}
+constexpr inline uint64_t ToFidlImageIdValue(ImageId image_id) { return image_id.value(); }
 
 constexpr ImageId kInvalidImageId(fuchsia_hardware_display::wire::kInvalidDispId);
 

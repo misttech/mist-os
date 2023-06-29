@@ -43,11 +43,11 @@ TEST(LayerIdTest, EqualityForDifferentValues) {
   EXPECT_NE(kInvalidLayerId, kTwo);
 }
 
-TEST(LayerIdTest, ToFidlLayerId) {
-  EXPECT_EQ(1u, ToFidlLayerId(kOne));
-  EXPECT_EQ(2u, ToFidlLayerId(kTwo));
-  EXPECT_EQ(kLargeIdValue, ToFidlLayerId(kLargeId));
-  EXPECT_EQ(fuchsia_hardware_display::wire::kInvalidDispId, ToFidlLayerId(kInvalidLayerId));
+TEST(LayerIdTest, ToFidlLayerIdValue) {
+  EXPECT_EQ(1u, ToFidlLayerIdValue(kOne));
+  EXPECT_EQ(2u, ToFidlLayerIdValue(kTwo));
+  EXPECT_EQ(kLargeIdValue, ToFidlLayerIdValue(kLargeId));
+  EXPECT_EQ(fuchsia_hardware_display::wire::kInvalidDispId, ToFidlLayerIdValue(kInvalidLayerId));
 }
 
 TEST(LayerIdTest, ToLayerIdWithFidlValue) {
@@ -57,11 +57,11 @@ TEST(LayerIdTest, ToLayerIdWithFidlValue) {
   EXPECT_EQ(kInvalidLayerId, ToLayerId(fuchsia_hardware_display::wire::kInvalidDispId));
 }
 
-TEST(LayerIdTest, FidlConversionRoundtrip) {
-  EXPECT_EQ(kOne, ToLayerId(ToFidlLayerId(kOne)));
-  EXPECT_EQ(kTwo, ToLayerId(ToFidlLayerId(kTwo)));
-  EXPECT_EQ(kLargeId, ToLayerId(ToFidlLayerId(kLargeId)));
-  EXPECT_EQ(kInvalidLayerId, ToLayerId(ToFidlLayerId(kInvalidLayerId)));
+TEST(LayerIdTest, FidlLayerIdValueConversionRoundtrip) {
+  EXPECT_EQ(kOne, ToLayerId(ToFidlLayerIdValue(kOne)));
+  EXPECT_EQ(kTwo, ToLayerId(ToFidlLayerIdValue(kTwo)));
+  EXPECT_EQ(kLargeId, ToLayerId(ToFidlLayerIdValue(kLargeId)));
+  EXPECT_EQ(kInvalidLayerId, ToLayerId(ToFidlLayerIdValue(kInvalidLayerId)));
 }
 
 }  // namespace

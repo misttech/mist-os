@@ -21,7 +21,7 @@ constexpr inline DisplayId ToDisplayId(uint64_t banjo_display_id) {
   return DisplayId(banjo_display_id);
 }
 constexpr inline uint64_t ToBanjoDisplayId(DisplayId display_id) { return display_id.value(); }
-constexpr inline uint64_t ToFidlDisplayId(DisplayId display_id) { return display_id.value(); }
+constexpr inline uint64_t ToFidlDisplayIdValue(DisplayId display_id) { return display_id.value(); }
 
 constexpr DisplayId kInvalidDisplayId(fuchsia_hardware_display::wire::kInvalidDispId);
 

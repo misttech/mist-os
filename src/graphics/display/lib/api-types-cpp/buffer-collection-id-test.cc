@@ -15,25 +15,47 @@ namespace display {
 
 namespace {
 
-TEST(BufferCollectionId, Equality) {
-  constexpr BufferCollectionId kOne(1);
-  constexpr BufferCollectionId kAnotherOne(1);
-  constexpr BufferCollectionId kTwo(2);
+constexpr BufferCollectionId kOne(1);
+constexpr BufferCollectionId kAnotherOne(1);
+constexpr BufferCollectionId kTwo(2);
 
+constexpr uint64_t kLargeIdValue = uint64_t{1} << 63;
+constexpr BufferCollectionId kLargeId(kLargeIdValue);
+
+TEST(BufferCollectionIdTest, EqualityIsReflexive) {
   EXPECT_EQ(kOne, kOne);
-  EXPECT_EQ(kOne, kAnotherOne);
-  EXPECT_NE(kOne, kTwo);
+  EXPECT_EQ(kAnotherOne, kAnotherOne);
+  EXPECT_EQ(kTwo, kTwo);
 }
 
-TEST(BufferCollectionId, FidlConversion) {
-  EXPECT_EQ(ToBufferCollectionId(1), BufferCollectionId(1));
-  EXPECT_EQ(ToBufferCollectionId(1).value(), uint64_t{1});
+TEST(BufferCollectionIdTest, EqualityIsSymmetric) {
+  EXPECT_EQ(kOne, kAnotherOne);
+  EXPECT_EQ(kAnotherOne, kOne);
+}
 
-  EXPECT_EQ(ToFidlBufferCollectionId(BufferCollectionId(1)), uint64_t{1});
+TEST(BufferCollectionIdTest, EqualityForDifferentValues) {
+  EXPECT_NE(kOne, kTwo);
+  EXPECT_NE(kAnotherOne, kTwo);
+  EXPECT_NE(kTwo, kOne);
+  EXPECT_NE(kTwo, kAnotherOne);
+}
 
-  const uint64_t kLargeBufferCollectionIdValue = uint64_t{1} << 63;
-  EXPECT_EQ(ToFidlBufferCollectionId(BufferCollectionId(kLargeBufferCollectionIdValue)),
-            kLargeBufferCollectionIdValue);
+TEST(BufferCollectionIdTest, ToFidlBufferCollectionIdValue) {
+  EXPECT_EQ(1u, ToFidlBufferCollectionIdValue(kOne));
+  EXPECT_EQ(2u, ToFidlBufferCollectionIdValue(kTwo));
+  EXPECT_EQ(kLargeIdValue, ToFidlBufferCollectionIdValue(kLargeId));
+}
+
+TEST(BufferCollectionIdTest, ToBufferCollectionIdWithFidlValue) {
+  EXPECT_EQ(kOne, ToBufferCollectionId(1));
+  EXPECT_EQ(kTwo, ToBufferCollectionId(2));
+  EXPECT_EQ(kLargeId, ToBufferCollectionId(kLargeIdValue));
+}
+
+TEST(BufferCollectionIdTest, FidlBufferCollectionIdValueConversionRoundtrip) {
+  EXPECT_EQ(kOne, ToBufferCollectionId(ToFidlBufferCollectionIdValue(kOne)));
+  EXPECT_EQ(kTwo, ToBufferCollectionId(ToFidlBufferCollectionIdValue(kTwo)));
+  EXPECT_EQ(kLargeId, ToBufferCollectionId(ToFidlBufferCollectionIdValue(kLargeId)));
 }
 
 }  // namespace

@@ -22,10 +22,10 @@ namespace display {
 // BufferCollections imported to display drivers.
 DEFINE_STRONG_INT(BufferCollectionId, uint64_t);
 
-constexpr inline BufferCollectionId ToBufferCollectionId(uint64_t fidl_buffer_collection_id) {
-  return BufferCollectionId(fidl_buffer_collection_id);
+constexpr inline BufferCollectionId ToBufferCollectionId(uint64_t fidl_buffer_collection_id_value) {
+  return BufferCollectionId(fidl_buffer_collection_id_value);
 }
-constexpr inline uint64_t ToFidlBufferCollectionId(BufferCollectionId buffer_collection_id) {
+constexpr inline uint64_t ToFidlBufferCollectionIdValue(BufferCollectionId buffer_collection_id) {
   return buffer_collection_id.value();
 }
 

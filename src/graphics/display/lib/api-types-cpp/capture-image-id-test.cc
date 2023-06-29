@@ -46,12 +46,12 @@ TEST(CaptureImageIdTest, EqualityForDifferentValues) {
   EXPECT_NE(kInvalidCaptureImageId, kTwo);
 }
 
-TEST(CaptureImageIdTest, ToFidlCaptureImageId) {
-  EXPECT_EQ(1u, ToFidlCaptureImageId(kOne));
-  EXPECT_EQ(2u, ToFidlCaptureImageId(kTwo));
-  EXPECT_EQ(kLargeIdValue, ToFidlCaptureImageId(kLargeId));
+TEST(CaptureImageIdTest, ToFidlCaptureImageIdValue) {
+  EXPECT_EQ(1u, ToFidlCaptureImageIdValue(kOne));
+  EXPECT_EQ(2u, ToFidlCaptureImageIdValue(kTwo));
+  EXPECT_EQ(kLargeIdValue, ToFidlCaptureImageIdValue(kLargeId));
   EXPECT_EQ(fuchsia_hardware_display::wire::kInvalidDispId,
-            ToFidlCaptureImageId(kInvalidCaptureImageId));
+            ToFidlCaptureImageIdValue(kInvalidCaptureImageId));
 }
 
 TEST(CaptureImageIdTest, ToCaptureImageIdWithFidlValue) {
@@ -62,11 +62,12 @@ TEST(CaptureImageIdTest, ToCaptureImageIdWithFidlValue) {
             ToCaptureImageId(fuchsia_hardware_display::wire::kInvalidDispId));
 }
 
-TEST(CaptureImageIdTest, FidlConversionRoundtrip) {
-  EXPECT_EQ(kOne, ToCaptureImageId(ToFidlCaptureImageId(kOne)));
-  EXPECT_EQ(kTwo, ToCaptureImageId(ToFidlCaptureImageId(kTwo)));
-  EXPECT_EQ(kLargeId, ToCaptureImageId(ToFidlCaptureImageId(kLargeId)));
-  EXPECT_EQ(kInvalidCaptureImageId, ToCaptureImageId(ToFidlCaptureImageId(kInvalidCaptureImageId)));
+TEST(CaptureImageIdTest, FidlCaptureImageIdValueConversionRoundtrip) {
+  EXPECT_EQ(kOne, ToCaptureImageId(ToFidlCaptureImageIdValue(kOne)));
+  EXPECT_EQ(kTwo, ToCaptureImageId(ToFidlCaptureImageIdValue(kTwo)));
+  EXPECT_EQ(kLargeId, ToCaptureImageId(ToFidlCaptureImageIdValue(kLargeId)));
+  EXPECT_EQ(kInvalidCaptureImageId,
+            ToCaptureImageId(ToFidlCaptureImageIdValue(kInvalidCaptureImageId)));
 }
 
 }  // namespace

@@ -18,10 +18,10 @@ namespace display {
 // TODO(fxbug.dev/129092): Remove this type when unifying image ID namespaces.
 DEFINE_STRONG_INT(CaptureImageId, uint64_t);
 
-constexpr inline CaptureImageId ToCaptureImageId(uint64_t fidl_capture_image_id) {
-  return CaptureImageId(fidl_capture_image_id);
+constexpr inline CaptureImageId ToCaptureImageId(uint64_t fidl_capture_image_id_value) {
+  return CaptureImageId(fidl_capture_image_id_value);
 }
-constexpr inline uint64_t ToFidlCaptureImageId(CaptureImageId capture_image_id) {
+constexpr inline uint64_t ToFidlCaptureImageIdValue(CaptureImageId capture_image_id) {
   return capture_image_id.value();
 }
 

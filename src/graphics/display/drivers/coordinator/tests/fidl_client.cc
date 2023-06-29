@@ -258,7 +258,7 @@ zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_
   for (const auto& info : present_layers) {
     layers.push_back(info.layer_id);
   }
-  if (auto reply = dc_->SetDisplayLayers(ToFidlDisplayId(display_id()),
+  if (auto reply = dc_->SetDisplayLayers(ToFidlDisplayIdValue(display_id()),
                                          fidl::VectorView<uint64_t>::FromExternal(layers));
       !reply.ok()) {
     return reply.status();
