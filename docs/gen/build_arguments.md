@@ -138,7 +138,7 @@ their own `__asan_default_options` C function.  Instead, they can use a
 sanitizer_extra_options() target in their `deps` and then any options
 injected that way can override that option's setting in this list.
 
-**Current value (from the default):** `["detect_stack_use_after_return=1", "quarantine_size_mb=64"]`
+**Current value (from the default):** `["detect_stack_use_after_return=1", "quarantine_size_mb=32"]`
 
 From //build/config/sanitizers/sanitizer_default_options.gni:16
 
