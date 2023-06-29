@@ -1,22 +1,5 @@
 {
     "bindings": {
-        "dart": {
-            "starting_fidl": "step_00_before",
-            "starting_src": "dart/step_00_before.dart",
-            "steps": [
-                {
-                    "fidl": "step_01_after",
-                    "step_num": 1
-                },
-                {
-                    "instructions": [
-                        "You can now use the new member"
-                    ],
-                    "source": "dart/step_02_after.dart",
-                    "step_num": 2
-                }
-            ]
-        },
         "go": {
             "starting_fidl": "step_00_before",
             "starting_src": "go/step_00_before/step_00_before.go",

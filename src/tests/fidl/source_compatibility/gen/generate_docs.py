@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import IO, List, Tuple
 import yaml
 
-from types_ import CompatTest, FidlStep, SourceStep, HLCPP, LLCPP, RUST, DART, GO
+from types_ import CompatTest, FidlStep, SourceStep, HLCPP, LLCPP, RUST, GO
 
 # Lines of context to show in diffs. We can be very liberal with this number
 # since we already filter out the boilerplate before passing code to difflib.
@@ -23,7 +23,6 @@ MD_LANG = {
     HLCPP: 'cpp',
     LLCPP: 'cpp',
     RUST: 'rust',
-    DART: 'dart',
     GO: 'go',
 }
 

@@ -1,30 +1,5 @@
 {
     "bindings": {
-        "dart": {
-            "starting_fidl": "step_00_before",
-            "starting_src": "dart/step_00_before.dart",
-            "steps": [
-                {
-                    "instructions": [
-                        "Evolve readers first by updating switch statements on the union tag to handle the soon-to-be-added variant as part of a default case."
-                    ],
-                    "source": "dart/step_01_during.dart",
-                    "step_num": 1
-                },
-                {
-                    "fidl": "step_02_after",
-                    "step_num": 2
-                },
-                {
-                    "instructions": [
-                        "Writers can now start producing instances of the new variant.",
-                        "Readers should handle the new variant in switch statements."
-                    ],
-                    "source": "dart/step_03_after.dart",
-                    "step_num": 3
-                }
-            ]
-        },
         "go": {
             "starting_fidl": "step_00_before",
             "starting_src": "go/step_00_before/step_00_before.go",

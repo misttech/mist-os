@@ -1,29 +1,5 @@
 {
     "bindings": {
-        "dart": {
-            "starting_fidl": "step_00_before",
-            "starting_src": "dart/step_00_before.dart",
-            "steps": [
-                {
-                    "instructions": [
-                        "Replace the unknown tag with a default case in any switch statements"
-                    ],
-                    "source": "dart/step_01_during.dart",
-                    "step_num": 1
-                },
-                {
-                    "fidl": "step_02_after",
-                    "step_num": 2
-                },
-                {
-                    "instructions": [
-                        "You can now remove the default case in any switch statements"
-                    ],
-                    "source": "dart/step_03_after.dart",
-                    "step_num": 3
-                }
-            ]
-        },
         "go": {
             "starting_fidl": "step_00_before",
             "starting_src": "go/step_00_before/step_00_before.go",

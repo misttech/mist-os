@@ -1,27 +1,5 @@
 {
     "bindings": {
-        "dart": {
-            "starting_fidl": "step_00_before",
-            "starting_src": "dart/step_00_before.dart",
-            "steps": [
-                {
-                    "fidl": "step_01_during",
-                    "step_num": 1
-                },
-                {
-                    "instructions": [
-                        "Remove implementations of the event stream",
-                        "Stop handling the event on the client side."
-                    ],
-                    "source": "dart/step_02_during.dart",
-                    "step_num": 2
-                },
-                {
-                    "fidl": "step_03_after",
-                    "step_num": 3
-                }
-            ]
-        },
         "go": {
             "starting_fidl": "step_00_before",
             "starting_src": "go/step_00_before/step_00_before.go",

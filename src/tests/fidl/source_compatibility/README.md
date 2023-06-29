@@ -166,23 +166,22 @@ of classes which correspond directly to the test JSON.
 
 When a test fails to compile, the failure output will contain a path to a place
 somewhere in your out directory (what the path represents depends on the
-binding, e.g. for C++ the path is the path to the `.o` file, whereas for Dart
-it's the path that the source file is copied to before building), that will tell
+binding, e.g. for C++ the path is the path to the `.o` file), that will tell
 you exactly which test/FIDL file/source file combination the error is coming
 from. For example, if you see the directory
 
-  protocoleventremove_dart_step_03_after_step_02_during_dart_package
+  protocoleventremove_rust_step_03_after_step_02_during_rust_package
 
 somewhere in the path, you can deduce the following based on the ordering:
 
 * The test `protocoleventremove`.
-* The language is `dart`.
+* The language is `rust`.
 * The FIDL step being used is `step_03_after`.
 * The source file being used is `step_02_during`.
 
 From this, you can deduce that the files in question are
 `protocol-event-remove/fidl/step_03_after.test.fidl` and
-`protocol-event-remove/fidl/step_02_during.dart`, and use that to debug the
+`protocol-event-remove/fidl/step_02_during.rs`, and use that to debug the
 compile error.
 
 ### "Reverse" tests:

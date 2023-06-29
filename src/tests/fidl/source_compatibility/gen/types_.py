@@ -13,9 +13,8 @@ from typing import Dict, List, Optional, Union
 HLCPP = 'hlcpp'
 LLCPP = 'llcpp'
 RUST = 'rust'
-DART = 'dart'
 GO = 'go'
-BINDINGS = [HLCPP, DART, LLCPP, RUST, GO]
+BINDINGS = [HLCPP, LLCPP, RUST, GO]
 
 # Path relative to the test root.
 RelativePath = str

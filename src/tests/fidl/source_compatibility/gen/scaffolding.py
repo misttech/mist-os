@@ -10,7 +10,7 @@ import datetime
 import os
 from pathlib import Path
 
-from types_ import (HLCPP, LLCPP, RUST, DART, GO)
+from types_ import (HLCPP, LLCPP, RUST, GO)
 
 year = datetime.datetime.now().year
 
@@ -83,21 +83,11 @@ import (
 func main() {{}}
 '''
 
-dart_init = '''
-
-import 'package:fidl_fidl_test_{library_name}/fidl_async.dart' as fidllib;
-
-// [START contents]
-// INSERT TEST CODE HERE
-// [END contents]
-'''
-
 init_by_binding = {
     HLCPP: hlcpp_init,
     LLCPP: llcpp_init,
     RUST: rust_init,
     GO: go_init,
-    DART: dart_init,
 }
 
 gn_template = f'# Copyright {year}' + ''' The Fuchsia Authors. All rights reserved.

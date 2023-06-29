@@ -22,7 +22,6 @@ EXTENSIONS = {
     HLCPP: 'cc',
     LLCPP: 'cc',
     RUST: 'rs',
-    DART: 'dart',
     GO: 'go',
 }
 

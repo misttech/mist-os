@@ -2,13 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/dart/dart_library.gni")
 import("//build/fidl/fidl.gni")
 import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
 import("//build/rust/rustc_binary.gni")
 
-is_dart = current_toolchain == dart_toolchain
 is_go = current_toolchain == go_toolchain
 
 # HLCPP Compatibility Test
@@ -70,28 +68,6 @@ if (is_go) {
     go_binary(target_name) {
       library = ":${target_name}_lib"
       output_dir = target_out_dir
-    }
-  }
-}
-
-if (is_dart) {
-  # Dart Source Compatibility Test
-  template("_dart_compat") {
-    copy_target_name = "${target_name}__copy"
-    dest_dir = get_label_info(":${target_name}", "target_gen_dir") +
-               "/${target_name}_dart_package"
-    dest_file = "${dest_dir}/lib/" + invoker.source
-    copy(copy_target_name) {
-      sources = [ invoker.source ]
-      outputs = [ dest_file ]
-    }
-    dart_library(target_name) {
-      infer_package_name = true
-      package_root = dest_dir
-      sources = [ invoker.source ]
-      deps = [ ":${invoker.fidl}_dart(${dart_toolchain})" ]
-      non_dart_deps = [ ":${copy_target_name}" ]
-      pubspec = "//src/tests/fidl/source_compatibility/pubspec.yaml"
     }
   }
 }
@@ -227,20 +203,6 @@ template("source_compatibility_test") {
         template_name = "_rust_compat"
       }
       test_targets += [ ":${target_name}_rust" ]
-    }
-
-    # Dart
-    if (defined(transitions.dart)) {
-      if (is_dart) {
-        _source_compat_steps("${target_name}_dart") {
-          tmp = transitions.dart
-          starting_fidl = tmp.starting_fidl
-          starting_src = tmp.starting_src
-          steps = tmp.steps
-          template_name = "_dart_compat"
-        }
-      }
-      test_targets += [ ":${target_name}_dart($dart_toolchain)" ]
     }
   } else {
     not_needed(invoker, "*")
