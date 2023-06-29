@@ -7,14 +7,19 @@
 This requires python protobufs for reproxy LogDump.
 """
 
+import argparse
 import hashlib
+import multiprocessing
 import os
 import shutil
 import subprocess
+import sys
 
 from api.log import log_pb2
 from pathlib import Path
-from typing import Dict
+from typing import Callable, Dict, Iterable, Sequence, Tuple
+
+import fuchsia
 
 _SCRIPT_BASENAME = Path(__file__).name
 
@@ -67,6 +72,41 @@ class ReproxyLog(object):
     @property
     def records_by_action_digest(self) -> Dict[str, log_pb2.LogRecord]:
         return self._records_by_action_digest
+
+    def diff_by_outputs(
+        self, other: 'ReproxyLog',
+        eq_comparator: Callable[[log_pb2.LogRecord, log_pb2.LogRecord], bool]
+    ) -> Iterable[Tuple[Path, log_pb2.LogRecord, log_pb2.LogRecord]]:
+        """Compare actions output-by-output.
+
+        Args:
+          other: the other log to compare.
+          eq_comparator: compare function for LogRecord.
+              When this evaluates to False, report a difference.
+
+        Yields:
+          pairs of (left, right) log records with key differences.
+        """
+        # Find output files common to both logs.
+        # Non-common files are ignored.
+        left_keys = set(self.records_by_output_file.keys())
+        right_keys = set(other.records_by_output_file.keys())
+        common_keys = left_keys & right_keys
+        visited_outputs = set()
+        for k in common_keys:
+            if k in visited_outputs:
+                continue
+            left_record = self.records_by_output_file[k]
+            right_record = other.records_by_output_file[k]
+            if not eq_comparator(left_record, right_record):
+                yield (k, left_record, right_record)
+            left_outputs = set(
+                Path(p) for p in left_record.command.output.output_files)
+            right_outputs = set(
+                Path(p) for p in right_record.command.output.output_files)
+            common_outputs = left_outputs & right_outputs
+            for p in common_outputs:
+                visited_outputs.add(p)
 
 
 def setup_logdir_for_logdump(path: Path, verbose: bool = False) -> Path:
@@ -135,3 +175,113 @@ def convert_reproxy_actions_log(
         msg(f"Loading log records from {log_pb_file}.")
 
     return _log_dump_from_pb(log_pb_file)
+
+
+def parse_log(
+        log_path: Path,
+        reclient_bindir: Path,
+        verbose: bool = False) -> ReproxyLog:
+    """Prepare and parse reproxy logs."""
+    return ReproxyLog(
+        convert_reproxy_actions_log(
+            reproxy_logdir=setup_logdir_for_logdump(log_path, verbose=verbose),
+            reclient_bindir=reclient_bindir,
+            verbose=verbose,
+        ))
+
+
+def _action_digest_eq(
+        left: log_pb2.LogRecord, right: log_pb2.LogRecord) -> bool:
+    return left.remote_metadata.action_digest == right.remote_metadata.action_digest
+
+
+def _diff_printer(log) -> str:
+    lines = [f'action_digest: {log.remote_metadata.action_digest}']
+    for file, digest in log.remote_metadata.output_file_digests.items():
+        lines.extend([
+            f'file: {file}',
+            f'  digest: {digest}',
+        ])
+    return '\n'.join(lines)
+
+
+# Defined at the module level for multiprocessing to be able to serialize.
+def _process_log_mp(log_path: Path) -> ReproxyLog:
+    """Prepare and parse reproxy logs (for parallel processing)."""
+    return parse_log(
+        log_path=log_path,
+        reclient_bindir=fuchsia.RECLIENT_BINDIR,
+        verbose=True,
+    )
+
+
+def parse_logs(reproxy_logs: Sequence[Path]) -> Sequence[ReproxyLog]:
+    """Parse reproxy logs, maybe in parallel."""
+    try:
+        with multiprocessing.Pool() as pool:
+            return pool.map(_process_log_mp, reproxy_logs)
+    except OSError:  # in case /dev/shm is not write-able (required)
+        if len(reproxy_logs) > 1:
+            msg("Warning: downloading sequentially instead of in parallel.")
+        return map(_process_log_mp, reproxy_logs)
+
+
+def diff_logs(args: argparse.Namespace) -> int:
+    logs = parse_logs(args.reproxy_logs)
+
+    # len(logs) == 2, enforced by _MAIN_ARG_PARSER.
+
+    # TODO: argparse options to customize:
+    #   different comparators
+    #   different result printers
+    # TODO: use a structured proto difference representation
+    #   to avoid showing fields that match.
+    left, right = logs
+    diffs = list(left.diff_by_outputs(right, _action_digest_eq))
+
+    if diffs:
+        print('Action differences found.')
+        for path, d_left, d_right in diffs:
+            left_text = _diff_printer(d_left)
+            right_text = _diff_printer(d_right)
+            print('---------------------------------')
+            print(f'{path}: (left)\n{left_text}\n')
+            print(f'{path}: (right)\n{right_text}\n')
+
+    return 0
+
+
+def _main_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+
+    # universal options
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        default=False,
+        help="Print additional debug information while running.",
+    )
+
+    subparsers = parser.add_subparsers(required=True)
+    diff_parser = subparsers.add_parser('diff', help='diff --help')
+    diff_parser.set_defaults(func=diff_logs)
+    diff_parser.add_argument(
+        "reproxy_logs",
+        type=Path,
+        help="reproxy logs (.rrpl or .rpl) or the directories containing them",
+        metavar="PATH",
+        nargs=2,
+    )
+    return parser
+
+
+_MAIN_ARG_PARSER = _main_arg_parser()
+
+
+def main(argv: Sequence[str]) -> int:
+    args = _MAIN_ARG_PARSER.parse_args(argv)
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

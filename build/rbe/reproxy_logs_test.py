@@ -3,6 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import argparse
 import shutil
 import subprocess
 import tempfile
@@ -20,6 +21,10 @@ from pathlib import Path
 def _write_file_contents(path: Path, contents: str):
     with open(path, 'w') as f:
         f.write(contents)
+
+
+def _digests_equal(left: log_pb2.LogRecord, right: log_pb2.LogRecord) -> bool:
+    return left.remote_metadata.action_digest == right.remote_metadata.action_digest
 
 
 class ReproxyLogTests(unittest.TestCase):
@@ -45,6 +50,30 @@ class ReproxyLogTests(unittest.TestCase):
                 'ffff0000/13': record1,
                 'bbbbaaaa/9': record2,
             })
+
+    def test_diff_by_outputs_matching(self):
+        record1 = log_pb2.LogRecord()
+        record1.command.output.output_files.extend(['obj/foo.o'])
+        record1.remote_metadata.action_digest = 'ffeeff001100/313'
+        log_dump = log_pb2.LogDump(records=[record1])
+        log = reproxy_logs.ReproxyLog(log_dump)
+        diffs = list(log.diff_by_outputs(log, _digests_equal))
+        self.assertEqual(diffs, [])
+
+    def test_diff_by_outputs_different(self):
+        output = Path('obj/foo')
+        record1 = log_pb2.LogRecord()
+        record1.command.output.output_files.extend([str(output)])
+        record1.remote_metadata.action_digest = 'ffeeff001100/313'
+        record2 = log_pb2.LogRecord()
+        record2.command.output.output_files.extend([str(output)])
+        record2.remote_metadata.action_digest = '98231772bbbd/313'
+        log_dump1 = log_pb2.LogDump(records=[record1])
+        log_dump2 = log_pb2.LogDump(records=[record2])
+        log1 = reproxy_logs.ReproxyLog(log_dump1)
+        log2 = reproxy_logs.ReproxyLog(log_dump2)
+        diffs = list(log1.diff_by_outputs(log2, _digests_equal))
+        self.assertEqual(diffs, [(output, record1, record2)])
 
 
 class SetupLogdirForLogDumpTest(unittest.TestCase):
@@ -80,6 +109,31 @@ class ConvertReproxyActionsLogTest(unittest.TestCase):
         mock_process_call.assert_called_once()
         mock_parse.assert_called_once()
         self.assertEqual(log_dump, log_dump)
+
+
+class DiffLogsTests(unittest.TestCase):
+
+    def test_flow(self):
+        empty_log = log_pb2.LogDump()
+        empty_logs = [reproxy_logs.ReproxyLog(empty_log)] * 2
+        args = argparse.Namespace(reproxy_logs=[Path('log1'), Path('log2')],)
+        with mock.patch.object(reproxy_logs, 'parse_logs',
+                               return_value=empty_logs) as mock_multi_parse:
+            status = reproxy_logs.diff_logs(args)
+        self.assertEqual(status, 0)
+
+
+class MainTests(unittest.TestCase):
+
+    def test_diff(self):
+        empty_log = log_pb2.LogDump()
+        empty_logs = [reproxy_logs.ReproxyLog(empty_log)] * 2
+        with mock.patch.object(reproxy_logs, 'diff_logs',
+                               return_value=0) as mock_diff:
+            with mock.patch.object(reproxy_logs, 'parse_logs',
+                                   return_value=empty_logs) as mock_multi_parse:
+                status = reproxy_logs.main(['diff', 'left.rrpl', 'right.rrpl'])
+        self.assertEqual(status, 0)
 
 
 if __name__ == '__main__':
