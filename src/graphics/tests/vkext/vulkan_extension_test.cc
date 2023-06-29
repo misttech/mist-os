@@ -191,6 +191,7 @@ void VulkanExtensionTest::CheckLinearSubresourceLayout(VkFormat format, uint32_t
       break;
 
     case VK_FORMAT_R8G8_UNORM:
+    case VK_FORMAT_R5G6B5_UNORM_PACK16:
       min_bytes_per_pixel = 2;
       break;
 

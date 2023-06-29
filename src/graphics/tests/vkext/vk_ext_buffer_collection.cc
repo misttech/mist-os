@@ -86,6 +86,11 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionNV12_1280_546) {
   ASSERT_TRUE(Exec(VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, 8192, 546, GetParam(), false));
 }
 
+TEST_P(VulkanImageExtensionTest, BufferCollectionRGB565) {
+  ASSERT_TRUE(Initialize());
+  ASSERT_TRUE(Exec(VK_FORMAT_R5G6B5_UNORM_PACK16, 64, 64, GetParam(), false));
+}
+
 TEST_P(VulkanImageExtensionTest, BufferCollectionMultipleFormats) {
   ASSERT_TRUE(Initialize());
 
