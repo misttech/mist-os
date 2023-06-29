@@ -5,7 +5,7 @@
 #ifndef LIB_DRIVER_LOGGING_CPP_STRUCTURED_LOGGER_H_
 #define LIB_DRIVER_LOGGING_CPP_STRUCTURED_LOGGER_H_
 
-#include <lib/driver/logging/cpp/logger_internal.h>
+#include <lib/driver/logging/cpp/internal/logger_internal.h>
 
 // Used to denote a key-value pair for use in structured logging API calls.
 // This macro exists solely to improve readability of calls to FX_SLOG

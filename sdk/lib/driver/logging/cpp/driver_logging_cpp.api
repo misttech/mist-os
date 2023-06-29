@@ -1,0 +1,5 @@
+{
+  "pkg/driver_logging_cpp/include/lib/driver/logging/cpp/internal/logger_internal.h": "fc4490b55751cdf890981d882687a14b",
+  "pkg/driver_logging_cpp/include/lib/driver/logging/cpp/logger.h": "936ceda01e11a33d80604ce8d12aae0f",
+  "pkg/driver_logging_cpp/include/lib/driver/logging/cpp/structured_logger.h": "ddd5f1417dec14adf3ac40dd777e6b64"
+}

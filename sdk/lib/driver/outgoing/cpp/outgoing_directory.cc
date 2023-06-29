@@ -8,17 +8,13 @@
 namespace fdf {
 
 OutgoingDirectory::OutgoingDirectory(OutgoingDirectory&& other) noexcept
-    : component_outgoing_dir_(std::move(other.component_outgoing_dir_)),
-      dispatcher_(other.dispatcher_) {
-  other.dispatcher_ = nullptr;
+    : component_outgoing_dir_(std::move(other.component_outgoing_dir_)) {
+  dispatcher_ = std::move(other.dispatcher_);
 }
 
 OutgoingDirectory& OutgoingDirectory::operator=(OutgoingDirectory&& other) noexcept {
   component_outgoing_dir_ = std::move(other.component_outgoing_dir_);
-  dispatcher_ = other.dispatcher_;
-
-  other.dispatcher_ = nullptr;
-
+  dispatcher_ = std::move(other.dispatcher_);
   return *this;
 }
 
@@ -35,7 +31,7 @@ void OutgoingDirectory::RegisterRuntimeToken(zx::channel token, AnyHandler handl
 
   auto protocol = std::make_unique<fdf::Protocol>(std::move(token_connect_handler));
   // We do not assert ZX_OK, as this may fail in the case where the dispatcher is shutting down.
-  auto status = protocol->Register(std::move(token), dispatcher_);
+  auto status = protocol->Register(std::move(token), dispatcher_->get());
   if (status == ZX_OK) {
     protocol.release();  // Will be deleted in the callback.
   }

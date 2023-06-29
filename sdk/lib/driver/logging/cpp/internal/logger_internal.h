@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_LOGGING_CPP_LOGGER_INTERNAL_H_
-#define LIB_DRIVER_LOGGING_CPP_LOGGER_INTERNAL_H_
+#ifndef LIB_DRIVER_LOGGING_CPP_INTERNAL_LOGGER_INTERNAL_H_
+#define LIB_DRIVER_LOGGING_CPP_INTERNAL_LOGGER_INTERNAL_H_
 
 #include <lib/driver/logging/cpp/logger.h>
 
@@ -179,4 +179,4 @@ static void fx_slog(fdf::Logger& logger, FuchsiaLogSeverity severity, const char
 
 }  // namespace fdf_internal
 
-#endif  // LIB_DRIVER_LOGGING_CPP_LOGGER_INTERNAL_H_
+#endif  // LIB_DRIVER_LOGGING_CPP_INTERNAL_LOGGER_INTERNAL_H_

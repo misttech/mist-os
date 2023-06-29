@@ -5,14 +5,14 @@
 import("//build/cpp/sdk_source_set.gni")
 
 sdk_source_set("cpp") {
-  category = "experimental"
+  category = "partner"
   sdk_name = "driver_logging_cpp"
   include_base = "//sdk"
 
   sources = [
+    "internal/logger_internal.h",
     "logger.cc",
     "logger.h",
-    "logger_internal.h",
     "structured_logger.h",
   ]
 
