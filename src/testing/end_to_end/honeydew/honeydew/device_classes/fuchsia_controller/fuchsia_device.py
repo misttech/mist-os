@@ -283,7 +283,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             # ZX_ERR_PEER_CLOSED is expected in this instance because the device
             # powered off.
             zx_status: Optional[int] = \
-                status.args[0] if len(status.args) == 0 else None
+                status.args[0] if len(status.args) > 0 else None
             if zx_status != fuchsia_controller.ZxStatus.ZX_ERR_PEER_CLOSED:
                 raise errors.FuchsiaControllerError(
                     "Fuchsia Controller FIDL Error") from status

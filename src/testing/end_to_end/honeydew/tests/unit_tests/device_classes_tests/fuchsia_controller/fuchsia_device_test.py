@@ -13,9 +13,11 @@ import fidl.fuchsia_buildinfo as f_buildinfo
 import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
 import fidl.fuchsia_hardware_power_statecontrol as fhp_statecontrol
 import fidl.fuchsia_hwinfo as f_hwinfo
+import fuchsia_controller_py as fuchsia_controller
 from parameterized import parameterized
 
 from honeydew import custom_types
+from honeydew import errors
 from honeydew.device_classes import base_fuchsia_device
 from honeydew.device_classes.fuchsia_controller import fuchsia_device
 from honeydew.interfaces.device_classes import affordances_capable
@@ -115,7 +117,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice.close()"""
         self.fd_obj.close()
 
-    # List all the tests related to private methods in alphabetical order
+    # List all the tests related to private properties in alphabetical order
     @mock.patch.object(
         f_buildinfo.Provider.Client,
         "get_build_info",
@@ -129,6 +131,23 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         self.assertEqual(
             self.fd_obj._build_info, _MOCK_DEVICE_PROPERTIES["build_info"])
         mock_buildinfo_provider.assert_called()
+
+    @mock.patch.object(
+        f_buildinfo.Provider.Client,
+        "get_build_info",
+        new_callable=mock.AsyncMock,
+        return_value=f_buildinfo.ProviderGetBuildInfoResponse(
+            build_info=_MOCK_DEVICE_PROPERTIES["build_info"]),
+    )
+    def test_build_info_error(self, mock_buildinfo_provider) -> None:
+        """Testcase for FuchsiaDevice._build_info property when the get_info
+        FIDL call raises an error.
+        ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
+        mock_buildinfo_provider.side_effect = fuchsia_controller.ZxStatus(
+            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS)
+        with self.assertRaises(errors.FuchsiaControllerError):
+            # pylint: disable=protected-access
+            _ = self.fd_obj._build_info
 
     @mock.patch.object(
         f_hwinfo.Device.Client,
@@ -145,6 +164,23 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_hwinfo_device.assert_called()
 
     @mock.patch.object(
+        f_hwinfo.Device.Client,
+        "get_info",
+        new_callable=mock.AsyncMock,
+        return_value=f_hwinfo.DeviceGetInfoResponse(
+            info=_MOCK_DEVICE_PROPERTIES["device_info"]),
+    )
+    def test_device_info_error(self, mock_hwinfo_device) -> None:
+        """Testcase for FuchsiaDevice._device_info property when the get_info
+        FIDL call raises an error.
+        ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
+        mock_hwinfo_device.side_effect = fuchsia_controller.ZxStatus(
+            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS)
+        with self.assertRaises(errors.FuchsiaControllerError):
+            # pylint: disable=protected-access
+            _ = self.fd_obj._device_info
+
+    @mock.patch.object(
         f_hwinfo.Product.Client,
         "get_info",
         new_callable=mock.AsyncMock,
@@ -157,6 +193,34 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         self.assertEqual(
             self.fd_obj._product_info, _MOCK_DEVICE_PROPERTIES["product_info"])
         mock_hwinfo_product.assert_called()
+
+    @mock.patch.object(
+        f_hwinfo.Product.Client,
+        "get_info",
+        new_callable=mock.AsyncMock,
+        return_value=f_hwinfo.ProductGetInfoResponse(
+            info=_MOCK_DEVICE_PROPERTIES["product_info"]),
+    )
+    def test_product_info_error(self, mock_hwinfo_product) -> None:
+        """Testcase for FuchsiaDevice._product_info property when the get_info
+        FIDL call raises an error.
+        ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
+        mock_hwinfo_product.side_effect = fuchsia_controller.ZxStatus(
+            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS)
+        with self.assertRaises(errors.FuchsiaControllerError):
+            # pylint: disable=protected-access
+            _ = self.fd_obj._product_info
+
+    # List all the tests related to private methods in alphabetical order
+    @mock.patch("fuchsia_controller_py.Context", autospec=True)
+    def test_context_create_init_error(self, mock_fc_context) -> None:
+        """Verify _context_create when the fuchsia controller Context creation
+        raises an error."""
+        mock_fc_context.side_effect = fuchsia_controller.ZxStatus(
+            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS)
+        with self.assertRaises(errors.FuchsiaControllerError):
+            # pylint: disable=protected-access
+            self.fd_obj._context_create()
 
     @mock.patch.object(
         fuchsia_device.FuchsiaDevice, "health_check", autospec=True)
@@ -207,12 +271,60 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_rcs_log_message.assert_called()
 
     @mock.patch.object(
+        fd_remotecontrol.RemoteControl.Client,
+        "log_message",
+        new_callable=mock.AsyncMock,
+    )
+    def test_send_log_command_error(self, mock_rcs_log_message) -> None:
+        """Testcase for FuchsiaDevice._send_log_command() when the log FIDL call
+        raises an error.
+        ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
+        mock_rcs_log_message.side_effect = fuchsia_controller.ZxStatus(
+            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS)
+        with self.assertRaises(errors.FuchsiaControllerError):
+            # pylint: disable=protected-access
+            self.fd_obj._send_log_command(
+                tag="test", level=custom_types.LEVEL.ERROR, message="test")
+
+    @mock.patch.object(
         fhp_statecontrol.Admin.Client,
         "reboot",
         new_callable=mock.AsyncMock,
     )
     def test_send_reboot_command(self, mock_admin_reboot) -> None:
         """Testcase for FuchsiaDevice._send_reboot_command()"""
+        # pylint: disable=protected-access
+        self.fd_obj._send_reboot_command()
+
+        mock_admin_reboot.assert_called()
+
+    @mock.patch.object(
+        fhp_statecontrol.Admin.Client,
+        "reboot",
+        new_callable=mock.AsyncMock,
+    )
+    def test_send_reboot_command_error(self, mock_admin_reboot) -> None:
+        """Testcase for FuchsiaDevice._send_reboot_command() when the reboot
+        FIDL call raises a non-ZX_ERR_PEER_CLOSED error.
+        ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
+        mock_admin_reboot.side_effect = fuchsia_controller.ZxStatus(
+            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS)
+        with self.assertRaises(errors.FuchsiaControllerError):
+            # pylint: disable=protected-access
+            self.fd_obj._send_reboot_command()
+
+    @mock.patch.object(
+        fhp_statecontrol.Admin.Client,
+        "reboot",
+        new_callable=mock.AsyncMock,
+    )
+    def test_send_reboot_command_error_is_peer_closed(
+            self, mock_admin_reboot) -> None:
+        """Testcase for FuchsiaDevice._send_reboot_command() when the reboot
+        FIDL call raises a ZX_ERR_PEER_CLOSED error.  This error should not
+        result in `FuchsiaControllerError` being raised."""
+        mock_admin_reboot.side_effect = fuchsia_controller.ZxStatus(
+            fuchsia_controller.ZxStatus.ZX_ERR_PEER_CLOSED)
         # pylint: disable=protected-access
         self.fd_obj._send_reboot_command()
 
