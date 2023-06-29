@@ -4,7 +4,7 @@
 
 use crate::{error::Result, pixel_format::PixelFormat};
 use {
-    fidl_fuchsia_hardware_display::Info,
+    fidl_fuchsia_hardware_display::{Info, LayerId as FidlLayerId, INVALID_DISP_ID},
     fuchsia_async::OnSignals,
     fuchsia_zircon::{self as zx, AsHandleRef},
     std::fmt,
@@ -19,8 +19,26 @@ pub struct DisplayId(pub u64);
 pub struct EventId(pub u64);
 
 /// Strongly typed wrapper around a display layer ID.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct LayerId(pub u64);
+
+impl Default for LayerId {
+    fn default() -> Self {
+        LayerId(INVALID_DISP_ID)
+    }
+}
+
+impl From<FidlLayerId> for LayerId {
+    fn from(fidl_layer_id: FidlLayerId) -> Self {
+        LayerId(fidl_layer_id.value)
+    }
+}
+
+impl From<LayerId> for FidlLayerId {
+    fn from(layer_id: LayerId) -> Self {
+        FidlLayerId { value: layer_id.0 }
+    }
+}
 
 /// Strongly typed wrapper around an image ID.
 #[derive(Clone, Copy, Debug)]
@@ -113,5 +131,48 @@ impl Event {
     pub fn signal(&self) -> Result<()> {
         self.event.as_handle_ref().signal(zx::Signals::NONE, zx::Signals::EVENT_SIGNALED)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[fuchsia::test]
+    fn layer_id_from_fidl_layer_id() {
+        assert_eq!(LayerId(1), LayerId::from(FidlLayerId { value: 1 }));
+        assert_eq!(LayerId(2), LayerId::from(FidlLayerId { value: 2 }));
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(LayerId(LARGE), LayerId::from(FidlLayerId { value: LARGE }));
+    }
+
+    #[fuchsia::test]
+    fn fidl_layer_id_from_layer_id() {
+        assert_eq!(FidlLayerId { value: 1 }, FidlLayerId::from(LayerId(1)));
+        assert_eq!(FidlLayerId { value: 2 }, FidlLayerId::from(LayerId(2)));
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(FidlLayerId { value: LARGE }, FidlLayerId::from(LayerId(LARGE)));
+    }
+
+    #[fuchsia::test]
+    fn fidl_layer_id_to_layer_id() {
+        assert_eq!(LayerId(1), FidlLayerId { value: 1 }.into());
+        assert_eq!(LayerId(2), FidlLayerId { value: 2 }.into());
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(LayerId(LARGE), FidlLayerId { value: LARGE }.into());
+    }
+
+    #[fuchsia::test]
+    fn layer_id_to_fidl_layer_id() {
+        assert_eq!(FidlLayerId { value: 1 }, LayerId(1).into());
+        assert_eq!(FidlLayerId { value: 2 }, LayerId(2).into());
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(FidlLayerId { value: LARGE }, LayerId(LARGE).into());
+    }
+
+    #[fuchsia::test]
+    fn layer_id_default() {
+        let default: LayerId = Default::default();
+        assert_eq!(default, LayerId(INVALID_DISP_ID));
     }
 }
