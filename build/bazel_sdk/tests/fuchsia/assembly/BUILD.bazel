@@ -70,7 +70,6 @@ fuchsia_product_configuration(
     json_config = {
         "platform": {
             "build_type": "user",
-            "additional_serial_log_tags": [],
             "connectivity": {"wlan": {
                 "legacy_privacy_support": True,
             }},

@@ -100,6 +100,13 @@ def normalize_platform(config, root_dir):
     # sections in the configuration, this removes them all (recursively).
     remove_empty_items(platform)
 
+    # When unset, set config_data to empty list for consistency, to avoid noisy
+    # diff.
+    if "diagnostics" not in platform:
+        platform["diagnostics"] = {}
+    if "additional_serial_log_components" not in platform["diagnostics"]:
+        platform["diagnostics"]["additional_serial_log_components"] = []
+
 
 def normalize_product(
         config, root_dir, extra_files_read, config_data_to_ignore):

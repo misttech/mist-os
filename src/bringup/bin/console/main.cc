@@ -9,7 +9,6 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
-#include "src/bringup/bin/console/args.h"
 #include "src/bringup/bin/console/console.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
 
@@ -32,59 +31,12 @@ zx::resource GetDebugResource() {
   return std::move(result->resource);
 }
 
-zx_status_t ConnectListener(fidl::ClientEnd<fuchsia_logger::LogListenerSafe> listener,
-                            const std::vector<std::string>& allowed_log_tags) {
-  auto client_end = component::Connect<fuchsia_logger::Log>();
-  if (client_end.is_error()) {
-    printf("console: fdio_service_connect() = %s\n", client_end.status_string());
-    return client_end.status_value();
-  }
-
-  fidl::WireSyncClient log{std::move(client_end.value())};
-  std::vector<fidl::StringView> tags;
-  tags.reserve(allowed_log_tags.size());
-  for (auto& tag : allowed_log_tags) {
-    tags.emplace_back(fidl::StringView::FromExternal(tag));
-  }
-  fuchsia_logger::wire::LogFilterOptions options{
-      .filter_by_pid = false,
-      .filter_by_tid = false,
-      .min_severity = fuchsia_logger::wire::LogLevelFilter::kTrace,
-      .tags = fidl::VectorView<fidl::StringView>::FromExternal(tags),
-  };
-  auto result = log->ListenSafe(
-      std::move(listener),
-      fidl::ObjectView<fuchsia_logger::wire::LogFilterOptions>::FromExternal(&options));
-  if (!result.ok()) {
-    printf("console: fuchsia.logger.Log/ListenSafe() = %s\n", result.FormatDescription().c_str());
-    return result.status();
-  }
-  return ZX_OK;
-}
-
 }  // namespace
 
 int main(int argc, const char** argv) {
   if (zx_status_t status = StdoutToDebuglog::Init(); status != ZX_OK) {
     printf("console: StdoutToDebuglog::Init() = %s\n", zx_status_get_string(status));
     return status;
-  }
-
-  Options opts;
-  {
-    zx::result client = component::Connect<fuchsia_boot::Arguments>();
-    if (client.is_error()) {
-      printf("console: component::Connect<fuchsia_boot::Arguments>() = %s\n",
-             client.status_string());
-      return client.status_value();
-    }
-
-    if (zx_status_t status = ParseArgs(console_config::Config::TakeFromStartupHandle(),
-                                       fidl::WireSyncClient{std::move(client.value())}, &opts);
-        status != ZX_OK) {
-      printf("console: ParseArgs() = %s\n", zx_status_get_string(status));
-      return status;
-    }
   }
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
@@ -117,27 +69,7 @@ int main(int argc, const char** argv) {
     return status;
   }
   auto console = std::make_unique<Console>(loop.dispatcher(), std::move(event1), std::move(event2),
-                                           std::move(rx_source), std::move(tx_sink),
-                                           std::move(opts.denied_log_tags));
-
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_logger::LogListenerSafe>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
-  }
-  auto& [client, server] = endpoints.value();
-
-  // TODO(fxbug.dev/100486): delete everything related to logs as it's moving to the Archivist.
-  // Treat no tags as "log nothing".
-  if (!opts.allowed_log_tags.empty()) {
-    if (zx_status_t status = ConnectListener(std::move(client), opts.allowed_log_tags);
-        status != ZX_OK) {
-      return status;
-    }
-
-    fidl::BindServer(
-        loop.dispatcher(), std::move(server),
-        static_cast<fidl::WireServer<fuchsia_logger::LogListenerSafe>*>(console.get()));
-  }
+                                           std::move(rx_source), std::move(tx_sink));
 
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
   if (zx::result status = outgoing.AddProtocol<fuchsia_hardware_pty::Device>(std::move(console));

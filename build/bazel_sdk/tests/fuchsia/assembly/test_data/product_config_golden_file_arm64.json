@@ -1,6 +1,5 @@
 {
     "platform": {
-        "additional_serial_log_tags": [],
         "build_type": "user",
         "connectivity": {
             "wlan": {

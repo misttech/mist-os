@@ -24,7 +24,6 @@ use prelude::*;
 
 mod battery;
 mod connectivity;
-mod console;
 mod development;
 mod diagnostics;
 mod driver_framework;
@@ -179,13 +178,6 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'connectivity' subsystem")?;
-
-    console::ConsoleSubsystemConfig::define_configuration(
-        context,
-        &config.platform.additional_serial_log_tags,
-        builder,
-    )
-    .context("Configuring the 'console' subsystem")?;
 
     development::DevelopmentConfig::define_configuration(
         context,

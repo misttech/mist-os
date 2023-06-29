@@ -10,22 +10,15 @@ fuchsia_component_manifest("manifest") {
   manifest = "meta/console.cml"
 }
 
-fuchsia_structured_config_cpp_elf_lib("console_config") {
-  cm_label = ":manifest"
-}
-
 source_set("common") {
   visibility = [ ":*" ]
   sources = [
-    "args.cc",
-    "args.h",
     "console.cc",
     "console.h",
     "fifo.cc",
     "fifo.h",
   ]
   public_deps = [
-    ":console_config",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp_wire",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
@@ -75,7 +68,6 @@ fuchsia_package("package") {
 
 test("console-test") {
   sources = [
-    "args-test.cc",
     "console-test.cc",
     "fifo-test.cc",
   ]

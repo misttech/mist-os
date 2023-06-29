@@ -21,13 +21,12 @@
 #include <fbl/string_buffer.h>
 
 Console::Console(async_dispatcher_t* dispatcher, zx::eventpair event1, zx::eventpair event2,
-                 RxSource rx_source, TxSink tx_sink, std::vector<std::string> denied_log_tags)
+                 RxSource rx_source, TxSink tx_sink)
     : dispatcher_(dispatcher),
       rx_fifo_(std::move(event1)),
       rx_event_(std::move(event2)),
       rx_source_(std::move(rx_source)),
       tx_sink_(std::move(tx_sink)),
-      denied_log_tags_(std::move(denied_log_tags)),
       rx_thread_(std::thread([this]() { DebugReaderThread(); })) {}
 
 Console::~Console() { rx_thread_.join(); }
@@ -122,82 +121,3 @@ void Console::DebugReaderThread() {
     rx_fifo_.Write(&ch, 1, &actual);
   }
 }
-
-zx_status_t Console::Log(fuchsia_logger::wire::LogMessage log) {
-  fbl::StringBuffer<kMaxWriteSize> buffer;
-  auto time = zx::nsec(log.time);
-  buffer.AppendPrintf("[%05ld.%03ld] %05lu:%05lu> [", time.to_secs(), time.to_msecs() % 1000,
-                      log.pid, log.tid);
-  auto count = log.tags.count();
-  for (auto& tag : log.tags) {
-    for (auto& denied_log_tag : denied_log_tags_) {
-      if (strncmp(denied_log_tag.data(), tag.data(), tag.size()) == 0) {
-        return ZX_OK;
-      }
-    }
-    buffer.Append(tag.data(), tag.size());
-    if (--count > 0) {
-      buffer.Append(", ");
-    }
-  }
-  switch (log.severity) {
-    case static_cast<int32_t>(fuchsia_logger::LogLevelFilter::kTrace):
-      buffer.Append("] TRACE: ");
-      break;
-    case static_cast<int32_t>(fuchsia_logger::LogLevelFilter::kDebug):
-      buffer.Append("] DEBUG: ");
-      break;
-    case static_cast<int32_t>(fuchsia_logger::LogLevelFilter::kInfo):
-      buffer.Append("] INFO: ");
-      break;
-    case static_cast<int32_t>(fuchsia_logger::LogLevelFilter::kWarn):
-      buffer.Append("] WARNING: ");
-      break;
-    case static_cast<int32_t>(fuchsia_logger::LogLevelFilter::kError):
-      buffer.Append("] ERROR: ");
-      break;
-    case static_cast<int32_t>(fuchsia_logger::LogLevelFilter::kFatal):
-      buffer.Append("] FATAL: ");
-      break;
-    default:
-      buffer.AppendPrintf(
-          "] VLOG(%d): ",
-          static_cast<int32_t>(fuchsia_logger::LogLevelFilter::kInfo) - log.severity);
-  }
-  // Split log into multiple lines if necessary. Log splitting assumes logs are ASCII for
-  // simplicities sake.
-  size_t offset = 0;
-  while (offset < log.msg.size()) {
-    auto count = std::min(buffer.capacity() - buffer.size() - 1, log.msg.size() - offset);
-    buffer.Append(log.msg.data() + offset, count).Append('\n');
-    zx_status_t status = tx_sink_(reinterpret_cast<const uint8_t*>(buffer.data()), buffer.size());
-    if (status != ZX_OK) {
-      return status;
-    }
-    buffer.Clear();
-    offset += count;
-  };
-  return ZX_OK;
-}
-
-void Console::Log(LogRequestView request, LogCompleter::Sync& completer) {
-  zx_status_t status = Log(request->log);
-  if (status != ZX_OK) {
-    completer.Close(status);
-    return;
-  }
-  completer.Reply();
-}
-
-void Console::LogMany(LogManyRequestView request, LogManyCompleter::Sync& completer) {
-  for (auto& log : request->log) {
-    zx_status_t status = Log(log);
-    if (status != ZX_OK) {
-      completer.Close(status);
-      return;
-    }
-  }
-  completer.Reply();
-}
-
-void Console::Done(DoneCompleter::Sync& completer) {}

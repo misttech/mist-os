@@ -17,8 +17,7 @@
 
 #include "fifo.h"
 
-class Console : public fidl::WireServer<fuchsia_logger::LogListenerSafe>,
-                public fidl::WireServer<fuchsia_hardware_pty::Device> {
+class Console : public fidl::WireServer<fuchsia_hardware_pty::Device> {
  public:
   // Maximum amount of data that will be written to tx_sink_() per call.
   static constexpr size_t kMaxWriteSize = 256;
@@ -33,20 +32,12 @@ class Console : public fidl::WireServer<fuchsia_logger::LogListenerSafe>,
   using TxSink = fit::function<zx_status_t(const uint8_t* buffer, size_t length)>;
 
   Console(async_dispatcher_t* dispatcher, zx::eventpair event1, zx::eventpair event2,
-          RxSource rx_source, TxSink tx_sink, std::vector<std::string> denied_log_tags);
+          RxSource rx_source, TxSink tx_sink);
   ~Console() override;
-
-  // Used to implement fuchsia.log.LogListenerSafe/{Log,LogMany}. Exposed for testing.
-  zx_status_t Log(fuchsia_logger::wire::LogMessage log);
 
  private:
   // Thread for getting tty input via zx_debug_read
   void DebugReaderThread();
-
-  // Functions to handle fuchsia.log.LogListenerSafe
-  void Log(LogRequestView request, LogCompleter::Sync& completer) override;
-  void LogMany(LogManyRequestView request, LogManyCompleter::Sync& completer) override;
-  void Done(DoneCompleter::Sync& completer) override;
 
   // Functions to handle fuchsia.hardware.pty.Device
   void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) final;
@@ -70,7 +61,6 @@ class Console : public fidl::WireServer<fuchsia_logger::LogListenerSafe>,
   zx::eventpair rx_event_;
   RxSource rx_source_;
   TxSink tx_sink_;
-  std::vector<std::string> denied_log_tags_;
   std::thread rx_thread_;
 };
 

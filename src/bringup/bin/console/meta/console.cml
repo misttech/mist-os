@@ -14,10 +14,8 @@
     use: [
         {
             protocol: [
-                "fuchsia.boot.Arguments",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.kernel.DebugResource",
-                "fuchsia.logger.Log",
             ],
         },
     ],
@@ -27,24 +25,4 @@
             from: "self",
         },
     ],
-
-    // Console's config values are defined by product assembly. See ../README.md for details.
-    config: {
-        allowed_log_tags: {
-            type: "vector",
-            max_count: 512,
-            element: {
-                type: "string",
-                max_size: 50,
-            },
-        },
-        denied_log_tags: {
-            type: "vector",
-            max_count: 512,
-            element: {
-                type: "string",
-                max_size: 50,
-            },
-        },
-    },
 }
