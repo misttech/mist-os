@@ -223,6 +223,7 @@ executable("driver_manager") {
   deps = [
     ":driver_manager_config",
     ":lib",
+    "//src/lib/scheduler/cpp",
     "//src/sys/lib/stdout-to-debuglog/cpp",
   ]
 

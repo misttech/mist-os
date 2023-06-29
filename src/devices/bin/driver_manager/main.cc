@@ -18,9 +18,11 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fdio/io.h>
+#include <lib/scheduler/role.h>
 #include <lib/zx/event.h>
 #include <lib/zx/port.h>
 #include <lib/zx/resource.h>
+#include <lib/zx/thread.h>
 #include <lib/zx/vmo.h>
 #include <threads.h>
 #include <zircon/process.h>
@@ -29,6 +31,7 @@
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/syscalls/policy.h>
+#include <zircon/threads.h>
 #include <zircon/types.h>
 
 #include <cstdio>
@@ -202,8 +205,17 @@ int RunDfv1(driver_manager_config::Config dm_config,
     config.mexec_resource = std::move(mexec_resource.value());
   }
 
+  thrd_t thrd;
   async::Loop firmware_loop(&kAsyncLoopConfigNeverAttachToThread);
-  firmware_loop.StartThread("firmware-loop");
+  firmware_loop.StartThread("firmware-loop", &thrd);
+  {
+    const zx_status_t status = fuchsia_scheduler::SetRoleForThread(
+        zx::unowned_thread{thrd_get_zx_handle(thrd)}, "fuchsia.driver-manager.firmware-loop");
+    if (status != ZX_OK) {
+      LOGF(WARNING, "Failed to apply role to firmware loop thread: %s",
+           zx_status_get_string(status));
+    }
+  }
 
   auto realm_result = component::Connect<fuchsia_component::Realm>();
   if (realm_result.is_error()) {
