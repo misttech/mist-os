@@ -59,6 +59,7 @@ def convert_budget_format(platform_aib_paths, component, all_manifests):
         # These location are used in bazel based workflows
         "external/legacy_ninja_build_outputs/obj/build/images/fuchsia/fuchsia/fuchsia.bazel_legacy_aib",
         "bazel-out/aarch64-fastbuild/bin",
+        "bazel-out/aarch64-opt/bin",  # Release Bazel builds will have this prefix.
     ]
     # And these are the assembly bundle locations that packages can be from
     for bundle_path in platform_aib_paths:
