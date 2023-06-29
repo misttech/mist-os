@@ -683,6 +683,7 @@ BufferCollection::CloneAuxBuffersResultForSendingV1(
 }
 
 void BufferCollection::OnBuffersAllocated(const AllocationResult& allocation_result) {
+  TRACE_DURATION("gfx", "BufferCollection::OnBuffersAllocated", "status", allocation_result.status);
   ZX_DEBUG_ASSERT(!logical_allocation_result_.has_value());
 
   ZX_DEBUG_ASSERT((allocation_result.status == ZX_OK) ==
@@ -781,7 +782,7 @@ void BufferCollection::MaybeCompleteWaitForBuffersAllocated() {
       }
       v1 = v1_result.take_value();
     }
-    TRACE_ASYNC_END("gfx", "BufferCollection::WaitForBuffersAllocated async", async_id, "this",
+    TRACE_ASYNC_END("gfx", "BufferCollection::WaitForAllBuffersAllocated async", async_id, "this",
                     this, "logical_buffer_collection", &logical_buffer_collection());
 
     fuchsia_sysmem::BufferCollectionWaitForBuffersAllocatedResponse response;
@@ -813,7 +814,7 @@ void BufferCollection::MaybeCompleteWaitForBuffersAllocated() {
       }
       v2 = v2_result.take_value();
     }
-    TRACE_ASYNC_END("gfx", "BufferCollection::WaitForBuffersAllocated async", async_id, "this",
+    TRACE_ASYNC_END("gfx", "BufferCollection::WaitForAllBuffersAllocated async", async_id, "this",
                     this, "logical_buffer_collection", &logical_buffer_collection());
     if (logical_allocation_result_->status != ZX_OK) {
       txn.Reply(fit::error(logical_allocation_result_->status));
