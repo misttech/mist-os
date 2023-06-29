@@ -19,7 +19,7 @@ declare_args() {
     # TODO(fxbug.dev/67985): Using default quarantine size of 256MiB causes
     # asan bots to OOM, this reduces the per-app quarantine size until we
     # investigate other possible fixes.
-    "quarantine_size_mb=64",
+    "quarantine_size_mb=32",
   ]
 
   # Default [LeakSanitizer](https://clang.llvm.org/docs/LeakSanitizer.html)
