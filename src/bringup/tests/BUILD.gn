@@ -85,7 +85,6 @@ group("bootfs-tests") {
     "//zircon/system/utest/core:core-version-bootfs-test",
     "//zircon/system/utest/core:core-vmar-bootfs-test",
     "//zircon/system/utest/core:core-vmo-bootfs-test",
-    "//zircon/system/utest/core-display:core-display-bootfs-test",
     "//zircon/system/utest/debugger:debugger-bootfs-test",
     "//zircon/system/utest/device-enumeration:device-enumeration-bootfs-test",
     "//zircon/system/utest/dlfcn:dlfcn-bootfs-test",
