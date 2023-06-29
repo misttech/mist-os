@@ -6,10 +6,7 @@ use fidl_fidl_test_compatibility::{ConfigRequest, ConfigRequestStream};
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
 
-const IMPLS: [&'static str; 6] = [
-    "cpp", "dart", // TODO(b/240154207): delete dart.
-    "hlcpp", "go", "llcpp", "rust",
-];
+const IMPLS: [&'static str; 5] = ["cpp", "hlcpp", "go", "llcpp", "rust"];
 
 async fn config_server(stream: ConfigRequestStream) {
     stream

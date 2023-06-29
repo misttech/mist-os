@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/dart/dart_test_component.gni")
 import("//build/rust/rustc_binary.gni")
 
 # Shared between the hlcpp test server and the test harness.
@@ -38,9 +37,6 @@ fidl_compatibility_tests_categories = [
 # LINT.IfChange
 fidl_compatibilty_test_impls = [
   "cpp",
-
-  # TODO(b/240154207): delete dart.
-  "dart",
   "hlcpp",
   "go",
   "llcpp",
@@ -218,16 +214,11 @@ fuchsia_test_package("fidl_compatibility_test_package") {
 
 group("compatibility") {
   testonly = true
-  deps = [
-    ":fidl_compatibility_test_package",
-    "//src/dart",
-  ]
+  deps = [ ":fidl_compatibility_test_package" ]
 }
 
 group("packages") {
   testonly = true
-
-  # TODO(b/240154207): delete dart.
-  impl_packages = fidl_compatibilty_test_impls - [ "dart" ]
+  impl_packages = fidl_compatibilty_test_impls
   deps = impl_packages + test_harness_labels
 }
