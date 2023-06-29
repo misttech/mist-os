@@ -154,6 +154,13 @@ closed protocol RadarBurstReader {
     /// *         quickly enough.
     /// *     `SENSOR_ERROR`: An unspecified driver or sensor error occurred
     /// *         when trying to read the burst.
+    @available(added=14)
+    strict -> OnBurst(flexible union {
+        1: burst Burst;
+        2: error StatusCode;
+    });
+
+    @available(removed=14)
     strict -> OnBurst(struct {
         burst Burst;
     }) error StatusCode;
