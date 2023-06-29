@@ -9,7 +9,7 @@ use {
     fuchsia_async::Task,
     fuchsia_component::server::ServiceFs,
     futures::{StreamExt, TryStreamExt},
-    security_pkg_test_util::config::load_config,
+    security_pkg_test_util::load_config,
     std::net::Ipv4Addr,
     tracing::info,
 };

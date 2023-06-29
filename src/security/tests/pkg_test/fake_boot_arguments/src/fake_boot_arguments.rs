@@ -4,10 +4,8 @@
 
 use {
     anyhow::Context as _,
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio,
     futures::stream::{StreamExt as _, TryStreamExt as _},
-    std::sync::Arc,
     tracing::{error, info},
 };
 
@@ -20,11 +18,6 @@ pub struct Args {
     /// absolute path to system_image package file.
     #[argh(option)]
     system_image_path: String,
-}
-
-enum BootServices {
-    Arguments(fidl_fuchsia_boot::ArgumentsRequestStream),
-    Items(fidl_fuchsia_boot::ItemsRequestStream),
 }
 
 #[fuchsia::main]
@@ -48,28 +41,15 @@ async fn main() {
     let pkgfs_boot_arg_value = format!("{}{}", PKGFS_BOOT_ARG_VALUE_PREFIX, system_image_merkle);
 
     let mut fs = fuchsia_component::server::ServiceFs::new();
-    fs.dir("svc").add_fidl_service(BootServices::Arguments);
-    fs.dir("svc").add_fidl_service(BootServices::Items);
+    fs.dir("svc").add_fidl_service(|stream: fidl_fuchsia_boot::ArgumentsRequestStream| stream);
     fs.take_and_serve_directory_handle().unwrap();
-
     fs.for_each_concurrent(None, |stream| async {
-        match stream {
-            BootServices::Arguments(stream) => {
-                let () = serve(stream, pkgfs_boot_arg_value.as_str()).await.unwrap_or_else(|err| {
-                    error!("error handling fuchsia.boot/Arguments stream: {:#}", err)
-                });
-            }
-            BootServices::Items(stream) => {
-                // The VMO provided here would be for the recovery case only, which isn't of interest for pkg_test.
-                run_boot_items(stream, None).await
-            }
-        }
+        let () = serve(stream, pkgfs_boot_arg_value.as_str()).await.unwrap_or_else(|err| {
+            error!("error handling fuchsia.boot/Arguments stream: {:#}", err)
+        });
     })
     .await;
 }
-
-/// Identifier for ramdisk storage. Defined in sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
-const ZBI_TYPE_STORAGE_RAMDISK: u32 = 0x4b534452;
 
 async fn serve(
     mut stream: fidl_fuchsia_boot::ArgumentsRequestStream,
@@ -81,63 +61,12 @@ async fn serve(
                 let value = if key == PKGFS_BOOT_ARG_KEY {
                     Some(pkgfs_boot_arg_value)
                 } else {
-                    // fshost may depend on using this interface, but not care about the return value.
-                    None
+                    anyhow::bail!("unsupported boot argument key {}", key);
                 };
                 responder.send(value).unwrap();
             }
-            fidl_fuchsia_boot::ArgumentsRequest::GetStrings { keys, responder } => {
-                responder.send(&vec![None; keys.len()]).unwrap();
-            }
-            fidl_fuchsia_boot::ArgumentsRequest::GetBool { key: _, defaultval, responder } => {
-                responder.send(defaultval).unwrap();
-            }
-            fidl_fuchsia_boot::ArgumentsRequest::GetBools { keys, responder } => {
-                let vec: Vec<_> = keys.iter().map(|bool_pair| bool_pair.defaultval).collect();
-                responder.send(&vec).unwrap();
-            }
-            fidl_fuchsia_boot::ArgumentsRequest::Collect { .. } => {
-                // This seems to be deprecated. Either way, fshost doesn't use it.
-                panic!(
-                    "unexpectedly called Collect on {}",
-                    fidl_fuchsia_boot::ArgumentsMarker::PROTOCOL_NAME
-                );
-            }
+            req => anyhow::bail!("unexpected request {:?}", req),
         }
     }
     Ok(())
-}
-
-// Mocks for fshost, from https://cs.opensource.google/fuchsia/fuchsia/+/main:src/storage/fshost/integration/src/mocks.rs
-// fshost uses exactly one boot item - it checks to see if there is an item of type
-// ZBI_TYPE_STORAGE_RAMDISK. If it's there, it's a vmo that represents a ramdisk version of the
-// fvm, and fshost creates a ramdisk from the vmo so it can go through the normal device matching.
-async fn run_boot_items(
-    mut stream: fidl_fuchsia_boot::ItemsRequestStream,
-    vmo: Option<Arc<zx::Vmo>>,
-) {
-    while let Some(request) = stream.next().await {
-        match request.unwrap() {
-            fidl_fuchsia_boot::ItemsRequest::Get { type_, extra, responder } => {
-                assert_eq!(type_, ZBI_TYPE_STORAGE_RAMDISK);
-                assert_eq!(extra, 0);
-                let response_vmo = vmo.as_ref().map(|vmo| {
-                    vmo.create_child(zx::VmoChildOptions::SLICE, 0, vmo.get_size().unwrap())
-                        .unwrap()
-                });
-                responder.send(response_vmo, 0).unwrap();
-            }
-            fidl_fuchsia_boot::ItemsRequest::Get2 { type_, extra, responder } => {
-                assert_eq!(type_, ZBI_TYPE_STORAGE_RAMDISK);
-                assert_eq!((*extra.unwrap()).n, 0);
-                responder.send(Ok(Vec::new())).unwrap();
-            }
-            fidl_fuchsia_boot::ItemsRequest::GetBootloaderFile { .. } => {
-                panic!(
-                    "unexpectedly called GetBootloaderFile on {}",
-                    fidl_fuchsia_boot::ItemsMarker::PROTOCOL_NAME
-                );
-            }
-        }
-    }
 }

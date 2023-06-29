@@ -26,7 +26,7 @@ use {
     fuchsia_merkle::MerkleTree,
     fuchsia_zircon::{AsHandleRef, Rights, Status},
     futures::{channel::oneshot::channel, join, TryStreamExt},
-    security_pkg_test_util::{config::load_config, storage::mount_image_as_ramdisk},
+    security_pkg_test_util::load_config,
     std::{convert::TryInto, fs::File},
     tracing::info,
 };
@@ -242,7 +242,6 @@ impl AccessCheckRequest {
             info!(%url_with_hash, "Skipping open package via pkg-resolver");
             None
         };
-
         let url_without_hash = format!(
             "fuchsia-pkg://{}/{}/0",
             &self.config.domain_without_hash, &self.config.package_name
@@ -467,7 +466,6 @@ async fn access_ota_blob_as_executable() {
     let config = load_config(test_config_path);
 
     // Setup storage capabilities.
-    let ramdisk_client = mount_image_as_ramdisk("/pkg/data/assemblies/hello_world_v0/fs.blk").await;
     let pkg_resolver_storage_proxy = get_storage_for_component_instance("./pkg-resolver").await;
     // TODO(fxbug.dev/88453): Need a test that confirms assumption: Production
     // configuration is an empty mutable storage directory.
@@ -606,7 +604,4 @@ async fn access_ota_blob_as_executable() {
         .pkg_resolver_with_hash
         .unwrap()
         .is_executable_err());
-
-    // Clean up ramdisk, not necessary but good practice
-    ramdisk_client.destroy().await.unwrap();
 }

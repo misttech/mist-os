@@ -1,0 +1,69 @@
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/lib/storage/fs_management/client.shard.cml",
+        "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "elf",
+        binary: "bin/product_security_fshost",
+
+        // Note: Manifests including this shard must provide args:
+        //   --fvm-block-file-path
+    },
+    children: [
+        {
+            name: "memfs",
+            url: "#meta/memfs.cm",
+        },
+        {
+            name: "blobfs",
+            url: "#meta/blobfs.cm",
+        },
+    ],
+    capabilities: [
+        {
+            directory: "blob-exec",
+            rights: [
+                "execute",
+                "rw*",
+            ],
+            path: "/blob",
+        },
+    ],
+    use: [
+        // Used to start filesystem processes
+        { protocol: "fuchsia.process.Launcher" },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: "#memfs",
+        },
+        {
+            protocol: "fuchsia.kernel.VmexResource",
+            from: "parent",
+            to: "#blobfs",
+        },
+        {
+            protocol: "fuchsia.scheduler.ProfileProvider",
+            from: "parent",
+            to: "#blobfs",
+        },
+    ],
+    expose: [
+        {
+            directory: "blob-exec",
+            from: "self",
+        },
+        {
+            directory: "memfs",
+            from: "#memfs",
+        },
+    ],
+}
