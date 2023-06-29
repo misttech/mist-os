@@ -376,8 +376,8 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
   [HoneyDew code guidelines](#honeydew-code-guidelines) by sharing a proof
   (output) with CL reviewers (until CQ/Pre-Submit is updated to automatically
   check this)
-* Please run any impacted functional tests locally and share the test output
-with the CL reviewers
+* Please ensure your CL does not introduce any regressions by successfully
+  running the [honeydew builders using try-jobs]
 * At least one of the [HoneyDew OWNERS] should be added as a reviewer
 * CL reviewers to make sure CL author has shared all the necessary output (as
   mentioned above) that was run using the latest patchset before approving the
@@ -400,6 +400,8 @@ with the CL reviewers
 [functional tests README]: tests/functional_tests/README.md
 
 [top level HoneyDew functional tests BUILD]: tests/functional_tests/BUILD.gn
+
+[honeydew builders using try-jobs]: images/pye2e_builders.png
 
 [instructions on how to submit contributions to the Fuchsia project]: https://fuchsia.dev/fuchsia-src/development/source_code/contribute_changes
 
