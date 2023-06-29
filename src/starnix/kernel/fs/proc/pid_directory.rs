@@ -6,8 +6,7 @@ use fuchsia_zircon as zx;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::borrow::Cow;
-use std::{ffi::CString, sync::Arc};
+use std::{borrow::Cow, ffi::CString, sync::Arc};
 
 use crate::{
     fs::{
@@ -299,8 +298,7 @@ impl FsNodeOps for TaskListDirectory {
         Ok(VecDirectory::new_file(
             self.thread_group
                 .read()
-                .tasks
-                .keys()
+                .task_ids()
                 .map(|tid| VecDirectoryEntry {
                     entry_type: DirectoryEntryType::DIR,
                     name: tid.to_string().into_bytes(),
@@ -321,7 +319,7 @@ impl FsNodeOps for TaskListDirectory {
             .parse::<pid_t>()
             .map_err(|_| errno!(ENOENT))?;
         // Make sure the tid belongs to this process.
-        if !self.thread_group.read().tasks.contains_key(&tid) {
+        if !self.thread_group.read().contains_task(tid) {
             return error!(ENOENT);
         }
         let task =
@@ -628,7 +626,7 @@ impl DynamicFileSource for StatFile {
             stats[13] =
                 duration_to_scheduler_clock(thread_group.children_time_stats.system_time) as u64;
 
-            stats[16] = thread_group.tasks.len() as u64;
+            stats[16] = thread_group.tasks_count() as u64;
             stats[21] = thread_group.limits.get(Resource::RSS).rlim_max;
         }
 
@@ -722,7 +720,7 @@ impl DynamicFileSource for StatusFile {
         writeln!(sink, "Pid:\t{}", task.id)?;
         let (ppid, threads) = {
             let task_group = task.thread_group.read();
-            (task_group.get_ppid(), task_group.tasks.len())
+            (task_group.get_ppid(), task_group.tasks_count())
         };
         writeln!(sink, "PPid:\t{}", ppid)?;
 

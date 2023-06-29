@@ -405,7 +405,7 @@ impl RemoteBinderHandleState {
         // Interrupt at least one task in the thread group to ensure that the request will be
         // handled.
         if let Some(thread_group) = self.thread_group.upgrade() {
-            if let Ok(task) = thread_group.read().get_task() {
+            if let Ok(task) = thread_group.read().get_live_task() {
                 task.interrupt();
             }
         }

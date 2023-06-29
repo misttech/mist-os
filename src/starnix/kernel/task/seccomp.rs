@@ -248,7 +248,7 @@ impl SeccompState {
             SECCOMP_RET_KILL_THREAD => {
                 let siginfo = SignalInfo::default(SIGSYS);
 
-                let is_last_thread = task.thread_group.read().tasks.len() == 1;
+                let is_last_thread = task.thread_group.read().tasks_count() == 1;
                 let mut task_state = task.write();
 
                 if is_last_thread {

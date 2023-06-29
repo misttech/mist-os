@@ -2874,7 +2874,7 @@ impl BinderDriver {
             Ok(task)
         } else if let Some(thread_group) = pids.get_thread_group(pid) {
             std::mem::drop(pids);
-            thread_group.read().get_task().map_err(|_| TransactionError::Dead)
+            thread_group.read().get_live_task().map_err(|_| TransactionError::Dead)
         } else {
             Err(TransactionError::Dead)
         }

@@ -17,7 +17,7 @@ use crate::{
     auth::Credentials,
     device::terminal::*,
     drop_notifier::DropNotifier,
-    lock::RwLock,
+    lock::{Mutex, MutexGuard, RwLock},
     logging::{log_error, not_implemented},
     mutable_state::*,
     selinux::SeLinuxThreadGroupState,
@@ -41,7 +41,7 @@ pub struct ThreadGroupMutableState {
     /// thread group.
     /// It is still expected that these weak references are always valid, as tasks must unregister
     /// themselves before they are deleted.
-    pub tasks: BTreeMap<pid_t, Weak<Task>>,
+    tasks: BTreeMap<pid_t, TaskContainer>,
 
     /// The children of this thread group.
     ///
@@ -303,7 +303,7 @@ impl ThreadGroup {
         if state.terminating {
             return error!(EINVAL);
         }
-        state.tasks.insert(task.id, Arc::downgrade(task));
+        state.tasks.insert(task.id, task.into());
         Ok(())
     }
 
@@ -311,20 +311,28 @@ impl ThreadGroup {
         let mut pids = self.kernel.pids.write();
         let mut state = self.write();
 
-        state.tasks.remove(&task.id);
         pids.remove_task(task.id);
+        let persistent_info = if let Some(container) = state.tasks.remove(&task.id) {
+            container.into_info()
+        } else {
+            // The task has never been added. The only expected case is that this thread was
+            // already terminating.
+            debug_assert!(state.terminating);
+            return;
+        };
 
         if task.id == state.leader() {
             let exit_status = task.read().exit_status.clone().unwrap_or_else(|| {
                 log_error!("Exiting without an exit code.");
                 ExitStatus::Exit(u8::MAX)
             });
+            let persistent_info = persistent_info.lock();
             state.zombie_leader = Some(ZombieProcess {
                 pid: state.leader(),
                 pgid: state.process_group.leader,
-                uid: task.creds().uid,
+                uid: persistent_info.creds.uid,
                 exit_status,
-                exit_signal: task.exit_signal,
+                exit_signal: persistent_info.exit_signal,
                 time_stats: Default::default(),
             });
         }
@@ -795,16 +803,26 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         self.base.leader
     }
 
-    pub fn children(&self) -> Box<dyn Iterator<Item = Arc<ThreadGroup>> + '_> {
-        Box::new(self.children.values().map(|v| {
+    pub fn children(&self) -> impl Iterator<Item = Arc<ThreadGroup>> + '_ {
+        self.children.values().map(|v| {
             v.upgrade().expect("Weak references to processes in ThreadGroup must always be valid")
-        }))
+        })
     }
 
-    pub fn tasks(&self) -> Box<dyn Iterator<Item = Arc<Task>> + '_> {
-        Box::new(self.tasks.values().map(|v| {
-            v.upgrade().expect("Weak references to task in ThreadGroup must always be valid")
-        }))
+    pub fn tasks(&self) -> impl Iterator<Item = Arc<Task>> + '_ {
+        self.tasks.values().flat_map(|t| t.upgrade())
+    }
+
+    pub fn task_ids(&self) -> impl Iterator<Item = &pid_t> {
+        self.tasks.keys()
+    }
+
+    pub fn contains_task(&self, tid: pid_t) -> bool {
+        self.tasks.contains_key(&tid)
+    }
+
+    pub fn tasks_count(&self) -> usize {
+        self.tasks.len()
     }
 
     pub fn get_ppid(&self) -> pid_t {
@@ -891,27 +909,19 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         };
 
         // The children whose exit signal matches the waiting options queried.
-        let filter_children_by_waiting_options: fn(&Arc<ThreadGroup>) -> bool =
+        let filter_children_by_waiting_options = |child: &Arc<ThreadGroup>| {
             if options.wait_for_all {
-                |_child: &Arc<ThreadGroup>| true
-            } else if options.wait_for_clone {
-                // A "clone" child is one which delivers no signal, or a signal other than SIGCHLD to its parent upon termination.
-                |child: &Arc<ThreadGroup>| {
-                    let exit_task = match child.read().get_task() {
-                        Ok(task) => task,
-                        Err(_) => return false, // I don't really think this can be ignored, maybe this closure needs to bubble up the Result
-                    };
-                    exit_task.exit_signal != Some(SIGCHLD)
+                return true;
+            }
+            child.read().tasks.values().any(|container| {
+                let info = container.info();
+                if options.wait_for_clone {
+                    info.exit_signal != Some(SIGCHLD)
+                } else {
+                    info.exit_signal == Some(SIGCHLD)
                 }
-            } else {
-                |child: &Arc<ThreadGroup>| {
-                    let exit_task = match child.read().get_task() {
-                        Ok(task) => task,
-                        Err(_) => return false, // I don't really think this can be ignored, maybe this closure needs to bubble up the Result
-                    };
-                    exit_task.exit_signal == Some(SIGCHLD)
-                }
-            };
+            })
+        };
 
         // If wait_for_exited flag is disabled or no terminated children were found we look for living children.
         let mut selected_children = self
@@ -933,11 +943,12 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
                     } else {
                         child.waitable.take().unwrap()
                     };
+                    let info = child.tasks.values().next().unwrap().info();
                     return Ok(Some(ZombieProcess::new(
                         child.as_ref(),
-                        &child.get_task()?.creds(),
+                        &info.creds,
                         ExitStatus::Continue(siginfo),
-                        child.get_task()?.exit_signal,
+                        info.exit_signal,
                     )));
                 }
                 if child.stopped && options.wait_for_stopped {
@@ -946,11 +957,12 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
                     } else {
                         child.waitable.take().unwrap()
                     };
+                    let info = child.tasks.values().next().unwrap().info();
                     return Ok(Some(ZombieProcess::new(
                         child.as_ref(),
-                        &child.get_task()?.creds(),
+                        &info.creds,
                         ExitStatus::Stop(siginfo),
-                        child.get_task()?.exit_signal,
+                        info.exit_signal,
                     )));
                 }
             }
@@ -980,12 +992,10 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
     }
 
     /// Returns a task in the current thread group.
-    pub fn get_task(&self) -> Result<Arc<Task>, Errno> {
+    pub fn get_live_task(&self) -> Result<Arc<Task>, Errno> {
         self.tasks
             .get(&self.leader())
-            .map(|t| {
-                t.upgrade().expect("Weak references to task in ThreadGroup must always be valid")
-            })
+            .and_then(|t| t.upgrade())
             .or_else(|| self.tasks().next())
             .ok_or_else(|| errno!(ESRCH))
     }
@@ -994,7 +1004,34 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
     pub fn get_signal_target(&self, _signal: &UncheckedSignal) -> Option<Arc<Task>> {
         // TODO(fxb/96632): Consider more than the main thread or the first thread in the thread group
         // to dispatch the signal.
-        self.get_task().ok()
+        self.get_live_task().ok()
+    }
+}
+
+/// Container around a weak task and a strong `TaskPersistentInfo`. It is needed to keep the
+/// information even when the task is not upgradable, because when the task is dropped, there is a
+/// moment where the task is not yet released, yet the weak pointer is not upgradeable anymore.
+/// During this time, it is still necessary to access the persistent info to compute the state of
+/// the thread for the different wait syscalls.
+struct TaskContainer(Weak<Task>, Arc<Mutex<TaskPersistentInfo>>);
+
+impl From<&Arc<Task>> for TaskContainer {
+    fn from(task: &Arc<Task>) -> Self {
+        Self(Arc::downgrade(task), task.persistent_info.clone())
+    }
+}
+
+impl TaskContainer {
+    fn upgrade(&self) -> Option<Arc<Task>> {
+        self.0.upgrade()
+    }
+
+    fn info(&self) -> MutexGuard<'_, TaskPersistentInfo> {
+        self.1.lock()
+    }
+
+    fn into_info(self) -> Arc<Mutex<TaskPersistentInfo>> {
+        self.1
     }
 }
 

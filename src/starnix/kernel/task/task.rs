@@ -22,7 +22,7 @@ use crate::{
     execution::*,
     fs::*,
     loader::*,
-    lock::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+    lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::*,
     mm::{MemoryAccessorExt, MemoryManager},
     signals::{types::*, SignalInfo},
@@ -312,6 +312,28 @@ impl TaskStateCode {
     }
 }
 
+/// The information of the task that needs to be available to the `ThreadGroup` while computing
+/// which process a wait can target. It is necessary to shared this data with the `ThreadGroup` so
+/// that it is available while the task is being dropped and so is not accessible from a weak
+/// pointer.
+#[derive(Debug)]
+pub struct TaskPersistentInfo {
+    /// The security credentials for this task.
+    ///
+    /// This is necessary because credentials need to be read from operations on Node, and other
+    /// locks may be taken at the time. No other lock may be held while this lock is taken.
+    pub creds: Credentials,
+
+    /// The signal this task generates on exit.
+    pub exit_signal: Option<Signal>,
+}
+
+impl TaskPersistentInfo {
+    fn new(creds: Credentials, exit_signal: Option<Signal>) -> Arc<Mutex<Self>> {
+        Arc::new(Mutex::new(Self { creds, exit_signal }))
+    }
+}
+
 /// A unit of execution.
 ///
 /// A task is the primary unit of execution in the Starnix kernel. Most tasks are *user* tasks,
@@ -374,23 +396,20 @@ pub struct Task {
     /// The namespace for AF_VSOCK for this task.
     pub abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
 
-    /// The signal this task generates on exit.
-    pub exit_signal: Option<Signal>,
-
     /// The mutable state of the Task.
     mutable_state: RwLock<TaskMutableState>,
+
+    /// The information of the task that needs to be available to the `ThreadGroup` while computing
+    /// which process a wait can target.
+    /// Contains the task credentials and the exit signal.
+    /// See `TaskPersistentInfo` for more information.
+    pub persistent_info: Arc<Mutex<TaskPersistentInfo>>,
 
     /// The command of this task.
     ///
     /// This is guarded by its own lock because it is use to display the task description, and
     /// other locks may be taken at the time. No other lock may be held while this lock is taken.
     command: RwLock<CString>,
-
-    /// The security credentials for this task.
-    ///
-    /// This is necessary because credentials need to be read from operations on Node, and other
-    /// locks may be taken at the time. No other lock may be held while this lock is taken.
-    creds: RwLock<Credentials>,
 
     /// For vfork and clone() with CLONE_VFORK, this is set when the task exits or calls execve().
     /// It allows the calling task to block until the fork has been completed. Only populated
@@ -456,9 +475,7 @@ impl Task {
             fs,
             abstract_socket_namespace,
             abstract_vsock_namespace,
-            exit_signal,
             command: RwLock::new(command),
-            creds: RwLock::new(creds),
             vfork_event,
             mutable_state: RwLock::new(TaskMutableState {
                 clear_child_tid: UserRef::default(),
@@ -473,13 +490,14 @@ impl Task {
                 seccomp_filters,
                 robust_list_head,
             }),
+            persistent_info: TaskPersistentInfo::new(creds, exit_signal),
             seccomp_filter_state,
         };
         #[cfg(any(test, debug_assertions))]
         {
             let _l1 = task.read();
             let _l2 = task.command.read();
-            let _l3 = task.creds.read();
+            let _l3 = task.persistent_info.lock();
         }
         task
     }
@@ -499,11 +517,15 @@ impl Task {
     }
 
     pub fn creds(&self) -> Credentials {
-        self.creds.read().clone()
+        self.persistent_info.lock().creds.clone()
+    }
+
+    pub fn exit_signal(&self) -> Option<Signal> {
+        self.persistent_info.lock().exit_signal
     }
 
     pub fn set_creds(&self, creds: Credentials) {
-        *self.creds.write() = creds;
+        self.persistent_info.lock().creds = creds;
     }
 
     pub fn fs(&self) -> &Arc<FsContext> {
@@ -1450,13 +1472,13 @@ impl CurrentTask {
 
         {
             let mut state = self.write();
-            let mut creds = self.creds.write();
+            let mut persistent_info = self.persistent_info.lock();
             state.signals.alt_stack = None;
             state.robust_list_head = UserAddress::NULL.into();
 
             // TODO(tbodt): Check whether capability xattrs are set on the file, and grant/limit
             // capabilities accordingly.
-            creds.exec();
+            persistent_info.creds.exec();
         }
         self.extended_pstate.reset();
 
