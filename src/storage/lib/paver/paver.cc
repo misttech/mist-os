@@ -181,8 +181,8 @@ zx::result<zx::channel> FormatFvm(const fbl::unique_fd& devfs_root,
   static_assert(PRODUCT_FVM_SLICE_SIZE > 0, "Invalid product FVM slice size.");
   header.slice_size = PRODUCT_FVM_SLICE_SIZE;
 
-  fbl::unique_fd fvm_fd(
-      FvmPartitionFormat(devfs_root, block.block_fd(), header, BindOption::Reformat));
+  fbl::unique_fd fvm_fd(FvmPartitionFormat(
+      devfs_root, block.block_channel(), block.controller_channel(), header, BindOption::Reformat));
   if (!fvm_fd) {
     ERROR("Couldn't format FVM partition\n");
     return zx::error(ZX_ERR_IO);
@@ -685,7 +685,7 @@ DataSinkImpl::WipeVolume() {
   // eliminate the races at this point: assuming that the driver can load, either
   // this call or the block watcher will succeed (and the other one will fail),
   // but the driver will be loaded before moving on.
-  TryBindToFvmDriver(devfs_root_, block.block_fd(), zx::sec(3));
+  TryBindToFvmDriver(devfs_root_, block.controller_channel(), zx::sec(3));
 
   {
     auto status = partitioner_->WipeFvm();

@@ -4,6 +4,7 @@
 #ifndef SRC_STORAGE_LIB_PAVER_PARTITION_CLIENT_H_
 #define SRC_STORAGE_LIB_PAVER_PARTITION_CLIENT_H_
 
+#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <lib/zx/channel.h>
@@ -25,6 +26,9 @@ namespace paver {
 // This represents a block device.
 class BlockDeviceClient {
  public:
+  virtual fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block_channel() = 0;
+  virtual fidl::UnownedClientEnd<fuchsia_device::Controller> controller_channel() = 0;
+
   // Returns a channel to the partition, when backed by a block device.
   virtual fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() = 0;
 
@@ -93,6 +97,9 @@ class BlockPartitionClient final : public BlockDevicePartitionClient {
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size, size_t dev_offset, size_t vmo_offset);
   zx::result<> Trim() final;
   zx::result<> Flush() final;
+
+  fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block_channel() final;
+  fidl::UnownedClientEnd<fuchsia_device::Controller> controller_channel() final;
   fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() final;
   fbl::unique_fd block_fd() final;
 
@@ -141,6 +148,9 @@ class FixedOffsetBlockPartitionClient final : public BlockDevicePartitionClient 
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) final;
   zx::result<> Trim() final;
   zx::result<> Flush() final;
+
+  fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block_channel() final;
+  fidl::UnownedClientEnd<fuchsia_device::Controller> controller_channel() final;
   fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() final;
   fbl::unique_fd block_fd() final;
 

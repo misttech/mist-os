@@ -213,7 +213,18 @@ zx::result<> BlockPartitionClient::Flush() {
   return zx::make_result(client_->Transaction(&request, 1));
 }
 
+fidl::UnownedClientEnd<fuchsia_hardware_block::Block> BlockPartitionClient::block_channel() {
+  return partition_.client_end().borrow();
+}
+
+fidl::UnownedClientEnd<fuchsia_device::Controller> BlockPartitionClient::controller_channel() {
+  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+  return fidl::UnownedClientEnd<fuchsia_device::Controller>(
+      partition_.client_end().channel().borrow());
+}
+
 fidl::ClientEnd<block::Block> BlockPartitionClient::GetChannel() {
+  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
   return component::MaybeClone(partition_.client_end(), component::AssumeProtocolComposesNode);
 }
 
@@ -282,6 +293,16 @@ zx::result<size_t> FixedOffsetBlockPartitionClient::GetBlockSize() {
 zx::result<> FixedOffsetBlockPartitionClient::Trim() { return client_.Trim(); }
 
 zx::result<> FixedOffsetBlockPartitionClient::Flush() { return client_.Flush(); }
+
+fidl::UnownedClientEnd<fuchsia_hardware_block::Block>
+FixedOffsetBlockPartitionClient::block_channel() {
+  return client_.block_channel();
+}
+
+fidl::UnownedClientEnd<fuchsia_device::Controller>
+FixedOffsetBlockPartitionClient::controller_channel() {
+  return client_.controller_channel();
+}
 
 fidl::ClientEnd<block::Block> FixedOffsetBlockPartitionClient::GetChannel() {
   return client_.GetChannel();

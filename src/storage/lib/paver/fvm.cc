@@ -5,7 +5,7 @@
 #include "fvm.h"
 
 #include <dirent.h>
-#include <fidl/fuchsia.device/cpp/wire.h>
+#include <fidl/fuchsia.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
@@ -56,6 +56,7 @@ using fuchsia_hardware_block_volume::wire::VolumeManagerInfo;
 // TODO(aarongreen): Replace this with a value supplied by ulib/zxcrypt.
 constexpr size_t kZxcryptExtraSlices = 1;
 
+// TODO(http://fxbug.dev/112484): Remove this as it relies on multiplexing.
 // Looks up the topological path of a device.
 // |buf| is the buffer the path will be written to.  |buf_len| is the total
 // capcity of the buffer, including space for a null byte.
@@ -74,6 +75,19 @@ zx_status_t GetTopoPathFromFd(const fbl::unique_fd& fd, char* buf, size_t buf_le
   strncpy(buf, response.path.data(), std::min(buf_len, response.path.size()));
   buf[response.path.size()] = '\0';
   return ZX_OK;
+}
+
+zx::result<std::string> GetTopoPath(fidl::UnownedClientEnd<fuchsia_device::Controller> controller) {
+  fidl::Result result = fidl::Call(controller)->GetTopologicalPath();
+  if (result.is_error()) {
+    if (result.error_value().is_domain_error()) {
+      return zx::error(result.error_value().domain_error());
+    }
+    if (result.error_value().is_framework_error()) {
+      return zx::error(result.error_value().framework_error().status());
+    }
+  }
+  return zx::ok(std::move(result.value().path()));
 }
 
 // Confirm that the file descriptor to the underlying partition exists within an
@@ -209,42 +223,39 @@ zx_status_t StreamFvmPartition(fvm::SparseReader* reader, PartitionInfo* part,
 }  // namespace
 
 fbl::unique_fd TryBindToFvmDriver(const fbl::unique_fd& devfs_root,
-                                  const fbl::unique_fd& partition_fd, zx::duration timeout) {
-  char path[PATH_MAX] = {};
-  zx_status_t status = GetTopoPathFromFd(partition_fd, path, sizeof(path));
-  if (status != ZX_OK) {
-    ERROR("Failed to get topological path: %s\n", zx_status_get_string(status));
+                                  fidl::UnownedClientEnd<fuchsia_device::Controller> partition,
+                                  zx::duration timeout) {
+  zx::result path = GetTopoPath(partition);
+  if (path.is_error()) {
+    ERROR("Failed to get topological path: %s\n", path.status_string());
     return {};
   }
 
-  char fvm_path[PATH_MAX];
-  snprintf(fvm_path, sizeof(fvm_path), "%s/fvm", &path[5]);
+  std::string fvm_path = path.value() + "/fvm";
+  fvm_path.erase(0, 5);
 
   fbl::unique_fd fvm;
   if (zx_status_t status =
-          fdio_open_fd_at(devfs_root.get(), fvm_path, 0, fvm.reset_and_get_address());
+          fdio_open_fd_at(devfs_root.get(), fvm_path.c_str(), 0, fvm.reset_and_get_address());
       status != ZX_OK) {
     LOG("Failed to open fvm: %s, proceeding to rebind...\n", zx_status_get_string(status));
   } else {
     return fvm;
   }
 
-  fdio_cpp::UnownedFdioCaller caller(partition_fd.get());
   constexpr char kFvmDriverLib[] = "fvm.cm";
-  auto resp = fidl::WireCall(caller.borrow_as<fuchsia_device::Controller>())
-                  ->Rebind(fidl::StringView(kFvmDriverLib));
-  status = resp.status();
-  if (status == ZX_OK) {
-    if (resp->is_error()) {
-      status = resp->error_value();
-    }
+  fidl::WireResult result = fidl::WireCall(partition)->Rebind(fidl::StringView(kFvmDriverLib));
+  if (!result.ok()) {
+    ERROR("Could not call rebind driver: %s\n", zx_status_get_string(result.status()));
+    return {};
   }
-  if (status != ZX_OK && status != ZX_ERR_ALREADY_BOUND) {
-    ERROR("Could not rebind fvm driver: %s\n", zx_status_get_string(status));
+  if (result.value().is_error() && result.value().error_value() != ZX_ERR_ALREADY_BOUND) {
+    ERROR("Could not rebind fvm driver: %s\n", zx_status_get_string(result.value().error_value()));
     return fbl::unique_fd();
   }
 
-  zx::result channel = device_watcher::RecursiveWaitForFile(devfs_root.get(), fvm_path, timeout);
+  zx::result channel =
+      device_watcher::RecursiveWaitForFile(devfs_root.get(), fvm_path.c_str(), timeout);
   if (channel.is_error()) {
     ERROR("Error waiting for fvm driver to bind: %s\n", channel.status_string());
     return fbl::unique_fd();
@@ -252,15 +263,18 @@ fbl::unique_fd TryBindToFvmDriver(const fbl::unique_fd& devfs_root,
   fbl::unique_fd fd;
   if (zx_status_t status = fdio_fd_create(channel.value().release(), fd.reset_and_get_address());
       status != ZX_OK) {
-    ERROR("Failed to create fvm device fd at \"%s\": %s\n", fvm_path, zx_status_get_string(status));
+    ERROR("Failed to create fvm device fd at \"%s\": %s\n", fvm_path.c_str(),
+          zx_status_get_string(status));
     return fbl::unique_fd();
   }
   return fd;
 }
 
-fbl::unique_fd FvmPartitionFormat(const fbl::unique_fd& devfs_root, fbl::unique_fd partition_fd,
-                                  const fvm::SparseImage& header, BindOption option,
-                                  FormatResult* format_result) {
+fbl::unique_fd FvmPartitionFormat(
+    const fbl::unique_fd& devfs_root,
+    fidl::UnownedClientEnd<fuchsia_hardware_block::Block> partition,
+    fidl::UnownedClientEnd<fuchsia_device::Controller> partition_controller,
+    const fvm::SparseImage& header, BindOption option, FormatResult* format_result) {
   // Although the format (based on the magic in the FVM superblock)
   // indicates this is (or at least was) an FVM image, it may be invalid.
   //
@@ -271,12 +285,10 @@ fbl::unique_fd FvmPartitionFormat(const fbl::unique_fd& devfs_root, fbl::unique_
   if (format_result != nullptr) {
     *format_result = FormatResult::kUnknown;
   }
-  fdio_cpp::UnownedFdioCaller partition_connection(partition_fd.get());
-  fidl::UnownedClientEnd partition_device = partition_connection.borrow_as<block::Block>();
   if (option == BindOption::TryBind) {
-    fs_management::DiskFormat df = fs_management::DetectDiskFormat(partition_device);
+    fs_management::DiskFormat df = fs_management::DetectDiskFormat(partition);
     if (df == fs_management::kDiskFormatFvm) {
-      fvm_fd = TryBindToFvmDriver(devfs_root, partition_fd, zx::sec(3));
+      fvm_fd = TryBindToFvmDriver(devfs_root, partition_controller, zx::sec(3));
       if (fvm_fd) {
         LOG("Found already formatted FVM.\n");
         fdio_cpp::UnownedFdioCaller volume_manager(fvm_fd.get());
@@ -314,7 +326,7 @@ fbl::unique_fd FvmPartitionFormat(const fbl::unique_fd& devfs_root, fbl::unique_
       *format_result = FormatResult::kReformatted;
     }
 
-    const fidl::WireResult result = fidl::WireCall(partition_device)->GetInfo();
+    const fidl::WireResult result = fidl::WireCall(partition)->GetInfo();
     if (!result.ok()) {
       ERROR("Failed to query block info: %s\n", result.FormatDescription().c_str());
       return fbl::unique_fd();
@@ -330,16 +342,15 @@ fbl::unique_fd FvmPartitionFormat(const fbl::unique_fd& devfs_root, fbl::unique_
     uint64_t max_disk_size =
         (header.maximum_disk_size == 0) ? initial_disk_size : header.maximum_disk_size;
 
-    zx_status_t status =
-        fs_management::FvmInitPreallocated(partition_connection.borrow_as<block::Block>(),
-                                           initial_disk_size, max_disk_size, header.slice_size);
+    zx_status_t status = fs_management::FvmInitPreallocated(partition, initial_disk_size,
+                                                            max_disk_size, header.slice_size);
     if (status != ZX_OK) {
       ERROR("Failed to initialize fvm: %s\n", zx_status_get_string(status));
       return fbl::unique_fd();
     }
   }
 
-  return TryBindToFvmDriver(devfs_root, partition_fd, zx::sec(3));
+  return TryBindToFvmDriver(devfs_root, partition_controller, zx::sec(3));
 }
 
 namespace {
@@ -705,8 +716,8 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
   fvm::SparseImage* hdr = reader->Image();
   // Acquire an fd to the FVM, either by finding one that already
   // exists, or formatting a new one.
-  fbl::unique_fd fvm_fd(
-      FvmPartitionFormat(devfs_root, block.block_fd(), *hdr, BindOption::TryBind));
+  fbl::unique_fd fvm_fd(FvmPartitionFormat(devfs_root, block.block_channel(),
+                                           block.controller_channel(), *hdr, BindOption::TryBind));
   if (!fvm_fd) {
     ERROR("Couldn't find FVM partition\n");
     return zx::error(ZX_ERR_IO);
@@ -743,7 +754,8 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
   if (free_slices < requested_slices) {
     Warn("Not enough space to non-destructively pave",
          "Automatically reinitializing FVM; Expect data loss");
-    fvm_fd = FvmPartitionFormat(devfs_root, block.block_fd(), *hdr, BindOption::Reformat);
+    fvm_fd = FvmPartitionFormat(devfs_root, block.block_channel(), block.controller_channel(), *hdr,
+                                BindOption::Reformat);
     if (!fvm_fd) {
       ERROR("Couldn't reformat FVM partition.\n");
       return zx::error(ZX_ERR_IO);

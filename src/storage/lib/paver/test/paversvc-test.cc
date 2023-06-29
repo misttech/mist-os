@@ -2155,14 +2155,8 @@ TEST_F(PaverServiceLuisTest, FindGPTDevicesIgnoreFvmPartitions) {
   // Initialize the primary block solely as FVM and allocate sub-partitions.
   fvm::SparseImage header = {};
   header.slice_size = 1 << 20;
-  fidl::UnownedClientEnd block_interface = gpt_dev_->block_interface();
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result gpt_chan = component::Clone(block_interface, component::AssumeProtocolComposesNode);
-  ASSERT_OK(gpt_chan.status_value());
-  fbl::unique_fd block_fd;
-  ASSERT_OK(
-      fdio_fd_create(gpt_chan.value().TakeChannel().release(), block_fd.reset_and_get_address()));
-  fbl::unique_fd fvm_fd(FvmPartitionFormat(devmgr_.devfs_root(), std::move(block_fd), header,
+  fbl::unique_fd fvm_fd(FvmPartitionFormat(devmgr_.devfs_root(), gpt_dev_->block_interface(),
+                                           gpt_dev_->block_controller_interface(), header,
                                            paver::BindOption::Reformat));
   ASSERT_TRUE(fvm_fd);
   auto status = paver::AllocateEmptyPartitions(devmgr_.devfs_root(), fvm_fd);
