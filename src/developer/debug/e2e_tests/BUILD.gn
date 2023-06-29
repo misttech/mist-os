@@ -79,8 +79,8 @@ if (is_host) {
       vim3_env,
     ]
 
-    # TODO(fxbug.dev/64897): The arm64 emulator is run from an arm64 host but we only support
-    # running tests on x64 hosts.
+    # TODO(https://fxbug.dev/64897): The arm64 emulator is run from an arm64 host but we only
+    # support running tests on x64 hosts.
     if (target_cpu == "arm64") {
       environments -= [ emu_env ]
     }

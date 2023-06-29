@@ -3,8 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/components/fuchsia_package.gni")
-import("//build/go/go_test.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/testing/environments.gni")
 
 if (is_host) {
   rustc_test("ffx_connection_test") {
@@ -41,7 +41,13 @@ if (is_host) {
       "//src/developer/ffx/plugins/target:ffx_target_tool_test_data",
     ]
 
-    test_environments = [ nuc_env ]
+    test_environments = all_fuchsia_envs
+
+    # TODO(https://fxbug.dev/64897): The arm64 emulator is run from an arm64 host but we only
+    # support running tests on x64 hosts.
+    if (target_cpu == "arm64") {
+      test_environments -= [ emu_env ]
+    }
   }
 }
 
