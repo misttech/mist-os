@@ -8,9 +8,9 @@
 #include "magma_util/short_macros.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/platform_semaphore.h"
-#include "sys_driver/magma_driver.h"
 #include "sys_driver/magma_system_connection.h"
 #include "sys_driver/magma_system_context.h"
+#include "sys_driver/magma_system_device.h"
 
 namespace {
 

@@ -16,11 +16,11 @@
 #include <zircon/threads.h>
 
 #include "dependency_injection_server.h"
+#include "magma_system_device.h"
 #include "magma_util/macros.h"
 #include "performance_counters_server.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_logger_dfv2.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
-#include "sys_driver/magma_driver.h"
 
 namespace msd {
 
@@ -108,9 +108,9 @@ class MagmaDriverBase : public fdf::DriverBase,
 
   std::mutex& magma_mutex() FIT_RETURN_CAPABILITY(magma_mutex_) { return magma_mutex_; }
 
-  MagmaDriver* magma_driver() FIT_REQUIRES(magma_mutex_) { return magma_driver_.get(); }
+  msd::Driver* magma_driver() FIT_REQUIRES(magma_mutex_) { return magma_driver_.get(); }
 
-  void set_magma_driver(std::unique_ptr<MagmaDriver> magma_driver) FIT_REQUIRES(magma_mutex_) {
+  void set_magma_driver(std::unique_ptr<msd::Driver> magma_driver) FIT_REQUIRES(magma_mutex_) {
     ZX_DEBUG_ASSERT(!magma_driver_);
     magma_driver_ = std::move(magma_driver);
   }
@@ -317,7 +317,7 @@ class MagmaDriverBase : public fdf::DriverBase,
   fit::deferred_callback teardown_logger_callback_;
 
   std::mutex magma_mutex_;
-  std::unique_ptr<MagmaDriver> magma_driver_ FIT_GUARDED(magma_mutex_);
+  std::unique_ptr<msd::Driver> magma_driver_ FIT_GUARDED(magma_mutex_);
   std::shared_ptr<MagmaSystemDevice> magma_system_device_ FIT_GUARDED(magma_mutex_);
   driver_devfs::Connector<FidlDeviceType> magma_devfs_connector_;
   // Node representing /dev/class/gpu/<id>.

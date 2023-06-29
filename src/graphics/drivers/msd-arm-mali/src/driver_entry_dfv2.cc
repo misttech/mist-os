@@ -16,7 +16,6 @@
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_logger_dfv2.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 #include "src/graphics/lib/magma/src/sys_driver/magma_driver_base.h"
-#include "sys_driver/magma_driver.h"
 
 #if MAGMA_TEST_DRIVER
 using MagmaDriverBaseType = msd::MagmaTestDriverBase;
@@ -44,14 +43,15 @@ class MaliDriver : public MagmaDriverBaseType {
 
     std::lock_guard lock(magma_mutex());
 
-    set_magma_driver(msd::MagmaDriver::Create());
+    set_magma_driver(msd::Driver::Create());
     if (!magma_driver()) {
       DMESSAGE("Failed to create MagmaDriver");
       return zx::error(ZX_ERR_INTERNAL);
     }
 
     // TODO(fxbug.dev/126333): Run in-driver tests.
-    set_magma_system_device(magma_driver()->CreateDevice(parent_device_->ToDeviceHandle()));
+    set_magma_system_device(msd::MagmaSystemDevice::Create(
+        magma_driver(), magma_driver()->CreateDevice(parent_device_->ToDeviceHandle())));
     if (!magma_system_device()) {
       DMESSAGE("Failed to create MagmaSystemDevice");
       return zx::error(ZX_ERR_INTERNAL);

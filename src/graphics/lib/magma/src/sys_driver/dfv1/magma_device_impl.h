@@ -15,7 +15,7 @@
 #include "magma_performance_counter_device.h"
 #include "platform_thread.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
-#include "sys_driver/magma_driver.h"
+#include "sys_driver/magma_system_device.h"
 
 namespace msd {
 #if MAGMA_TEST_DRIVER
@@ -40,8 +40,8 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
 
   std::mutex& magma_mutex() FIT_RETURN_CAPABILITY(magma_mutex_) { return magma_mutex_; }
 
-  MagmaDriver* magma_driver() FIT_REQUIRES(magma_mutex_) { return magma_driver_.get(); }
-  void set_magma_driver(std::unique_ptr<MagmaDriver> magma_driver) FIT_REQUIRES(magma_mutex_) {
+  msd::Driver* magma_driver() FIT_REQUIRES(magma_mutex_) { return magma_driver_.get(); }
+  void set_magma_driver(std::unique_ptr<msd::Driver> magma_driver) FIT_REQUIRES(magma_mutex_) {
     ZX_DEBUG_ASSERT(!magma_driver_);
     magma_driver_ = std::move(magma_driver);
   }
@@ -211,7 +211,7 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
 
  private:
   std::mutex magma_mutex_;
-  std::unique_ptr<MagmaDriver> magma_driver_ FIT_GUARDED(magma_mutex_);
+  std::unique_ptr<msd::Driver> magma_driver_ FIT_GUARDED(magma_mutex_);
   std::shared_ptr<MagmaSystemDevice> magma_system_device_ FIT_GUARDED(magma_mutex_);
   zx_device_t* zx_device_ = nullptr;
   zx_koid_t perf_counter_koid_ = 0;

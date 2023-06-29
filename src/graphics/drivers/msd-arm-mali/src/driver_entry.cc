@@ -29,7 +29,6 @@
 #include "platform_logger.h"
 #include "src/graphics/drivers/msd-arm-mali/src/parent_device.h"
 #include "src/graphics/lib/magma/src/sys_driver/dfv1/magma_device_impl.h"
-#include "sys_driver/magma_driver.h"
 #include "sys_driver/magma_system_device.h"
 
 #if MAGMA_TEST_DRIVER
@@ -58,7 +57,8 @@ class GpuDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_GP
 };
 
 zx_status_t GpuDevice::MagmaStart() {
-  set_magma_system_device(magma_driver()->CreateDevice(parent_device_->ToDeviceHandle()));
+  set_magma_system_device(msd::MagmaSystemDevice::Create(
+      magma_driver(), magma_driver()->CreateDevice(parent_device_->ToDeviceHandle())));
   if (!magma_system_device())
     return DRET_MSG(ZX_ERR_NO_RESOURCES, "Failed to create device");
   InitSystemDevice();
@@ -90,7 +90,7 @@ zx_status_t GpuDevice::Init() {
     MAGMA_LOG(ERROR, "Failed to create ParentDeviceDFv1");
     return ZX_ERR_INTERNAL;
   }
-  set_magma_driver(msd::MagmaDriver::Create());
+  set_magma_driver(msd::Driver::Create());
 #if MAGMA_TEST_DRIVER
   DLOG("running magma indriver test");
   set_unit_test_status(magma_indriver_test(parent_device_.get()));

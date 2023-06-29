@@ -10,7 +10,6 @@
 #include <gtest/gtest.h>
 
 #include "helper/platform_msd_device_helper.h"
-#include "sys_driver/magma_driver.h"
 #include "sys_driver/magma_system_connection.h"
 #include "sys_driver/magma_system_context.h"
 #include "sys_driver/magma_system_device.h"
@@ -28,7 +27,7 @@ inline uint64_t page_size() { return sysconf(_SC_PAGESIZE); }
 // may bail out early on some devices.
 class TestMultithread {
  public:
-  TestMultithread(std::unique_ptr<MagmaDriver> driver, std::shared_ptr<MagmaSystemDevice> device)
+  TestMultithread(std::unique_ptr<Driver> driver, std::shared_ptr<MagmaSystemDevice> device)
       : driver_(std::move(driver)), device_(std::move(device)) {}
 
   void Test(uint32_t num_threads) {
@@ -112,16 +111,17 @@ class TestMultithread {
   }
 
  private:
-  std::unique_ptr<MagmaDriver> driver_;
+  std::unique_ptr<msd::Driver> driver_;
   std::shared_ptr<MagmaSystemDevice> device_;
   uint32_t context_id_ = 0;
 };
 
 TEST(MagmaSystem, Multithread) {
-  auto driver = MagmaDriver::Create();
+  auto driver = msd::Driver::Create();
   ASSERT_TRUE(driver);
 
-  auto device = driver->CreateDevice(GetTestDeviceHandle());
+  auto device =
+      msd::MagmaSystemDevice::Create(driver.get(), driver->CreateDevice(GetTestDeviceHandle()));
   ASSERT_TRUE(device);
 
   uint64_t vendor_id;

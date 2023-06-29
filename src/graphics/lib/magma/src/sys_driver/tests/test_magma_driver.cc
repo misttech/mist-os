@@ -5,13 +5,13 @@
 #include <gtest/gtest.h>
 
 #include "helper/platform_device_helper.h"
-#include "sys_driver/magma_driver.h"
+#include "msd/msd.h"
 
 namespace msd {
 class TestMagmaDriver {
  public:
   static void CreateAndDestroy() {
-    auto driver = MagmaDriver::Create();
+    auto driver = msd::Driver::Create();
     EXPECT_NE(nullptr, driver);
   }
 };

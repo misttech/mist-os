@@ -26,12 +26,13 @@ class FakeTestDriver : public MagmaTestDriverBase {
   zx::result<> MagmaStart() override {
     std::lock_guard lock(magma_mutex());
 
-    set_magma_driver(MagmaDriver::Create());
+    set_magma_driver(msd::Driver::Create());
     if (!magma_driver()) {
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    set_magma_system_device(magma_driver()->CreateDevice(nullptr));
+    set_magma_system_device(
+        MagmaSystemDevice::Create(magma_driver(), magma_driver()->CreateDevice(nullptr)));
     if (!magma_system_device()) {
       return zx::error(ZX_ERR_INTERNAL);
     }
@@ -50,12 +51,13 @@ class FakeDriver : public MagmaProductionDriverBase {
   zx::result<> MagmaStart() override {
     std::lock_guard lock(magma_mutex());
 
-    set_magma_driver(MagmaDriver::Create());
+    set_magma_driver(msd::Driver::Create());
     if (!magma_driver()) {
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    set_magma_system_device(magma_driver()->CreateDevice(nullptr));
+    set_magma_system_device(
+        MagmaSystemDevice::Create(magma_driver(), magma_driver()->CreateDevice(nullptr)));
     if (!magma_system_device()) {
       return zx::error(ZX_ERR_INTERNAL);
     }

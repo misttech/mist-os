@@ -25,6 +25,9 @@ class MagmaSystemDevice {
   // The msd::Driver instance must outlive the MagmaSystemDevice
   static std::unique_ptr<MagmaSystemDevice> Create(msd::Driver* driver,
                                                    std::unique_ptr<msd::Device> msd_device) {
+    if (!msd_device) {
+      return nullptr;
+    }
     return std::make_unique<MagmaSystemDevice>(driver, std::move(msd_device));
   }
 

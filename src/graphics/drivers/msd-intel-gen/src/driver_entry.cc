@@ -29,7 +29,6 @@
 #include "msd_intel_pci_device.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 #include "src/graphics/lib/magma/src/sys_driver/dfv1/magma_device_impl.h"
-#include "sys_driver/magma_driver.h"
 
 #if MAGMA_TEST_DRIVER
 zx_status_t magma_indriver_test(magma::PlatformPciDevice* platform_device);
@@ -47,8 +46,9 @@ class IntelDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_
   int MagmaStart() FIT_REQUIRES(magma_mutex()) {
     DLOG("magma_start");
 
-    set_magma_system_device(
-        magma_driver()->CreateDevice(reinterpret_cast<msd::DeviceHandle*>(&gpu_core_protocol_)));
+    set_magma_system_device(msd::MagmaSystemDevice::Create(
+        magma_driver(),
+        magma_driver()->CreateDevice(reinterpret_cast<msd::DeviceHandle*>(&gpu_core_protocol_))));
     if (!magma_system_device())
       return DRET_MSG(ZX_ERR_NO_RESOURCES, "Failed to create device");
 
@@ -96,7 +96,7 @@ zx_status_t IntelDevice::Init() {
   gpu_core_client.GetProto(&gpu_core_protocol_);
 
   std::lock_guard<std::mutex> lock(magma_mutex());
-  set_magma_driver(msd::MagmaDriver::Create());
+  set_magma_driver(msd::Driver::Create());
 #if MAGMA_TEST_DRIVER
   DLOG("running magma indriver test");
   {
