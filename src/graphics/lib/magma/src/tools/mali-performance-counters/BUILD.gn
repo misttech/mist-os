@@ -47,11 +47,11 @@ executable("mali-performance-counters-test-bin") {
   configs -= [ "//build/config:no_exceptions" ]
 }
 
-fuchsia_component("mali-performance-counters-test-cmp") {
-  testonly = true
+fuchsia_test_component("mali-performance-counters-test-cmp") {
   component_name = "mali-performance-counters-test"
   deps = [ ":mali-performance-counters-test-bin" ]
   manifest = "meta/mali_performance_counters_test.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("mali-performance-counters-test") {

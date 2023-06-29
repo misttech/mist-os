@@ -25,10 +25,11 @@ group("tools-only") {
   deps = [ ":magma-info" ]
 }
 
-fuchsia_component("magma-info-cmp") {
+fuchsia_test_component("magma-info-cmp") {
   component_name = "magma-info"
   deps = [ ":magma-info-bin" ]
   manifest = "meta/magma-info.cml"
+  test_type = "system"
 }
 
 fuchsia_shell_package("magma-info") {

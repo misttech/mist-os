@@ -94,6 +94,7 @@ fuchsia_unittest_package("magma_nonhardware_tests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "system"
 }
 
 # Runs on any GPU if the only device present; if multiple
@@ -107,6 +108,7 @@ fuchsia_unittest_package("magma-conformance-tests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "system"
 }
 
 fuchsia_unittest_package("magma-conformance-tests-hermetic") {
@@ -118,6 +120,7 @@ fuchsia_unittest_package("magma-conformance-tests-hermetic") {
       max_severity = "ERROR"
     }
   }
+  test_type = "system"
 }
 
 # Runs only on ARM devices
@@ -130,6 +133,7 @@ fuchsia_unittest_package("magma-conformance-tests-arm") {
       max_severity = "ERROR"
     }
   }
+  test_type = "system"
 }
 
 # Runs only on VSI devices
@@ -145,4 +149,5 @@ fuchsia_unittest_package("magma-conformance-tests-vsi") {
       max_severity = "ERROR"
     }
   }
+  test_type = "system"
 }

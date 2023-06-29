@@ -25,14 +25,14 @@ executable("mali_vulkan_test_bin") {
   configs -= [ "//build/config:no_exceptions" ]
 }
 
-fuchsia_component("mali_vulkan_test_cmp") {
-  testonly = true
+fuchsia_test_component("mali_vulkan_test_cmp") {
   deps = [
     ":mali_vulkan_test_bin",
     "//src/lib/vulkan/validation_layers",
   ]
   component_name = "mali_vulkan_test"
   manifest = "meta/mali_vulkan_test.cml"
+  test_type = "system"
 }
 
 protected_libvulkan_envs = []

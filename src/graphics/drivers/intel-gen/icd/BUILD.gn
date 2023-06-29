@@ -97,6 +97,7 @@ if (target_cpu == "x64") {
   fuchsia_test_component("mesa_integration_tests_component") {
     deps = [ "//third_party/mesa:tests" ]
     manifest = "meta/mesa_integration_tests.cml"
+    test_type = "system"
   }
 
   fuchsia_test_package("mesa_integration_tests") {

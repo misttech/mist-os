@@ -53,7 +53,6 @@ def main(argv):
     if args.type in ('test'):
         content['include'] += [
             "//src/sys/test_runners/gtest/default.shard.cml",
-            "sys/testing/system-test.shard.cml",
         ]
 
     # Is this an executable?

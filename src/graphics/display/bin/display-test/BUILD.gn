@@ -21,10 +21,11 @@ executable("display-test") {
   ]
 }
 
-fuchsia_component("display-test-cmp") {
+fuchsia_test_component("display-test-cmp") {
   component_name = "display-test"
   deps = [ ":display-test" ]
   manifest = "meta/display-test.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("display-test-test") {

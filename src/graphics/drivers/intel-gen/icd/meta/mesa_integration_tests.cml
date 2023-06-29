@@ -4,7 +4,8 @@
 {
     include: [
         "//src/sys/test_runners/gtest/default.shard.cml",
-        "sys/testing/system-test.shard.cml", // Needed for dev-gpu
+
+        // Needed for dev-gpu
         "syslog/client.shard.cml",
     ],
     program: {

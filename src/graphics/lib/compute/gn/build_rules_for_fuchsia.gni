@@ -117,15 +117,14 @@ template("graphics_compute_single_component_package") {
 
   _component_target = "${target_name}_component"
 
-  fuchsia_component(_component_target) {
-    component_name = _component_name
-    manifest = _component_manifest
-    deps = [ ":${_binary_target}" ]
-    manifest_deps = [ ":${_component_manifest_target}" ]
-    testonly = _testonly
-  }
-
   if (_test_package) {
+    fuchsia_test_component(_component_target) {
+      component_name = _component_name
+      manifest = _component_manifest
+      deps = [ ":${_binary_target}" ]
+      manifest_deps = [ ":${_component_manifest_target}" ]
+      test_type = "system"
+    }
     fuchsia_test_package(target_name) {
       test_components = [ ":$_component_target" ]
       if (defined(invoker.test_environments)) {
@@ -135,6 +134,12 @@ template("graphics_compute_single_component_package") {
       }
     }
   } else {
+    fuchsia_component(_component_target) {
+      component_name = _component_name
+      manifest = _component_manifest
+      deps = [ ":${_binary_target}" ]
+      manifest_deps = [ ":${_component_manifest_target}" ]
+    }
     group(target_name) {
       deps = [ ":$_binary_target" ]
     }

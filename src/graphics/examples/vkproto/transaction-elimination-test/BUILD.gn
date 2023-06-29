@@ -6,8 +6,7 @@ import("//build/components.gni")
 import("//src/graphics/examples/vkproto/common/common.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
-fuchsia_component("transaction_elimination_test") {
-  testonly = true
+fuchsia_test_component("transaction_elimination_test") {
   manifest = "meta/transaction-elimination-test.cml"
   deps = [
     ":bin",
@@ -15,6 +14,7 @@ fuchsia_component("transaction_elimination_test") {
     "//src/lib/vulkan/swapchain:image_pipe_swapchain_fb_layer",
     "//src/lib/vulkan/validation_layers",
   ]
+  test_type = "system"
 }
 
 executable("bin") {

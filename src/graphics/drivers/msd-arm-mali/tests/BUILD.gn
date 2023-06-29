@@ -34,6 +34,7 @@ fuchsia_unittest_package("msd_arm_mali_nonhardware_tests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "system"
 }
 
 fuchsia_unittest_package("msd_arm_mali_dfv2_tests") {

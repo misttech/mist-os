@@ -23,11 +23,11 @@ executable("goldfish_test_bin") {
   ]
 }
 
-fuchsia_component("goldfish_test_cmp") {
-  testonly = true
+fuchsia_test_component("goldfish_test_cmp") {
   deps = [ ":goldfish_test_bin" ]
   component_name = "goldfish_test"
   manifest = "meta/goldfish_test.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("goldfish-test-pkg") {

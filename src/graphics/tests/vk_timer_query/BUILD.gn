@@ -27,8 +27,7 @@ executable("vk_timer_query_bin") {
   deps += [ "//src/lib/vulkan" ]
 }
 
-fuchsia_component("vk_timer_query_cmp") {
-  testonly = true
+fuchsia_test_component("vk_timer_query_cmp") {
   component_name = "vk_timer_query"
   deps = [
     ":vk_timer_query_bin",
@@ -36,6 +35,7 @@ fuchsia_component("vk_timer_query_cmp") {
   ]
 
   manifest = "meta/vk_timer_query.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("vk-timer-query-pkg") {
