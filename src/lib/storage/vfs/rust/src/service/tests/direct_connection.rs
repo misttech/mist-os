@@ -50,13 +50,9 @@ async fn echo_server(
     }
 }
 
-const READ_WRITE: fio::OpenFlags = fio::OpenFlags::empty()
-    .union(fio::OpenFlags::RIGHT_READABLE)
-    .union(fio::OpenFlags::RIGHT_WRITABLE);
-
 #[test]
 fn construction() {
-    run_server_client(READ_WRITE, endpoint(|_scope, _channel| ()), |_proxy| {
+    run_server_client(fio::OpenFlags::empty(), endpoint(|_scope, _channel| ()), |_proxy| {
         async move {
             // NOOP.  Can not even call `Close` as it is part of the `Node` interface and we
             // did not connect to a service that speaks `Node`.
@@ -67,7 +63,7 @@ fn construction() {
 #[test]
 fn simple_endpoint() {
     run_server_client(
-        READ_WRITE,
+        fio::OpenFlags::empty(),
         endpoint(|scope, channel| {
             scope.spawn(async move {
                 echo_server(RequestStream::from_channel(channel), None, None).await;
@@ -86,7 +82,7 @@ fn simple_endpoint() {
 #[test]
 fn simple_host() {
     run_server_client(
-        READ_WRITE,
+        fio::OpenFlags::empty(),
         host(|requests| echo_server(requests, None, None)),
         |node_proxy| async move {
             let proxy = EchoProxy::from_channel(node_proxy.into_channel().unwrap());
@@ -107,7 +103,7 @@ fn server_state_checking() {
     let on_message_tx = Mutex::new(Some(on_message_tx));
 
     run_server_client(
-        READ_WRITE,
+        fio::OpenFlags::empty(),
         host(move |requests| {
             echo_server(
                 requests,
@@ -144,7 +140,7 @@ fn server_state_checking() {
 #[test]
 fn test_describe() {
     run_server_client(
-        READ_WRITE | fio::OpenFlags::DESCRIBE,
+        fio::OpenFlags::empty() | fio::OpenFlags::DESCRIBE,
         host(|requests| echo_server(requests, None, None)),
         |node_proxy| async move {
             let (status, node_info) = node_proxy
@@ -173,7 +169,7 @@ fn test_describe() {
 #[test]
 fn test_describe_error() {
     run_server_client(
-        READ_WRITE | fio::OpenFlags::DIRECTORY | fio::OpenFlags::DESCRIBE,
+        fio::OpenFlags::empty() | fio::OpenFlags::DIRECTORY | fio::OpenFlags::DESCRIBE,
         host(|requests| echo_server(requests, None, None)),
         |node_proxy| async move {
             let mut event_stream = node_proxy.take_event_stream();
@@ -202,7 +198,7 @@ fn test_describe_error() {
 #[test]
 fn test_epitaph() {
     run_server_client(
-        READ_WRITE | fio::OpenFlags::DIRECTORY,
+        fio::OpenFlags::empty() | fio::OpenFlags::DIRECTORY,
         host(|requests| echo_server(requests, None, None)),
         |node_proxy| async move {
             let mut event_stream = node_proxy.take_event_stream();

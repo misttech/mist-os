@@ -10,6 +10,7 @@ mod common;
 mod tests;
 
 use crate::{
+    common::send_on_open_with_error,
     directory::entry::{DirectoryEntry, EntryInfo},
     execution_scope::ExecutionScope,
     node::{self, Node},
@@ -93,6 +94,17 @@ impl DirectoryEntry for Service {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
+        let flags = match new_connection_validate_flags(flags) {
+            Ok(flags) => flags,
+            Err(status) => {
+                send_on_open_with_error(
+                    flags.contains(fio::OpenFlags::DESCRIBE),
+                    server_end,
+                    status,
+                );
+                return;
+            }
+        };
         flags.to_object_request(server_end).handle(|object_request| {
             if !path.is_empty() {
                 return Err(zx::Status::NOT_DIR);
@@ -100,7 +112,6 @@ impl DirectoryEntry for Service {
             if flags.is_node() {
                 scope.spawn(node::Connection::create(scope.clone(), self, flags, object_request)?);
             } else {
-                new_connection_validate_flags(flags)?;
                 if object_request.what_to_send() == ObjectRequestSend::OnOpen {
                     if let Ok(channel) = object_request
                         .take()
