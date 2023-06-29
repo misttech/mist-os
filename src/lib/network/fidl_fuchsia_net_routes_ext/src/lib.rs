@@ -21,10 +21,11 @@ use async_utils::fold;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
 use fidl_fuchsia_net_routes as fnet_routes;
+use fidl_fuchsia_net_stack as fnet_stack;
 use futures::{Future, Stream, StreamExt as _, TryStreamExt as _};
 use net_types::{
     ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Ipv6Addr, Subnet},
-    SpecifiedAddr, UnicastAddress,
+    SpecifiedAddr, UnicastAddress, Witness as _,
 };
 use thiserror::Error;
 
@@ -278,26 +279,30 @@ impl TryFrom<fnet_routes::RouteActionV6> for RouteAction<Ipv6> {
     }
 }
 
+const ROUTE_ACTION_V4_UNKNOWN_VARIANT_TAG: &str = "fuchsia.net.routes/RouteActionV4";
+
 impl TryFrom<RouteAction<Ipv4>> for fnet_routes::RouteActionV4 {
     type Error = NetTypeConversionError;
     fn try_from(action: RouteAction<Ipv4>) -> Result<Self, Self::Error> {
         match action {
             RouteAction::Forward(target) => Ok(fnet_routes::RouteActionV4::Forward(target.into())),
-            RouteAction::Unknown => {
-                Err(NetTypeConversionError::UnknownUnionVariant("fuchsia.net.routes/RouteActionV4"))
-            }
+            RouteAction::Unknown => Err(NetTypeConversionError::UnknownUnionVariant(
+                ROUTE_ACTION_V4_UNKNOWN_VARIANT_TAG,
+            )),
         }
     }
 }
+
+const ROUTE_ACTION_V6_UNKNOWN_VARIANT_TAG: &str = "fuchsia.net.routes/RouteActionV6";
 
 impl TryFrom<RouteAction<Ipv6>> for fnet_routes::RouteActionV6 {
     type Error = NetTypeConversionError;
     fn try_from(action: RouteAction<Ipv6>) -> Result<Self, Self::Error> {
         match action {
             RouteAction::Forward(target) => Ok(fnet_routes::RouteActionV6::Forward(target.into())),
-            RouteAction::Unknown => {
-                Err(NetTypeConversionError::UnknownUnionVariant("fuchsia.net.routes/RouteActionV6"))
-            }
+            RouteAction::Unknown => Err(NetTypeConversionError::UnknownUnionVariant(
+                ROUTE_ACTION_V6_UNKNOWN_VARIANT_TAG,
+            )),
         }
     }
 }
@@ -367,6 +372,48 @@ impl TryFrom<Route<Ipv6>> for fnet_routes::RouteV6 {
             },
             action: action.try_into()?,
             properties: properties.into(),
+        })
+    }
+}
+
+impl<I: Ip> TryFrom<Route<I>> for fnet_stack::ForwardingEntry {
+    type Error = NetTypeConversionError;
+    fn try_from(
+        Route {
+            destination,
+            action,
+            properties:
+                RouteProperties { specified_properties: SpecifiedRouteProperties { metric } },
+        }: Route<I>,
+    ) -> Result<Self, Self::Error> {
+        let RouteTarget { outbound_interface, next_hop } = match action {
+            RouteAction::Unknown => {
+                return Err(NetTypeConversionError::UnknownUnionVariant(match I::VERSION {
+                    net_types::ip::IpVersion::V4 => ROUTE_ACTION_V4_UNKNOWN_VARIANT_TAG,
+                    net_types::ip::IpVersion::V6 => ROUTE_ACTION_V6_UNKNOWN_VARIANT_TAG,
+                }))
+            }
+            RouteAction::Forward(target) => target,
+        };
+
+        let IpInvariant(next_hop) = I::map_ip(
+            next_hop,
+            |next_hop| {
+                IpInvariant(next_hop.map(|addr| fnet::IpAddress::Ipv4(addr.get().into_ext())))
+            },
+            |next_hop| {
+                IpInvariant(next_hop.map(|addr| fnet::IpAddress::Ipv6(addr.get().into_ext())))
+            },
+        );
+
+        Ok(fnet_stack::ForwardingEntry {
+            subnet: destination.into_ext(),
+            device_id: outbound_interface,
+            next_hop: next_hop.map(Box::new),
+            metric: match metric {
+                fnet_routes::SpecifiedMetric::ExplicitMetric(metric) => metric,
+                fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty) => 0,
+            },
         })
     }
 }

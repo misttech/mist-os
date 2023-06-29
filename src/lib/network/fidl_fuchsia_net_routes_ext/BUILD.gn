@@ -12,6 +12,7 @@ rustc_library("fidl_fuchsia_net_routes_ext") {
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
     "//sdk/fidl/fuchsia.net.routes.admin:fuchsia.net.routes.admin_rust",
+    "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
     "//src/connectivity/lib/net-types",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",

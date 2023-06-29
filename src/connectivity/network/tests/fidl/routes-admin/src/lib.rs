@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 //! Integration tests for fuchsia.net.routes.admin.
-// TODO(https://fxbug.dev/129220): These tests are work-in-progress and need to
-// be made more comprehensive before we can call this sufficiently tested.
+// TODO(https://fxbug.dev/129220): Add tests for authentication of interfaces.
 
 #![cfg(test)]
 
@@ -12,13 +11,20 @@ use std::collections::HashSet;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::ProtocolMarker;
+use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_routes as fnet_routes;
+use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext::{
     self as fnet_routes_ext, admin::FidlRouteAdminIpExt, FidlRouteIpExt,
 };
+use fidl_fuchsia_net_stack as fnet_stack;
 use fuchsia_async::TimeoutExt as _;
 use futures::{future::FutureExt as _, pin_mut};
-use net_types::{ip::Ip, SpecifiedAddr};
+use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
+use net_types::{
+    ip::{Ip, Ipv4, Ipv6},
+    SpecifiedAddr,
+};
 use netstack_testing_common::{
     realms::{Netstack, TestSandboxExt},
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
@@ -148,6 +154,124 @@ async fn add_remove_route<
 }
 
 #[netstack_test]
+#[test_case(
+    fidl_ip_v4_with_prefix!("192.0.2.0/24"), None
+    => Ok(());
+    "accepts with no nexthop"
+)]
+#[test_case(
+    fidl_ip_v4_with_prefix!("192.0.2.0/24"), Some(fidl_ip_v4!("192.0.2.1"))
+    => Ok(());
+    "accepts with valid nexthop"
+)]
+#[test_case(
+    fidl_ip_v4_with_prefix!("192.0.2.1/24"), None
+    => Err(fnet_routes_admin::RouteSetError::InvalidDestinationSubnet);
+    "rejects destination subnet with set host bits"
+)]
+#[test_case(
+    fnet::Ipv4AddressWithPrefix {
+        addr: fidl_ip_v4!("192.0.2.0"),
+        prefix_len: 33,
+    }, None
+    => Err(fnet_routes_admin::RouteSetError::InvalidDestinationSubnet);
+    "rejects destination subnet with invalid prefix length"
+)]
+#[test_case(
+    fidl_ip_v4_with_prefix!("192.0.2.0/24"), Some(fidl_ip_v4!("255.255.255.255")) => Err(fnet_routes_admin::RouteSetError::InvalidNextHop);
+    "rejects broadcast next hop"
+)]
+#[test_case(
+    fidl_ip_v4_with_prefix!("192.0.2.0/24"), Some(fidl_ip_v4!("0.0.0.0")) => Err(fnet_routes_admin::RouteSetError::InvalidNextHop);
+    "rejects next hop set to unspecified address"
+)]
+async fn validates_route_v4<N: Netstack>(
+    name: &str,
+    destination: fnet::Ipv4AddressWithPrefix,
+    next_hop: Option<fnet::Ipv4Address>,
+) -> Result<(), fnet_routes_admin::RouteSetError> {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let TestSetup { realm: _realm, network: _network, interface, set_provider, state: _ } =
+        TestSetup::<Ipv4>::new::<N>(&sandbox, name).await;
+    let proxy =
+        fnet_routes_ext::admin::new_route_set::<Ipv4>(&set_provider).expect("new route set");
+    fnet_routes_ext::admin::add_route::<Ipv4>(
+        &proxy,
+        &fnet_routes::RouteV4 {
+            destination,
+            action: fnet_routes::RouteActionV4::Forward(fnet_routes::RouteTargetV4 {
+                outbound_interface: interface.id(),
+                next_hop: next_hop.map(Box::new),
+            }),
+            properties: fnet_routes::RoutePropertiesV4::default(),
+        },
+    )
+    .await
+    .expect("no FIDL error")
+    .map(|_: bool| ())
+}
+
+#[netstack_test]
+#[test_case(
+    fidl_ip_v6_with_prefix!("2001:DB8::/64"), None
+    => Ok(());
+    "accepts with no nexthop"
+)]
+#[test_case(
+    fidl_ip_v6_with_prefix!("2001:DB8::/64"), Some(fidl_ip_v6!("2001:DB8::1"))
+    => Ok(());
+    "accepts with valid nexthop"
+)]
+#[test_case(
+    fidl_ip_v6_with_prefix!("2001:DB8::1/64"), None
+    => Err(fnet_routes_admin::RouteSetError::InvalidDestinationSubnet);
+    "rejects destination subnet with set host bits"
+)]
+#[test_case(
+    fnet::Ipv6AddressWithPrefix {
+        addr: fidl_ip_v6!("2001:DB8::"),
+        prefix_len: 129,
+    }, None
+    => Err(fnet_routes_admin::RouteSetError::InvalidDestinationSubnet);
+    "rejects destination subnet with invalid prefix length"
+)]
+#[test_case(
+    fidl_ip_v6_with_prefix!("2001:DB8::/64"), Some(fidl_ip_v6!("ff0e:0:0:0:0:DB8::1"))
+    => Err(fnet_routes_admin::RouteSetError::InvalidNextHop);
+    "rejects multicast next hop"
+)]
+#[test_case(
+    fidl_ip_v6_with_prefix!("2001:DB8::/64"), Some(fidl_ip_v6!("::"))
+    => Err(fnet_routes_admin::RouteSetError::InvalidNextHop);
+    "rejects next hop set to unspecified address"
+)]
+async fn validates_route_v6<N: Netstack>(
+    name: &str,
+    destination: fnet::Ipv6AddressWithPrefix,
+    next_hop: Option<fnet::Ipv6Address>,
+) -> Result<(), fnet_routes_admin::RouteSetError> {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let TestSetup { realm: _realm, network: _network, interface, set_provider, state: _ } =
+        TestSetup::<Ipv6>::new::<N>(&sandbox, name).await;
+    let proxy =
+        fnet_routes_ext::admin::new_route_set::<Ipv6>(&set_provider).expect("new route set");
+    fnet_routes_ext::admin::add_route::<Ipv6>(
+        &proxy,
+        &fnet_routes::RouteV6 {
+            destination,
+            action: fnet_routes::RouteActionV6::Forward(fnet_routes::RouteTargetV6 {
+                outbound_interface: interface.id(),
+                next_hop: next_hop.map(Box::new),
+            }),
+            properties: fnet_routes::RoutePropertiesV6::default(),
+        },
+    )
+    .await
+    .expect("no FIDL error")
+    .map(|_: bool| ())
+}
+
+#[netstack_test]
 async fn add_route_twice_with_same_set<
     I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
@@ -173,14 +297,14 @@ async fn add_route_twice_with_same_set<
 
     for expect_newly_added in [true, false] {
         assert_eq!(
-            expect_newly_added,
             fnet_routes_ext::admin::add_route::<I>(
                 &proxy,
                 &route_to_add.try_into().expect("convert to FIDL")
             )
             .await
             .expect("no FIDL error")
-            .expect("add route")
+            .expect("add route"),
+            expect_newly_added
         );
     }
 
@@ -215,11 +339,8 @@ async fn add_route_twice_with_same_set<
     .expect("remove route"));
 }
 
-// TODO(https://fxbug.dev/129220): Add test cases where one of the "multiple
-// sets" is the "system route set", and/or cases where the route is implicitly
-// installed by the netstack (e.g. for loopback).
 #[netstack_test]
-async fn add_route_with_multiple_sets<
+async fn add_route_with_multiple_route_sets<
     I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
@@ -295,4 +416,151 @@ async fn add_route_with_multiple_sets<
     })
     .await
     .expect("should succeed");
+}
+
+#[netstack_test]
+async fn add_remove_system_route<
+    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    N: Netstack,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let TestSetup { realm, network: _network, interface, set_provider, state } =
+        TestSetup::<I>::new::<N>(&sandbox, name).await;
+
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
+    pin_mut!(routes_stream);
+
+    let mut routes =
+        fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
+            .await
+            .expect("collect routes should succeed");
+
+    let route_set =
+        fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+    let fuchsia_net_stack = realm
+        .connect_to_protocol::<fnet_stack::StackMarker>()
+        .expect("connect to fuchsia.net.stack.Stack");
+
+    let route_to_add = test_route::<I>(&interface);
+
+    // Add a "system route" with fuchsia.net.stack.
+    fuchsia_net_stack
+        .add_forwarding_entry(&route_to_add.try_into().expect("convert to ForwardingEntry"))
+        .await
+        .expect("should not have FIDL error")
+        .expect("should succeed");
+
+    fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+        routes.iter().any(|installed_route| &installed_route.route == &route_to_add)
+    })
+    .await
+    .expect("should succeed");
+
+    // Trying to remove the route via the RouteSet should return `newly_removed` = false.
+    assert!(!fnet_routes_ext::admin::remove_route::<I>(
+        &route_set,
+        &route_to_add.try_into().expect("convert to FIDL")
+    )
+    .await
+    .expect("no FIDL error")
+    .expect("remove route"));
+
+    // Adding and removing the same route with a RouteSet should not result in it going away.
+    assert!(fnet_routes_ext::admin::add_route::<I>(
+        &route_set,
+        &route_to_add.try_into().expect("convert to FIDL")
+    )
+    .await
+    .expect("no FIDL error")
+    .expect("add route"));
+
+    assert!(fnet_routes_ext::admin::remove_route::<I>(
+        &route_set,
+        &route_to_add.try_into().expect("convert to FIDL")
+    )
+    .await
+    .expect("no FIDL error")
+    .expect("remove route"));
+
+    assert_matches!(
+        fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+            !routes.iter().any(|installed_route| &installed_route.route == &route_to_add)
+        })
+        .map(Some)
+        .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, || None)
+        .await,
+        None
+    );
+}
+
+#[netstack_test]
+async fn system_removes_route_from_route_set<
+    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    N: Netstack,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let TestSetup { realm, network: _network, interface, set_provider, state } =
+        TestSetup::<I>::new::<N>(&sandbox, name).await;
+
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
+    pin_mut!(routes_stream);
+
+    let mut routes =
+        fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
+            .await
+            .expect("collect routes should succeed");
+
+    let route_set =
+        fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+    let fuchsia_net_stack = realm
+        .connect_to_protocol::<fnet_stack::StackMarker>()
+        .expect("connect to fuchsia.net.stack.Stack");
+
+    let route_to_add = test_route::<I>(&interface);
+
+    // Add a route with the RouteSet.
+    assert!(fnet_routes_ext::admin::add_route::<I>(
+        &route_set,
+        &route_to_add.try_into().expect("convert to FIDL")
+    )
+    .await
+    .expect("no FIDL error")
+    .expect("add route"));
+
+    fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+        routes.iter().any(|installed_route| &installed_route.route == &route_to_add)
+    })
+    .await
+    .expect("should succeed");
+
+    // Have the "system" remove that route out from under the RouteSet.
+    fuchsia_net_stack
+        .del_forwarding_entry(&route_to_add.try_into().expect("convert to ForwardingEntry"))
+        .await
+        .expect("should not have FIDL error")
+        .expect("should succeed");
+
+    // The route should disappear.
+    fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+        !routes.iter().any(|installed_route| &installed_route.route == &route_to_add)
+    })
+    .await
+    .expect("should succeed");
+
+    // When we "remove" the route from the local RouteSet, the RouteSet should
+    // have noticed the route disappearing (and thus return false here because
+    // the route had already been removed).
+    assert!(!fnet_routes_ext::admin::remove_route::<I>(
+        &route_set,
+        &route_to_add.try_into().expect("convert to FIDL")
+    )
+    .await
+    .expect("no FIDL error")
+    .expect("remove route"));
 }
