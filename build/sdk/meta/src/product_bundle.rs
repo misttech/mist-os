@@ -46,7 +46,8 @@ impl LoadedProductBundle {
             }
             SerializationHelper::V2(SerializationHelperVersioned::V2(data)) => {
                 let mut data = data.clone();
-                data.canonicalize_paths(path.as_ref())?;
+                data.canonicalize_paths(path.as_ref())
+                    .with_context(|| format!("Canonicalizing paths from {:?}", path.as_ref()))?;
                 Ok(LoadedProductBundle::new(ProductBundle::V2(data), path))
             }
         }

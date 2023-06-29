@@ -150,20 +150,34 @@ impl ProductBundleV2 {
 
         // Canonicalize the partitions.
         for part in &mut self.partitions.bootstrap_partitions {
-            part.image = product_bundle_dir.join(&part.image).canonicalize_utf8()?;
+            part.image = product_bundle_dir
+                .join(&part.image)
+                .canonicalize_utf8()
+                .with_context(|| format!("Canonicalizing {:?}", &part.image))?;
         }
         for part in &mut self.partitions.bootloader_partitions {
-            part.image = product_bundle_dir.join(&part.image).canonicalize_utf8()?;
+            part.image = product_bundle_dir
+                .join(&part.image)
+                .canonicalize_utf8()
+                .with_context(|| format!("Canonicalizing {:?}", &part.image))?;
         }
         for cred in &mut self.partitions.unlock_credentials {
-            *cred = product_bundle_dir.join(&cred).canonicalize_utf8()?;
+            *cred = product_bundle_dir
+                .join(&cred)
+                .canonicalize_utf8()
+                .with_context(|| format!("Canonicalizing {:?}", &cred))?;
         }
 
         // Canonicalize the systems.
         let canonicalize_system = |system: &mut Option<Vec<Image>>| -> Result<()> {
             if let Some(system) = system {
                 for image in system.iter_mut() {
-                    image.set_source(product_bundle_dir.join(image.source()).canonicalize_utf8()?);
+                    image.set_source(
+                        product_bundle_dir
+                            .join(image.source())
+                            .canonicalize_utf8()
+                            .with_context(|| format!("Canonicalizing {:?}", image.source()))?,
+                    );
                 }
             }
             Ok(())
@@ -180,7 +194,8 @@ impl ProductBundleV2 {
                     std::fs::create_dir_all(&dir)
                         .with_context(|| format!("Creating the directory: {}", dir))?;
                 }
-                let path = dir.canonicalize_utf8()?;
+                let path =
+                    dir.canonicalize_utf8().with_context(|| format!("Canonicalizing {:?}", dir))?;
                 Ok(path)
             };
             repository.metadata_path = canonicalize_dir(&repository.metadata_path)?;
