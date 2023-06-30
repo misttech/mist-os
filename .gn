@@ -65,6 +65,9 @@ default_args = {
   pw_log_BACKEND = "//third_party/pigweed/backends/pw_log"
   pw_chrono_SYSTEM_CLOCK_BACKEND =
       "//third_party/pigweed/src/pw_chrono_stl:system_clock"
+  pw_sync_MUTEX_BACKEND = "//third_party/pigweed/src/pw_sync_baremetal:mutex"
+  pw_sys_io_BACKEND = "//third_party/pigweed/src/pw_sys_io_stdio"
+  pw_thread_SLEEP_BACKEND = "//third_party/pigweed/src/pw_thread_stl:sleep"
 
   # Pigweed configs for Fuchsia.
   pw_function_CONFIG =
@@ -90,4 +93,8 @@ default_args = {
 
   pw_async_FAKE_DISPATCHER_BACKEND =
       "//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"
+
+  # Use protoc from the Fuchsia build for Pigweed
+  pw_protobuf_compiler_PROTOC_TARGET = "//third_party/protobuf:protoc"
+  pw_protobuf_compiler_PROTOC_BINARY = "host_x64/protoc"
 }

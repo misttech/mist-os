@@ -1,0 +1,38 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+
+group("echo") {
+  deps = [ ":package" ]
+}
+
+executable("bin") {
+  output_name = "pw_rpc_echo"
+
+  sources = [ "pw_rpc_echo.cc" ]
+
+  deps = [
+    "//sdk/lib/syslog/cpp",
+    "//third_party/pigweed:pw_hdlc",
+    "//third_party/pigweed:pw_rpc.pwpb.echo_service",
+    "//third_party/pigweed:pw_rpc_client",
+    "//third_party/pigweed:pw_stream_socket_stream",
+    "//third_party/pigweed/backends/pw_log:printf",
+    "//zircon/system/ulib/async-default",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+  ]
+}
+
+fuchsia_component("component") {
+  component_name = "pw_rpc_echo"
+  manifest = "meta/echo.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("package") {
+  package_name = "pw_rpc_echo"
+  deps = [ ":component" ]
+}

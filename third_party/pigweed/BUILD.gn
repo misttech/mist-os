@@ -51,10 +51,28 @@ source_set("pw_log") {
   visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
 }
 
+source_set("pw_rpc_client") {
+  public_deps = [ "src/pw_rpc:client" ]
+}
+
+source_set("pw_hdlc") {
+  public_deps = [
+    "src/pw_hdlc",
+    "src/pw_hdlc:pw_rpc",
+    "src/pw_hdlc:rpc_channel_output",
+  ]
+}
+
+source_set("pw_stream_socket_stream") {
+  public_deps = [ "src/pw_stream:socket_stream" ]
+}
+
+source_set("pw_rpc.pwpb.echo_service") {
+  public_deps = [ "src/pw_rpc/pwpb:echo_service" ]
+}
+
 # TODO(fxbug.dev/125377): Add "backends/pw_async_fuchsia:tests" to deps.
 group("tests") {
   testonly = true
-  deps = [
-    "backends/pw_random:tests",
-  ]
+  deps = [ "backends/pw_random:tests" ]
 }
