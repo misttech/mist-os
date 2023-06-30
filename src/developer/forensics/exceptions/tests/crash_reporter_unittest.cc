@@ -4,7 +4,6 @@
 #include "src/developer/forensics/exceptions/handler/crash_reporter.h"
 
 #include <fuchsia/feedback/cpp/fidl.h>
-#include <fuchsia/sys/internal/cpp/fidl.h>
 #include <fuchsia/sys2/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/syslog/cpp/macros.h>

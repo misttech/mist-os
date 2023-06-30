@@ -20,10 +20,6 @@ string contents.
 If a message is written to the [`LogSink`] protocol it also has a severity, a
 PID, a TID, a count of prior dropped logs, and a list of string tags.
 
-Unless a component's parent realm provides its own `LogSink`, diagnostics also
-includes trusted [SourceIdentity] metadata for incoming log connections. This
-information is used to provide a default tag for messages without tags.
-
 ## Storage
 
 Currently all log stores are rotated on a first-in-first-out (FIFO) basis, with
@@ -50,7 +46,6 @@ from the previous boot. These messages appear when running [`fx snapshot`].
 
 [LogMessage]: https://fuchsia.dev/reference/fidl/fuchsia.logger#LogMessage
 [`LogSink`]: https://fuchsia.dev/reference/fidl/fuchsia.logger#LogSink
-[SourceIdentity]: https://fuchsia.dev/reference/fidl/fuchsia.sys.internal#SourceIdentity
 [debuglog]: /docs/reference/kernel_objects/debuglog.md
 [128kb buffer in the kernel]: /zircon/kernel/lib/debuglog/debuglog.cc
 [4MB buffer in the archivist]: /src/diagnostics/archivist/src/logs/mod.rs
