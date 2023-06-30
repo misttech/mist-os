@@ -812,10 +812,10 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
     case ZX_INFO_RESOURCE: {
       // grab a reference to the dispatcher
       fbl::RefPtr<ResourceDispatcher> resource;
-      zx_status_t error =
+      zx_status_t status =
           up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_INSPECT, &resource);
-      if (error != ZX_OK) {
-        return error;
+      if (status != ZX_OK) {
+        return status;
       }
 
       // build the info structure
@@ -824,7 +824,8 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       info.base = resource->get_base();
       info.size = resource->get_size();
       info.flags = resource->get_flags();
-      resource->get_name(info.name);
+      status = resource->get_name(info.name);
+      DEBUG_ASSERT(status == ZX_OK);
 
       return single_record_result(_buffer, buffer_size, _actual, _avail, info);
     }

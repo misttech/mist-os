@@ -147,7 +147,8 @@ zx_status_t ResourceDispatcher::Create(KernelHandle<ResourceDispatcher>* handle,
   }
 
   if (name != nullptr) {
-    new_handle.dispatcher()->set_name(name, ZX_MAX_NAME_LEN);
+    [[maybe_unused]] zx_status_t status = new_handle.dispatcher()->set_name(name, ZX_MAX_NAME_LEN);
+    DEBUG_ASSERT(status == ZX_OK);
   }
 
   *rights = default_rights();
@@ -202,7 +203,8 @@ zx_status_t ResourceDispatcher::CreateRangedRoot(KernelHandle<ResourceDispatcher
   }
 
   if (name != nullptr) {
-    new_handle.dispatcher()->set_name(name, ZX_MAX_NAME_LEN);
+    [[maybe_unused]] zx_status_t status = new_handle.dispatcher()->set_name(name, ZX_MAX_NAME_LEN);
+    DEBUG_ASSERT(status == ZX_OK);
   }
 
   *rights = default_rights();
@@ -256,7 +258,8 @@ ResourceDispatcher::~ResourceDispatcher() {
   // shared need to be removed from |all_shared_list_|
   Guard<Mutex> guard{ResourcesLock::Get()};
   char name[ZX_MAX_NAME_LEN];
-  get_name(name);
+  [[maybe_unused]] zx_status_t status = get_name(name);
+  DEBUG_ASSERT(status == ZX_OK);
   resource_list_->erase(*this);
 }
 
@@ -312,7 +315,8 @@ void ResourceDispatcher::DumpResources() {
     char region[32]{};
     char name[ZX_MAX_NAME_LEN]{};
     char flag_str[kFlagLen]{};
-    r.get_name(name);
+    [[maybe_unused]] zx_status_t status = r.get_name(name);
+    DEBUG_ASSERT(status == ZX_OK);
     flags_to_string(r.get_flags(), flag_str);
     printf("%32s  ", name);
     printf("\t%10s  ", kind_to_string(r.get_kind()));

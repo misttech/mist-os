@@ -76,14 +76,16 @@ class ResourceDispatcher final
 
   // Returns a null-terminated name, or the empty string if set_name() has not
   // been called.
-  zx_status_t get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const final {
+  [[nodiscard]] zx_status_t get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const final {
     name_.get(ZX_MAX_NAME_LEN, out_name);
     return ZX_OK;
   }
 
   // Sets the name of the object. May truncate internally. |size| is the size
   // of the buffer pointed to by |name|.
-  zx_status_t set_name(const char* name, size_t size) final { return name_.set(name, size); }
+  [[nodiscard]] zx_status_t set_name(const char* name, size_t size) final {
+    return name_.set(name, size);
+  }
 
   uint64_t get_base() const { return base_; }
   size_t get_size() const { return size_; }
