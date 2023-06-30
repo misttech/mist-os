@@ -175,15 +175,16 @@ fuchsia_component("exception_broker_config_test") {
   ]
 }
 
-fuchsia_component("exception_broker_integration_test") {
-  testonly = true
-
+fuchsia_test_component("exception_broker_integration_test") {
   manifest = "meta/exception_broker_integration_test.cml"
 
   deps = [
     ":crasher",
     ":exception_broker_integration_test_exe",
   ]
+
+  # Depends on config_data which is a system capability.
+  test_type = "system"
 }
 
 fuchsia_component("exception_broker_unittest") {

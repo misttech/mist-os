@@ -141,15 +141,14 @@ resource("test_image") {
 ###############################################################################
 # COMPONENTS
 ###############################################################################
-fuchsia_component("data_provider_unittest") {
-  testonly = true
-
+fuchsia_test_component("data_provider_unittest") {
   manifest = "meta/data_provider_unittest.cml"
 
   deps = [
     ":data_provider_unittest_exe",
     ":test_image",
   ]
+  test_type = "system"
 }
 
 fuchsia_unittest_component("inspect_data_budget_unittest") {

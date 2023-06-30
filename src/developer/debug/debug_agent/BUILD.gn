@@ -296,6 +296,9 @@ fuchsia_unittest_package("debug_agent_unit_tests") {
   component_name = "debug_agent_unit_tests"
   manifest = "meta/debug_agent_unit_tests.cml"
   deps = [ ":unit_tests" ]
+
+  # required for accessing RootJob.
+  test_type = "system"
 }
 
 fuchsia_unittest_package("debug_agent_integration_tests") {
@@ -308,6 +311,9 @@ fuchsia_unittest_package("debug_agent_integration_tests") {
     # actual behaviour against zircon.
     "test_data:test_executables",
   ]
+
+  # required for accessing RootJob.
+  test_type = "system"
 }
 
 group("tests") {

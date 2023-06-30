@@ -62,6 +62,7 @@ fuchsia_test_component("sched_tests_component") {
     ":bin_test",
     "//third_party/sbase:echo_bin",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("sched_tests") {

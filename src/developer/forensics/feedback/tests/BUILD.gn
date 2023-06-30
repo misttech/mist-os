@@ -567,12 +567,11 @@ fuchsia_unittest_component("annotation_manager_unittest") {
   ]
 }
 
-fuchsia_component("attachment_manager_unittest") {
-  testonly = true
-
+fuchsia_test_component("attachment_manager_unittest") {
   manifest = "meta/attachment_manager_unittest.cml"
 
   deps = [ ":attachment_manager_unittest_exe" ]
+  test_type = "system"
 }
 
 fuchsia_unittest_component("annotation_metrics_unittest") {
@@ -647,12 +646,11 @@ fuchsia_unittest_component("previous_boot_log_unittest") {
   ]
 }
 
-fuchsia_component("kernel_log_integration_test") {
-  testonly = true
-
+fuchsia_test_component("kernel_log_integration_test") {
   manifest = "meta/kernel_log_integration_test.cml"
 
   deps = [ ":kernel_log_integration_test_exe" ]
+  test_type = "system"
 }
 
 fuchsia_unittest_component("last_reboot_unittest") {

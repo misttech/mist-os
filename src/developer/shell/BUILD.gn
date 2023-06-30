@@ -34,6 +34,7 @@ fuchsia_test_component("josh-log-tests-component") {
   component_name = "josh_log_tests_bin"
   manifest = "meta/josh_log_tests_bin.cml"
   deps = [ "//src/developer/shell/josh:josh_log_tests_bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("josh-log-tests") {
@@ -50,6 +51,7 @@ fuchsia_test_component("josh-tests-component") {
   component_name = "josh_tests_bin"
   manifest = "meta/josh_tests_bin.cml"
   deps = [ "//src/developer/shell/josh:josh_tests_bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("josh-tests") {

@@ -5,7 +5,6 @@
     include: [
         "//src/sys/test_runners/gtest/default.shard.cml",
         "inspect/client.shard.cml",
-        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {

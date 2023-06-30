@@ -44,6 +44,7 @@ executable("memory_monitor_unittests") {
 fuchsia_unittest_package("memory_monitor_tests") {
   manifest = "meta/memory_monitor_unittests.cml"
   deps = [ ":memory_monitor_unittests" ]
+  test_type = "system"
 }
 
 executable("bin-monitor") {
@@ -88,6 +89,7 @@ fuchsia_test_component("memory_monitor_inspect_integration_tests_component") {
   component_name = "memory_monitor_inspect_integration_tests"
   manifest = "meta/memory_monitor_inspect_integration_tests.cml"
   deps = [ ":test-inspect" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("memory_monitor_inspect_integration_tests") {

@@ -56,6 +56,7 @@ fuchsia_test_component("memory_metrics_systemtests_component") {
   component_name = "memory_metrics_systemtests"
   manifest = "meta/memory_metrics_systemtests.cml"
   deps = [ ":memory_metrics_systemtests" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("memory_metrics_tests") {
