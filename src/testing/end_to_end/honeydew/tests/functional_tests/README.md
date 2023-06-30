@@ -42,7 +42,7 @@ If a test case requires fuchsia emulator then follow the below steps to start it
 
 3. In a separate terminal, start the emulator with networking enabled
     ```shell
-    $ ffx emu stop && ffx emu start -H --net tap
+    $ ffx emu stop ; ffx emu start -H --net tap
     ```
 
 4. Ensure emulator shows up in FFX CLI
@@ -80,7 +80,7 @@ $ fx set core.qemu-x64 \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
 # start the emulator with networking enabled
-$ ffx emu stop && ffx emu start -H --net tap
+$ ffx emu stop ; ffx emu start -H --net tap
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_generic_fuchsia_device:generic_fuchsia_device_test --e2e --output
 ```
@@ -120,7 +120,7 @@ $ fx set core.qemu-x64 \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
 # start the emulator with networking enabled
-$ ffx emu stop && ffx emu start -H --net tap
+$ ffx emu stop ; ffx emu start -H --net tap
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_component:component_test --e2e --output
 ```
@@ -134,9 +134,33 @@ $ fx set core.qemu-x64 \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
 # start the emulator with networking enabled
-$ ffx emu stop && ffx emu start -H --net tap
+$ ffx emu stop ; ffx emu start -H --net tap
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_tracing:tracing_test --e2e --output
+```
+## Transport tests
+
+### Fastboot tests
+``` shell
+$ fx set core.x64 \
+    --with //build/images/recovery:recovery-installer \
+    --with //src/testing/sl4f \
+    --with //src/sys/bin/start_sl4f \
+    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+    --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
+
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/transport_tests/test_fastboot:fastboot_test --e2e --output
+```
+
+### FFX tests
+``` shell
+$ fx set core.qemu-x64 \
+    --with //src/testing/sl4f \
+    --with //src/sys/bin/start_sl4f \
+    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+    --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
+
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/transport_tests/test_ffx:ffx_test --e2e --output
 ```
 
 [Intel NUC]: https://fuchsia.dev/fuchsia-src/development/hardware/intel_nuc

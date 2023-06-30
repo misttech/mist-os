@@ -16,6 +16,7 @@ if (is_host) {
     public_deps = [
       "affordance_tests:emulator_tests_fyi",
       "device_class_tests:emulator_tests_fyi",
+      "transport_tests:emulator_tests_fyi",
     ]
   }
 
@@ -29,6 +30,7 @@ if (is_host) {
     public_deps = [
       "affordance_tests:tests",
       "device_class_tests:tests",
+      "transport_tests:tests",
     ]
   }
 }

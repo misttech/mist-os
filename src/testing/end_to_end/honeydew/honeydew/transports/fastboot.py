@@ -125,7 +125,7 @@ class Fastboot:
         try:
             target_info: Dict[str, Any] = self._get_target_info()
         except errors.FfxCommandError as err:
-            _LOGGER.warning(err)
+            _LOGGER.debug(err)
             return False
 
         return (

@@ -21,6 +21,7 @@ from honeydew.interfaces.device_classes import fuchsia_device
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
+# pylint: disable=pointless-statement
 class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
     """FuchsiaDevice tests"""
 
@@ -121,5 +122,5 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         asserts.assert_true(exists, msg="snapshot failed")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_runner.main()

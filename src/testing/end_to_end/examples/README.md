@@ -29,7 +29,7 @@ $ fx set core.qemu-x64 \
     --with-host //src/testing/end_to_end/examples:tests
 
 # start the emulator with networking enabled
-$ ffx emu stop && ffx emu start -H --net tap
+$ ffx emu stop ; ffx emu start -H --net tap
 
 $ fx test //src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test --e2e --output
 ```
