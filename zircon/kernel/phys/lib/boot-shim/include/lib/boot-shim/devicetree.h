@@ -386,6 +386,22 @@ class DevicetreeMemoryItem : public DevicetreeItemBase<DevicetreeMemoryItem, 1>,
   std::optional<devicetree::RangesProperty> reserved_memory_ranges_;
 };
 
+// This item parses the '/cpus' 'timebase-frequency property to generate a timer driver
+// configuration ZBI item.
+//
+// The timebase frequency specifies the clock frequency of the RISC-V timer device.
+//
+// See:
+// https://www.kernel.org/doc/Documentation/devicetree/bindings/timer/riscv%2Ctimer.yaml
+class RiscvDevicetreeTimerItem
+    : public DevicetreeItemBase<RiscvDevicetreeTimerItem, 1>,
+      public SingleOptionalItem<zbi_dcfg_riscv_generic_timer_driver_t, ZBI_TYPE_KERNEL_DRIVER,
+                                ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER> {
+ public:
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+};
+
 }  // namespace boot_shim
 
 #endif  // ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_DEVICETREE_H_

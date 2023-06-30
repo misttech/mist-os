@@ -27,6 +27,7 @@ dts_synthetic = [
   "synthetic/complex_no_properties.dts",
   "synthetic/complex_with_alias.dts",
   "synthetic/complex_with_alias_first.dts",
+  "synthetic/cpus_riscv.dts",
   "synthetic/empty.dts",
   "synthetic/memory_complex.dts",
   "synthetic/memory.dts",

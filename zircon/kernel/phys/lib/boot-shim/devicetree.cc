@@ -569,4 +569,25 @@ bool DevicetreeMemoryItem::AppendRangesFromReg(
   return true;
 }
 
+devicetree::ScanState RiscvDevicetreeTimerItem::OnNode(const devicetree::NodePath& path,
+                                                       const devicetree::PropertyDecoder& decoder) {
+  if (path.size() == 1) {
+    return devicetree::ScanState::kActive;
+  }
+
+  if (path.size() == 2 && path.back().name() == "cpus") {
+    auto freq = decoder.FindProperty("timebase-frequency");
+    if (freq) {
+      if (auto freq_val = freq->AsUint32()) {
+        set_payload(zbi_dcfg_riscv_generic_timer_driver_t{
+            .freq_hz = *freq_val,
+        });
+      }
+    }
+    return devicetree::ScanState::kDone;
+  }
+
+  return devicetree::ScanState::kDoneWithSubtree;
+}
+
 }  // namespace boot_shim
