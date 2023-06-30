@@ -8,7 +8,6 @@
         "//sdk/lib/syslog/client.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "sys/testing/elf_test_runner.shard.cml",
-        "sys/testing/system-test.shard.cml",
     ],
     program: {
         binary: "test/platform-bus-bti-test",

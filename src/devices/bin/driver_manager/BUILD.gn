@@ -287,6 +287,7 @@ fuchsia_unittest_component("driver-manager-test") {
     "//src/devices/internal/drivers/fragment",
     "//src/devices/tests/mock-device",
   ]
+  test_type = "system"
 }
 
 # This is a separate test binary because this test fixture uses gtest, not zxtest
@@ -301,6 +302,7 @@ test("driver_host_loader_service_test") {
 fuchsia_unittest_component("driver-host-loader-service-test") {
   manifest = "meta/driver-host-loader-service-test.cml"
   deps = [ ":driver_host_loader_service_test" ]
+  test_type = "system"
 }
 
 executable("manifest_parser_test") {

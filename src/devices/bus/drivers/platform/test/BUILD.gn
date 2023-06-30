@@ -458,4 +458,5 @@ fuchsia_unittest_package("platform-bus-bti-test") {
     "//src/devices/bus/drivers/platform",
     "//src/devices/internal/drivers/fragment",
   ]
+  test_type = "system"
 }

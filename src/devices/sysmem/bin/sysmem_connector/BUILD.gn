@@ -59,6 +59,7 @@ executable("sysmem_connector_test_executable") {
 fuchsia_test_component("sysmem_connector_test_component") {
   manifest = "meta/sysmem_connector_test.cml"
   deps = [ ":sysmem_connector_test_executable" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("sysmem_connector_test") {

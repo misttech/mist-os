@@ -173,6 +173,7 @@ fuchsia_unittest_package("driver_runtime_scheduler_role_tests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "system"
 }
 
 fuchsia_unittest_package("driver_runtime_death_tests") {

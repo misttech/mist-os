@@ -56,6 +56,7 @@ fuchsia_unittest_package("sysmem-test-v1") {
     ":sysmem-v1",
     "//src/devices/sysmem/bin/sysmem_connector:sysmem_connector_cmp",
   ]
+  test_type = "system"
 }
 
 fuchsia_unittest_package("sysmem-test-v2") {
@@ -64,6 +65,7 @@ fuchsia_unittest_package("sysmem-test-v2") {
     ":sysmem-v2",
     "//src/devices/sysmem/bin/sysmem_connector:sysmem_connector_cmp",
   ]
+  test_type = "system"
 }
 
 bootfs_test("sysmem-bootfs-test-v1") {
