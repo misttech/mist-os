@@ -228,7 +228,11 @@ template("assemble_security_pkg_test_system") {
 
   # Main system assembly.
   assembled_system(labels.assembly) {
-    forward_variables_from(invoker, [ "fvm_truncate_to_length" ])
+    forward_variables_from(invoker,
+                           [
+                             "fvm_truncate_to_length",
+                             "assembly_fxfs_image_size_bytes",
+                           ])
     generate_fvm = !fxfs_blob
     generate_fxfs = fxfs_blob
     testonly = true

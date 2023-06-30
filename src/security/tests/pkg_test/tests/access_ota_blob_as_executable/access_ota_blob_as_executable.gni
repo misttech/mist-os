@@ -51,7 +51,11 @@ template("access_ota_blob_as_executable") {
     #   minfs size: 8388608
     #
     #   Total: round_up(3063808 + 46365598 + 8388608, 4096) = 57819136
-    fvm_truncate_to_length = 57819136
+    if (fxfs_blob) {
+      assembly_fxfs_image_size_bytes = 57819136
+    } else {
+      fvm_truncate_to_length = 57819136
+    }
   }
 
   # System assembly for system version to OTA from package server.
