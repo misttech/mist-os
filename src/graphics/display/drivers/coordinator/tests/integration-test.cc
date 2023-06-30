@@ -562,17 +562,33 @@ TEST_F(IntegrationTest, CreateLayer) {
   EXPECT_OK(create_layer_reply.value().res);
 }
 
-TEST_F(IntegrationTest, ImportImageWithInvalidBufferCollectionId) {
+TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
   TestFidlClient client(sysmem_);
   ASSERT_TRUE(client.CreateChannel(display_fidl(), /*is_vc=*/false));
   ASSERT_TRUE(client.Bind(dispatcher()));
 
   fbl::AutoLock lock(client.mtx());
+  const uint64_t image_id = fuchsia_hardware_display::wire::kInvalidDispId;
   const uint64_t buffer_collection_id = 0xffeeeedd;
-  const uint64_t image_id = 1;
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
       client.dc_->ImportImage(client.displays_[0].image_config_, buffer_collection_id, image_id,
                               /*index=*/0);
+  ASSERT_OK(import_image_reply.status());
+  EXPECT_NE(ZX_OK, import_image_reply.value().res);
+}
+
+TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
+  TestFidlClient client(sysmem_);
+  ASSERT_TRUE(client.CreateChannel(display_fidl(), /*is_vc=*/false));
+  ASSERT_TRUE(client.Bind(dispatcher()));
+
+  fbl::AutoLock lock(client.mtx());
+  const uint64_t image_id = 1;
+  const uint64_t buffer_collection_id = 0xffeeeedd;
+  fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
+      client.dc_->ImportImage(client.displays_[0].image_config_, buffer_collection_id, image_id,
+                              /*index=*/0);
+  ASSERT_OK(import_image_reply.status());
   EXPECT_NE(ZX_OK, import_image_reply.value().res);
 }
 

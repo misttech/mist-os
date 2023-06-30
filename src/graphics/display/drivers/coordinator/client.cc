@@ -82,21 +82,24 @@ void DisplayConfig::InitializeInspect(inspect::Node* parent) {
 }
 
 void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& completer) {
-  const BufferCollectionId buffer_collection_id = ToBufferCollectionId(request->collection_id);
-  auto it = collection_map_.find(buffer_collection_id);
-  if (it == collection_map_.end()) {
+  const ImageId image_id = ToImageId(request->image_id);
+  if (image_id == kInvalidImageId) {
     completer.Reply(ZX_ERR_INVALID_ARGS);
     return;
   }
-  const auto& collections = it->second;
-
-  // Can't import an image with an id that's already in use.
-  const ImageId image_id = ToImageId(request->image_id);
-  auto image_check = images_.find(image_id);
-  if (image_check.IsValid()) {
+  auto images_it = images_.find(image_id);
+  if (images_it.IsValid()) {
     completer.Reply(ZX_ERR_ALREADY_EXISTS);
     return;
   }
+
+  const BufferCollectionId buffer_collection_id = ToBufferCollectionId(request->collection_id);
+  auto collection_map_it = collection_map_.find(buffer_collection_id);
+  if (collection_map_it == collection_map_.end()) {
+    completer.Reply(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  const Collections& collections = collection_map_it->second;
 
   image_t dc_image = {};
   dc_image.height = request->image_config.height;
@@ -114,22 +117,21 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
 
   auto release_image =
       fit::defer([this, &dc_image]() { controller_->dc()->ReleaseImage(&dc_image); });
-  zx::vmo vmo;
 
-  fbl::AllocChecker ac;
-  auto image =
-      fbl::AdoptRef(new (&ac) Image(controller_, dc_image, std::move(vmo), &proxy_->node(), id_));
-  if (!ac.check()) {
+  fbl::AllocChecker alloc_checker;
+  fbl::RefPtr<Image> image = fbl::AdoptRef(
+      new (&alloc_checker) Image(controller_, dc_image, zx::vmo(), &proxy_->node(), id_));
+  if (!alloc_checker.check()) {
     zxlogf(DEBUG, "Alloc checker failed while constructing Image.\n");
     completer.Reply(ZX_ERR_NO_MEMORY);
     return;
   }
+  // `dc_image` is now owned by the Image instance.
+  release_image.cancel();
 
   image->id = image_id;
-  release_image.cancel();
   images_.insert(std::move(image));
-
-  completer.Reply(0);
+  completer.Reply(ZX_OK);
 }
 
 void Client::ReleaseImage(ReleaseImageRequestView request,
@@ -756,7 +758,7 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
     completer.ReplyError(ZX_ERR_NO_MEMORY);
     return;
   }
-  // `capture_image_handle` is now owned by the CaptureImage instance.
+  // `driver_capture_image_id` is now owned by the CaptureImage instance.
   release_image.cancel();
 
   const CaptureImageId capture_image_id = next_capture_image_id_++;
