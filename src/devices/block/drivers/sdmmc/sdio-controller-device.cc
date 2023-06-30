@@ -641,35 +641,6 @@ zx_status_t SdioControllerDevice::SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo
   return sdmmc_.host().UnregisterVmo(vmo_id, fn_idx, out_vmo);
 }
 
-void SdioControllerDevice::SdioRunDiagnostics() {
-  if (dead_) {
-    return;
-  }
-
-  fbl::AutoLock lock(&lock_);
-  if (tuned_) {
-    zx_status_t status = sdmmc_.host().PerformTuning(SD_SEND_TUNING_BLOCK);
-    if (status == ZX_OK) {
-      zxlogf(INFO, "tuning passed");
-    } else {
-      zxlogf(INFO, "tuning failed: %d", status);
-    }
-  }
-
-  char cccr_string[(0x17 * 3) + 1];  // 0x17 octets plus spaces plus null byte
-  char* next_byte = cccr_string;
-  for (uint32_t addr = 0; addr < 0x17; addr++) {
-    zx::result<uint8_t> byte = ReadCccrByte(addr);
-    if (byte.is_ok()) {
-      next_byte += snprintf(next_byte, 4, " %02x", byte.value());
-    } else {
-      next_byte += snprintf(next_byte, 4, " --");
-    }
-  }
-
-  zxlogf(INFO, "CCCR:%s", cccr_string);
-}
-
 void SdioControllerDevice::SdioRequestCardReset(sdio_request_card_reset_callback callback,
                                                 void* cookie) {
   if (dead_) {
@@ -692,6 +663,10 @@ void SdioControllerDevice::SdioRequestCardReset(sdio_request_card_reset_callback
   }
 
   callback(cookie, status);
+}
+
+void SdioControllerDevice::SdioPerformTuning(sdio_perform_tuning_callback callback, void* cookie) {
+  callback(cookie, ZX_ERR_NOT_SUPPORTED);
 }
 
 zx::result<uint8_t> SdioControllerDevice::ReadCccrByte(uint32_t addr) {

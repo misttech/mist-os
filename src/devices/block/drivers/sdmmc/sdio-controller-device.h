@@ -67,8 +67,8 @@ class SdioControllerDevice : public SdioControllerDeviceType,
                               uint64_t size, uint32_t vmo_rights);
   zx_status_t SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo_id, zx::vmo* out_vmo);
   zx_status_t SdioDoRwTxn(uint8_t fn_idx, const sdio_rw_txn_t* txn);
-  void SdioRunDiagnostics();
   void SdioRequestCardReset(sdio_request_card_reset_callback callback, void* cookie) TA_EXCL(lock_);
+  void SdioPerformTuning(sdio_perform_tuning_callback callback, void* cookie);
 
   void InBandInterruptCallback();
 

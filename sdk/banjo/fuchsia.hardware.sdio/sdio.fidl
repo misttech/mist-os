@@ -165,14 +165,6 @@ closed protocol Sdio {
         status zx.Status;
     });
 
-    /// Runs tests and logs the results in order to diagnose issues with the bus. Clients should
-    /// call this before shutting down due to unrecoverable errors. This method may block for some
-    /// time to send commands to the card, so it should be the last call made by the client.
-    /// Note: SDIO devices may have different drivers bound to different functions. Clients must not
-    /// call RunDiagnostics in these cases, since doing so could interfere with other clients.
-    /// TODO(fxbug.dev/64166): Remove this when the SDIO issues have been investigated.
-    strict RunDiagnostics();
-
     /// Requests that the core driver hard reset the card and perform the SDIO initialization
     /// sequence again. The callback will be called after the card has been re-initialized, and in
     /// the meantime all IO calls from this client will return ZX_ERR_SHOULD_WAIT. If an error
@@ -189,6 +181,20 @@ closed protocol Sdio {
     /// include toggling a reset GPIO or power cycling the card.
     @async
     strict RequestCardReset() -> (struct {
+        status zx.Status;
+    });
+
+    /// Perform tuning in the background. Clients can use this to update the host controller delay
+    /// settings in case the bus delay has changed due to temperature or other factors. For example,
+    /// clients could call this periodically, or only in response to data CRC errors. The amount of
+    /// time this call takes (and the amount of time that other requests are blocked for) is
+    /// controller-dependent.
+    ///
+    /// Returns `ZX_ERR_ALREADY_BOUND` if another call to `PerformTuning()` is already pending.
+    /// Otherwise returns `ZX_OK` or an error value if the SDMMC driver's tuning process failed (see
+    /// the [SDMMC protocol](/sdk/banjo/fuchsia.hardware.sdmmc/sdmmc.fidl)).
+    @async
+    strict PerformTuning() -> (struct {
         status zx.Status;
     });
 };

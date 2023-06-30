@@ -233,11 +233,13 @@ zx_status_t SdioFunctionDevice::SdioDoRwTxn(const sdio_rw_txn_t* txn) {
   return sdio_parent_->SdioDoRwTxn(function_, txn);
 }
 
-void SdioFunctionDevice::SdioRunDiagnostics() { return sdio_parent_->SdioRunDiagnostics(); }
-
 void SdioFunctionDevice::SdioRequestCardReset(sdio_request_card_reset_callback callback,
                                               void* cookie) {
   sdio_parent_->SdioRequestCardReset(callback, cookie);
+}
+
+void SdioFunctionDevice::SdioPerformTuning(sdio_perform_tuning_callback callback, void* cookie) {
+  sdio_parent_->SdioPerformTuning(callback, cookie);
 }
 
 }  // namespace sdmmc
