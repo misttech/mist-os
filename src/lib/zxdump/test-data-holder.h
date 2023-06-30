@@ -188,6 +188,15 @@ struct TestDataValueType<zx_arm64_info_guest_stats_t> {
 };
 
 template <>
+struct TestDataValueType<zx_riscv64_info_guest_stats_t> {
+  using type = zx_riscv64_info_guest_stats_t;
+
+  static constexpr bool kIsVector = false;
+
+  static void Check(std::string_view name, const type& old_value, const type& new_value);
+};
+
+template <>
 struct TestDataValueType<zx_x86_64_info_guest_stats_t> {
   using type = zx_x86_64_info_guest_stats_t;
 

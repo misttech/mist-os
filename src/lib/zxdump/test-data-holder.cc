@@ -84,4 +84,14 @@ void TestDataValueType<zx_arm64_info_guest_stats_t>::Check(
   EXPECT_LE(old_value.interrupts, new_value.interrupts) << name << " interrupts";
 }
 
+void TestDataValueType<zx_riscv64_info_guest_stats_t>::Check(
+    std::string_view name, const zx_riscv64_info_guest_stats_t& old_value,
+    const zx_riscv64_info_guest_stats_t& new_value) {
+  EXPECT_EQ(old_value.cpu_number, new_value.cpu_number) << name << " cpu_number";
+  EXPECT_EQ(old_value.flags, new_value.flags) << name << " flags";
+  EXPECT_LE(old_value.vm_entries, new_value.vm_entries) << name << " vm_entries";
+  EXPECT_LE(old_value.vm_exits, new_value.vm_exits) << name << " vm_exits";
+  EXPECT_LE(old_value.interrupts, new_value.interrupts) << name << " interrupts";
+}
+
 }  // namespace zxdump::testing
