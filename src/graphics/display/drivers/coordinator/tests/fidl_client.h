@@ -22,6 +22,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 
 namespace display {
 
@@ -62,13 +63,13 @@ class TestFidlClient {
       const fuchsia_hardware_display::wire::ImageConfig& image_config) TA_EXCL(mtx());
 
   zx::result<uint64_t> CreateImage() TA_EXCL(mtx());
-  zx::result<uint64_t> CreateLayer() TA_EXCL(mtx());
+  zx::result<LayerId> CreateLayer() TA_EXCL(mtx());
   zx::result<EventInfo> CreateEvent() TA_EXCL(mtx());
 
   fuchsia_hardware_display::wire::ConfigStamp GetRecentAppliedConfigStamp() TA_EXCL(mtx());
 
   struct PresentLayerInfo {
-    uint64_t layer_id;
+    LayerId layer_id;
     uint64_t image_id;
     std::optional<uint64_t> image_ready_wait_event_id;
   };
@@ -110,7 +111,7 @@ class TestFidlClient {
 
   zx::result<uint64_t> ImportImageWithSysmemLocked(
       const fuchsia_hardware_display::wire::ImageConfig& image_config) TA_REQ(mtx());
-  zx::result<uint64_t> CreateLayerLocked() TA_REQ(mtx());
+  zx::result<LayerId> CreateLayerLocked() TA_REQ(mtx());
   zx::result<EventInfo> CreateEventLocked() TA_REQ(mtx());
 
   void OnEventMsgAsync(async_dispatcher_t* dispatcher, async::WaitBase* self, zx_status_t status,

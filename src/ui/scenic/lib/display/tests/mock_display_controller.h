@@ -37,9 +37,10 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   using SetMinimumRgbFn = std::function<void(uint8_t)>;
   using ImportEventFn = std::function<void(zx::event event, uint64_t event_id)>;
   using AcknowledgeVsyncFn = std::function<void(uint64_t cookie)>;
-  using SetDisplayLayersFn = std::function<void(uint64_t, std::vector<uint64_t>)>;
+  using SetDisplayLayersFn =
+      std::function<void(uint64_t, std::vector<fuchsia::hardware::display::LayerId>)>;
   using SetLayerPrimaryPositionFn =
-      std::function<void(uint64_t, fuchsia::hardware::display::Transform,
+      std::function<void(fuchsia::hardware::display::LayerId, fuchsia::hardware::display::Transform,
                          fuchsia::hardware::display::Frame, fuchsia::hardware::display::Frame)>;
 
   MockDisplayCoordinator() : binding_(this) {}
@@ -96,11 +97,12 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   }
 
   void CreateLayer(CreateLayerCallback callback) override {
-    static uint64_t layer_id = 1;
-    callback(ZX_OK, layer_id++);
+    static uint64_t layer_id_value = 1;
+    callback(ZX_OK, {.value = layer_id_value++});
   }
 
-  void SetDisplayLayers(uint64_t display_id, ::std::vector<uint64_t> layer_ids) override {
+  void SetDisplayLayers(uint64_t display_id,
+                        ::std::vector<fuchsia::hardware::display::LayerId> layer_ids) override {
     ++set_display_layers_count_;
     if (set_display_layers_fn_) {
       set_display_layers_fn_(display_id, layer_ids);
@@ -112,7 +114,8 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
     callback(ZX_OK);
   }
 
-  void SetLayerPrimaryPosition(uint64_t layer_id, fuchsia::hardware::display::Transform transform,
+  void SetLayerPrimaryPosition(fuchsia::hardware::display::LayerId layer_id,
+                               fuchsia::hardware::display::Transform transform,
                                fuchsia::hardware::display::Frame src_frame,
                                fuchsia::hardware::display::Frame dest_frame) override {
     ++set_layer_primary_position_count_;

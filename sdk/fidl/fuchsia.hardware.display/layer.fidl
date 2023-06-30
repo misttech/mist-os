@@ -92,7 +92,7 @@ type ClientCompositionOp = struct {
 
     /// Invalid for issues that aren't scoped to a specific layer, such as
     /// unsupported color conversion tables.
-    layer_id LayerIdValue;
+    layer_id LayerId;
 
     opcode ClientCompositionOpcode;
 };

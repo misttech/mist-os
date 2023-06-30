@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/async-testing/test_loop.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/async/cpp/wait.h>
@@ -69,22 +70,22 @@ class DisplayTest : public gtest::RealLoopFixture {
     gtest::RealLoopFixture::TearDown();
   }
 
-  uint64_t InitializeDisplayLayer(
+  fuchsia::hardware::display::LayerId InitializeDisplayLayer(
       fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
       scenic_impl::display::Display* display) {
-    uint64_t layer_id;
+    fuchsia::hardware::display::LayerId layer_id;
     zx_status_t create_layer_status;
     zx_status_t transport_status =
         display_coordinator->CreateLayer(&create_layer_status, &layer_id);
     if (create_layer_status != ZX_OK || transport_status != ZX_OK) {
       FX_LOGS(ERROR) << "Failed to create layer, " << create_layer_status;
-      return 0;
+      return {.value = fuchsia::hardware::display::INVALID_DISP_ID};
     }
 
     zx_status_t status = display_coordinator->SetDisplayLayers(display->display_id(), {layer_id});
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "Failed to configure display layers. Error code: " << status;
-      return 0;
+      return {.value = fuchsia::hardware::display::INVALID_DISP_ID};
     }
 
     return layer_id;
@@ -213,8 +214,9 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   auto display = display_manager_->default_display();
   ASSERT_TRUE(display);
 
-  auto layer_id = InitializeDisplayLayer(*display_coordinator.get(), display);
-  ASSERT_NE(layer_id, 0U);
+  fuchsia::hardware::display::LayerId layer_id =
+      InitializeDisplayLayer(*display_coordinator.get(), display);
+  ASSERT_NE(layer_id.value, fuchsia::hardware::display::INVALID_DISP_ID);
 
   const uint32_t kWidth = display->width_in_px();
   const uint32_t kHeight = display->height_in_px();

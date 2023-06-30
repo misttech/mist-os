@@ -11,6 +11,7 @@
 #include <fbl/auto_lock.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace fhd = fuchsia_hardware_display;
@@ -73,7 +74,7 @@ zx::result<uint64_t> TestFidlClient::CreateImage() {
   return ImportImageWithSysmem(displays_[0].image_config_);
 }
 
-zx::result<uint64_t> TestFidlClient::CreateLayer() {
+zx::result<LayerId> TestFidlClient::CreateLayer() {
   fbl::AutoLock lock(mtx());
   return CreateLayerLocked();
 }
@@ -83,7 +84,7 @@ zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEvent() {
   return CreateEventLocked();
 }
 
-zx::result<uint64_t> TestFidlClient::CreateLayerLocked() {
+zx::result<LayerId> TestFidlClient::CreateLayerLocked() {
   ZX_DEBUG_ASSERT(dc_);
   auto reply = dc_->CreateLayer();
   if (!reply.ok()) {
@@ -95,7 +96,7 @@ zx::result<uint64_t> TestFidlClient::CreateLayerLocked() {
   }
   EXPECT_EQ(dc_->SetLayerPrimaryConfig(reply.value().layer_id, displays_[0].image_config_).status(),
             ZX_OK);
-  return zx::ok(reply.value().layer_id);
+  return zx::ok(ToLayerId(reply.value().layer_id));
 }
 
 zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEventLocked() {
@@ -254,18 +255,20 @@ TestFidlClient::~TestFidlClient() {
 zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_layers) {
   fbl::AutoLock l(mtx());
 
-  std::vector<uint64_t> layers;
+  std::vector<fhd::wire::LayerId> fidl_layers;
   for (const auto& info : present_layers) {
-    layers.push_back(info.layer_id);
+    fidl_layers.push_back(ToFidlLayerId(info.layer_id));
   }
-  if (auto reply = dc_->SetDisplayLayers(ToFidlDisplayIdValue(display_id()),
-                                         fidl::VectorView<uint64_t>::FromExternal(layers));
+  if (auto reply =
+          dc_->SetDisplayLayers(ToFidlDisplayIdValue(display_id()),
+                                fidl::VectorView<fhd::wire::LayerId>::FromExternal(fidl_layers));
       !reply.ok()) {
     return reply.status();
   }
 
   for (const auto& info : present_layers) {
-    if (auto reply = dc_->SetLayerImage(info.layer_id, info.image_id,
+    const fhd::wire::LayerId fidl_layer_id = ToFidlLayerId(info.layer_id);
+    if (auto reply = dc_->SetLayerImage(fidl_layer_id, info.image_id,
                                         info.image_ready_wait_event_id.value_or(0u),
                                         /*signal_event_id*/ 0);
         !reply.ok()) {
@@ -295,7 +298,7 @@ zx::result<uint64_t> TestFidlClient::ImportImageWithSysmem(
 }
 
 std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPresentLayerInfo() {
-  zx::result<uint64_t> layer_result = CreateLayer();
+  zx::result<LayerId> layer_result = CreateLayer();
   EXPECT_OK(layer_result.status_value());
 
   zx::result<uint64_t> image_result = ImportImageWithSysmem(displays_[0].image_config_);

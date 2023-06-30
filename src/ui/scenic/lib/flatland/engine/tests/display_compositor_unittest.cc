@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fuchsia/hardware/display/cpp/fidl.h>
+
 #include <memory>
 
 #include "src/lib/fsl/handles/object_info.h"
+#include "src/lib/fxl/strings/join_strings.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/display/tests/mock_display_controller.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
@@ -38,6 +41,21 @@ using fuchsia::sysmem::BufferUsage;
 namespace flatland::test {
 
 namespace {
+
+// FIDL HLCPP non-resource structs (e.g. LayerId) cannot be compared directly
+// using Eq() matcher. This implements a matcher for FIDL type comparison.
+//
+// Example:
+//
+// fuchsia::hardware::display::LayerId kId = {.value = 1};
+// fuchsia::hardware::display::LayerId kAnotherId = {.value = 1};
+// EXPECT_THAT(kId, FidlEquals(kAnotherId));
+//
+MATCHER_P(FidlEquals, value,
+          fxl::JoinStrings(std::vector<std::string>{"FIDL values", negation ? " don't " : " ",
+                                                    "match"})) {
+  return fidl::Equals(arg, value);
+}
 
 fuchsia::sysmem::BufferCollectionTokenPtr DuplicateToken(
     fuchsia::sysmem::BufferCollectionTokenSyncPtr& token) {
@@ -1007,31 +1025,37 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
                                                 {-0.3f, -0.2f, -0.1f});
 
   // Setup the EXPECT_CALLs for gmock.
-  uint64_t layer_id = 1;
+  uint64_t layer_id_value = 1;
   EXPECT_CALL(*mock_display_coordinator_, CreateLayer(_))
       .WillRepeatedly(testing::Invoke([&](MockDisplayCoordinator::CreateLayerCallback callback) {
-        callback(ZX_OK, layer_id++);
+        callback(ZX_OK, {.value = layer_id_value++});
       }));
 
-  std::vector<uint64_t> layers = {1u, 2u};
-  EXPECT_CALL(*mock_display_coordinator_, SetDisplayLayers(display_id, layers)).Times(1);
+  std::vector<fuchsia::hardware::display::LayerId> layers = {{.value = 1}, {.value = 2}};
+  EXPECT_CALL(*mock_display_coordinator_,
+              SetDisplayLayers(display_id,
+                               testing::ElementsAre(FidlEquals(layers[0]), FidlEquals(layers[1]))))
+      .Times(1);
 
   // Make sure each layer has all of its components set properly.
   uint64_t collection_ids[] = {child_image_metadata.identifier, parent_image_metadata.identifier};
   for (uint32_t i = 0; i < 2; i++) {
-    EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryConfig(layers[i], _)).Times(1);
+    EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryConfig(FidlEquals(layers[i]), _))
+        .Times(1);
     EXPECT_CALL(*mock_display_coordinator_,
-                SetLayerPrimaryPosition(layers[i], fhd_Transform::IDENTITY, _, _))
-        .WillOnce(
-            testing::Invoke([sources, destinations, index = i](
-                                uint64_t layer_id, fuchsia::hardware::display::Transform transform,
-                                fuchsia::hardware::display::Frame src_frame,
-                                fuchsia::hardware::display::Frame dest_frame) {
+                SetLayerPrimaryPosition(FidlEquals(layers[i]), fhd_Transform::IDENTITY, _, _))
+        .WillOnce(testing::Invoke(
+            [sources, destinations, index = i](fuchsia::hardware::display::LayerId layer_id,
+                                               fuchsia::hardware::display::Transform transform,
+                                               fuchsia::hardware::display::Frame src_frame,
+                                               fuchsia::hardware::display::Frame dest_frame) {
               EXPECT_TRUE(fidl::Equals(src_frame, sources[index]));
               EXPECT_TRUE(fidl::Equals(dest_frame, destinations[index]));
             }));
-    EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryAlpha(layers[i], _, _)).Times(1);
-    EXPECT_CALL(*mock_display_coordinator_, SetLayerImage(layers[i], collection_ids[i], _, _))
+    EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryAlpha(FidlEquals(layers[i]), _, _))
+        .Times(1);
+    EXPECT_CALL(*mock_display_coordinator_,
+                SetLayerImage(FidlEquals(layers[i]), collection_ids[i], _, _))
         .Times(1);
   }
   EXPECT_CALL(*mock_display_coordinator_, ImportEvent(_, _)).Times(2);
@@ -1067,7 +1091,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
       [](const scheduling::Timestamps&) {});
 
   for (uint32_t i = 0; i < 2; i++) {
-    EXPECT_CALL(*mock_display_coordinator_, DestroyLayer(layers[i]));
+    EXPECT_CALL(*mock_display_coordinator_, DestroyLayer(FidlEquals(layers[i])));
   }
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
@@ -1188,29 +1212,34 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
 
   // Setup the EXPECT_CALLs for gmock.
   // Note that a couple of layers are created upfront for the display.
-  uint64_t layer_id = 1;
+  uint64_t layer_id_value = 1;
   EXPECT_CALL(*mock_display_coordinator_, CreateLayer(_))
       .WillRepeatedly(testing::Invoke([&](MockDisplayCoordinator::CreateLayerCallback callback) {
-        callback(ZX_OK, layer_id++);
+        callback(ZX_OK, {.value = layer_id_value++});
       }));
 
   // However, we only set one display layer for the image.
-  std::vector<uint64_t> layers = {1u};
-  EXPECT_CALL(*mock_display_coordinator_, SetDisplayLayers(display_id, layers)).Times(1);
+  std::vector<fuchsia::hardware::display::LayerId> layers = {{.value = 1}};
+  EXPECT_CALL(*mock_display_coordinator_,
+              SetDisplayLayers(display_id, testing::ElementsAre(FidlEquals(layers[0]))))
+      .Times(1);
 
   uint64_t collection_id = parent_image_metadata.identifier;
-  EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryConfig(layers[0], _)).Times(1);
+  EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryConfig(FidlEquals(layers[0]), _)).Times(1);
   EXPECT_CALL(*mock_display_coordinator_,
-              SetLayerPrimaryPosition(layers[0], expected_transform, _, _))
-      .WillOnce(testing::Invoke(
-          [source, expected_dst](uint64_t layer_id, fuchsia::hardware::display::Transform transform,
-                                 fuchsia::hardware::display::Frame src_frame,
-                                 fuchsia::hardware::display::Frame dest_frame) {
+              SetLayerPrimaryPosition(FidlEquals(layers[0]), expected_transform, _, _))
+      .WillOnce(
+          testing::Invoke([source, expected_dst](fuchsia::hardware::display::LayerId layer_id,
+                                                 fuchsia::hardware::display::Transform transform,
+                                                 fuchsia::hardware::display::Frame src_frame,
+                                                 fuchsia::hardware::display::Frame dest_frame) {
             EXPECT_TRUE(fidl::Equals(src_frame, source));
             EXPECT_TRUE(fidl::Equals(dest_frame, expected_dst));
           }));
-  EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryAlpha(layers[0], _, _)).Times(1);
-  EXPECT_CALL(*mock_display_coordinator_, SetLayerImage(layers[0], collection_id, _, _)).Times(1);
+  EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryAlpha(FidlEquals(layers[0]), _, _))
+      .Times(1);
+  EXPECT_CALL(*mock_display_coordinator_, SetLayerImage(FidlEquals(layers[0]), collection_id, _, _))
+      .Times(1);
   EXPECT_CALL(*mock_display_coordinator_, ImportEvent(_, _)).Times(1);
 
   EXPECT_CALL(*mock_display_coordinator_, SetDisplayColorConversion(_, _, _, _)).Times(1);
@@ -1243,8 +1272,8 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
       GenerateDisplayListForTest({{display_id, {display_info, parent_root_handle}}}), {},
       [](const scheduling::Timestamps&) {});
 
-  for (uint64_t i = 1; i < layer_id; ++i) {
-    EXPECT_CALL(*mock_display_coordinator_, DestroyLayer(i));
+  for (uint64_t i = 1; i < layer_id_value; ++i) {
+    EXPECT_CALL(*mock_display_coordinator_, DestroyLayer(testing::FieldsAre(i)));
   }
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
@@ -1507,12 +1536,12 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
           }));
 
   // Set expectation for CreateLayer calls.
-  uint64_t layer_id = 1;
-  std::vector<uint64_t> layers = {1u, 2u};
+  uint64_t layer_id_value = 1;
+  std::vector<fuchsia::hardware::display::LayerId> layers = {{.value = 1}, {.value = 2}};
   EXPECT_CALL(*mock_display_coordinator_, CreateLayer(_))
       .Times(2)
       .WillRepeatedly(testing::Invoke([&](MockDisplayCoordinator::CreateLayerCallback callback) {
-        callback(ZX_OK, layer_id++);
+        callback(ZX_OK, {.value = layer_id_value++});
       }));
   EXPECT_CALL(*renderer_, ChoosePreferredPixelFormat(_));
 
@@ -1525,16 +1554,20 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
                                   /*out_buffer_collection*/ nullptr);
 
   // Set expectation for rendering image on layer.
-  std::vector<uint64_t> active_layers = {1u};
+  std::vector<fuchsia::hardware::display::LayerId> active_layers = {{.value = 1}};
   zx::event imported_event;
   EXPECT_CALL(*mock_display_coordinator_, ImportEvent(_, _))
       .WillOnce(testing::Invoke(
           [&imported_event](zx::event event, uint64_t) { imported_event = std::move(event); }));
-  EXPECT_CALL(*mock_display_coordinator_, SetDisplayLayers(kDisplayId, active_layers)).Times(1);
-  EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryConfig(layers[0], _)).Times(1);
-  EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryPosition(layers[0], _, _, _)).Times(1);
-  EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryAlpha(layers[0], _, _)).Times(1);
-  EXPECT_CALL(*mock_display_coordinator_, SetLayerImage(layers[0], _, _, _)).Times(1);
+  EXPECT_CALL(*mock_display_coordinator_,
+              SetDisplayLayers(kDisplayId, testing::ElementsAre(FidlEquals(active_layers[0]))))
+      .Times(1);
+  EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryConfig(FidlEquals(layers[0]), _)).Times(1);
+  EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryPosition(FidlEquals(layers[0]), _, _, _))
+      .Times(1);
+  EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryAlpha(FidlEquals(layers[0]), _, _))
+      .Times(1);
+  EXPECT_CALL(*mock_display_coordinator_, SetLayerImage(FidlEquals(layers[0]), _, _, _)).Times(1);
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(false, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
         fuchsia::hardware::display::ConfigResult result =
@@ -1564,7 +1597,7 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
                                    [](const scheduling::Timestamps&) {});
 
   for (uint32_t i = 0; i < 2; i++) {
-    EXPECT_CALL(*mock_display_coordinator_, DestroyLayer(layers[i]));
+    EXPECT_CALL(*mock_display_coordinator_, DestroyLayer(FidlEquals(layers[i])));
   }
   display_compositor_.reset();
 }

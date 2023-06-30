@@ -4,7 +4,7 @@
 
 use {
     fidl::endpoints::ClientEnd,
-    fidl_fuchsia_hardware_display::{self as display, CoordinatorEvent},
+    fidl_fuchsia_hardware_display::{self as display, CoordinatorEvent, LayerId as FidlLayerId},
     fidl_fuchsia_io as fio,
     fuchsia_async::{DurationExt as _, TimeoutExt as _},
     fuchsia_component::client::connect_to_protocol_at_path,
@@ -188,7 +188,7 @@ impl Coordinator {
     pub async fn create_layer(&self) -> Result<LayerId> {
         let (result, id) = self.proxy().create_layer().await?;
         let _ = zx::Status::ok(result)?;
-        Ok(LayerId(id))
+        Ok(id.into())
     }
 
     /// Creates and registers a zircon event with the display driver. The returned event can be
@@ -212,13 +212,13 @@ impl Coordinator {
         for config in configs {
             proxy.set_display_layers(
                 config.id.0,
-                &config.layers.iter().map(|l| l.id.0).collect::<Vec<u64>>(),
+                &config.layers.iter().map(|l| l.id.into()).collect::<Vec<FidlLayerId>>(),
             )?;
             for layer in &config.layers {
                 match &layer.config {
                     LayerConfig::Color { pixel_format, color_bytes } => {
                         proxy.set_layer_color_config(
-                            layer.id.0,
+                            &layer.id.into(),
                             pixel_format.into(),
                             &color_bytes,
                         )?;
@@ -229,9 +229,9 @@ impl Coordinator {
                         unblock_event,
                         retirement_event,
                     } => {
-                        proxy.set_layer_primary_config(layer.id.0, &image_config)?;
+                        proxy.set_layer_primary_config(&layer.id.into(), &image_config)?;
                         proxy.set_layer_image(
-                            layer.id.0,
+                            &layer.id.into(),
                             image_id.0,
                             unblock_event.map_or(0, |id| id.0),
                             retirement_event.map_or(0, |id| id.0),

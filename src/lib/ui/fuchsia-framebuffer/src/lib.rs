@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::{ensure, format_err, Context as _, Error};
-use display_utils::{get_bytes_per_pixel, PixelFormat};
+use display_utils::{get_bytes_per_pixel, LayerId, PixelFormat};
 use fidl::endpoints::{self, ClientEnd};
 use fidl_fuchsia_hardware_display::{
     ConfigStamp, CoordinatorEvent, CoordinatorMarker, CoordinatorProxy, ImageConfig,
-    ProviderSynchronousProxy, VirtconMode,
+    ProviderSynchronousProxy, VirtconMode, INVALID_DISP_ID,
 };
 use fidl_fuchsia_sysmem::{ImageFormatConstraints, PixelFormatType};
 use fuchsia_async::{self as fasync, DurationExt, OnSignals, TimeoutExt};
@@ -541,7 +541,7 @@ pub enum Message {
 pub struct FrameBuffer {
     pub coordinator: CoordinatorProxy,
     config: Config,
-    layer_id: u64,
+    layer_id: LayerId,
     pub usage: FrameUsage,
     initial_virtcon_mode: Option<VirtconMode>,
     next_image_id: AtomicU64,
@@ -597,16 +597,16 @@ impl FrameBuffer {
         })
     }
 
-    async fn create_layer(&mut self) -> Result<u64, Error> {
+    async fn create_layer(&mut self) -> Result<LayerId, Error> {
         let (status, layer_id) = self.coordinator.create_layer().await?;
         ensure!(status == zx::sys::ZX_OK, "Failed to create layer {}", Status::from_raw(status));
-        Ok(layer_id)
+        Ok(layer_id.into())
     }
 
     pub fn configure_layer(&mut self, config: &Config, image_type: u32) -> Result<(), Error> {
         let image_config = Frame::create_image_config(image_type, config);
-        self.coordinator.set_layer_primary_config(self.layer_id, &image_config)?;
-        self.coordinator.set_display_layers(config.display_id, &[self.layer_id])?;
+        self.coordinator.set_layer_primary_config(&self.layer_id.into(), &image_config)?;
+        self.coordinator.set_display_layers(config.display_id, &[self.layer_id.into()])?;
         Ok(())
     }
 
@@ -742,7 +742,7 @@ impl FrameBuffer {
             initial_virtcon_mode,
             coordinator: proxy,
             config,
-            layer_id: 0,
+            layer_id: LayerId(INVALID_DISP_ID),
             usage,
             next_image_id: AtomicU64::new(1),
         };
@@ -789,10 +789,10 @@ impl FrameBuffer {
         sender: Option<futures::channel::mpsc::UnboundedSender<ImageInCollection>>,
         signal_wait_event: bool,
     ) -> Result<(), Error> {
-        self.coordinator.set_display_layers(self.config.display_id, &[self.layer_id])?;
+        self.coordinator.set_display_layers(self.config.display_id, &[self.layer_id.into()])?;
         self.coordinator
             .set_layer_image(
-                self.layer_id,
+                &self.layer_id.into(),
                 frame.image_id,
                 frame.wait_event_id,
                 frame.signal_event_id,

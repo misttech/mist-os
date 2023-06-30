@@ -246,7 +246,7 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
   // TODO(fxbug.dev/129036): Layer IDs should be client-managed.
 
   if (layers_.size() == kMaxLayers) {
-    completer.Reply(ZX_ERR_NO_RESOURCES, 0);
+    completer.Reply(ZX_ERR_NO_RESOURCES, ToFidlLayerId(kInvalidLayerId));
     return;
   }
 
@@ -255,7 +255,7 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
   auto new_layer = fbl::make_unique_checked<Layer>(&alloc_checker, driver_layer_id);
   if (!alloc_checker.check()) {
     --driver_layer_id;
-    completer.Reply(ZX_ERR_NO_MEMORY, 0);
+    completer.Reply(ZX_ERR_NO_MEMORY, ToFidlLayerId(kInvalidLayerId));
     return;
   }
 
@@ -266,7 +266,7 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
   // Client instances will be responsible for translating between driver-side
   // and client-side IDs.
   LayerId layer_id(driver_layer_id.value());
-  completer.Reply(ZX_OK, ToFidlLayerIdValue(layer_id));
+  completer.Reply(ZX_OK, ToFidlLayerId(layer_id));
 }
 
 void Client::DestroyLayer(DestroyLayerRequestView request,
@@ -279,12 +279,12 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
 
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
-    zxlogf(ERROR, "Tried to destroy invalid layer %ld", request->layer_id);
+    zxlogf(ERROR, "Tried to destroy invalid layer %" PRIu64, layer_id.value());
     TearDown();
     return;
   }
   if (layer->in_use()) {
-    zxlogf(ERROR, "Destroyed layer %ld which was in use", request->layer_id);
+    zxlogf(ERROR, "Destroyed layer %" PRIu64 " which was in use", layer_id.value());
     TearDown();
     return;
   }
@@ -377,7 +377,7 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
     DriverLayerId driver_layer_id(layer_id.value());
     auto layer = layers_.find(driver_layer_id);
     if (!layer.IsValid()) {
-      zxlogf(ERROR, "Unknown layer %lu", request->layer_ids[i]);
+      zxlogf(ERROR, "Unknown layer %lu", request->layer_ids[i].value);
       TearDown();
       return;
     }
@@ -535,7 +535,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
-    zxlogf(ERROR, "SetLayerImage ordinal with invalid layer %lu", request->layer_id);
+    zxlogf(ERROR, "SetLayerImage ordinal with invalid layer %lu", request->layer_id.value);
     TearDown();
     return;
   }
@@ -1027,14 +1027,13 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
 
       // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
       // client-side ID will have to be looked up in a map.
-      LayerId layer_id(layer_node.layer->id.value());
-      const uint64_t fidl_layer_id = ToFidlLayerIdValue(layer_id);
+      const LayerId layer_id(layer_node.layer->id.value());
 
       for (uint8_t i = 0; i < 32; i++) {
         if (err & (1 << i)) {
           ops->emplace_back(fhd::wire::ClientCompositionOp{
               .display_id = fidl_display_id,
-              .layer_id = fidl_layer_id,
+              .layer_id = ToFidlLayerId(layer_id),
               .opcode = static_cast<fhd::wire::ClientCompositionOpcode>(i),
           });
         }

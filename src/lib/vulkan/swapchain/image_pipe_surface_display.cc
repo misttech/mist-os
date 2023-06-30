@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/images2/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
@@ -506,11 +507,12 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
   pDisp->DestroyBufferCollectionFUCHSIA(device, collection, pAllocator);
   display_coordinator_->ReleaseBufferCollection(kBufferCollectionId);
 
-  display_coordinator_->CreateLayer([this, &status](zx_status_t layer_status, uint64_t layer_id) {
-    status = layer_status;
-    layer_id_ = layer_id;
-    got_message_response_ = true;
-  });
+  display_coordinator_->CreateLayer(
+      [this, &status](zx_status_t layer_status, fuchsia::hardware::display::LayerId layer_id) {
+        status = layer_status;
+        layer_id_ = layer_id;
+        got_message_response_ = true;
+      });
   if (!WaitForAsyncMessage()) {
     return false;
   }
@@ -519,7 +521,8 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
     return false;
   }
 
-  display_coordinator_->SetDisplayLayers(display_id_, std::vector<uint64_t>{layer_id_});
+  display_coordinator_->SetDisplayLayers(
+      display_id_, std::vector<fuchsia::hardware::display::LayerId>{layer_id_});
   display_coordinator_->SetLayerPrimaryConfig(layer_id_, image_config);
 
   return true;

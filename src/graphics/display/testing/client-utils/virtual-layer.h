@@ -11,6 +11,7 @@
 #include <lib/zx/channel.h>
 #include <zircon/types.h>
 
+#include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/testing/client-utils/display.h"
 #include "src/graphics/display/testing/client-utils/image.h"
 
@@ -18,7 +19,7 @@ namespace testing {
 namespace display {
 
 typedef struct custom_layer {
-  uint64_t id;
+  ::display::LayerId id;
   bool active;
 
   bool done;
@@ -58,13 +59,13 @@ class VirtualLayer {
   virtual size_t GetCurrentImageSize() = 0;
 
   // Gets the display coordinator layer ID for usage on the given display.
-  uint64_t id(uint64_t display_id) const {
+  ::display::LayerId id(uint64_t display_id) const {
     for (unsigned i = 0; i < displays_.size(); i++) {
       if (displays_[i]->id() == display_id && layers_[i].active) {
         return layers_[i].id;
       }
     }
-    return fuchsia_hardware_display::wire::kInvalidDispId;
+    return ::display::kInvalidLayerId;
   }
 
   // Gets the ID of the image on the given display.

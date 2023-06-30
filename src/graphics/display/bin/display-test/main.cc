@@ -26,10 +26,12 @@
 #include <cstring>
 #include <memory>
 #include <string_view>
+#include <vector>
 
 #include <fbl/string_buffer.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/testing/client-utils/display.h"
 #include "src/graphics/display/testing/client-utils/utils.h"
 #include "src/graphics/display/testing/client-utils/virtual-layer.h"
@@ -167,12 +169,13 @@ Display* find_display(fbl::Vector<Display>& displays, const char* id_str) {
 }
 
 bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& layers,
-                           const Display& display, fbl::Vector<uint64_t>* current_layers) {
-  fbl::Vector<uint64_t> new_layers;
+                           const Display& display,
+                           fbl::Vector<::display::LayerId>* current_layers) {
+  fbl::Vector<::display::LayerId> new_layers;
 
   for (auto& layer : layers) {
-    uint64_t id = layer->id(display.id());
-    if (id != fhd::wire::kInvalidDispId) {
+    ::display::LayerId id = layer->id(display.id());
+    if (id.value() != fhd::wire::kInvalidDispId) {
       new_layers.push_back(id);
     }
   }
@@ -189,8 +192,14 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
 
   if (layer_change) {
     current_layers->swap(new_layers);
-    if (!dc->SetDisplayLayers(display.id(), fidl::VectorView<uint64_t>::FromExternal(
-                                                current_layers->data(), current_layers->size()))
+
+    std::vector<fhd::wire::LayerId> current_layers_fidl_id;
+    current_layers_fidl_id.reserve(current_layers->size());
+    for (const ::display::LayerId& layer_id : *current_layers) {
+      current_layers_fidl_id.push_back(display::ToFidlLayerId(layer_id));
+    }
+    if (!dc->SetDisplayLayers(display.id(), fidl::VectorView<fhd::wire::LayerId>::FromExternal(
+                                                current_layers_fidl_id))
              .ok()) {
       printf("Failed to set layers\n");
       return false;
@@ -209,8 +218,8 @@ std::optional<fhd::wire::ConfigStamp> apply_config() {
   if (result.value().res != fhd::wire::ConfigResult::kOk) {
     printf("Config not valid (%d)\n", static_cast<uint32_t>(result.value().res));
     for (const auto& op : result.value().ops) {
-      printf("Client composition op (display %ld, layer %ld): %hhu\n", op.display_id, op.layer_id,
-             static_cast<uint8_t>(op.opcode));
+      printf("Client composition op (display %ld, layer %ld): %hhu\n", op.display_id,
+             op.layer_id.value, static_cast<uint8_t>(op.opcode));
     }
     return std::nullopt;
   }
@@ -652,7 +661,7 @@ int main(int argc, const char* argv[]) {
   printf("Running display test\n");
 
   fbl::Vector<Display> displays;
-  fbl::Vector<fbl::Vector<uint64_t>> display_layers;
+  fbl::Vector<fbl::Vector<::display::LayerId>> display_layers;
   fbl::Vector<std::unique_ptr<VirtualLayer>> layers;
   std::optional<int32_t> num_frames = 120;  // default to 120 frames. std::nullopt means infinite
   int32_t delay = 0;
@@ -695,7 +704,7 @@ int main(int argc, const char* argv[]) {
   }
 
   for (unsigned i = 0; i < displays.size(); i++) {
-    display_layers.push_back(fbl::Vector<uint64_t>());
+    display_layers.push_back(fbl::Vector<::display::LayerId>());
   }
 
   argc--;

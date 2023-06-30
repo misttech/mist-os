@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/gfx/swapchain/display_swapchain.h"
 
+#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/trace/event.h>
@@ -445,7 +446,8 @@ void DisplaySwapchain::OnVsync(zx::time timestamp,
   pending_frame_.pop_front();
 }
 
-void DisplaySwapchain::Flip(uint64_t layer_id, FrameRecord* frame_record) {
+void DisplaySwapchain::Flip(fuchsia::hardware::display::LayerId layer_id,
+                            FrameRecord* frame_record) {
   const uint64_t framebuffer_id = frame_record->buffer->id;
   uint64_t wait_event_id = frame_record->render_finished_event_id;
   uint64_t signal_event_id = frame_record->retired_event_id;

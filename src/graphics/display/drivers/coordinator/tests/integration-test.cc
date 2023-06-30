@@ -724,17 +724,17 @@ TEST_F(IntegrationTest, VsyncEvent) {
   EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
   EXPECT_NE(0u, present_config_stamp_0.value());
 
-  auto create_default_layer_result = primary_client->CreateLayer();
-  auto create_image_0_result = primary_client->CreateImage();
-  auto create_image_1_result = primary_client->CreateImage();
+  zx::result<LayerId> create_default_layer_result = primary_client->CreateLayer();
+  zx::result<uint64_t> create_image_0_result = primary_client->CreateImage();
+  zx::result<uint64_t> create_image_1_result = primary_client->CreateImage();
 
   EXPECT_EQ(ZX_OK, create_default_layer_result.status_value());
   EXPECT_EQ(ZX_OK, create_image_0_result.status_value());
   EXPECT_EQ(ZX_OK, create_image_1_result.status_value());
 
-  auto default_layer_id = create_default_layer_result.value();
-  auto image_0_id = create_image_0_result.value();
-  auto image_1_id = create_image_1_result.value();
+  LayerId default_layer_id = create_default_layer_result.value();
+  uint64_t image_0_id = create_image_0_result.value();
+  uint64_t image_1_id = create_image_1_result.value();
 
   // Present one single image without wait.
   EXPECT_EQ(ZX_OK, primary_client->PresentLayers({
@@ -857,20 +857,22 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
   EXPECT_NE(0u, present_config_stamp_0.value());
 
-  auto create_default_layer_result = primary_client->CreateLayer();
-  auto create_image_0_result = primary_client->CreateImage();
-  auto create_image_1_result = primary_client->CreateImage();
-  auto create_image_1_ready_fence_result = primary_client->CreateEvent();
+  zx::result<LayerId> create_default_layer_result = primary_client->CreateLayer();
+  zx::result<uint64_t> create_image_0_result = primary_client->CreateImage();
+  zx::result<uint64_t> create_image_1_result = primary_client->CreateImage();
+  zx::result<TestFidlClient::EventInfo> create_image_1_ready_fence_result =
+      primary_client->CreateEvent();
 
   EXPECT_EQ(ZX_OK, create_default_layer_result.status_value());
   EXPECT_EQ(ZX_OK, create_image_0_result.status_value());
   EXPECT_EQ(ZX_OK, create_image_1_result.status_value());
   EXPECT_EQ(ZX_OK, create_image_1_ready_fence_result.status_value());
 
-  auto default_layer_id = create_default_layer_result.value();
-  auto image_0_id = create_image_0_result.value();
-  auto image_1_id = create_image_1_result.value();
-  auto image_1_ready_fence = std::move(create_image_1_ready_fence_result.value());
+  LayerId default_layer_id = create_default_layer_result.value();
+  uint64_t image_0_id = create_image_0_result.value();
+  uint64_t image_1_id = create_image_1_result.value();
+  TestFidlClient::EventInfo image_1_ready_fence =
+      std::move(create_image_1_ready_fence_result.value());
 
   // Present one single image without wait.
   EXPECT_EQ(ZX_OK, primary_client->PresentLayers({
@@ -997,20 +999,22 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
   EXPECT_NE(0u, present_config_stamp_0.value());
 
-  auto create_default_layer_result = primary_client->CreateLayer();
-  auto create_image_0_result = primary_client->CreateImage();
-  auto create_image_1_result = primary_client->CreateImage();
-  auto create_image_1_ready_fence_result = primary_client->CreateEvent();
+  zx::result<LayerId> create_default_layer_result = primary_client->CreateLayer();
+  zx::result<uint64_t> create_image_0_result = primary_client->CreateImage();
+  zx::result<uint64_t> create_image_1_result = primary_client->CreateImage();
+  zx::result<TestFidlClient::EventInfo> create_image_1_ready_fence_result =
+      primary_client->CreateEvent();
 
   EXPECT_EQ(ZX_OK, create_default_layer_result.status_value());
   EXPECT_EQ(ZX_OK, create_image_0_result.status_value());
   EXPECT_EQ(ZX_OK, create_image_1_result.status_value());
   EXPECT_EQ(ZX_OK, create_image_1_ready_fence_result.status_value());
 
-  auto default_layer_id = create_default_layer_result.value();
-  auto image_0_id = create_image_0_result.value();
-  auto image_1_id = create_image_1_result.value();
-  auto image_1_ready_fence = std::move(create_image_1_ready_fence_result.value());
+  LayerId default_layer_id = create_default_layer_result.value();
+  uint64_t image_0_id = create_image_0_result.value();
+  uint64_t image_1_id = create_image_1_result.value();
+  TestFidlClient::EventInfo image_1_ready_fence =
+      std::move(create_image_1_ready_fence_result.value());
 
   // Present an image layer.
   EXPECT_EQ(ZX_OK, primary_client->PresentLayers({
@@ -1124,12 +1128,14 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
   ASSERT_TRUE(primary_client->Bind(dispatcher()));
 
-  auto create_default_layer_result = primary_client->CreateLayer();
-  auto create_image_0_result = primary_client->CreateImage();
-  auto create_image_1_result = primary_client->CreateImage();
-  auto create_image_2_result = primary_client->CreateImage();
-  auto create_image_1_ready_fence_result = primary_client->CreateEvent();
-  auto create_image_2_ready_fence_result = primary_client->CreateEvent();
+  zx::result<LayerId> create_default_layer_result = primary_client->CreateLayer();
+  zx::result<uint64_t> create_image_0_result = primary_client->CreateImage();
+  zx::result<uint64_t> create_image_1_result = primary_client->CreateImage();
+  zx::result<uint64_t> create_image_2_result = primary_client->CreateImage();
+  zx::result<TestFidlClient::EventInfo> create_image_1_ready_fence_result =
+      primary_client->CreateEvent();
+  zx::result<TestFidlClient::EventInfo> create_image_2_ready_fence_result =
+      primary_client->CreateEvent();
 
   EXPECT_EQ(ZX_OK, create_default_layer_result.status_value());
   EXPECT_EQ(ZX_OK, create_image_0_result.status_value());
@@ -1138,12 +1144,14 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   EXPECT_EQ(ZX_OK, create_image_1_ready_fence_result.status_value());
   EXPECT_EQ(ZX_OK, create_image_2_ready_fence_result.status_value());
 
-  auto default_layer_id = create_default_layer_result.value();
-  auto image_0_id = create_image_0_result.value();
-  auto image_1_id = create_image_1_result.value();
-  auto image_2_id = create_image_2_result.value();
-  auto image_1_ready_fence = std::move(create_image_1_ready_fence_result.value());
-  auto image_2_ready_fence = std::move(create_image_2_ready_fence_result.value());
+  LayerId default_layer_id = create_default_layer_result.value();
+  uint64_t image_0_id = create_image_0_result.value();
+  uint64_t image_1_id = create_image_1_result.value();
+  uint64_t image_2_id = create_image_2_result.value();
+  TestFidlClient::EventInfo image_1_ready_fence =
+      std::move(create_image_1_ready_fence_result.value());
+  TestFidlClient::EventInfo image_2_ready_fence =
+      std::move(create_image_2_ready_fence_result.value());
 
   // Apply a config for client to become active; Present an image layer.
   EXPECT_EQ(ZX_OK, primary_client->PresentLayers({

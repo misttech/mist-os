@@ -132,7 +132,7 @@ impl From<ClientCompositionOp> for ClientCompositionAction {
     fn from(src: ClientCompositionOp) -> Self {
         Self {
             display_id: DisplayId(src.display_id),
-            layer_id: LayerId(src.layer_id),
+            layer_id: src.layer_id.into(),
             opcode: src.opcode,
         }
     }

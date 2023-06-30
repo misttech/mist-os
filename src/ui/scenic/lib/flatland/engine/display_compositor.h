@@ -5,6 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_DISPLAY_COMPOSITOR_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_DISPLAY_COMPOSITOR_H_
 
+#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 
@@ -147,7 +148,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   struct DisplayEngineData {
     // The hardware layers we've created to use on this display.
-    std::vector<uint64_t> layers;
+    std::vector<fuchsia::hardware::display::LayerId> layers;
 
     // The number of vmos we are using in the case of software composition
     // (1 for each render target).
@@ -187,7 +188,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Generates a hardware layer for direct compositing on the display. Returns the ID used
   // to reference that layer in the display coordinator API.
-  uint64_t CreateDisplayLayer() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  fuchsia::hardware::display::LayerId CreateDisplayLayer() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Moves a token out of |display_buffer_collection_ptrs_| and returns it.
   fuchsia::sysmem::BufferCollectionSyncPtr TakeDisplayBufferCollectionPtr(
@@ -211,17 +212,18 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Sets the provided layers onto the display referenced by the given display_id.
-  void SetDisplayLayers(uint64_t display_id, const std::vector<uint64_t>& layers)
+  void SetDisplayLayers(uint64_t display_id,
+                        const std::vector<fuchsia::hardware::display::LayerId>& layers)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Takes a solid color rectangle and directly composites it to a hardware layer on the display.
-  void ApplyLayerColor(uint64_t layer_id, ImageRect rectangle, allocation::ImageMetadata image)
-      FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  void ApplyLayerColor(fuchsia::hardware::display::LayerId layer_id, ImageRect rectangle,
+                       allocation::ImageMetadata image) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Takes an image and directly composites it to a hardware layer on the display.
-  void ApplyLayerImage(uint64_t layer_id, ImageRect rectangle, allocation::ImageMetadata image,
-                       scenic_impl::DisplayEventId wait_id, scenic_impl::DisplayEventId signal_id)
-      FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  void ApplyLayerImage(fuchsia::hardware::display::LayerId layer_id, ImageRect rectangle,
+                       allocation::ImageMetadata image, scenic_impl::DisplayEventId wait_id,
+                       scenic_impl::DisplayEventId signal_id) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Checks if the display coordinator is capable of applying the configuration settings that
   // have been set up until that point.

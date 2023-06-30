@@ -8,6 +8,7 @@ static_library("client-utils") {
     "image.cc",
     "virtual-layer.cc",
   ]
+  public_deps = [ "//src/graphics/display/lib/api-types-cpp" ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_wire",

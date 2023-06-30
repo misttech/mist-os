@@ -130,7 +130,7 @@ class DisplaySwapchain : public Swapchain {
   //
   // fuchsia::hardware::display::INVALID_DISP_ID can be passed for any of the event_ids if there is
   // no corresponding event to signal.
-  void Flip(uint64_t layer_id, FrameRecord* frame_record);
+  void Flip(fuchsia::hardware::display::LayerId layer_id, FrameRecord* frame_record);
 
   // A nullable Escher (good for testing) means some resources must be accessed
   // through its (valid) pointer.
@@ -141,7 +141,8 @@ class DisplaySwapchain : public Swapchain {
   const uint64_t swapchain_image_count_;
 
   display::Display* const display_;
-  uint64_t primary_layer_id_ = fuchsia::hardware::display::INVALID_DISP_ID;
+  fuchsia::hardware::display::LayerId primary_layer_id_ = {
+      .value = fuchsia::hardware::display::INVALID_DISP_ID};
 
   // The display coordinator driver binding.
   std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator_;

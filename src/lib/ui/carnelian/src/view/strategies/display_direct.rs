@@ -21,9 +21,11 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
-use display_utils::PixelFormat;
+use display_utils::{LayerId, PixelFormat};
 use euclid::size2;
-use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy, ImageConfig};
+use fidl_fuchsia_hardware_display::{
+    CoordinatorEvent, CoordinatorProxy, ImageConfig, INVALID_DISP_ID,
+};
 use fuchsia_async::{self as fasync, OnSignals};
 use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
 use fuchsia_trace::{duration, instant};
@@ -105,7 +107,7 @@ pub struct Display {
     pub coordinator: CoordinatorProxyPtr,
     pub display_id: DisplayId,
     pub info: fidl_fuchsia_hardware_display::Info,
-    pub layer_id: u64,
+    pub layer_id: LayerId,
     pub mode_idx: usize,
 }
 
@@ -115,7 +117,7 @@ impl Display {
         display_id: DisplayId,
         info: fidl_fuchsia_hardware_display::Info,
     ) -> Result<Self, Error> {
-        Ok(Self { coordinator, display_id, info, layer_id: 0, mode_idx: 0 })
+        Ok(Self { coordinator, display_id, info, layer_id: LayerId(INVALID_DISP_ID), mode_idx: 0 })
     }
 
     pub fn set_mode(&mut self, mode_idx: usize) -> Result<(), Error> {
@@ -131,7 +133,7 @@ impl Display {
             "Display::new(): failed to create layer {}",
             Status::from_raw(status)
         );
-        self.layer_id = layer_id;
+        self.layer_id = layer_id.into();
         Ok(())
     }
 
@@ -367,7 +369,7 @@ impl DisplayDirectViewStrategy {
 
         let frame_set = FrameSet::new(collection_id as u64, image_ids);
 
-        display.coordinator.set_layer_primary_config(display.layer_id, &image_config)?;
+        display.coordinator.set_layer_primary_config(&display.layer_id.into(), &image_config)?;
 
         Ok(DisplayResources { context, image_indexes, frame_set, wait_events, signal_events })
     }
@@ -525,7 +527,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
             let view_key = view_details.key;
             self.display
                 .coordinator
-                .set_display_layers(self.display.display_id, &[self.display.layer_id])
+                .set_display_layers(self.display.display_id, &[self.display.layer_id.into()])
                 .expect("set_display_layers");
             let (_, wait_event_id) =
                 *self.display_resources().wait_events.get(&prepared).expect("wait event");
@@ -534,7 +536,12 @@ impl ViewStrategy for DisplayDirectViewStrategy {
             let image_id = prepared;
             self.display
                 .coordinator
-                .set_layer_image(self.display.layer_id, prepared, wait_event_id, signal_event_id)
+                .set_layer_image(
+                    &self.display.layer_id.into(),
+                    prepared,
+                    wait_event_id,
+                    signal_event_id,
+                )
                 .expect("Frame::present() set_layer_image");
             self.display.coordinator.apply_config().expect("Frame::present() apply_config");
             let local_event =

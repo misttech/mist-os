@@ -16,6 +16,7 @@
 
 #include <fbl/algorithm.h>
 
+#include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/testing/client-utils/utils.h"
 
 namespace fhd = fuchsia_hardware_display;
@@ -108,7 +109,7 @@ custom_layer_t* VirtualLayer::CreateLayer(const fidl::WireSyncClient<fhd::Coordi
     printf("Creating layer failed\n");
     return nullptr;
   }
-  layers_[layers_.size() - 1].id = result.value().layer_id;
+  layers_[layers_.size() - 1].id = ::display::ToLayerId(result.value().layer_id);
 
   return &layers_[layers_.size() - 1];
 }
@@ -179,14 +180,15 @@ bool PrimaryLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
 
     fhd::wire::ImageConfig image_config;
     images_[0]->GetConfig(&image_config);
-    auto set_config_result = dc->SetLayerPrimaryConfig(layer->id, image_config);
+    const fhd::wire::LayerId fidl_layer_id = ::display::ToFidlLayerId(layer->id);
+    auto set_config_result = dc->SetLayerPrimaryConfig(fidl_layer_id, image_config);
     if (!set_config_result.ok()) {
       printf("Setting layer config failed\n");
       return false;
     }
 
     auto set_alpha_result = dc->SetLayerPrimaryAlpha(
-        layer->id,
+        fidl_layer_id,
         alpha_enable_ ? fhd::wire::AlphaMode::kHwMultiply : fhd::wire::AlphaMode::kDisable,
         alpha_val_);
     if (!set_alpha_result.ok()) {
@@ -329,7 +331,8 @@ void PrimaryLayer::Render(int32_t frame_num) {
 
 void PrimaryLayer::SetLayerPositions(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
   for (auto& layer : layers_) {
-    ZX_ASSERT(dc->SetLayerPrimaryPosition(layer.id, rotation_, layer.src, layer.dest).ok());
+    const fhd::wire::LayerId fidl_layer_id = ::display::ToFidlLayerId(layer.id);
+    ZX_ASSERT(dc->SetLayerPrimaryPosition(fidl_layer_id, rotation_, layer.src, layer.dest).ok());
   }
 }
 
@@ -337,7 +340,8 @@ void VirtualLayer::SetLayerImages(const fidl::WireSyncClient<fhd::Coordinator>& 
                                   bool alt_image) {
   for (auto& layer : layers_) {
     const auto& image = layer.import_info[alt_image];
-    auto result = dc->SetLayerImage(layer.id, image.id, image.event_ids[WAIT_EVENT],
+    const fhd::wire::LayerId fidl_layer_id = ::display::ToFidlLayerId(layer.id);
+    auto result = dc->SetLayerImage(fidl_layer_id, image.id, image.event_ids[WAIT_EVENT],
                                     image.event_ids[SIGNAL_EVENT]);
 
     ZX_ASSERT(result.ok());
@@ -395,7 +399,9 @@ bool CursorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
     image_config.height = info.height;
     image_config.width = info.width;
     image_config.type = fhd::wire::kTypeSimple;
-    auto result = dc->SetLayerCursorConfig(layer->id, image_config);
+
+    const fhd::wire::LayerId fidl_layer_id = ::display::ToFidlLayerId(layer->id);
+    auto result = dc->SetLayerCursorConfig(fidl_layer_id, image_config);
     if (!result.ok()) {
       printf("Setting layer config failed\n");
       return false;
@@ -417,7 +423,8 @@ void CursorLayer::StepLayout(int32_t frame_num) {
 void CursorLayer::SendLayout(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
   uint32_t display_start = 0;
   for (unsigned i = 0; i < displays_.size(); i++) {
-    ZX_ASSERT(dc->SetLayerCursorPosition(layers_[i].id, x_pos_ - display_start, y_pos_).ok());
+    const fhd::wire::LayerId fidl_layer_id = ::display::ToFidlLayerId(layers_[i].id);
+    ZX_ASSERT(dc->SetLayerCursorPosition(fidl_layer_id, x_pos_ - display_start, y_pos_).ok());
     display_start += displays_[i]->mode().horizontal_resolution;
   }
 }
@@ -443,8 +450,9 @@ bool ColorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
     uint8_t data[kColorLayerBytesPerPixel];
     *reinterpret_cast<uint32_t*>(data) = kColorLayerColor;
 
+    const fhd::wire::LayerId fidl_layer_id = ::display::ToFidlLayerId(layer->id);
     auto result = dc->SetLayerColorConfig(
-        layer->id, kColorLayerFormat,
+        fidl_layer_id, kColorLayerFormat,
         ::fidl::VectorView<uint8_t>::FromExternal(data, kColorLayerBytesPerPixel));
 
     if (!result.ok()) {

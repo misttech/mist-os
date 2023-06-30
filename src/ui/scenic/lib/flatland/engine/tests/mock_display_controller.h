@@ -26,9 +26,11 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   MOCK_METHOD(void, ImportEvent, (zx::event, uint64_t));
 
   MOCK_METHOD(void, SetLayerColorConfig,
-              (uint64_t, fuchsia::images2::PixelFormat, std::vector<uint8_t>));
+              (fuchsia::hardware::display::LayerId, fuchsia::images2::PixelFormat,
+               std::vector<uint8_t>));
 
-  MOCK_METHOD(void, SetLayerImage, (uint64_t, uint64_t, uint64_t, uint64_t));
+  MOCK_METHOD(void, SetLayerImage,
+              (fuchsia::hardware::display::LayerId, uint64_t, uint64_t, uint64_t));
 
   MOCK_METHOD(void, ApplyConfig, ());
 
@@ -52,19 +54,22 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
 
   MOCK_METHOD(void, ReleaseImage, (uint64_t));
 
-  MOCK_METHOD(void, SetLayerPrimaryConfig, (uint64_t, fuchsia::hardware::display::ImageConfig));
+  MOCK_METHOD(void, SetLayerPrimaryConfig,
+              (fuchsia::hardware::display::LayerId, fuchsia::hardware::display::ImageConfig));
 
   MOCK_METHOD(void, SetLayerPrimaryPosition,
-              (uint64_t, fuchsia::hardware::display::Transform, fuchsia::hardware::display::Frame,
-               fuchsia::hardware::display::Frame));
+              (fuchsia::hardware::display::LayerId, fuchsia::hardware::display::Transform,
+               fuchsia::hardware::display::Frame, fuchsia::hardware::display::Frame));
 
-  MOCK_METHOD(void, SetLayerPrimaryAlpha, (uint64_t, fuchsia::hardware::display::AlphaMode, float));
+  MOCK_METHOD(void, SetLayerPrimaryAlpha,
+              (fuchsia::hardware::display::LayerId, fuchsia::hardware::display::AlphaMode, float));
 
   MOCK_METHOD(void, CreateLayer, (CreateLayerCallback));
 
-  MOCK_METHOD(void, DestroyLayer, (uint64_t));
+  MOCK_METHOD(void, DestroyLayer, (fuchsia::hardware::display::LayerId));
 
-  MOCK_METHOD(void, SetDisplayLayers, (uint64_t, ::std::vector<uint64_t>));
+  MOCK_METHOD(void, SetDisplayLayers,
+              (uint64_t, ::std::vector<fuchsia::hardware::display::LayerId>));
 
   MOCK_METHOD(void, SetDisplayColorConversion,
               ((uint64_t), (std::array<float, 3>), (std::array<float, 9>), (std::array<float, 3>)));

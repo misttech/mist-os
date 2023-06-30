@@ -98,14 +98,14 @@ closed protocol Coordinator {
     // display is removed.
     strict CreateLayer() -> (struct {
         res zx.Status;
-        layer_id LayerIdValue;
+        layer_id LayerId;
     });
 
     // Destroys the given layer.
     //
     // It is illegal to destroy a layer which does not exist or which is in use.
     strict DestroyLayer(struct {
-        layer_id LayerIdValue;
+        layer_id LayerId;
     });
 
     // Sets the display mode for the given display.
@@ -157,7 +157,7 @@ closed protocol Coordinator {
     // is also illegal to pass an invalid layer id.
     strict SetDisplayLayers(struct {
         display_id DisplayIdValue;
-        layer_ids vector<LayerIdValue>:MAX;
+        layer_ids vector<LayerId>:MAX;
     });
 
     // Configures the layer as a primary layer with no image and the default
@@ -169,7 +169,7 @@ closed protocol Coordinator {
     //
     // It is illegal to pass an invalid layer id.
     strict SetLayerPrimaryConfig(struct {
-        layer_id LayerIdValue;
+        layer_id LayerId;
         image_config ImageConfig;
     });
 
@@ -183,7 +183,7 @@ closed protocol Coordinator {
     // Calling this on a non-primary layer or passing an invalid transform
     // is illegal.
     strict SetLayerPrimaryPosition(struct {
-        layer_id LayerIdValue;
+        layer_id LayerId;
         transform Transform;
         src_frame Frame;
         dest_frame Frame;
@@ -205,7 +205,7 @@ closed protocol Coordinator {
     // invalid mode, or to pass a value of `val` which is not NaN or
     // in the range [0, 1].
     strict SetLayerPrimaryAlpha(struct {
-        layer_id LayerIdValue;
+        layer_id LayerId;
         mode AlphaMode;
         val float32;
     });
@@ -218,7 +218,7 @@ closed protocol Coordinator {
     //
     // It is illegal to call this on an invalid layer.
     strict SetLayerCursorConfig(struct {
-        layer_id LayerIdValue;
+        layer_id LayerId;
         image_config ImageConfig;
     });
 
@@ -229,7 +229,7 @@ closed protocol Coordinator {
     //
     // It is illegal to call this on a non-cursor layer.
     strict SetLayerCursorPosition(struct {
-        layer_id LayerIdValue;
+        layer_id LayerId;
         x int32;
         y int32;
     });
@@ -243,7 +243,7 @@ closed protocol Coordinator {
     // It is illegal to call this on an invalid layer or for the length of
     // color_bytes to mismatch the size of the supplied format.
     strict SetLayerColorConfig(struct {
-        layer_id LayerIdValue;
+        layer_id LayerId;
         pixel_format fuchsia.images2.PixelFormat;
         color_bytes vector<uint8>:MAX;
     });
@@ -282,7 +282,7 @@ closed protocol Coordinator {
     // validate such a configuration). It is illegal to reuse a wait event which
     // another layer that has not been presented is waiting on.
     strict SetLayerImage(struct {
-        layer_id LayerIdValue;
+        layer_id LayerId;
         image_id uint64;
         wait_event_id uint64;
         signal_event_id uint64;

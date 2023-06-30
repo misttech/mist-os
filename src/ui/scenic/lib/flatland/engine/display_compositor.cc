@@ -222,7 +222,7 @@ DisplayCompositor::~DisplayCompositor() {
   // Destroy all of the display layers.
   DiscardConfig();
   for (const auto& [_, data] : display_engine_data_map_) {
-    for (const auto& layer : data.layers) {
+    for (const fuchsia::hardware::display::LayerId& layer : data.layers) {
       (*display_coordinator_)->DestroyLayer(layer);
     }
     for (const auto& event_data : data.frame_event_datas) {
@@ -421,21 +421,21 @@ void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image
   image_event_map_.erase(image_id);
 }
 
-uint64_t DisplayCompositor::CreateDisplayLayer() {
+fuchsia::hardware::display::LayerId DisplayCompositor::CreateDisplayLayer() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
-  uint64_t layer_id;
+  fuchsia::hardware::display::LayerId layer_id;
   zx_status_t create_layer_status;
   const zx_status_t transport_status =
       (*display_coordinator_)->CreateLayer(&create_layer_status, &layer_id);
   if (create_layer_status != ZX_OK || transport_status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to create layer, " << create_layer_status;
-    return 0;
+    return {.value = fuchsia::hardware::display::INVALID_DISP_ID};
   }
   return layer_id;
 }
 
-void DisplayCompositor::SetDisplayLayers(const uint64_t display_id,
-                                         const std::vector<uint64_t>& layers) {
+void DisplayCompositor::SetDisplayLayers(
+    const uint64_t display_id, const std::vector<fuchsia::hardware::display::LayerId>& layers) {
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::SetDisplayLayers");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   // Set all of the layers for each of the images on the display.
@@ -450,7 +450,8 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
 
   // Since we map 1 image to 1 layer, if there are more images than layers available for
   // the given display, then they cannot be directly composited to the display in hardware.
-  const std::vector<uint64_t>& layers = display_engine_data_map_.at(data.display_id).layers;
+  const std::vector<fuchsia::hardware::display::LayerId>& layers =
+      display_engine_data_map_.at(data.display_id).layers;
   if (layers.size() < num_images) {
     return false;
   }
@@ -472,8 +473,8 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   }
 
   // We only set as many layers as needed for the images we have.
-  SetDisplayLayers(data.display_id,
-                   std::vector<uint64_t>(layers.begin(), layers.begin() + num_images));
+  SetDisplayLayers(data.display_id, std::vector<fuchsia::hardware::display::LayerId>(
+                                        layers.begin(), layers.begin() + num_images));
 
   for (uint32_t i = 0; i < num_images; i++) {
     const allocation::GlobalImageId image_id = data.images[i].identifier;
@@ -504,7 +505,8 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   return true;
 }
 
-void DisplayCompositor::ApplyLayerColor(const uint64_t layer_id, const ImageRect rectangle,
+void DisplayCompositor::ApplyLayerColor(const fuchsia::hardware::display::LayerId layer_id,
+                                        const ImageRect rectangle,
                                         const allocation::ImageMetadata image) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   // We have to convert the image_metadata's multiply color, which is an array of normalized
@@ -540,7 +542,8 @@ void DisplayCompositor::ApplyLayerColor(const uint64_t layer_id, const ImageRect
 #endif
 }
 
-void DisplayCompositor::ApplyLayerImage(const uint64_t layer_id, const ImageRect rectangle,
+void DisplayCompositor::ApplyLayerImage(const fuchsia::hardware::display::LayerId layer_id,
+                                        const ImageRect rectangle,
                                         const allocation::ImageMetadata image,
                                         const scenic_impl::DisplayEventId wait_id,
                                         const scenic_impl::DisplayEventId signal_id) {
