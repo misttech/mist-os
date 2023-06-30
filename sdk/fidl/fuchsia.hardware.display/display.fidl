@@ -5,6 +5,9 @@ library fuchsia.hardware.display;
 
 using fuchsia.images2;
 
+/// Type of the internal value in [`fuchsia.hardware.display/DisplayId`].
+alias DisplayIdValue = uint64;
+
 /// Unique identifier for a display device attached to the system.
 ///
 /// [`fuchsia.hardware.display/INVALID_DISP_ID`] represents an invalid value.
@@ -19,7 +22,9 @@ using fuchsia.images2;
 /// [`fuchsia.hardware.display/Info`] identifiers, not display IDs.
 ///
 /// This type is not related to the VESA DisplayID standard.
-alias DisplayIdValue = uint64;
+type DisplayId = struct {
+    value DisplayIdValue;
+};
 
 /// Describes an operational mode for a display device attached to the system.
 ///

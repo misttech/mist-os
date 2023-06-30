@@ -20,8 +20,14 @@ DEFINE_STRONG_INT(DisplayId, uint64_t);
 constexpr inline DisplayId ToDisplayId(uint64_t banjo_display_id) {
   return DisplayId(banjo_display_id);
 }
+constexpr inline DisplayId ToDisplayId(fuchsia_hardware_display::wire::DisplayId fidl_display_id) {
+  return DisplayId(fidl_display_id.value);
+}
 constexpr inline uint64_t ToBanjoDisplayId(DisplayId display_id) { return display_id.value(); }
 constexpr inline uint64_t ToFidlDisplayIdValue(DisplayId display_id) { return display_id.value(); }
+constexpr inline fuchsia_hardware_display::wire::DisplayId ToFidlDisplayId(DisplayId display_id) {
+  return {.value = display_id.value()};
+}
 
 constexpr DisplayId kInvalidDisplayId(fuchsia_hardware_display::wire::kInvalidDispId);
 

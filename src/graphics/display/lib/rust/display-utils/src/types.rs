@@ -4,7 +4,9 @@
 
 use crate::{error::Result, pixel_format::PixelFormat};
 use {
-    fidl_fuchsia_hardware_display::{Info, LayerId as FidlLayerId, INVALID_DISP_ID},
+    fidl_fuchsia_hardware_display::{
+        DisplayId as FidlDisplayId, Info, LayerId as FidlLayerId, INVALID_DISP_ID,
+    },
     fuchsia_async::OnSignals,
     fuchsia_zircon::{self as zx, AsHandleRef},
     std::fmt,
@@ -13,6 +15,24 @@ use {
 /// Strongly typed wrapper around a display ID.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct DisplayId(pub u64);
+
+impl Default for DisplayId {
+    fn default() -> Self {
+        DisplayId(INVALID_DISP_ID)
+    }
+}
+
+impl From<FidlDisplayId> for DisplayId {
+    fn from(fidl_display_id: FidlDisplayId) -> Self {
+        DisplayId(fidl_display_id.value)
+    }
+}
+
+impl From<DisplayId> for FidlDisplayId {
+    fn from(display_id: DisplayId) -> Self {
+        FidlDisplayId { value: display_id.0 }
+    }
+}
 
 /// Strongly typed wrapper around a display driver event ID.
 #[derive(Clone, Copy, Debug)]
@@ -174,5 +194,43 @@ mod tests {
     fn layer_id_default() {
         let default: LayerId = Default::default();
         assert_eq!(default, LayerId(INVALID_DISP_ID));
+    }
+
+    #[fuchsia::test]
+    fn display_id_from_fidl_display_id() {
+        assert_eq!(DisplayId(1), DisplayId::from(FidlDisplayId { value: 1 }));
+        assert_eq!(DisplayId(2), DisplayId::from(FidlDisplayId { value: 2 }));
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(DisplayId(LARGE), DisplayId::from(FidlDisplayId { value: LARGE }));
+    }
+
+    #[fuchsia::test]
+    fn fidl_display_id_from_display_id() {
+        assert_eq!(FidlDisplayId { value: 1 }, FidlDisplayId::from(DisplayId(1)));
+        assert_eq!(FidlDisplayId { value: 2 }, FidlDisplayId::from(DisplayId(2)));
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(FidlDisplayId { value: LARGE }, FidlDisplayId::from(DisplayId(LARGE)));
+    }
+
+    #[fuchsia::test]
+    fn fidl_display_id_to_display_id() {
+        assert_eq!(DisplayId(1), FidlDisplayId { value: 1 }.into());
+        assert_eq!(DisplayId(2), FidlDisplayId { value: 2 }.into());
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(DisplayId(LARGE), FidlDisplayId { value: LARGE }.into());
+    }
+
+    #[fuchsia::test]
+    fn display_id_to_fidl_display_id() {
+        assert_eq!(FidlDisplayId { value: 1 }, DisplayId(1).into());
+        assert_eq!(FidlDisplayId { value: 2 }, DisplayId(2).into());
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(FidlDisplayId { value: LARGE }, DisplayId(LARGE).into());
+    }
+
+    #[fuchsia::test]
+    fn display_id_default() {
+        let default: DisplayId = Default::default();
+        assert_eq!(default, DisplayId(INVALID_DISP_ID));
     }
 }
