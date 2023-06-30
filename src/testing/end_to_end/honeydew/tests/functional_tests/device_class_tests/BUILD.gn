@@ -29,8 +29,6 @@ if (is_host) {
     public_deps = [
       ":emulator_tests_fyi",
       ":nuc_tests_fyi",
-      "test_generic_fuchsia_device:generic_fuchsia_device_test_fc($host_toolchain)",
-      "test_x64:x64_test_fc($host_toolchain)",
     ]
   }
 }
