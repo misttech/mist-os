@@ -39,8 +39,8 @@ use internet_checksum::Checksum;
 use net_types::ip::{Ip, IpAddress, Ipv4, Ipv6};
 use packet::records::options::{Options, OptionsImpl};
 use packet::{
-    AsFragmentedByteSlice, BufferView, FragmentedByteSlice, FromRaw, PacketBuilder,
-    PacketConstraints, ParsablePacket, ParseMetadata, SerializeBuffer,
+    AsFragmentedByteSlice, BufferView, FragmentedByteSlice, FragmentedBytesMut, FromRaw,
+    PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
 };
 use zerocopy::byteorder::{network_endian::U16, ByteOrder, NetworkEndian};
 use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned};
@@ -650,12 +650,15 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> PacketBuilder
         PacketConstraints::new(mem::size_of::<Header<M>>(), 0, 0, core::u32::MAX as usize)
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
+    fn serialize(
+        &self,
+        target: &mut SerializeTarget<'_>,
+        message_body: FragmentedBytesMut<'_, '_>,
+    ) {
         use packet::BufferViewMut;
 
-        let (mut prefix, message_body, _) = buffer.parts();
         // implements BufferViewMut, giving us take_obj_xxx_zero methods
-        let mut prefix = &mut prefix;
+        let mut prefix = &mut target.header;
 
         assert!(
             M::Body::EXPECTS_BODY || message_body.is_empty(),
@@ -668,13 +671,14 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> PacketBuilder
         header.prefix.set_msg_type(M::TYPE);
         header.prefix.code = self.code.into();
         header.message = self.msg;
-        let checksum = compute_checksum_fragmented(&header, message_body, self.src_ip, self.dst_ip)
-            .unwrap_or_else(|| {
-                panic!(
+        let checksum =
+            compute_checksum_fragmented(&header, &message_body, self.src_ip, self.dst_ip)
+                .unwrap_or_else(|| {
+                    panic!(
                     "total ICMP packet length of {} overflows 32-bit length field of pseudo-header",
                     header.bytes().len() + message_body.len(),
                 )
-            });
+                });
         header.prefix.checksum = checksum;
     }
 }

@@ -19,9 +19,9 @@ use core::ops::Range;
 use net_types::ip::{Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
 use packet::records::{AlignedRecordSequenceBuilder, Records, RecordsRaw};
 use packet::{
-    BufferProvider, BufferView, BufferViewMut, EmptyBuf, FromRaw, InnerPacketBuilder, MaybeParsed,
-    PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeBuffer,
-    SerializeError, Serializer, TargetBuffer,
+    BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
+    InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints, ParsablePacket,
+    ParseMetadata, SerializeBuffer, SerializeError, SerializeTarget, Serializer,
 };
 use tracing::debug;
 use zerocopy::{
@@ -602,7 +602,7 @@ impl<B: ByteSlice> Ipv6Packet<B> {
                 provider: P,
             ) -> Result<B, (SerializeError<P::Error>, Self)>
             where
-                B: TargetBuffer,
+                B: SerializeBuffer,
                 P: BufferProvider<Self::Buffer, B>,
             {
                 match self {
@@ -1101,9 +1101,8 @@ impl PacketBuilder for Ipv6PacketBuilder {
         PacketConstraints::new(IPV6_FIXED_HDR_LEN, 0, 0, (1 << 16) - 1)
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let (mut header, body, _) = buffer.parts();
-        self.serialize_fixed_hdr(&mut header, body.len(), self.proto.into());
+    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
+        self.serialize_fixed_hdr(&mut target.header, body.len(), self.proto.into());
     }
 }
 
@@ -1131,13 +1130,16 @@ where
         PacketConstraints::new(header_len, 0, 0, (1 << 16) - 1)
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let (mut header, body, _) = buffer.parts();
+    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
         let aligned_hbh_len = self.aligned_hbh_len();
         // The next header in the fixed header now should be 0 (Hop-by-Hop Extension Header)
-        self.prefix_builder.serialize_fixed_hdr(&mut header, body.len() + aligned_hbh_len, 0);
+        self.prefix_builder.serialize_fixed_hdr(
+            &mut target.header,
+            body.len() + aligned_hbh_len,
+            0,
+        );
         // header implements BufferViewMut
-        let mut header = &mut header;
+        let mut header = &mut target.header;
         let mut hbh_extension_header = header
             .take_back_zero(aligned_hbh_len)
             .expect("too few bytes for Hop-by-Hop extension header");

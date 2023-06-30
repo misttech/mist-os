@@ -17,9 +17,9 @@ use core::ops::Range;
 
 use net_types::ip::{Ip, IpAddress, IpVersionMarker};
 use packet::{
-    BufferView, BufferViewMut, ByteSliceInnerPacketBuilder, EmptyBuf, FromRaw, InnerPacketBuilder,
-    MaybeParsed, PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeBuffer,
-    Serializer,
+    BufferView, BufferViewMut, ByteSliceInnerPacketBuilder, EmptyBuf, FragmentedBytesMut, FromRaw,
+    InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints, ParsablePacket,
+    ParseMetadata, SerializeTarget, Serializer,
 };
 use zerocopy::{
     byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified,
@@ -444,15 +444,17 @@ impl<A: IpAddress> PacketBuilder for UdpPacketBuilder<A> {
         )
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
+    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
         // See for details: https://en.wikipedia.org/wiki/User_Datagram_Protocol#Packet_structure
 
-        let total_len = buffer.len();
-        let mut header = buffer.header();
-        // implements BufferViewMut, giving us write_obj_front method
-        let mut header = &mut header;
+        let total_len = target.header.len() + body.len() + target.footer.len();
 
-        header.write_obj_front(&Header {
+        // `write_obj_front` consumes the extent of the receiving slice, but
+        // that behavior is undesirable here: at the end of this method, we
+        // write the checksum back into the header. To avoid this, we re-slice
+        // header before calling `write_obj_front`; the re-slice will be
+        // consumed, but `target.header` is unaffected.
+        (&mut &mut target.header[..]).write_obj_front(&Header {
             src_port: U16::new(self.src_port.map_or(0, NonZeroU16::get)),
             dst_port: U16::new(self.dst_port.map_or(0, NonZeroU16::get)),
             length: U16::new(total_len.try_into().unwrap_or_else(|_| {
@@ -474,7 +476,8 @@ impl<A: IpAddress> PacketBuilder for UdpPacketBuilder<A> {
             self.src_ip,
             self.dst_ip,
             IpProto::Udp.into(),
-            buffer,
+            target,
+            body,
         )
         .unwrap_or_else(|| {
             panic!(
@@ -485,7 +488,7 @@ impl<A: IpAddress> PacketBuilder for UdpPacketBuilder<A> {
         if checksum == [0, 0] {
             checksum = [0xFF, 0xFF];
         }
-        buffer.header()[CHECKSUM_RANGE].copy_from_slice(&checksum[..]);
+        target.header[CHECKSUM_RANGE].copy_from_slice(&checksum[..]);
     }
 }
 
@@ -717,11 +720,10 @@ mod tests {
         let mut buf = [0u8; 7];
         let mut buf = [&mut buf[..]];
         let buf = FragmentedBytesMut::new(&mut buf[..]);
-        let (head, body, foot) = buf.try_split_contiguous(..).unwrap();
-        let mut buffer = SerializeBuffer::new(head, body, foot);
+        let (header, body, footer) = buf.try_split_contiguous(..).unwrap();
         let builder =
             UdpPacketBuilder::new(TEST_SRC_IPV4, TEST_DST_IPV4, None, NonZeroU16::new(1).unwrap());
-        builder.serialize(&mut buffer);
+        builder.serialize(&mut SerializeTarget { header, footer }, body);
     }
 
     #[test]

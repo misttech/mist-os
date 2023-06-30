@@ -21,9 +21,9 @@ use explicit::ResultExt as _;
 use net_types::ip::IpAddress;
 use packet::records::options::OptionsRaw;
 use packet::{
-    BufferView, BufferViewMut, ByteSliceInnerPacketBuilder, EmptyBuf, FragmentedByteSlice, FromRaw,
+    BufferView, BufferViewMut, ByteSliceInnerPacketBuilder, EmptyBuf, FragmentedBytesMut, FromRaw,
     InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints, ParsablePacket,
-    ParseMetadata, SerializeBuffer, Serializer,
+    ParseMetadata, SerializeTarget, Serializer,
 };
 use zerocopy::{
     byteorder::network_endian::{U16, U32},
@@ -729,16 +729,17 @@ impl<A: IpAddress, O: InnerPacketBuilder> PacketBuilder for TcpSegmentBuilderWit
         PacketConstraints::new(header_len, 0, 0, (1 << 16) - 1 - header_len)
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let (mut header, _body, _footer): (_, &mut FragmentedByteSlice<'_, _>, &mut [u8]) =
-            buffer.parts();
-        // `&mut header` has type `&mut &mut [u8]`, which implements
-        // `BufferViewMut`, giving us the `take_back_zero` method.
-        let mut header = &mut header;
+    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
         let opt_len = self.aligned_options_len();
+        // `take_back_zero` consumes the extent of the receiving slice, but that
+        // behavior is undesirable here: `prefix_builder.serialize` also needs
+        // to write into the header. To avoid changing the extent of
+        // target.header, we re-slice header before calling `take_back_zero`;
+        // the re-slice will be consumed, but `target.header` is unaffected.
+        let mut header = &mut &mut target.header[..];
         let options = header.take_back_zero(opt_len).expect("too few bytes for TCP options");
         self.options.serialize(options);
-        self.prefix_builder.serialize(buffer);
+        self.prefix_builder.serialize(target, body);
     }
 }
 
@@ -815,18 +816,21 @@ impl<A: IpAddress> PacketBuilder for TcpSegmentBuilder<A> {
         PacketConstraints::new(HDR_PREFIX_LEN, 0, 0, core::usize::MAX)
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let mut header = buffer.header();
-        let hdr_len = header.len();
-        // Implements BufferViewMut, giving us write_obj_front method.
-        let mut header = &mut header;
+    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
+        let hdr_len = target.header.len();
+        let total_len = hdr_len + body.len() + target.footer.len();
 
         debug_assert_eq!(hdr_len % 4, 0, "header length isn't a multiple of 4: {}", hdr_len);
         let mut data_offset_reserved_flags = self.data_offset_reserved_flags;
         data_offset_reserved_flags.set_data_offset(
             (hdr_len / 4).try_into().expect("header length too long for TCP segment"),
         );
-        header
+        // `write_obj_front` consumes the extent of the receiving slice, but
+        // that behavior is undesirable here: at the end of this method, we
+        // write the checksum back into the header. To avoid this, we re-slice
+        // header before calling `write_obj_front`; the re-slice will be
+        // consumed, but `target.header` is unaffected.
+        (&mut &mut target.header[..])
             .write_obj_front(&HeaderPrefix::new(
                 self.src_port.map_or(0, NonZeroU16::get),
                 self.dst_port.map_or(0, NonZeroU16::get),
@@ -847,15 +851,16 @@ impl<A: IpAddress> PacketBuilder for TcpSegmentBuilder<A> {
             self.src_ip,
             self.dst_ip,
             IpProto::Tcp.into(),
-            buffer,
+            target,
+            body,
         )
         .unwrap_or_else(|| {
             panic!(
                 "total TCP segment length of {} bytes overflows length field of pseudo-header",
-                buffer.len()
+                total_len
             )
         });
-        buffer.header()[CHECKSUM_RANGE].copy_from_slice(&checksum[..]);
+        target.header[CHECKSUM_RANGE].copy_from_slice(&checksum[..]);
     }
 }
 

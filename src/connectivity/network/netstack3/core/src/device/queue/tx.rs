@@ -10,7 +10,7 @@ use core::convert::Infallible as Never;
 use derivative::Derivative;
 use packet::{
     new_buf_vec, Buf, BufferProvider, ContiguousBuffer, FragmentedBufferMut as _, ReusableBuffer,
-    Serializer, ShrinkBuffer, TargetBuffer,
+    SerializeBuffer, Serializer, ShrinkBuffer,
 };
 
 use crate::{
@@ -55,7 +55,7 @@ pub(crate) trait TransmitQueueNonSyncContext<D: Device, DeviceId> {
 pub(crate) trait TransmitQueueCommon<D: Device, C>: DeviceIdContext<D> {
     type Meta;
     type Allocator;
-    type Buffer: TargetBuffer + ContiguousBuffer;
+    type Buffer: SerializeBuffer + ContiguousBuffer;
 
     /// Parses an outgoing frame for packet socket delivery.
     fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError>;

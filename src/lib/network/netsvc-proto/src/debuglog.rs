@@ -9,8 +9,8 @@
 use crate::ValidStr;
 use const_unwrap::const_unwrap_option;
 use packet::{
-    BufferView, BufferViewMut, InnerPacketBuilder, PacketBuilder, PacketConstraints,
-    ParsablePacket, ParseMetadata, SerializeBuffer,
+    BufferView, BufferViewMut, FragmentedBytesMut, InnerPacketBuilder, PacketBuilder,
+    PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
 };
 use std::num::NonZeroU16;
 use zerocopy::{
@@ -136,9 +136,8 @@ impl<'a> PacketBuilder for LogPacketBuilder<'a> {
         )
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let mut buffer_head = buffer.header();
-        let mut bv = crate::as_buffer_view_mut(&mut buffer_head);
+    fn serialize(&self, target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {
+        let mut bv = crate::as_buffer_view_mut(&mut target.header);
         let mut head = bv.take_obj_front::<PacketHead>().unwrap();
         head.magic.set(MAGIC);
         head.seqno.set(self.seqno);

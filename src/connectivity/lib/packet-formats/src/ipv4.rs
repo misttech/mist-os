@@ -19,9 +19,9 @@ use net_types::ip::{Ipv4, Ipv4Addr, Ipv6Addr};
 use packet::records::options::OptionSequenceBuilder;
 use packet::records::options::OptionsRaw;
 use packet::{
-    BufferProvider, BufferView, BufferViewMut, EmptyBuf, FromRaw, InnerPacketBuilder, MaybeParsed,
-    PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeBuffer,
-    SerializeError, Serializer, TargetBuffer,
+    BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
+    InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints, ParsablePacket,
+    ParseMetadata, SerializeBuffer, SerializeError, SerializeTarget, Serializer,
 };
 use tracing::debug;
 use zerocopy::{
@@ -428,7 +428,7 @@ impl<B: ByteSlice> Ipv4Packet<B> {
                 provider: P,
             ) -> Result<B, (SerializeError<P::Error>, Self)>
             where
-                B: TargetBuffer,
+                B: SerializeBuffer,
                 P: BufferProvider<Self::Buffer, B>,
             {
                 match self {
@@ -700,15 +700,18 @@ where
         PacketConstraints::new(header_len, 0, 0, (1 << 16) - 1 - header_len)
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let (mut header, _body, _footer) = buffer.parts();
-        // Implements BufferViewMut.
-        let mut header = &mut header;
+    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
         let opt_len = self.aligned_options_len();
+        // `take_back_zero` consumes the extent of the receiving slice, but that
+        // behavior is undesirable here: `prefix_builder.serialize` also needs
+        // to write into the header. To avoid changing the extent of
+        // target.header, we re-slice header before calling `take_back_zero`;
+        // the re-slice will be consumed, but `target.header` is unaffected.
+        let mut header = &mut &mut target.header[..];
         let opts = header.take_back_zero(opt_len).expect("too few bytes for Ipv4 options");
         let Ipv4PacketBuilderWithOptions { prefix_builder, options } = self;
         options.serialize_into(opts);
-        prefix_builder.serialize(buffer);
+        prefix_builder.serialize(target, body);
     }
 }
 
@@ -806,12 +809,10 @@ impl PacketBuilder for Ipv4PacketBuilder {
         PacketConstraints::new(IPV4_MIN_HDR_LEN, 0, 0, (1 << 16) - 1 - IPV4_MIN_HDR_LEN)
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let (mut header, body, _footer) = buffer.parts();
-
-        let total_len = header.len() + body.len();
-        assert_eq!(header.len() % 4, 0);
-        let ihl: u8 = u8::try_from(header.len() / 4).expect("Header too large");
+    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
+        let total_len = target.header.len() + body.len();
+        assert_eq!(target.header.len() % 4, 0);
+        let ihl: u8 = u8::try_from(target.header.len() / 4).expect("Header too large");
 
         // As Per [RFC 6864 Section 2]:
         //
@@ -854,10 +855,10 @@ impl PacketBuilder for Ipv4PacketBuilder {
             self.dst_ip,
         );
 
-        let options = &header[HDR_PREFIX_LEN..];
+        let options = &target.header[HDR_PREFIX_LEN..];
         let checksum = compute_header_checksum(hdr_prefix.as_bytes(), options);
         hdr_prefix.hdr_checksum = checksum;
-        let mut header = &mut header;
+        let mut header = &mut target.header;
         header.write_obj_front(&hdr_prefix).expect("too few bytes for IPv4 header prefix");
     }
 }

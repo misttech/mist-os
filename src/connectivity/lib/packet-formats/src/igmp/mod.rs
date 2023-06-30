@@ -29,8 +29,8 @@ use core::mem;
 use internet_checksum::Checksum;
 use net_types::ip::Ipv4Addr;
 use packet::{
-    AsFragmentedByteSlice, BufferView, FragmentedByteSlice, InnerPacketBuilder, PacketBuilder,
-    PacketConstraints, ParsablePacket, ParseMetadata, SerializeBuffer,
+    AsFragmentedByteSlice, BufferView, FragmentedByteSlice, FragmentedBytesMut, InnerPacketBuilder,
+    PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
 };
 use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned};
 
@@ -158,7 +158,7 @@ impl<B, M: MessageType<B>> IgmpPacketBuilder<B, M> {
     fn serialize_headers<BB: packet::Fragment>(
         &self,
         mut headers_buff: &mut [u8],
-        body: &FragmentedByteSlice<'_, BB>,
+        body: FragmentedByteSlice<'_, BB>,
     ) {
         use packet::BufferViewMut;
         let mut bytes = &mut headers_buff;
@@ -173,7 +173,7 @@ impl<B, M: MessageType<B>> IgmpPacketBuilder<B, M> {
             bytes.take_obj_front_zero::<M::FixedHeader>().expect("too few bytes for IGMP message");
         *header = self.message_header;
 
-        let checksum = compute_checksum_fragmented(&header_prefix, &header.bytes(), body);
+        let checksum = compute_checksum_fragmented(&header_prefix, &header.bytes(), &body);
         header_prefix.checksum = checksum;
     }
 }
@@ -187,7 +187,7 @@ impl<B, M: MessageType<B, VariableBody = ()>> InnerPacketBuilder for IgmpPacketB
 
     fn serialize(&self, buffer: &mut [u8]) {
         let empty = FragmentedByteSlice::<&'static [u8]>::new_empty();
-        self.serialize_headers(buffer, &empty);
+        self.serialize_headers(buffer, empty);
     }
 }
 
@@ -204,10 +204,12 @@ where
         )
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let (prefix, message_body, _) = buffer.parts();
-        // implements BufferViewMut, giving us take_obj_xxx_zero methods
-        self.serialize_headers(prefix, message_body);
+    fn serialize(
+        &self,
+        target: &mut SerializeTarget<'_>,
+        message_body: FragmentedBytesMut<'_, '_>,
+    ) {
+        self.serialize_headers(target.header, message_body);
     }
 }
 

@@ -16,8 +16,8 @@ pub mod records;
 
 use {
     packet::{
-        BufferView, BufferViewMut, PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata,
-        SerializeBuffer,
+        BufferView, BufferViewMut, FragmentedBytesMut, PacketBuilder, PacketConstraints,
+        ParsablePacket, ParseMetadata, SerializeTarget,
     },
     std::convert::TryInto,
     thiserror::Error,
@@ -98,10 +98,8 @@ impl PacketBuilder for PppPacketBuilder {
         PacketConstraints::new(std::mem::size_of::<PppHeader>(), 0, 0, usize::max_value())
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let (mut header, _, _) = buffer.parts();
-        let mut header = &mut header;
-        let mut header = header.take_obj_front_zero::<PppHeader>().unwrap();
+    fn serialize(&self, target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {
+        let mut header = (&mut target.header).take_obj_front_zero::<PppHeader>().unwrap();
         header.protocol = U16::new(self.protocol);
     }
 }
@@ -196,9 +194,8 @@ impl PacketBuilder for ControlProtocolPacketBuilder {
         )
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let (mut header, body, _) = buffer.parts();
-        let mut header = &mut header;
+    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
+        let mut header = &mut target.header;
         let mut header = header.take_obj_front_zero::<ControlProtocolHeader>().unwrap();
 
         let length = body
@@ -247,7 +244,7 @@ impl PacketBuilder for ConfigurationPacketBuilder {
         PacketConstraints::new(0, 0, 0, usize::max_value())
     }
 
-    fn serialize(&self, _buffer: &mut SerializeBuffer<'_, '_>) {}
+    fn serialize(&self, _target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {}
 }
 
 /// Wrapper around a parsed on-the-wire termination packet header and the rest of the packet.
@@ -283,7 +280,7 @@ impl PacketBuilder for TerminationPacketBuilder {
         PacketConstraints::new(0, 0, 0, usize::max_value())
     }
 
-    fn serialize(&self, _buffer: &mut SerializeBuffer<'_, '_>) {}
+    fn serialize(&self, _target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {}
 }
 
 /// Wrapper around a parsed on-the-wire code reject packet header and the rest of the packet.
@@ -319,7 +316,7 @@ impl PacketBuilder for CodeRejectPacketBuilder {
         PacketConstraints::new(0, 0, 0, usize::max_value())
     }
 
-    fn serialize(&self, _buffer: &mut SerializeBuffer<'_, '_>) {}
+    fn serialize(&self, _target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {}
 }
 
 #[derive(FromZeroes, FromBytes, AsBytes, Unaligned)]
@@ -384,11 +381,9 @@ impl PacketBuilder for ProtocolRejectPacketBuilder {
         )
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let (mut header, _, _) = buffer.parts();
-        let mut header = &mut header;
-        let mut header = header.take_obj_front_zero::<ProtocolRejectHeader>().unwrap();
-
+    fn serialize(&self, target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {
+        let mut header =
+            (&mut target.header).take_obj_front_zero::<ProtocolRejectHeader>().unwrap();
         header.rejected_protocol = U16::new(self.rejected_protocol);
     }
 }
@@ -450,10 +445,8 @@ impl PacketBuilder for EchoDiscardPacketBuilder {
         PacketConstraints::new(std::mem::size_of::<EchoDiscardHeader>(), 0, 0, usize::max_value())
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let (mut header, _, _) = buffer.parts();
-        let mut header = &mut header;
-        let mut header = header.take_obj_front_zero::<EchoDiscardHeader>().unwrap();
+    fn serialize(&self, target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {
+        let mut header = (&mut target.header).take_obj_front_zero::<EchoDiscardHeader>().unwrap();
         header.magic_number = U32::new(self.magic_number);
     }
 }

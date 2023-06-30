@@ -13,7 +13,7 @@ use crate::{canonicalize_range, take_back, take_back_mut, take_front, take_front
 /// `FragmentedByteSlice` shares its underlying memory with the slice it was
 /// constructed from and, as a result, operations on a `FragmentedByteSlice` may
 /// mutate the backing slice.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct FragmentedByteSlice<'a, B: ByteSlice>(&'a mut [B]);
 
 /// A single byte slice fragment in a [`FragmentedByteSlice`].

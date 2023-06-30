@@ -651,7 +651,8 @@ impl<R: Default + ReceiveBuffer, S: Default + SendBuffer> IntoBuffers<R, S> for 
 mod test {
     use assert_matches::assert_matches;
     use packet::{
-        Buf, PacketBuilder, PacketConstraints, SerializeBuffer, SerializeError, Serializer,
+        Buf, FragmentedBytesMut, PacketBuilder, PacketConstraints, SerializeError, SerializeTarget,
+        Serializer,
     };
     use proptest::{
         proptest,
@@ -886,9 +887,9 @@ mod test {
             constraints.clone()
         }
 
-        fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-            buffer.header().fill(Self::HEADER_BYTE);
-            buffer.footer().fill(Self::FOOTER_BYTE);
+        fn serialize(&self, target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {
+            target.header.fill(Self::HEADER_BYTE);
+            target.footer.fill(Self::FOOTER_BYTE);
         }
     }
 

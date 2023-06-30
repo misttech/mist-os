@@ -12,7 +12,8 @@
 
 use const_unwrap::const_unwrap_option;
 use packet::{
-    BufferView, PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeBuffer,
+    BufferView, FragmentedBytesMut, PacketBuilder, PacketConstraints, ParsablePacket,
+    ParseMetadata, SerializeTarget,
 };
 use std::{
     convert::{TryFrom, TryInto},
@@ -276,9 +277,8 @@ impl PacketBuilder for NetbootPacketBuilder {
         PacketConstraints::new(std::mem::size_of::<MessageHead>(), 0, 0, std::usize::MAX)
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let mut buffer = buffer.header();
-        let mut bv = crate::as_buffer_view_mut(&mut buffer);
+    fn serialize(&self, target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {
+        let mut bv = crate::as_buffer_view_mut(&mut target.header);
         let mut message = bv.take_obj_front::<MessageHead>().expect("not enough space in buffer");
         let MessageHead { magic, cookie, cmd, arg } = &mut *message;
         magic.set(MAGIC);

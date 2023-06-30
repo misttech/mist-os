@@ -167,14 +167,14 @@
 //! footers, and minimum and maximum body lengths via the `constraints` method.
 //! It serializes via the `serialize` method.
 //!
-//! In order to serialize a `PacketBuilder`, a [`SerializeBuffer`] must first be
-//! constructed. A `SerializeBuffer` is a view into a buffer used for
+//! In order to serialize a `PacketBuilder`, a [`SerializeTarget`] must first be
+//! constructed. A `SerializeTarget` is a view into a buffer used for
 //! serialization, and it is initialized with the proper number of bytes for the
 //! header, footer, and body. The number of bytes required for these is
 //! discovered through calls to the `PacketBuilder`'s `constraints` method.
 //!
 //! The `PacketBuilder`'s `serialize` method serializes the headers and footers
-//! of the packet into the buffer. It expects that the `SerializeBuffer` is
+//! of the packet into the buffer. It expects that the `SerializeTarget` is
 //! initialized with a body equal to the body which will be encapsulated. For
 //! example, imagine that we are trying to serialize a TCP segment in an IPv4
 //! packet in an Ethernet frame, and that, so far, we have only serialized the
@@ -197,7 +197,7 @@
 //!
 //! Given an `Ipv4PacketBuilder`, we call the appropriate methods to discover
 //! that it requires 20 bytes for its header. Thus, we modify the buffer by
-//! extending the body by 20 bytes, and constructing a `SerializeBuffer` whose
+//! extending the body by 20 bytes, and constructing a `SerializeTarget` whose
 //! header references the newly-added 20 bytes, and whose body references the
 //! old contents of the body, corresponding to the TCP segment.
 //!
@@ -211,15 +211,15 @@
 //!                             |                   |
 //!                             +-----------+       |
 //!                                         |       |
-//!                      SerializeBuffer { header, body }
+//!                      SerializeTarget { header, body }
 //!
 //! |-----------------|----------------------------------------|-----|
 //!    buffer prefix                 buffer body                 buffer suffix
 //! ```
 //!
-//! We then pass the `SerializeBuffer` to a call to the `Ipv4PacketBuilder`'s
+//! We then pass the `SerializeTarget` to a call to the `Ipv4PacketBuilder`'s
 //! `serialize` method, and it serializes the IPv4 header in the space provided.
-//! When the call to `serialize` returns, the `SerializeBuffer` and
+//! When the call to `serialize` returns, the `SerializeTarget` and
 //! `Ipv4PacketBuilder` have been discarded, and the buffer's body is now equal
 //! to the bytes of the IPv4 packet.
 //!
@@ -862,29 +862,29 @@ impl<B: GrowBuffer + FragmentedBufferMut> GrowBufferMut for B {}
 
 /// A buffer that can be serialized into.
 ///
-/// `TargetBuffer` is a [`GrowBufferMut`] that can be serialized into. A
-/// `TargetBuffer` MAY have a fragmented body but it MUST NOT have a fragmented
-/// prefix or suffix. That is a requirement to be able to generate a
-/// [`SerializeBuffer`], creating a contiguous header and footer from the
-/// `TargetBuffer`'s contiguous prefix and suffix, respectively.
+/// `SerializeBuffer` is a [`GrowBufferMut`] that can be serialized into. A
+/// `SerializeBuffer` MAY have a fragmented body but it MUST NOT have a
+/// fragmented prefix or suffix. That is a requirement in order to serialize
+/// a [`PacketBuilder`], as [`PacketBuilder::serialize`] requires contiguous
+/// memory into which it can write its header and footer.
 ///
 /// This guarantee allows for complex buffer setups that reuse a body from
 /// incoming data, but need to serialize a new header or footer around that
 /// body, e.g., a scatter-gather buffer that has dedicated space for serializing
 /// new headers and footers and reuses the body from another buffer.
 ///
-/// Because `TargetBuffer` is a sub-trait of [`GrowBufferMut`] but NOT of
+/// Because `SerializeBuffer` is a sub-trait of [`GrowBufferMut`] but NOT of
 /// [`ShrinkBuffer`], implementers may guarantee a correct implementation that
 /// always provides a contiguous prefix and suffix without resorting to runtime
 /// panics. \[1\]
 ///
-/// \[1\] If `TargetBuffer` were also a sub-trait of `ShrinkBuffer`, then it
+/// \[1\] If `SerializeBuffer` were also a sub-trait of `ShrinkBuffer`, then it
 /// would be possible to start off with a buffer with a fragmented body, and
 /// then shrink the buffer such that the prefix or suffix would become
-/// fragmented, which would be a violation of `TargetBuffer`'s invariants. The
-/// only option, in this case, would be to panic.
-pub trait TargetBuffer: GrowBufferMut {
-    /// Gets a view into the parts of this `TargetBuffer`.
+/// fragmented, which would be a violation of `SerializeBuffer`'s invariants.
+/// The only option, in this case, would be to panic.
+pub trait SerializeBuffer: GrowBufferMut {
+    /// Gets a view into the parts of this `SerializeBuffer`.
     ///
     /// Calls `f`, passing the prefix, body, and suffix as arguments (in that
     /// order).
@@ -894,11 +894,13 @@ pub trait TargetBuffer: GrowBufferMut {
 
     /// Serializes a packet in the buffer.
     ///
-    /// `serialize` serializes the packet with constraints `c` described in
-    /// `builder` into the buffer. The body of the buffer is used as the body of
-    /// the packet, and the prefix and suffix of the buffer are used to
-    /// serialize the packet's header and footer. This is a low-level function;
-    /// you probably want the [`Serializer`] trait instead.
+    /// *This method is usually called by this crate during the serialization of
+    /// a [`Serializer`], not directly by the user.*
+    ///
+    /// `serialize` serializes the packet described by `builder` into the
+    /// buffer. The body of the buffer is used as the body of the packet, and
+    /// the prefix and suffix of the buffer are used to serialize the packet's
+    /// header and footer.
     ///
     /// If `builder` has a minimum body size which is larger than the current
     /// body, then `serialize` first grows the body to the right (towards the
@@ -911,16 +913,14 @@ pub trait TargetBuffer: GrowBufferMut {
     ///
     /// # Panics
     ///
-    /// `serialize` assumes that `c` came from `builder`. If it didn't, then
-    /// `builder.serialize()` may be called with arguments that cause
-    /// unspecified behavior, possibly including panicking.
-    ///
-    /// `serialize` also panics if there are not enough prefix or suffix bytes
-    /// to serialize the packet. In particular, `b.serialize(c, builder)` panics
-    /// if either of the following hold:
+    /// `serialize` panics if there are not enough prefix or suffix bytes to
+    /// serialize the packet. In particular, `b.serialize(builder)` with `c =
+    /// builder.constraints()` panics if either of the following hold:
     /// - `b.prefix_len() < c.header_len()`
     /// - `b.len() + b.suffix_len() < c.min_body_bytes() + c.footer_len()`
-    fn serialize<B: PacketBuilder>(&mut self, c: PacketConstraints, builder: B) {
+    #[doc(hidden)]
+    fn serialize<B: PacketBuilder>(&mut self, builder: B) {
+        let c = builder.constraints();
         if self.len() < c.min_body_len() {
             // The body isn't large enough to satisfy the minimum body length
             // requirement, so we add padding.
@@ -960,7 +960,7 @@ pub trait TargetBuffer: GrowBufferMut {
             // will probably take care of it for us.
             zero(header);
             zero(footer);
-            builder.serialize(&mut SerializeBuffer::new(header, body, footer));
+            builder.serialize(&mut SerializeTarget { header, footer }, body);
         });
 
         self.grow_front(c.header_len());
@@ -968,14 +968,14 @@ pub trait TargetBuffer: GrowBufferMut {
     }
 }
 
-/// A byte buffer that can be reused.
+/// A byte buffer that can be serialized into multiple times.
 ///
-/// `ReusableBuffer` is a shorthand for `TargetBuffer + ShrinkBuffer`. A
+/// `ReusableBuffer` is a shorthand for `SerializeBuffer + ShrinkBuffer`. A
 /// `ReusableBuffer` can be serialized into multiple times - the
 /// [`ShrinkBuffer`] implementation allows the buffer's capacity to be reclaimed
 /// for a new serialization pass.
-pub trait ReusableBuffer: TargetBuffer + ShrinkBuffer {}
-impl<B> ReusableBuffer for B where B: TargetBuffer + ShrinkBuffer {}
+pub trait ReusableBuffer: SerializeBuffer + ShrinkBuffer {}
+impl<B> ReusableBuffer for B where B: SerializeBuffer + ShrinkBuffer {}
 
 /// A byte buffer used for parsing that can grow back to its original size.
 ///
@@ -995,11 +995,11 @@ pub trait Buffer: GrowBuffer + ParseBuffer {
 
 /// A byte buffer used for parsing and serialization.
 ///
-/// `BufferMut` is a shorthand for `TargetBuffer + ParseBufferMut`. A
+/// `BufferMut` is a shorthand for `SerializeBuffer + ParseBufferMut`. A
 /// `BufferMut` can be used for parsing (via [`ParseBufferMut`]) and
-/// serialization (via [`TargetBuffer`]).
-pub trait BufferMut: TargetBuffer + ParseBufferMut + Buffer {}
-impl<B> BufferMut for B where B: TargetBuffer + ParseBufferMut + Buffer {}
+/// serialization (via [`SerializeBuffer`]).
+pub trait BufferMut: SerializeBuffer + ParseBufferMut + Buffer {}
+impl<B> BufferMut for B where B: SerializeBuffer + ParseBufferMut + Buffer {}
 
 /// An empty buffer.
 ///
@@ -1069,7 +1069,7 @@ impl GrowBuffer for EmptyBuf {
         assert_eq!(n, 0);
     }
 }
-impl TargetBuffer for EmptyBuf {
+impl SerializeBuffer for EmptyBuf {
     fn with_parts<O, F>(&mut self, f: F) -> O
     where
         F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O,
@@ -1169,7 +1169,7 @@ impl GrowBuffer for Never {
     fn grow_front(&mut self, _n: usize) {}
     fn grow_back(&mut self, _n: usize) {}
 }
-impl TargetBuffer for Never {
+impl SerializeBuffer for Never {
     fn with_parts<O, F>(&mut self, _f: F) -> O
     where
         F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O,
@@ -1663,74 +1663,6 @@ pub trait ParsablePacket<B: ByteSlice, ParseArgs>: Sized {
     /// bytes from the suffix, but calling `parse_metadata` on the resulting
     /// object would return a `ParseMetadata` with only 8 bytes of footer.
     fn parse_metadata(&self) -> ParseMetadata;
-}
-
-/// A view into a [`TargetBuffer`] used for serializing new packets.
-///
-/// A `SerializeBuffer` is a view into a [`TargetBuffer`] which is used by the
-/// [`PacketBuilder::serialize`] method to serialize a new packet. It is
-/// constructed with a contiguous header and footer, and a potentially
-/// fragmented body, typically obtained from [`TargetBuffer::with_parts`].
-///
-/// A `SerializeBuffer` provides separate access to the bytes which will store
-/// the header, body, and footer of the new packet. The body is initialized to
-/// contain the bytes of the packet to be encapsulated (including any padding),
-/// and it is the caller's responsibility to serialize the header and footer.
-pub struct SerializeBuffer<'a, 'b> {
-    header: &'a mut [u8],
-    body: FragmentedBytesMut<'a, 'b>,
-    footer: &'a mut [u8],
-}
-
-#[allow(clippy::len_without_is_empty)]
-impl<'a, 'b> SerializeBuffer<'a, 'b> {
-    /// Constructs a new `SerializeBuffer`.
-    ///
-    /// `new` constructs a new `SerializeBuffer` with the provided `header`,
-    /// `body`, and `footer` parts.
-    pub fn new(
-        header: &'a mut [u8],
-        body: FragmentedBytesMut<'a, 'b>,
-        footer: &'a mut [u8],
-    ) -> SerializeBuffer<'a, 'b> {
-        SerializeBuffer { header, body, footer }
-    }
-
-    /// Gets the bytes of the header.
-    pub fn header(&mut self) -> &mut [u8] {
-        self.header
-    }
-
-    /// Gets the bytes of the body.
-    pub fn body(&mut self) -> &mut FragmentedBytesMut<'a, 'b> {
-        &mut self.body
-    }
-
-    /// Gets the bytes of the footer.
-    pub fn footer(&mut self) -> &mut [u8] {
-        self.footer
-    }
-
-    /// Gets the bytes of the header, body, and footer.
-    ///
-    /// `parts` gets references to the header, body, and footer all at once.
-    /// Because of lifetime rules and the fact that the [`header`], [`body`],
-    /// and [`footer`] methods borrow this `SerializeBuffer`, this is the only
-    /// way to construct and operate on references to more than one section of
-    /// the buffer at a time.
-    ///
-    /// [`header`]: SerializeBuffer::header
-    /// [`body`]: SerializeBuffer::body
-    /// [`footer`]: SerializeBuffer::footer
-    pub fn parts(&mut self) -> (&mut [u8], &mut FragmentedBytesMut<'a, 'b>, &mut [u8]) {
-        (self.header, &mut self.body, self.footer)
-    }
-
-    /// Gets the total length of this `SerializeBuffer`, equal to the sum of the
-    /// lengths of header, body, and footer.
-    pub fn len(&self) -> usize {
-        self.header.len() + self.body.len() + self.footer.len()
-    }
 }
 
 fn zero_iter<'a, I: Iterator<Item = &'a mut u8>>(bytes: I) {

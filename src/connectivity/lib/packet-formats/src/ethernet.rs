@@ -7,8 +7,8 @@
 use net_types::ethernet::Mac;
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use packet::{
-    BufferView, BufferViewMut, PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata,
-    SerializeBuffer,
+    BufferView, BufferViewMut, FragmentedBytesMut, PacketBuilder, PacketConstraints,
+    ParsablePacket, ParseMetadata, SerializeTarget,
 };
 use zerocopy::{
     byteorder::network_endian::{U16, U32},
@@ -265,15 +265,14 @@ impl PacketBuilder for EthernetFrameBuilder {
         PacketConstraints::new(ETHERNET_HDR_LEN_NO_TAG, 0, self.min_body_len, core::usize::MAX)
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
+    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
         // NOTE: EtherType values of 1500 and below are used to indicate the
         // length of the body in bytes. We don't need to validate this because
         // the EtherType enum has no variants with values in that range.
 
-        let total_len = buffer.header().len() + buffer.body().len();
-        let mut header = buffer.header();
+        let total_len = target.header.len() + body.len();
         // implements BufferViewMut, giving us take_obj_xxx_zero methods
-        let mut header = &mut header;
+        let mut header = &mut target.header;
 
         header
             .write_obj_front(&HeaderPrefix { src_mac: self.src_mac, dst_mac: self.dst_mac })
@@ -318,8 +317,8 @@ pub mod testutil {
 #[cfg(test)]
 mod tests {
     use packet::{
-        AsFragmentedByteSlice, Buf, InnerPacketBuilder, ParseBuffer, SerializeBuffer, Serializer,
-        TargetBuffer,
+        AsFragmentedByteSlice, Buf, InnerPacketBuilder, ParseBuffer, SerializeBuffer,
+        SerializeTarget, Serializer,
     };
     use zerocopy::byteorder::{ByteOrder, NetworkEndian};
 
@@ -541,15 +540,14 @@ mod tests {
         let mut buf = [0u8; ETHERNET_MIN_FRAME_LEN - 1];
         let mut b = [&mut buf[..]];
         let buf = b.as_fragmented_byte_slice();
-        let (head, body, foot) = buf.try_split_contiguous(ETHERNET_HDR_LEN_NO_TAG..).unwrap();
-        let mut buffer = SerializeBuffer::new(head, body, foot);
+        let (header, body, footer) = buf.try_split_contiguous(ETHERNET_HDR_LEN_NO_TAG..).unwrap();
         EthernetFrameBuilder::new(
             Mac::new([0, 1, 2, 3, 4, 5]),
             Mac::new([6, 7, 8, 9, 10, 11]),
             EtherType::Arp,
             ETHERNET_MIN_BODY_LEN_NO_TAG,
         )
-        .serialize(&mut buffer);
+        .serialize(&mut SerializeTarget { header, footer }, body);
     }
 
     #[test]
@@ -565,9 +563,8 @@ mod tests {
         );
 
         let mut buffer = [UNWRITTEN_BYTE; ETHERNET_MIN_FRAME_LEN];
-        TargetBuffer::serialize(
+        SerializeBuffer::serialize(
             &mut Buf::new(&mut buffer[..], ETHERNET_HDR_LEN_NO_TAG..ETHERNET_HDR_LEN_NO_TAG),
-            builder.constraints(),
             builder,
         );
 

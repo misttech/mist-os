@@ -23,8 +23,8 @@
 use crate::ValidStr;
 use const_unwrap::const_unwrap_option;
 use packet::{
-    BufferView, InnerPacketBuilder, PacketBuilder, PacketConstraints, ParsablePacket,
-    ParseMetadata, SerializeBuffer,
+    BufferView, FragmentedBytesMut, InnerPacketBuilder, PacketBuilder, PacketConstraints,
+    ParsablePacket, ParseMetadata, SerializeTarget,
 };
 use std::{convert::TryFrom, io::Write as _, num::NonZeroU16, str::FromStr};
 use thiserror::Error;
@@ -886,9 +886,8 @@ impl PacketBuilder for DataPacketBuilder {
         )
     }
 
-    fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
-        let mut buffer = buffer.header();
-        let mut bv = crate::as_buffer_view_mut(&mut buffer);
+    fn serialize(&self, target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {
+        let mut bv = crate::as_buffer_view_mut(&mut target.header);
         bv.take_obj_front::<MessageHead>().unwrap().set_opcode(Opcode::Data);
         bv.take_obj_front::<U16>().unwrap().set(self.block);
     }
