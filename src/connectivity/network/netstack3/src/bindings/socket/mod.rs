@@ -172,7 +172,8 @@ fn get_interface_addresses(ctx: &Ctx) -> Vec<psocket::InterfaceAddresses> {
 
                 let info = d.external_state();
                 let flags = flags_for_device(&info);
-                let StaticCommonInfo { binding_id, name } = info.static_common_info();
+                let StaticCommonInfo { binding_id, name, tx_notifier: _ } =
+                    info.static_common_info();
 
                 psocket::InterfaceAddresses {
                     id: Some(binding_id.get()),

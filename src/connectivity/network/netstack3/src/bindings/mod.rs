@@ -378,7 +378,10 @@ impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
     }
 
     fn wake_tx_task(&mut self, device: &DeviceId<BindingsNonSyncCtxImpl>) {
-        unimplemented!("TODO(https://fxbug.dev/105615): wake_tx_task(_, {})", device);
+        let external_state = device.external_state();
+        let StaticCommonInfo { binding_id: _, name: _, tx_notifier } =
+            external_state.static_common_info();
+        tx_notifier.schedule()
     }
 
     fn send_frame(
@@ -836,6 +839,7 @@ impl Netstack {
                     static_common_info: StaticCommonInfo {
                         binding_id,
                         name: LOOPBACK_NAME.to_string(),
+                        tx_notifier: Default::default(),
                     },
                     dynamic_common_info: DynamicCommonInfo {
                         mtu: DEFAULT_LOOPBACK_MTU,
@@ -851,15 +855,16 @@ impl Netstack {
         )
         .expect("error adding loopback device");
 
-        let LoopbackInfo {
-            static_common_info: StaticCommonInfo { binding_id, name: _ },
-            dynamic_common_info: _,
-            rx_notifier,
-        } = loopback.external_state();
+        let LoopbackInfo { static_common_info: _, dynamic_common_info: _, rx_notifier } =
+            loopback.external_state();
         crate::bindings::devices::spawn_rx_task(rx_notifier, self, &loopback);
-        let binding_id = *binding_id;
         let loopback: DeviceId<_> = loopback.into();
+        let external_state = loopback.external_state();
+        let StaticCommonInfo { binding_id, name: _, tx_notifier } =
+            external_state.static_common_info();
+        let binding_id = *binding_id;
         devices.add_device(binding_id, loopback.clone());
+        crate::bindings::devices::spawn_tx_task(tx_notifier, self, loopback.clone());
 
         // Don't need DAD and IGMP/MLD on loopback.
         let ip_config = Some(IpDeviceConfigurationUpdate {

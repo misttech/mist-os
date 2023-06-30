@@ -35,7 +35,8 @@ use rand::Rng as _;
 
 use crate::bindings::{
     devices, interfaces_admin, trace_duration, BindingId, BindingsNonSyncCtxImpl, Ctx, DeviceId,
-    Ipv6DeviceConfiguration, Netstack, NonSyncContext, SyncCtx, DEFAULT_INTERFACE_METRIC,
+    DeviceIdExt as _, Ipv6DeviceConfiguration, Netstack, NonSyncContext, SyncCtx,
+    DEFAULT_INTERFACE_METRIC,
 };
 
 #[derive(Clone)]
@@ -317,22 +318,29 @@ impl DeviceHandler {
                         },
                     }
                     .into(),
-                    static_common_info: devices::StaticCommonInfo { binding_id, name },
+                    static_common_info: devices::StaticCommonInfo {
+                        binding_id,
+                        name,
+                        tx_notifier: Default::default(),
+                    },
                 }
                 .into()
             },
         );
 
-        let devices::NetdeviceInfo {
-            static_common_info: devices::StaticCommonInfo { binding_id, .. },
-            handler: _,
-            mac: _,
-            dynamic: _,
-        } = core_id.external_state();
-        let binding_id = *binding_id;
         state_entry.insert(core_id.downgrade());
-
-        let core_id = core_id.into();
+        let core_id: DeviceId<_> = core_id.into();
+        let external_state = core_id.external_state();
+        let devices::StaticCommonInfo { binding_id, name: _, tx_notifier } =
+            external_state.static_common_info();
+        let binding_id = *binding_id;
+        crate::bindings::devices::spawn_tx_task(&tx_notifier, ns, core_id.clone());
+        netstack3_core::device::set_tx_queue_configuration(
+            sync_ctx,
+            non_sync_ctx,
+            &core_id,
+            netstack3_core::device::queue::tx::TransmitQueueConfiguration::Fifo,
+        );
         add_initial_routes(sync_ctx, non_sync_ctx, &core_id).expect("failed to add default routes");
 
         // TODO(https://fxbug.dev/69644): Use a different secret key (not this

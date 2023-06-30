@@ -1666,7 +1666,8 @@ where
             .upgrade()
             .map(|core_id| {
                 let state = core_id.external_state();
-                let StaticCommonInfo { binding_id: _, name } = state.static_common_info();
+                let StaticCommonInfo { binding_id: _, name, tx_notifier: _ } =
+                    state.static_common_info();
                 Some(name.to_string())
             })
             .ok_or(fposix::Errno::Enodev)

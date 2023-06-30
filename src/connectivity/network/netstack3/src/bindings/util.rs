@@ -1118,6 +1118,7 @@ mod tests {
                             static_common_info: devices::StaticCommonInfo {
                                 binding_id: binding,
                                 name: LOOPBACK_NAME.to_string(),
+                                tx_notifier: Default::default(),
                             },
                             dynamic_common_info: devices::DynamicCommonInfo {
                                 mtu: DEFAULT_LOOPBACK_MTU,

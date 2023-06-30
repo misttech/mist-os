@@ -18,9 +18,13 @@ use net_types::{
     SpecifiedAddr, UnicastAddr,
 };
 use netstack3_core::{
-    device::{handle_queued_rx_packets, loopback::LoopbackDeviceId, DeviceId},
+    device::{
+        handle_queued_rx_packets, loopback::LoopbackDeviceId, transmit_queued_tx_frames, DeviceId,
+        DeviceSendFrameError,
+    },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
 };
+use tracing::warn;
 
 use crate::bindings::{
     interfaces_admin, util::NeedsDataNotifier, BindingsNonSyncCtxImpl, Ctx, DeviceIdExt as _,
@@ -167,11 +171,41 @@ pub(crate) fn spawn_rx_task(
     .detach()
 }
 
+pub(crate) fn spawn_tx_task(
+    notifier: &NeedsDataNotifier,
+    ns: &Netstack,
+    device_id: DeviceId<BindingsNonSyncCtxImpl>,
+) {
+    let mut watcher = notifier.watcher();
+    let device_id = device_id.downgrade();
+
+    let ns = ns.clone();
+    fuchsia_async::Task::spawn(async move {
+        // Loop while we are woken up to handle enqueued TX frames.
+        while let Some(device_id) = watcher.next().await.and_then(|()| device_id.upgrade()) {
+            let mut ctx = ns.ctx.clone();
+            let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+            match transmit_queued_tx_frames(sync_ctx, non_sync_ctx, &device_id) {
+                Ok(()) => {}
+                Err(DeviceSendFrameError::DeviceNotReady(())) => {
+                    warn!(
+                        "TODO(https://fxbug.dev/105921): Support waiting for TX buffers to be available, dropping packet for now on device={}",
+                        device_id,
+                    )
+                }
+            }
+        }
+    })
+    .detach()
+}
+
 /// Static information common to all devices.
-#[derive(Debug)]
+#[derive(Derivative, Debug)]
 pub struct StaticCommonInfo {
     pub binding_id: BindingId,
     pub name: String,
+    #[derivative(Debug = "ignore")]
+    pub tx_notifier: NeedsDataNotifier,
 }
 
 /// Information common to all devices.
