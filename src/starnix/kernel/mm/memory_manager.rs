@@ -6,7 +6,12 @@ use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, convert::TryInto, ops::Range, sync::Arc};
+use std::{
+    collections::HashMap,
+    convert::TryInto,
+    ops::Range,
+    sync::{Arc, Weak},
+};
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
@@ -2125,10 +2130,10 @@ pub struct MemoryStats {
 }
 
 #[derive(Clone)]
-pub struct ProcMapsFile(Arc<Task>);
+pub struct ProcMapsFile(Weak<Task>);
 impl ProcMapsFile {
-    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(task.clone()))
+    pub fn new_node(task: Weak<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task))
     }
 }
 
@@ -2140,11 +2145,11 @@ impl SequenceFileSource for ProcMapsFile {
         cursor: UserAddress,
         sink: &mut DynamicFileBuf,
     ) -> Result<Option<UserAddress>, Errno> {
-        let task = &self.0;
+        let task = Task::from_weak(&self.0)?;
         let state = task.mm.state.read();
         let mut iter = state.mappings.iter_starting_at(&cursor);
         if let Some((range, map)) = iter.next() {
-            write_map(task, sink, range, map)?;
+            write_map(&task, sink, range, map)?;
             return Ok(Some(range.end));
         }
         Ok(None)
@@ -2152,10 +2157,10 @@ impl SequenceFileSource for ProcMapsFile {
 }
 
 #[derive(Clone)]
-pub struct ProcSmapsFile(Arc<Task>);
+pub struct ProcSmapsFile(Weak<Task>);
 impl ProcSmapsFile {
-    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(task.clone()))
+    pub fn new_node(task: Weak<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task))
     }
 }
 
@@ -2168,11 +2173,11 @@ impl SequenceFileSource for ProcSmapsFile {
         sink: &mut DynamicFileBuf,
     ) -> Result<Option<UserAddress>, Errno> {
         let page_size_kb = *PAGE_SIZE / 1024;
-        let task = &self.0;
+        let task = Task::from_weak(&self.0)?;
         let state = task.mm.state.read();
         let mut iter = state.mappings.iter_starting_at(&cursor);
         if let Some((range, map)) = iter.next() {
-            write_map(task, sink, range, map)?;
+            write_map(&task, sink, range, map)?;
 
             let size_kb = (range.end.ptr() - range.start.ptr()) / 1024;
             writeln!(sink, "Size:\t{size_kb} kB",)?;

@@ -13,7 +13,11 @@ use crate::{
     types::*,
 };
 use derivative::Derivative;
-use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
+use std::{
+    borrow::Cow,
+    collections::BTreeMap,
+    sync::{Arc, Weak},
+};
 use zerocopy::AsBytes;
 
 /// The version of selinux_status_t this kernel implements.
@@ -322,7 +326,7 @@ enum SeLinuxContextAttr {
 
 impl SeLinuxContextAttr {
     fn new_node(self, task: &Arc<Task>) -> impl FsNodeOps {
-        BytesFile::new_node(AttrNode { attr: self, task: Arc::clone(task) })
+        BytesFile::new_node(AttrNode { attr: self, task: Arc::downgrade(task) })
     }
 
     fn access_on_task<R, F: FnOnce(&mut FsString) -> R>(&self, task: &Task, f: F) -> R {
@@ -337,16 +341,19 @@ impl SeLinuxContextAttr {
 
 struct AttrNode {
     attr: SeLinuxContextAttr,
-    task: Arc<Task>,
+    task: Weak<Task>,
 }
 impl BytesFileOps for AttrNode {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        self.attr.access_on_task(&self.task, |attr| *attr = data);
+        self.attr.access_on_task(Task::from_weak(&self.task)?.as_ref(), |attr| *attr = data);
         Ok(())
     }
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(self.attr.access_on_task(&self.task, |attr| attr.clone()).into())
+        Ok(self
+            .attr
+            .access_on_task(Task::from_weak(&self.task)?.as_ref(), |attr| attr.clone())
+            .into())
     }
 }
 
