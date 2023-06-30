@@ -299,7 +299,7 @@ async fn configure_interface(
             let subnet = fnet_ext::apply_subnet_mask(interface_address);
             let stack =
                 connect_to_protocol::<fnet_stack::StackMarker>().context("connect to protocol")?;
-            stack
+            match stack
                 .add_forwarding_entry(&fnet_stack::ForwardingEntry {
                     subnet,
                     device_id: nicid,
@@ -307,7 +307,16 @@ async fn configure_interface(
                     metric: 0,
                 })
                 .await?
-                .map_err(NetstackError::AddForwardingEntry)?;
+            {
+                Ok(()) => Ok(()),
+                // TODO(https://fxbug.dev/129944): Remove or revise once ns2 and
+                // ns3 no longer diverge in their handling of duplicate routes.
+                Err(e @ fnet_stack::Error::AlreadyExists) => {
+                    tracing::warn!("added duplicate forwarding entry: {:?}", e);
+                    Ok(())
+                }
+                Err(e) => Err(NetstackError::AddForwardingEntry(e)),
+            }?;
 
             info!("interface '{}': added subnet route for {:?}", name, subnet);
         }

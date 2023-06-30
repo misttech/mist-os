@@ -129,7 +129,7 @@ TEST(GetIfAddrsTest, GetIfAddrsTest) {
   }
   freeifaddrs(ifaddr);
 
-  EXPECT_THAT(other_addrs, testing::ContainerEq(want_ifaddrs));
+  EXPECT_THAT(other_addrs, testing::UnorderedElementsAreArray(want_ifaddrs));
   EXPECT_THAT(unknown_link_local_addrs, testing::SizeIs(want_unknown_link_local_addrs));
 }
 

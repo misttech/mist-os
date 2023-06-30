@@ -99,7 +99,7 @@ template("fuchsia_test_component_with_expectations") {
   group(_expected_includes_metadata_target) {
     metadata = {
       cmc_expected_includes_cml =
-          [ "//src/lib/testing/expectation/meta/client.shard.cml" ]
+          [ "//src/lib/testing/expectation/meta/common.shard.cml" ]
     }
   }
   _expected_includes_metadata_target = ":$_expected_includes_metadata_target"

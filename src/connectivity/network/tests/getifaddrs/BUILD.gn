@@ -24,41 +24,32 @@ fuchsia_test_component("test-driver") {
   deps = [ ":test" ]
 }
 
-fuchsia_test_component("getifaddrs-test") {
-  manifest = "meta/getifaddrs-test.cml"
-  deps = [
-    ":test-driver",
-    "//src/connectivity/network/testing/netemul/configurable-netstack",
-  ]
+common_deps = [ ":test-driver" ]
+
+fuchsia_test_component("ns2-tests") {
+  manifest = "meta/netstack2.cml"
+  deps = common_deps +
+         [ "//src/connectivity/network/testing/netemul/configurable-netstack" ]
 }
 
-fuchsia_unittest_package("getifaddrs-test-ns3") {
-  manifest = "meta/getifaddrs-test-ns3.cml"
-  deps = [
-    ":test-driver",
-    "//src/connectivity/network/testing/netemul/configurable-netstack:configurable-netstack-netstack3",
-  ]
-
-  # TODO(https://fxbug.dev/123587): Re-enable this test and move it into the
-  # getifaddrs-tests package when either:
-  #  * Netstack3 passes the test, or
-  #  * Netemul runner tests are compatible with the expectations framework and
-  #    we can mark it "expect fail".
-  test_specs = {
-    environments = []
-  }
+fuchsia_test_component("ns3-tests") {
+  manifest = "meta/netstack3.cml"
+  deps = common_deps + [ "//src/connectivity/network/testing/netemul/configurable-netstack:configurable-netstack-netstack3" ]
 }
 
 fuchsia_test_package("getifaddrs-tests") {
-  test_components = [ ":getifaddrs-test" ]
+  test_components = [
+    ":ns2-tests",
+    ":ns3-tests",
+  ]
 }
 
 group("tests") {
   testonly = true
 
   deps = [
-    ":getifaddrs-test($host_toolchain)",
-    ":getifaddrs-test-ns3",
     ":getifaddrs-tests",
+    ":ns2-tests($host_toolchain)",
+    ":ns3-tests($host_toolchain)",
   ]
 }

@@ -4,6 +4,8 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
 
 test("bin") {
   output_name = "external_network_client"
@@ -28,17 +30,30 @@ fuchsia_test_component("device-name-provider") {
   deps = [ "//src/bringup/bin/device-name-provider" ]
 }
 
-fuchsia_test_component("test") {
-  manifest = "meta/test.cml"
-  deps = [
-    ":client",
-    ":device-name-provider",
-    "//src/connectivity/network/testing/netemul/configurable-netstack",
-  ]
+common_deps = [
+  ":client",
+  ":device-name-provider",
+]
+
+fuchsia_test_component_with_expectations("ns2-tests") {
+  expectations = "expects/netstack2.json5"
+  manifest = "meta/netstack2.cml"
+  deps = common_deps +
+         [ "//src/connectivity/network/testing/netemul/configurable-netstack" ]
+}
+
+fuchsia_test_component_with_expectations("ns3-tests") {
+  expectations = "expects/netstack3.json5"
+  manifest = "meta/netstack3.cml"
+  deps = common_deps + [ "//src/connectivity/network/testing/netemul/configurable-netstack:configurable-netstack-netstack3" ]
 }
 
 fuchsia_test_package("netstack-external-network-tests") {
-  test_components = [ ":test" ]
+  test_components = [
+    ":ns2-tests",
+    ":ns3-tests",
+  ]
+  deps = [ "//src/lib/testing/expectation:expectation_comparer" ]
 }
 
 group("tests") {

@@ -1,9 +1,10 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
     include: [
         "//src/connectivity/network/testing/netemul/runner/default.shard.cml",
+        "//src/connectivity/network/testing/netemul/runner/expectations-client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
@@ -36,19 +37,11 @@
             url: "#meta/client.cm",
         },
         {
-            name: "netstack",
-            url: "#meta/configurable-netstack.cm",
-        },
-        {
             name: "device-name-provider",
             url: "#meta/device-name-provider.cm",
         },
     ],
     use: [
-        {
-            protocol: "fuchsia.test.Suite",
-            from: "#client",
-        },
         {
             protocol: "fuchsia.netemul.ConfigurableNetstack",
             from: "#netstack",
@@ -74,6 +67,11 @@
             protocol: [ "fuchsia.device.NameProvider" ],
             from: "#device-name-provider",
             to: "#client",
+        },
+        {
+            protocol: [ "fuchsia.test.Suite" ],
+            from: "#client",
+            to: "#expectation-comparer",
         },
     ],
 }

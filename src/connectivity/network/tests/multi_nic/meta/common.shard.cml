@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/connectivity/network/testing/netemul/runner/default.shard.cml" ],
+    include: [
+        "//src/connectivity/network/testing/netemul/runner/default.shard.cml",
+        "//src/connectivity/network/testing/netemul/runner/expectations-client.shard.cml",
+    ],
     program: {
         networks: [
             {
@@ -65,10 +68,6 @@
     ],
     use: [
         {
-            protocol: "fuchsia.test.Suite",
-            from: "#client",
-        },
-        {
             protocol: "fuchsia.netemul.ConfigurableNetstack",
             from: "#client-netstack",
             path: "/svc/client",
@@ -108,6 +107,11 @@
             protocol: "fuchsia.posix.socket.Provider",
             from: "#server-netstack",
             to: "#server",
+        },
+        {
+            protocol: [ "fuchsia.test.Suite" ],
+            from: "#client",
+            to: "#expectation-comparer",
         },
     ],
 }
