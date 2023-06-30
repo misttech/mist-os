@@ -99,6 +99,11 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   // end that can communicate with the server.
   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> Connect();
 
+  // Returns a handler that binds incoming gpio service connections to this
+  // server implementation.
+  fuchsia_hardware_gpio::Service::InstanceHandler CreateInstanceHandler(
+      async_dispatcher_t* dispatcher);
+
  private:
   // Contains the states that the gpio has been set to in chronological order.
   std::vector<State> state_log_;

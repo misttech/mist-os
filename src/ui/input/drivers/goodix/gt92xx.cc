@@ -133,19 +133,26 @@ zx_status_t Gt92xxDevice::Create(zx_device_t* device) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  ddk::GpioProtocolClient int_gpio(device, "gpio-int");
-  if (!int_gpio.is_valid()) {
-    zxlogf(ERROR, "failed to acquire interrupt gpio");
+  const char* kInterruptGpioFragmentName = "gpio-int";
+  zx::result int_gpio = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      device, kInterruptGpioFragmentName);
+  if (int_gpio.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kInterruptGpioFragmentName,
+           int_gpio.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
 
-  ddk::GpioProtocolClient reset_gpio(device, "gpio-reset");
-  if (!reset_gpio.is_valid()) {
-    zxlogf(ERROR, "failed to acquire reset gpio");
+  const char* kResetGpioFragmentName = "gpio-reset";
+  zx::result reset_gpio = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      device, kResetGpioFragmentName);
+  if (reset_gpio.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kResetGpioFragmentName,
+           reset_gpio.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
 
-  auto goodix_dev = std::make_unique<Gt92xxDevice>(device, std::move(i2c), int_gpio, reset_gpio);
+  auto goodix_dev = std::make_unique<Gt92xxDevice>(
+      device, std::move(i2c), std::move(int_gpio.value()), std::move(reset_gpio.value()));
 
   zx_status_t status = goodix_dev->Init();
   if (status != ZX_OK) {
@@ -229,28 +236,84 @@ zx_status_t Gt92xxDevice::Init() {
 
   // Note: Our configuration inverts polarity of interrupt
   // (datasheet implies it is active high)
-  status = int_gpio_.GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW, &irq_);
-  if (status != ZX_OK) {
-    return status;
+  fidl::WireResult interrupt_result = int_gpio_->GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW);
+  if (!interrupt_result.ok()) {
+    zxlogf(ERROR, "Failed to send GetInterrupt request to interrupt gpio: %s",
+           interrupt_result.status_string());
+    return interrupt_result.status();
   }
+  if (interrupt_result->is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt from interrupt gpio: %s",
+           zx_status_get_string(interrupt_result->error_value()));
+    return interrupt_result->error_value();
+  }
+  irq_ = std::move(interrupt_result.value()->irq);
 
   LogFirmwareStatus();
   return ZX_OK;
 }
 
-void Gt92xxDevice::HWReset() {
+zx_status_t Gt92xxDevice::HWReset() {
   // Hardware reset will also set the address of the controller to either
   // 0x14 0r 0x5d.  See the datasheet for explanation of sequence.
-  reset_gpio_.ConfigOut(0);  // Make reset pin an output and pull low
-  int_gpio_.ConfigOut(0);    // Make interrupt pin an output and pull low
+  {
+    fidl::WireResult result = reset_gpio_->ConfigOut(0);  // Make reset pin an output and pull low
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigOut request to reset gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure reset gpio to output: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
+
+  {
+    fidl::WireResult result = int_gpio_->ConfigOut(0);  // Make interrupt pin an output and pull low
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigOut request to interrupt gpio: %s",
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure interrupt gpio to output: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
 
   // Delay for 100us
   zx_nanosleep(zx_deadline_after(ZX_USEC(100)));
-
-  reset_gpio_.Write(1);                              // Release the reset
+  {
+    fidl::WireResult result = reset_gpio_->Write(1);  // Release the reset
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to write to reset gpio: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(5 + 50)));  // Interrupt still output low
-  int_gpio_.ConfigIn(GPIO_PULL_UP);                  // Make interrupt pin an input again;
-  zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));      // Wait for reset before sending config
+  {
+    fidl::WireResult result = int_gpio_->ConfigIn(
+        fuchsia_hardware_gpio::GpioFlags::kPullUp);  // Make interrupt pin an input again
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigIn request to interrupt gpio: %s",
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure interrupt gpio to input: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
+  zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));  // Wait for reset before sending config
+  return ZX_OK;
 }
 
 zx_status_t Gt92xxDevice::HidbusQuery(uint32_t options, hid_info_t* info) {

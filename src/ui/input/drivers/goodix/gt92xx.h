@@ -5,7 +5,7 @@
 #ifndef SRC_UI_INPUT_DRIVERS_GOODIX_GT92XX_H_
 #define SRC_UI_INPUT_DRIVERS_GOODIX_GT92XX_H_
 
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/hidbus/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
@@ -76,8 +76,9 @@ class Gt92xxDevice : public ddk::Device<Gt92xxDevice, ddk::Unbindable>,
     uint8_t copy_command;
   };
 
-  Gt92xxDevice(zx_device_t* device, ddk::I2cChannel i2c, ddk::GpioProtocolClient intr,
-               ddk::GpioProtocolClient reset)
+  Gt92xxDevice(zx_device_t* device, ddk::I2cChannel i2c,
+               fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> intr,
+               fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset)
       : ddk::Device<Gt92xxDevice, ddk::Unbindable>(device),
         i2c_(std::move(i2c)),
         int_gpio_(std::move(intr)),
@@ -131,7 +132,7 @@ class Gt92xxDevice : public ddk::Device<Gt92xxDevice, ddk::Unbindable>,
   void LogFirmwareStatus();
 
   // performs hardware reset using gpio
-  void HWReset();
+  zx_status_t HWReset();
 
   zx_status_t SetSramBank(uint8_t bank) { return Write(GT_REG_SRAM_BANK, bank); }
 
@@ -172,7 +173,7 @@ class Gt92xxDevice : public ddk::Device<Gt92xxDevice, ddk::Unbindable>,
   zx::result<fzl::VmoMapper> LoadAndVerifyFirmware();
   bool IsFirmwareApplicable(const fzl::VmoMapper& firmware_mapper);
   zx_status_t EnterUpdateMode();
-  void LeaveUpdateMode();
+  zx_status_t LeaveUpdateMode();
   zx_status_t WritePayload(uint16_t address, cpp20::span<const uint8_t> data);
   zx_status_t VerifyPayload(uint16_t address, cpp20::span<const uint8_t> data);
   zx_status_t WaitUntilNotBusy();
@@ -196,8 +197,8 @@ class Gt92xxDevice : public ddk::Device<Gt92xxDevice, ddk::Unbindable>,
   zx_status_t Write(uint8_t* buf, size_t len);
 
   ddk::I2cChannel i2c_;
-  ddk::GpioProtocolClient int_gpio_;
-  ddk::GpioProtocolClient reset_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> int_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> reset_gpio_;
 
   gt92xx_touch_t gt_rpt_ __TA_GUARDED(client_lock_);
   thrd_t thread_;

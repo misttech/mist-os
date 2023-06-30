@@ -38,8 +38,8 @@ source_set("firmware-sherlock") {
 group("common") {
   public_deps = [
     ":focaltech_touch_bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
@@ -112,9 +112,9 @@ test("focaltech-test-bin") {
   ]
   deps = [
     ":common",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp_mock",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/i2c/testing/fake-i2c",
     "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/zx",

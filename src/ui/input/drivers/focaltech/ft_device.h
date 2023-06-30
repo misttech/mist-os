@@ -5,8 +5,8 @@
 #ifndef SRC_UI_INPUT_DRIVERS_FOCALTECH_FT_DEVICE_H_
 #define SRC_UI_INPUT_DRIVERS_FOCALTECH_FT_DEVICE_H_
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/focaltech/focaltech.h>
@@ -181,8 +181,8 @@ class FtDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTR
   zx_status_t UpdateFirmwareIfNeeded(const FocaltechMetadata& metadata);
 
   async_dispatcher_t* dispatcher_;
-  ddk::GpioProtocolClient int_gpio_;
-  ddk::GpioProtocolClient reset_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> int_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> reset_gpio_;
   zx::interrupt irq_;
   ddk::I2cChannel i2c_;
 

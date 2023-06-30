@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 #include <endian.h>
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/fake-i2c/fake-i2c.h>
 #include <lib/fzl/vmo-mapper.h>
 
@@ -15,6 +14,7 @@
 #include <zxtest/zxtest.h>
 
 #include "gt92xx.h"
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
@@ -208,11 +208,11 @@ class FakeTouchDevice : public fake_i2c::FakeI2c {
   ControllerState current_state_ = kIdle;
 };
 
-class Gt92xxTest : public Gt92xxDevice {
+class Gt92xxTestDevice : public Gt92xxDevice {
  public:
-  Gt92xxTest(ddk::I2cChannel i2c, ddk::GpioProtocolClient intr, ddk::GpioProtocolClient reset,
-             zx_device_t* parent)
-      : Gt92xxDevice(parent, std::move(i2c), intr, reset) {}
+  Gt92xxTestDevice(ddk::I2cChannel i2c, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> intr,
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset, zx_device_t* parent)
+      : Gt92xxDevice(parent, std::move(i2c), std::move(intr), std::move(reset)) {}
 
   void Running(bool run) { Gt92xxDevice::running_.store(run); }
 
@@ -223,7 +223,9 @@ class Gt92xxTest : public Gt92xxDevice {
   zx_status_t StartThread() {
     EXPECT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq_));
 
-    auto thunk = [](void* arg) -> int { return reinterpret_cast<Gt92xxTest*>(arg)->Thread(); };
+    auto thunk = [](void* arg) -> int {
+      return reinterpret_cast<Gt92xxTestDevice*>(arg)->Thread();
+    };
 
     Running(true);
     int ret = thrd_create_with_name(&test_thread_, thunk, this, "gt92xx-test-thread");
@@ -242,193 +244,147 @@ class Gt92xxTest : public Gt92xxDevice {
 
 class GoodixTest : public zxtest::Test {
  public:
-  GoodixTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
-
   void SetUp() override {
+    ASSERT_OK(fidl_servers_loop_.StartThread("fidl-servers"));
     enable_load_firmware = true;
-    loop_.StartThread();
+    fidl::ClientEnd reset_gpio_client = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
+    fidl::ClientEnd intr_gpio_client = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
+    EXPECT_TRUE(endpoints.is_ok());
+    fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints->server), &i2c_);
+    fake_parent_ = MockDevice::FakeRootParent();
+    device_.emplace(std::move(endpoints->client), std::move(intr_gpio_client),
+                    std::move(reset_gpio_client), fake_parent_.get());
   }
 
   void TearDown() override {
     enable_load_firmware = false;
     corrupt_firmware_checksum = false;
-    loop_.Shutdown();
+    fidl_servers_loop_.Shutdown();
   }
 
-  fidl::ClientEnd<fuchsia_hardware_i2c::Device> BindServer(FakeTouchDevice* server) {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    EXPECT_TRUE(endpoints.is_ok());
+  void VerifyInitialReset() {
+    std::vector reset_states = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+    ASSERT_GE(reset_states.size(), 2);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, reset_states[0]);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 1}, reset_states[1]);
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), server);
-
-    return std::move(endpoints->client);
+    std::vector intr_states = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+    ASSERT_GE(intr_states.size(), 2);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, intr_states[0]);
+    ASSERT_EQ(fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullUp},
+              intr_states[1]);
   }
 
- private:
-  async::Loop loop_;
+  void VerifyEnteringUpdateMode(size_t reset_state_log_offset, size_t intr_state_log_offset) {
+    std::vector reset_states = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+    ASSERT_GE(reset_states.size(), reset_state_log_offset + 2);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, reset_states[reset_state_log_offset]);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 1}, reset_states[reset_state_log_offset + 1]);
+
+    std::vector intr_states = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+    ASSERT_GE(intr_states.size(), intr_state_log_offset + 1);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, intr_states[intr_state_log_offset]);
+  }
+
+  void VerifyLeavingUpdateMode(size_t reset_state_log_offset, size_t intr_state_log_offset) {
+    std::vector reset_states = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+    ASSERT_GE(reset_states.size(), reset_state_log_offset + 3);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, reset_states[reset_state_log_offset]);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 1}, reset_states[reset_state_log_offset + 1]);
+    ASSERT_EQ(fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullDown},
+              reset_states[reset_state_log_offset + 2]);
+
+    std::vector intr_states = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+    ASSERT_GE(intr_states.size(), intr_state_log_offset + 4);
+    ASSERT_EQ(fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullUp},
+              intr_states[intr_state_log_offset]);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, intr_states[intr_state_log_offset + 1]);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, intr_states[intr_state_log_offset + 2]);
+    ASSERT_EQ(fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullUp},
+              intr_states[intr_state_log_offset + 3]);
+  }
+
+  void VerifyUpdateMode(size_t reset_state_log_offset, size_t intr_state_log_offset) {
+    VerifyEnteringUpdateMode(reset_state_log_offset, intr_state_log_offset);
+    VerifyLeavingUpdateMode(reset_state_log_offset + 2, intr_state_log_offset + 1);
+  }
+
+  async::Loop fidl_servers_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> reset_gpio_{
+      fidl_servers_loop_.dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> intr_gpio_{
+      fidl_servers_loop_.dispatcher(), std::in_place};
+  FakeTouchDevice i2c_;
+  std::optional<Gt92xxTestDevice> device_;
+  std::shared_ptr<MockDevice> fake_parent_;
 };
 
 TEST_F(GoodixTest, FirmwareTest) {
-  ddk::MockGpio reset;
-  ddk::MockGpio intr;
-  FakeTouchDevice i2c;
+  EXPECT_OK(device_->Init());
+  VerifyInitialReset();
+  VerifyUpdateMode(2, 2);
 
-  // Initial reset
-  reset.ExpectConfigOut(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
-  intr.ExpectConfigOut(ZX_OK, 0)
-      .ExpectConfigIn(ZX_OK, GPIO_PULL_UP)
-      .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, {});
-
-  // Entering update mode
-  reset.ExpectConfigOut(ZX_OK, 0).ExpectConfigOut(ZX_OK, 1);
-  intr.ExpectConfigOut(ZX_OK, 0);
-
-  // Leaving update mode
-  reset.ExpectConfigOut(ZX_OK, 0).ExpectConfigOut(ZX_OK, 1).ExpectConfigIn(ZX_OK, 0);
-  intr.ExpectConfigIn(ZX_OK, GPIO_PULL_UP)
-      .ExpectConfigOut(ZX_OK, 0)
-      .ExpectConfigOut(ZX_OK, 0)
-      .ExpectConfigIn(ZX_OK, GPIO_PULL_UP);
-
-  auto fake_parent = MockDevice::FakeRootParent();
-  Gt92xxTest device(BindServer(&i2c), intr.GetProto(), reset.GetProto(), fake_parent.get());
-  EXPECT_OK(device.Init());
-  EXPECT_TRUE(i2c.FirmwareWritten());
-  EXPECT_EQ(i2c.CurrentState(), FakeTouchDevice::kReady);
-
-  ASSERT_NO_FATAL_FAILURE(reset.VerifyAndClear());
-  ASSERT_NO_FATAL_FAILURE(intr.VerifyAndClear());
+  EXPECT_TRUE(i2c_.FirmwareWritten());
+  EXPECT_EQ(i2c_.CurrentState(), FakeTouchDevice::kReady);
 }
 
 TEST_F(GoodixTest, FirmwareCurrent) {
-  ddk::MockGpio reset;
-  ddk::MockGpio intr;
-  FakeTouchDevice i2c;
+  i2c_.SetProductInfo({'9', '2', '9', '3', 0x05, 0x61});
 
-  i2c.SetProductInfo({'9', '2', '9', '3', 0x05, 0x61});
+  EXPECT_OK(device_->Init());
+  VerifyInitialReset();
 
-  // Initial reset
-  reset.ExpectConfigOut(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
-  intr.ExpectConfigOut(ZX_OK, 0)
-      .ExpectConfigIn(ZX_OK, GPIO_PULL_UP)
-      .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, {});
-
-  auto fake_parent = MockDevice::FakeRootParent();
-  Gt92xxTest device(BindServer(&i2c), intr.GetProto(), reset.GetProto(), fake_parent.get());
-  EXPECT_OK(device.Init());
-  EXPECT_FALSE(i2c.FirmwareWritten());
-  EXPECT_EQ(i2c.CurrentState(), FakeTouchDevice::kIdle);
-
-  ASSERT_NO_FATAL_FAILURE(reset.VerifyAndClear());
-  ASSERT_NO_FATAL_FAILURE(intr.VerifyAndClear());
+  EXPECT_FALSE(i2c_.FirmwareWritten());
+  EXPECT_EQ(i2c_.CurrentState(), FakeTouchDevice::kIdle);
 }
 
 TEST_F(GoodixTest, FirmwareNotApplicable) {
-  ddk::MockGpio reset;
-  ddk::MockGpio intr;
-  FakeTouchDevice i2c;
-
   // Wrong product ID
-  i2c.SetProductInfo({'9', '2', '9', '5', 0x04, 0x61});
+  i2c_.SetProductInfo({'9', '2', '9', '5', 0x04, 0x61});
 
-  // Initial reset
-  reset.ExpectConfigOut(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
-  intr.ExpectConfigOut(ZX_OK, 0)
-      .ExpectConfigIn(ZX_OK, GPIO_PULL_UP)
-      .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, {});
+  EXPECT_OK(device_->Init());
+  VerifyInitialReset();
 
-  auto fake_parent = MockDevice::FakeRootParent();
-  Gt92xxTest device(BindServer(&i2c), intr.GetProto(), reset.GetProto(), fake_parent.get());
-  EXPECT_OK(device.Init());
-  EXPECT_FALSE(i2c.FirmwareWritten());
-  EXPECT_EQ(i2c.CurrentState(), FakeTouchDevice::kIdle);
-
-  ASSERT_NO_FATAL_FAILURE(reset.VerifyAndClear());
-  ASSERT_NO_FATAL_FAILURE(intr.VerifyAndClear());
+  EXPECT_FALSE(i2c_.FirmwareWritten());
+  EXPECT_EQ(i2c_.CurrentState(), FakeTouchDevice::kIdle);
 }
 
 TEST_F(GoodixTest, ForceFirmwareUpdate) {
-  ddk::MockGpio reset;
-  ddk::MockGpio intr;
-  FakeTouchDevice i2c;
-
   // Wrong product ID
-  i2c.SetProductInfo({'9', '2', '9', '5', 0x04, 0x61});
+  i2c_.SetProductInfo({'9', '2', '9', '5', 0x04, 0x61});
 
   // Send an unknown firmware message so that the product ID/version check is skipped
-  i2c.SetFirmwareMessageInvalid();
+  i2c_.SetFirmwareMessageInvalid();
 
-  // Initial reset
-  reset.ExpectConfigOut(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
-  intr.ExpectConfigOut(ZX_OK, 0)
-      .ExpectConfigIn(ZX_OK, GPIO_PULL_UP)
-      .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, {});
+  EXPECT_OK(device_->Init());
+  VerifyInitialReset();
 
-  // Entering update mode
-  reset.ExpectConfigOut(ZX_OK, 0).ExpectConfigOut(ZX_OK, 1);
-  intr.ExpectConfigOut(ZX_OK, 0);
+  VerifyUpdateMode(2, 2);
 
-  // Leaving update mode
-  reset.ExpectConfigOut(ZX_OK, 0).ExpectConfigOut(ZX_OK, 1).ExpectConfigIn(ZX_OK, 0);
-  intr.ExpectConfigIn(ZX_OK, GPIO_PULL_UP)
-      .ExpectConfigOut(ZX_OK, 0)
-      .ExpectConfigOut(ZX_OK, 0)
-      .ExpectConfigIn(ZX_OK, GPIO_PULL_UP);
-
-  auto fake_parent = MockDevice::FakeRootParent();
-  Gt92xxTest device(BindServer(&i2c), intr.GetProto(), reset.GetProto(), fake_parent.get());
-  EXPECT_OK(device.Init());
-  EXPECT_TRUE(i2c.FirmwareWritten());
-  EXPECT_EQ(i2c.CurrentState(), FakeTouchDevice::kReady);
-
-  ASSERT_NO_FATAL_FAILURE(reset.VerifyAndClear());
-  ASSERT_NO_FATAL_FAILURE(intr.VerifyAndClear());
+  EXPECT_TRUE(i2c_.FirmwareWritten());
+  EXPECT_EQ(i2c_.CurrentState(), FakeTouchDevice::kReady);
 }
 
 TEST_F(GoodixTest, BadFirmwareChecksum) {
-  ddk::MockGpio reset;
-  ddk::MockGpio intr;
-  FakeTouchDevice i2c;
-
-  // Initial reset
-  reset.ExpectConfigOut(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
-  intr.ExpectConfigOut(ZX_OK, 0).ExpectConfigIn(ZX_OK, GPIO_PULL_UP);
-
   corrupt_firmware_checksum = true;
 
-  auto fake_parent = MockDevice::FakeRootParent();
-  Gt92xxTest device(BindServer(&i2c), intr.GetProto(), reset.GetProto(), fake_parent.get());
-  EXPECT_NOT_OK(device.Init());
-  EXPECT_FALSE(i2c.FirmwareWritten());
-  EXPECT_EQ(i2c.CurrentState(), FakeTouchDevice::kIdle);
+  EXPECT_NOT_OK(device_->Init());
+  VerifyInitialReset();
 
-  ASSERT_NO_FATAL_FAILURE(reset.VerifyAndClear());
-  ASSERT_NO_FATAL_FAILURE(intr.VerifyAndClear());
+  EXPECT_FALSE(i2c_.FirmwareWritten());
+  EXPECT_EQ(i2c_.CurrentState(), FakeTouchDevice::kIdle);
 }
 
 TEST_F(GoodixTest, ReadbackCheckFail) {
-  ddk::MockGpio reset;
-  ddk::MockGpio intr;
-  FakeTouchDevice i2c;
+  i2c_.SetCorruptSectionRead();
 
-  i2c.SetCorruptSectionRead();
+  EXPECT_NOT_OK(device_->Init());
+  VerifyInitialReset();
+  VerifyEnteringUpdateMode(2, 2);
 
-  // Initial reset
-  reset.ExpectConfigOut(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
-  intr.ExpectConfigOut(ZX_OK, 0).ExpectConfigIn(ZX_OK, GPIO_PULL_UP);
-
-  // Entering update mode
-  reset.ExpectConfigOut(ZX_OK, 0).ExpectConfigOut(ZX_OK, 1);
-  intr.ExpectConfigOut(ZX_OK, 0);
-
-  auto fake_parent = MockDevice::FakeRootParent();
-  Gt92xxTest device(BindServer(&i2c), intr.GetProto(), reset.GetProto(), fake_parent.get());
-  EXPECT_NOT_OK(device.Init());
-  EXPECT_TRUE(i2c.FirmwareWritten());
-  EXPECT_EQ(i2c.CurrentState(), FakeTouchDevice::kReadingDspIsp);
-
-  ASSERT_NO_FATAL_FAILURE(reset.VerifyAndClear());
-  ASSERT_NO_FATAL_FAILURE(intr.VerifyAndClear());
+  EXPECT_TRUE(i2c_.FirmwareWritten());
+  EXPECT_EQ(i2c_.CurrentState(), FakeTouchDevice::kReadingDspIsp);
 }
 
 }  // namespace goodix

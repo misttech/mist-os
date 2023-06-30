@@ -39,8 +39,8 @@ fuchsia_driver("goodix-module-driver") {
   defines = [ "GT9293_ASTRO_FIRMWARE_PATH=\"$astro_firmware_path\"" ]
   deps = [
     ":gt92xx_bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
@@ -99,10 +99,10 @@ test("gt92xx-test") {
   defines = [ "GT9293_ASTRO_FIRMWARE_PATH=\"$astro_firmware_path\"" ]
   deps = [
     ":gt92xx_bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp_mock",
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
+    "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/i2c/testing/fake-i2c",
     "//src/devices/i2c/testing/mock-i2c",

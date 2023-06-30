@@ -152,29 +152,55 @@ zx_status_t FtDevice::Init() {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  int_gpio_ = ddk::GpioProtocolClient(parent(), "gpio-int");
-  if (!int_gpio_.is_valid()) {
-    zxlogf(ERROR, "failed to acquire int gpio");
+  const char* kIntGpioFragmentName = "gpio-int";
+  zx::result gpio_client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      parent(), kIntGpioFragmentName);
+  if (gpio_client.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kIntGpioFragmentName,
+           gpio_client.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
+  int_gpio_.Bind(std::move(gpio_client.value()));
 
-  reset_gpio_ = ddk::GpioProtocolClient(parent(), "gpio-reset");
-  if (!reset_gpio_.is_valid()) {
-    zxlogf(ERROR, "focaltouch: failed to acquire gpio");
+  const char* kResetGpioFragmentName = "gpio-reset";
+  gpio_client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      parent(), kResetGpioFragmentName);
+  if (gpio_client.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kResetGpioFragmentName,
+           gpio_client.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
+  reset_gpio_.Bind(std::move(gpio_client.value()));
 
-  int_gpio_.ConfigIn(GPIO_NO_PULL);
-
-  zx_status_t status = int_gpio_.GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW, &irq_);
-  if (status != ZX_OK) {
-    return status;
+  {
+    fidl::WireResult result = int_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigIn request to int gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure int gpio to input: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
+
+  fidl::WireResult interrupt = int_gpio_->GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW);
+  if (!interrupt.ok()) {
+    zxlogf(ERROR, "Failed to send GetInterrupt request to int gpio: %s", interrupt.status_string());
+    return interrupt.status();
+  }
+  if (interrupt->is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt from int gpio: %s",
+           zx_status_get_string(interrupt->error_value()));
+    return interrupt->error_value();
+  }
+  irq_ = std::move(interrupt.value()->irq);
 
   size_t actual;
   FocaltechMetadata device_info;
-  status = device_get_metadata(parent(), DEVICE_METADATA_PRIVATE, &device_info, sizeof(device_info),
-                               &actual);
+  zx_status_t status = device_get_metadata(parent(), DEVICE_METADATA_PRIVATE, &device_info,
+                                           sizeof(device_info), &actual);
   if (status != ZX_OK || sizeof(device_info) != actual) {
     zxlogf(ERROR, "focaltouch: failed to read metadata");
     return status == ZX_OK ? ZX_ERR_INTERNAL : status;
@@ -202,9 +228,31 @@ zx_status_t FtDevice::Init() {
 
   // Reset the chip -- should be low for at least 1ms, and the chip should take at most 200ms to
   // initialize.
-  reset_gpio_.ConfigOut(0);
+  {
+    fidl::WireResult result = reset_gpio_->ConfigOut(0);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigOut request to reset gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure reset gpio to output: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
   zx::nanosleep(zx::deadline_after(zx::msec(5)));
-  reset_gpio_.Write(1);
+  {
+    fidl::WireResult result = reset_gpio_->Write(1);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to write to reset gpio: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
   zx::nanosleep(zx::deadline_after(zx::msec(200)));
 
   status = UpdateFirmwareIfNeeded(device_info);

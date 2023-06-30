@@ -41,26 +41,28 @@ const device_bind_prop_t kI2cProperties[] = {
 };
 
 const ddk::BindRule kInterruptRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                            bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_1),
 };
 
 const device_bind_prop_t kInterruptProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                      bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
     ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                       bind_fuchsia_hardware_gpio::FUNCTION_TOUCH_INTERRUPT)};
 
 const ddk::BindRule kResetRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                            bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_9),
 };
 
 const device_bind_prop_t kResetProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                      bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
     ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                       bind_fuchsia_hardware_gpio::FUNCTION_TOUCH_RESET),
 };

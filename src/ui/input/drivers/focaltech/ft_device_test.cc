@@ -4,7 +4,6 @@
 
 #include "ft_device.h"
 
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
@@ -17,6 +16,7 @@
 #include <zxtest/zxtest.h>
 
 #include "ft_firmware.h"
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
@@ -164,44 +164,73 @@ class FakeFtDevice : public fake_i2c::FakeI2c {
 
 class FocaltechTest : public zxtest::Test, public loop_fixture::RealLoop {
  public:
-  FocaltechTest() : fake_parent_(MockDevice::FakeRootParent()), outgoing_(dispatcher()) {}
+  FocaltechTest()
+      : fake_parent_(MockDevice::FakeRootParent()),
+        i2c_fragment_outgoing_(dispatcher()),
+        interrupt_gpio_fragment_outgoing_(dispatcher()),
+        reset_gpio_fragment_outgoing_(dispatcher()) {}
 
   void SetUp() override {
-    fake_parent_->AddProtocol(ZX_PROTOCOL_GPIO, interrupt_gpio_.GetProto()->ops,
-                              interrupt_gpio_.GetProto()->ctx, "gpio-int");
-    fake_parent_->AddProtocol(ZX_PROTOCOL_GPIO, reset_gpio_.GetProto()->ops,
-                              reset_gpio_.GetProto()->ctx, "gpio-reset");
-
-    auto service_result = outgoing_.AddService<fuchsia_hardware_i2c::Service>(
+    // I2c fragment
+    zx::result service_result = i2c_fragment_outgoing_.AddService<fuchsia_hardware_i2c::Service>(
         fuchsia_hardware_i2c::Service::InstanceHandler(
             {.device = i2c_.bind_handler(dispatcher())}));
     ZX_ASSERT(service_result.is_ok());
-
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ZX_ASSERT(endpoints.is_ok());
-    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
-
+    ZX_ASSERT(i2c_fragment_outgoing_.Serve(std::move(endpoints->server)).is_ok());
     fake_parent_->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints->client),
                                  "i2c");
+
+    // Reset gpio fragment
+    service_result = reset_gpio_fragment_outgoing_.AddService<fuchsia_hardware_gpio::Service>(
+        reset_gpio_.CreateInstanceHandler(dispatcher()));
+    ZX_ASSERT(service_result.is_ok());
+    endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(reset_gpio_fragment_outgoing_.Serve(std::move(endpoints->server)).is_ok());
+    fake_parent_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(endpoints->client),
+                                 "gpio-reset");
+
+    // Interrupt gpio fragment
+    service_result = interrupt_gpio_fragment_outgoing_.AddService<fuchsia_hardware_gpio::Service>(
+        interrupt_gpio_.CreateInstanceHandler(dispatcher()));
+    ZX_ASSERT(service_result.is_ok());
+    endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(interrupt_gpio_fragment_outgoing_.Serve(std::move(endpoints->server)).is_ok());
+    fake_parent_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(endpoints->client),
+                                 "gpio-int");
 
     zx::interrupt interrupt;
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &interrupt));
     ASSERT_OK(interrupt.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq_));
+    interrupt_gpio_.SetInterrupt(zx::ok(std::move(interrupt)));
+  }
 
-    interrupt_gpio_.ExpectConfigIn(ZX_OK, GPIO_NO_PULL)
-        .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(interrupt));
-    reset_gpio_.ExpectConfigOut(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  void VerifyGpioInit() {
+    std::vector interrupt_states = interrupt_gpio_.GetStateLog();
+    ASSERT_GE(interrupt_states.size(), 1);
+    ASSERT_EQ(fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
+              interrupt_states[0]);
+
+    std::vector reset_states = reset_gpio_.GetStateLog();
+    ASSERT_GE(reset_states.size(), 2);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, reset_states[0]);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 1}, reset_states[1]);
   }
 
  protected:
   std::shared_ptr<MockDevice> fake_parent_;
   FakeFtDevice i2c_;
+  fake_gpio::FakeGpio interrupt_gpio_;
+  fake_gpio::FakeGpio reset_gpio_;
   zx::interrupt irq_;
 
  private:
-  ddk::MockGpio interrupt_gpio_;
-  ddk::MockGpio reset_gpio_;
-  component::OutgoingDirectory outgoing_;
+  component::OutgoingDirectory i2c_fragment_outgoing_;
+  component::OutgoingDirectory interrupt_gpio_fragment_outgoing_;
+  component::OutgoingDirectory reset_gpio_fragment_outgoing_;
 };
 
 void VerifyDescriptor(const fuchsia_input_report::wire::DeviceDescriptor& descriptor, size_t x_max,
@@ -261,6 +290,7 @@ TEST_F(FocaltechTest, Metadata3x27) {
 
   FtDevice dut(fake_parent_.get(), dispatcher());
   PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
+  VerifyGpioInit();
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
   ASSERT_OK(endpoints);
@@ -283,6 +313,7 @@ TEST_F(FocaltechTest, Metadata5726) {
 
   FtDevice dut(fake_parent_.get(), dispatcher());
   PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
+  VerifyGpioInit();
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
   ASSERT_OK(endpoints);
@@ -305,6 +336,7 @@ TEST_F(FocaltechTest, Metadata6336) {
 
   FtDevice dut(fake_parent_.get(), dispatcher());
   PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
+  VerifyGpioInit();
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
   ASSERT_OK(endpoints);
@@ -329,6 +361,7 @@ TEST_F(FocaltechTest, Firmware5726) {
 
   FtDevice dut(fake_parent_.get(), dispatcher());
   PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
+  VerifyGpioInit();
   EXPECT_EQ(i2c_.firmware_write_size(), sizeof(kFirmware3));
 }
 
@@ -343,6 +376,7 @@ TEST_F(FocaltechTest, Firmware5726UpToDate) {
 
   FtDevice dut(fake_parent_.get(), dispatcher());
   PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
+  VerifyGpioInit();
   EXPECT_EQ(i2c_.firmware_write_size(), 0);
 }
 
@@ -357,6 +391,7 @@ TEST_F(FocaltechTest, Touch) {
   loop.StartThread("focaltech-test-thread");
   FtDevice dut(fake_parent_.get(), loop.dispatcher());
   PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
+  VerifyGpioInit();
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
   ASSERT_OK(endpoints);

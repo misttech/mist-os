@@ -4,10 +4,9 @@
 
 #include "gt92xx.h"
 
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/mock-i2c/mock-i2c.h>
 
@@ -17,15 +16,16 @@
 #include <hid/gt92xx.h>
 #include <zxtest/zxtest.h>
 
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace goodix {
 
-class Gt92xxTest : public Gt92xxDevice {
+class Gt92xxTestDevice : public Gt92xxDevice {
  public:
-  Gt92xxTest(ddk::I2cChannel i2c, ddk::GpioProtocolClient intr, ddk::GpioProtocolClient reset,
-             zx_device_t* parent)
-      : Gt92xxDevice(parent, std::move(i2c), intr, reset) {}
+  Gt92xxTestDevice(ddk::I2cChannel i2c, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> intr,
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset, zx_device_t* parent)
+      : Gt92xxDevice(parent, std::move(i2c), std::move(intr), std::move(reset)) {}
 
   void Running(bool run) { Gt92xxDevice::running_.store(run); }
 
@@ -35,7 +35,9 @@ class Gt92xxTest : public Gt92xxDevice {
   zx_status_t StartThread() {
     EXPECT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq_));
 
-    auto thunk = [](void* arg) -> int { return reinterpret_cast<Gt92xxTest*>(arg)->Thread(); };
+    auto thunk = [](void* arg) -> int {
+      return reinterpret_cast<Gt92xxTestDevice*>(arg)->Thread();
+    };
 
     Running(true);
     int ret = thrd_create_with_name(&test_thread_, thunk, this, "gt92xx-test-thread");
@@ -49,6 +51,47 @@ class Gt92xxTest : public Gt92xxDevice {
   }
 
   thrd_t test_thread_;
+};
+
+class Gt92xxTest : public zxtest::Test {
+ public:
+  void SetUp() override {
+    ASSERT_OK(fidl_servers_loop_.StartThread("fidl-servers"));
+    fidl::ClientEnd reset_gpio_client = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
+    fidl::ClientEnd intr_gpio_client = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
+    ASSERT_TRUE(endpoints.is_ok());
+    fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
+    fake_parent_ = MockDevice::FakeRootParent();
+    device_.emplace(std::move(endpoints->client), std::move(intr_gpio_client),
+                    std::move(reset_gpio_client), fake_parent_.get());
+  }
+
+  void TearDown() override {}
+
+  void InitDevice() {
+    ASSERT_OK(device_->Init());
+
+    std::vector reset_states = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+    ASSERT_GE(reset_states.size(), 2);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, reset_states[0]);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 1}, reset_states[1]);
+
+    std::vector intr_states = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+    ASSERT_GE(intr_states.size(), 2);
+    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, intr_states[0]);
+    ASSERT_EQ(fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullUp},
+              intr_states[1]);
+  }
+
+  async::Loop fidl_servers_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> reset_gpio_{
+      fidl_servers_loop_.dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> intr_gpio_{
+      fidl_servers_loop_.dispatcher(), std::in_place};
+  mock_i2c::MockI2c mock_i2c_;
+  std::optional<Gt92xxTestDevice> device_;
+  std::shared_ptr<MockDevice> fake_parent_;
 };
 
 static std::atomic<uint8_t> rpt_ran = 0;
@@ -67,34 +110,8 @@ void rpt_handler(void* ctx, const uint8_t* buffer, size_t size, zx_time_t time) 
   rpt_ran.store(1);
 }
 
-TEST(GoodixTest, Init) {
-  ddk::MockGpio reset_mock;
-  ddk::MockGpio intr_mock;
-  mock_i2c::MockI2c mock_i2c;
-  zx::interrupt irq;
-
-  reset_mock.ExpectConfigOut(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
-
-  intr_mock.ExpectConfigOut(ZX_OK, 0)
-      .ExpectConfigIn(ZX_OK, GPIO_PULL_UP)
-      .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(irq));
-
-  const gpio_protocol_t* reset = reset_mock.GetProto();
-  const gpio_protocol_t* intr = intr_mock.GetProto();
-
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  EXPECT_TRUE(endpoints.is_ok());
-
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
-
-  EXPECT_OK(loop.StartThread());
-
-  auto fake_parent = MockDevice::FakeRootParent();
-  Gt92xxTest device(std::move(endpoints->client), intr, reset, fake_parent.get());
-
-  mock_i2c
+TEST_F(Gt92xxTest, Init) {
+  mock_i2c_
       .ExpectWrite({static_cast<uint8_t>(GT_REG_CONFIG_DATA >> 8),
                     static_cast<uint8_t>(GT_REG_CONFIG_DATA & 0xff)})
       .ExpectReadStop({0x00})
@@ -108,43 +125,15 @@ TEST(GoodixTest, Init) {
                     static_cast<uint8_t>(GT_REG_FW_VERSION & 0xff)})
       .ExpectReadStop({0x05, 0x61});
 
-  EXPECT_OK(device.Init());
-  ASSERT_NO_FATAL_FAILURE(reset_mock.VerifyAndClear());
-  ASSERT_NO_FATAL_FAILURE(intr_mock.VerifyAndClear());
+  InitDevice();
 }
 
-TEST(GoodixTest, InitForceConfig) {
-  ddk::MockGpio reset_mock;
-  ddk::MockGpio intr_mock;
-  mock_i2c::MockI2c mock_i2c;
-  zx::interrupt irq;
-
-  reset_mock.ExpectConfigOut(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
-
-  intr_mock.ExpectConfigOut(ZX_OK, 0)
-      .ExpectConfigIn(ZX_OK, GPIO_PULL_UP)
-      .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(irq));
-
-  const gpio_protocol_t* reset = reset_mock.GetProto();
-  const gpio_protocol_t* intr = intr_mock.GetProto();
-
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  EXPECT_TRUE(endpoints.is_ok());
-
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
-
-  EXPECT_OK(loop.StartThread());
-
-  auto fake_parent = MockDevice::FakeRootParent();
-  Gt92xxTest device(std::move(endpoints->client), intr, reset, fake_parent.get());
-
+TEST_F(Gt92xxTest, InitForceConfig) {
   fbl::Vector conf_data = Gt92xxDevice::GetConfData();
   EXPECT_NE(conf_data[sizeof(uint16_t)], 0x00);
   conf_data[sizeof(uint16_t)] = 0x00;
 
-  mock_i2c
+  mock_i2c_
       .ExpectWrite({static_cast<uint8_t>(GT_REG_CONFIG_DATA >> 8),
                     static_cast<uint8_t>(GT_REG_CONFIG_DATA & 0xff)})
       .ExpectReadStop({0x60})
@@ -158,17 +147,11 @@ TEST(GoodixTest, InitForceConfig) {
                     static_cast<uint8_t>(GT_REG_FW_VERSION & 0xff)})
       .ExpectReadStop({0x05, 0x61});
 
-  EXPECT_OK(device.Init());
-  ASSERT_NO_FATAL_FAILURE(reset_mock.VerifyAndClear());
-  ASSERT_NO_FATAL_FAILURE(intr_mock.VerifyAndClear());
+  InitDevice();
 }
 
-TEST(GoodixTest, TestReport) {
-  ddk::MockGpio reset_mock;
-  ddk::MockGpio intr_mock;
-  mock_i2c::MockI2c mock_i2c;
-
-  mock_i2c
+TEST_F(Gt92xxTest, TestReport) {
+  mock_i2c_
       .ExpectWrite({static_cast<uint8_t>(GT_REG_TOUCH_STATUS >> 8),
                     static_cast<uint8_t>(GT_REG_TOUCH_STATUS & 0xff)})
       .ExpectReadStop({0x85})
@@ -180,20 +163,7 @@ TEST(GoodixTest, TestReport) {
                        0x01, 0x00, 0x04, 0x00, 0x05, 0x50, 0x05, 0x01, 0x01, 0x00})
       .ExpectWriteStop({static_cast<uint8_t>(GT_REG_TOUCH_STATUS >> 8),
                         static_cast<uint8_t>(GT_REG_TOUCH_STATUS & 0xff), 0x00});
-
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  EXPECT_TRUE(endpoints.is_ok());
-
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
-
-  EXPECT_OK(loop.StartThread());
-
-  auto fake_parent = MockDevice::FakeRootParent();
-  Gt92xxTest device(std::move(endpoints->client), intr_mock.GetProto(), reset_mock.GetProto(),
-                    fake_parent.get());
-  EXPECT_OK(device.StartThread());
+  EXPECT_OK(device_->StartThread());
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
 
   hidbus_ifc_protocol_ops_t ops = {};
@@ -201,13 +171,13 @@ TEST(GoodixTest, TestReport) {
 
   hidbus_ifc_protocol_t protocol = {};
   protocol.ops = &ops;
-  device.HidbusStart(&protocol);
+  device_->HidbusStart(&protocol);
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
-  device.Trigger();
+  device_->Trigger();
   while (!rpt_ran.load()) {
     zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
   }
-  EXPECT_OK(device.StopThread());
+  EXPECT_OK(device_->StopThread());
 }
 
 }  // namespace goodix
