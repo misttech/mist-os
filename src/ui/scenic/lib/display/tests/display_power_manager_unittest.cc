@@ -5,6 +5,7 @@
 #include "src/ui/scenic/lib/display/display_power_manager.h"
 
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/ui/display/internal/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/async/time.h>
@@ -51,7 +52,7 @@ class DisplayPowerManagerMockTest : public gtest::RealLoopFixture {
 };
 
 TEST_F(DisplayPowerManagerMockTest, Ok) {
-  const uint64_t kDisplayId = 0;
+  constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
   const uint32_t kDisplayWidth = 1024;
   const uint32_t kDisplayHeight = 768;
 
@@ -134,7 +135,7 @@ TEST_F(DisplayPowerManagerMockTest, NoDisplay) {
 }
 
 TEST_F(DisplayPowerManagerMockTest, NotSupported) {
-  const uint64_t kDisplayId = 0;
+  constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
   const uint32_t kDisplayWidth = 1024;
   const uint32_t kDisplayHeight = 768;
 

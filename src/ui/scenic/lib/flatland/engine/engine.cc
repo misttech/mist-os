@@ -94,7 +94,7 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
   last_rendered_frame_ = frame_number;
 
   SceneState scene_state(*this, display.root_transform());
-  const auto hw_display = display.display();
+  scenic_impl::display::Display* const hw_display = display.display();
 
 #if defined(USE_FLATLAND_VERBOSE_LOGGING)
   std::ostringstream str;
@@ -121,9 +121,10 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
                             hw_display->device_pixel_ratio(), scene_state.snapshot);
 
   // TODO(fxbug.dev/76640): hack!  need a better place to call AddDisplay().
-  if (hack_seen_display_ids_.find(hw_display->display_id()) == hack_seen_display_ids_.end()) {
+  if (hack_seen_display_id_values_.find(hw_display->display_id().value) ==
+      hack_seen_display_id_values_.end()) {
     // This display hasn't been added to the DisplayCompositor yet.
-    hack_seen_display_ids_.insert(hw_display->display_id());
+    hack_seen_display_id_values_.insert(hw_display->display_id().value);
 
     DisplayInfo display_info{
         .dimensions = glm::uvec2{hw_display->width_in_px(), hw_display->height_in_px()},

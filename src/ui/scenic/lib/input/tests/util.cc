@@ -211,8 +211,8 @@ SessionWrapper InputSystemTest::CreateClient(const std::string& name,
 }
 
 void InputSystemTest::InitializeScenic(std::shared_ptr<Scenic> scenic) {
-  display_ = std::make_unique<Display>(
-      /*id*/ 0, test_display_width_px(), test_display_height_px());
+  display_ = std::make_unique<Display>(fuchsia::hardware::display::DisplayId{.value = 1},
+                                       test_display_width_px(), test_display_height_px());
   engine_ = std::make_shared<Engine>(escher::EscherWeakPtr());
 
   std::function<void(zx_koid_t)> request_focus = [this, use_auto_focus =

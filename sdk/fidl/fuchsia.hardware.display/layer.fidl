@@ -88,7 +88,7 @@ type ClientCompositionOpcode = strict enum : uint8 {
 type ClientCompositionOp = struct {
     /// display_id and layer_id uniquely identify the subject of the
     /// opcode.
-    display_id DisplayIdValue;
+    display_id DisplayId;
 
     /// Invalid for issues that aren't scoped to a specific layer, such as
     /// unsupported color conversion tables.

@@ -5,6 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_TESTS_MOCK_DISPLAY_CONTROLLER_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_TESTS_MOCK_DISPLAY_CONTROLLER_H_
 
+#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl_test_base.h>
 
 namespace flatland {
@@ -69,10 +70,12 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   MOCK_METHOD(void, DestroyLayer, (fuchsia::hardware::display::LayerId));
 
   MOCK_METHOD(void, SetDisplayLayers,
-              (uint64_t, ::std::vector<fuchsia::hardware::display::LayerId>));
+              (fuchsia::hardware::display::DisplayId,
+               ::std::vector<fuchsia::hardware::display::LayerId>));
 
   MOCK_METHOD(void, SetDisplayColorConversion,
-              ((uint64_t), (std::array<float, 3>), (std::array<float, 9>), (std::array<float, 3>)));
+              (fuchsia::hardware::display::DisplayId, (std::array<float, 3>),
+               (std::array<float, 9>), (std::array<float, 3>)));
 
  private:
   void NotImplemented_(const std::string& name) final {}

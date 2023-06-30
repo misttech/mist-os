@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::{
-    app::strategies::framebuffer::CoordinatorProxyPtr,
+    app::strategies::framebuffer::{CoordinatorProxyPtr, DisplayId},
     geometry::{IntSize, Size},
     view::{UserInputMessage, ViewAssistantPtr, ViewDetails},
     ViewAssistantContext, ViewKey,
@@ -83,7 +83,7 @@ pub(crate) trait ViewStrategy {
     ) {
     }
 
-    fn is_hosted_on_display(&self, _display_id: u64) -> bool {
+    fn is_hosted_on_display(&self, _display_id: DisplayId) -> bool {
         false
     }
 
@@ -124,15 +124,15 @@ impl ViewStrategyParams {
     pub fn view_key(&self) -> Option<ViewKey> {
         match self {
             ViewStrategyParams::DisplayDirect(params) => {
-                params.view_key.or_else(|| Some(ViewKey(params.info.id)))
+                params.view_key.or_else(|| Some(ViewKey(params.info.id.value)))
             }
             _ => None,
         }
     }
 
-    pub fn display_id(&self) -> Option<u64> {
+    pub fn display_id(&self) -> Option<DisplayId> {
         match self {
-            ViewStrategyParams::DisplayDirect(params) => Some(params.info.id),
+            ViewStrategyParams::DisplayDirect(params) => Some(params.info.id.into()),
             _ => None,
         }
     }

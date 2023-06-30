@@ -28,9 +28,10 @@ namespace display {
 // resolution, vsync interval, last vsync time, etc.
 class Display {
  public:
-  Display(uint64_t id, uint32_t width_in_px, uint32_t height_in_px, uint32_t width_in_mm,
-          uint32_t height_in_mm, std::vector<fuchsia_images2::PixelFormat> pixel_formats);
-  Display(uint64_t id, uint32_t width_in_px, uint32_t height_in_px);
+  Display(fuchsia::hardware::display::DisplayId id, uint32_t width_in_px, uint32_t height_in_px,
+          uint32_t width_in_mm, uint32_t height_in_mm,
+          std::vector<fuchsia_images2::PixelFormat> pixel_formats);
+  Display(fuchsia::hardware::display::DisplayId id, uint32_t width_in_px, uint32_t height_in_px);
   virtual ~Display() = default;
 
   using VsyncCallback = fit::function<void(
@@ -56,7 +57,7 @@ class Display {
   }
 
   // The display's ID in the context of the DisplayManager's DisplayController.
-  uint64_t display_id() const { return display_id_; }
+  fuchsia::hardware::display::DisplayId display_id() const { return display_id_; }
   uint32_t width_in_px() const { return width_in_px_; }
   uint32_t height_in_px() const { return height_in_px_; }
   uint32_t width_in_mm() const { return width_in_mm_; }
@@ -83,7 +84,7 @@ class Display {
   // The maximum vsync interval we would ever expect.
   static constexpr zx::duration kMaximumVsyncInterval = zx::msec(100);
 
-  const uint64_t display_id_;
+  const fuchsia::hardware::display::DisplayId display_id_;
   const uint32_t width_in_px_;
   const uint32_t height_in_px_;
   const uint32_t width_in_mm_;

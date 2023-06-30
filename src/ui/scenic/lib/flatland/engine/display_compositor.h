@@ -212,7 +212,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Sets the provided layers onto the display referenced by the given display_id.
-  void SetDisplayLayers(uint64_t display_id,
+  void SetDisplayLayers(fuchsia::hardware::display::DisplayId display_id,
                         const std::vector<fuchsia::hardware::display::LayerId>& layers)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
@@ -290,11 +290,13 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Maps a display ID to the the DisplayInfo struct. This is kept separate from the
   // display_DisplayCompositor_data_map_ since this only this data is needed for the
   // render_data_func_.
-  std::unordered_map<uint64_t, DisplayInfo> display_info_map_;
+  std::unordered_map</*fuchsia::hardware::display::DisplayId::value*/ uint64_t, DisplayInfo>
+      display_info_map_;
 
   // Maps a display ID to a struct of all the information needed to properly render to
   // that display in both the hardware and software composition paths.
-  std::unordered_map<uint64_t, DisplayEngineData> display_engine_data_map_;
+  std::unordered_map</*fuchsia::hardware::display::DisplayId::value*/ uint64_t, DisplayEngineData>
+      display_engine_data_map_;
 
   ReleaseFenceManager release_fence_manager_;
 

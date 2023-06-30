@@ -157,7 +157,11 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
   ASSERT_TRUE(vc_client.CreateChannel(display_fidl(), /*is_vc=*/true));
   {
     fbl::AutoLock lock(vc_client.mtx());
-    EXPECT_EQ(ZX_OK, vc_client.dc_->SetDisplayLayers(1, {}).status());
+    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // display events instead.
+    const DisplayId virtcon_display_id(1);
+    EXPECT_EQ(ZX_OK,
+              vc_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_EQ(ZX_OK, vc_client.dc_->ApplyConfig().status());
   }
 
@@ -185,7 +189,7 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
   {
     fbl::AutoLock lock(primary_client->mtx());
     EXPECT_OK(
-        primary_client->dc_->SetDisplayLayers(ToBanjoDisplayId(primary_client->display_id()), {})
+        primary_client->dc_->SetDisplayLayers(ToFidlDisplayId(primary_client->display_id()), {})
             .status());
     EXPECT_OK(primary_client->dc_->ApplyConfig().status());
   }
@@ -235,7 +239,11 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   ASSERT_TRUE(vc_client.CreateChannel(display_fidl(), /*is_vc=*/true));
   {
     fbl::AutoLock lock(vc_client.mtx());
-    EXPECT_EQ(ZX_OK, vc_client.dc_->SetDisplayLayers(1, {}).status());
+    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // display events instead.
+    const DisplayId virtcon_display_id(1);
+    EXPECT_EQ(ZX_OK,
+              vc_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_EQ(ZX_OK, vc_client.dc_->ApplyConfig().status());
   }
 
@@ -629,7 +637,11 @@ TEST_F(IntegrationTest, ClampRgb) {
   // Apply a config for virtcon client to become active.
   {
     fbl::AutoLock lock(vc_client.mtx());
-    EXPECT_EQ(ZX_OK, vc_client.dc_->SetDisplayLayers(1, {}).status());
+    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // display events instead.
+    const DisplayId virtcon_display_id(1);
+    EXPECT_EQ(ZX_OK,
+              vc_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_EQ(ZX_OK, vc_client.dc_->ApplyConfig().status());
   }
   EXPECT_TRUE(
@@ -653,7 +665,11 @@ TEST_F(IntegrationTest, EmptyConfigIsNotApplied) {
   ASSERT_TRUE(vc_client.Bind(dispatcher()));
   {
     fbl::AutoLock lock(vc_client.mtx());
-    EXPECT_EQ(ZX_OK, vc_client.dc_->SetDisplayLayers(1, {}).status());
+    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // display events instead.
+    const DisplayId virtcon_display_id(1);
+    EXPECT_EQ(ZX_OK,
+              vc_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_EQ(ZX_OK, vc_client.dc_->ApplyConfig().status());
   }
   EXPECT_TRUE(
@@ -720,7 +736,12 @@ TEST_F(IntegrationTest, VsyncEvent) {
   // Apply a config for client to become active.
   {
     fbl::AutoLock lock(primary_client->mtx());
-    EXPECT_EQ(ZX_OK, primary_client->dc_->SetDisplayLayers(1, {}).status());
+    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // display events instead.
+    const DisplayId virtcon_display_id(1);
+    EXPECT_EQ(
+        ZX_OK,
+        primary_client->dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_0 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
@@ -805,7 +826,12 @@ TEST_F(IntegrationTest, VsyncEvent) {
   // Hide the existing layer.
   {
     fbl::AutoLock lock(primary_client->mtx());
-    EXPECT_EQ(ZX_OK, primary_client->dc_->SetDisplayLayers(1, {}).status());
+    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // display events instead.
+    const DisplayId virtcon_display_id(1);
+    EXPECT_EQ(
+        ZX_OK,
+        primary_client->dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_3 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
@@ -853,7 +879,12 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   // Apply a config for client to become active.
   {
     fbl::AutoLock lock(primary_client->mtx());
-    EXPECT_EQ(ZX_OK, primary_client->dc_->SetDisplayLayers(1, {}).status());
+    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // display events instead.
+    const DisplayId virtcon_display_id(1);
+    EXPECT_EQ(
+        ZX_OK,
+        primary_client->dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_0 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
@@ -995,7 +1026,12 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   // Apply a config for client to become active.
   {
     fbl::AutoLock lock(primary_client->mtx());
-    EXPECT_EQ(ZX_OK, primary_client->dc_->SetDisplayLayers(1, {}).status());
+    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // display events instead.
+    const DisplayId virtcon_display_id(1);
+    EXPECT_EQ(
+        ZX_OK,
+        primary_client->dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_0 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
@@ -1088,7 +1124,12 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   // and thus use the latest configuration stamp.
   {
     fbl::AutoLock lock(primary_client->mtx());
-    EXPECT_EQ(ZX_OK, primary_client->dc_->SetDisplayLayers(1, {}).status());
+    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // display events instead.
+    const DisplayId virtcon_display_id(1);
+    EXPECT_EQ(
+        ZX_OK,
+        primary_client->dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_3 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());

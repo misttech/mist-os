@@ -20,11 +20,12 @@ namespace display {
 // registering for event callbacks.
 class DisplayCoordinatorListener {
  public:
-  using OnDisplaysChangedCallback = std::function<void(
-      std::vector<fuchsia::hardware::display::Info> added, std::vector<uint64_t> removed)>;
+  using OnDisplaysChangedCallback =
+      std::function<void(std::vector<fuchsia::hardware::display::Info> added,
+                         std::vector<fuchsia::hardware::display::DisplayId> removed)>;
   using OnClientOwnershipChangeCallback = std::function<void(bool has_ownership)>;
   using OnVsyncCallback = std::function<void(
-      uint64_t display_id, uint64_t timestamp,
+      fuchsia::hardware::display::DisplayId display_id, uint64_t timestamp,
       fuchsia::hardware::display::ConfigStamp applied_config_stamp, uint64_t cookie)>;
 
   // Binds to a Display fuchsia::hardware::display::Coordinator with channels |device| and

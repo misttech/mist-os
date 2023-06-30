@@ -25,7 +25,7 @@ class DisplayManager {
   // |display_available_cb| is a one-shot callback that is triggered when the first display is
   // observed, and cleared immediately afterward.
   explicit DisplayManager(fit::closure display_available_cb);
-  DisplayManager(std::optional<uint64_t> i_can_haz_display_id,
+  DisplayManager(std::optional<fuchsia::hardware::display::DisplayId> i_can_haz_display_id,
                  std::optional<size_t> i_can_haz_display_mode, fit::closure display_available_cb);
   ~DisplayManager() = default;
 
@@ -55,7 +55,7 @@ class DisplayManager {
   // TODO(fxbug.dev/76640): we may want to have multiple clients of this, so a single setter that
   // stomps previous callbacks may not be what we want.
   using VsyncCallback =
-      fit::function<void(uint64_t display_id, zx::time timestamp,
+      fit::function<void(fuchsia::hardware::display::DisplayId display_id, zx::time timestamp,
                          fuchsia::hardware::display::ConfigStamp applied_config_stamp)>;
   void SetVsyncCallback(VsyncCallback callback);
 
@@ -63,9 +63,9 @@ class DisplayManager {
   VsyncCallback vsync_callback_;
 
   void OnDisplaysChanged(std::vector<fuchsia::hardware::display::Info> added,
-                         std::vector<uint64_t> removed);
+                         std::vector<fuchsia::hardware::display::DisplayId> removed);
   void OnClientOwnershipChange(bool has_ownership);
-  void OnVsync(uint64_t display_id, uint64_t timestamp,
+  void OnVsync(fuchsia::hardware::display::DisplayId display_id, uint64_t timestamp,
                fuchsia::hardware::display::ConfigStamp applied_config_stamp, uint64_t cookie);
 
   std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> default_display_coordinator_;
@@ -75,7 +75,7 @@ class DisplayManager {
 
   // When new displays are detected, ignore all displays which don't match this ID.
   // TODO(fxb/76985): Remove this when we have proper multi-display support.
-  const std::optional<uint64_t> i_can_haz_display_id_;
+  const std::optional<fuchsia::hardware::display::DisplayId> i_can_haz_display_id_;
 
   // When a new display is picked, use display mode with this index.
   // TODO(fxb/76985): Remove this when we have proper multi-display support.

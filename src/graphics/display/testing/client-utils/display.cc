@@ -4,11 +4,14 @@
 
 #include "src/graphics/display/testing/client-utils/display.h"
 
+#include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <zircon/syscalls.h>
 
 #include <array>
 #include <cmath>
 #include <cstdio>
+
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace fhd = fuchsia_hardware_display;
 
@@ -16,7 +19,7 @@ namespace testing {
 namespace display {
 
 Display::Display(const fhd::wire::Info& info) {
-  id_ = info.id;
+  id_ = ::display::ToDisplayId(info.id);
 
   for (fuchsia_images2::wire::PixelFormat pixel_format : info.pixel_format) {
     ZX_ASSERT(!pixel_format.IsUnknown());
@@ -43,7 +46,7 @@ Display::Display(const fhd::wire::Info& info) {
 }
 
 void Display::Dump() {
-  printf("Display id = %ld\n", id_);
+  printf("Display id = %ld\n", id_.value());
   printf("\tManufacturer name = \"%s\"\n", manufacturer_name_.c_str());
   printf("\tMonitor name = \"%s\"\n", monitor_name_.c_str());
   printf("\tMonitor serial = \"%s\"\n", monitor_serial_.c_str());
@@ -75,8 +78,9 @@ void Display::Dump() {
 
 void Display::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc,
                    ColorCorrectionArgs color_correction_args) {
+  fhd::wire::DisplayId fidl_display_id = ToFidlDisplayId(id_);
   if (mode_idx_ != 0) {
-    ZX_ASSERT(dc->SetDisplayMode(id_, modes_[mode_idx_]).ok());
+    ZX_ASSERT(dc->SetDisplayMode(fidl_display_id, modes_[mode_idx_]).ok());
   }
 
   if (grayscale_) {
@@ -85,12 +89,14 @@ void Display::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc,
     ::fidl::Array<float, 9> grayscale = {
         .2126f, .7152f, .0722f, .2126f, .7152f, .0722f, .2126f, .7152f, .0722f,
     };
-    ZX_ASSERT(dc->SetDisplayColorConversion(id_, preoffsets, grayscale, postoffsets).ok());
+    ZX_ASSERT(
+        dc->SetDisplayColorConversion(fidl_display_id, preoffsets, grayscale, postoffsets).ok());
   } else if (apply_color_correction_) {
     ::fidl::Array<float, 3> preoffsets = color_correction_args.preoffsets;
     ::fidl::Array<float, 3> postoffsets = color_correction_args.postoffsets;
     ::fidl::Array<float, 9> grayscale = color_correction_args.coeff;
-    ZX_ASSERT(dc->SetDisplayColorConversion(id_, preoffsets, grayscale, postoffsets).ok());
+    ZX_ASSERT(
+        dc->SetDisplayColorConversion(fidl_display_id, preoffsets, grayscale, postoffsets).ok());
   }
 }
 

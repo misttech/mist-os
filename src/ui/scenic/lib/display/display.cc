@@ -12,8 +12,9 @@
 namespace scenic_impl {
 namespace display {
 
-Display::Display(uint64_t id, uint32_t width_in_px, uint32_t height_in_px, uint32_t width_in_mm,
-                 uint32_t height_in_mm, std::vector<fuchsia_images2::PixelFormat> pixel_formats)
+Display::Display(fuchsia::hardware::display::DisplayId id, uint32_t width_in_px,
+                 uint32_t height_in_px, uint32_t width_in_mm, uint32_t height_in_mm,
+                 std::vector<fuchsia_images2::PixelFormat> pixel_formats)
     : vsync_timing_(std::make_shared<scheduling::VsyncTiming>()),
       display_id_(id),
       width_in_px_(width_in_px),
@@ -24,7 +25,8 @@ Display::Display(uint64_t id, uint32_t width_in_px, uint32_t height_in_px, uint3
   zx::event::create(0, &ownership_event_);
   device_pixel_ratio_.store({1.f, 1.f});
 }
-Display::Display(uint64_t id, uint32_t width_in_px, uint32_t height_in_px)
+Display::Display(fuchsia::hardware::display::DisplayId id, uint32_t width_in_px,
+                 uint32_t height_in_px)
     : Display(id, width_in_px, height_in_px, 0, 0, {fuchsia_images2::PixelFormat::kBgra32}) {}
 
 void Display::Claim() {

@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/bin/app.h"
 
+#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
@@ -44,11 +45,13 @@ static constexpr zx::duration kShutdownTimeout = zx::sec(1);
 // escher/profiling/timestamp_profiler.cc.
 static constexpr zx::duration kEscherCleanupRetryInterval{1'000'000};  // 1 millisecond
 
-std::optional<uint64_t> GetDisplayId(scenic_structured_config::Config values) {
+std::optional<fuchsia::hardware::display::DisplayId> GetDisplayId(
+    scenic_structured_config::Config values) {
   if (values.i_can_haz_display_id() < 0) {
     return std::nullopt;
   }
-  return values.i_can_haz_display_id();
+  return std::make_optional<fuchsia::hardware::display::DisplayId>(
+      {.value = static_cast<uint64_t>(values.i_can_haz_display_id())});
 }
 
 std::optional<uint64_t> GetDisplayMode(scenic_structured_config::Config values) {
@@ -70,7 +73,11 @@ scenic_structured_config::Config GetConfig() {
   FX_LOGS(INFO) << "Scenic pointer auto focus: " << values.pointer_auto_focus();
   FX_LOGS(INFO) << "flatland_enable_display_composition: "
                 << values.flatland_enable_display_composition();
-  FX_LOGS(INFO) << "Scenic i_can_haz_display_id: " << GetDisplayId(values).value_or(0);
+  FX_LOGS(INFO) << "Scenic i_can_haz_display_id: "
+                << GetDisplayId(values)
+                       .value_or(fuchsia::hardware::display::DisplayId{
+                           .value = fuchsia::hardware::display::INVALID_DISP_ID})
+                       .value;
   FX_LOGS(INFO) << "Scenic i_can_haz_display_mode: " << GetDisplayMode(values).value_or(0);
 
   return values;

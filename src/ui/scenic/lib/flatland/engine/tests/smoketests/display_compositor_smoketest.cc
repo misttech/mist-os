@@ -224,7 +224,7 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id(), std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
 }
 

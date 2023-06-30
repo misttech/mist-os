@@ -4,6 +4,8 @@
 
 #include "src/ui/scenic/lib/display/display_controller.h"
 
+#include <fuchsia/hardware/display/cpp/fidl.h>
+
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/ui/scenic/lib/display/tests/mock_display_controller.h"
 
@@ -14,14 +16,14 @@ namespace test {
 class DisplayCoordinatorTest : public gtest::TestLoopFixture {};
 
 TEST_F(DisplayCoordinatorTest, Display2Test) {
-  const uint64_t kDisplayId = 2;
+  constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 2};
   const fuchsia::hardware::display::Mode kDisplayMode = {
       .horizontal_resolution = 1024, .vertical_resolution = 800, .refresh_rate_e2 = 60, .flags = 0};
   const fuchsia_images2::PixelFormat kPixelFormat = fuchsia_images2::PixelFormat::kBgra32;
 
   Display2 display(kDisplayId, /*display_modes=*/{kDisplayMode}, /*pixel_formats=*/{kPixelFormat});
 
-  EXPECT_EQ(kDisplayId, display.display_id());
+  EXPECT_EQ(kDisplayId.value, display.display_id().value);
   EXPECT_TRUE(fidl::Equals(kDisplayMode, display.display_modes()[0]));
   EXPECT_EQ(kPixelFormat, display.pixel_formats()[0]);
 
@@ -41,8 +43,8 @@ TEST_F(DisplayCoordinatorTest, Display2Test) {
 TEST_F(DisplayCoordinatorTest, DisplayCoordinatorTest) {
   DisplayCoordinatorObjects display_controller_objs = CreateMockDisplayCoordinator();
 
-  const uint64_t kDisplayId1 = 1;
-  const uint64_t kDisplayId2 = 2;
+  constexpr fuchsia::hardware::display::DisplayId kDisplayId1 = {.value = 1};
+  constexpr fuchsia::hardware::display::DisplayId kDisplayId2 = {.value = 2};
   const fuchsia::hardware::display::Mode kDisplayMode = {
       .horizontal_resolution = 1024, .vertical_resolution = 800, .refresh_rate_e2 = 60, .flags = 0};
   const fuchsia_images2::PixelFormat kPixelFormat = fuchsia_images2::PixelFormat::kBgra32;
@@ -57,29 +59,29 @@ TEST_F(DisplayCoordinatorTest, DisplayCoordinatorTest) {
   EXPECT_EQ(display_controller_objs.interface_ptr.get(), dc.coordinator().get());
 
   EXPECT_EQ(1u, dc.displays()->size());
-  EXPECT_EQ(kDisplayId1, dc.displays()->at(0).display_id());
+  EXPECT_EQ(kDisplayId1.value, dc.displays()->at(0).display_id().value);
 
   bool display_removed = false;
-  dc.set_on_display_removed_callback([&](uint64_t display_id) {
+  dc.set_on_display_removed_callback([&](fuchsia::hardware::display::DisplayId display_id) {
     display_removed = true;
-    EXPECT_EQ(kDisplayId1, display_id);
+    EXPECT_EQ(kDisplayId1.value, display_id.value);
   });
 
   bool display_added = false;
   dc.set_on_display_added_callback([&](Display2* display) {
     display_added = true;
-    EXPECT_EQ(kDisplayId2, display->display_id());
+    EXPECT_EQ(kDisplayId2.value, display->display_id().value);
   });
 
   dc.AddDisplay(std::move(display2));
 
   EXPECT_TRUE(display_added);
   EXPECT_EQ(2u, dc.displays()->size());
-  EXPECT_EQ(kDisplayId2, dc.displays()->at(1).display_id());
+  EXPECT_EQ(kDisplayId2.value, dc.displays()->at(1).display_id().value);
 
   dc.RemoveDisplay(kDisplayId1);
   EXPECT_EQ(1u, dc.displays()->size());
-  EXPECT_EQ(kDisplayId2, dc.displays()->at(0).display_id());
+  EXPECT_EQ(kDisplayId2.value, dc.displays()->at(0).display_id().value);
 }
 
 }  // namespace test

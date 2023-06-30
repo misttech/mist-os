@@ -186,18 +186,18 @@ void FlatlandManager::CreateFlatlandDisplay(
 
   if (hw_display->is_claimed()) {
     // TODO(fxbug.dev/76640): error reporting direct to client somehow?
-    FX_LOGS(ERROR) << "Display id=" << hw_display->display_id()
+    FX_LOGS(ERROR) << "Display id=" << hw_display->display_id().value
                    << " is already claimed, cannot instantiate FlatlandDisplay.";
     return;
   }
   hw_display->Claim();
 
   // Allocate the worker Loop first so that the impl can be bound to its dispatcher.
-  auto result =
+  auto [new_instance_iterator, inserted] =
       flatland_display_instances_.emplace(id, std::make_unique<FlatlandDisplayInstance>());
-  FX_DCHECK(result.second);
+  FX_DCHECK(inserted);
 
-  auto& instance = result.first->second;
+  auto& instance = new_instance_iterator->second;
   instance->loop = std::make_shared<utils::LoopDispatcherHolder>(
       &kAsyncLoopConfigNoAttachToCurrentThread,
       [this](std::unique_ptr<async::Loop> loop_to_destroy) {
@@ -404,18 +404,17 @@ void FlatlandManager::RemoveFlatlandInstance(scheduling::SessionId session_id) {
       //
       // Note: Capturing "this" is safe as a flatland manager is guaranteed to outlive any flatland
       // display instance.
-      async::PostTask(instance_kv->second->loop->dispatcher(),
-                      [instance = std::move(instance_kv->second)]() {
-                        TRACE_DURATION("gfx",
-                                       "FlatlandManager::RemoveFlatlandInstance[display/task]");
+      async::PostTask(
+          instance_kv->second->loop->dispatcher(), [instance = std::move(instance_kv->second)]() {
+            TRACE_DURATION("gfx", "FlatlandManager::RemoveFlatlandInstance[display/task]");
 
-                        // A flatland display instance must release all its resources, and its loop
-                        // must be destroyed on cleanup_loop_, before |alive_sessions_| can safely
-                        // be decremented. This ensures that flatland manager outlives every
-                        // flatland instance.
-                        instance->impl.reset();
-                        // Actually decrement alive_sessions_ in instance loop destruction thunk.
-                      });
+            // A flatland display instance must release all its resources, and its loop
+            // must be destroyed on cleanup_loop_, before |alive_sessions_| can safely
+            // be decremented. This ensures that flatland manager outlives every
+            // flatland instance.
+            instance->impl.reset();
+            // Actually decrement alive_sessions_ in instance loop destruction thunk.
+          });
       flatland_display_instances_.erase(session_id);
     }
   }

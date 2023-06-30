@@ -294,12 +294,13 @@ bool DisplaySwapchain::DrawAndPresentFrame(const std::shared_ptr<FrameTimings>& 
 
 bool DisplaySwapchain::SetDisplayColorConversion(const ColorTransform& transform) {
   FX_CHECK(display_);
-  uint64_t display_id = display_->display_id();
+  const fuchsia::hardware::display::DisplayId display_id = display_->display_id();
   return SetDisplayColorConversion(display_id, *display_coordinator_, transform);
 }
 
 bool DisplaySwapchain::SetDisplayColorConversion(
-    uint64_t display_id, fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
+    fuchsia::hardware::display::DisplayId display_id,
+    fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
     const ColorTransform& transform) {
   // Attempt to apply color conversion.
   zx_status_t status = display_coordinator->SetDisplayColorConversion(

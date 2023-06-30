@@ -5,7 +5,7 @@
 use {
     anyhow::Error,
     argh::FromArgs,
-    display_utils::{Coordinator, PixelFormat},
+    display_utils::{Coordinator, DisplayId, PixelFormat},
     fuchsia_async as fasync, fuchsia_trace_provider,
     futures::{
         future::{FutureExt, TryFutureExt},
@@ -104,15 +104,19 @@ async fn main() -> Result<(), Error> {
     let cmd_future = async {
         match args.cmd {
             SubCommands::Info(args) => {
-                commands::show_display_info(&coordinator, args.id, args.fidl)
+                commands::show_display_info(&coordinator, args.id.map(DisplayId), args.fidl)
             }
             SubCommands::Vsync(args) => {
-                commands::vsync(&coordinator, args.id, args.color, args.pixel_format).await
+                commands::vsync(&coordinator, args.id.map(DisplayId), args.color, args.pixel_format)
+                    .await
             }
             SubCommands::Color(args) => {
-                commands::color(&coordinator, args.id, args.color, args.pixel_format).await
+                commands::color(&coordinator, args.id.map(DisplayId), args.color, args.pixel_format)
+                    .await
             }
-            SubCommands::Squares(args) => commands::squares(&coordinator, args.id).await,
+            SubCommands::Squares(args) => {
+                commands::squares(&coordinator, args.id.map(DisplayId)).await
+            }
         }
     };
 

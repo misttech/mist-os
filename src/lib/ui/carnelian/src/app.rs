@@ -323,7 +323,7 @@ pub struct ViewCreationParameters {
     pub app_sender: AppSender,
     /// Display ID of the hosting display for views running directly
     /// on the display coordinator.
-    pub display_id: Option<u64>,
+    pub display_id: Option<DisplayId>,
     /// Options passed to `create_additional_view()`, if this view is being created
     /// by that function and if the caller passed any.
     pub options: Option<Box<dyn Any>>,
@@ -603,14 +603,14 @@ impl App {
             MessageInternal::DisplayCoordinatorEvent(event) => match event {
                 CoordinatorEvent::OnVsync { display_id, .. } => {
                     if let Some(view_key) =
-                        self.strategy.get_visible_view_key_for_display(display_id)
+                        self.strategy.get_visible_view_key_for_display(display_id.into())
                     {
                         if let Ok(view) = self.get_view(view_key) {
                             view.handle_display_coordinator_event(event).await;
                         } else {
                             // We seem to get two vsyncs after the display is removed.
                             // Log it to help run down why that is.
-                            eprintln!("vsync for display {} with no view", display_id);
+                            eprintln!("vsync for display {:?} with no view", display_id);
                         }
                     }
                 }
@@ -692,7 +692,7 @@ impl App {
         }
     }
 
-    fn get_view_keys_for_display(&mut self, display_id: u64) -> Vec<ViewKey> {
+    fn get_view_keys_for_display(&mut self, display_id: DisplayId) -> Vec<ViewKey> {
         self.view_controllers
             .iter()
             .filter_map(|(view_key, view_controller)| {
@@ -732,7 +732,7 @@ impl App {
     fn create_view_assistant(
         &mut self,
         view_key: ViewKey,
-        display_id: Option<u64>,
+        display_id: Option<DisplayId>,
         options: Option<CreateViewOptions>,
     ) -> Result<ViewAssistantPtr, Error> {
         Ok(self.assistant.create_view_assistant_with_parameters(ViewCreationParameters {

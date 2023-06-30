@@ -61,7 +61,8 @@ class DisplayCompositorTestBase : public gtest::RealLoopFixture {
   }
 
   std::vector<RenderData> GenerateDisplayListForTest(
-      const std::unordered_map<uint64_t, std::pair<DisplayInfo, TransformHandle>>& display_map) {
+      const std::unordered_map</*fuchsia::hardware::display::DisplayId::value*/ uint64_t,
+                               std::pair<DisplayInfo, TransformHandle>>& display_map) {
     const auto snapshot = uber_struct_system_->Snapshot();
     const auto links = link_system_->GetResolvedTopologyLinks();
     const auto link_system_id = link_system_->GetInstanceId();
@@ -69,7 +70,7 @@ class DisplayCompositorTestBase : public gtest::RealLoopFixture {
     // Gather the flatland data into a vector of rectangle and image data that can be passed to
     // either the display controller directly or to the software renderer.
     std::vector<RenderData> image_list_per_display;
-    for (const auto& [display_id, display_data] : display_map) {
+    for (const auto& [display_id_value, display_data] : display_map) {
       const auto& transform = display_data.second;
 
       const auto topology_data =
@@ -98,8 +99,9 @@ class DisplayCompositorTestBase : public gtest::RealLoopFixture {
                      display_data.first.dimensions.y);
       FX_DCHECK(image_rectangles.size() == images.size());
 
-      image_list_per_display.push_back(
-          {.rectangles = image_rectangles, .images = images, .display_id = display_id});
+      image_list_per_display.push_back({.rectangles = image_rectangles,
+                                        .images = images,
+                                        .display_id = {.value = display_id_value}});
     }
     return image_list_per_display;
   }

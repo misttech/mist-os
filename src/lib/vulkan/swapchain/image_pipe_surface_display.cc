@@ -184,7 +184,8 @@ bool ImagePipeSurfaceDisplay::WaitForAsyncMessage() {
 }
 
 void ImagePipeSurfaceDisplay::ControllerOnDisplaysChanged(
-    std::vector<fuchsia::hardware::display::Info> info, std::vector<uint64_t>) {
+    std::vector<fuchsia::hardware::display::Info> info,
+    std::vector<fuchsia::hardware::display::DisplayId>) {
   if (info.size() == 0)
     return;
   width_ = info[0].modes[0].horizontal_resolution;

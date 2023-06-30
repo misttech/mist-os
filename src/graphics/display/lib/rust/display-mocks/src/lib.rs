@@ -42,6 +42,8 @@ pub struct MockCoordinator {
     displays: HashMap<DisplayId, display::Info>,
 }
 
+// TODO(fxbug.dev/129863): Instead of defining a separate DisplayId, we should
+// use the same DisplayId from display_utils instead.
 #[derive(Eq, Hash, Ord, PartialOrd, PartialEq)]
 struct DisplayId(u64);
 
@@ -61,12 +63,13 @@ impl MockCoordinator {
     /// Returns an error if `displays` contains entries with repeated display IDs.
     pub fn assign_displays(&mut self, displays: Vec<display::Info>) -> Result<()> {
         let mut map = HashMap::new();
-        if !displays.into_iter().all(|info| map.insert(DisplayId(info.id), info).is_none()) {
+        if !displays.into_iter().all(|info| map.insert(DisplayId(info.id.value), info).is_none()) {
             return Err(MockCoordinatorError::DuplicateIds);
         }
 
         let added: Vec<_> = map.iter().sorted().map(|(_, info)| info.clone()).collect();
-        let removed: Vec<u64> = self.displays.iter().map(|(_, info)| info.id).collect();
+        let removed: Vec<display::DisplayId> =
+            self.displays.iter().map(|(_, info)| info.id).collect();
         self.displays = map;
         self.control_handle.send_on_displays_changed(&added, &removed)?;
         Ok(())
@@ -75,9 +78,21 @@ impl MockCoordinator {
     /// Sends a single OnVsync event to the client. The vsync event will appear to be sent from the
     /// given `display_id` even if a corresponding fake display has not been assigned by a call to
     /// `assign_displays`.
-    pub fn emit_vsync_event(&self, display_id: u64, stamp: display::ConfigStamp) -> Result<()> {
+    // TODO(fxbug.dev/129863): Currently we cannot use display_utils::DisplayId
+    // here due to circular dependency. Instead of passing a raw u64 value, we
+    // should use a generic and strong-typed DisplayId.
+    pub fn emit_vsync_event(
+        &self,
+        display_id_value: u64,
+        stamp: display::ConfigStamp,
+    ) -> Result<()> {
         self.control_handle
-            .send_on_vsync(display_id, zx::Time::get_monotonic().into_nanos() as u64, &stamp, 0)
+            .send_on_vsync(
+                &display::DisplayId { value: display_id_value },
+                zx::Time::get_monotonic().into_nanos() as u64,
+                &stamp,
+                0,
+            )
             .map_err(MockCoordinatorError::from)
     }
 }
@@ -103,7 +118,7 @@ mod tests {
 
     async fn wait_for_displays_changed_event(
         events: &mut display::CoordinatorEventStream,
-    ) -> Result<(Vec<display::Info>, Vec<u64>)> {
+    ) -> Result<(Vec<display::Info>, Vec<display::DisplayId>)> {
         let mut stream = events.try_filter_map(|event| match event {
             display::CoordinatorEvent::OnDisplaysChanged { added, removed } => {
                 future::ok(Some((added, removed)))
@@ -117,7 +132,7 @@ mod tests {
     async fn assign_displays_fails_with_duplicate_display_ids() {
         let displays = vec![
             display::Info {
-                id: 1,
+                id: display::DisplayId { value: 1 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
                 cursor_configs: Vec::new(),
@@ -129,7 +144,7 @@ mod tests {
                 using_fallback_size: false,
             },
             display::Info {
-                id: 1,
+                id: display::DisplayId { value: 1 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
                 cursor_configs: Vec::new(),
@@ -151,7 +166,7 @@ mod tests {
     async fn assign_displays_displays_added() -> Result<()> {
         let displays = vec![
             display::Info {
-                id: 1,
+                id: display::DisplayId { value: 1 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
                 cursor_configs: Vec::new(),
@@ -163,7 +178,7 @@ mod tests {
                 using_fallback_size: false,
             },
             display::Info {
-                id: 2,
+                id: display::DisplayId { value: 2 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
                 cursor_configs: Vec::new(),
@@ -190,7 +205,7 @@ mod tests {
     #[fuchsia::test]
     async fn assign_displays_displays_removed() -> Result<()> {
         let displays = vec![display::Info {
-            id: 1,
+            id: display::DisplayId { value: 1 },
             modes: Vec::new(),
             pixel_format: Vec::new(),
             cursor_configs: Vec::new(),
@@ -212,7 +227,7 @@ mod tests {
         mock.assign_displays(vec![])?;
         let (added, removed) = wait_for_displays_changed_event(&mut events).await?;
         assert_eq!(added, vec![]);
-        assert_eq!(removed, vec![1]);
+        assert_eq!(removed, vec![display::DisplayId { value: 1 }]);
 
         Ok(())
     }

@@ -162,6 +162,8 @@ impl Coordinator {
         while let Some(msg) = events.try_next().await? {
             match msg {
                 CoordinatorEvent::OnDisplaysChanged { added, removed } => {
+                    let removed =
+                        removed.into_iter().map(|id| id.into()).collect::<Vec<DisplayId>>();
                     inner.read().handle_displays_changed(added, removed);
                 }
                 CoordinatorEvent::OnVsync {
@@ -171,7 +173,7 @@ impl Coordinator {
                     cookie,
                 } => {
                     inner.write().handle_vsync(
-                        display_id,
+                        display_id.into(),
                         timestamp,
                         applied_config_stamp,
                         cookie,
@@ -211,7 +213,7 @@ impl Coordinator {
         let proxy = self.proxy();
         for config in configs {
             proxy.set_display_layers(
-                config.id.0,
+                &config.id.into(),
                 &config.layers.iter().map(|l| l.id.into()).collect::<Vec<FidlLayerId>>(),
             )?;
             for layer in &config.layers {
@@ -321,14 +323,14 @@ impl CoordinatorInner {
         Ok(EventId(self.id_counter))
     }
 
-    fn handle_displays_changed(&self, _added: Vec<display::Info>, _removed: Vec<u64>) {
+    fn handle_displays_changed(&self, _added: Vec<display::Info>, _removed: Vec<DisplayId>) {
         // TODO(armansito): update the displays list and notify clients. Terminate vsync listeners
         // that are attached to a removed display.
     }
 
     fn handle_vsync(
         &mut self,
-        display_id: u64,
+        display_id: DisplayId,
         timestamp: u64,
         applied_config_stamp: display::ConfigStamp,
         cookie: u64,
@@ -338,11 +340,11 @@ impl CoordinatorInner {
         let mut listeners_to_remove = Vec::new();
         for (pos, (sender, filter)) in self.vsync_listeners.iter().enumerate() {
             // Skip the listener if it has a filter that does not match `display_id`.
-            if filter.as_ref().map_or(false, |id| id.0 != display_id) {
+            if filter.as_ref().map_or(false, |id| *id != display_id) {
                 continue;
             }
             let payload = VsyncEvent {
-                id: DisplayId(display_id),
+                id: display_id,
                 timestamp: zx::Time::from_nanos(timestamp as i64),
                 config: applied_config_stamp,
             };
@@ -451,7 +453,7 @@ mod tests {
     async fn test_init_with_displays() -> Result<()> {
         let displays = [
             display::Info {
-                id: 1,
+                id: display::DisplayId { value: 1 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
                 cursor_configs: Vec::new(),
@@ -463,7 +465,7 @@ mod tests {
                 using_fallback_size: false,
             },
             display::Info {
-                id: 2,
+                id: display::DisplayId { value: 2 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
                 cursor_configs: Vec::new(),

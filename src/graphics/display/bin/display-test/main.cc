@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <endian.h>
+#include <errno.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
@@ -31,6 +32,7 @@
 #include <fbl/string_buffer.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/testing/client-utils/display.h"
 #include "src/graphics/display/testing/client-utils/utils.h"
@@ -157,8 +159,16 @@ static bool bind_display(const char* coordinator, fbl::Vector<Display>* displays
 }
 
 Display* find_display(fbl::Vector<Display>& displays, const char* id_str) {
-  uint64_t id = strtoul(id_str, nullptr, 10);
-  if (id != 0) {  // 0 is the invalid id, and luckily what strtoul returns on failure
+  errno = 0;
+  uint64_t id_value = strtoul(id_str, nullptr, 10);
+  // strtoul() sets `errno` to non-zero on failure.
+  if (errno != 0) {
+    fprintf(stderr, "Failed to convert display ID \"%s\": %s\n", id_str, strerror(errno));
+    errno = 0;
+    return nullptr;
+  }
+  display::DisplayId id(id_value);
+  if (id != display::kInvalidDisplayId) {
     for (auto& d : displays) {
       if (d.id() == id) {
         return &d;
@@ -198,8 +208,9 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
     for (const ::display::LayerId& layer_id : *current_layers) {
       current_layers_fidl_id.push_back(display::ToFidlLayerId(layer_id));
     }
-    if (!dc->SetDisplayLayers(display.id(), fidl::VectorView<fhd::wire::LayerId>::FromExternal(
-                                                current_layers_fidl_id))
+    if (!dc->SetDisplayLayers(
+               ToFidlDisplayId(display.id()),
+               fidl::VectorView<fhd::wire::LayerId>::FromExternal(current_layers_fidl_id))
              .ok()) {
       printf("Failed to set layers\n");
       return false;
@@ -218,7 +229,7 @@ std::optional<fhd::wire::ConfigStamp> apply_config() {
   if (result.value().res != fhd::wire::ConfigResult::kOk) {
     printf("Config not valid (%d)\n", static_cast<uint32_t>(result.value().res));
     for (const auto& op : result.value().ops) {
-      printf("Client composition op (display %ld, layer %ld): %hhu\n", op.display_id,
+      printf("Client composition op (display %ld, layer %ld): %hhu\n", op.display_id.value,
              op.layer_id.value, static_cast<uint8_t>(op.opcode));
     }
     return std::nullopt;

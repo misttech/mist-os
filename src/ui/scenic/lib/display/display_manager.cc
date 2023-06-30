@@ -10,6 +10,7 @@
 #include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include "lib/fidl/cpp/comparison.h"
 #include "lib/fit/function.h"
 
 namespace scenic_impl {
@@ -18,9 +19,9 @@ namespace display {
 DisplayManager::DisplayManager(fit::closure display_available_cb)
     : DisplayManager(std::nullopt, std::nullopt, std::move(display_available_cb)) {}
 
-DisplayManager::DisplayManager(std::optional<uint64_t> i_can_haz_display_id,
-                               std::optional<uint64_t> i_can_haz_display_mode,
-                               fit::closure display_available_cb)
+DisplayManager::DisplayManager(
+    std::optional<fuchsia::hardware::display::DisplayId> i_can_haz_display_id,
+    std::optional<uint64_t> i_can_haz_display_mode, fit::closure display_available_cb)
     : i_can_haz_display_id_(i_can_haz_display_id),
       i_can_haz_display_mode_(i_can_haz_display_mode),
       display_available_cb_(std::move(display_available_cb)) {}
@@ -47,12 +48,12 @@ void DisplayManager::BindDefaultDisplayCoordinator(
 }
 
 void DisplayManager::OnDisplaysChanged(std::vector<fuchsia::hardware::display::Info> added,
-                                       std::vector<uint64_t> removed) {
+                                       std::vector<fuchsia::hardware::display::DisplayId> removed) {
   for (auto& display : added) {
     // Ignore display if |i_can_haz_display_id| is set and it doesn't match ID.
-    if (i_can_haz_display_id_.has_value() && display.id != *i_can_haz_display_id_) {
-      FX_LOGS(INFO) << "Ignoring display with id=" << display.id
-                    << " ... waiting for display with id=" << *i_can_haz_display_id_;
+    if (i_can_haz_display_id_.has_value() && !fidl::Equals(display.id, *i_can_haz_display_id_)) {
+      FX_LOGS(INFO) << "Ignoring display with id=" << display.id.value
+                    << " ... waiting for display with id=" << i_can_haz_display_id_->value;
       continue;
     }
 
@@ -67,7 +68,7 @@ void DisplayManager::OnDisplaysChanged(std::vector<fuchsia::hardware::display::I
           (*default_display_coordinator_)->ApplyConfig();
         } else {
           FX_LOGS(ERROR) << "Requested display mode=" << *i_can_haz_display_mode_
-                         << " doesn't exist for display with id=" << display.id;
+                         << " doesn't exist for display with id=" << display.id.value;
         }
       }
 
@@ -86,8 +87,8 @@ void DisplayManager::OnDisplaysChanged(std::vector<fuchsia::hardware::display::I
     }
   }
 
-  for (uint64_t id : removed) {
-    if (default_display_ && default_display_->display_id() == id) {
+  for (fuchsia::hardware::display::DisplayId id : removed) {
+    if (default_display_ && fidl::Equals(default_display_->display_id(), id)) {
       // TODO(fxbug.dev/23490): handle this more robustly.
       FX_CHECK(false) << "Display disconnected";
       return;
@@ -115,7 +116,7 @@ void DisplayManager::SetVsyncCallback(VsyncCallback callback) {
   vsync_callback_ = std::move(callback);
 }
 
-void DisplayManager::OnVsync(uint64_t display_id, uint64_t timestamp,
+void DisplayManager::OnVsync(fuchsia::hardware::display::DisplayId display_id, uint64_t timestamp,
                              fuchsia::hardware::display::ConfigStamp applied_config_stamp,
                              uint64_t cookie) {
   if (cookie) {
@@ -129,7 +130,7 @@ void DisplayManager::OnVsync(uint64_t display_id, uint64_t timestamp,
   if (!default_display_) {
     return;
   }
-  if (default_display_->display_id() != display_id) {
+  if (!fidl::Equals(default_display_->display_id(), display_id)) {
     return;
   }
   default_display_->OnVsync(zx::time(timestamp), applied_config_stamp);

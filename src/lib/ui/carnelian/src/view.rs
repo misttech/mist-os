@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    app::MessageInternal,
+    app::{strategies::framebuffer::DisplayId, MessageInternal},
     geometry::{IntPoint, Size},
     input::{self, UserInputMessage},
     message::Message,
@@ -25,7 +25,7 @@ pub(crate) mod strategies;
 
 #[derive(Debug, Clone)]
 pub struct DisplayInfo {
-    pub id: u64,
+    pub id: DisplayId,
     pub horizontal_size_mm: u32,
     pub vertical_size_mm: u32,
     pub using_fallback_size: bool,
@@ -34,7 +34,7 @@ pub struct DisplayInfo {
 impl From<&fidl_fuchsia_hardware_display::Info> for DisplayInfo {
     fn from(info: &fidl_fuchsia_hardware_display::Info) -> Self {
         Self {
-            id: info.id,
+            id: info.id.into(),
             horizontal_size_mm: info.horizontal_size_mm,
             vertical_size_mm: info.vertical_size_mm,
             using_fallback_size: info.using_fallback_size,
@@ -655,7 +655,7 @@ impl ViewController {
         self.strategy.handle_display_coordinator_event(event).await;
     }
 
-    pub fn is_hosted_on_display(&self, display_id: u64) -> bool {
+    pub fn is_hosted_on_display(&self, display_id: DisplayId) -> bool {
         self.strategy.is_hosted_on_display(display_id)
     }
 

@@ -862,7 +862,8 @@ void Client::SetMinimumRgb(SetMinimumRgbRequestView request,
 void Client::SetDisplayPower(SetDisplayPowerRequestView request,
                              SetDisplayPowerCompleter::Sync& completer) {
   ZX_DEBUG_ASSERT(controller_->dc());
-  auto status = controller_->dc()->SetDisplayPower(request->display_id, request->power_on);
+  const DisplayId display_id = ToDisplayId(request->display_id);
+  auto status = controller_->dc()->SetDisplayPower(ToBanjoDisplayId(display_id), request->power_on);
   if (status == ZX_OK) {
     completer.ReplySuccess();
   } else {
@@ -1025,8 +1026,6 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
         }
       }
 
-      const uint64_t fidl_display_id = ToFidlDisplayIdValue(display_config.id);
-
       // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
       // client-side ID will have to be looked up in a map.
       const LayerId layer_id(layer_node.layer->id.value());
@@ -1034,7 +1033,7 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
       for (uint8_t i = 0; i < 32; i++) {
         if (err & (1 << i)) {
           ops->emplace_back(fhd::wire::ClientCompositionOp{
-              .display_id = fidl_display_id,
+              .display_id = ToFidlDisplayId(display_config.id),
               .layer_id = ToFidlLayerId(layer_id),
               .opcode = static_cast<fhd::wire::ClientCompositionOpcode>(i),
           });
@@ -1205,7 +1204,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     }
 
     fhd::wire::Info info;
-    info.id = ToFidlDisplayIdValue(config->id);
+    info.id = ToFidlDisplayId(config->id);
 
     const fbl::Vector<edid::timing_params>* edid_timings;
     const display_params_t* params;
@@ -1274,7 +1273,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     coded_configs.push_back(info);
   }
 
-  std::vector<uint64_t> fidl_removed_display_ids;
+  std::vector<fhd::wire::DisplayId> fidl_removed_display_ids;
   fidl_removed_display_ids.reserve(removed_display_ids.size());
 
   for (DisplayId removed_display_id : removed_display_ids) {
@@ -1282,7 +1281,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     if (display) {
       display->pending_layers_.clear();
       display->current_layers_.clear();
-      fidl_removed_display_ids.push_back(ToFidlDisplayIdValue(display->id));
+      fidl_removed_display_ids.push_back(ToFidlDisplayId(display->id));
     }
   }
 
@@ -1290,7 +1289,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     fidl::Status result = binding_state_.SendEvents([&](auto&& endpoint) {
       return fidl::WireSendEvent(endpoint)->OnDisplaysChanged(
           fidl::VectorView<fhd::wire::Info>::FromExternal(coded_configs),
-          fidl::VectorView<uint64_t>::FromExternal(fidl_removed_display_ids));
+          fidl::VectorView<fhd::wire::DisplayId>::FromExternal(fidl_removed_display_ids));
     });
     if (!result.ok()) {
       zxlogf(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
@@ -1686,7 +1685,7 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
     vsync_msg_t v = buffered_vsync_messages_.front();
     buffered_vsync_messages_.pop();
     event_sending_result = handler_.binding_state().SendEvents([&](auto&& endpoint) {
-      return fidl::WireSendEvent(endpoint)->OnVsync(ToFidlDisplayIdValue(v.display_id), v.timestamp,
+      return fidl::WireSendEvent(endpoint)->OnVsync(ToFidlDisplayId(v.display_id), v.timestamp,
                                                     ToFidlConfigStamp(v.config_stamp), 0);
     });
     if (!event_sending_result.ok()) {
@@ -1699,7 +1698,7 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
 
   // Send the latest vsync event
   event_sending_result = handler_.binding_state().SendEvents([&](auto&& endpoint) {
-    return fidl::WireSendEvent(endpoint)->OnVsync(ToFidlDisplayIdValue(display_id), timestamp,
+    return fidl::WireSendEvent(endpoint)->OnVsync(ToFidlDisplayId(display_id), timestamp,
                                                   ToFidlConfigStamp(client_stamp), cookie);
   });
   if (!event_sending_result.ok()) {

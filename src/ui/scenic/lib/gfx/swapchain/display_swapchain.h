@@ -62,7 +62,8 @@ class DisplaySwapchain : public Swapchain {
 
   // Static function made accessible for tests.
   static bool SetDisplayColorConversion(
-      uint64_t display_id, fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
+      fuchsia::hardware::display::DisplayId display_id,
+      fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
       const ColorTransform& transform);
 
  private:

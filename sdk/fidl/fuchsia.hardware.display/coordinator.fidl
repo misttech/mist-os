@@ -35,7 +35,7 @@ closed protocol Coordinator {
     // or revalidate and reapply their current configuration.
     strict -> OnDisplaysChanged(struct {
         added vector<Info>:MAX;
-        removed vector<DisplayIdValue>:MAX;
+        removed vector<DisplayId>:MAX;
     });
 
     // Imports a Buffer-Collection backed image. If tiling is not TYPE_SIMPLE,
@@ -112,7 +112,7 @@ closed protocol Coordinator {
     //
     // It is illegal to pass a display mode which was not part of the display's Info.
     strict SetDisplayMode(struct {
-        display_id DisplayIdValue;
+        display_id DisplayId;
         mode Mode;
     });
 
@@ -143,7 +143,7 @@ closed protocol Coordinator {
     // successful. If SetDisplayColorConversion() is called and then the config is discarded, then
     // the last successfully applied state is restored.
     strict SetDisplayColorConversion(struct {
-        display_id DisplayIdValue;
+        display_id DisplayId;
         preoffsets array<float32, 3>;
         coefficients array<float32, 9>;
         postoffsets array<float32, 3>;
@@ -156,7 +156,7 @@ closed protocol Coordinator {
     // pending config before being added to the second display's pending config. It
     // is also illegal to pass an invalid layer id.
     strict SetDisplayLayers(struct {
-        display_id DisplayIdValue;
+        display_id DisplayId;
         layer_ids vector<LayerId>:MAX;
     });
 
@@ -416,7 +416,7 @@ closed protocol Coordinator {
     // OnVsync on all display clients.
     //
     strict -> OnVsync(resource struct {
-        display_id DisplayIdValue;
+        display_id DisplayId;
         timestamp uint64;
         applied_config_stamp ConfigStamp;
         cookie uint64;
@@ -533,7 +533,7 @@ closed protocol Coordinator {
     /// Returns ZX_ERR_NOT_SUPPORTED if the display driver IC doesn't support
     /// turning on/off displays.
     strict SetDisplayPower(struct {
-        display_id DisplayIdValue;
+        display_id DisplayId;
         power_on bool;
     }) -> () error zx.Status;
 };

@@ -131,7 +131,7 @@ impl ConfigError {
 impl From<ClientCompositionOp> for ClientCompositionAction {
     fn from(src: ClientCompositionOp) -> Self {
         Self {
-            display_id: DisplayId(src.display_id),
+            display_id: src.display_id.into(),
             layer_id: src.layer_id.into(),
             opcode: src.opcode,
         }

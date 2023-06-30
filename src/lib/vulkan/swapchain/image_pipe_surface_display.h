@@ -43,7 +43,7 @@ class ImagePipeSurfaceDisplay : public ImagePipeSurface {
  private:
   void ControllerError(zx_status_t status);
   void ControllerOnDisplaysChanged(std::vector<fuchsia::hardware::display::Info>,
-                                   std::vector<uint64_t>);
+                                   std::vector<fuchsia::hardware::display::DisplayId>);
 
   bool WaitForAsyncMessage();
 
@@ -57,7 +57,8 @@ class ImagePipeSurfaceDisplay : public ImagePipeSurface {
   bool have_display_ = false;
   uint32_t width_ = 0;
   uint32_t height_ = 0;
-  uint64_t display_id_ = 0;
+  fuchsia::hardware::display::DisplayId display_id_ = {
+      .value = fuchsia::hardware::display::INVALID_DISP_ID};
   fuchsia::hardware::display::LayerId layer_id_{fuchsia::hardware::display::INVALID_DISP_ID};
   fuchsia::hardware::display::CoordinatorPtr display_coordinator_;
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;

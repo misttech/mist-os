@@ -33,7 +33,7 @@ struct RenderData {
   // TODO(fxbug.dev/70464): should we remove this, and pass to RenderFrame() as a std::map of
   // RenderData keyed by display_id?  That would have the benefit of guaranteeing by construction
   // that each display_id could only appear once.
-  uint64_t display_id;
+  fuchsia::hardware::display::DisplayId display_id;
 };
 
 // Struct to combine the source and destination frames used to set a layer's

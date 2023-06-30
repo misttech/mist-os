@@ -121,7 +121,7 @@ impl Display {
     }
 
     pub fn set_mode(&mut self, mode_idx: usize) -> Result<(), Error> {
-        self.coordinator.set_display_mode(self.info.id, &self.info.modes[mode_idx])?;
+        self.coordinator.set_display_mode(&self.info.id, &self.info.modes[mode_idx])?;
         self.mode_idx = mode_idx;
         Ok(())
     }
@@ -194,7 +194,7 @@ impl DisplayDirectViewStrategy {
             })
             .unwrap_or(0);
 
-        let mut display = Display::new(coordinator, info.id, info).await?;
+        let mut display = Display::new(coordinator, info.id.into(), info).await?;
 
         if mode_idx != 0 {
             display.set_mode(mode_idx)?;
@@ -323,7 +323,7 @@ impl DisplayDirectViewStrategy {
         let buffers = buffer_allocator
             .allocate_buffers(true)
             .await
-            .context(format!("view: {} allocate_buffers", display.display_id))?;
+            .context(format!("view: {:?} allocate_buffers", display.display_id))?;
 
         ensure!(buffers.settings.has_image_format_constraints, "No image format constraints");
         ensure!(
@@ -527,7 +527,10 @@ impl ViewStrategy for DisplayDirectViewStrategy {
             let view_key = view_details.key;
             self.display
                 .coordinator
-                .set_display_layers(self.display.display_id, &[self.display.layer_id.into()])
+                .set_display_layers(
+                    &self.display.display_id.into(),
+                    &[self.display.layer_id.into()],
+                )
                 .expect("set_display_layers");
             let (_, wait_event_id) =
                 *self.display_resources().wait_events.get(&prepared).expect("wait event");
@@ -662,7 +665,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
         }
     }
 
-    fn is_hosted_on_display(&self, display_id: u64) -> bool {
+    fn is_hosted_on_display(&self, display_id: DisplayId) -> bool {
         self.display.display_id == display_id
     }
 

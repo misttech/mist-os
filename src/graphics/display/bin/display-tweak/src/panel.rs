@@ -105,11 +105,13 @@ impl DisplayClient {
         }
 
         let display_id = self.display_infos[0].id;
-        tracing::trace!("First display's id: {}", display_id);
+        tracing::trace!("First display's id: {}", display_id.value);
 
         tracing::trace!("Setting new power state");
-        utils::flatten_zx_error(self.coordinator.set_display_power(display_id, power_state).await)
-            .context("Failed to set panel power state")
+        utils::flatten_zx_error(
+            self.coordinator.set_display_power(&display_id.into(), power_state).await,
+        )
+        .context("Failed to set panel power state")
     }
 }
 
@@ -170,7 +172,7 @@ mod tests {
                 coordinator_server.into_stream_and_control_handle().unwrap();
 
             let added_displays = &[display::Info {
-                id: 42,
+                id: display::DisplayId { value: 42 },
                 modes: vec![],
                 pixel_format: vec![],
                 cursor_configs: vec![],
@@ -185,7 +187,7 @@ mod tests {
 
             match coordinator_request_stream.next().await.unwrap() {
                 Ok(display::CoordinatorRequest::SetDisplayPower {
-                    display_id: 42,
+                    display_id: display::DisplayId { value: 42 },
                     responder,
                     ..
                 }) => {

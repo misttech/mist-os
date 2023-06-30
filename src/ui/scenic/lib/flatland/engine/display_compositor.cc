@@ -435,7 +435,8 @@ fuchsia::hardware::display::LayerId DisplayCompositor::CreateDisplayLayer() {
 }
 
 void DisplayCompositor::SetDisplayLayers(
-    const uint64_t display_id, const std::vector<fuchsia::hardware::display::LayerId>& layers) {
+    const fuchsia::hardware::display::DisplayId display_id,
+    const std::vector<fuchsia::hardware::display::LayerId>& layers) {
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::SetDisplayLayers");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   // Set all of the layers for each of the images on the display.
@@ -451,7 +452,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   // Since we map 1 image to 1 layer, if there are more images than layers available for
   // the given display, then they cannot be directly composited to the display in hardware.
   const std::vector<fuchsia::hardware::display::LayerId>& layers =
-      display_engine_data_map_.at(data.display_id).layers;
+      display_engine_data_map_.at(data.display_id.value).layers;
   if (layers.size() < num_images) {
     return false;
   }
@@ -491,7 +492,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
       // If we encounter one of those rects here -- unless it is the backmost layer and fullscreen
       // -- then we abort.
       const auto& rect = data.rectangles[i];
-      const auto& display_size = display_info_map_[data.display_id].dimensions;
+      const glm::uvec2& display_size = display_info_map_[data.display_id.value].dimensions;
       if (i == 0 && rect.origin.x == 0 && rect.origin.y == 0 &&
           rect.extent.x == static_cast<float>(display_size.x) &&
           rect.extent.y == static_cast<float>(display_size.y)) {
@@ -620,7 +621,7 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
   for (size_t i = 0; i < render_data_list.size(); ++i) {
     const bool is_final_display = i == (render_data_list.size() - 1);
     const auto& render_data = render_data_list[i];
-    const auto display_engine_data_it = display_engine_data_map_.find(render_data.display_id);
+    const auto display_engine_data_it = display_engine_data_map_.find(render_data.display_id.value);
     FX_DCHECK(display_engine_data_it != display_engine_data_map_.end());
     auto& display_engine_data = display_engine_data_it->second;
 
@@ -886,12 +887,12 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
 
   const fuchsia::math::SizeU size = {/*width*/ info.dimensions.x, /*height*/ info.dimensions.y};
 
-  const auto display_id = display->display_id();
-  FX_DCHECK(display_engine_data_map_.find(display_id) == display_engine_data_map_.end())
-      << "DisplayCompositor::AddDisplay(): display already exists: " << display_id;
+  const fuchsia::hardware::display::DisplayId display_id = display->display_id();
+  FX_DCHECK(display_engine_data_map_.find(display_id.value) == display_engine_data_map_.end())
+      << "DisplayCompositor::AddDisplay(): display already exists: " << display_id.value;
 
-  display_info_map_[display_id] = std::move(info);
-  auto& display_engine_data = display_engine_data_map_[display_id];
+  display_info_map_[display_id.value] = std::move(info);
+  DisplayEngineData& display_engine_data = display_engine_data_map_[display_id.value];
 
   {
     std::scoped_lock lock(lock_);

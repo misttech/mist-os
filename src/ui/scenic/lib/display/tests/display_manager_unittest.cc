@@ -5,6 +5,7 @@
 #include "src/ui/scenic/lib/display/display_manager.h"
 
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/async/time.h>
 
@@ -55,7 +56,7 @@ class DisplayManagerMockTest : public gtest::TestLoopFixture {
 };
 
 TEST_F(DisplayManagerMockTest, DisplayVsyncCallback) {
-  const uint64_t kDisplayId = 0;
+  constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
   const uint32_t kDisplayWidth = 1024;
   const uint32_t kDisplayHeight = 768;
   const size_t kTotalVsync = 10;

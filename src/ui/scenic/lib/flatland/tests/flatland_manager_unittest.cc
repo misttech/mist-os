@@ -115,9 +115,9 @@ class FlatlandManagerTest : public gtest::RealLoopFixture {
               });
             }));
 
-    uint64_t kDisplayId = 1;
-    uint32_t kDisplayWidth = 640;
-    uint32_t kDisplayHeight = 480;
+    constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
+    constexpr uint32_t kDisplayWidth = 640;
+    constexpr uint32_t kDisplayHeight = 480;
     std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> importers;
     manager_ = std::make_unique<FlatlandManager>(
         dispatcher(), mock_flatland_presenter_, uber_struct_system_, link_system_,

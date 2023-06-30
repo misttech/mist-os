@@ -836,7 +836,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id(), std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
 
   // Grab the capture vmo data.
@@ -959,7 +959,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
     display_compositor->RenderFrame(
         1, zx::time(1),
         GenerateDisplayListForTest(
-            {{display->display_id(), std::make_pair(display_info, root_handle)}}),
+            {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
         {}, [](const scheduling::Timestamps&) {});
 
     // Grab the capture vmo data.
@@ -1098,7 +1098,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id(), std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
 
   // Grab the capture vmo data.
@@ -1217,7 +1217,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id(), std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
 
   // Grab the capture vmo data.
@@ -1741,7 +1741,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id(), std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
   renderer->WaitIdle();
 
@@ -1920,7 +1920,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id(), std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
   renderer->WaitIdle();
 

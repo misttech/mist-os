@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/display/display_controller_listener.h"
 
+#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/images2/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
@@ -181,10 +182,10 @@ TEST_F(DisplayCoordinatorListenerTest, DisconnectCoordinatorAndDeviceChannel) {
 
 TEST_F(DisplayCoordinatorListenerTest, OnDisplaysChanged) {
   std::vector<fuchsia::hardware::display::Info> displays_added;
-  std::vector<uint64_t> displays_removed;
+  std::vector<fuchsia::hardware::display::DisplayId> displays_removed;
   auto displays_changed_cb = [&displays_added, &displays_removed](
                                  std::vector<fuchsia::hardware::display::Info> added,
-                                 std::vector<uint64_t> removed) {
+                                 std::vector<fuchsia::hardware::display::DisplayId> removed) {
     displays_added = added;
     displays_removed = removed;
   };
@@ -198,7 +199,7 @@ TEST_F(DisplayCoordinatorListenerTest, OnDisplaysChanged) {
   test_mode.refresh_rate_e2 = 60;
   test_mode.flags = 0;
   fuchsia::hardware::display::Info test_display;
-  test_display.id = 1;
+  test_display.id = {.value = 1};
   test_display.modes = {test_mode};
   test_display.pixel_format = {fuchsia::images2::PixelFormat::BGRA32};
   test_display.cursor_configs = {};
@@ -207,25 +208,25 @@ TEST_F(DisplayCoordinatorListenerTest, OnDisplaysChanged) {
   test_display.monitor_serial = "fake_monitor_serial";
 
   mock_display_coordinator()->events().OnDisplaysChanged(/*added=*/{test_display},
-                                                         /*removed=*/{2u});
+                                                         /*removed=*/{{.value = 2u}});
   ASSERT_EQ(0u, displays_added.size());
   ASSERT_EQ(0u, displays_removed.size());
   RunLoopUntilIdle();
   ASSERT_EQ(1u, displays_added.size());
   ASSERT_EQ(1u, displays_removed.size());
   EXPECT_TRUE(fidl::Equals(displays_added[0], test_display));
-  EXPECT_EQ(displays_removed[0], 2u);
+  EXPECT_EQ(displays_removed[0].value, 2u);
 
   // Verify we stop getting callbacks after ClearCallbacks().
   display_coordinator_listener()->ClearCallbacks();
   mock_display_coordinator()->events().OnDisplaysChanged(/*added=*/{},
-                                                         /*removed=*/{3u});
+                                                         /*removed=*/{{.value = 3u}});
   RunLoopUntilIdle();
 
   // Expect that nothing changed.
   ASSERT_EQ(1u, displays_added.size());
   ASSERT_EQ(1u, displays_removed.size());
-  EXPECT_EQ(displays_removed[0], 2u);
+  EXPECT_EQ(displays_removed[0].value, 2u);
 
   // Expect no crashes on teardown.
   ResetDisplayCoordinatorListener();
@@ -258,12 +259,13 @@ TEST_F(DisplayCoordinatorListenerTest, OnClientOwnershipChangeCallback) {
 }
 
 TEST_F(DisplayCoordinatorListenerTest, OnVsyncCallback) {
-  uint64_t last_display_id = 0u;
+  fuchsia::hardware::display::DisplayId last_display_id = {
+      .value = fuchsia::hardware::display::INVALID_DISP_ID};
   uint64_t last_timestamp = 0u;
   fuchsia::hardware::display::ConfigStamp last_config_stamp = {
       .value = fuchsia::hardware::display::INVALID_CONFIG_STAMP_VALUE};
 
-  auto vsync_cb = [&](uint64_t display_id, uint64_t timestamp,
+  auto vsync_cb = [&](fuchsia::hardware::display::DisplayId display_id, uint64_t timestamp,
                       fuchsia::hardware::display::ConfigStamp stamp, uint64_t cookie) {
     last_display_id = display_id;
     last_timestamp = timestamp;
@@ -274,22 +276,23 @@ TEST_F(DisplayCoordinatorListenerTest, OnVsyncCallback) {
                                                       /*client_ownership_change_cb=*/nullptr);
   display_coordinator_listener()->SetOnVsyncCallback(std::move(vsync_cb));
 
-  const uint64_t kTestDisplayId = 1u;
+  constexpr fuchsia::hardware::display::DisplayId kTestDisplayId = {.value = 1};
+  constexpr fuchsia::hardware::display::DisplayId kInvalidDisplayId = {.value = 2};
   const uint64_t kTestTimestamp = 111111u;
   const fuchsia::hardware::display::ConfigStamp kConfigStamp = {.value = 2u};
   mock_display_coordinator()->events().OnVsync(kTestDisplayId, kTestTimestamp, kConfigStamp, 0);
   ASSERT_EQ(fuchsia::hardware::display::INVALID_CONFIG_STAMP_VALUE, last_config_stamp.value);
   RunLoopUntilIdle();
-  EXPECT_EQ(kTestDisplayId, last_display_id);
+  EXPECT_EQ(kTestDisplayId.value, last_display_id.value);
   EXPECT_EQ(kTestTimestamp, last_timestamp);
   EXPECT_EQ(last_config_stamp.value, kConfigStamp.value);
 
   // Verify we stop getting callbacks after ClearCallbacks().
   display_coordinator_listener()->ClearCallbacks();
-  mock_display_coordinator()->events().OnVsync(kTestDisplayId + 1, kTestTimestamp, kConfigStamp, 0);
+  mock_display_coordinator()->events().OnVsync(kInvalidDisplayId, kTestTimestamp, kConfigStamp, 0);
   // Expect that nothing changed.
   RunLoopUntilIdle();
-  EXPECT_EQ(kTestDisplayId, last_display_id);
+  EXPECT_EQ(kTestDisplayId.value, last_display_id.value);
 
   // Expect no crashes on teardown.
   ResetDisplayCoordinatorListener();

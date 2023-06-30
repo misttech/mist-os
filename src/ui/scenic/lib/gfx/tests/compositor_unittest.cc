@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
@@ -40,10 +41,11 @@ class CompositorTest : public SessionTest {
     SessionTest::SetUp();
     display_manager_ = std::make_unique<display::DisplayManager>([]() {});
 
+    constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
     constexpr float display_width = 1024;
     constexpr float display_height = 768;
     display_manager_->SetDefaultDisplayForTests(std::make_unique<display::Display>(
-        /*id*/ 0, /*px-width*/ display_width, /*px-height*/ display_height));
+        kDisplayId, /*width_in_px=*/display_width, /*height_in_px=*/display_height));
     sysmem_ = std::make_unique<Sysmem>();
   }
 
@@ -110,7 +112,7 @@ TEST_F(CompositorTest, Validation) {
     display::test::MockDisplayCoordinator mock_display_coordinator;
 
     mock_display_coordinator.set_display_color_conversion_fn(
-        [&](uint64_t display_id, std::array<float, 3> preoffsets_out,
+        [&](fuchsia::hardware::display::DisplayId display_id, std::array<float, 3> preoffsets_out,
             std::array<float, 9> matrix_out, std::array<float, 3> postoffsets_out) {
           // Check that the display coordinator got the color correction matrix we passed in.
           EXPECT_EQ(preoffsets, preoffsets_out);
@@ -211,7 +213,8 @@ TEST_F(CompositorTestSimple, ColorConversionConfigChecking) {
   mock_display_coordinator.set_check_config_fn(check_config_fn);
 
   std::thread client([display_coordinator = std::move(display_coordinator), transform]() mutable {
-    DisplaySwapchain::SetDisplayColorConversion(/*id=*/1, display_coordinator, transform);
+    constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
+    DisplaySwapchain::SetDisplayColorConversion(kDisplayId, display_coordinator, transform);
   });
 
   // Wait for |SetDisplayColorConversion|.

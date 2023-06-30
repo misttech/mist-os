@@ -4,6 +4,8 @@
 
 #include "src/ui/scenic/lib/gfx/tests/vk_session_test.h"
 
+#include <fuchsia/hardware/display/cpp/fidl.h>
+
 #include "src/ui/lib/escher/impl/vulkan_utils.h"
 #include "src/ui/lib/escher/test/common/vk/vk_debug_report_collector.h"
 
@@ -36,10 +38,11 @@ void VkSessionTest::SetUp() {
 
   sysmem_ = std::make_unique<Sysmem>();
   display_manager_ = std::make_unique<display::DisplayManager>([]() {});
+  constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
   constexpr float display_width = 1024;
   constexpr float display_height = 768;
   display_manager_->SetDefaultDisplayForTests(std::make_unique<display::Display>(
-      /*id*/ 0, /*px-width*/ display_width, /*px-height*/ display_height));
+      /*id*/ kDisplayId, /*px-width*/ display_width, /*px-height*/ display_height));
 }
 void VkSessionTest::TearDown() {
   EXPECT_VULKAN_VALIDATION_OK();

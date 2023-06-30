@@ -75,14 +75,14 @@ pub struct DisplayInfo(pub Info);
 impl DisplayInfo {
     /// Returns the ID for this display.
     pub fn id(&self) -> DisplayId {
-        DisplayId(self.0.id)
+        self.0.id.into()
     }
 }
 
 /// Custom user-friendly format representation.
 impl fmt::Display for DisplayInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Display (id: {})", self.0.id)?;
+        writeln!(f, "Display (id: {})", self.0.id.value)?;
         writeln!(f, "\tManufacturer Name: \"{}\"", self.0.manufacturer_name)?;
         writeln!(f, "\tMonitor Name: \"{}\"", self.0.monitor_name)?;
         writeln!(f, "\tMonitor Serial: \"{}\"", self.0.monitor_serial)?;

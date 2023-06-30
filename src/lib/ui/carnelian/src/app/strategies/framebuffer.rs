@@ -190,7 +190,7 @@ impl DisplayCoordinator {
     }
 }
 
-pub type DisplayId = u64;
+pub type DisplayId = display_utils::DisplayId;
 
 #[derive(Debug)]
 pub struct DisplayInfo {
@@ -233,13 +233,13 @@ impl<'a> DisplayDirectAppStrategy<'a> {
     async fn handle_displays_changed(
         &mut self,
         added: Vec<fidl_fuchsia_hardware_display::Info>,
-        removed: Vec<u64>,
+        removed: Vec<fidl_fuchsia_hardware_display::DisplayId>,
     ) -> Result<(), Error> {
         let display_coordinator = self.display_coordinator.as_ref().expect("display_coordinator");
         for display_id in removed {
-            self.views.remove(&display_id);
+            self.views.remove(&display_id.into());
             self.app_sender
-                .unbounded_send(MessageInternal::CloseViewsOnDisplay(display_id))
+                .unbounded_send(MessageInternal::CloseViewsOnDisplay(display_id.into()))
                 .expect("unbounded");
         }
 
@@ -288,7 +288,7 @@ impl<'a> AppStrategy for DisplayDirectAppStrategy<'a> {
                 "Incorrect ViewStrategyParams passed to create_view_strategy for frame buffer"
             ),
         };
-        let views_on_display = self.views.entry(strategy_params.info.id).or_default();
+        let views_on_display = self.views.entry(strategy_params.info.id.into()).or_default();
         views_on_display.push(key);
         Ok(DisplayDirectViewStrategy::new(
             key,

@@ -26,7 +26,7 @@ class DisplayCoordinatorTest_DisplayCoordinatorTest_Test;
 
 using DisplayCoordinatorUniquePtr =
     std::unique_ptr<DisplayCoordinator, std::function<void(DisplayCoordinator*)>>;
-using OnDisplayRemovedCallback = fit::function<void(/*display_id=*/uint64_t)>;
+using OnDisplayRemovedCallback = fit::function<void(fuchsia::hardware::display::DisplayId)>;
 using OnDisplayAddedCallback = fit::function<void(Display2*)>;
 using OnVsyncCallback =
     fit::function<void(zx::time timestamp, fuchsia::hardware::display::ConfigStamp config_stamp)>;
@@ -34,11 +34,12 @@ using OnVsyncCallback =
 // Display metadata, as well as a registration point for vsync events for the display.
 class Display2 {
  public:
-  Display2(uint64_t display_id, std::vector<fuchsia::hardware::display::Mode> display_modes,
+  Display2(fuchsia::hardware::display::DisplayId display_id,
+           std::vector<fuchsia::hardware::display::Mode> display_modes,
            std::vector<fuchsia_images2::PixelFormat> pixel_formats);
 
   // The display's ID in the context of DisplayManager's DisplayCoordinator.
-  uint64_t display_id() const { return display_id_; }
+  fuchsia::hardware::display::DisplayId display_id() const { return display_id_; }
 
   const std::vector<fuchsia::hardware::display::Mode>& display_modes() const {
     return display_modes_;
@@ -52,7 +53,7 @@ class Display2 {
   void OnVsync(zx::time timestamp, fuchsia::hardware::display::ConfigStamp config_stamp);
 
  private:
-  uint64_t display_id_;
+  fuchsia::hardware::display::DisplayId display_id_;
   std::vector<fuchsia::hardware::display::Mode> display_modes_;
   std::vector<fuchsia_images2::PixelFormat> pixel_formats_;
   OnVsyncCallback on_vsync_callback_;
@@ -92,7 +93,7 @@ class DisplayCoordinator {
   void AddDisplay(Display2 display);
 
   // Removes a display. Should only be called by DisplayManager or during testing.
-  bool RemoveDisplay(uint64_t display_id);
+  bool RemoveDisplay(fuchsia::hardware::display::DisplayId display_id);
 
   std::vector<Display2> displays_;
   // TODO(fxbug.dev/42795): Replace with a fxl::WeakPtr.

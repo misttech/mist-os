@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{ensure, format_err, Context as _, Error};
-use display_utils::{get_bytes_per_pixel, LayerId, PixelFormat};
+use display_utils::{get_bytes_per_pixel, DisplayId, LayerId, PixelFormat};
 use fidl::endpoints::{self, ClientEnd};
 use fidl_fuchsia_hardware_display::{
     ConfigStamp, CoordinatorEvent, CoordinatorMarker, CoordinatorProxy, ImageConfig,
@@ -174,7 +174,7 @@ pub fn to_565(pixel: &[u8; 4]) -> [u8; 2] {
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Config {
-    pub display_id: u64,
+    pub display_id: DisplayId,
     pub width: u32,
     pub height: u32,
     pub refresh_rate_e2: u32,
@@ -526,7 +526,7 @@ mod frame_collection_tests {
 
 #[derive(Debug)]
 pub struct VSync {
-    pub display_id: u64,
+    pub display_id: DisplayId,
     pub timestamp: u64,
     pub applied_config_stamp: ConfigStamp,
     pub cookie: u64,
@@ -584,7 +584,7 @@ impl FrameBuffer {
         }
         let pixel_size_bytes = get_bytes_per_pixel(pixel_format.into())? as u32;
         Ok(Config {
-            display_id: display_id,
+            display_id: display_id.into(),
             width: width,
             height: height,
             refresh_rate_e2: refresh_rate_e2,
@@ -606,7 +606,7 @@ impl FrameBuffer {
     pub fn configure_layer(&mut self, config: &Config, image_type: u32) -> Result<(), Error> {
         let image_config = Frame::create_image_config(image_type, config);
         self.coordinator.set_layer_primary_config(&self.layer_id.into(), &image_config)?;
-        self.coordinator.set_display_layers(config.display_id, &[self.layer_id.into()])?;
+        self.coordinator.set_display_layers(&config.display_id.into(), &[self.layer_id.into()])?;
         Ok(())
     }
 
@@ -718,7 +718,7 @@ impl FrameBuffer {
                         } => {
                             sender
                                 .unbounded_send(Message::VSync(VSync {
-                                    display_id,
+                                    display_id: display_id.into(),
                                     timestamp,
                                     applied_config_stamp,
                                     cookie,
@@ -789,7 +789,8 @@ impl FrameBuffer {
         sender: Option<futures::channel::mpsc::UnboundedSender<ImageInCollection>>,
         signal_wait_event: bool,
     ) -> Result<(), Error> {
-        self.coordinator.set_display_layers(self.config.display_id, &[self.layer_id.into()])?;
+        self.coordinator
+            .set_display_layers(&self.config.display_id.into(), &[self.layer_id.into()])?;
         self.coordinator
             .set_layer_image(
                 &self.layer_id.into(),

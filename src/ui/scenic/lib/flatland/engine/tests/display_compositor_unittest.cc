@@ -941,7 +941,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   // Submit the UberStruct.
   child_session.PushUberStruct(std::move(child_struct));
 
-  uint64_t display_id = 1;
+  constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
   glm::uvec2 resolution(1024, 768);
 
   // We will end up with 2 source frames, 2 destination frames, and two layers beind sent to the
@@ -1033,7 +1033,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
 
   std::vector<fuchsia::hardware::display::LayerId> layers = {{.value = 1}, {.value = 2}};
   EXPECT_CALL(*mock_display_coordinator_,
-              SetDisplayLayers(display_id,
+              SetDisplayLayers(FidlEquals(kDisplayId),
                                testing::ElementsAre(FidlEquals(layers[0]), FidlEquals(layers[1]))))
       .Times(1);
 
@@ -1073,7 +1073,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   EXPECT_CALL(*renderer_, ChoosePreferredPixelFormat(_));
 
   DisplayInfo display_info = {resolution, {kPixelFormat}};
-  scenic_impl::display::Display display(display_id, resolution.x, resolution.y);
+  scenic_impl::display::Display display(kDisplayId, resolution.x, resolution.y);
   display_compositor_->AddDisplay(&display, display_info, /*num_vmos*/ 0,
                                   /*out_buffer_collection*/ nullptr);
 
@@ -1087,7 +1087,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
 
   display_compositor_->RenderFrame(
       1, zx::time(1),
-      GenerateDisplayListForTest({{display_id, {display_info, parent_root_handle}}}), {},
+      GenerateDisplayListForTest({{kDisplayId.value, {display_info, parent_root_handle}}}), {},
       [](const scheduling::Timestamps&) {});
 
   for (uint32_t i = 0; i < 2; i++) {
@@ -1141,7 +1141,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   // Submit the UberStruct.
   parent_session.PushUberStruct(std::move(parent_struct));
 
-  uint64_t display_id = 1;
+  constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
   glm::uvec2 resolution(1024, 768);
 
   // We will end up with 1 source frame, 1 destination frame, and one layer being sent to the
@@ -1221,7 +1221,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   // However, we only set one display layer for the image.
   std::vector<fuchsia::hardware::display::LayerId> layers = {{.value = 1}};
   EXPECT_CALL(*mock_display_coordinator_,
-              SetDisplayLayers(display_id, testing::ElementsAre(FidlEquals(layers[0]))))
+              SetDisplayLayers(FidlEquals(kDisplayId), testing::ElementsAre(FidlEquals(layers[0]))))
       .Times(1);
 
   uint64_t collection_id = parent_image_metadata.identifier;
@@ -1255,7 +1255,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   EXPECT_CALL(*renderer_, ChoosePreferredPixelFormat(_));
 
   DisplayInfo display_info = {resolution, {kPixelFormat}};
-  scenic_impl::display::Display display(display_id, resolution.x, resolution.y);
+  scenic_impl::display::Display display(kDisplayId, resolution.x, resolution.y);
   display_compositor_->AddDisplay(&display, display_info, /*num_vmos*/ 0,
                                   /*out_buffer_collection*/ nullptr);
 
@@ -1269,7 +1269,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
 
   display_compositor_->RenderFrame(
       1, zx::time(1),
-      GenerateDisplayListForTest({{display_id, {display_info, parent_root_handle}}}), {},
+      GenerateDisplayListForTest({{kDisplayId.value, {display_info, parent_root_handle}}}), {},
       [](const scheduling::Timestamps&) {});
 
   for (uint64_t i = 1; i < layer_id_value; ++i) {
@@ -1546,7 +1546,7 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   EXPECT_CALL(*renderer_, ChoosePreferredPixelFormat(_));
 
   // Add display.
-  uint64_t kDisplayId = 1;
+  constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
   glm::uvec2 kResolution(1024, 768);
   DisplayInfo display_info = {kResolution, {kPixelFormat}};
   scenic_impl::display::Display display(kDisplayId, kResolution.x, kResolution.y);
@@ -1559,8 +1559,9 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   EXPECT_CALL(*mock_display_coordinator_, ImportEvent(_, _))
       .WillOnce(testing::Invoke(
           [&imported_event](zx::event event, uint64_t) { imported_event = std::move(event); }));
-  EXPECT_CALL(*mock_display_coordinator_,
-              SetDisplayLayers(kDisplayId, testing::ElementsAre(FidlEquals(active_layers[0]))))
+  EXPECT_CALL(
+      *mock_display_coordinator_,
+      SetDisplayLayers(FidlEquals(kDisplayId), testing::ElementsAre(FidlEquals(active_layers[0]))))
       .Times(1);
   EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryConfig(FidlEquals(layers[0]), _)).Times(1);
   EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryPosition(FidlEquals(layers[0]), _, _, _))
@@ -1585,7 +1586,7 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
 
   // Render image. This should end up in display.
   const auto& display_list =
-      GenerateDisplayListForTest({{kDisplayId, {display_info, root_handle}}});
+      GenerateDisplayListForTest({{kDisplayId.value, {display_info, root_handle}}});
   display_compositor_->RenderFrame(1, zx::time(1), display_list, {},
                                    [](const scheduling::Timestamps&) {});
 

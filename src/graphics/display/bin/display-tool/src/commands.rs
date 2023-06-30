@@ -4,7 +4,7 @@
 
 use {
     anyhow::{format_err, Result},
-    display_utils::{Coordinator, PixelFormat},
+    display_utils::{Coordinator, DisplayId, PixelFormat},
 };
 
 mod display_color_layer;
@@ -13,10 +13,14 @@ mod static_config_vsync_loop;
 
 use crate::rgb::Rgb888;
 
-pub fn show_display_info(coordinator: &Coordinator, id: Option<u64>, fidl: bool) -> Result<()> {
+pub fn show_display_info(
+    coordinator: &Coordinator,
+    id: Option<DisplayId>,
+    fidl: bool,
+) -> Result<()> {
     let displays = coordinator.displays();
     println!("{} display(s) available", displays.len());
-    for display in displays.iter().filter(|&info| id.map_or(true, |id| info.0.id == id)) {
+    for display in displays.iter().filter(|&info| id.map_or(true, |id| id == info.0.id.into())) {
         if fidl {
             println!("{:#?}", display.0);
         } else {
@@ -28,7 +32,7 @@ pub fn show_display_info(coordinator: &Coordinator, id: Option<u64>, fidl: bool)
 
 pub async fn vsync(
     coordinator: &Coordinator,
-    id: Option<u64>,
+    id: Option<DisplayId>,
     color: Rgb888,
     pixel_format: PixelFormat,
 ) -> Result<()> {
@@ -42,8 +46,8 @@ pub async fn vsync(
         None => &displays[0],
         Some(id) => displays
             .iter()
-            .find(|d| d.id().0 == id)
-            .ok_or_else(|| format_err!("display with id '{}' not found", id))?,
+            .find(|d| d.id() == id)
+            .ok_or_else(|| format_err!("display with id '{:?}' not found", id))?,
     };
 
     static_config_vsync_loop::run(
@@ -55,7 +59,7 @@ pub async fn vsync(
 
 pub async fn color(
     coordinator: &Coordinator,
-    id: Option<u64>,
+    id: Option<DisplayId>,
     color: Rgb888,
     pixel_format: PixelFormat,
 ) -> Result<()> {
@@ -69,8 +73,8 @@ pub async fn color(
         None => &displays[0],
         Some(id) => displays
             .iter()
-            .find(|d| d.id().0 == id)
-            .ok_or_else(|| format_err!("display with id '{}' not found", id))?,
+            .find(|d| d.id() == id)
+            .ok_or_else(|| format_err!("display with id '{:?}' not found", id))?,
     };
 
     display_color_layer::run(
@@ -80,7 +84,7 @@ pub async fn color(
     .await
 }
 
-pub async fn squares(coordinator: &Coordinator, id: Option<u64>) -> Result<()> {
+pub async fn squares(coordinator: &Coordinator, id: Option<DisplayId>) -> Result<()> {
     let displays = coordinator.displays();
     if displays.is_empty() {
         return Err(format_err!("no displays found"));
@@ -91,8 +95,8 @@ pub async fn squares(coordinator: &Coordinator, id: Option<u64>) -> Result<()> {
         None => &displays[0],
         Some(id) => displays
             .iter()
-            .find(|d| d.id().0 == id)
-            .ok_or_else(|| format_err!("display with id '{}' not found", id))?,
+            .find(|d| d.id() == id)
+            .ok_or_else(|| format_err!("display with id '{:?}' not found", id))?,
     };
 
     double_buffered_fence_loop::run(coordinator, display).await

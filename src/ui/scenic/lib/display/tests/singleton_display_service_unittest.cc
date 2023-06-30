@@ -13,7 +13,9 @@ namespace display {
 namespace test {
 
 TEST(SingletonDisplayService, Request) {
-  auto display = std::make_shared<Display>(0, 777, 555, 77, 55,
+  auto display = std::make_shared<Display>(fuchsia::hardware::display::DisplayId{.value = 1},
+                                           /*width_in_px=*/777, /*height_in_px=*/555,
+                                           /*width_in_mm=*/77, /*height_in_mm=*/55,
                                            std::vector{fuchsia_images2::PixelFormat::kBgra32});
   auto singleton = std::make_unique<SingletonDisplayService>(display);
 
@@ -45,7 +47,9 @@ TEST(SingletonDisplayService, Request) {
 }
 
 TEST(SingletonDisplayService, DevicePixelRatioChange) {
-  auto display = std::make_shared<Display>(0, 777, 555, 77, 55,
+  auto display = std::make_shared<Display>(fuchsia::hardware::display::DisplayId{.value = 1},
+                                           /*width_in_px=*/777, /*height_in_px=*/555,
+                                           /*width_in_mm=*/77, /*height_in_mm=*/55,
                                            std::vector{fuchsia_images2::PixelFormat::kBgra32});
   auto singleton = std::make_unique<SingletonDisplayService>(display);
 
