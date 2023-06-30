@@ -16,8 +16,7 @@ use crate::{
     canonicalize_range, take_back, take_back_mut, take_front, take_front_mut,
     AsFragmentedByteSlice, Buffer, BufferView, BufferViewMut, ContiguousBuffer, EmptyBuf,
     FragmentedBuffer, FragmentedBufferMut, FragmentedBytes, FragmentedBytesMut, GrowBuffer,
-    GrowBufferMut, ParsablePacket, ParseBuffer, ParseBufferMut, ReusableBuffer, SerializeBuffer,
-    ShrinkBuffer,
+    GrowBufferMut, ParsablePacket, ParseBuffer, ParseBufferMut, ReusableBuffer, ShrinkBuffer,
 };
 
 /// Either of two buffers.
@@ -222,6 +221,13 @@ where
     A: GrowBuffer,
     B: GrowBuffer,
 {
+    #[inline]
+    fn with_parts<O, F>(&self, f: F) -> O
+    where
+        F: for<'a, 'b> FnOnce(&'a [u8], FragmentedBytes<'a, 'b>, &'a [u8]) -> O,
+    {
+        call_method_on_either!(self, with_parts, f)
+    }
     fn capacity(&self) -> usize {
         call_method_on_either!(self, capacity)
     }
@@ -242,16 +248,16 @@ where
     }
 }
 
-impl<A, B> SerializeBuffer for Either<A, B>
+impl<A, B> GrowBufferMut for Either<A, B>
 where
-    A: SerializeBuffer,
-    B: SerializeBuffer,
+    A: GrowBufferMut,
+    B: GrowBufferMut,
 {
-    fn with_parts<O, F>(&mut self, f: F) -> O
+    fn with_parts_mut<O, F>(&mut self, f: F) -> O
     where
         F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O,
     {
-        call_method_on_either!(self, with_parts, f)
+        call_method_on_either!(self, with_parts_mut, f)
     }
 
     fn serialize<BB: PacketBuilder>(&mut self, builder: BB) {
@@ -390,6 +396,15 @@ impl<B: AsRef<[u8]> + AsMut<[u8]>> ParseBufferMut for Buf<B> {
 }
 
 impl<B: AsRef<[u8]>> GrowBuffer for Buf<B> {
+    fn with_parts<O, F>(&self, f: F) -> O
+    where
+        F: for<'a, 'b> FnOnce(&'a [u8], FragmentedBytes<'a, 'b>, &'a [u8]) -> O,
+    {
+        let (prefix, buf) = self.buf.as_ref().split_at(self.body.start);
+        let (body, suffix) = buf.split_at(self.body.end - self.body.start);
+        let mut body = [&body[..]];
+        f(prefix, body.as_fragmented_byte_slice(), suffix)
+    }
     fn capacity(&self) -> usize {
         self.buf.as_ref().len()
     }
@@ -409,8 +424,8 @@ impl<B: AsRef<[u8]>> GrowBuffer for Buf<B> {
     }
 }
 
-impl<B: AsRef<[u8]> + AsMut<[u8]>> SerializeBuffer for Buf<B> {
-    fn with_parts<O, F>(&mut self, f: F) -> O
+impl<B: AsRef<[u8]> + AsMut<[u8]>> GrowBufferMut for Buf<B> {
+    fn with_parts_mut<O, F>(&mut self, f: F) -> O
     where
         F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O,
     {
@@ -1333,7 +1348,7 @@ pub trait Serializer: Sized {
     /// it and allocating a new one.
     ///
     /// [`encapsulate`]: Serializer::encapsulate
-    fn serialize<B: SerializeBuffer, P: BufferProvider<Self::Buffer, B>>(
+    fn serialize<B: GrowBufferMut, P: BufferProvider<Self::Buffer, B>>(
         self,
         outer: PacketConstraints,
         provider: P,
@@ -1407,7 +1422,7 @@ pub trait Serializer: Sized {
     ///
     /// [`serialize`]: Serializer::serialize
     #[inline]
-    fn serialize_outer<B: SerializeBuffer, P: BufferProvider<Self::Buffer, B>>(
+    fn serialize_outer<B: GrowBufferMut, P: BufferProvider<Self::Buffer, B>>(
         self,
         provider: P,
     ) -> Result<B, (SerializeError<P::Error>, Self)> {
@@ -1500,7 +1515,7 @@ impl<I: InnerPacketBuilder, B: GrowBuffer + ShrinkBuffer> Serializer for InnerSe
 
     #[inline]
     #[allow(clippy::type_complexity)]
-    fn serialize<BB: SerializeBuffer, P: BufferProvider<B, BB>>(
+    fn serialize<BB: GrowBufferMut, P: BufferProvider<B, BB>>(
         self,
         outer: PacketConstraints,
         provider: P,
@@ -1546,7 +1561,7 @@ impl<B: GrowBuffer + ShrinkBuffer> Serializer for B {
     type Buffer = B;
 
     #[inline]
-    fn serialize<BB: SerializeBuffer, P: BufferProvider<Self::Buffer, BB>>(
+    fn serialize<BB: GrowBufferMut, P: BufferProvider<Self::Buffer, BB>>(
         self,
         outer: PacketConstraints,
         provider: P,
@@ -1568,7 +1583,7 @@ pub enum EitherSerializer<A, B> {
 impl<A: Serializer, B: Serializer<Buffer = A::Buffer>> Serializer for EitherSerializer<A, B> {
     type Buffer = A::Buffer;
 
-    fn serialize<TB: SerializeBuffer, P: BufferProvider<Self::Buffer, TB>>(
+    fn serialize<TB: GrowBufferMut, P: BufferProvider<Self::Buffer, TB>>(
         self,
         outer: PacketConstraints,
         provider: P,
@@ -1626,7 +1641,7 @@ impl<B> TruncatingSerializer<B> {
 impl<B: GrowBuffer + ShrinkBuffer> Serializer for TruncatingSerializer<B> {
     type Buffer = B;
 
-    fn serialize<BB: SerializeBuffer, P: BufferProvider<B, BB>>(
+    fn serialize<BB: GrowBufferMut, P: BufferProvider<B, BB>>(
         mut self,
         outer: PacketConstraints,
         provider: P,
@@ -1684,7 +1699,7 @@ impl<I: Serializer, O: PacketBuilder> Serializer for Nested<I, O> {
     type Buffer = I::Buffer;
 
     #[inline]
-    fn serialize<B: SerializeBuffer, P: BufferProvider<I::Buffer, B>>(
+    fn serialize<B: GrowBufferMut, P: BufferProvider<I::Buffer, B>>(
         self,
         outer: PacketConstraints,
         provider: P,
@@ -1802,7 +1817,7 @@ mod tests {
     {
         type Buffer = S::Buffer;
 
-        fn serialize<B: SerializeBuffer, P: BufferProvider<Self::Buffer, B>>(
+        fn serialize<B: GrowBufferMut, P: BufferProvider<Self::Buffer, B>>(
             self,
             outer: PacketConstraints,
             provider: P,
@@ -2541,6 +2556,16 @@ mod tests {
     }
 
     impl<B: BufferMut> GrowBuffer for ScatterGatherBuf<B> {
+        fn with_parts<O, F>(&self, f: F) -> O
+        where
+            F: for<'a, 'b> FnOnce(&'a [u8], FragmentedBytes<'a, 'b>, &'a [u8]) -> O,
+        {
+            let (prefix, rest) = self.data.split_at(self.range.start);
+            let (prefix_b, rest) = rest.split_at(self.mid - self.range.start);
+            let (suffix_b, suffix) = rest.split_at(self.range.end - self.mid);
+            let mut bytes = [prefix_b, self.inner.as_ref(), suffix_b];
+            f(prefix, bytes.as_fragmented_byte_slice(), suffix)
+        }
         fn prefix_len(&self) -> usize {
             self.range.start
         }
@@ -2559,8 +2584,8 @@ mod tests {
         }
     }
 
-    impl<B: BufferMut> SerializeBuffer for ScatterGatherBuf<B> {
-        fn with_parts<O, F>(&mut self, f: F) -> O
+    impl<B: BufferMut> GrowBufferMut for ScatterGatherBuf<B> {
+        fn with_parts_mut<O, F>(&mut self, f: F) -> O
         where
             F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O,
         {

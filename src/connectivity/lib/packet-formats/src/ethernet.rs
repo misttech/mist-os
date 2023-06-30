@@ -317,7 +317,7 @@ pub mod testutil {
 #[cfg(test)]
 mod tests {
     use packet::{
-        AsFragmentedByteSlice, Buf, InnerPacketBuilder, ParseBuffer, SerializeBuffer,
+        AsFragmentedByteSlice, Buf, GrowBufferMut, InnerPacketBuilder, ParseBuffer,
         SerializeTarget, Serializer,
     };
     use zerocopy::byteorder::{ByteOrder, NetworkEndian};
@@ -563,7 +563,9 @@ mod tests {
         );
 
         let mut buffer = [UNWRITTEN_BYTE; ETHERNET_MIN_FRAME_LEN];
-        SerializeBuffer::serialize(
+        // TODO(https://fxbug.dev/129396): Don't use this `#[doc(hidden)]`
+        // method, and use the public API instead.
+        GrowBufferMut::serialize(
             &mut Buf::new(&mut buffer[..], ETHERNET_HDR_LEN_NO_TAG..ETHERNET_HDR_LEN_NO_TAG),
             builder,
         );

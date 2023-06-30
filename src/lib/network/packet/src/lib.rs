@@ -717,21 +717,33 @@ pub trait ParseBufferMut: ParseBuffer + ContiguousBufferMut {
 /// [`to_flattened_vec`]: FragmentedBuffer::to_flattened_vec
 /// [`undo_parse`]: GrowBuffer::undo_parse
 pub trait GrowBuffer: FragmentedBuffer {
+    /// Gets a view into the parts of this `GrowBuffer`.
+    ///
+    /// Calls `f`, passing the prefix, body, and suffix as arguments (in that
+    /// order).
+    fn with_parts<O, F>(&self, f: F) -> O
+    where
+        F: for<'a, 'b> FnOnce(&'a [u8], FragmentedBytes<'a, 'b>, &'a [u8]) -> O;
+
     /// The capacity of the buffer.
     ///
     /// `b.capacity()` is equivalent to `b.prefix_len() + b.len() +
     /// b.suffix_len()`.
     fn capacity(&self) -> usize {
-        self.prefix_len() + self.len() + self.suffix_len()
+        self.with_parts(|prefix, body, suffix| prefix.len() + body.len() + suffix.len())
     }
 
     /// The length of the prefix.
-    fn prefix_len(&self) -> usize;
+    fn prefix_len(&self) -> usize {
+        self.with_parts(|prefix, _body, _suffix| prefix.len())
+    }
 
     /// The length of the suffix.
-    fn suffix_len(&self) -> usize;
+    fn suffix_len(&self) -> usize {
+        self.with_parts(|_prefix, _body, suffix| suffix.len())
+    }
 
-    /// Grows the front of the body towards the beginning of the buffer.
+    /// Grows the front of the body towards Growf the buffer.
     ///
     /// `grow_front` consumes the right-most `n` bytes of the prefix, and adds
     /// them to the body.
@@ -812,6 +824,14 @@ pub trait GrowBuffer: FragmentedBuffer {
 /// A `GrowBufferMut`, on the other hand, provides mutable access to the
 /// contents of its prefix, body, and suffix.
 pub trait GrowBufferMut: GrowBuffer + FragmentedBufferMut {
+    /// Gets a mutable view into the parts of this `GrowBufferMut`.
+    ///
+    /// Calls `f`, passing the prefix, body, and suffix as arguments (in that
+    /// order).
+    fn with_parts_mut<O, F>(&mut self, f: F) -> O
+    where
+        F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O;
+
     /// Extends the front of the body towards the beginning of the buffer,
     /// zeroing the new bytes.
     ///
@@ -847,41 +867,6 @@ pub trait GrowBufferMut: GrowBuffer + FragmentedBufferMut {
         self.grow_front_zero(self.prefix_len());
         self.grow_back_zero(self.suffix_len());
     }
-}
-
-impl<B: GrowBuffer + FragmentedBufferMut> GrowBufferMut for B {}
-
-/// A buffer that can be serialized into.
-///
-/// `SerializeBuffer` is a [`GrowBufferMut`] that can be serialized into. A
-/// `SerializeBuffer` MAY have a fragmented body but it MUST NOT have a
-/// fragmented prefix or suffix. That is a requirement in order to serialize
-/// a [`PacketBuilder`], as [`PacketBuilder::serialize`] requires contiguous
-/// memory into which it can write its header and footer.
-///
-/// This guarantee allows for complex buffer setups that reuse a body from
-/// incoming data, but need to serialize a new header or footer around that
-/// body, e.g., a scatter-gather buffer that has dedicated space for serializing
-/// new headers and footers and reuses the body from another buffer.
-///
-/// Because `SerializeBuffer` is a sub-trait of [`GrowBufferMut`] but NOT of
-/// [`ShrinkBuffer`], implementers may guarantee a correct implementation that
-/// always provides a contiguous prefix and suffix without resorting to runtime
-/// panics. \[1\]
-///
-/// \[1\] If `SerializeBuffer` were also a sub-trait of `ShrinkBuffer`, then it
-/// would be possible to start off with a buffer with a fragmented body, and
-/// then shrink the buffer such that the prefix or suffix would become
-/// fragmented, which would be a violation of `SerializeBuffer`'s invariants.
-/// The only option, in this case, would be to panic.
-pub trait SerializeBuffer: GrowBufferMut {
-    /// Gets a view into the parts of this `SerializeBuffer`.
-    ///
-    /// Calls `f`, passing the prefix, body, and suffix as arguments (in that
-    /// order).
-    fn with_parts<O, F>(&mut self, f: F) -> O
-    where
-        F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O;
 
     /// Serializes a packet in the buffer.
     ///
@@ -939,7 +924,7 @@ pub trait SerializeBuffer: GrowBufferMut {
             c.footer_len()
         );
 
-        self.with_parts(|prefix, body, suffix| {
+        self.with_parts_mut(|prefix, body, suffix| {
             let header = prefix.len() - c.header_len();
             let header = &mut prefix[header..];
             let footer = &mut suffix[..c.footer_len()];
@@ -961,12 +946,12 @@ pub trait SerializeBuffer: GrowBufferMut {
 
 /// A byte buffer that can be serialized into multiple times.
 ///
-/// `ReusableBuffer` is a shorthand for `SerializeBuffer + ShrinkBuffer`. A
+/// `ReusableBuffer` is a shorthand for `GrowBufferMut + ShrinkBuffer`. A
 /// `ReusableBuffer` can be serialized into multiple times - the
 /// [`ShrinkBuffer`] implementation allows the buffer's capacity to be reclaimed
 /// for a new serialization pass.
-pub trait ReusableBuffer: SerializeBuffer + ShrinkBuffer {}
-impl<B> ReusableBuffer for B where B: SerializeBuffer + ShrinkBuffer {}
+pub trait ReusableBuffer: GrowBufferMut + ShrinkBuffer {}
+impl<B> ReusableBuffer for B where B: GrowBufferMut + ShrinkBuffer {}
 
 /// A byte buffer used for parsing that can grow back to its original size.
 ///
@@ -986,11 +971,11 @@ pub trait Buffer: GrowBuffer + ParseBuffer {
 
 /// A byte buffer used for parsing and serialization.
 ///
-/// `BufferMut` is a shorthand for `SerializeBuffer + ParseBufferMut`. A
+/// `BufferMut` is a shorthand for `GrowBufferMut + ParseBufferMut`. A
 /// `BufferMut` can be used for parsing (via [`ParseBufferMut`]) and
-/// serialization (via [`SerializeBuffer`]).
-pub trait BufferMut: SerializeBuffer + ParseBufferMut + Buffer {}
-impl<B> BufferMut for B where B: SerializeBuffer + ParseBufferMut + Buffer {}
+/// serialization (via [`GrowBufferMut`]).
+pub trait BufferMut: GrowBufferMut + ParseBufferMut + Buffer {}
+impl<B> BufferMut for B where B: GrowBufferMut + ParseBufferMut + Buffer {}
 
 /// An empty buffer.
 ///
@@ -1049,12 +1034,11 @@ impl ParseBufferMut for EmptyBuf {
 }
 impl GrowBuffer for EmptyBuf {
     #[inline]
-    fn prefix_len(&self) -> usize {
-        0
-    }
-    #[inline]
-    fn suffix_len(&self) -> usize {
-        0
+    fn with_parts<O, F>(&self, f: F) -> O
+    where
+        F: for<'a, 'b> FnOnce(&'a [u8], FragmentedBytes<'a, 'b>, &'a [u8]) -> O,
+    {
+        f(&[], FragmentedBytes::new_empty(), &[])
     }
     #[inline]
     fn grow_front(&mut self, n: usize) {
@@ -1065,8 +1049,8 @@ impl GrowBuffer for EmptyBuf {
         assert_eq!(n, 0);
     }
 }
-impl SerializeBuffer for EmptyBuf {
-    fn with_parts<O, F>(&mut self, f: F) -> O
+impl GrowBufferMut for EmptyBuf {
+    fn with_parts_mut<O, F>(&mut self, f: F) -> O
     where
         F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O,
     {
@@ -1156,17 +1140,17 @@ impl ShrinkBuffer for Never {
     fn shrink_back(&mut self, _n: usize) {}
 }
 impl GrowBuffer for Never {
-    fn prefix_len(&self) -> usize {
-        match *self {}
-    }
-    fn suffix_len(&self) -> usize {
+    fn with_parts<O, F>(&self, _f: F) -> O
+    where
+        F: for<'a, 'b> FnOnce(&'a [u8], FragmentedBytes<'a, 'b>, &'a [u8]) -> O,
+    {
         match *self {}
     }
     fn grow_front(&mut self, _n: usize) {}
     fn grow_back(&mut self, _n: usize) {}
 }
-impl SerializeBuffer for Never {
-    fn with_parts<O, F>(&mut self, _f: F) -> O
+impl GrowBufferMut for Never {
+    fn with_parts_mut<O, F>(&mut self, _f: F) -> O
     where
         F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O,
     {

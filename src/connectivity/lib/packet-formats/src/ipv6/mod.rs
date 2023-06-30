@@ -20,8 +20,8 @@ use net_types::ip::{Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
 use packet::records::{AlignedRecordSequenceBuilder, Records, RecordsRaw};
 use packet::{
     BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
-    InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints, ParsablePacket,
-    ParseMetadata, SerializeBuffer, SerializeError, SerializeTarget, Serializer,
+    GrowBufferMut, InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints,
+    ParsablePacket, ParseMetadata, SerializeError, SerializeTarget, Serializer,
 };
 use tracing::debug;
 use zerocopy::{
@@ -602,7 +602,7 @@ impl<B: ByteSlice> Ipv6Packet<B> {
                 provider: P,
             ) -> Result<B, (SerializeError<P::Error>, Self)>
             where
-                B: SerializeBuffer,
+                B: GrowBufferMut,
                 P: BufferProvider<Self::Buffer, B>,
             {
                 match self {

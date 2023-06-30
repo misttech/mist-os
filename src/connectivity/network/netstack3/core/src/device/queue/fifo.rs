@@ -7,7 +7,7 @@
 use alloc::collections::VecDeque;
 
 use derivative::Derivative;
-use packet::{ParseBuffer, SerializeBuffer, Serializer};
+use packet::{GrowBufferMut, ParseBuffer, Serializer};
 
 use crate::device::queue::{
     DequeueResult, EnqueueResult, ReceiveQueueFullError, TransmitQueueFrameError,
@@ -83,7 +83,7 @@ impl<Meta, Buffer: ParseBuffer> Queue<Meta, Buffer> {
     }
 }
 
-impl<Meta, Buffer: SerializeBuffer> Queue<Meta, Buffer> {
+impl<Meta, Buffer: GrowBufferMut> Queue<Meta, Buffer> {
     /// Attempts to add the tx frame to the queue.
     pub(crate) fn queue_tx_frame<
         S: Serializer,
