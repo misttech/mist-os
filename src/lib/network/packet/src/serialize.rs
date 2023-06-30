@@ -14,10 +14,10 @@ use zerocopy::ByteSlice;
 
 use crate::{
     canonicalize_range, take_back, take_back_mut, take_front, take_front_mut,
-    AsFragmentedByteSlice, Buffer, BufferView, BufferViewMut, ContiguousBuffer,
-    ContiguousBufferImpl, ContiguousBufferMut, ContiguousBufferMutImpl, EmptyBuf, FragmentedBuffer,
-    FragmentedBufferMut, FragmentedBytes, FragmentedBytesMut, GrowBuffer, GrowBufferMut,
-    ParsablePacket, ParseBuffer, ParseBufferMut, ReusableBuffer, SerializeBuffer, ShrinkBuffer,
+    AsFragmentedByteSlice, Buffer, BufferView, BufferViewMut, ContiguousBuffer, EmptyBuf,
+    FragmentedBuffer, FragmentedBufferMut, FragmentedBytes, FragmentedBytesMut, GrowBuffer,
+    GrowBufferMut, ParsablePacket, ParseBuffer, ParseBufferMut, ReusableBuffer, SerializeBuffer,
+    ShrinkBuffer,
 };
 
 /// Either of two buffers.
@@ -153,13 +153,6 @@ impl<A, B> ContiguousBuffer for Either<A, B>
 where
     A: ContiguousBuffer,
     B: ContiguousBuffer,
-{
-}
-
-impl<A, B> ContiguousBufferMut for Either<A, B>
-where
-    A: ContiguousBufferMut,
-    B: ContiguousBufferMut,
 {
 }
 
@@ -352,7 +345,10 @@ impl<B: AsRef<[u8]> + AsMut<[u8]>> Buf<B> {
     }
 }
 
-impl<B: AsRef<[u8]>> ContiguousBufferImpl for Buf<B> {}
+impl<B: AsRef<[u8]>> FragmentedBuffer for Buf<B> {
+    fragmented_buffer_method_impls!();
+}
+impl<B: AsRef<[u8]>> ContiguousBuffer for Buf<B> {}
 impl<B: AsRef<[u8]>> ShrinkBuffer for Buf<B> {
     fn shrink<R: RangeBounds<usize>>(&mut self, range: R) {
         let len = self.len();
@@ -378,6 +374,10 @@ impl<B: AsRef<[u8]>> ParseBuffer for Buf<B> {
     ) -> Result<P, P::Error> {
         P::parse(self.buffer_view(), args)
     }
+}
+
+impl<B: AsRef<[u8]> + AsMut<[u8]>> FragmentedBufferMut for Buf<B> {
+    fragmented_buffer_mut_method_impls!();
 }
 
 impl<B: AsRef<[u8]> + AsMut<[u8]>> ParseBufferMut for Buf<B> {
@@ -408,7 +408,7 @@ impl<B: AsRef<[u8]>> GrowBuffer for Buf<B> {
         self.body.end += n;
     }
 }
-impl<B: AsRef<[u8]> + AsMut<[u8]>> ContiguousBufferMutImpl for Buf<B> {}
+
 impl<B: AsRef<[u8]> + AsMut<[u8]>> SerializeBuffer for Buf<B> {
     fn with_parts<O, F>(&mut self, f: F) -> O
     where

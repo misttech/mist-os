@@ -341,6 +341,55 @@
 //! with a new packet. The buffer that the original packet was stored in can be
 //! used to serialize the new packet, avoiding any unnecessary allocation.
 
+/// Emits method impls for [`FragmentedBuffer`] which assume that the type is
+/// a contiguous buffer which implements [`AsRef`].
+macro_rules! fragmented_buffer_method_impls {
+    () => {
+        fn len(&self) -> usize {
+            self.as_ref().len()
+        }
+
+        fn with_bytes<R, F>(&self, f: F) -> R
+        where
+            F: for<'macro_a, 'macro_b> FnOnce(FragmentedBytes<'macro_a, 'macro_b>) -> R,
+        {
+            let mut bs = [AsRef::<[u8]>::as_ref(self)];
+            f(FragmentedBytes::new(&mut bs))
+        }
+
+        fn to_flattened_vec(&self) -> Vec<u8> {
+            self.as_ref().to_vec()
+        }
+    };
+}
+
+/// Emits method impls for [`FragmentedBufferMut`] which assume that the type is
+/// a contiguous buffer which implements [`AsMut`].
+macro_rules! fragmented_buffer_mut_method_impls {
+    () => {
+        fn with_bytes_mut<R, F>(&mut self, f: F) -> R
+        where
+            F: for<'macro_a, 'macro_b> FnOnce(FragmentedBytesMut<'macro_a, 'macro_b>) -> R,
+        {
+            let mut bs = [AsMut::<[u8]>::as_mut(self)];
+            f(FragmentedBytesMut::new(&mut bs))
+        }
+
+        fn zero_range<R>(&mut self, range: R)
+        where
+            R: RangeBounds<usize>,
+        {
+            let len = FragmentedBuffer::len(self);
+            let range = crate::canonicalize_range(len, &range);
+            crate::zero(&mut self.as_mut()[range.start..range.end]);
+        }
+
+        fn copy_within<R: RangeBounds<usize>>(&mut self, src: R, dest: usize) {
+            self.as_mut().copy_within(src, dest);
+        }
+    };
+}
+
 mod fragmented;
 pub mod records;
 pub mod serialize;
@@ -456,77 +505,19 @@ pub trait FragmentedBufferMut: FragmentedBuffer {
 /// A buffer that is contiguous in memory.
 ///
 /// If the implementing type is a buffer which exposes a prefix and a suffix,
-/// the [`AsRef`] implementation provides access only to the body.
-pub trait ContiguousBuffer: AsRef<[u8]> {}
+/// the [`AsRef`] implementation provides access only to the body. If [`AsMut`]
+/// is also implemented, it must provide access to the same bytes as [`AsRef`].
+pub trait ContiguousBuffer: FragmentedBuffer + AsRef<[u8]> {}
 
 /// A mutable buffer that is contiguous in memory.
 ///
 /// If the implementing type is a buffer which exposes a prefix and a suffix,
 /// the [`AsMut`] implementation provides access only to the body.
-pub trait ContiguousBufferMut: ContiguousBuffer + AsMut<[u8]> {}
-
-/// A helper trait to implement [`FragmentedBuffer`] and [`ContiguousBuffer`]
-/// for any type that is `AsRef<[u8]>`.
 ///
-/// Implementers of `ContiguousBufferImpl` will receive a blanket implementation
-/// of [`FragmentedBuffer`] and [`ContiguousBuffer`], where the
-/// [`FragmentedBuffer`] implementation is optimized for contiguous buffers.
-pub trait ContiguousBufferImpl: AsRef<[u8]> {}
-impl<B> ContiguousBuffer for B where B: ContiguousBufferImpl {}
-impl<B> FragmentedBuffer for B
-where
-    B: ContiguousBufferImpl,
-{
-    fn len(&self) -> usize {
-        self.as_ref().len()
-    }
-
-    fn with_bytes<R, F>(&self, f: F) -> R
-    where
-        F: for<'a, 'b> FnOnce(FragmentedBytes<'a, 'b>) -> R,
-    {
-        let mut bs = [self.as_ref()];
-        f(FragmentedBytes::new(&mut bs))
-    }
-
-    fn to_flattened_vec(&self) -> Vec<u8> {
-        self.as_ref().to_vec()
-    }
-}
-
-/// A helper trait to implement [`FragmentedBufferMut`] and
-/// [`ContiguousBufferMut`] for any type that is `AsMut<[u8]>`.
-///
-/// Implementers of `ContiguousBufferMutImpl` will receive a blanket
-/// implementation of [`FragmentedBufferMut`] and [`ContiguousBufferMut`], where
-/// the [`FragmentedBufferMut`] implementation is optimized for contiguous
-/// buffers.
-pub trait ContiguousBufferMutImpl: ContiguousBuffer + AsMut<[u8]> {}
-impl<B> ContiguousBufferMut for B where B: ContiguousBufferMutImpl {}
-impl<B> FragmentedBufferMut for B
-where
-    B: ContiguousBufferMutImpl + ContiguousBufferImpl,
-{
-    fn with_bytes_mut<R, F>(&mut self, f: F) -> R
-    where
-        F: for<'a, 'b> FnOnce(FragmentedBytesMut<'a, 'b>) -> R,
-    {
-        let mut bs = [self.as_mut()];
-        f(FragmentedBytesMut::new(&mut bs))
-    }
-
-    fn zero_range<R>(&mut self, range: R)
-    where
-        R: RangeBounds<usize>,
-    {
-        let range = canonicalize_range(self.len(), &range);
-        zero(&mut self.as_mut()[range.start..range.end]);
-    }
-
-    fn copy_within<R: RangeBounds<usize>>(&mut self, src: R, dest: usize) {
-        self.as_mut().copy_within(src, dest);
-    }
-}
+/// `ContiguousBufferMut` is shorthand for `ContiguousBuffer +
+/// FragmentedBufferMut + AsMut<[u8]>`.
+pub trait ContiguousBufferMut: ContiguousBuffer + FragmentedBufferMut + AsMut<[u8]> {}
+impl<B: ContiguousBuffer + FragmentedBufferMut + AsMut<[u8]>> ContiguousBufferMut for B {}
 
 /// A buffer that can reduce its size.
 ///
@@ -660,7 +651,7 @@ pub trait ParseBuffer: ShrinkBuffer + ContiguousBuffer {
 /// Mutable byte slices do not implement [`GrowBuffer`] or [`GrowBufferMut`];
 /// once bytes are consumed from their bodies, those bytes are discarded and
 /// cannot be recovered.
-pub trait ParseBufferMut: ParseBuffer + FragmentedBufferMut + ContiguousBufferMut {
+pub trait ParseBufferMut: ParseBuffer + ContiguousBufferMut {
     /// Parses a mutable packet from the body.
     ///
     /// `parse_mut` is like [`ParseBuffer::parse`], but instead of calling
@@ -1021,8 +1012,13 @@ impl AsMut<[u8]> for EmptyBuf {
         &mut []
     }
 }
-impl ContiguousBufferImpl for EmptyBuf {}
-impl ContiguousBufferMutImpl for EmptyBuf {}
+impl FragmentedBuffer for EmptyBuf {
+    fragmented_buffer_method_impls!();
+}
+impl FragmentedBufferMut for EmptyBuf {
+    fragmented_buffer_mut_method_impls!();
+}
+impl ContiguousBuffer for EmptyBuf {}
 impl ShrinkBuffer for EmptyBuf {
     #[inline]
     fn shrink_front(&mut self, n: usize) {
@@ -1676,7 +1672,10 @@ fn zero(bytes: &mut [u8]) {
         *byte = 0;
     }
 }
-impl<'a> ContiguousBufferImpl for &'a [u8] {}
+impl<'a> FragmentedBuffer for &'a [u8] {
+    fragmented_buffer_method_impls!();
+}
+impl<'a> ContiguousBuffer for &'a [u8] {}
 impl<'a> ShrinkBuffer for &'a [u8] {
     fn shrink_front(&mut self, n: usize) {
         let _: &[u8] = take_front(self, n);
@@ -1725,8 +1724,13 @@ impl<'a> ParseBuffer for &'a [u8] {
         P::parse(ByteSlice(self), args)
     }
 }
-impl<'a> ContiguousBufferImpl for &'a mut [u8] {}
-impl<'a> ContiguousBufferMutImpl for &'a mut [u8] {}
+impl<'a> FragmentedBuffer for &'a mut [u8] {
+    fragmented_buffer_method_impls!();
+}
+impl<'a> FragmentedBufferMut for &'a mut [u8] {
+    fragmented_buffer_mut_method_impls!();
+}
+impl<'a> ContiguousBuffer for &'a mut [u8] {}
 impl<'a> ShrinkBuffer for &'a mut [u8] {
     fn shrink_front(&mut self, n: usize) {
         let _: &[u8] = take_front_mut(self, n);
