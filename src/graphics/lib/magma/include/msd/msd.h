@@ -13,7 +13,7 @@
 
 #include <memory>
 
-#include "msd_defs.h"
+#include "msd_defs.h"  // IWYU pragma: export
 
 namespace msd {
 

@@ -113,7 +113,7 @@ def externs(begin):
 # Includes list.
 def includes():
     return (
-        '#include <lib/magma/magma_common_defs.h>\n'
+        '#include <lib/magma/magma_common_defs.h> // IWYU pragma: export\n'
         '#include <stdint.h>\n')
 
 

@@ -35,7 +35,7 @@
 #ifndef LIB_MAGMA_MAGMA_H_
 #define LIB_MAGMA_MAGMA_H_
 
-#include <lib/magma/magma_common_defs.h>
+#include <lib/magma/magma_common_defs.h> // IWYU pragma: export
 #include <stdint.h>
 
 // LINT.IfChange
