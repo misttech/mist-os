@@ -140,12 +140,13 @@ group("tests") {
     "tests:fuchsia_controller_ir_test",
   ]
 
-  # TODO(fxbug.dev/127523): This test fails on mac builders. This is most likely because of the
-  # infra machines running OSX 10.15
+  # TODO(fxbug.dev/127523): These tests fail on mac builders. This is most likely
+  # because of the infra machines running OSX 10.15
   if (host_os != "mac") {
     deps += [
       "tests:fuchsia_controller_errors_test",
       "tests:fuchsia_controller_importing_test",
+      "tests:fuchsia_controller_isolate_directory_test",
     ]
 
     # TODO(https://fxbug.dev/129633): Re-enable when the corrupt profile header

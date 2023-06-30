@@ -49,8 +49,15 @@ int IsolateDir_init(IsolateDir *self, PyObject *args, PyObject *kwds) {  // NOLI
     // Guarantee the directory is created.
     std::error_code err;
     if (!std::filesystem::create_directory(tmp_path, err)) {
-      PyErr_Format(PyExc_IOError, error_format_str, tmp_path.c_str(), err.message().c_str());
-      return -1;
+      // If |err| is falsey this indicates success, although `create_directory`
+      // might return false.  This can occur when the directory already exists,
+      // so creating it succeeds even though there was an "error".
+      //
+      // Don't raise a python error in this case.
+      if (err) {
+        PyErr_Format(PyExc_IOError, error_format_str, tmp_path.c_str(), err.message().c_str());
+        return -1;
+      }
     }
     self->dir = std::move(tmp_path);
   }

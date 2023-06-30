@@ -91,13 +91,6 @@ python_host_test("fuchsia_controller_encode_test") {
   deps = [ ":fuchsia_controller_test_base" ]
 }
 
-python_host_test("fuchsia_controller_errors_test") {
-  main_source = "errors.py"
-  libraries =
-      [ "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py" ]
-  deps = [ ":fuchsia_controller_test_base" ]
-}
-
 python_host_test("fuchsia_controller_importing_test") {
   main_source = "importing.py"
   libraries = [
@@ -108,6 +101,20 @@ python_host_test("fuchsia_controller_importing_test") {
     ":fuchsia_controller_fidl_test_data",
     ":fuchsia_controller_test_base",
   ]
+}
+
+python_host_test("fuchsia_controller_errors_test") {
+  main_source = "errors.py"
+  libraries =
+      [ "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py" ]
+  deps = [ ":fuchsia_controller_test_base" ]
+}
+
+python_host_test("fuchsia_controller_isolate_directory_test") {
+  main_source = "isolate_directory.py"
+  libraries =
+      [ "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py" ]
+  deps = [ ":fuchsia_controller_test_base" ]
 }
 
 python_host_test("fuchsia_controller_e2e_test") {
