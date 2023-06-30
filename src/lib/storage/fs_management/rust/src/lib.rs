@@ -390,8 +390,7 @@ impl FSConfig for MinfsLegacy {
 pub type CryptClientFn = Arc<dyn Fn() -> zx::Channel + Send + Sync>;
 
 /// Fxfs Filesystem Configuration
-/// If fields are None or false, they will not be set in arguments.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Fxfs {
     // This is only used by fsck.
     pub crypt_client_fn: Option<CryptClientFn>,
@@ -399,6 +398,19 @@ pub struct Fxfs {
     pub readonly: bool,
     pub fsck_after_every_transaction: bool,
     pub component_type: ComponentType,
+    pub allow_delivery_blobs: bool,
+}
+
+impl Default for Fxfs {
+    fn default() -> Self {
+        Self {
+            crypt_client_fn: None,
+            readonly: false,
+            fsck_after_every_transaction: false,
+            component_type: Default::default(),
+            allow_delivery_blobs: true,
+        }
+    }
 }
 
 impl Fxfs {
@@ -435,7 +447,7 @@ impl FSConfig for Fxfs {
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
-                allow_delivery_blobs: false,
+                allow_delivery_blobs: self.allow_delivery_blobs,
             },
             component_type: self.component_type.clone(),
         }

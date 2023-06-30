@@ -6,27 +6,31 @@
 //! create a Type 1 delivery blob:
 //!
 //! ```
-//! use delivery_blob::Type1Blob;
+//! use delivery_blob::{CompressionMode, Type1Blob};
 //! let merkle = "68d131bc271f9c192d4f6dcd8fe61bef90004856da19d0f2f514a7f4098b0737";
 //! let data: Vec<u8> = vec![0xFF; 8192];
-//! let type_1_blob: Vec<u8> = Type1Blob::generate(&data, None);
+//! let payload: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Attempt);
 //! ```
 //!
-//! The result represents a delivery blob payload, which can be written as any other blob:
+//! `payload` is now a delivery blob which can be written using the delivery path:
 //! ```
 //! use delivery_blob::delivery_blob_path;
 //! use std::fs::OpenOptions;
 //! let path = delivery_blob_path(merkle);
 //! let mut file = OpenOptions::new().write(true).create_new(true).open(&path).unwrap();
-//! file.set_len(type_1_blob.len() as u64).unwrap();
-//! file.write_all(&type_1_blob).unwrap();
-//! ```
+//! file.set_len(payload.len() as u64).unwrap();
+//! file.write_all(&payload).unwrap();
 
-use {thiserror::Error, zerocopy::AsBytes as _};
+use {
+    crate::{compression::ChunkedArchive, format::SerializedType1Blob},
+    thiserror::Error,
+    zerocopy::{AsBytes, LayoutVerified},
+};
 
-use crate::format::SerializedType1Blob;
+#[cfg(target_os = "fuchsia")]
+use fuchsia_zircon as zx;
 
-mod compression;
+pub mod compression;
 mod format;
 
 /// Prefix used for writing delivery blobs. Should be prepended to the Merkle root of the blob.
@@ -68,16 +72,27 @@ pub enum DeliveryBlobError {
 
     #[error("Integrity/checksum or other validity checks failed.")]
     IntegrityError,
+}
 
-    #[error("Not enough bytes to decode delivery blob.")]
-    BufferTooSmall,
+#[cfg(target_os = "fuchsia")]
+impl From<DeliveryBlobError> for zx::Status {
+    fn from(value: DeliveryBlobError) -> Self {
+        match value {
+            // Unsupported delivery blob type.
+            DeliveryBlobError::InvalidType => zx::Status::PROTOCOL_NOT_SUPPORTED,
+            // Potentially corrupted delivery blob.
+            DeliveryBlobError::BadMagic | DeliveryBlobError::IntegrityError => {
+                zx::Status::IO_DATA_INTEGRITY
+            }
+        }
+    }
 }
 
 /// Typed header of an RFC 0207 compliant delivery blob.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DeliveryBlobHeader {
     pub delivery_type: DeliveryBlobType,
-    pub header_length: usize,
+    pub header_length: u32,
 }
 
 /// Type of delivery blob.
@@ -101,6 +116,12 @@ impl TryFrom<u32> for DeliveryBlobType {
             value if value == DeliveryBlobType::Type1 as u32 => Ok(DeliveryBlobType::Type1),
             _ => Err(DeliveryBlobError::InvalidType),
         }
+    }
+}
+
+impl From<DeliveryBlobType> for u32 {
+    fn from(value: DeliveryBlobType) -> Self {
+        value as u32
     }
 }
 
@@ -132,65 +153,58 @@ pub struct Type1Blob {
 impl Type1Blob {
     pub const HEADER: DeliveryBlobHeader = DeliveryBlobHeader {
         delivery_type: DeliveryBlobType::Type1,
-        header_length: std::mem::size_of::<SerializedType1Blob>(),
+        header_length: std::mem::size_of::<SerializedType1Blob>() as u32,
     };
 
-    /// Generate a Type 1 delivery blob for `data` using the specified `compression_mode`.
-    pub fn generate(data: &[u8], compression_mode: CompressionMode) -> Vec<u8> {
-        let compression_buffer: Option<Vec<u8>> = match compression_mode {
-            CompressionMode::Attempt | CompressionMode::Always => {
-                const CHUNK_ALIGNMENT: usize = fuchsia_merkle::BLOCK_SIZE;
-                let compressed =
-                    crate::compression::ChunkedArchive::new(data, CHUNK_ALIGNMENT).serialize();
-                let use_compressed =
-                    compression_mode == CompressionMode::Always || compressed.len() < data.len();
-                use_compressed.then_some(compressed)
-            }
-            CompressionMode::Never => None,
-        };
-        let payload = compression_buffer.as_ref().map(Vec::as_slice).unwrap_or(data);
-        let is_compressed = compression_buffer.is_some();
-        let blob_header: SerializedType1Blob =
-            Self { header: Type1Blob::HEADER, payload_length: payload.len(), is_compressed }.into();
-        [blob_header.as_bytes(), payload].concat()
+    const CHUNK_ALIGNMENT: usize = fuchsia_merkle::BLOCK_SIZE;
+
+    /// Generate a Type 1 delivery blob for `data` using the specified `mode`.
+    ///
+    /// **WARNING**: This function will panic on error.
+    // TODO(fxbug.dev/122054): Bubble up library/compression errors.
+    pub fn generate(data: &[u8], mode: CompressionMode) -> Vec<u8> {
+        let mut delivery_blob: Vec<u8> = vec![];
+        Self::generate_to(data, mode, &mut delivery_blob).unwrap();
+        delivery_blob
     }
 
+    /// Generate a Type 1 delivery blob for `data` using the specified `mode`. Writes delivery blob
+    /// directly into `writer`.
+    ///
+    /// **WARNING**: This function will panic on compression errors.
+    // TODO(fxbug.dev/122054): Bubble up library/compression errors.
     pub fn generate_to(
         data: &[u8],
-        compression_mode: CompressionMode,
+        mode: CompressionMode,
         mut writer: impl std::io::Write,
     ) -> Result<(), std::io::Error> {
-        let chunked_archive = match compression_mode {
+        // Compress `data` depending on `compression_mode` and if we save any space.
+        let compressed = match mode {
             CompressionMode::Attempt | CompressionMode::Always => {
-                const CHUNK_ALIGNMENT: usize = fuchsia_merkle::BLOCK_SIZE;
-                let compressed = crate::compression::ChunkedArchive::new(data, CHUNK_ALIGNMENT);
-                let use_compressed = compression_mode == CompressionMode::Always
-                    || compressed.serialized_size() < data.len();
-                use_compressed.then_some(compressed)
+                let compressed = ChunkedArchive::new(data, Self::CHUNK_ALIGNMENT)
+                    .expect("failed to compress data");
+                if mode == CompressionMode::Always || compressed.serialized_size() <= data.len() {
+                    Some(compressed)
+                } else {
+                    None
+                }
             }
             CompressionMode::Never => None,
         };
-        match chunked_archive {
-            Some(chunked_archive) => {
-                let blob_header: SerializedType1Blob = Self {
-                    header: Type1Blob::HEADER,
-                    payload_length: chunked_archive.serialized_size(),
-                    is_compressed: true,
-                }
-                .into();
-                writer.write_all(blob_header.as_bytes())?;
-                chunked_archive.write(writer)?;
-            }
-            None => {
-                let blob_header: SerializedType1Blob = Self {
-                    header: Type1Blob::HEADER,
-                    payload_length: data.len(),
-                    is_compressed: false,
-                }
-                .into();
-                writer.write_all(blob_header.as_bytes())?;
-                writer.write_all(data)?;
-            }
+
+        // Write header to `writer`.
+        let payload_length =
+            compressed.as_ref().map(|archive| archive.serialized_size()).unwrap_or(data.len());
+        let header =
+            Self { header: Type1Blob::HEADER, payload_length, is_compressed: compressed.is_some() };
+        let serialized_header: SerializedType1Blob = header.into();
+        writer.write_all(serialized_header.as_bytes())?;
+
+        // Write payload to `writer`.
+        if let Some(archive) = compressed {
+            archive.write(writer)?;
+        } else {
+            writer.write_all(data)?;
         }
         Ok(())
     }
@@ -199,11 +213,11 @@ impl Type1Blob {
     /// and the remainder of `data` representing the blob payload.
     /// **WARNING**: This function does not verify that the payload is complete. Only the full
     /// header and metadata portion of a delivery blob are required to be present in `data`.
-    pub fn parse(data: &[u8]) -> Result<(Type1Blob, &[u8]), DeliveryBlobError> {
-        use zerocopy::LayoutVerified;
-        let (metadata, payload) =
-            LayoutVerified::<_, SerializedType1Blob>::new_unaligned_from_prefix(data)
-                .ok_or(DeliveryBlobError::BufferTooSmall)?;
-        metadata.decode().map(|metadata| (metadata, payload))
+    pub fn parse(data: &[u8]) -> Result<Option<(Type1Blob, &[u8])>, DeliveryBlobError> {
+        let Some((serialized_header, payload)) =
+            LayoutVerified::<_, SerializedType1Blob>::new_unaligned_from_prefix(data) else {
+                return Ok(None);
+            };
+        serialized_header.decode().map(|metadata| Some((metadata, payload)))
     }
 }

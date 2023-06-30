@@ -1030,9 +1030,7 @@ async fn verify_blobs() {
     fixture.tear_down().await;
 }
 
-// TODO(https://fxbug.dev/122125): fxblob delivery blob support.
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn delivery_blob_support_disabled() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("blobfs_allow_delivery_blobs", false);
@@ -1047,22 +1045,19 @@ async fn delivery_blob_support_disabled() {
     )
     .await
     .expect_err("Should fail to open delivery blob for writing when disabled.");
-    match open_error {
-        OpenError::OpenError(status) => assert_eq!(status, zx::Status::NOT_SUPPORTED),
-        other => panic!("Wrong error when opening blob (expected NOT_SUPPORTED): {:?}", other),
-    }
+    assert_matches!(open_error, OpenError::OpenError(zx::Status::NOT_SUPPORTED));
     fixture.tear_down().await;
 }
 
-// TODO(https://fxbug.dev/122125): fxblob delivery blob support.
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn delivery_blob_support_enabled() {
     let mut builder = new_builder();
-    builder.fshost().set_config_value("blobfs_allow_delivery_blobs", true);
+    builder
+        .fshost()
+        .set_config_value("blobfs_allow_delivery_blobs", true)
+        .set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
     builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
-    // Generate delivery blob, ensuring it's compressed, so we exercise sandboxed decompression.
     // 65536 bytes of 0xff "small" f75f59a944d2433bc6830ec243bfefa457704d2aed12f30539cd4f18bf1d62cf
     const HASH: &'static str = "f75f59a944d2433bc6830ec243bfefa457704d2aed12f30539cd4f18bf1d62cf";
     let data: Vec<u8> = vec![0xff; 65536];

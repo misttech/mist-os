@@ -11,7 +11,7 @@
 use {
     bitflags::bitflags,
     crc::Hasher32 as _,
-    static_assertions::const_assert_eq,
+    static_assertions::{assert_eq_size, const_assert_eq},
     zerocopy::{
         byteorder::{LE, U32, U64},
         AsBytes, FromBytes, FromZeroes, Unaligned,
@@ -19,6 +19,9 @@ use {
 };
 
 use crate::{DeliveryBlobError, DeliveryBlobHeader, DeliveryBlobType, Type1Blob};
+
+// This library assumes usize is large enough to hold a u64.
+assert_eq_size!(usize, u64);
 
 /// Delivery blob magic number (0xfc1ab10b or "Fuchsia Blob" in big-endian).
 const DELIVERY_BLOB_MAGIC: [u8; 4] = [0xfc, 0x1a, 0xb1, 0x0b];
@@ -64,7 +67,7 @@ impl SerializedHeader {
         }
         Ok(DeliveryBlobHeader {
             delivery_type: self.delivery_type.get().try_into()?,
-            header_length: self.header_length.get().try_into().unwrap(),
+            header_length: self.header_length.get(),
         })
     }
 }
@@ -73,8 +76,8 @@ impl From<&DeliveryBlobHeader> for SerializedHeader {
     fn from(value: &DeliveryBlobHeader) -> Self {
         Self {
             magic: DELIVERY_BLOB_MAGIC,
-            delivery_type: (value.delivery_type as u32).into(),
-            header_length: TryInto::<u32>::try_into(value.header_length).unwrap().into(),
+            delivery_type: Into::<u32>::into(value.delivery_type).into(),
+            header_length: value.header_length.into(),
         }
     }
 }
@@ -100,7 +103,7 @@ impl From<Type1Blob> for SerializedType1Blob {
     fn from(value: Type1Blob) -> Self {
         let serialized = Self {
             header: (&value.header).into(),
-            payload_length: TryInto::<u64>::try_into(value.payload_length).unwrap().into(),
+            payload_length: (value.payload_length as u64).into(),
             checksum: Default::default(), // Calculated below.
             flags: SerializedType1Flags::from(&value).bits().into(),
         };
@@ -133,7 +136,7 @@ impl SerializedType1Blob {
             return Err(DeliveryBlobError::IntegrityError);
         }
         // Validate and decode remaining metadata fields.
-        let payload_length: usize = self.payload_length.get().try_into().unwrap();
+        let payload_length = self.payload_length.get() as usize;
         let flags = SerializedType1Flags::from_bits(self.flags.get())
             .ok_or(DeliveryBlobError::IntegrityError)?;
 
@@ -160,7 +163,7 @@ mod tests {
             std::mem::size_of::<SerializedType1Blob>() + TEST_DATA.len()
         );
         // We should be able to decode and verify the parsed data.
-        let (metadata, payload) = Type1Blob::parse(&delivery_blob).unwrap();
+        let (metadata, payload) = Type1Blob::parse(&delivery_blob).unwrap().unwrap();
         assert_eq!(metadata.header, Type1Blob::HEADER);
         assert_eq!(metadata.payload_length, TEST_DATA.len());
         assert_eq!(metadata.is_compressed, false);
@@ -173,7 +176,7 @@ mod tests {
         let delivery_blob = Type1Blob::generate(&[], CompressionMode::Never);
         assert_eq!(delivery_blob.len(), std::mem::size_of::<SerializedType1Blob>());
         // We should be able to decode and verify the parsed data.
-        let (metadata, payload) = Type1Blob::parse(&delivery_blob).unwrap();
+        let (metadata, payload) = Type1Blob::parse(&delivery_blob).unwrap().unwrap();
         assert_eq!(metadata.header, Type1Blob::HEADER);
         assert_eq!(metadata.payload_length, 0);
         assert_eq!(metadata.is_compressed, false);
@@ -183,19 +186,17 @@ mod tests {
     #[test]
     fn type_1_not_enough_data() {
         let delivery_blob = Type1Blob::generate(TEST_DATA, CompressionMode::Never);
-        // If we don't pass enough data to decode a Type 1 blob, it should fail.
         let not_enough_data = &delivery_blob[..std::mem::size_of::<SerializedType1Blob>() - 1];
-        assert_eq!(
-            Type1Blob::parse(not_enough_data).unwrap_err(),
-            DeliveryBlobError::BufferTooSmall
-        );
+        assert!(Type1Blob::parse(not_enough_data).unwrap().is_none());
     }
 
     #[test]
     fn type_1_bad_magic() {
         // Create a valid serialized Type 1 blob.
         let valid: SerializedType1Blob =
-            Type1Blob { header: Type1Blob::HEADER, payload_length: 0, is_compressed: false }.into();
+            Type1Blob { header: Type1Blob::HEADER, payload_length: 0, is_compressed: false }
+                .try_into()
+                .unwrap();
         assert!(Type1Blob::parse(valid.as_bytes()).is_ok());
         // Corrupt magic, recalculate checksum, and ensure we fail with the correct error.
         let mut has_corrupt_magic = SerializedType1Blob {
@@ -220,7 +221,8 @@ mod tests {
             payload_length: 0,
             is_compressed: false,
         }
-        .into();
+        .try_into()
+        .unwrap();
         assert_eq!(
             Type1Blob::parse(has_invalid_type.as_bytes()).unwrap_err(),
             DeliveryBlobError::InvalidType
@@ -238,7 +240,8 @@ mod tests {
             payload_length: 0,
             is_compressed: false,
         }
-        .into();
+        .try_into()
+        .unwrap();
         assert_eq!(
             Type1Blob::parse(has_invalid_header_length.as_bytes()).unwrap_err(),
             DeliveryBlobError::IntegrityError
@@ -253,7 +256,8 @@ mod tests {
             payload_length: TEST_DATA.len(),
             is_compressed: false,
         }
-        .into();
+        .try_into()
+        .unwrap();
         assert!(serialized.decode().is_ok());
         assert_eq!(serialized.checksum.get(), serialized.checksum());
         // We should fail to parse a Type 1 blob with a corrupted checksum.

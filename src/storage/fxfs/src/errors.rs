@@ -46,6 +46,8 @@ pub enum FxfsError {
     BadPath,
     #[error("Wrong type")]
     WrongType,
+    #[error("Data integrity error")]
+    IntegrityError,
 }
 
 impl FxfsError {
@@ -96,6 +98,7 @@ mod fuchsia {
                 FxfsError::AlreadyBound => Status::ALREADY_BOUND,
                 FxfsError::BadPath => Status::BAD_PATH,
                 FxfsError::WrongType => Status::WRONG_TYPE,
+                FxfsError::IntegrityError => Status::IO_DATA_INTEGRITY,
             }
         }
     }

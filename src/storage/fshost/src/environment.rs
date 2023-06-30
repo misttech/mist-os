@@ -1066,7 +1066,11 @@ impl FilesystemLauncher {
     ) -> Result<ServingMultiVolumeFilesystem, Error> {
         let mut fs = fs_management::filesystem::Filesystem::new(
             device.reopen_controller()?,
-            Fxfs { component_type: ComponentType::StaticChild, ..Default::default() },
+            Fxfs {
+                component_type: ComponentType::StaticChild,
+                allow_delivery_blobs: self.config.blobfs_allow_delivery_blobs,
+                ..Default::default()
+            },
         );
         fs.serve_multi_volume().await
     }
