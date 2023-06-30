@@ -10,7 +10,7 @@ use fuchsia_async as fasync;
 use futures_util::{AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _};
 use net_declare::{fidl_subnet, std_ip};
 use netemul::{RealmTcpListener as _, RealmTcpStream as _};
-use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
+use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use tcp_stream_ext::TcpStreamExt as _;
 
@@ -57,15 +57,13 @@ const REMOTE_IP: std::net::IpAddr = std_ip!("192.168.0.1");
 const PORT: u16 = 80;
 
 #[netstack_test]
-async fn timeouts(name: &str) {
+async fn timeouts<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
-    let client = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_client", name))
-        .expect("create realm");
-    let server = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_server", name))
-        .expect("create realm");
+    let client =
+        sandbox.create_netstack_realm::<N, _>(format!("{}_client", name)).expect("create realm");
+    let server =
+        sandbox.create_netstack_realm::<N, _>(format!("{}_server", name)).expect("create realm");
     let client_iface = client
         .join_network(&network, "client-ep")
         .await

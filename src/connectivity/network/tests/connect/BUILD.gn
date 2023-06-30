@@ -4,6 +4,8 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
 
 rustc_test("connect") {
   edition = "2021"
@@ -24,12 +26,26 @@ rustc_test("connect") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_unittest_package("netstack-connect-tests") {
-  deps = [
-    ":connect",
-    "//src/connectivity/network/netstack:component-debug",
-    "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
-  ]
+package_deps = [
+  "//src/connectivity/network/netstack3:component-debug",
+  "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
+  "//src/lib/testing/expectation:expectation_comparer",
+]
+
+# RISC-V on Fuchsia does not support Golang.
+if (target_cpu != "riscv64") {
+  package_deps += [ "//src/connectivity/network/netstack:component-debug" ]
+}
+
+fuchsia_test_component_with_expectations("netstack-connect-test-component") {
+  expectations = "expects.json5"
+  manifest = "meta/connect.cml"
+  deps = [ ":connect" ]
+}
+
+fuchsia_test_package("netstack-connect-tests") {
+  test_components = [ ":netstack-connect-test-component" ]
+  deps = package_deps
 }
 
 group("tests") {
