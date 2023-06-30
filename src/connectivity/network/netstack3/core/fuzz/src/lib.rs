@@ -6,7 +6,10 @@
 
 extern crate netstack3_core_testutils as netstack3_core;
 
-use core::{convert::TryInto as _, time::Duration};
+use core::{
+    convert::{Infallible as Never, TryInto as _},
+    time::Duration,
+};
 
 use arbitrary::{Arbitrary, Unstructured};
 use fuzz_util::Fuzzed;
@@ -22,8 +25,8 @@ use netstack3_core::{
     TimerId,
 };
 use packet::{
-    serialize::{Buf, SerializeError},
-    FragmentedBuffer, Nested, NestedPacketBuilder, Serializer,
+    serialize::{Buf, Either, PacketBuilder, PacketConstraints, SerializeError},
+    FragmentedBuffer, Serializer,
 };
 use packet_formats::{
     ethernet::EthernetFrameBuilder,
@@ -210,13 +213,13 @@ impl FrameType {
 }
 
 impl EthernetFrameType {
-    fn arbitrary_buf<O: NestedPacketBuilder + core::fmt::Debug>(
+    fn arbitrary_buf<O: PacketBuilder + core::fmt::Debug>(
         &self,
         outer: O,
         u: &mut Unstructured<'_>,
     ) -> arbitrary::Result<(Buf<Vec<u8>>, String)> {
         match self {
-            EthernetFrameType::Raw => arbitrary_packet(outer, u),
+            EthernetFrameType::Raw => arbitrary_packet((outer,), u),
             EthernetFrameType::Ipv4(ip_type) => {
                 ip_type.arbitrary_buf::<Ipv4Addr, Ipv4PacketBuilder, _>(outer, u)
             }
@@ -232,7 +235,7 @@ impl IpFrameType {
         'a,
         A: IpAddress,
         IPB: IpPacketBuilder<A::Version>,
-        O: NestedPacketBuilder + core::fmt::Debug,
+        O: PacketBuilder + core::fmt::Debug,
     >(
         &self,
         outer: O,
@@ -243,14 +246,37 @@ impl IpFrameType {
         Fuzzed<IPB>: Arbitrary<'a>,
     {
         match self {
-            IpFrameType::Raw => arbitrary_packet(outer, u),
+            IpFrameType::Raw => arbitrary_packet((outer,), u),
             IpFrameType::Udp => {
-                let udp_in_ip = Fuzzed::<Nested<UdpPacketBuilder<A>, IPB>>::arbitrary(u)?.into();
-                arbitrary_packet(udp_in_ip.encapsulate(outer), u)
+                // Note that the UDP checksum includes parameters from the IP
+                // layer (source and destination address), and so it's important
+                // that the same parameters are used to generate builders for
+                // both layers.
+                let ip = Fuzzed::<IPB>::arbitrary(u)?.into();
+                let udp =
+                    UdpPacketBuilder::new(ip.src_ip(), ip.dst_ip(), u.arbitrary()?, u.arbitrary()?);
+                arbitrary_packet((udp, ip, outer), u)
             }
             IpFrameType::Tcp => {
-                let tcp_in_ip = Fuzzed::<Nested<TcpSegmentBuilder<A>, IPB>>::arbitrary(u)?.into();
-                arbitrary_packet(tcp_in_ip.encapsulate(outer), u)
+                // Note that the TCP checksum includes parameters from the IP
+                // layer (source and destination address), and so it's important
+                // that the same parameters are used to generate builders for
+                // both layers.
+                let ip = Fuzzed::<IPB>::arbitrary(u)?.into();
+                let mut tcp = TcpSegmentBuilder::new(
+                    ip.src_ip(),
+                    ip.dst_ip(),
+                    u.arbitrary()?,
+                    u.arbitrary()?,
+                    u.arbitrary()?,
+                    u.arbitrary()?,
+                    u.arbitrary()?,
+                );
+                tcp.psh(u.arbitrary()?);
+                tcp.rst(u.arbitrary()?);
+                tcp.syn(u.arbitrary()?);
+                tcp.fin(u.arbitrary()?);
+                arbitrary_packet((tcp, ip, outer), u)
             }
         }
     }
@@ -298,15 +324,52 @@ impl core::fmt::Display for FuzzAction {
     }
 }
 
-fn arbitrary_packet<B: NestedPacketBuilder + core::fmt::Debug>(
-    builder: B,
+// A `PacketBuilder` or multiple `PacketBuilder`s which will be encapsulated in
+// sequence.
+trait FuzzablePacket {
+    fn try_constraints(&self) -> Option<PacketConstraints>;
+
+    fn serialize(self, buf: Buf<Vec<u8>>) -> Result<Buf<Vec<u8>>, SerializeError<Never>>;
+}
+
+// Implement for `(B,)` rather than for `B` to avoid a blanket impl conflict.
+impl<B: PacketBuilder> FuzzablePacket for (B,) {
+    fn try_constraints(&self) -> Option<PacketConstraints> {
+        Some(self.0.constraints())
+    }
+
+    fn serialize(self, buf: Buf<Vec<u8>>) -> Result<Buf<Vec<u8>>, SerializeError<Never>> {
+        buf.encapsulate(self.0)
+            .serialize_vec_outer()
+            .map(Either::into_inner)
+            .map_err(|(err, _ser)| err)
+    }
+}
+
+impl<BA: PacketBuilder, BB: PacketBuilder, BC: PacketBuilder> FuzzablePacket for (BA, BB, BC) {
+    fn try_constraints(&self) -> Option<PacketConstraints> {
+        let (a, b, c) = self;
+        a.constraints()
+            .try_encapsulate(&b.constraints())
+            .and_then(|constraints| constraints.try_encapsulate(&c.constraints()))
+    }
+
+    fn serialize(self, buf: Buf<Vec<u8>>) -> Result<Buf<Vec<u8>>, SerializeError<Never>> {
+        let (a, b, c) = self;
+        buf.encapsulate(a)
+            .encapsulate(b)
+            .encapsulate(c)
+            .serialize_vec_outer()
+            .map(Either::into_inner)
+            .map_err(|(err, _ser)| err)
+    }
+}
+
+fn arbitrary_packet<P: FuzzablePacket + std::fmt::Debug>(
+    packet: P,
     u: &mut Unstructured<'_>,
 ) -> arbitrary::Result<(Buf<Vec<u8>>, String)> {
-    let constraints = match builder.try_constraints() {
-        Some(constraints) => constraints,
-        None => return Err(arbitrary::Error::IncorrectFormat),
-    };
-
+    let constraints = packet.try_constraints().ok_or(arbitrary::Error::IncorrectFormat)?;
     let body_len = core::cmp::min(
         core::cmp::max(u.arbitrary_len::<u8>()?, constraints.min_body_len()),
         constraints.max_body_len(),
@@ -317,7 +380,7 @@ fn arbitrary_packet<B: NestedPacketBuilder + core::fmt::Debug>(
     // so use that to save CPU and memory when the value would otherwise be
     // thrown away.
     let description = if print_on_panic::log_enabled(tracing::Level::INFO) {
-        format!("{:?} with body length {}", builder, body_len)
+        format!("{:?} with body length {}", packet, body_len)
     } else {
         String::new()
     };
@@ -325,15 +388,15 @@ fn arbitrary_packet<B: NestedPacketBuilder + core::fmt::Debug>(
     let mut buffer = vec![0; body_len + constraints.header_len() + constraints.footer_len()];
     u.fill_buffer(&mut buffer[constraints.header_len()..(constraints.header_len() + body_len)])?;
 
-    let bytes = Buf::new(buffer, constraints.header_len()..(constraints.header_len() + body_len))
-        .encapsulate(builder)
-        .serialize_vec_outer()
-        .map_err(|(e, _): (_, Nested<Buf<Vec<_>>, B>)| match e {
+    let bytes = packet
+        .serialize(Buf::new(
+            buffer,
+            constraints.header_len()..(constraints.header_len() + body_len),
+        ))
+        .map_err(|e| match e {
             SerializeError::Alloc(e) => match e {},
             SerializeError::SizeLimitExceeded => arbitrary::Error::IncorrectFormat,
-        })?
-        .map_a(|buffer| Buf::new(buffer.as_ref().to_vec(), ..))
-        .into_inner();
+        })?;
     Ok((bytes, description))
 }
 

@@ -258,6 +258,7 @@ impl<B: ByteSlice> ParsablePacket<B, ()> for NetbootPacket<B> {
 }
 
 /// A [`PacketBuilder`] for the netboot protocol.
+#[derive(Debug)]
 pub struct NetbootPacketBuilder {
     cmd: OpcodeOrErr,
     cookie: u32,
@@ -300,7 +301,8 @@ mod tests {
         const PAYLOAD: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
         let mut pkt = (&PAYLOAD[..])
             .into_serializer()
-            .serialize_vec(NetbootPacketBuilder::new(Opcode::Ack.into(), 3, 4))
+            .encapsulate(NetbootPacketBuilder::new(Opcode::Ack.into(), 3, 4))
+            .serialize_vec_outer()
             .expect("failed to serialize");
         let parsed = pkt.parse::<NetbootPacket<_>>().expect("failed to parse");
         assert_eq!(parsed.command(), OpcodeOrErr::Op(Opcode::Ack));

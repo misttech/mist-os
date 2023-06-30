@@ -9,15 +9,13 @@ use net_types::{
     ethernet::Mac,
     ip::{IpAddress, Ipv4Addr},
 };
-use packet::{Nested, NestedPacketBuilder as _};
 use packet_formats::{
     ethernet::{EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck},
     icmp::IcmpParseArgs,
-    ip::{IpExt, IpPacketBuilder},
     ipv4::Ipv4PacketBuilder,
     ipv6::Ipv6PacketBuilder,
-    tcp::{TcpParseArgs, TcpSegmentBuilder},
-    udp::{UdpPacketBuilder, UdpParseArgs},
+    tcp::TcpParseArgs,
+    udp::UdpParseArgs,
 };
 use zerocopy::FromBytes;
 
@@ -110,54 +108,5 @@ impl<'a, A: IpAddress + FromBytes> Arbitrary<'a> for Fuzzed<TcpParseArgs<A>> {
         let src = A::arbitrary_from_bytes(u)?;
         let dst = A::arbitrary_from_bytes(u)?;
         Ok(Self(TcpParseArgs::new(src, dst)))
-    }
-}
-
-// Since UDP and TCP packets have a checksum that includes parameters from the
-// IP layer (source and destination addresses), generate UDP and TCP packet
-// builders as Nested<UDP, I> or Nested<TCP, I> where I is the IP layer builder.
-// This ensures that the inner transport builder uses the correct addresses.
-
-impl<'a, A: IpAddress, B: IpPacketBuilder<A::Version>> Arbitrary<'a>
-    for Fuzzed<Nested<UdpPacketBuilder<A>, B>>
-where
-    A::Version: IpExt,
-    Fuzzed<B>: Arbitrary<'a>,
-{
-    fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self> {
-        let ip_builder: B = Fuzzed::<B>::arbitrary(u)?.into();
-        let udp_builder = UdpPacketBuilder::new(
-            ip_builder.src_ip(),
-            ip_builder.dst_ip(),
-            u.arbitrary()?,
-            u.arbitrary()?,
-        );
-        Ok(Self(udp_builder.encapsulate(ip_builder)))
-    }
-}
-
-impl<'a, A: IpAddress, B: IpPacketBuilder<A::Version>> Arbitrary<'a>
-    for Fuzzed<Nested<TcpSegmentBuilder<A>, B>>
-where
-    A::Version: IpExt,
-    Fuzzed<B>: Arbitrary<'a>,
-{
-    fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self> {
-        let ip_builder: B = Fuzzed::<B>::arbitrary(u)?.into();
-        let mut tcp_builder = TcpSegmentBuilder::new(
-            ip_builder.src_ip(),
-            ip_builder.dst_ip(),
-            u.arbitrary()?,
-            u.arbitrary()?,
-            u.arbitrary()?,
-            u.arbitrary()?,
-            u.arbitrary()?,
-        );
-        tcp_builder.psh(u.arbitrary()?);
-        tcp_builder.rst(u.arbitrary()?);
-        tcp_builder.syn(u.arbitrary()?);
-        tcp_builder.fin(u.arbitrary()?);
-
-        Ok(Self(tcp_builder.encapsulate(ip_builder)))
     }
 }

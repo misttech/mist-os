@@ -168,7 +168,8 @@ mod tests {
         let mut log = LOG_DATA
             .as_bytes()
             .into_serializer()
-            .serialize_vec(LogPacketBuilder::new(3, NODENAME).unwrap())
+            .encapsulate(LogPacketBuilder::new(3, NODENAME).unwrap())
+            .serialize_vec_outer()
             .unwrap_or_else(|_| panic!("Failed to serialize"));
         let packet = log.parse::<DebugLogPacket<_>>().expect("Failed to parse");
         assert_eq!(packet.seqno(), 3);

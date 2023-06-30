@@ -1022,7 +1022,8 @@ mod tests {
         let data: Vec<_> = std::iter::successors(Some(0u8), |v| Some(*v + 1)).take(128).collect();
         let mut ser = (&data[..])
             .into_serializer()
-            .serialize_vec(DataPacketBuilder::new(123))
+            .encapsulate(DataPacketBuilder::new(123))
+            .serialize_vec_outer()
             .unwrap_or_else(|_| panic!("failed to serialize"));
         let body = match ser.parse::<TftpPacket<_>>().expect("failed to parse") {
             TftpPacket::Data(b) => b,

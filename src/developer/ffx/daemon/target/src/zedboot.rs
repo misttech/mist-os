@@ -253,7 +253,8 @@ async fn send(opcode: Opcode, body: &str, to_addr: TargetAddr) -> Result<()> {
     const ARG: u32 = 0;
     let msg = (body.as_bytes())
         .into_serializer_with(Buf::new([0u8; BUFFER_SIZE], ..))
-        .serialize_no_alloc(NetbootPacketBuilder::new(opcode.into(), COOKIE, ARG))
+        .encapsulate(NetbootPacketBuilder::new(opcode.into(), COOKIE, ARG))
+        .serialize_no_alloc_outer()
         .expect("failed to serialize");
     let mut to_sock: SocketAddr = to_addr.into();
     to_sock.set_port(SERVER_PORT.get());

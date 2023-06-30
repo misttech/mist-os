@@ -13,7 +13,6 @@ rustc_library("fuzz-util") {
   deps = [
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
-    "//src/lib/network/packet",
     "//third_party/rust_crates:arbitrary",
     "//third_party/rust_crates:zerocopy",
   ]

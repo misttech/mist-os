@@ -575,11 +575,12 @@ async fn discover(sock: &fuchsia_async::net::UdpSocket, scope_id: u32) -> std::n
                 // Build a query for all nodes ("*" + null termination).
                 let query = ("*\0".as_bytes())
                     .into_serializer()
-                    .serialize_vec(netboot::NetbootPacketBuilder::new(
+                    .encapsulate(netboot::NetbootPacketBuilder::new(
                         netboot::OpcodeOrErr::Op(netboot::Opcode::Query),
                         cookie,
                         ARG,
                     ))
+                    .serialize_vec_outer()
                     .expect("serialize query")
                     .unwrap_b();
 

@@ -20,8 +20,8 @@ use packet::records::options::OptionSequenceBuilder;
 use packet::records::options::OptionsRaw;
 use packet::{
     BufferProvider, BufferView, BufferViewMut, EmptyBuf, FromRaw, InnerPacketBuilder, MaybeParsed,
-    NestedPacketBuilder, PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata,
-    SerializeBuffer, SerializeError, Serializer, TargetBuffer,
+    PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeBuffer,
+    SerializeError, Serializer, TargetBuffer,
 };
 use tracing::debug;
 use zerocopy::{
@@ -422,14 +422,13 @@ impl<B: ByteSlice> Ipv4Packet<B> {
             O: Serializer<Buffer = EmptyBuf>,
         {
             type Buffer = EmptyBuf;
-            fn serialize<B, PB, P>(
+            fn serialize<B, P>(
                 self,
-                outer: PB,
+                outer: PacketConstraints,
                 provider: P,
             ) -> Result<B, (SerializeError<P::Error>, Self)>
             where
                 B: TargetBuffer,
-                PB: NestedPacketBuilder,
                 P: BufferProvider<Self::Buffer, B>,
             {
                 match self {
