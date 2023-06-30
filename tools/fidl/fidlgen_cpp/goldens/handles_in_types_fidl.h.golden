@@ -8,7 +8,9 @@
 
 #pragma once
 
+// IWYU pragma: begin_exports
 #include <fidl/test.handlesintypes/cpp/natural_messaging.h>
 #include <fidl/test.handlesintypes/cpp/natural_types.h>
 #include <fidl/test.handlesintypes/cpp/type_conversions.h>
 #include <fidl/test.handlesintypes/cpp/wire.h>
+// IWYU pragma: end_exports

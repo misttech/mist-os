@@ -9,6 +9,8 @@
 
 #pragma once
 
+// IWYU pragma: begin_exports
 #include <fidl/test.unknowninteractions/cpp/driver/natural_messaging.h>
 #include <fidl/test.unknowninteractions/cpp/driver/wire.h>
 #include <fidl/test.unknowninteractions/cpp/natural_types.h>
+// IWYU pragma: end_exports

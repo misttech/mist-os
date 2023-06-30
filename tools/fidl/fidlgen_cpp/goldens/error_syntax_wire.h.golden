@@ -8,7 +8,10 @@
 
 #pragma once
 
-#include <fidl/test.errorsyntax.parent/cpp/wire.h>
+// IWYU pragma: begin_exports
 #include <fidl/test.errorsyntax/cpp/markers.h>
 #include <fidl/test.errorsyntax/cpp/wire_messaging.h>
 #include <fidl/test.errorsyntax/cpp/wire_types.h>
+// IWYU pragma: end_exports
+
+#include <fidl/test.errorsyntax.parent/cpp/wire.h>

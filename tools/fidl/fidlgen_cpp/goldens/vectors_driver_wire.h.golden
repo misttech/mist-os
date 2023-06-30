@@ -8,6 +8,8 @@
 
 #pragma once
 
+// IWYU pragma: begin_exports
 #include <fidl/test.vectors/cpp/driver/wire_messaging.h>
 #include <fidl/test.vectors/cpp/markers.h>
 #include <fidl/test.vectors/cpp/wire_types.h>
+// IWYU pragma: end_exports

@@ -8,8 +8,11 @@
 
 #pragma once
 
-#include <fidl/test.exampleusing/cpp/fidl.h>
+// IWYU pragma: begin_exports
 #include <fidl/test.placementofattributes/cpp/natural_messaging.h>
 #include <fidl/test.placementofattributes/cpp/natural_types.h>
 #include <fidl/test.placementofattributes/cpp/type_conversions.h>
 #include <fidl/test.placementofattributes/cpp/wire.h>
+// IWYU pragma: end_exports
+
+#include <fidl/test.exampleusing/cpp/fidl.h>

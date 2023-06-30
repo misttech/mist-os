@@ -8,8 +8,11 @@
 
 #pragma once
 
-#include <fidl/test.bottom/cpp/driver/wire.h>
-#include <fidl/test.middle/cpp/driver/wire.h>
+// IWYU pragma: begin_exports
 #include <fidl/test.transitivedependenciescompose/cpp/driver/wire_messaging.h>
 #include <fidl/test.transitivedependenciescompose/cpp/markers.h>
 #include <fidl/test.transitivedependenciescompose/cpp/wire_types.h>
+// IWYU pragma: end_exports
+
+#include <fidl/test.bottom/cpp/driver/wire.h>
+#include <fidl/test.middle/cpp/driver/wire.h>

@@ -8,6 +8,8 @@
 
 #pragma once
 
+// IWYU pragma: begin_exports
 #include <fidl/test.requestflexibleenvelope/cpp/driver/wire_messaging.h>
 #include <fidl/test.requestflexibleenvelope/cpp/markers.h>
 #include <fidl/test.requestflexibleenvelope/cpp/wire_types.h>
+// IWYU pragma: end_exports

@@ -8,7 +8,10 @@
 
 #pragma once
 
+// IWYU pragma: begin_exports
 #include <fidl/test.aliases/cpp/driver/natural_messaging.h>
 #include <fidl/test.aliases/cpp/driver/wire.h>
 #include <fidl/test.aliases/cpp/natural_types.h>
+// IWYU pragma: end_exports
+
 #include <fidl/test.someotherlibrary/cpp/driver/fidl.h>

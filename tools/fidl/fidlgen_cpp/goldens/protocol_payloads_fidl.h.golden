@@ -8,8 +8,11 @@
 
 #pragma once
 
-#include <fidl/test.protocolpayloads.imported/cpp/fidl.h>
+// IWYU pragma: begin_exports
 #include <fidl/test.protocolpayloads/cpp/natural_messaging.h>
 #include <fidl/test.protocolpayloads/cpp/natural_types.h>
 #include <fidl/test.protocolpayloads/cpp/type_conversions.h>
 #include <fidl/test.protocolpayloads/cpp/wire.h>
+// IWYU pragma: end_exports
+
+#include <fidl/test.protocolpayloads.imported/cpp/fidl.h>

@@ -8,7 +8,10 @@
 
 #pragma once
 
-#include <fidl/test.middle/cpp/wire.h>
+// IWYU pragma: begin_exports
 #include <fidl/test.transitivedependencies/cpp/markers.h>
 #include <fidl/test.transitivedependencies/cpp/wire_messaging.h>
 #include <fidl/test.transitivedependencies/cpp/wire_types.h>
+// IWYU pragma: end_exports
+
+#include <fidl/test.middle/cpp/wire.h>
