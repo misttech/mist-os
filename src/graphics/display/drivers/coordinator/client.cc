@@ -48,6 +48,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
+#include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
@@ -149,10 +150,11 @@ void Client::ReleaseImage(ReleaseImageRequestView request,
 
 void Client::ImportEvent(ImportEventRequestView request,
                          ImportEventCompleter::Sync& /*_completer*/) {
-  if (request->id == INVALID_ID) {
-    zxlogf(ERROR, "Cannot import events with an invalid ID #%i", INVALID_ID);
+  const EventId event_id = ToEventId(request->id);
+  if (event_id == kInvalidEventId) {
+    zxlogf(ERROR, "Cannot import events with an invalid ID #%" PRIu64, event_id.value());
     TearDown();
-  } else if (fences_.ImportEvent(std::move(request->event), request->id) != ZX_OK) {
+  } else if (fences_.ImportEvent(std::move(request->event), event_id) != ZX_OK) {
     TearDown();
   }
 }
@@ -241,7 +243,10 @@ void Client::SetBufferCollectionConstraints(
 
 void Client::ReleaseEvent(ReleaseEventRequestView request,
                           ReleaseEventCompleter::Sync& /*_completer*/) {
-  fences_.ReleaseEvent(request->id);
+  const EventId event_id = ToEventId(request->id);
+  // TODO(fxbug.dev/129990): Check if the ID is valid (i.e. imported but not
+  // yet released) before calling ReleaseEvent().
+  fences_.ReleaseEvent(event_id);
 }
 
 void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
@@ -569,7 +574,11 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
     return;
   }
 
-  layer->SetImage(image.CopyPointer(), request->wait_event_id, request->signal_event_id);
+  const EventId wait_event_id = ToEventId(request->wait_event_id);
+  const EventId signal_event_id = ToEventId(request->signal_event_id);
+  // TODO(fxbug.dev/129990): Check if the IDs are valid (i.e. imported but not
+  // yet released) before calling SetImage().
+  layer->SetImage(image.CopyPointer(), wait_event_id, signal_event_id);
   // no Reply defined
 }
 
@@ -781,7 +790,7 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
   }
 
   // Ensure we have a capture fence for the request signal event.
-  auto signal_fence = fences_.GetFence(request->signal_event_id);
+  auto signal_fence = fences_.GetFence(ToEventId(request->signal_event_id));
   if (signal_fence == nullptr) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
@@ -1310,7 +1319,7 @@ void Client::OnFenceFired(FenceReference* fence) {
 }
 
 void Client::CaptureCompleted() {
-  auto signal_fence = fences_.GetFence(capture_fence_id_);
+  auto signal_fence = fences_.GetFence(ToEventId(capture_fence_id_));
   if (signal_fence != nullptr) {
     signal_fence->Signal();
   }

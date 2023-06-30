@@ -16,6 +16,7 @@
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
+#include "src/graphics/display/lib/api-types-cpp/event-id.h"
 
 namespace fhd = fuchsia_hardware_display;
 
@@ -323,7 +324,7 @@ void Layer::SetColorConfig(fuchsia_images2::wire::PixelFormat pixel_format,
   config_change_ = true;
 }
 
-void Layer::SetImage(fbl::RefPtr<Image> image, uint64_t wait_event_id, uint64_t signal_event_id) {
+void Layer::SetImage(fbl::RefPtr<Image> image, EventId wait_event_id, EventId signal_event_id) {
   if (pending_image_) {
     pending_image_->DiscardAcquire();
   }

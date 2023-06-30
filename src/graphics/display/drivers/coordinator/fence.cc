@@ -13,6 +13,7 @@
 #include <utility>
 
 #include "src/graphics/display/drivers/coordinator/client.h"
+#include "src/graphics/display/lib/api-types-cpp/event-id.h"
 
 namespace display {
 
@@ -84,8 +85,7 @@ void Fence::OnReady(async_dispatcher_t* dispatcher, async::WaitBase* self, zx_st
   }
 }
 
-Fence::Fence(FenceCallback* cb, async_dispatcher_t* dispatcher, uint64_t fence_id,
-             zx::event&& event)
+Fence::Fence(FenceCallback* cb, async_dispatcher_t* dispatcher, EventId fence_id, zx::event&& event)
     : cb_(cb), dispatcher_(dispatcher), event_(std::move(event)) {
   id = fence_id;
   ZX_DEBUG_ASSERT(event_.is_valid());
@@ -151,7 +151,7 @@ void FenceCollection::Clear() {
   }
 }
 
-zx_status_t FenceCollection::ImportEvent(zx::event event, uint64_t id) {
+zx_status_t FenceCollection::ImportEvent(zx::event event, EventId id) {
   fbl::AutoLock lock(&mtx_);
   auto fence = fences_.find(id);
   // Create and ref a new fence.
@@ -162,7 +162,7 @@ zx_status_t FenceCollection::ImportEvent(zx::event event, uint64_t id) {
     if (ac.check() && new_fence->CreateRef()) {
       fences_.insert_or_find(std::move(new_fence));
     } else {
-      zxlogf(ERROR, "Failed to allocate fence ref for event#%ld", id);
+      zxlogf(ERROR, "Failed to allocate fence ref for event#%ld", id.value());
       return ZX_ERR_NO_MEMORY;
     }
     return ZX_OK;
@@ -170,16 +170,16 @@ zx_status_t FenceCollection::ImportEvent(zx::event event, uint64_t id) {
 
   // Ref an existing fence
   if (fence->event() != event.get()) {
-    zxlogf(ERROR, "Cannot reuse event#%ld for zx::event %u", id, event.get());
+    zxlogf(ERROR, "Cannot reuse event#%ld for zx::event %u", id.value(), event.get());
     return ZX_ERR_INVALID_ARGS;
   } else if (!fence->CreateRef()) {
-    zxlogf(ERROR, "Failed to allocate fence ref for event#%ld", id);
+    zxlogf(ERROR, "Failed to allocate fence ref for event#%ld", id.value());
     return ZX_ERR_NO_MEMORY;
   }
   return ZX_OK;
 }
 
-void FenceCollection::ReleaseEvent(uint64_t id) {
+void FenceCollection::ReleaseEvent(EventId id) {
   // Hold a ref to prevent double locking if this destroys the fence.
   auto fence_ref = GetFence(id);
   if (fence_ref) {
@@ -188,8 +188,8 @@ void FenceCollection::ReleaseEvent(uint64_t id) {
   }
 }
 
-fbl::RefPtr<FenceReference> FenceCollection::GetFence(uint64_t id) {
-  if (id == INVALID_ID) {
+fbl::RefPtr<FenceReference> FenceCollection::GetFence(EventId id) {
+  if (id == kInvalidEventId) {
     return nullptr;
   }
   fbl::AutoLock l(&mtx_);

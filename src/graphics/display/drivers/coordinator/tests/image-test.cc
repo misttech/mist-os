@@ -77,8 +77,9 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
   ASSERT_OK(zx::event::create(0, &signal_event));
   zx::event signal_event_dup;
   signal_event.duplicate(ZX_RIGHT_SAME_RIGHTS, &signal_event_dup);
+  constexpr EventId kEventId(1);
   auto signal_fence =
-      fbl::AdoptRef(new Fence(this, loop.dispatcher(), 1, std::move(signal_event_dup)));
+      fbl::AdoptRef(new Fence(this, loop.dispatcher(), kEventId, std::move(signal_event_dup)));
   signal_fence->CreateRef();
   auto signal_cleanup = fit::defer([signal_fence]() { signal_fence->ClearRef(); });
 

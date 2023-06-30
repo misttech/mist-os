@@ -18,6 +18,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
+#include "src/graphics/display/lib/api-types-cpp/event-id.h"
 
 namespace display {
 
@@ -105,7 +106,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   void SetCursorPosition(int32_t x, int32_t y);
   void SetColorConfig(fuchsia_images2::wire::PixelFormat pixel_format,
                       ::fidl::VectorView<uint8_t> color_bytes);
-  void SetImage(fbl::RefPtr<Image> image_id, uint64_t wait_event_id, uint64_t signal_event_id);
+  void SetImage(fbl::RefPtr<Image> image_id, EventId wait_event_id, EventId signal_event_id);
 
  private:
   // Retires the `pending_image_`.
@@ -126,8 +127,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   bool config_change_;
 
   // Event ids passed to SetLayerImage which haven't been applied yet.
-  uint64_t pending_wait_event_id_;
-  uint64_t pending_signal_event_id_;
+  EventId pending_wait_event_id_;
+  EventId pending_signal_event_id_;
 
   // The image given to SetLayerImage which hasn't been applied yet.
   fbl::RefPtr<Image> pending_image_;

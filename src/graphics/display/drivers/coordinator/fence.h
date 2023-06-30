@@ -21,6 +21,7 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/graphics/display/drivers/coordinator/id-map.h"
+#include "src/graphics/display/lib/api-types-cpp/event-id.h"
 
 namespace display {
 
@@ -41,10 +42,10 @@ class FenceCallback {
 // in order to avoid data races, we require `Fence`s and its `FenceReference`s
 // be created and destroyed on the same thread where the Fence is created.
 class Fence : public fbl::RefCounted<Fence>,
-              public IdMappable<fbl::RefPtr<Fence>, /*IdType=*/uint64_t>,
+              public IdMappable<fbl::RefPtr<Fence>, EventId>,
               public fbl::SinglyLinkedListable<fbl::RefPtr<Fence>> {
  public:
-  Fence(FenceCallback* cb, async_dispatcher_t* dispatcher, uint64_t id, zx::event&& event);
+  Fence(FenceCallback* cb, async_dispatcher_t* dispatcher, EventId id, zx::event&& event);
   ~Fence();
 
   // Creates a new FenceReference when an event is imported.
@@ -138,9 +139,9 @@ class FenceCollection : private FenceCallback {
   // Explicit destruction step. Use this to control when fences are destroyed.
   void Clear() __TA_EXCLUDES(mtx_);
 
-  zx_status_t ImportEvent(zx::event event, uint64_t id) __TA_EXCLUDES(mtx_);
-  void ReleaseEvent(uint64_t id) __TA_EXCLUDES(mtx_);
-  fbl::RefPtr<FenceReference> GetFence(uint64_t id) __TA_EXCLUDES(mtx_);
+  zx_status_t ImportEvent(zx::event event, EventId id) __TA_EXCLUDES(mtx_);
+  void ReleaseEvent(EventId id) __TA_EXCLUDES(mtx_);
+  fbl::RefPtr<FenceReference> GetFence(EventId id) __TA_EXCLUDES(mtx_);
 
  private:
   // |FenceCallback|
