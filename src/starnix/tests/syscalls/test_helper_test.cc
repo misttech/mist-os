@@ -9,7 +9,7 @@
 namespace {
 
 TEST(TestHelperTest, DetectFailingChildren) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([] { FAIL() << "Expected failure"; });
 

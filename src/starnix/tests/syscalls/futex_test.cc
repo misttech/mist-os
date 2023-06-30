@@ -28,7 +28,7 @@ struct robust_list_entry {
 // Tests that robust_lists set futex FUTEX_OWNER_DIED bit if the thread that locked a futex
 // dies without unlocking it.
 TEST(RobustFutexTest, FutexStateCheck) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([] {
     robust_list_entry entry = {.next = nullptr, .futex = 0};
     robust_list_head head = {.list = {.next = nullptr},
@@ -49,7 +49,7 @@ TEST(RobustFutexTest, FutexStateCheck) {
 // Tests that robust_lists set futex FUTEX_OWNER_DIED bit if the thread that locked a futex
 // executes an exec() without unlocking it.
 TEST(RobustFutexTest, FutexStateAfterExecCheck) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([] {
     // Allocate the futex and the robust list in shared memory.
     void *shared = mmap(nullptr, sizeof(robust_list_entry) + sizeof(robust_list_head),
@@ -71,11 +71,11 @@ TEST(RobustFutexTest, FutexStateAfterExecCheck) {
 
     // Create a file we can lock.  After it notifies us that it is running via
     // the pipe, the child will wait to terminate until we unlock the file.
-    ScopedTempFD terminate_child_fd;
+    test_helper::ScopedTempFD terminate_child_fd;
     struct flock fl = {.l_type = F_WRLCK, .l_whence = SEEK_SET, .l_start = 0, .l_len = 0};
     EXPECT_EQ(0, fcntl(terminate_child_fd.fd(), F_SETLK, &fl));
 
-    ForkHelper helper;
+    test_helper::ForkHelper helper;
 
     helper.RunInForkedProcess([&entry, &head, &terminate_child_fd, &pipefd] {
       // Redirect stdout to one end of the pipe

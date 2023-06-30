@@ -89,7 +89,8 @@ class FuseTest : public ::testing::Test {
     OK_OR_RETURN(MkDir(mergedir));
     std::string witness_name = "witness";
     {
-      ScopedFD witness(open((lowerdir + "/" + witness_name).c_str(), O_RDWR | O_CREAT, 0600));
+      test_helper::ScopedFD witness(
+          open((lowerdir + "/" + witness_name).c_str(), O_RDWR | O_CREAT, 0600));
       if (!witness.is_valid()) {
         return testing::AssertionFailure() << "Unable to create witness file: " << strerror(errno);
       }
@@ -119,7 +120,7 @@ class FuseTest : public ::testing::Test {
     return testing::AssertionSuccess();
   }
 
-  ForkHelper fork_helper_;
+  test_helper::ForkHelper fork_helper_;
   std::optional<std::string> base_dir_;
 };
 
@@ -129,11 +130,11 @@ TEST_F(FuseTest, Stats) {
   ASSERT_TRUE(Mount());
   std::string mounted_witness = GetMountDir() + "/witness";
   std::string original_witness = *base_dir_ + "/lower/witness";
-  ScopedFD fd(open(mounted_witness.c_str(), O_RDONLY));
+  test_helper::ScopedFD fd(open(mounted_witness.c_str(), O_RDONLY));
   ASSERT_TRUE(fd.is_valid());
   struct stat mounted_stats;
   ASSERT_EQ(fstat(fd.get(), &mounted_stats), 0);
-  fd = ScopedFD(open(original_witness.c_str(), O_RDONLY));
+  fd = test_helper::ScopedFD(open(original_witness.c_str(), O_RDONLY));
   ASSERT_TRUE(fd.is_valid());
   struct stat original_stats;
   ASSERT_EQ(fstat(fd.get(), &original_stats), 0);
@@ -151,7 +152,7 @@ TEST_F(FuseTest, Stats) {
 TEST_F(FuseTest, Read) {
   ASSERT_TRUE(Mount());
   std::string mounted_witness = GetMountDir() + "/witness";
-  ScopedFD fd(open(mounted_witness.c_str(), O_RDONLY));
+  test_helper::ScopedFD fd(open(mounted_witness.c_str(), O_RDONLY));
   ASSERT_TRUE(fd.is_valid());
   char buffer[100];
   ASSERT_EQ(read(fd.get(), buffer, 100), 6);
@@ -161,7 +162,7 @@ TEST_F(FuseTest, Read) {
 TEST_F(FuseTest, NoFile) {
   ASSERT_TRUE(Mount());
   std::string mounted_witness = GetMountDir() + "/unexistent";
-  ScopedFD fd(open(mounted_witness.c_str(), O_RDONLY));
+  test_helper::ScopedFD fd(open(mounted_witness.c_str(), O_RDONLY));
   ASSERT_FALSE(fd.is_valid());
   ASSERT_EQ(errno, ENOENT);
 }
@@ -169,14 +170,14 @@ TEST_F(FuseTest, NoFile) {
 TEST_F(FuseTest, Mknod) {
   ASSERT_TRUE(Mount());
   std::string filename = GetMountDir() + "/file";
-  ScopedFD fd(open(filename.c_str(), O_WRONLY | O_CREAT));
+  test_helper::ScopedFD fd(open(filename.c_str(), O_WRONLY | O_CREAT));
   ASSERT_TRUE(fd.is_valid());
 }
 
 TEST_F(FuseTest, Write) {
   ASSERT_TRUE(Mount());
   std::string filename = GetMountDir() + "/file";
-  ScopedFD fd(open(filename.c_str(), O_WRONLY | O_CREAT));
+  test_helper::ScopedFD fd(open(filename.c_str(), O_WRONLY | O_CREAT));
   ASSERT_TRUE(fd.is_valid());
   EXPECT_EQ(write(fd.get(), "hello\n", 6), 6);
 }
@@ -190,7 +191,7 @@ TEST_F(FuseTest, Statfs) {
 
 TEST_F(FuseTest, Seek) {
   ASSERT_TRUE(Mount());
-  ScopedFD fd(open((GetMountDir() + "/witness").c_str(), O_RDONLY));
+  test_helper::ScopedFD fd(open((GetMountDir() + "/witness").c_str(), O_RDONLY));
   ASSERT_TRUE(fd.is_valid());
   char buffer[100];
   ASSERT_EQ(read(fd.get(), buffer, 100), 6);
@@ -210,7 +211,7 @@ TEST_F(FuseTest, Seek) {
 
 TEST_F(FuseTest, Poll) {
   ASSERT_TRUE(Mount());
-  ScopedFD fd(open((GetMountDir() + "/witness").c_str(), O_RDONLY));
+  test_helper::ScopedFD fd(open((GetMountDir() + "/witness").c_str(), O_RDONLY));
   ASSERT_TRUE(fd.is_valid());
   struct pollfd poll_struct;
   poll_struct.fd = fd.get();
@@ -224,7 +225,7 @@ TEST_F(FuseTest, Mkdir) {
   std::string dirname = GetMountDir() + "/dir";
   ASSERT_EQ(open(dirname.c_str(), O_RDONLY), -1);
   ASSERT_EQ(mkdir(dirname.c_str(), 0777), 0);
-  ScopedFD fd(open(dirname.c_str(), O_RDONLY));
+  test_helper::ScopedFD fd(open(dirname.c_str(), O_RDONLY));
   ASSERT_TRUE(fd.is_valid());
   struct stat stats;
   ASSERT_EQ(fstat(fd.get(), &stats), 0);
@@ -263,20 +264,20 @@ TEST_F(FuseTest, Link) {
 TEST_F(FuseTest, Unlink) {
   ASSERT_TRUE(Mount());
   std::string witness = GetMountDir() + "/witness";
-  ASSERT_TRUE(ScopedFD(open(witness.c_str(), O_RDONLY)).is_valid());
+  ASSERT_TRUE(test_helper::ScopedFD(open(witness.c_str(), O_RDONLY)).is_valid());
   ASSERT_EQ(unlink(witness.c_str()), 0);
-  ASSERT_FALSE(ScopedFD(open(witness.c_str(), O_RDONLY)).is_valid());
+  ASSERT_FALSE(test_helper::ScopedFD(open(witness.c_str(), O_RDONLY)).is_valid());
 }
 
 TEST_F(FuseTest, Truncate) {
   ASSERT_TRUE(Mount());
   std::string file = GetMountDir() + "/file";
-  ScopedFD fd(open(file.c_str(), O_WRONLY | O_CREAT));
+  test_helper::ScopedFD fd(open(file.c_str(), O_WRONLY | O_CREAT));
   ASSERT_TRUE(fd.is_valid());
   ASSERT_EQ(write(fd.get(), "hello", 5), 5);
   fd.reset();
   ASSERT_EQ(truncate(file.c_str(), 2), 0);
-  fd = ScopedFD(open(file.c_str(), O_RDONLY));
+  fd = test_helper::ScopedFD(open(file.c_str(), O_RDONLY));
   char buffer[10];
   ASSERT_EQ(read(fd.get(), buffer, 10), 2);
 }
@@ -293,7 +294,7 @@ TEST_F(FuseTest, Readdir) {
     if (i % 2 == 0) {
       ASSERT_EQ(mkdir((root + "/dir_" + value).c_str(), 0777), 0);
     } else {
-      ScopedFD fd(open((root + "/file" + value).c_str(), O_WRONLY | O_CREAT));
+      test_helper::ScopedFD fd(open((root + "/file" + value).c_str(), O_WRONLY | O_CREAT));
       ASSERT_TRUE(fd.is_valid());
     }
   }
@@ -331,7 +332,7 @@ TEST_F(FuseTest, XAttr) {
   ASSERT_TRUE(Mount());
 
   std::string filename = GetMountDir() + "/file";
-  ScopedFD fd(open(filename.c_str(), O_RDWR | O_CREAT));
+  test_helper::ScopedFD fd(open(filename.c_str(), O_RDWR | O_CREAT));
   ASSERT_TRUE(fd.is_valid());
 
   ASSERT_EQ(fgetxattr(fd.get(), attribute_name, nullptr, 0), -1);

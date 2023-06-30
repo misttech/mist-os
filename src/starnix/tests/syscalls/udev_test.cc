@@ -19,8 +19,8 @@ namespace {
 
 const int kBufferSize = 16 * 1024 * 1024;
 
-ScopedFD GetUdevSocket() {
-  ScopedFD fd(socket(PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT));
+test_helper::ScopedFD GetUdevSocket() {
+  test_helper::ScopedFD fd(socket(PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT));
 
   if (!fd.is_valid()) {
     return fd;
@@ -93,7 +93,7 @@ TEST(UdevTest, AddDevMapper) {
   auto fd = GetUdevSocket();
   ASSERT_TRUE(fd.is_valid());
 
-  ScopedFD write_fd(open("/sys/devices/virtual/misc/device-mapper/uevent", O_WRONLY));
+  test_helper::ScopedFD write_fd(open("/sys/devices/virtual/misc/device-mapper/uevent", O_WRONLY));
   ASSERT_TRUE(write_fd.is_valid());
   ASSERT_EQ(write(write_fd.get(), "add\n", 4), 4);
 
@@ -118,7 +118,7 @@ TEST(UdevTest, RemoveDevMapper) {
   auto fd = GetUdevSocket();
   ASSERT_TRUE(fd.is_valid());
 
-  ScopedFD write_fd(open("/sys/devices/virtual/misc/device-mapper/uevent", O_WRONLY));
+  test_helper::ScopedFD write_fd(open("/sys/devices/virtual/misc/device-mapper/uevent", O_WRONLY));
   ASSERT_TRUE(write_fd.is_valid());
   ASSERT_EQ(write(write_fd.get(), "remove\n", 7), 7);
 
@@ -144,7 +144,7 @@ TEST(UdevTest, AddInput) {
   ASSERT_TRUE(fd.is_valid());
 
   // This path is based on values in `ueventd.rc`.
-  ScopedFD write_fd(open("/sys/devices/virtual/input/event0/uevent", O_WRONLY));
+  test_helper::ScopedFD write_fd(open("/sys/devices/virtual/input/event0/uevent", O_WRONLY));
   ASSERT_TRUE(write_fd.is_valid());
   ASSERT_EQ(write(write_fd.get(), "add\n", 4), 4);
 

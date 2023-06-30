@@ -18,8 +18,9 @@ std::vector<int> receivedSignals;
 
 void handler(int signum) { receivedSignals.push_back(signum); }
 
-// This CloneHelper instance must only be used after a clone without 'CLONE_THREAD | CLONE_VM'.
-CloneHelper nestedCloneHelper;
+// This test_helper::CloneHelper instance must only be used after a clone without 'CLONE_THREAD |
+// CLONE_VM'.
+test_helper::CloneHelper nestedCloneHelper;
 
 void ensureWait(int pid, unsigned int waitFlags) {
   int actualWaitpid = waitpid(pid, NULL, waitFlags);
@@ -47,11 +48,11 @@ class WaitpidExitSignalTest : public testing::Test {
  * On termination, P1 sends its exit signal (if any) to P0.
  */
 TEST_F(WaitpidExitSignalTest, childProcessSendsDefaultSignalOnTerminationToParentProcess) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([] {
-    CloneHelper testCloneHelper;
-    int pid = testCloneHelper.runInClonedChild(SIGCHLD, CloneHelper::doNothing);
+    test_helper::CloneHelper testCloneHelper;
+    int pid = testCloneHelper.runInClonedChild(SIGCHLD, test_helper::CloneHelper::doNothing);
     ensureWait(pid, __WALL);
     EXPECT_TRUE(receivedSignals.size() == 1);
     EXPECT_EQ(receivedSignals[0], SIGCHLD);
@@ -61,11 +62,11 @@ TEST_F(WaitpidExitSignalTest, childProcessSendsDefaultSignalOnTerminationToParen
 }
 
 TEST_F(WaitpidExitSignalTest, childProcessSendsCustomExitSignalOnTerminationToParentProcess) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([] {
-    CloneHelper testCloneHelper;
-    int pid = testCloneHelper.runInClonedChild(SIGUSR1, CloneHelper::doNothing);
+    test_helper::CloneHelper testCloneHelper;
+    int pid = testCloneHelper.runInClonedChild(SIGUSR1, test_helper::CloneHelper::doNothing);
     ensureWait(pid, __WALL);
     EXPECT_TRUE(receivedSignals.size() == 1);
     EXPECT_EQ(receivedSignals[0], SIGUSR1);
@@ -74,11 +75,11 @@ TEST_F(WaitpidExitSignalTest, childProcessSendsCustomExitSignalOnTerminationToPa
 }
 
 TEST_F(WaitpidExitSignalTest, childProcessSendsNoExitSignalOnTerminationToParentProcess) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([] {
-    CloneHelper testCloneHelper;
-    int pid = testCloneHelper.runInClonedChild(0, CloneHelper::doNothing);
+    test_helper::CloneHelper testCloneHelper;
+    int pid = testCloneHelper.runInClonedChild(0, test_helper::CloneHelper::doNothing);
     ensureWait(pid, __WALL);
     EXPECT_TRUE(receivedSignals.empty());
   });
@@ -92,22 +93,22 @@ TEST_F(WaitpidExitSignalTest, childProcessSendsNoExitSignalOnTerminationToParent
  */
 int processThatFinishAfterChildThread(void *) {
   nestedCloneHelper.runInClonedChild(CLONE_THREAD | CLONE_VM | CLONE_SIGHAND | SIGUSR2,
-                                     CloneHelper::doNothing);
-  CloneHelper::sleep_1sec(NULL);
+                                     test_helper::CloneHelper::doNothing);
+  test_helper::CloneHelper::sleep_1sec(NULL);
   return 0;
 }
 
 int processThatFinishBeforeChildThread(void *) {
   nestedCloneHelper.runInClonedChild(CLONE_THREAD | CLONE_VM | CLONE_SIGHAND | SIGUSR2,
-                                     CloneHelper::sleep_1sec);
+                                     test_helper::CloneHelper::sleep_1sec);
   return 0;
 }
 
 TEST_F(WaitpidExitSignalTest, childThreadGroupSendsCorrectExitSignalWhenLeaderTerminatesLast) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([] {
-    CloneHelper testCloneHelper;
+    test_helper::CloneHelper testCloneHelper;
     int pid = testCloneHelper.runInClonedChild(SIGUSR1, processThatFinishAfterChildThread);
     ensureWait(pid, __WALL);
     EXPECT_TRUE(receivedSignals.size() == 1);
@@ -117,10 +118,10 @@ TEST_F(WaitpidExitSignalTest, childThreadGroupSendsCorrectExitSignalWhenLeaderTe
 }
 
 TEST_F(WaitpidExitSignalTest, childThreadGroupSendsCorrectExitSignalWhenLeaderTerminatesFirst) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([] {
-    CloneHelper testCloneHelper;
+    test_helper::CloneHelper testCloneHelper;
     int pid = testCloneHelper.runInClonedChild(SIGUSR1, processThatFinishBeforeChildThread);
     ensureWait(pid, __WALL);
     EXPECT_TRUE(receivedSignals.size() == 1);

@@ -54,7 +54,7 @@ TEST(JobControl, BackgroundProcessGroupDoNotUpdateOnDeath) {
   if (!test_helper::IsStarnix() && access("/dev/ptmx", F_OK) == -1) {
     GTEST_SKIP() << "Pseudoterminal not available, skipping...";
   }
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   IgnoreSignal(SIGTTOU);
 
@@ -84,7 +84,7 @@ TEST(JobControl, BackgroundProcessGroupDoNotUpdateOnDeath) {
 }
 
 TEST(JobControl, OrphanedProcessGroupsReceivesSignal) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     // Create a new session here, and associate it with the new terminal.
@@ -124,7 +124,7 @@ class Pty : public testing::Test {
 };
 
 TEST_F(Pty, SigWinch) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     // Create a new session here, and associate it with the new terminal.
@@ -184,7 +184,7 @@ ssize_t FullRead(int fd, char* buf, size_t count) {
 }
 
 TEST_F(Pty, OpenDevTTY) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     // Create a new session here, and associate it with the new terminal.
@@ -209,7 +209,7 @@ TEST_F(Pty, OpenDevTTY) {
 }
 
 TEST_F(Pty, ioctl_TCSETSF) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     // Create a new session here, and associate it with the new terminal.
@@ -227,7 +227,7 @@ void FullWrite(int fd, const char* buffer, ssize_t size) {
 }
 
 TEST_F(Pty, EndOfFile) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     // Create a new session here.
@@ -273,7 +273,7 @@ TEST_F(Pty, EndOfFile) {
 }
 
 TEST_F(Pty, EchoModes) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     // Create a new session here.
@@ -319,7 +319,7 @@ TEST_F(Pty, EchoModes) {
 }
 
 TEST_F(Pty, SendSignals) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   std::map<int, char> signal_and_control_character;
   signal_and_control_character[SIGINT] = 3;
@@ -383,7 +383,7 @@ TEST_F(Pty, SendSignals) {
 }
 
 TEST_F(Pty, CloseMainTerminal) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {
     IgnoreSignal(SIGHUP);
     // Create a new session here, and associate it with the new terminal.
@@ -407,7 +407,7 @@ TEST_F(Pty, CloseMainTerminal) {
 }
 
 TEST_F(Pty, CloseReplicaTerminal) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {
     // Create a new session here, and associate it with the new terminal.
     SAFE_SYSCALL(setsid());
@@ -432,7 +432,7 @@ TEST_F(Pty, CloseReplicaTerminal) {
 }
 
 TEST_F(Pty, DetectReplicaClosing) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {
     // Create a new session here, and associate it with the new terminal.
     SAFE_SYSCALL(setsid());

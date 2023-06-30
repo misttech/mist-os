@@ -27,7 +27,7 @@ bool get_bit(const std::array<uint8_t, SIZE>& buf, size_t bit_num) {
 
 // TODO(quiche): Maybe move this to a test fixture, and guarantee removal of the input
 // node between test cases.
-ScopedFD GetInputFile() {
+test_helper::ScopedFD GetInputFile() {
   // Typically, this would be `/dev/input/event0`, but there's not much to be gained by
   // exercising `mkdir()` in this test.
   const char kInputFile[] = "/dev/input0";
@@ -40,7 +40,7 @@ ScopedFD GetInputFile() {
   };
 
   // Open device node.
-  ScopedFD fd(open(kInputFile, O_RDONLY));
+  test_helper::ScopedFD fd(open(kInputFile, O_RDONLY));
   EXPECT_TRUE(fd.is_valid()) << " failed to open " << kInputFile << ": " << strerror(errno);
 
   return fd;
@@ -167,7 +167,7 @@ TEST(InputTest, DeviceCanBeRegisteredWithEpoll) {
   auto input_fd = GetInputFile();
   ASSERT_TRUE(input_fd.is_valid());
 
-  ScopedFD epoll_fd(epoll_create(1));  // Per `man` page, must be >0.
+  test_helper::ScopedFD epoll_fd(epoll_create(1));  // Per `man` page, must be >0.
   ASSERT_TRUE(epoll_fd.is_valid()) << "failed to create epoll fd: " << strerror(errno);
 
   epoll_event epoll_params = {.events = EPOLLIN | EPOLLWAKEUP, .data = {.fd = input_fd.get()}};

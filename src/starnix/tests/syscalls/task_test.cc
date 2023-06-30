@@ -273,7 +273,7 @@ TEST(Task, CloneVfork_exit) {
 TEST(Task, BrkShrinkAfterFork) {
   // Tests that a program can shrink their break after forking.
   const void* SBRK_ERROR = reinterpret_cast<void*>(-1);
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   constexpr int brk_increment = 0x4000;
   ASSERT_NE(SBRK_ERROR, sbrk(brk_increment));
@@ -293,7 +293,7 @@ TEST(Task, BrkShrinkAfterFork) {
 TEST(Task, ChildCantModifyParent) {
   ASSERT_GT(MAX_PAGE_ALIGNMENT, getpagesize());
 
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   g_global_variable_data = 1;
   g_global_variable_bss = 10;
@@ -370,7 +370,7 @@ TEST(Task, ForkDoesntDropWrites) {
 TEST(Task, ParentCantModifyChild) {
   ASSERT_GT(MAX_PAGE_ALIGNMENT, getpagesize());
 
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   g_global_variable_data = 1;
   g_global_variable_bss = 10;
@@ -383,7 +383,7 @@ TEST(Task, ParentCantModifyChild) {
   ASSERT_EQ(local_variable, 100);
   ASSERT_EQ(*heap_variable, 1000);
 
-  SignalMaskHelper signal_helper = SignalMaskHelper();
+  test_helper::SignalMaskHelper signal_helper = test_helper::SignalMaskHelper();
   signal_helper.blockSignal(SIGUSR1);
 
   pid_t child_pid = helper.RunInForkedProcess([&] {
@@ -412,7 +412,7 @@ constexpr size_t kVecSize = 100;
 constexpr size_t kPageLimit = 32;
 
 TEST(Task, ExecveArgumentExceedsMaxArgStrlen) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([] {
     size_t arg_size = kPageLimit * sysconf(_SC_PAGESIZE);
     std::vector<char> arg(arg_size + 1, 'a');
@@ -426,7 +426,7 @@ TEST(Task, ExecveArgumentExceedsMaxArgStrlen) {
 }
 
 TEST(Task, ExecveArgvExceedsLimit) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([] {
     size_t arg_size = kPageLimit * sysconf(_SC_PAGESIZE);
     std::vector<char> arg(arg_size, 'a');
@@ -442,7 +442,7 @@ TEST(Task, ExecveArgvExceedsLimit) {
 }
 
 TEST(Task, ExecveArgvEnvExceedLimit) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([] {
     size_t arg_size = kPageLimit * sysconf(_SC_PAGESIZE);
     std::vector<char> string(arg_size, 'a');
@@ -458,7 +458,7 @@ TEST(Task, ExecveArgvEnvExceedLimit) {
 }
 
 TEST(Task, ExecvePathnameTooLong) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([] {
     constexpr size_t path_size = PATH_MAX + 1;
     // We use '/' here because ////// (...) is a valid path:

@@ -22,6 +22,8 @@
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 
+namespace test_helper {
+
 ::testing::AssertionResult ForkHelper::WaitForChildrenInternal(int death_signum) {
   ::testing::AssertionResult result = ::testing::AssertionSuccess();
   while (!only_wait_for_child_pids_ || !child_pids_.empty()) {
@@ -238,8 +240,6 @@ std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_vie
   }
   return std::nullopt;
 }
-
-namespace test_helper {
 
 bool HasCapability(uint32_t cap) {
   struct __user_cap_header_struct header = {_LINUX_CAPABILITY_VERSION_3, 0};

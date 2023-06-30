@@ -51,7 +51,7 @@ TEST(RestartRead, ReadFromPipeRestarts) {
   child_wrote_data = false;
   parent_read_started = false;
 
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   // Install the signal handler that will interrupt the read syscall. The `SA_RESTART` flag tells
   // the kernel to restart any interrupted syscalls that support being restarted.
   struct sigaction sa = {};

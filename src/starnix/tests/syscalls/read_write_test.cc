@@ -11,7 +11,7 @@
 #include "src/starnix/tests/syscalls/test_helper.h"
 
 TEST(ReadWriteTest, preadv_pwritev) {
-  ScopedTempFD temp_file;
+  test_helper::ScopedTempFD temp_file;
   ASSERT_TRUE(temp_file);
 
   // Add some data to the file and seek back to the beginning so we know the offset took effect.
@@ -59,7 +59,7 @@ TEST(ReadWriteTest, preadv_pwritev) {
 // TODO(fxbug.dev/117677) implement partial read/write support (we'll also need tests for read(),
 //                        writev(), and readv()).
 TEST(ReadWriteTest, DISABLED_PartialWrite) {
-  ScopedTempFD temp_file;
+  test_helper::ScopedTempFD temp_file;
   ASSERT_TRUE(temp_file);
 
   // Allocate 2 pages and remove permission from the second.

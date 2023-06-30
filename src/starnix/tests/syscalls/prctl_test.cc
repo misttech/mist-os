@@ -27,7 +27,7 @@ TEST(PrctlTest, SubReaperTest) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
 
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   // Reap children.
   prctl(PR_SET_CHILD_SUBREAPER, 1);
@@ -55,7 +55,7 @@ TEST(PrctlTest, SubReaperTest) {
 }
 
 TEST(PrctlTest, SecureBits) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     SAFE_SYSCALL_SKIP_ON_EPERM(prctl(PR_SET_SECUREBITS, SECBIT_NOROOT));
@@ -71,7 +71,7 @@ TEST(PrctlTest, DropCapabilities) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
 
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     ASSERT_EQ(SAFE_SYSCALL(prctl(PR_CAPBSET_READ, CAP_DAC_OVERRIDE)), true);
@@ -81,7 +81,7 @@ TEST(PrctlTest, DropCapabilities) {
 }
 
 TEST(PrctlTest, CapGet) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   __user_cap_header_struct header;
   memset(&header, 0, sizeof(header));
@@ -112,7 +112,7 @@ TEST(PrctlTest, CapGet) {
 }
 
 TEST(PrctlTest, AmbientCapabilitiesBasicOperations) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     ASSERT_EQ(SAFE_SYSCALL(prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_LOWER, CAP_CHOWN, 0, 0)), 0);

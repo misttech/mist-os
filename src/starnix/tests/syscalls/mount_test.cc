@@ -98,7 +98,7 @@ class MountTest : public ::testing::Test {
     if (skip_mount_tests) {
       GTEST_SKIP() << "Permission denied for unshare(CLONE_NEWNS), skipping suite.";
     }
-    tmp_ = get_tmp_path() + "/mounttest";
+    tmp_ = test_helper::get_tmp_path() + "/mounttest";
     mkdir(tmp_.c_str(), 0777);
     RecursiveUnmount(tmp_.c_str());
     ASSERT_THAT(mount(nullptr, tmp_.c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
@@ -320,7 +320,7 @@ class ProcMountsTest : public ProcTestBase {
   }
 
  protected:
-  const std::string tmp_ = get_tmp_path();
+  const std::string tmp_ = test_helper::get_tmp_path();
 };
 
 TEST_F(ProcMountsTest, Basic) {

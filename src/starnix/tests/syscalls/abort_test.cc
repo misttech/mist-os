@@ -13,7 +13,7 @@
 #include "src/starnix/tests/syscalls/test_helper.h"
 
 TEST(AbortTest, Abort) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.ExpectSignal(SIGABRT);
   helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] { abort(); });
@@ -21,7 +21,7 @@ TEST(AbortTest, Abort) {
 }
 
 TEST(AbortTest, AbortFromChildThread) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.ExpectSignal(SIGABRT);
   helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {

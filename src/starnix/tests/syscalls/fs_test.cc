@@ -277,7 +277,7 @@ TEST_F(UtimensatTest, OwnerCanAlwaysSetTime) {
   ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);
 
   // File owner can change time to now even without write perms.
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([this] {
     ASSERT_TRUE(change_ids(kOwnerUid, kOwnerGid));
     EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), NULL, 0))
@@ -301,7 +301,7 @@ TEST_F(UtimensatTest, NonOwnerWithWriteAccessCanOnlySetTimeToNow) {
   ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);
 
   // Non file owner cannot change time to now without write perms.
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([this] {
     ASSERT_TRUE(change_ids(kNonOwnerUid, kNonOwnerGid));
     EXPECT_NE(0, utimensat(-1, test_file_.c_str(), NULL, 0));
@@ -333,7 +333,7 @@ TEST_F(UtimensatTest, NonOwnerWithCapabilitiesCanSetTime) {
 
   // Non file owner without write permissions can set the time to now with
   // either CAP_DAC_OVERRIDE or CAP_FOWNER capability.
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([this] {
     ASSERT_TRUE(has_capability(CAP_DAC_OVERRIDE));
     ASSERT_TRUE(has_capability(CAP_FOWNER));
@@ -396,7 +396,7 @@ TEST_F(UtimensatTest, CanSetOmitTimestampsWithoutPermissions) {
   // Non file owner without write permissions and without the CAP_DAC_OVERRIDE or
   // CAP_FOWNER capability can set the timestamps to UTIME_OMIT.
   ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([this] {
     unset_capability(CAP_DAC_OVERRIDE);
     unset_capability(CAP_FOWNER);
@@ -410,7 +410,7 @@ TEST_F(UtimensatTest, CanSetOmitTimestampsWithoutPermissions) {
 }
 
 TEST_F(UtimensatTest, ReturnsEFAULTOnNullPathAndCWDDirFd) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([] {
     struct timespec times[2] = {{0, 0}};
     EXPECT_NE(0, syscall(SYS_utimensat, AT_FDCWD, NULL, times, 0));
@@ -420,7 +420,7 @@ TEST_F(UtimensatTest, ReturnsEFAULTOnNullPathAndCWDDirFd) {
 }
 
 TEST_F(UtimensatTest, ReturnsENOENTOnEmptyPath) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([] {
     EXPECT_NE(0, utimensat(-1, "", NULL, 0));
     EXPECT_EQ(errno, ENOENT);

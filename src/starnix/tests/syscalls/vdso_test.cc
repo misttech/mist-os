@@ -46,7 +46,8 @@ class VdsoProcTest : public ::testing::Test {
     // mapping size in /proc/self/maps. The latter is easier.
     std::string maps;
     ASSERT_TRUE(files::ReadFileToString("/proc/self/maps", &maps));
-    auto vdso_mapping = find_memory_mapping(reinterpret_cast<uintptr_t>(vdso_base_), maps);
+    auto vdso_mapping =
+        test_helper::find_memory_mapping(reinterpret_cast<uintptr_t>(vdso_base_), maps);
     ASSERT_NE(vdso_mapping, std::nullopt);
     ASSERT_EQ(vdso_mapping->pathname, "[vdso]");
 
@@ -77,7 +78,7 @@ TEST_F(VdsoProcTest, VdsoMappingCannotBeSplit) {
     GTEST_SKIP() << "Need more than one vdso page to split it";
   }
 
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   // We cannot unmap one page of the vdso.
   helper.RunInForkedProcess([&] {
@@ -126,7 +127,7 @@ TEST_F(VdsoProcTest, VdsoMappingCannotBeSplit) {
 }
 
 TEST_F(VdsoProcTest, VdsoCanBeUnmapped) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     EXPECT_EQ(munmap(vdso_base_, vdso_size_), 0);
@@ -137,7 +138,7 @@ TEST_F(VdsoProcTest, VdsoCanBeUnmapped) {
 }
 
 TEST_F(VdsoProcTest, VdsoCanBeMprotected) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     EXPECT_EQ(mprotect(vdso_base_, vdso_size_, PROT_READ | PROT_WRITE | PROT_EXEC), 0);
@@ -149,7 +150,7 @@ TEST_F(VdsoProcTest, VdsoCanBeMprotected) {
 }
 
 TEST_F(VdsoProcTest, VdsoCanBeMappedInto) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     EXPECT_NE(
@@ -162,7 +163,7 @@ TEST_F(VdsoProcTest, VdsoCanBeMappedInto) {
 }
 
 TEST_F(VdsoProcTest, VdsoCanBeRemapped) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     void* new_addr = mmap(NULL, vdso_size_, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -176,7 +177,7 @@ TEST_F(VdsoProcTest, VdsoCanBeRemapped) {
 }
 
 TEST_F(VdsoProcTest, VdsoCanBeRemappedInto) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     void* new_addr = mmap(NULL, vdso_size_, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -191,7 +192,7 @@ TEST_F(VdsoProcTest, VdsoCanBeRemappedInto) {
 
 TEST_F(VdsoProcTest, VdsoModificationsDontAffectParent) {
   ASSERT_TRUE(IsEIPadFirstByteZero(vdso_base_));
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     ASSERT_EQ(mprotect(vdso_base_, vdso_size_, PROT_READ | PROT_WRITE | PROT_EXEC), 0);
@@ -205,7 +206,7 @@ TEST_F(VdsoProcTest, VdsoModificationsDontAffectParent) {
 
 TEST_F(VdsoProcTest, VdsoModificationsShowUpInFork) {
   ASSERT_TRUE(IsEIPadFirstByteZero(vdso_base_));
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     ASSERT_EQ(mprotect(vdso_base_, vdso_size_, PROT_READ | PROT_WRITE | PROT_EXEC), 0);
@@ -233,15 +234,15 @@ TEST_F(VdsoProcTest, VdsoModificationsShowUpInFork) {
 
 TEST_F(VdsoProcTest, VdsoModificationsAferForkDontShowUpInChild) {
   ASSERT_TRUE(IsEIPadFirstByteZero(vdso_base_));
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     ASSERT_EQ(mprotect(vdso_base_, vdso_size_, PROT_READ | PROT_WRITE | PROT_EXEC), 0);
 
-    SignalMaskHelper signal_helper = SignalMaskHelper();
+    test_helper::SignalMaskHelper signal_helper = test_helper::SignalMaskHelper();
     signal_helper.blockSignal(SIGUSR1);
 
-    ForkHelper child_helper;
+    test_helper::ForkHelper child_helper;
     pid_t child_pid = fork();
     if (child_pid == 0) {
       signal_helper.waitForSignal(SIGUSR1);
@@ -292,7 +293,7 @@ TEST(VdsoTest, VdsoHasElfHeader) {
 }
 
 TEST_F(VdsoProcTest, VdsoModificationsDontAffectOtherPrograms) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     const char* argv[] = {"/proc/self/exe", "--gtest_filter=" ELF_HEADER_TEST_NAME, NULL};

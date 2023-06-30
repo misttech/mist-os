@@ -59,7 +59,7 @@ void install_filter_block(uint32_t syscall_nr, uint32_t action) {
 }
 
 TEST(SeccompTest, RetTrapBypassesIgn) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   helper.ExpectSignal(SIGSYS);
   helper.RunInForkedProcess([] {
@@ -78,7 +78,7 @@ TEST(SeccompTest, RetTrapBypassesIgn) {
 
 // Test to ensure strict mode works.
 TEST(SeccompTest, Strict) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   helper.ExpectSignal(SIGKILL);
   helper.RunInForkedProcess([] {
@@ -100,7 +100,7 @@ TEST(SeccompTest, Strict) {
 
 // Cannot change from Filtered to Strict
 TEST(SeccompTest, FilterToStrictErrors) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     ASSERT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
@@ -122,7 +122,7 @@ TEST(SeccompTest, FilterToStrictErrors) {
 // Checks for attempt to install null filter with FILTER, or non-null filter
 // with seccomp(SET_MODE_STRICT)
 TEST(SeccompTest, BadArgs) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
@@ -149,7 +149,7 @@ TEST(SeccompTest, BadNoNewPrivs) {
     GTEST_SKIP() << "Skipped privs test because running as root";
   }
 
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     // Running in locked down mode with no new privs already set - skip.
@@ -174,7 +174,7 @@ TEST(SeccompTest, BadNoNewPrivs) {
 }
 
 TEST(SeccompTest, FilterMax4KMinOne) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
@@ -205,7 +205,7 @@ TEST(SeccompTest, FilterMax4KMinOne) {
 // seem to mean 32768 instructions consistently, so it's acceptable just to use
 // that as an upper bound.
 TEST(SeccompTest, FilterMaxTotalInsns) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     const int kFilterSize = BPF_MAXINSNS;
@@ -230,7 +230,7 @@ TEST(SeccompTest, FilterMaxTotalInsns) {
 // If a BPF operation contains BPF_ABS, then the specified offset has to be
 // aligned to a 32-bit boundary and not exceed sizeof(seccomp_data)
 TEST(SeccompTest, FilterAccessInBounds) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
@@ -251,7 +251,7 @@ TEST(SeccompTest, FilterAccessInBounds) {
 }
 
 TEST(SeccompTest, RetKillProcess) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   helper.ExpectSignal(SIGSYS);
   helper.RunInForkedProcess([] {
@@ -266,7 +266,7 @@ TEST(SeccompTest, RetKillProcess) {
 }
 
 TEST(SeccompTest, KillProcessOnBadRetAction) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   helper.ExpectSignal(SIGSYS);
   helper.RunInForkedProcess([] {
@@ -281,7 +281,7 @@ TEST(SeccompTest, KillProcessOnBadRetAction) {
 }
 
 TEST(SeccompTest, PrctlGetSeccomp) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   helper.ExpectSignal(SIGSYS);
   helper.RunInForkedProcess([] {
@@ -327,7 +327,7 @@ TEST(SeccompTest, GetActionAvail) {
 }
 
 TEST(SeccompTest, ErrnoIsMaxFFF) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
@@ -343,7 +343,7 @@ TEST(SeccompTest, ErrnoIsMaxFFF) {
 // Test that TSYNC from thread A won't work if you add a filter in thread B,
 // spawned from thread A.
 TEST(SeccompTest, TsyncEsrch) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   helper.RunInForkedProcess([] {
     std::mutex m;

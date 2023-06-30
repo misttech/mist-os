@@ -510,7 +510,7 @@ TEST_F(SigaltstackDeathTest, SigaltstackExceededThrowsSIGSEGV) {
 }
 
 TEST_F(SigaltstackDeathTest, MINSIGSTKSZIsEnough) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     ASSERT_EQ(0, setup_sigaltstack_at(sigaltstack_base_, 5120));
@@ -532,7 +532,7 @@ TEST_F(SigaltstackDeathTest, MINSIGSTKSZIsEnough) {
 }
 
 TEST_F(SigaltstackDeathTest, NestedSignalsWork) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
     ASSERT_EQ(0, setup_sigaltstack_at(sigaltstack_base_, sigaltstack_size_));
@@ -558,7 +558,7 @@ TEST_F(SigaltstackDeathTest, SigaltstackSetupFailureIsNotResumed) {
   // Raise an exception with a non-writable main stack.
   // Handle the exception in the altstack by mprotecting the bad region.
   // If the sigusr1 handler is resumed, it should exit with kExitTestFailure.
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   g_mmap_area = mmap(NULL, 0x10000, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
   ASSERT_NE(MAP_FAILED, g_mmap_area);
@@ -585,7 +585,7 @@ TEST_F(SigaltstackDeathTest, SigaltstackSetupFailureIsNotResumed) {
 TEST_F(SigaltstackDeathTest, SigaltstackSetupFailureCanUseMainStack) {
   // Raise an exception with a non-writable alt stack.
   // Handle the exception in the main stack.
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   ASSERT_EQ(0, mprotect(sigaltstack_mapping_, sigaltstack_mapping_size_, PROT_NONE));
 
   helper.RunInForkedProcess([&] {
@@ -609,7 +609,7 @@ TEST_F(SigaltstackDeathTest, SigaltstackSetupFailureCanUseMainStack) {
 }
 
 TEST(SignalHandling, Sigsuspend) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
 
   sigset_t old_sigset;
   sigset_t sigset;

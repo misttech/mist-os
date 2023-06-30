@@ -32,7 +32,7 @@ int EpollAdd(int epfd, int to_watch, uint32_t events, uint64_t data) {
 // Implements the backend thread that responds to 1-byte socket messages for the LotsaSignals test.
 // Quits when one of the sockets receives a 'q'.
 void LotsaSignals_DoPong(int main_tid, int* socks) {
-  ScopedFD epfd(epoll_create(2));
+  test_helper::ScopedFD epfd(epoll_create(2));
   ASSERT_TRUE(epfd.is_valid());
 
   ASSERT_EQ(0, EpollAdd(epfd.get(), socks[0], EPOLLIN, 0));
@@ -92,17 +92,19 @@ TEST(EpollTest, LotsaSignals) {
 
   // Ping pong
   pid_t main_tid = DoGetTid();
-  std::thread ponger([main_tid, one = ScopedFD(pair1[1]), two = ScopedFD(pair2[1])]() {
-    int socks[2];
-    socks[0] = one.get();
-    socks[1] = two.get();
-    LotsaSignals_DoPong(main_tid, socks);
-  });
+  std::thread ponger(
+      [main_tid, one = test_helper::ScopedFD(pair1[1]), two = test_helper::ScopedFD(pair2[1])]() {
+        int socks[2];
+        socks[0] = one.get();
+        socks[1] = two.get();
+        LotsaSignals_DoPong(main_tid, socks);
+      });
 
-  ScopedFD epfd(epoll_create(2));
+  test_helper::ScopedFD epfd(epoll_create(2));
   ASSERT_TRUE(epfd.is_valid());
 
-  ScopedFD socks[2] = {ScopedFD(pair1[0]), ScopedFD(pair2[0])};
+  test_helper::ScopedFD socks[2] = {test_helper::ScopedFD(pair1[0]),
+                                    test_helper::ScopedFD(pair2[0])};
   ASSERT_EQ(0, EpollAdd(epfd.get(), socks[0].get(), EPOLLIN, 0));
   ASSERT_EQ(0, EpollAdd(epfd.get(), socks[1].get(), EPOLLIN, 1));
 
@@ -175,7 +177,7 @@ TEST(EpollTest, InvalidCreateSize) {
 }
 
 TEST(EpollTest, WaitInvalidParams) {
-  ScopedFD epfd(epoll_create(2));
+  test_helper::ScopedFD epfd(epoll_create(2));
   ASSERT_TRUE(epfd);
 
   struct epoll_event event;

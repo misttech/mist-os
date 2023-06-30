@@ -172,12 +172,12 @@ TEST_F(MMapProcTest, CommonMappingsHavePathnames) {
 
   std::string maps;
   ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
-  auto stack_mapping = find_memory_mapping(stack_addr, maps);
+  auto stack_mapping = test_helper::find_memory_mapping(stack_addr, maps);
   ASSERT_NE(stack_mapping, std::nullopt);
   EXPECT_EQ(stack_mapping->pathname, "[stack]");
 
   if (vdso_addr) {
-    auto vdso_mapping = find_memory_mapping(vdso_addr, maps);
+    auto vdso_mapping = test_helper::find_memory_mapping(vdso_addr, maps);
     ASSERT_NE(vdso_mapping, std::nullopt);
     EXPECT_EQ(vdso_mapping->pathname, "[vdso]");
   }
@@ -188,7 +188,8 @@ TEST_F(MMapProcTest, MapFileWithNewlineInName) {
   char* tmp = getenv("TEST_TMPDIR");
   std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
   std::string path = dir + "/mmap\nnewline";
-  ScopedFD fd = ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
+  test_helper::ScopedFD fd =
+      test_helper::ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
   ASSERT_TRUE(fd);
   SAFE_SYSCALL(ftruncate(fd.get(), page_size));
   void* p = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
@@ -196,7 +197,7 @@ TEST_F(MMapProcTest, MapFileWithNewlineInName) {
 
   std::string maps;
   ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
-  auto mapping = find_memory_mapping(reinterpret_cast<uintptr_t>(p), maps);
+  auto mapping = test_helper::find_memory_mapping(reinterpret_cast<uintptr_t>(p), maps);
   EXPECT_NE(mapping, std::nullopt);
   EXPECT_EQ(mapping->pathname, dir + "/mmap\\012newline");
 
@@ -209,7 +210,8 @@ TEST_F(MMapProcTest, MapDeletedField) {
   char* tmp = getenv("TEST_TMPDIR");
   std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
   std::string path = dir + "/tmpfile";
-  ScopedFD fd = ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
+  test_helper::ScopedFD fd =
+      test_helper::ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
   ASSERT_TRUE(fd);
   SAFE_SYSCALL(ftruncate(fd.get(), page_size));
   void* p = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
@@ -219,7 +221,7 @@ TEST_F(MMapProcTest, MapDeletedField) {
 
   std::string maps;
   ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
-  auto mapping = find_memory_mapping(reinterpret_cast<uintptr_t>(p), maps);
+  auto mapping = test_helper::find_memory_mapping(reinterpret_cast<uintptr_t>(p), maps);
   EXPECT_NE(mapping, std::nullopt);
   EXPECT_EQ(mapping->pathname, dir + "/tmpfile (deleted)");
 
@@ -468,7 +470,7 @@ class MapGrowsdownTest : public testing::Test {
 
   bool TestThatAccessSegfaults(intptr_t offset, AccessType type) {
     std::byte* test_address = OffsetToAddress(offset);
-    ForkHelper helper;
+    test_helper::ForkHelper helper;
     helper.RunInForkedProcess([test_address, type] {
       struct sigaction segv_act;
       segv_act.sa_sigaction = [](int signo, siginfo_t* info, void* ucontext) {
@@ -762,7 +764,7 @@ inline int MemFdCreate(const char* name, unsigned int flags) {
 // Attempts to read a byte from the given memory address.
 // Returns whether the read succeeded or not.
 bool TryRead(uintptr_t addr) {
-  ScopedFD mem_fd(MemFdCreate("try_read", O_WRONLY));
+  test_helper::ScopedFD mem_fd(MemFdCreate("try_read", O_WRONLY));
   if (!mem_fd) {
     return false;
   }
@@ -773,7 +775,7 @@ bool TryRead(uintptr_t addr) {
 // Attempts to write a zero byte to the given memory address.
 // Returns whether the write succeeded or not.
 bool TryWrite(uintptr_t addr) {
-  ScopedFD zero_fd(open("/dev/zero", O_RDONLY));
+  test_helper::ScopedFD zero_fd(open("/dev/zero", O_RDONLY));
   if (!zero_fd) {
     return false;
   }
@@ -782,7 +784,7 @@ bool TryWrite(uintptr_t addr) {
 }
 
 TEST_F(MMapProcTest, MProtectIsThreadSafe) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {
     const size_t page_size = sysconf(_SC_PAGE_SIZE);
     void* mmap1 = mmap(NULL, page_size, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -817,7 +819,7 @@ TEST_F(MMapProcTest, MProtectIsThreadSafe) {
     std::string maps;
 
     ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
-    auto mapping = find_memory_mapping(addr, maps);
+    auto mapping = test_helper::find_memory_mapping(addr, maps);
     ASSERT_NE(mapping, std::nullopt);
 
     std::string perms = mapping->perms;
@@ -849,7 +851,8 @@ TEST(Mprotect, GrowTempFilePermisisons) {
   std::string path = dir + "/grow_temp_file_permissions";
   {
     uint8_t buf[] = {'a'};
-    ScopedFD fd = ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
+    test_helper::ScopedFD fd =
+        test_helper::ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
     ASSERT_TRUE(fd);
     ASSERT_EQ(write(fd.get(), &buf[0], sizeof(buf)), 1) << errno << ": " << strerror(errno);
   }
@@ -860,14 +863,14 @@ TEST(Mprotect, GrowTempFilePermisisons) {
 
   {
     uint8_t buf[] = {'b'};
-    ScopedFD fd = ScopedFD(open(path.c_str(), O_RDONLY));
+    test_helper::ScopedFD fd = test_helper::ScopedFD(open(path.c_str(), O_RDONLY));
     ASSERT_EQ(-1, write(fd.get(), buf, sizeof(buf)));
 
     void* ptr = mmap(NULL, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
     EXPECT_NE(ptr, MAP_FAILED);
 
     EXPECT_NE(mprotect(ptr, page_size, PROT_READ | PROT_WRITE), 0);
-    ForkHelper helper;
+    test_helper::ForkHelper helper;
     helper.RunInForkedProcess([ptr] { *reinterpret_cast<volatile char*>(ptr) = 'b'; });
     EXPECT_FALSE(helper.WaitForChildren());
   }
@@ -886,11 +889,12 @@ TEST_F(MMapProcTest, MprotectFailureIsConsistent) {
   std::string path = dir + "/test_mprotect_consistent_failure";
   {
     uint8_t buf[] = {1};
-    ScopedFD fd = ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
+    test_helper::ScopedFD fd =
+        test_helper::ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
     ASSERT_TRUE(fd);
     ASSERT_EQ(write(fd.get(), &buf[0], sizeof(buf)), 1);
   }
-  ScopedFD fd = ScopedFD(open(path.c_str(), O_RDONLY));
+  test_helper::ScopedFD fd = test_helper::ScopedFD(open(path.c_str(), O_RDONLY));
   ASSERT_TRUE(fd);
 
   void* ptr = mmap(0, page_size * 3, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -908,7 +912,7 @@ TEST_F(MMapProcTest, MprotectFailureIsConsistent) {
   std::string maps;
   ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
 
-  auto second_page = find_memory_mapping(ptr_addr + page_size, maps);
+  auto second_page = test_helper::find_memory_mapping(ptr_addr + page_size, maps);
   ASSERT_NE(second_page, std::nullopt);
   EXPECT_EQ(second_page->perms, "r--s");
   EXPECT_TRUE(TryRead(ptr_addr + page_size));
@@ -932,11 +936,11 @@ TEST_F(MMapProcTest, MprotectFailureIsConsistent) {
     }
   };
 
-  auto first_page = find_memory_mapping(ptr_addr, maps);
+  auto first_page = test_helper::find_memory_mapping(ptr_addr, maps);
   ASSERT_NE(first_page, std::nullopt);
   test_consistency(first_page, ptr_addr);
 
-  auto third_page = find_memory_mapping(ptr_addr + page_size * 2, maps);
+  auto third_page = test_helper::find_memory_mapping(ptr_addr + page_size * 2, maps);
   ASSERT_NE(third_page, std::nullopt);
   test_consistency(third_page, ptr_addr + page_size * 2);
 

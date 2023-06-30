@@ -14,7 +14,7 @@
 void* volatile target;
 
 TEST(Fault, PreserveVectorRegisters) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([] {
     size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
     target = mmap(nullptr, page_size, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);

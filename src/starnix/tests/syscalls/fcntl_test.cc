@@ -14,7 +14,7 @@
 namespace {
 
 bool CheckLock(int fd, short type, off_t start, off_t length, pid_t pid) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   // Fork a process to be able to check the state of locks in fd.
   helper.RunInForkedProcess([&] {
     struct flock fl;
@@ -52,7 +52,7 @@ int OpenTestFile() {
 // Test that exiting a processes releases locks on a file.
 TEST(FcntlLockTest, ChildProcessReleaseLock) {
   for (int i = 0; i < 10; ++i) {
-    ForkHelper helper;
+    test_helper::ForkHelper helper;
     helper.RunInForkedProcess([] {
       int fd = OpenTestFile();
 
@@ -69,7 +69,7 @@ TEST(FcntlLockTest, ChildProcessReleaseLock) {
 }
 
 TEST(FcntlLockTest, ReleaseLockInMiddleOfAnotherLock) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {
     int fd = OpenTestFile();
 
@@ -94,7 +94,7 @@ TEST(FcntlLockTest, ReleaseLockInMiddleOfAnotherLock) {
 }
 
 TEST(FcntlLockTest, ChangeLockTypeInMiddleOfAnotherLock) {
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {
     int fd = OpenTestFile();
 
@@ -127,7 +127,7 @@ TEST(FcntlLockTest, CloneFiles) {
 
   // Do all the test in another process, as it will requires closing the parent
   // process before the child one.
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {
     int fd = OpenTestFile();
     pid_t pid = getpid();

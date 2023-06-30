@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
-#define SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
+#ifndef SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_BASE_H_
+#define SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_BASE_H_
 
 #include <sys/mount.h>
 
@@ -24,7 +24,7 @@ class ProcTestBase : public ::testing::Test {
     // but first the mount point needs to exist in the image
     // (prebuilt/starnix/chromiumos-image-amd64/system.img).
     if (access(kProc, F_OK) != 0) {
-      proc_ = get_tmp_path() + kProc;
+      proc_ = test_helper::get_tmp_path() + kProc;
       ASSERT_THAT(mkdir(proc_.c_str(), 0777), SyscallSucceeds());
       ASSERT_THAT(mount(nullptr, proc_.c_str(), "proc", 0, nullptr), SyscallSucceeds());
       mounted_ = true;
@@ -51,4 +51,4 @@ class ProcTestBase : public ::testing::Test {
   std::string proc_;
 };
 
-#endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
+#endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_BASE_H_

@@ -24,7 +24,7 @@ TEST(ExtendedPstateInitialState, Basic) {
         files::JoinPath(files::GetDirectoryName(self_path), "extended_pstate_initial_state_child");
   }
   ASSERT_TRUE(files::IsFile(child_path)) << child_path;
-  ForkHelper helper;
+  test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&child_path] {
     char* argv[] = {nullptr};
     char* envp[] = {nullptr};

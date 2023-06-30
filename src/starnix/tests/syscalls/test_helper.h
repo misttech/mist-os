@@ -40,6 +40,8 @@
     retval;                                                                           \
   })
 
+namespace test_helper {
+
 // Helper class to handle test that needs to fork and do assertion on the child
 // process.
 class ForkHelper {
@@ -193,8 +195,6 @@ struct MemoryMapping {
 };
 
 std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_view maps);
-
-namespace test_helper {
 
 // Returns true if running with sysadmin capabilities.
 bool HasSysAdmin();
