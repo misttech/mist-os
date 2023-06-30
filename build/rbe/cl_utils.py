@@ -8,6 +8,7 @@
 import argparse
 import asyncio
 import collections
+import contextlib
 import dataclasses
 import io
 import os
@@ -51,6 +52,7 @@ def bool_golang_flag(value: str) -> bool:
         'false': False,
     }[value.lower()]
 
+
 def copy_preserve_subpath(src: Path, dest_dir: Path):
     """Like copy(), but preserves the relative path of src in the destination.
 
@@ -67,6 +69,7 @@ def copy_preserve_subpath(src: Path, dest_dir: Path):
     dest_subdir = dest_dir / src.parent
     dest_subdir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dest_subdir)
+
 
 # TODO: move this to library for abstract data operations
 def partition_sequence(seq: Sequence[Any],
@@ -337,6 +340,17 @@ class FlagForwarder(object):
             filtered_argv.append(tok)
 
         return forwarded_flags, filtered_argv
+
+
+@contextlib.contextmanager
+def chdir_cm(d: Path):
+    """FIXME: replace with contextlib.chdir(), once Python 3.11 is default."""
+    save_dir = os.getcwd()
+    os.chdir(d)  # could raise OSError
+    try:
+        yield
+    finally:
+        os.chdir(save_dir)
 
 
 def relpath(path: Path, start: Path) -> Path:

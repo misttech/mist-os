@@ -58,15 +58,6 @@ class BoolGolangFlagTests(unittest.TestCase):
             with self.assertRaises(KeyError):
                 cl_utils.bool_golang_flag(v)
 
-@contextlib.contextmanager
-def chdir_cm(d: Path):
-    """FIXME: replace with contextlib.chdir(), once Python 3.11 is default."""
-    save_dir = os.getcwd()
-    os.chdir(d)  # could raise OSError
-    try:
-        yield
-    finally:
-        os.chdir(save_dir)
 
 class CopyPreserveSubpathTests(unittest.TestCase):
 
@@ -74,7 +65,7 @@ class CopyPreserveSubpathTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td1:
             tdp1 = Path(td1)
             dest_dir = tdp1 / 'backups'
-            with chdir_cm(tdp1):  # working directory
+            with cl_utils.chdir_cm(tdp1):  # working directory
                 srcdir = Path('aa/bb')
                 srcdir.mkdir(parents=True, exist_ok=True)
                 src_file = srcdir / 'c.txt'

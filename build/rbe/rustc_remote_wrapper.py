@@ -324,6 +324,11 @@ class RustRemoteAction(object):
         return cl_utils.relpath(self.exec_root, start=self.working_dir)
 
     @property
+    def build_subdir(self) -> Path:  # relative
+        """This is the relative path from the exec_root to the current working dir."""
+        return self.working_dir.relative_to(self.exec_root)
+
+    @property
     def crate_type(self) -> rustc.CrateType:
         return self._rust_action.crate_type
 
@@ -814,6 +819,7 @@ class RustRemoteAction(object):
     def run_local(self) -> int:
         # don't bother with remote action preparation
         # or any of the remote action features.
+        export_dir = self.miscomparison_export_dir
         command = cl_utils.auto_env_prefix_command(self.original_command)
         if self.check_determinism:
             self.vmsg("Comparing two local runs of the original command.")
@@ -821,11 +827,20 @@ class RustRemoteAction(object):
                 exec_root=self.exec_root_rel,
                 outputs=list(self._remote_output_files()),
                 command=command,
-                miscomparison_export_dir=self.miscomparison_export_dir,
+                miscomparison_export_dir=(
+                    export_dir / self.build_subdir if export_dir else None),
                 label=self.label,
             )
 
-        return subprocess.call(command, cwd=self.working_dir)
+        exit_code = subprocess.call(command, cwd=self.working_dir)
+
+        # Optional: on determinism failures, copy data.
+        if exit_code != 0 and self.check_determinism and export_dir:
+            # Check determinism script already copies outputs, we just copy the inputs.
+            for f in self._remote_action.inputs_relative_to_working_dir:
+                cl_utils.copy_preserve_subpath(f, export_dir)
+
+        return exit_code
 
     def run(self) -> int:
         if self.local_only:

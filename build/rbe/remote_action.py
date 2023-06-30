@@ -1267,11 +1267,14 @@ class RemoteAction(object):
         yield from self.remote_only_command
 
     def _generate_check_determinism_prefix(self) -> Iterable[str]:
+        export_dir = None
+        if self.miscomparison_export_dir:
+            export_dir = self.miscomparison_export_dir / self.build_subdir
         yield from fuchsia.check_determinism_command(
             exec_root=self.exec_root_rel,
             outputs=self.output_files_relative_to_working_dir,
             label=self.label,
-            miscomparison_export_dir=self.miscomparison_export_dir,
+            miscomparison_export_dir=export_dir,
             # no command, just prefix
         )
         # TODO: The comparison script does not support directories yet.
@@ -1423,6 +1426,16 @@ class RemoteAction(object):
 
     def _on_failure(self, result: cl_utils.SubprocessResult) -> int:
         """Work to do after execution fails."""
+
+        export_dir = self.miscomparison_export_dir
+        if self.check_determinism and export_dir:
+            # Assume failure was due to determinism.
+            # Outputs were already copied by the check-determinism script.
+            # Copy just the inputs.
+            with cl_utils.chdir_cm(self.project_root):
+                for f in self.inputs_relative_to_working_dir:
+                    cl_utils.copy_preserve_subpath(f, export_dir)
+
         exec_strategy = self.exec_strategy or "remote"  # rewrapper default
         # rewrapper assumes that the command it was given is suitable for
         # both local and remote execution, but this isn't always the case,
@@ -1773,10 +1786,17 @@ class RemoteAction(object):
 
                 # Optionally: copy differences to a location that other tools
                 # can pickup or upload.
-                export_dir = self.miscomparison_export_dir
+                export_dir = self.miscomparison_export_dir  # is absolute
                 if export_dir:
-                    cl_utils.copy_preserve_subpath(local_out, export_dir)
-                    cl_utils.copy_preserve_subpath(remote_out, export_dir)
+                    with cl_utils.chdir_cm(self.exec_root):
+                        # Copy outputs.
+                        cl_utils.copy_preserve_subpath(
+                            self.build_subdir / local_out, export_dir)
+                        cl_utils.copy_preserve_subpath(
+                            self.build_subdir / remote_out, export_dir)
+                        # Copy inputs.
+                        for f in self.inputs_relative_to_project_root:
+                            cl_utils.copy_preserve_subpath(f, export_dir)
 
             # Also compare file access traces, if available.
             if self._fsatrace_path:

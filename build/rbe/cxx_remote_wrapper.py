@@ -311,6 +311,11 @@ class CxxRemoteAction(object):
         return cl_utils.relpath(self.exec_root, start=self.working_dir)
 
     @property
+    def build_subdir(self) -> Path:  # relative
+        """This is the relative path from the exec_root to the current working dir."""
+        return self.working_dir.relative_to(self.exec_root)
+
+    @property
     def host_platform(self) -> str:
         return self._host_platform
 
@@ -404,6 +409,7 @@ class CxxRemoteAction(object):
         return fuchsia.remote_executable(self.cxx_action.compiler.tool)
 
     def _run_locally(self) -> int:
+        export_dir = self.miscomparison_export_dir
         if self.check_determinism:
             self.vmsg(
                 "Running the original compile command (with -Wdate-time) locally twice and comparing outputs."
@@ -412,7 +418,8 @@ class CxxRemoteAction(object):
                 exec_root=self.exec_root_rel,
                 outputs=self._remote_output_files(),
                 command=self.original_compile_command,
-                miscomparison_export_dir=self.miscomparison_export_dir,
+                miscomparison_export_dir=(
+                    export_dir / self.build_subdir if export_dir else None),
                 label=self.label,
             )
             # Both clang and gcc support -Wdate-time to catch nonreproducible
@@ -423,7 +430,17 @@ class CxxRemoteAction(object):
             self.vmsg("Running the original compile command locally.")
             command = self.original_compile_command
 
-        return subprocess.call(command, cwd=self.working_dir)
+        exit_code = subprocess.call(command, cwd=self.working_dir)
+
+        # It would be nice if we could upload the set of inputs when
+        # compilation fails the determinism check.
+        # For C++, the complete set of input is computed by re-client's
+        # input processor, and today, we don't have a way to directly access
+        # that information (without actually requesting remote execution).
+        # We don't have a remote action_digest either because determinism is a
+        # local-only check.
+
+        return exit_code
 
     def preprocess_locally(self) -> int:
         # Locally preprocess if needed

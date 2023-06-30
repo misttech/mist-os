@@ -1050,6 +1050,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
         build_dir = Path('build-out')
         working_dir = exec_root / build_dir
         output = Path('hello.txt')
+        input = Path('../greet.in')
         export_dir = Path('naughty/diffs')  # relative to working dir
         export_dir_abs = working_dir / export_dir
         base_command = ['touch', str(output)]
@@ -1059,6 +1060,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
             base_command)
         action = remote_action.remote_action_from_args(
             main_args,
+            inputs=[input],
             output_files=[output],
             exec_root=exec_root,
             working_dir=working_dir,
@@ -1090,10 +1092,13 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
                     with mock.patch.object(
                             remote_action.RemoteAction,
                             '_compare_fsatraces') as mock_compare_traces:
-                        with mock.patch.object(
-                                cl_utils,
-                                'copy_preserve_subpath') as mock_export:
-                            exit_code = action.run_with_main_args(main_args)
+                        with mock.patch.object(cl_utils, 'chdir_cm',
+                                               return_value=contextlib.
+                                               nullcontext()) as mock_chdir:
+                            with mock.patch.object(
+                                    cl_utils,
+                                    'copy_preserve_subpath') as mock_export:
+                                exit_code = action.run_with_main_args(main_args)
 
         remote_command = action.launch_command
         self.assertEqual(exit_code, 1)  # remote success, but compare failure
@@ -1104,11 +1109,14 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
         # Make sure we copied the differences to the export dir
         mock_export.assert_has_calls(
             [
-                mock.call(output, export_dir_abs),
-                mock.call(Path(str(output) + '.remote'), export_dir_abs),
+                mock.call(build_dir / output, export_dir_abs),
+                mock.call(
+                    build_dir / Path(str(output) + '.remote'), export_dir_abs),
+                mock.call(Path('greet.in'), export_dir_abs),
             ],
             any_order=True,
         )
+        mock_chdir.assert_called_with(exec_root)
 
     def test_local_remote_compare_with_fsatrace_from_main_args(self):
         # Same as test_remote_fsatrace_from_main_args, but with --compare
@@ -1264,8 +1272,9 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
             check_prefix)
         self.assertIn('--check-repeatability', check_prefix)
         # Make sure export dir argument is forwarded.
+        export_out_dir = export_dir_abs / build_dir
         self.assertIn(
-            f'--miscomparison-export-dir={export_dir_abs}', check_prefix)
+            f'--miscomparison-export-dir={export_out_dir}', check_prefix)
         _, _, output_list = cl_utils.partition_sequence(
             check_prefix, '--outputs')
         self.assertEqual(output_list, [str(output)])
