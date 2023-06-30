@@ -56,6 +56,8 @@
                 "/core/test_manager/starnix_test_runners/starnix_unit_test_runner",
                 "/core/test_manager/starnix-tests:**",
                 "/core/test_manager/system-tests:**",
+                "/core/testing/elf_test_create_raw_processes_ambient_exec_runner",
+                "/core/testing/elf_test_create_raw_processes_runner",
                 "/core/testing/starnix-tests:**",
                 "/core/testing/system-tests:**",
             ],
