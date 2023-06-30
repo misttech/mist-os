@@ -20,11 +20,13 @@
 namespace {
 
 // A syscall not implemented by Linux that we don't expect to be called.
-#ifdef __x86_64__
+#if defined(__x86_64__)
 constexpr uint32_t kFilteredSyscall = SYS_vserver;
-#elif __aarch64__
-// Use the last of arch_specific_syscalls which are not implemented on arm64.
-constexpr uint32_t kFilteredSyscall = __NR_arch_specific_syscall + 15;
+#elif defined(__aarch64__) || defined(__riscv)
+// Use the first of arch_specific_syscalls. It is not implemented on ARM64 or RISC-V.
+constexpr uint32_t kFilteredSyscall = __NR_arch_specific_syscall;
+#else
+#error Unsupported Architecture
 #endif
 
 #define ARRAY_SIZE(x) (sizeof((x)) / sizeof((x[0])))

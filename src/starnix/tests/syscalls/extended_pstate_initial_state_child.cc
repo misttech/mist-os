@@ -5,67 +5,72 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <asm/unistd.h>
+
 // This test examines the initial extended processor state when entering a new process.
 // This means it must start at _start and not depend on any of the usual initialization logic
 // performed by libc that may clobber this state before we have a chance to examine it. Thus
 // it has some assembly helpers to issue syscalls standalone.
 
-void exit_success() {
+// Generic syscall with 4 arguments.
+intptr_t syscall4(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr_t arg3,
+                  intptr_t arg4) {
+  intptr_t ret;
 #if defined(__x86_64__)
-  asm volatile(
-      "mov $0, %rdi\n"
-      "mov $231, %rax\n"
-      "syscall\n");
+  register intptr_t r10 asm("r10") = arg4;
+  __asm__ volatile("syscall;"
+                   : "=a"(ret)
+                   : "a"(syscall_number), "D"(arg1), "S"(arg2), "d"(arg3), "r"(r10)
+                   : "rcx", "r11", "memory");
 #elif defined(__aarch64__)
-  asm volatile(
-      "mov x8, 94\n"
-      "mov x0, 0\n"
-      "svc #0\n");
+  register intptr_t x0 asm("x0") = arg1;
+  register intptr_t x1 asm("x1") = arg2;
+  register intptr_t x2 asm("x2") = arg3;
+  register intptr_t x3 asm("x3") = arg4;
+  register intptr_t number asm("x8") = syscall_number;
+
+  __asm__ volatile("svc #0"
+                   : "=r"(ret)
+                   : "0"(x0), "r"(x1), "r"(x2), "r"(x3), "r"(number)
+                   : "memory");
+#elif defined(__riscv)
+  register intptr_t a0 asm("a0") = arg1;
+  register intptr_t a1 asm("a1") = arg2;
+  register intptr_t a2 asm("a2") = arg3;
+  register intptr_t a3 asm("a3") = arg4;
+  register intptr_t number asm("a7") = syscall_number;
+
+  __asm__ volatile("ecall"
+                   : "=r"(ret)
+                   : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(number)
+                   : "memory");
 #else
-  // TODO(fxbug.dev/128554): Implement RISC-V support.
-#error "unimplemented"
+#error Unsupported architecture
 #endif
+  return ret;
 }
 
-void exit_failure(int a) {
-#if defined(__x86_64__)
-  asm volatile(
-      "movl %0, %%edi\n"
-      "syscall\n"
-      :
-      : "r"(a), "a"(231)
-      :);
-#elif defined(__aarch64__)
-  asm volatile(
-      "mov w0, %w0\n"
-      "mov x8, 94\n"
-      "svc #0\n"
-      :
-      : "r"(a)
-      :);
-#else
-  // TODO(fxbug.dev/128554): Implement RISC-V support.
-#error "unimplemented"
-#endif
+#define SYSCCALL4(number, arg1, arg2, arg3, arg4, ...) \
+  syscall4(number, (intptr_t)(arg1), (intptr_t)(arg2), (intptr_t)(arg3), (intptr_t)(arg4))
+
+#define SYSCALL(number, ...) SYSCCALL4(number, __VA_ARGS__, 0, 0, 0, 0)
+
+void exit_group(int exit_code) { SYSCALL(__NR_exit_group, exit_code); }
+
+void exit_success() { exit_group(0); }
+
+size_t strlen(const char* str) {
+  const char* end = str;
+  while (*end)
+    ++end;
+  return end - str;
 }
 
-void write_stderr(const char* str, size_t len) {
-#if defined(__x86_64__)
-  asm volatile("syscall" : : "D"(2), "S"(str), "d"(len), "a"(1) :);
-#elif defined(__aarch64__)
-  asm volatile(
-      "mov x0, 2\n"
-      "mov x1, %0\n"
-      "mov x2, %1\n"
-      "mov x8, 64\n"
-      "svc #0\n"
-      :
-      : "r"(str), "r"(len)
-      :);
-#else
-  // TODO(fxbug.dev/128554): Implement RISC-V support.
-#error "unimplemented"
-#endif
+void write_stderr(const char* str, size_t len) { SYSCALL(__NR_write, 2, str, len); }
+
+void fail(const char* msg, int exit_code) {
+  write_stderr(msg, strlen(msg));
+  exit_group(exit_code);
 }
 
 extern "C" void _start() {
@@ -95,11 +100,10 @@ extern "C" void _start() {
   for (size_t i = 0; i < kXmmRegisterWidth * 16; ++i) {
     if (buffer[i] != std::byte{0}) {
       int register_number = static_cast<int>(i) / kXmmRegisterWidth;
-      char message[] = {'X', 'M', 'M', '0', '0', '\n'};
+      char message[] = "XMM00\n";
       message[4] = '0' + register_number % 10;
       message[3] = '0' + (register_number / 10) % 10;
-      write_stderr(message, 6);
-      exit_failure(static_cast<int>(i / kXmmRegisterWidth) + 1);
+      fail(message, static_cast<int>(i / kXmmRegisterWidth) + 1);
     }
   }
 #elif defined(__aarch64__)
@@ -132,23 +136,71 @@ extern "C" void _start() {
   for (size_t i = 0; i < 32 * kQRegisterWidth; ++i) {
     if (q_register_buffer[i] != std::byte{0}) {
       int register_number = static_cast<int>(i / kQRegisterWidth);
-      char message[] = {'Q', '0', '0', '\n'};
+      char message[] = "Q00\n";
       message[2] = '0' + register_number % 10;
       message[1] = '0' + (register_number / 10) % 10;
-      write_stderr(message, 4);
-      exit_failure(register_number + 1);
+      fail(message, register_number + 1);
     }
   }
   if (fpcr != 0) {
-    write_stderr("fpcr\n", 5);
-    exit_failure(33);
+    fail("fpcr\n", 33);
   }
   if (fpsr != 0) {
-    write_stderr("fpsr\n", 5);
-    exit_failure(34);
+    fail("fpsr\n", 34);
+  }
+#elif defined(__riscv)
+  uint64_t fp_registers[32];
+  uint32_t fcsr;
+
+  __asm__ volatile(
+      "fld  f0,  0 * 8(%[regs])\n"
+      "fld  f1,  1 * 8(%[regs])\n"
+      "fld  f2,  2 * 8(%[regs])\n"
+      "fld  f3,  3 * 8(%[regs])\n"
+      "fld  f4,  4 * 8(%[regs])\n"
+      "fld  f5,  5 * 8(%[regs])\n"
+      "fld  f6,  6 * 8(%[regs])\n"
+      "fld  f7,  7 * 8(%[regs])\n"
+      "fld  f8,  8 * 8(%[regs])\n"
+      "fld  f9,  9 * 8(%[regs])\n"
+      "fld f10, 10 * 8(%[regs])\n"
+      "fld f11, 11 * 8(%[regs])\n"
+      "fld f12, 12 * 8(%[regs])\n"
+      "fld f13, 13 * 8(%[regs])\n"
+      "fld f14, 14 * 8(%[regs])\n"
+      "fld f15, 15 * 8(%[regs])\n"
+      "fld f16, 16 * 8(%[regs])\n"
+      "fld f17, 17 * 8(%[regs])\n"
+      "fld f18, 18 * 8(%[regs])\n"
+      "fld f19, 19 * 8(%[regs])\n"
+      "fld f20, 20 * 8(%[regs])\n"
+      "fld f21, 21 * 8(%[regs])\n"
+      "fld f23, 23 * 8(%[regs])\n"
+      "fld f24, 24 * 8(%[regs])\n"
+      "fld f25, 25 * 8(%[regs])\n"
+      "fld f26, 26 * 8(%[regs])\n"
+      "fld f27, 27 * 8(%[regs])\n"
+      "fld f28, 28 * 8(%[regs])\n"
+      "fld f29, 29 * 8(%[regs])\n"
+      "fld f30, 30 * 8(%[regs])\n"
+      "fld f31, 31 * 8(%[regs])\n"
+      "fscsr %[fcsr]\n"
+      : [fcsr] "=r"(fcsr)
+      : [regs] "r"(fp_registers)
+      : "memory");
+  for (size_t i = 0; i < 32; ++i) {
+    if (fp_registers[i] != 0) {
+      char message[] = "F00\n";
+      char register_number = static_cast<char>(i);
+      message[2] = '0' + register_number % 10;
+      message[1] = '0' + register_number / 10;
+      fail(message, register_number + 1);
+    }
+  }
+  if (fcsr != 0) {
+    fail("fcsr\n", 33);
   }
 #else
-  // TODO(fxbug.dev/128554): Implement RISC-V support.
 #error "unimplemented"
 #endif
   exit_success();

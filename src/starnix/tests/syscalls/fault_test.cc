@@ -55,6 +55,16 @@ TEST(Fault, PreserveVectorRegisters) {
         :
         : "r"(buffer_addr), "r"(target), "m"(dest)
         : "memory", "w8");
+#elif defined(__riscv)
+    asm volatile(
+        "fld f0, 0(%0)\n"
+        "li  t1, 98\n"
+        // Issue store that will generate fault which will be fixed in SIGSEGV handler
+        "sd  t1, 0(%1)\n"
+        "fsd f0, %2\n"
+        :
+        : "r"(buffer_addr), "r"(target), "m"(dest)
+        : "memory", "t1");
 #else
 #error Add support for this architecture
 #endif

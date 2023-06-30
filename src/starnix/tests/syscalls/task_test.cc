@@ -39,7 +39,7 @@ volatile size_t g_fork_doesnt_drop_writes = 0;
 
 // As of this writing, our sysroot's syscall.h lacks the SYS_clone3 definition.
 #ifndef SYS_clone3
-#if defined(__aarch64__) || defined(__x86_64__)
+#if defined(__aarch64__) || defined(__x86_64__) || defined(__riscv)
 #define SYS_clone3 435
 #else
 #error SYS_clone3 needs a definition for this architecture.
@@ -99,6 +99,25 @@ pid_t DoClone3(const clone_args* cl_args, size_t size, int (*func)(void*), void*
       : "D"(cl_args), "m"(*cl_args), "S"(size),
         "a"(SYS_clone3), [func] "r"(func), [param] "r"(param), [exit] "i"(SYS_exit)
       : "rcx", "rdx", "r8", "r9", "r10", "r11", "cc", "memory");
+#elif defined(__riscv)
+  __asm__ volatile(
+      "mv   a0, %[cl_args]\n"
+      "mv   a1, %[size]\n"
+      "li   a7, %[sys_clone3]\n"
+      "ecall\n"
+      "bnez a0, 1f\n"
+      "ld   a0, %[param]\n"
+      "jalr %[func]\n"
+      "li   a7, %[sys_exit]\n"
+      "ecall\n"
+      "ebreak\n"
+      "1:\n"
+      "mv   %[pid], a0\n"
+      : [pid] "=r"(pid)
+      : [cl_args] "r"(cl_args), "m"(*cl_args), [size] "r"(size), [func] "r"(func),
+        [param] "r"(param), [sys_clone3] "i"(SYS_clone3), [sys_exit] "i"(SYS_exit)
+      : "ra", "t0", "t1", "t2", "t3", "t4", "t5", "t6", "a0", "a1", "a2", "a3", "a4", "a5", "a6",
+        "a7", "s1", "memory");
 #else
 #error clone3 needs a manual asm wrapper.
 #endif
