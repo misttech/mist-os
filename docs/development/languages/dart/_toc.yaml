@@ -14,8 +14,6 @@ toc:
   path: /docs/development/languages/dart/fidl.md
 - title: "IDEs"
   path: /docs/development/languages/dart/ides.md
-- title: "Logging"
-  path: /docs/development/languages/dart/logging.md
 - title: "Dart style guide"
   path: /docs/development/languages/dart/style.md
 - title: "Testing"
