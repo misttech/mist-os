@@ -380,18 +380,23 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         mock_ffx_is_target_connected.assert_called()
         mock_sleep.assert_called()
 
+    @mock.patch("time.sleep", autospec=True)
+    @mock.patch("time.time", side_effect=[0, 1, 2], autospec=True)
     @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX,
         "is_target_connected",
         return_value=True,
         autospec=True)
-    def test_wait_for_offline_fail(self, mock_ffx_is_target_connected) -> None:
+    def test_wait_for_offline_fail(
+            self, mock_ffx_is_target_connected, mock_sleep, mock_time) -> None:
         """Testcase for BaseFuchsiaDevice.wait_for_offline() failure case"""
         with self.assertRaisesRegex(errors.FuchsiaDeviceError,
                                     "failed to go offline"):
             self.fd_obj.wait_for_offline(timeout=2)
 
         mock_ffx_is_target_connected.assert_called()
+        mock_time.assert_called()
+        mock_sleep.assert_called()
 
     @mock.patch("time.sleep", autospec=True)
     @mock.patch.object(
@@ -407,18 +412,23 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         mock_ffx_is_target_connected.assert_called()
         mock_sleep.assert_called()
 
+    @mock.patch("time.sleep", autospec=True)
+    @mock.patch("time.time", side_effect=[0, 1, 2], autospec=True)
     @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX,
         "is_target_connected",
         return_value=False,
         autospec=True)
-    def test_wait_for_online_fail(self, mock_ffx_is_target_connected) -> None:
+    def test_wait_for_online_fail(
+            self, mock_ffx_is_target_connected, mock_time, mock_sleep) -> None:
         """Testcase for BaseFuchsiaDevice.wait_for_online() failure case"""
         with self.assertRaisesRegex(errors.FuchsiaDeviceError,
                                     "failed to go online"):
             self.fd_obj.wait_for_online(timeout=2)
 
         mock_ffx_is_target_connected.assert_called()
+        mock_time.assert_called()
+        mock_sleep.assert_called()
 
 
 if __name__ == "__main__":

@@ -49,17 +49,22 @@ class SshTests(unittest.TestCase):
         mock_ssh_run.assert_called()
         mock_sleep.assert_called()
 
+    @mock.patch("time.sleep", autospec=True)
+    @mock.patch("time.time", side_effect=[0, 1, 2], autospec=True)
     @mock.patch.object(
         ssh.SSH,
         "run",
         side_effect=subprocess.CalledProcessError,
         autospec=True)
-    def test_ssh_check_connection_fail(self, mock_ssh_run) -> None:
+    def test_ssh_check_connection_fail(
+            self, mock_ssh_run, mock_time, mock_sleep) -> None:
         """Testcase for SSH.check_connection() failure case"""
         with self.assertRaises(errors.SSHCommandError):
             self.ssh_obj.check_connection(timeout=2)
 
         mock_ssh_run.assert_called()
+        mock_time.assert_called()
+        mock_sleep.assert_called()
 
     @mock.patch.object(
         ssh.subprocess,
