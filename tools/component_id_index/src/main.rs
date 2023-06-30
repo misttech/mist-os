@@ -116,18 +116,9 @@ mod tests {
 
     fn gen_index(num_instances: u32) -> Index {
         Index {
-            appmgr_restrict_isolated_persistent_storage: None,
             instances: (0..num_instances)
-                .map(|i| InstanceIdEntry {
+                .map(|_i| InstanceIdEntry {
                     instance_id: Some(gen_instance_id(&mut rand::thread_rng())),
-                    appmgr_moniker: Some(AppmgrMoniker {
-                        url: format!(
-                            "fuchsia-pkg://example.com/fake_pkg#meta/fake_component_{}.cmx",
-                            i
-                        ),
-                        realm_path: vec!["root".to_string(), "child".to_string(), i.to_string()],
-                        transitional_realm_paths: None,
-                    }),
                     moniker: Some(AbsoluteMoniker::parse_str("/a/b/c").unwrap()),
                 })
                 .collect(),
@@ -157,28 +148,10 @@ mod tests {
 [
   {
     "instance_id": "RANDOM_GENERATED_INSTANCE_ID",
-    "appmgr_moniker": {
-      "url": "fuchsia-pkg://example.com/fake_pkg#meta/fake_component_1.cmx",
-      "realm_path": [
-        "root",
-        "child",
-        "1"
-      ],
-      "transitional_realm_paths": null
-    },
     "moniker": "/a/b/c"
   },
   {
     "instance_id": "RANDOM_GENERATED_INSTANCE_ID",
-    "appmgr_moniker": {
-      "url": "fuchsia-pkg://example.com/fake_pkg#meta/fake_component_3.cmx",
-      "realm_path": [
-        "root",
-        "child",
-        "3"
-      ],
-      "transitional_realm_paths": null
-    },
     "moniker": "/a/b/c"
   }
 ]

@@ -506,7 +506,6 @@ async fn use_restricted_storage_start_failure() {
     let component_id_index_path = make_index_file(component_id_index::Index {
         instances: vec![component_id_index::InstanceIdEntry {
             instance_id: parent_consumer_instance_id.clone(),
-            appmgr_moniker: None,
             moniker: Some(AbsoluteMoniker::parse_str("/parent_consumer").unwrap()),
         }],
         ..component_id_index::Index::default()
@@ -607,7 +606,6 @@ async fn use_restricted_storage_open_failure() {
     let component_id_index_path = make_index_file(component_id_index::Index {
         instances: vec![component_id_index::InstanceIdEntry {
             instance_id: parent_consumer_instance_id.clone(),
-            appmgr_moniker: None,
             moniker: Some(AbsoluteMoniker::parse_str("/parent_consumer/child_consumer").unwrap()),
         }],
         ..component_id_index::Index::default()
@@ -739,7 +737,6 @@ async fn open_storage_subdirectory() {
     let component_id_index_path = make_index_file(component_id_index::Index {
         instances: vec![component_id_index::InstanceIdEntry {
             instance_id: parent_consumer_instance_id.clone(),
-            appmgr_moniker: None,
             moniker: Some(AbsoluteMoniker::parse_str("/consumer").unwrap()),
         }],
         ..component_id_index::Index::default()
@@ -1136,7 +1133,6 @@ async fn storage_persistence_instance_id_path() {
     let component_id_index_path = make_index_file(component_id_index::Index {
         instances: vec![component_id_index::InstanceIdEntry {
             instance_id: Some(instance_id.clone()),
-            appmgr_moniker: None,
             moniker: Some(vec!["b", "persistent_coll:c"].try_into().unwrap()),
         }],
         ..component_id_index::Index::default()
@@ -1353,7 +1349,6 @@ async fn storage_persistence_inheritance() {
     let component_id_index_path = make_index_file(component_id_index::Index {
         instances: vec![component_id_index::InstanceIdEntry {
             instance_id: Some(instance_id.clone()),
-            appmgr_moniker: None,
             moniker: Some(vec!["b", "persistent_coll:c"].try_into().unwrap()),
         }],
         ..component_id_index::Index::default()
@@ -1622,7 +1617,6 @@ async fn storage_persistence_disablement() {
     let component_id_index_path = make_index_file(component_id_index::Index {
         instances: vec![component_id_index::InstanceIdEntry {
             instance_id: Some(instance_id.clone()),
-            appmgr_moniker: None,
             moniker: Some(
                 vec!["b".try_into().unwrap(), "persistent_coll:c".try_into().unwrap()]
                     .try_into()

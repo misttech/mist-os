@@ -2590,7 +2590,6 @@ pub mod tests {
         let component_id_index_path = make_index_file(component_id_index::Index {
             instances: vec![component_id_index::InstanceIdEntry {
                 instance_id: instance_id.clone(),
-                appmgr_moniker: None,
                 moniker: Some(AbsoluteMoniker::root()),
             }],
             ..component_id_index::Index::default()

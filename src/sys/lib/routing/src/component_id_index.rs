@@ -124,10 +124,6 @@ pub struct ComponentIdIndex {
 
     /// Stores all instance IDs from the index.
     /// This is used by StorageAdmin for methods that operate directly on instance IDs.
-    ///
-    /// This set will currently contain all storage IDs, even of components registered with appmgr
-    /// instead of component_manager. This is desired because it allows the StorageAdmin protocol
-    /// to handle all storage on the system.
     all_instance_ids: HashSet<ComponentInstanceId>,
 }
 
@@ -203,7 +199,6 @@ pub mod tests {
         let index_file = make_index_file(component_id_index::Index {
             instances: vec![component_id_index::InstanceIdEntry {
                 instance_id: Some(iid.clone()),
-                appmgr_moniker: None,
                 moniker: Some(AbsoluteMoniker::parse_str("/a/b/c").unwrap()),
             }],
             ..component_id_index::Index::default()
@@ -224,7 +219,6 @@ pub mod tests {
         let index_file = make_index_file(component_id_index::Index {
             instances: vec![component_id_index::InstanceIdEntry {
                 instance_id: Some(iid.clone()),
-                appmgr_moniker: None,
                 moniker: Some(AbsoluteMoniker::parse_str("/a/coll:name").unwrap()),
             }],
             ..component_id_index::Index::default()
@@ -248,7 +242,6 @@ pub mod tests {
         let inner_index = component_id_index::Index {
             instances: vec![component_id_index::InstanceIdEntry {
                 instance_id: Some(iid.clone()),
-                appmgr_moniker: None,
                 moniker: Some(AbsoluteMoniker::parse_str("/a/b/c").unwrap()),
             }],
             ..component_id_index::Index::default()

@@ -803,7 +803,6 @@ mod tests {
         let index_file = make_index_file(component_id_index::Index {
             instances: vec![component_id_index::InstanceIdEntry {
                 instance_id: Some(iid.clone()),
-                appmgr_moniker: None,
                 moniker: Some(AbsoluteMoniker::parse_str("/").unwrap()),
             }],
             ..component_id_index::Index::default()
