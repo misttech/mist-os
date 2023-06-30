@@ -49,6 +49,7 @@ Handle* KernelMappedVmo::Publish(ktl::string_view vmo_name, size_t content_size)
       VmObjectDispatcher::Create(pinned_vmo_.vmo(), ktl::move(content_size_manager),
                                  VmObjectDispatcher::InitialMutability::kMutable, &handle, &rights);
   ZX_ASSERT(status == ZX_OK);
-  handle.dispatcher()->set_name(vmo_name.data(), vmo_name.size());
+  status = handle.dispatcher()->set_name(vmo_name.data(), vmo_name.size());
+  DEBUG_ASSERT(status == ZX_OK);
   return Handle::Make(ktl::move(handle), rights & ~ZX_RIGHT_WRITE).release();
 }

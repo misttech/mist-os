@@ -55,8 +55,10 @@ class SymbolizerFile {
                                         VmObjectDispatcher::InitialMutability::kMutable, &handle,
                                         &rights);
     ZX_ASSERT(status == ZX_OK);
-    handle.dispatcher()->set_name(kVmoName.data(), kVmoName.size());
-    handle.dispatcher()->SetContentSize(pos_);
+    status = handle.dispatcher()->set_name(kVmoName.data(), kVmoName.size());
+    DEBUG_ASSERT(status == ZX_OK);
+    status = handle.dispatcher()->SetContentSize(pos_);
+    DEBUG_ASSERT(status == ZX_OK);
     return Handle::Make(ktl::move(handle), rights).release();
   }
 
@@ -76,7 +78,8 @@ void PrintDumpfile(const InstrumentationDataVmo& data, ktl::initializer_list<FIL
   auto vmo = DownCastDispatcher<VmObjectDispatcher>(data.handle->dispatcher().get());
 
   char name_buffer[ZX_MAX_NAME_LEN];
-  vmo->get_name(name_buffer);
+  [[maybe_unused]] zx_status_t status = vmo->get_name(name_buffer);
+  DEBUG_ASSERT(status == ZX_OK);
   ktl::string_view vmo_name{name_buffer, sizeof(name_buffer)};
   vmo_name = vmo_name.substr(0, vmo_name.find_first_of('\0'));
 

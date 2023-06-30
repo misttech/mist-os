@@ -43,6 +43,7 @@ Handle* MakePhysVmo(const PhysVmo& phys_vmo) {
       VmObjectDispatcher::Create(ktl::move(vmo), ktl::move(content_size_manager),
                                  VmObjectDispatcher::InitialMutability::kMutable, &handle, &rights);
   ZX_ASSERT(status == ZX_OK);
-  handle.dispatcher()->set_name(phys_vmo.name.data(), phys_vmo.name.size());
+  status = handle.dispatcher()->set_name(phys_vmo.name.data(), phys_vmo.name.size());
+  DEBUG_ASSERT(status == ZX_OK);
   return Handle::Make(ktl::move(handle), rights & ~ZX_RIGHT_WRITE).release();
 }
