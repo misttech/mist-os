@@ -3,6 +3,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+set -e
+
 # Formats the HoneyDew code as per coding guidelines
 
 LACEWING_SRC="$FUCHSIA_DIR/src/testing/end_to_end"

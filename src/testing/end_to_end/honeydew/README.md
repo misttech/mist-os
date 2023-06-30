@@ -23,9 +23,40 @@ Assumptions:
       appropriate port forwards.
 
 ## Installation
-**Running** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/install.sh`
-**will automatically perform the below mentioned installation steps**
+If you like to try HoneyDew locally in an interpreter, you can follow the
+guide below to install the library in a Python virtual environment where you
+experiment with HD's features in a REPL.
 
+### Prerequisites
+The Honeydew library depends on some Fuchsia build artifacts that must be built
+for Honeydew to be successfully imported in Python.
+
+```shell
+~/fuchsia$ fx set core.qemu-x64 \
+--with-host //src/testing/end_to_end/honeydew \
+--with //src/testing/sl4f --with //src/sys/bin/start_sl4f \
+--args='core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]'
+
+~/fuchsia$ fx build
+```
+
+* The `core.qemu-x64` product config can be updated out to match the
+`product.board` combination you want to test against.
+* `--with-host //src/testing/end_to_end/honeydew` is required so that
+Honeydew dependencies are built (e.g. Fuchsia controller's shared libraries).
+* (Optional) `--with //src/testing/sl4f --with //src/sys/bin/start_sl4f \
+--args='core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]'` is only
+required if you wish to use Honeydew's SL4F-based affordances.
+
+### Automated installation (recommended)
+**Running** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/install.sh`
+**will automatically perform the below
+[Manual installation](#manual-installation) steps**
+
+After the installation succeeds, follow the script's instruction message to
+start a Python interpreter and import Honeydew.
+
+### Manual installation
 If you like to try HoneyDew locally, you can [pip] install HoneyDew along with
 all of its dependencies inside a [python virtual environment]
 
