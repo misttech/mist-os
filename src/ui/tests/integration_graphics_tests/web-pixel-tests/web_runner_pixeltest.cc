@@ -52,6 +52,8 @@ using component_testing::Route;
 
 constexpr zx::duration kPredicateTimeout = zx::sec(10);
 
+const int kPixelMatchThresholdInProjections = 100000;
+
 enum class TapLocation { kTopLeft, kTopRight };
 
 // A dot product of the coordinates of two pixels.
@@ -91,6 +93,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
  public:
   bool use_flatland() override { return true; }
   std::string GetTestUIStackUrl() override { return "#meta/test-ui-stack.cm"; }
+  bool use_vulkan() const { return GetParam(); }
 
  private:
   void ExtendRealm() override {
@@ -108,7 +111,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
     realm_builder().InitMutableConfigToEmpty(kWebClient);
     realm_builder().SetConfigValue(kWebClient, "html", HtmlForTestCase());
     realm_builder().SetConfigValue(kWebClient, "use_vulkan",
-                                   component_testing::ConfigValue::Bool(GetParam()));
+                                   component_testing::ConfigValue::Bool(use_vulkan()));
   }
 
   virtual std::string HtmlForTestCase() = 0;
@@ -389,7 +392,7 @@ TEST_P(VideoHtmlPixelTests, ValidPixelTest) {
 
         // Fail the predicate check until at least some pixels are kinda blue. This will
         // cause a re-attempt of a screenshot.
-        if (MaxSumProject(kBlue, top) < 60000) {
+        if (MaxSumProject(kBlue, top) < kPixelMatchThresholdInProjections) {
           return false;
         }
 
@@ -400,10 +403,10 @@ TEST_P(VideoHtmlPixelTests, ValidPixelTest) {
         // diagram. Since it is hard to assert on the exact number of pixels for each shade of the
         // color, the test asserts on whether the shade that's most like the given color is
         // prominent enough.
-        EXPECT_GT(MaxSumProject(kYellow, top), 100000);
-        EXPECT_GT(MaxSumProject(kRed, top), 100000);
-        EXPECT_GT(MaxSumProject(kBlue, top), 100000);
-        EXPECT_GT(MaxSumProject(kGreen, top), 100000);
+        EXPECT_GT(MaxSumProject(kYellow, top), kPixelMatchThresholdInProjections);
+        EXPECT_GT(MaxSumProject(kRed, top), kPixelMatchThresholdInProjections);
+        EXPECT_GT(MaxSumProject(kBlue, top), kPixelMatchThresholdInProjections);
+        EXPECT_GT(MaxSumProject(kGreen, top), kPixelMatchThresholdInProjections);
 
         return true;
       },
