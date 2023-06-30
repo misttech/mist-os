@@ -30,6 +30,24 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
         result = await echo_proxy.echo_string(value=expected)
         self.assertEqual(result.response, expected)
 
+    async def test_echo_daemon_parallel(self):
+        ctx = self._make_ctx()
+        echo_proxy = ffx_fidl.Echo.Client(
+            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER))
+        expected1 = "this is an echo test1"
+        expected2 = "22222this is an echo test2"
+        expected3 = "frobination incoming. Heed the call of the frobe"
+        loop = asyncio.get_running_loop()
+        result1 = loop.create_task(echo_proxy.echo_string(value=expected1))
+        result2 = loop.create_task(echo_proxy.echo_string(value=expected2))
+        result3 = loop.create_task(echo_proxy.echo_string(value=expected3))
+        results_list = await asyncio.gather(result1, result2, result3)
+        self.assertEqual(results_list[0].response, expected1)
+        self.assertEqual(results_list[1].response, expected2)
+        self.assertEqual(results_list[2].response, expected3)
+        self.assertEqual(len(echo_proxy.pending_txids), 0)
+        self.assertEqual(len(echo_proxy.staged_messages), 0)
+
     def test_context_creation_no_config_but_target(self):
         """This test simply ensures passing a target does not cause an error."""
         _ctx = Context(target="foo")
@@ -50,4 +68,4 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
             ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER))
         e2 = ffx_fidl.Echo.Client(
             ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER))
-        self.assertNotEqual(e1.handle.as_int(), e2.handle.as_int())
+        self.assertNotEqual(e1.channel.as_int(), e2.channel.as_int())

@@ -74,10 +74,6 @@ class Importing(unittest.TestCase):
         v.union_str = v.union_str_type("foooberdooberdoo")
         _s = mod.CrossLibraryStruct(value=v)
 
-    def test_create_client(self):
-        mod = importlib.import_module("fidl.test_fidlcodec_examples")
-        _client = mod.Echo.Client(2)
-
     def test_encode_decode_enum_message(self):
         mod = importlib.import_module("fidl.test_fidlcodec_examples")
         req = mod.FidlCodecTestProtocolDefaultEnumMessageRequest(
