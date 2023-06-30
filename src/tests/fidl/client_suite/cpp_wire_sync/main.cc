@@ -17,6 +17,10 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
  public:
   RunnerServer() = default;
 
+  void GetVersion(GetVersionCompleter::Sync& completer) override {
+    completer.Reply(fidl_clientsuite::kClientSuiteVersion);
+  }
+
   void IsTestEnabled(IsTestEnabledRequestView request,
                      IsTestEnabledCompleter::Sync& completer) override {
     switch (request->test) {

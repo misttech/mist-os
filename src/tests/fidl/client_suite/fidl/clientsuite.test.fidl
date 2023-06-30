@@ -15,6 +15,9 @@
 //   runner protocol.
 library fidl.clientsuite;
 
+// An incrementing integer used to coordinate breaking changes across repositories.
+const CLIENT_SUITE_VERSION uint64 = 0;
+
 // Empty type used for valid but empty union variants.
 type Empty = struct {};
 
@@ -159,6 +162,12 @@ type UnknownEvent = struct {
 //   enum.
 @discoverable
 closed protocol Runner {
+    // Returns CLIENT_SUITE_VERSION. This allows the harness to determine if the
+    // Runner is up to date, or is speaking an earlier version of the protocol.
+    strict GetVersion() -> (struct {
+        version uint64;
+    });
+
     // Check if a test with a given name is enabled before running it.
     strict IsTestEnabled(struct {
         test Test;

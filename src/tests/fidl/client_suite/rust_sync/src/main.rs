@@ -11,7 +11,7 @@ use {
         NonEmptyResultClassification, NonEmptyResultWithErrorClassification, OpenTargetEvent,
         OpenTargetEventReport, OpenTargetEventReporterSynchronousProxy, OpenTargetSynchronousProxy,
         RunnerRequest, RunnerRequestStream, TableResultClassification, Test,
-        UnionResultClassification, UnknownEvent,
+        UnionResultClassification, UnknownEvent, CLIENT_SUITE_VERSION,
     },
     fidl_zx as _,
     fuchsia_component::server::ServiceFs,
@@ -36,6 +36,9 @@ async fn handle_runner_request(request: RunnerRequest) {
         // =====================================================================
         RunnerRequest::CheckAlive { responder } => {
             responder.send().unwrap();
+        }
+        RunnerRequest::GetVersion { responder } => {
+            responder.send(CLIENT_SUITE_VERSION).unwrap();
         }
         RunnerRequest::IsTestEnabled { test, responder } => {
             responder.send(!DISABLED_TESTS.contains(&test)).unwrap();

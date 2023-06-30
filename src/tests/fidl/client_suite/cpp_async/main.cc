@@ -25,6 +25,10 @@ class RunnerServer : public fidl::Server<fidl_clientsuite::Runner> {
  public:
   explicit RunnerServer(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
+  void GetVersion(GetVersionCompleter::Sync& completer) override {
+    completer.Reply(fidl_clientsuite::kClientSuiteVersion);
+  }
+
   void IsTestEnabled(IsTestEnabledRequest& request,
                      IsTestEnabledCompleter::Sync& completer) override {
     switch (request.test()) {

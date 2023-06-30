@@ -21,7 +21,7 @@ use {
         OpenTargetFlexibleTwoWayFieldsErrRequest, OpenTargetRequest, OpenTargetRequestStream,
         OpenTargetServerPair, OpenTargetStrictTwoWayErrRequest,
         OpenTargetStrictTwoWayFieldsErrRequest, RunnerRequest, RunnerRequestStream, SendEventError,
-        Test, UnknownMethodType as DynsuiteUnknownMethodType,
+        Test, UnknownMethodType as DynsuiteUnknownMethodType, SERVER_SUITE_VERSION,
     },
     fuchsia_component::server::ServiceFs,
     futures::prelude::*,
@@ -330,6 +330,9 @@ async fn handle_runner_request(request: RunnerRequest) {
     match request {
         RunnerRequest::CheckAlive { responder } => {
             responder.send().unwrap();
+        }
+        RunnerRequest::GetVersion { responder } => {
+            responder.send(SERVER_SUITE_VERSION).unwrap();
         }
         RunnerRequest::IsTestEnabled { test, responder } => {
             responder.send(!DISABLED_TESTS.contains(&test)).unwrap()

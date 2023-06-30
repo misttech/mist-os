@@ -345,6 +345,10 @@ class RunnerServer : public fidl::serversuite::Runner {
  public:
   explicit RunnerServer(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
+  void GetVersion(GetVersionCallback callback) override {
+    callback(fidl::serversuite::SERVER_SUITE_VERSION);
+  }
+
   void IsTestEnabled(fidl::serversuite::Test test, IsTestEnabledCallback callback) override {
     switch (test) {
       case fidl::serversuite::Test::IGNORE_DISABLED:

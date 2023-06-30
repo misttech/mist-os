@@ -6,9 +6,18 @@ library fidl.serversuite;
 
 using zx;
 
+// An incrementing integer used to coordinate breaking changes across repositories.
+const SERVER_SUITE_VERSION uint64 = 0;
+
 // The Runner coordinates test activity and is shared by multiple tests.
 @discoverable
 closed protocol Runner {
+    // Returns SERVER_SUITE_VERSION. This allows the harness to determine if the
+    // Runner is up to date, or is speaking an earlier version of the protocol.
+    strict GetVersion() -> (struct {
+        version uint64;
+    });
+
     // Check if a test with a given name is enabled before running it.
     strict IsTestEnabled(struct {
         test Test;

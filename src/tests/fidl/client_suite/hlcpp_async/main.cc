@@ -98,6 +98,10 @@ class RunnerServer : public fidl::clientsuite::Runner {
  public:
   RunnerServer() = default;
 
+  void GetVersion(GetVersionCallback callback) override {
+    callback(fidl::clientsuite::CLIENT_SUITE_VERSION);
+  }
+
   void IsTestEnabled(fidl::clientsuite::Test test, IsTestEnabledCallback callback) override {
     switch (test) {
       // TODO(fxbug.dev/99738): HLCPP bindings should reject V1 wire format.

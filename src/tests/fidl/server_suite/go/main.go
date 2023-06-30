@@ -133,6 +133,10 @@ type runnerImpl struct{}
 
 var _ serversuite.RunnerWithCtx = (*runnerImpl)(nil)
 
+func (*runnerImpl) GetVersion(_ fidl.Context) (uint64, error) {
+	return serversuite.ServerSuiteVersion, nil
+}
+
 func (*runnerImpl) IsTestEnabled(_ fidl.Context, test serversuite.Test) (bool, error) {
 	isEnabled := func(test serversuite.Test) bool {
 		switch test {

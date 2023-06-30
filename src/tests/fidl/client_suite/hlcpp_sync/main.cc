@@ -20,6 +20,10 @@ class RunnerServer : public fidl::clientsuite::Runner {
  public:
   RunnerServer() = default;
 
+  void GetVersion(GetVersionCallback callback) override {
+    callback(fidl::clientsuite::CLIENT_SUITE_VERSION);
+  }
+
   void IsTestEnabled(fidl::clientsuite::Test test, IsTestEnabledCallback callback) override {
     switch (test) {
       // HLCPP Sync Client Bindings do not support events.
@@ -45,8 +49,6 @@ class RunnerServer : public fidl::clientsuite::Runner {
       // TODO(fxbug.dev/99738): HLCPP bindings should reject V1 wire format.
       case fidl::clientsuite::Test::V1_TWO_WAY_NO_PAYLOAD:
       case fidl::clientsuite::Test::V1_TWO_WAY_STRUCT_PAYLOAD:
-        callback(false);
-        return;
       // TODO(fxbug.dev/113160): Peer-closed errors should be
       // hidden from one-way calls.
       case fidl::clientsuite::Test::ONE_WAY_CALL_DO_NOT_REPORT_PEER_CLOSED:

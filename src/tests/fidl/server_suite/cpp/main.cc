@@ -9,6 +9,7 @@
 
 #include <iostream>
 
+#include "fidl/fidl.serversuite/cpp/natural_types.h"
 #include "src/tests/fidl/server_suite/cpp_util/error_util.h"
 
 class ClosedTargetControllerServer : public fidl::Server<fidl_serversuite::ClosedTargetController> {
@@ -308,6 +309,10 @@ class OpenTargetServer : public fidl::Server<fidl_serversuite::OpenTarget> {
 class RunnerServer : public fidl::Server<fidl_serversuite::Runner> {
  public:
   explicit RunnerServer(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+
+  void GetVersion(GetVersionCompleter::Sync& completer) override {
+    completer.Reply(fidl_serversuite::kServerSuiteVersion);
+  }
 
   void IsTestEnabled(IsTestEnabledRequest& request,
                      IsTestEnabledCompleter::Sync& completer) override {

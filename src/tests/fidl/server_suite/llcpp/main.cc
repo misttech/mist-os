@@ -318,6 +318,10 @@ class RunnerServer : public fidl::WireServer<fidl_serversuite::Runner> {
  public:
   explicit RunnerServer(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
+  void GetVersion(GetVersionCompleter::Sync& completer) override {
+    completer.Reply(fidl_serversuite::kServerSuiteVersion);
+  }
+
   void IsTestEnabled(IsTestEnabledRequestView request,
                      IsTestEnabledCompleter::Sync& completer) override {
     bool is_enabled = [&request]() {
