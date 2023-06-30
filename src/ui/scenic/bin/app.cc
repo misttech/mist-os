@@ -168,7 +168,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
       inspect_node_(std::move(inspect_node)),
       frame_scheduler_(
           std::make_unique<scheduling::WindowedFramePredictor>(
-              zx::msec(config_values_.frame_scheduler_min_predicted_frame_duration_in_us()),
+              zx::usec(config_values_.frame_scheduler_min_predicted_frame_duration_in_us()),
               scheduling::DefaultFrameScheduler::kInitialRenderDuration,
               scheduling::DefaultFrameScheduler::kInitialUpdateDuration),
           inspect_node_.CreateChild("FrameScheduler"), &metrics_logger_),
