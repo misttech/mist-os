@@ -48,8 +48,9 @@ fbl::unique_fd FvmPartitionFormat(
 // Allocates empty partitions inside the volume manager. Note that the partitions
 // are simply allocated; the actual size of each partition (number of slices etc)
 // is determined when formatting each volume.
-zx::result<> AllocateEmptyPartitions(const fbl::unique_fd& devfs_root,
-                                     const fbl::unique_fd& fvm_fd);
+zx::result<> AllocateEmptyPartitions(
+    const fbl::unique_fd& devfs_root,
+    fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> fvm_device);
 
 // Given an fd representing a "sparse FVM format", fill the FVM with the
 // provided partitions described by |partition_fd|.

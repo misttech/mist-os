@@ -526,14 +526,12 @@ struct BoundZxcryptDevice {
 // later.
 // Partitions which are zxcrypt-enabled will have their driver bound.  A set of all such drivers is
 // returned so the caller can unbind them when finished writing into them.
-zx::result<std::vector<BoundZxcryptDevice>> AllocatePartitions(const fbl::unique_fd& devfs_root,
-                                                               const fbl::unique_fd& fvm_fd,
-                                                               fbl::Array<PartitionInfo>* parts) {
+zx::result<std::vector<BoundZxcryptDevice>> AllocatePartitions(
+    const fbl::unique_fd& devfs_root,
+    fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> fvm_device,
+    fbl::Array<PartitionInfo>* parts) {
   fdio_cpp::UnownedFdioCaller devfs_caller(devfs_root);
-  fdio_cpp::UnownedFdioCaller fvm_caller(fvm_fd);
   fidl::UnownedClientEnd devfs_client_end = devfs_caller.directory();
-  fidl::UnownedClientEnd fvm_client_end =
-      fvm_caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>();
 
   std::vector<BoundZxcryptDevice> bound_devices;
   for (PartitionInfo& part_info : *parts) {
@@ -553,8 +551,7 @@ zx::result<std::vector<BoundZxcryptDevice>> AllocatePartitions(const fbl::unique
       LOG("Allocating partition %s consisting of %zu slices\n", name, slice_count);
     }
     if (zx::result channel = fs_management::FvmAllocatePartitionWithDevfs(
-            devfs_client_end, fvm_client_end, slice_count, type_guid, instance_guid, name_view,
-            flags);
+            devfs_client_end, fvm_device, slice_count, type_guid, instance_guid, name_view, flags);
         channel.is_error()) {
       ERROR("Couldn't allocate partition\n");
       return zx::error(ZX_ERR_NO_SPACE);
@@ -672,8 +669,9 @@ zx_status_t WipeAllFvmPartitionsWithGuid(const fbl::unique_fd& fvm_fd, const uin
   }
 }
 
-zx::result<> AllocateEmptyPartitions(const fbl::unique_fd& devfs_root,
-                                     const fbl::unique_fd& fvm_fd) {
+zx::result<> AllocateEmptyPartitions(
+    const fbl::unique_fd& devfs_root,
+    fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> fvm_device) {
   FvmPartition fvm_partitions[] = {
       FvmPartition::Make(std::array<uint8_t, fvm::kGuidSize>(GUID_BLOB_VALUE),
                          paver::kBlobfsPartitionLabel),
@@ -688,7 +686,7 @@ zx::result<> AllocateEmptyPartitions(const fbl::unique_fd& devfs_root,
                                                                 .active = true,
                                                             }},
                                        2);
-  auto res = AllocatePartitions(devfs_root, fvm_fd, &partitions);
+  zx::result res = AllocatePartitions(devfs_root, fvm_device, &partitions);
   if (res.is_error()) {
     return res.take_error();
   }
@@ -766,7 +764,9 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
   LOG("Partitions pre-validated successfully: Enough space exists to pave.\n");
 
   // Actually allocate the storage for the incoming image.
-  auto devices = AllocatePartitions(devfs_root, fvm_fd, &parts);
+  fdio_cpp::FdioCaller volume_manager(std::move(fvm_fd));
+  zx::result devices =
+      AllocatePartitions(devfs_root, volume_manager.borrow_as<volume::VolumeManager>(), &parts);
   if (devices.is_error()) {
     ERROR("Failed to allocate partitions: %s\n", devices.status_string());
     return devices.take_error();
@@ -782,8 +782,6 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
     ERROR("Failed to create stream VMO\n");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-
-  fdio_cpp::FdioCaller volume_manager(std::move(fvm_fd));
 
   // Now that all partitions are preallocated, begin streaming data to them.
   for (size_t p = 0; p < parts.size(); p++) {

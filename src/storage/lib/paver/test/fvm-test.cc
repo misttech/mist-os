@@ -6,6 +6,7 @@
 
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/driver-integration-test/fixture.h>
+#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/zx/result.h>
@@ -167,7 +168,9 @@ TEST_F(FvmTest, AllocateEmptyPartitions) {
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
   ASSERT_TRUE(fvm_part.is_valid());
 
-  ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), fvm_part));
+  fdio_cpp::FdioCaller fvm_caller(std::move(fvm_part));
+  ASSERT_OK(paver::AllocateEmptyPartitions(
+      devfs_root(), fvm_caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>()));
 
   fbl::unique_fd blob;
   ASSERT_OK(
@@ -185,7 +188,9 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
   ASSERT_TRUE(fvm_part1.is_valid());
 
-  ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), fvm_part1));
+  fdio_cpp::FdioCaller fvm_caller1(std::move(fvm_part1));
+  ASSERT_OK(paver::AllocateEmptyPartitions(
+      devfs_root(), fvm_caller1.borrow_as<fuchsia_hardware_block_volume::VolumeManager>()));
 
   {
     fbl::unique_fd blob;
@@ -206,7 +211,10 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
   ASSERT_TRUE(fvm_part2.is_valid());
 
-  ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), fvm_part2));
+  // TODO(http://fxbug.dev/112484): Remove this as it relies on multiplexing.
+  fdio_cpp::FdioCaller fvm_caller2(std::move(fvm_part2));
+  ASSERT_OK(paver::AllocateEmptyPartitions(
+      devfs_root(), fvm_caller2.borrow_as<fuchsia_hardware_block_volume::VolumeManager>()));
 
   {
     fbl::unique_fd blob;
@@ -219,7 +227,7 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
   }
 
   std::array<uint8_t, fvm::kGuidSize> blobfs_guid = GUID_BLOB_VALUE;
-  ASSERT_OK(paver::WipeAllFvmPartitionsWithGuid(fvm_part2, blobfs_guid.data()));
+  ASSERT_OK(paver::WipeAllFvmPartitionsWithGuid(fvm_caller2.fd(), blobfs_guid.data()));
 
   // Check we can still open the first ramdisk's blobfs:
   {
@@ -243,7 +251,9 @@ TEST_F(FvmTest, Unbind) {
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
   ASSERT_TRUE(fvm_part.is_valid());
 
-  ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), fvm_part));
+  fdio_cpp::FdioCaller caller(std::move(fvm_part));
+  ASSERT_OK(paver::AllocateEmptyPartitions(
+      devfs_root(), caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>()));
 
   fbl::unique_fd blob;
   ASSERT_OK(
@@ -254,9 +264,6 @@ TEST_F(FvmTest, Unbind) {
       fdio_open_fd_at(devfs_root().get(), kRamdisk0DataPath, 0, data.reset_and_get_address()));
 
   ASSERT_OK(paver::FvmUnbind(devfs_root(), "/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block"));
-  fvm_part.reset();
-  blob.reset();
-  data.reset();
 }
 
 TEST_F(FvmTest, UnbindInvalidPath) {
@@ -266,7 +273,9 @@ TEST_F(FvmTest, UnbindInvalidPath) {
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
   ASSERT_TRUE(fvm_part.is_valid());
 
-  ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), fvm_part));
+  fdio_cpp::FdioCaller caller(std::move(fvm_part));
+  ASSERT_OK(paver::AllocateEmptyPartitions(
+      devfs_root(), caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>()));
 
   fbl::unique_fd blob;
   ASSERT_OK(
@@ -286,9 +295,6 @@ TEST_F(FvmTest, UnbindInvalidPath) {
   ASSERT_EQ(paver::FvmUnbind(devfs_root(), path), ZX_ERR_INVALID_ARGS);
 
   ASSERT_OK(paver::FvmUnbind(devfs_root(), "/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block"));
-  fvm_part.reset();
-  blob.reset();
-  data.reset();
 }
 
 }  // namespace

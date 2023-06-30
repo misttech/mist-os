@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/epitaph.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -189,19 +190,19 @@ zx::result<zx::channel> FormatFvm(const fbl::unique_fd& devfs_root,
   }
 
   {
-    zx::result<> status = AllocateEmptyPartitions(devfs_root, fvm_fd);
+    fdio_cpp::FdioCaller volume_manager(std::move(fvm_fd));
+    zx::result status = AllocateEmptyPartitions(
+        devfs_root, volume_manager.borrow_as<fuchsia_hardware_block_volume::VolumeManager>());
     if (status.is_error()) {
-      ERROR("Couldn't allocate empty partitions\n");
+      ERROR("Couldn't allocate empty partitions: %s\n", status.status_string());
       return status.take_error();
     }
 
-    zx::channel channel;
-    if (zx_status_t status = fdio_fd_transfer(fvm_fd.release(), channel.reset_and_get_address());
-        status != ZX_OK) {
-      ERROR("Couldn't get fvm handle\n");
-      return zx::error(status);
+    zx::result channel = volume_manager.take_channel();
+    if (channel.is_error()) {
+      ERROR("Couldn't get fvm handle: %s\n", channel.status_string());
     }
-    return zx::ok(std::move(channel));
+    return channel;
   }
 }
 

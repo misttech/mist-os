@@ -2159,8 +2159,10 @@ TEST_F(PaverServiceLuisTest, FindGPTDevicesIgnoreFvmPartitions) {
                                            gpt_dev_->block_controller_interface(), header,
                                            paver::BindOption::Reformat));
   ASSERT_TRUE(fvm_fd);
-  auto status = paver::AllocateEmptyPartitions(devmgr_.devfs_root(), fvm_fd);
-  ASSERT_TRUE(status.is_ok());
+  fdio_cpp::FdioCaller caller(std::move(fvm_fd));
+  zx::result status = paver::AllocateEmptyPartitions(
+      devmgr_.devfs_root(), caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>());
+  ASSERT_OK(status);
 
   // Check that FVM created sub-partitions are not considered as candidates.
   zx::result gpt_devices = paver::GptDevicePartitioner::FindGptDevices(devmgr_.devfs_root());
