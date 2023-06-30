@@ -508,6 +508,7 @@
             storage: "tmp",
             from: "self",
             to: [
+                "#g3_dart_jit_product_runner",
                 "#starnix-tests",
                 "#starnix_test_runners",
                 "#system-tests",
