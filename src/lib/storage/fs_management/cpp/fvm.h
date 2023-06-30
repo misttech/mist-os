@@ -9,7 +9,9 @@
 #include <lib/zx/result.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <zircon/types.h>
 
+#include <cstdint>
 #include <string_view>
 #include <vector>
 

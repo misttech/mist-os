@@ -9,8 +9,7 @@
 #include <zircon/types.h>
 
 #include <limits>
-
-#include "src/storage/fvm/format.h"
+#include <memory>
 
 namespace fvm {
 

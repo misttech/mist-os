@@ -7,7 +7,6 @@
 #include <lib/zx/result.h>
 
 #include "partition-client.h"
-#include "src/lib/storage/block_client/cpp/client.h"
 #include "src/storage/fvm/fvm_sparse.h"
 #include "src/storage/fvm/sparse_reader.h"
 
