@@ -77,9 +77,9 @@ glm::ivec4 GetPixel(const uint8_t* vmo_host, uint32_t width, uint32_t x, uint32_
   return glm::ivec4(r, g, b, a);
 }
 
-// When checking the output of a render target, we want to make sure that non only
-// are the renderables renderered correctly, but that the rest of the image is
-// black, without any errantly colored pixels.
+// When checking the output of a render target, we want to make sure that not only
+// are the renderables rendered correctly, but that the rest of the image is black,
+// without any errantly colored pixels.
 #define CHECK_BLACK_PIXELS(bytes, kTargetWidth, kTargetHeight, color_count) \
   {                                                                         \
     uint32_t black_pixels = 0;                                              \
