@@ -8,7 +8,7 @@ executable("bind") {
   testonly = true
   sources = [ "bind_test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.memory.heapdump:fuchsia.memory.heapdump.process_cpp_wire",
+    "//sdk/fidl/fuchsia.memory.heapdump.process:fuchsia.memory.heapdump.process_cpp_wire",
     "//src/lib/fxl/test:gtest_main",
     "//src/performance/memory/heapdump/instrumentation",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

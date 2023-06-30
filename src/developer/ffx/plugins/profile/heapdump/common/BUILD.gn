@@ -11,7 +11,7 @@ rustc_library("ffx_profile_heapdump_common") {
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.memory.heapdump:fuchsia.memory.heapdump.client_rust",
+    "//sdk/fidl/fuchsia.memory.heapdump.client:fuchsia.memory.heapdump.client_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/lib/fidl/rust/fidl",

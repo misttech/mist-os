@@ -26,8 +26,8 @@ rustc_binary("bin") {
 
   deps = [
     ":elf-search-wrapper",
-    "//sdk/fidl/fuchsia.memory.heapdump:fuchsia.memory.heapdump.client_rust",
-    "//sdk/fidl/fuchsia.memory.heapdump:fuchsia.memory.heapdump.process_rust",
+    "//sdk/fidl/fuchsia.memory.heapdump.client:fuchsia.memory.heapdump.client_rust",
+    "//sdk/fidl/fuchsia.memory.heapdump.process:fuchsia.memory.heapdump.process_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
