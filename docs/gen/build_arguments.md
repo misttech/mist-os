@@ -149,17 +149,7 @@ Used as a parameter to assembled_system().
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:185
-
-### authorized_ssh_keys
-
-Support SSH authorized_keys files as a build argument. This is only available
-for non-production builds and requires inclusion of configuration data from
-"//src/developer/sshd-host:authorized_ssh_keys_config_data".
-
-**Current value (from the default):** `[]`
-
-From //build/images/args.gni:172
+From //build/images/args.gni:180
 
 ### authorized_ssh_keys_label
 
@@ -324,7 +314,7 @@ From //build/testing/environments.gni:9
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:213
+From //build/images/args.gni:208
 
 ### bazel_product_bundle_prefix
 
@@ -349,7 +339,7 @@ The actual bazel_product_bundle used for Bazel assembly is:
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:212
+From //build/images/args.gni:207
 
 ### bazel_quiet
 
@@ -3103,7 +3093,7 @@ useful for including verification and other Bazel assembly specific targets.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:217
+From //build/images/args.gni:212
 
 ### extra_gn_labels_for_bazel_inputs
 
@@ -4196,7 +4186,7 @@ assembled_system().  See documentation there.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:181
+From //build/images/args.gni:176
 
 ### include_zxdb_large_tests
 
@@ -8354,7 +8344,7 @@ exactly what you are doing.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:192
+From //build/images/args.gni:187
 
 ### use_blink
 
@@ -8707,7 +8697,7 @@ is meant solely for developer debugging.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:177
+From //build/images/args.gni:172
 
 ### vim3_mcu_fan_default_level
 
