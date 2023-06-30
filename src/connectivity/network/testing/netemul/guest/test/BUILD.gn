@@ -36,6 +36,7 @@ rustc_test("guest") {
 fuchsia_test_component("netemul-guest-self-test") {
   manifest = "meta/netemul-guest-self-test.cml"
   deps = [ ":guest" ]
+  test_type = "system"
 }
 
 fuchsia_netemul_guest_test_package("netemul-guest-self-tests") {

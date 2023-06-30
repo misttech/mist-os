@@ -17,6 +17,7 @@ foreach(test, guest_tests) {
   fuchsia_test_component(name) {
     manifest = "meta/${name}.cml"
     deps = [ "${test}" ]
+    test_type = "system"
   }
 }
 

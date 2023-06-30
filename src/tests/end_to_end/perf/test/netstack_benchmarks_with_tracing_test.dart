@@ -30,6 +30,7 @@ Future<void> runBenchmarksWithTracing(
   try {
     final String command = 'run-test-suite'
         ' fuchsia-pkg://fuchsia.com/$packageName#meta/$componentName.cm'
+        ' --realm /core/testing:system-tests'
         ' --deprecated-output-directory $targetOutputDir';
     final result = await helper.sl4fDriver.ssh.run(command);
     expect(result.exitCode, equals(0));

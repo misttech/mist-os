@@ -61,6 +61,7 @@ fuchsia_test_component("tun-socket-benchmarks-ns2-with-tracing") {
   deps = common_deps +
          [ "//src/connectivity/network/netstack:component-with-tracing" ]
   manifest = "meta/tun-socket-benchmarks-ns2-with-tracing.cml"
+  test_type = "system"
 }
 
 netstack3_deps = common_deps + [
@@ -80,6 +81,7 @@ fuchsia_test_component("tun-socket-benchmarks-ns3") {
 fuchsia_test_component("tun-socket-benchmarks-ns3-with-tracing") {
   deps = netstack3_deps
   manifest = "meta/tun-socket-benchmarks-ns3-with-tracing.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("tun-socket-benchmarks") {

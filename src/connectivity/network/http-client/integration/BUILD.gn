@@ -24,11 +24,11 @@ rustc_test("http_client_integration_test") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_component("component") {
+fuchsia_test_component("component") {
   component_name = "http-client-integration-test"
-  testonly = true
   manifest = "meta/http_client_integration_test.cml"
   deps = [ ":http_client_integration_test" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("http-client-integration-tests") {

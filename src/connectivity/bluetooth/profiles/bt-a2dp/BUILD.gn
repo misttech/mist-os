@@ -182,6 +182,7 @@ fuchsia_unittest_package("bt-a2dp-encoding-tests") {
   restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/bt-a2dp-encoding-tests.cml"
   deps = [ ":encoding_integration_bin" ]
+  test_type = "system"
 }
 
 group("tests") {

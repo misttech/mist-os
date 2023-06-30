@@ -4,7 +4,6 @@
 {
     include: [
         "//src/connectivity/network/tests/benchmarks/socket-tun/meta/common.shard.cml",
-        "sys/testing/system-test.shard.cml",
         "trace/client.shard.cml",
     ],
     use: [

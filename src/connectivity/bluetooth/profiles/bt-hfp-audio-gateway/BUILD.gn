@@ -177,6 +177,7 @@ group("bt-hfp-audio-gateway") {
 fuchsia_test_component("test-component") {
   manifest = "meta/bt-hfp-audio-gateway-tests.cml"
   deps = [ ":bin_test" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("bt-hfp-audio-gateway-tests") {

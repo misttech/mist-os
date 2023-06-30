@@ -33,6 +33,7 @@ fuchsia_test_component("bt-a2dp-source-integration-test-component") {
   restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/bt-a2dp-source-integration-tests.cml"
   deps = [ ":tests_bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("bt-a2dp-source-integration-tests") {

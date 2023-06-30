@@ -107,6 +107,7 @@ fuchsia_unittest_component("socket-benchmarks-with-tracing") {
     ":socket_benchmarks",
     "//src/connectivity/network/netstack:component-with-tracing-dropin",
   ]
+  test_type = "system"
 }
 
 # TODO(https://fxbug.dev/117883): Delete this once Fast UDP is the default.
@@ -116,6 +117,7 @@ fuchsia_unittest_component("socket-benchmarks-with-fast-udp-tracing") {
     ":socket_benchmarks",
     "//src/connectivity/network/netstack:component-with-fast-udp-tracing",
   ]
+  test_type = "system"
 }
 
 fuchsia_unittest_component("socket-benchmarks-with-netstack3-tracing") {
@@ -124,6 +126,7 @@ fuchsia_unittest_component("socket-benchmarks-with-netstack3-tracing") {
     ":socket_benchmarks",
     "//src/connectivity/network/netstack3:component",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("socket-benchmarks-with-tracing-pkg") {

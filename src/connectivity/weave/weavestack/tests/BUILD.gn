@@ -52,14 +52,14 @@ resource("data") {
   outputs = [ "data/{{source_file_part}}" ]
 }
 
-fuchsia_component("weavestack-unittests") {
-  testonly = true
+fuchsia_test_component("weavestack-unittests") {
   manifest = "meta/weavestack_unittests.cml"
   deps = [
     ":config",
     ":data",
     ":unittests",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("package-test") {

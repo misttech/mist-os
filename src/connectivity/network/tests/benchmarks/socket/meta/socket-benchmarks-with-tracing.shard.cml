@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "//src/connectivity/network/tests/benchmarks/socket/meta/socket-benchmarks.shard.cml",
-        "sys/testing/system-test.shard.cml",
-    ],
+    include: [ "//src/connectivity/network/tests/benchmarks/socket/meta/socket-benchmarks.shard.cml" ],
     program: {
         args: [
             "-p",
