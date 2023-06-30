@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-pub const FASTBOOT_CHECK_INTERVAL: Duration = Duration::from_secs(5);
+pub const FASTBOOT_CHECK_INTERVAL: Duration = Duration::from_secs(10);
 pub(crate) const MDNS_BROADCAST_INTERVAL: Duration = Duration::from_secs(20);
 pub(crate) const ZEDBOOT_BROADCAST_INTERVAL: Duration = Duration::from_secs(2);
 pub(crate) const GRACE_INTERVAL: Duration = Duration::from_secs(5);
