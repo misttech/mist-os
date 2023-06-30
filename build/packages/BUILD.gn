@@ -74,6 +74,8 @@ group("allowed_to_use_subpackages") {
     "//src/performance/trace_manager:trace_manager",
     "//src/sys/pkg/lib/fuchsia-pkg:package_for_archive",
     "//src/sys/test_manager:pkg",
+    "//src/sys/test_runners/dart_wrapper:dart-aot-wrapper-runner",
+    "//src/sys/test_runners/dart_wrapper:dart-jit-wrapper-runner",
     "//src/tests/microbenchmarks:starnix_microbenchmarks_perftestmode",
     "//src/virtualization/bin/guest_manager:debian_guest_manager",
     "//src/virtualization/bin/guest_manager:zircon_guest_manager",

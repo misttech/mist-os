@@ -10,7 +10,7 @@
     program: {
         runner: "elf",
         binary: "bin/dart_wrapper_runner",
-        args: [ "fuchsia-pkg://fuchsia.com/dart_jit_runner#meta/dart_jit_runner.cm" ],
+        args: [ "dart_jit_runner#meta/dart_jit_runner.cm" ],
         use_next_vdso: "true",
     },
     collections: [

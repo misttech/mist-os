@@ -49,6 +49,11 @@ fuchsia_package("dart-aot-wrapper-runner") {
     "//src/sys/test_manager:*",
   ]
   deps = [ ":dart_aot_wrapper_runner" ]
+
+  # We don't have a dart prebuilt on this platform.
+  if (target_cpu != "riscv64") {
+    subpackages = [ "//src/dart:dart_aot_runner" ]
+  }
 }
 
 fuchsia_component("dart_jit_wrapper_runner") {
@@ -67,6 +72,11 @@ fuchsia_package("dart-jit-wrapper-runner") {
     "//src/sys/test_manager:*",
   ]
   deps = [ ":dart_jit_wrapper_runner" ]
+
+  # We don't have a dart prebuilt on this platform.
+  if (target_cpu != "riscv64") {
+    subpackages = [ "//src/dart:dart_jit_runner" ]
+  }
 }
 
 fuchsia_unittest_package("dart-wrapper-runner-unittests") {
