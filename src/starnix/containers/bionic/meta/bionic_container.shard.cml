@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 {
     program: {
-        apex_hack: [],
         features: [
             "binder",
             "selinux_enabled",

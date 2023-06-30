@@ -22,7 +22,6 @@ pub fn compile_container_manifest(
     compile_from_json(json!({
         "program": {
             "runner": "starnix",
-            "apex_hack": [],
             "features": features,
             "init": [],
             "init_user": "root:x:0:0",

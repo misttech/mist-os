@@ -85,16 +85,6 @@
         },
     ],
     config: {
-        // Hack for specifying apexes.
-        apex_hack: {
-            type: "vector",
-            element: {
-                type: "string",
-                max_size: 256,
-            },
-            max_count: 100,
-        },
-
         // The features to run in the container.
         features: {
             type: "vector",

@@ -5,7 +5,6 @@
     include: [ "//src/starnix/containers/container.shard.cml" ],
     program: {
         runner: "starnix",
-        apex_hack: [],
         features: [],
         init: [],
         kernel_cmdline: "",

@@ -43,7 +43,6 @@ appropriate container configuration values. For example,
 
 ```{
     program: {
-        apex_hack: [],
         features: [
             "wayland",
             "custom_artifacts",

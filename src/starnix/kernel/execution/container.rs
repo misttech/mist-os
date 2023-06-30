@@ -82,7 +82,6 @@ fn get_config_from_component_start_info(
 
     let get_string = |key| get_program_string(&start_info, key).unwrap_or_default().to_owned();
 
-    let apex_hack = get_strvec("apex_hack");
     let features = get_strvec("features");
     let init = get_strvec("init");
     let kernel_cmdline = get_string("kernel_cmdline");
@@ -97,16 +96,7 @@ fn get_config_from_component_start_info(
     let outgoing_dir = start_info.outgoing_dir.take().map(|dir| dir.into_channel());
 
     ConfigWrapper {
-        config: Config {
-            apex_hack,
-            features,
-            init,
-            kernel_cmdline,
-            mounts,
-            rlimits,
-            name,
-            startup_file_path,
-        },
+        config: Config { features, init, kernel_cmdline, mounts, rlimits, name, startup_file_path },
         pkg_dir,
         outgoing_dir,
         svc_dir,
@@ -282,10 +272,6 @@ async fn create_container(
 
     mount_filesystems(system_task, config, &pkg_dir_proxy)?;
 
-    // Hack to allow mounting apexes before apexd is working.
-    // TODO(tbodt): Remove once apexd works.
-    mount_apexes(system_task, config)?;
-
     // Run all common features that were specified in the .cml.
     run_features(&config.features, &kernel)
         .map_err(|e| anyhow!("Failed to initialize features: {:?}", e))?;
@@ -364,23 +350,6 @@ fn create_fs_context(
     let root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
 
     Ok(FsContext::new(root_fs))
-}
-
-fn mount_apexes(init_task: &CurrentTask, config: &ConfigWrapper) -> Result<(), Error> {
-    if !config.apex_hack.is_empty() {
-        init_task
-            .lookup_path_from_root(b"apex")?
-            .mount(WhatToMount::Fs(TmpFs::new_fs(init_task.kernel())), MountFlags::empty())?;
-        let apex_dir = init_task.lookup_path_from_root(b"apex")?;
-        for apex in &config.apex_hack {
-            let apex = apex.as_bytes();
-            let apex_subdir =
-                apex_dir.create_node(init_task, apex, mode!(IFDIR, 0o700), DeviceType::NONE)?;
-            let apex_source = init_task.lookup_path_from_root(&[b"system/apex/", apex].concat())?;
-            apex_subdir.mount(WhatToMount::Bind(apex_source), MountFlags::empty())?;
-        }
-    }
-    Ok(())
 }
 
 pub fn set_rlimits(current_task: &CurrentTask, rlimits: &[String]) -> Result<(), Error> {
