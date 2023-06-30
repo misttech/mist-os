@@ -1933,16 +1933,13 @@ impl Display for Ipv6Addr {
         // by creating a scratch buffer, calling `fmt_inner` on that scratch
         // buffer, and then satisfying those requirements.
         fn fmt_inner<W: fmt::Write>(addr: &Ipv6Addr, w: &mut W) -> Result<(), fmt::Error> {
-            // We special-case the unspecified and localhost addresses because
-            // both addresses are valid IPv4-compatible addresses, and so if we
-            // don't special case them, they'll get printed as IPv4-compatible
-            // addresses ("::0.0.0.0" and "::0.0.0.1") respectively.
+            // We special-case the unspecified address, localhost address, and
+            // IPv4-mapped addresses, but not IPv4-compatible addresses. We
+            // follow Rust's behavior here: https://github.com/rust-lang/rust/pull/112606
             if !addr.is_specified() {
                 write!(w, "::")
             } else if addr.is_loopback() {
                 write!(w, "::1")
-            } else if let Some(v4) = addr.to_ipv4_compatible() {
-                write!(w, "::{}", v4)
             } else if let Some(v4) = addr.to_ipv4_mapped() {
                 write!(w, "::ffff:{}", v4)
             } else {
@@ -3658,9 +3655,6 @@ mod tests {
     }
 
     #[test]
-    // TODO(fxbug.dev/129316): Temporarily disabled for toolchain roll.
-    // Change to match https://github.com/rust-lang/rust/pull/112606 and re-enable.
-    #[ignore]
     fn test_ipv6_display() {
         // Test that `addr` is formatted the same by our `Display` impl as by
         // the standard library's `Display` impl. Optionally test that it
