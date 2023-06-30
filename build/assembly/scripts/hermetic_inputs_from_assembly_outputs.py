@@ -120,8 +120,9 @@ def main():
         for image in image_manifest:
             inputs.append(os.path.join(manifest_path, image['path']))
 
-            # Collect the package manifests from the blobfs image.
-            if image['type'] == 'blk' and image['name'] == 'blob':
+            # Collect the package manifests from the blobfs/Fxblob image.
+            if ((image['type'] == 'blk' and image['name'] == 'blob') or
+                (image['type'] == 'fxfs-blk' and image['name'] == 'storage-full')):
                 packages = []
                 packages.extend(image['contents']['packages'].get('base', []))
                 packages.extend(image['contents']['packages'].get('cache', []))
