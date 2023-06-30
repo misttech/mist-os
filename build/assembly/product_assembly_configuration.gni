@@ -347,7 +347,12 @@ template("product_assembly_configuration") {
     if (defined(_p.ui)) {
       _ui = _p.ui
       if (defined(_ui.sensor_config)) {
-        _sensor_config = _ui.sensor_config
+        # If the path has not already been rebased, then do so (this is soon to
+        # be removed).
+        if ("../../" + string_replace(_ui.sensor_config, "../../", "") !=
+            _ui.sensor_config) {
+          _sensor_config = _ui.sensor_config
+        }
       } else {
         not_needed([ "_ui" ])
       }
@@ -471,15 +476,18 @@ template("product_assembly_configuration") {
                            [
                              "deps",
                              "public_deps",
+                             "inputs",
                              "testonly",
                              "visibility",
                            ])
     if (!defined(public_deps)) {
       public_deps = []
     }
-    inputs = []
     public_deps += [ ":${labels.assembly_config}" ]
 
+    if (!defined(inputs)) {
+      inputs = []
+    }
     if (_sensor_config != false) {
       inputs += [ _sensor_config ]
     }
