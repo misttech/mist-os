@@ -205,7 +205,7 @@ zx::result<fbl::unique_fd> OpenPartitionImpl(fidl::ClientEnd<fuchsia_io::Directo
 }
 
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartitionImpl(
-    fidl::ClientEnd<fuchsia_io::Directory> directory, const PartitionMatcher& matcher) {
+    fidl::ClientEnd<fuchsia_io::Directory> directory, const PartitionMatcher& matcher, bool wait) {
   auto cb = [&](fidl::UnownedClientEnd<fuchsia_io::Directory> directory, std::string_view name)
       -> std::optional<zx::result<fidl::ClientEnd<fuchsia_device::Controller>>> {
     zx::result channel = component::ConnectAt<fuchsia_device::Controller>(directory, name);
@@ -224,17 +224,41 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartitionImpl(
     return zx::ok(std::move(*channel));
   };
 
-  zx::result watch_result = device_watcher::WatchDirectoryForItems<
-      zx::result<fidl::ClientEnd<fuchsia_device::Controller>>>(
-      directory,
-      [&directory, cb = std::move(cb)](std::string_view fn)
-          -> std::optional<zx::result<fidl::ClientEnd<fuchsia_device::Controller>>> {
-        return cb(directory, fn);
-      });
-  if (watch_result.is_error()) {
-    return watch_result.take_error();
+  if (wait) {
+    zx::result watch_result = device_watcher::WatchDirectoryForItems<
+        zx::result<fidl::ClientEnd<fuchsia_device::Controller>>>(
+        directory,
+        [&directory, cb = std::move(cb)](std::string_view fn)
+            -> std::optional<zx::result<fidl::ClientEnd<fuchsia_device::Controller>>> {
+          return cb(directory, fn);
+        });
+    if (watch_result.is_error()) {
+      return watch_result.take_error();
+    }
+    return std::move(*watch_result);
   }
-  return std::move(*watch_result);
+
+  // TODO(https://fxbug.dev/124643): Create a C++ wrapper for channel-oriented readdir and use it
+  // here.
+  int fd;
+  if (zx_status_t status = fdio_fd_create(directory.TakeChannel().release(), &fd);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  DIR* const dir = fdopendir(fd);
+  auto cleanup = fit::defer([dir]() { closedir(dir); });
+  fdio_cpp::UnownedFdioCaller caller(dirfd(dir));
+  while (const dirent* const entry = readdir(dir)) {
+    if (std::string_view(entry->d_name) == ".") {
+      continue;
+    }
+    std::optional result = cb(caller.directory(), entry->d_name);
+    if (!result.has_value()) {
+      continue;
+    }
+    return std::move(result.value());
+  }
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 zx::result<> DestroyPartitionImpl(
@@ -583,24 +607,25 @@ zx::result<fbl::unique_fd> OpenPartitionWithDevfs(int devfs_root_fd,
 
 __EXPORT
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartition(
-    const PartitionMatcher& matcher) {
+    const PartitionMatcher& matcher, bool wait) {
   zx::result dir = component::Connect<fuchsia_io::Directory>(kBlockDevPath);
   if (dir.is_error()) {
     return dir.take_error();
   }
 
-  return OpenPartitionImpl(std::move(dir.value()), matcher);
+  return OpenPartitionImpl(std::move(dir.value()), matcher, wait);
 }
 
 __EXPORT
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartitionWithDevfs(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> devfs_root, const PartitionMatcher& matcher) {
+    fidl::UnownedClientEnd<fuchsia_io::Directory> devfs_root, const PartitionMatcher& matcher,
+    bool wait) {
   zx::result dir = component::ConnectAt<fuchsia_io::Directory>(devfs_root, kBlockDevRelativePath);
   if (dir.is_error()) {
     return dir.take_error();
   }
 
-  return OpenPartitionImpl(std::move(dir.value()), matcher);
+  return OpenPartitionImpl(std::move(dir.value()), matcher, wait);
 }
 
 __EXPORT

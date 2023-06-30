@@ -87,9 +87,10 @@ zx::result<fbl::unique_fd> OpenPartitionWithDevfs(int devfs_root_fd,
                                                   std::string* out_path_relative);
 
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartition(
-    const PartitionMatcher& matcher);
+    const PartitionMatcher& matcher, bool wait = true);
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartitionWithDevfs(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> devfs_root, const PartitionMatcher& matcher);
+    fidl::UnownedClientEnd<fuchsia_io::Directory> devfs_root, const PartitionMatcher& matcher,
+    bool wait = true);
 
 // Finds and destroys the first partition that matches |matcher|, if any.
 zx::result<> DestroyPartition(const PartitionMatcher& matcher, bool wait);

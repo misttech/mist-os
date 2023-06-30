@@ -227,7 +227,8 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
   }
 
   std::array<uint8_t, fvm::kGuidSize> blobfs_guid = GUID_BLOB_VALUE;
-  ASSERT_OK(paver::WipeAllFvmPartitionsWithGuid(fvm_caller2.fd(), blobfs_guid.data()));
+  ASSERT_OK(paver::WipeAllFvmPartitionsWithGuid(fvm_caller2.borrow_as<fuchsia_device::Controller>(),
+                                                blobfs_guid.data()));
 
   // Check we can still open the first ramdisk's blobfs:
   {
