@@ -420,6 +420,7 @@
                 "ProcSentryMeminfo.ContainsFieldsAndEndsWithNewline",
                 "ProcStat.ContainsBasicFields",
                 "ProcPidSymlink.SubprocessZombied",
+                "ProcPidSymlink.SubprocessExited",
                 "ProcPidFile.SubprocessRunning",
                 "ProcPidFile.SubprocessZombie",
                 "ProcPidFile.SubprocessExited",

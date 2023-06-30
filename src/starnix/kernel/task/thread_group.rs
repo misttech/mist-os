@@ -17,7 +17,7 @@ use crate::{
     auth::Credentials,
     device::terminal::*,
     drop_notifier::DropNotifier,
-    lock::{MutexGuard, RwLock},
+    lock::{Mutex, MutexGuard, RwLock},
     logging::{log_error, not_implemented},
     mutable_state::*,
     selinux::SeLinuxThreadGroupState,
@@ -312,15 +312,14 @@ impl ThreadGroup {
         let mut state = self.write();
 
         pids.remove_task(task.id);
-        let persistent_info: TaskPersistentInfo =
-            if let Some(container) = state.tasks.remove(&task.id) {
-                container.into()
-            } else {
-                // The task has never been added. The only expected case is that this thread was
-                // already terminating.
-                debug_assert!(state.terminating);
-                return;
-            };
+        let persistent_info = if let Some(container) = state.tasks.remove(&task.id) {
+            container.into_info()
+        } else {
+            // The task has never been added. The only expected case is that this thread was
+            // already terminating.
+            debug_assert!(state.terminating);
+            return;
+        };
 
         if task.id == state.leader() {
             let exit_status = task.read().exit_status.clone().unwrap_or_else(|| {
@@ -331,9 +330,9 @@ impl ThreadGroup {
             state.zombie_leader = Some(ZombieProcess {
                 pid: state.leader(),
                 pgid: state.process_group.leader,
-                uid: persistent_info.creds().uid,
+                uid: persistent_info.creds.uid,
                 exit_status,
-                exit_signal: *persistent_info.exit_signal(),
+                exit_signal: persistent_info.exit_signal,
                 time_stats: Default::default(),
             });
         }
@@ -917,9 +916,9 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
             child.read().tasks.values().any(|container| {
                 let info = container.info();
                 if options.wait_for_clone {
-                    *info.exit_signal() != Some(SIGCHLD)
+                    info.exit_signal != Some(SIGCHLD)
                 } else {
-                    *info.exit_signal() == Some(SIGCHLD)
+                    info.exit_signal == Some(SIGCHLD)
                 }
             })
         };
@@ -936,29 +935,35 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
             return error!(ECHILD);
         }
         for child in selected_children {
-            let child = child.write();
+            let mut child = child.write();
             if child.waitable.is_some() {
-                let build_zombie_process = |mut child: ThreadGroupWriteGuard<'_>,
-                                            exit_status: &dyn Fn(SignalInfo) -> ExitStatus|
-                 -> ZombieProcess {
+                if !child.stopped && options.wait_for_continued {
                     let siginfo = if options.keep_waitable_state {
                         child.waitable.clone().unwrap()
                     } else {
                         child.waitable.take().unwrap()
                     };
                     let info = child.tasks.values().next().unwrap().info();
-                    ZombieProcess::new(
+                    return Ok(Some(ZombieProcess::new(
                         child.as_ref(),
-                        info.creds(),
-                        exit_status(siginfo),
-                        *info.exit_signal(),
-                    )
-                };
-                if !child.stopped && options.wait_for_continued {
-                    return Ok(Some(build_zombie_process(child, &ExitStatus::Continue)));
+                        &info.creds,
+                        ExitStatus::Continue(siginfo),
+                        info.exit_signal,
+                    )));
                 }
                 if child.stopped && options.wait_for_stopped {
-                    return Ok(Some(build_zombie_process(child, &ExitStatus::Stop)));
+                    let siginfo = if options.keep_waitable_state {
+                        child.waitable.clone().unwrap()
+                    } else {
+                        child.waitable.take().unwrap()
+                    };
+                    let info = child.tasks.values().next().unwrap().info();
+                    return Ok(Some(ZombieProcess::new(
+                        child.as_ref(),
+                        &info.creds,
+                        ExitStatus::Stop(siginfo),
+                        info.exit_signal,
+                    )));
                 }
             }
         }
@@ -1008,17 +1013,11 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
 /// moment where the task is not yet released, yet the weak pointer is not upgradeable anymore.
 /// During this time, it is still necessary to access the persistent info to compute the state of
 /// the thread for the different wait syscalls.
-struct TaskContainer(Weak<Task>, TaskPersistentInfo);
+struct TaskContainer(Weak<Task>, Arc<Mutex<TaskPersistentInfo>>);
 
 impl From<&Arc<Task>> for TaskContainer {
     fn from(task: &Arc<Task>) -> Self {
         Self(Arc::downgrade(task), task.persistent_info.clone())
-    }
-}
-
-impl From<TaskContainer> for TaskPersistentInfo {
-    fn from(container: TaskContainer) -> TaskPersistentInfo {
-        container.1
     }
 }
 
@@ -1027,8 +1026,12 @@ impl TaskContainer {
         self.0.upgrade()
     }
 
-    fn info(&self) -> MutexGuard<'_, TaskPersistentInfoState> {
+    fn info(&self) -> MutexGuard<'_, TaskPersistentInfo> {
         self.1.lock()
+    }
+
+    fn into_info(self) -> Arc<Mutex<TaskPersistentInfo>> {
+        self.1
     }
 }
 
