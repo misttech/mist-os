@@ -14,7 +14,7 @@
 
 namespace display {
 
-// More useful representation of `fuchsia.hardware.display/DisplayIdValue`.
+// More useful representation of `fuchsia.hardware.display/DisplayId`.
 DEFINE_STRONG_INT(DisplayId, uint64_t);
 
 constexpr inline DisplayId ToDisplayId(uint64_t banjo_display_id) {
@@ -24,7 +24,6 @@ constexpr inline DisplayId ToDisplayId(fuchsia_hardware_display::wire::DisplayId
   return DisplayId(fidl_display_id.value);
 }
 constexpr inline uint64_t ToBanjoDisplayId(DisplayId display_id) { return display_id.value(); }
-constexpr inline uint64_t ToFidlDisplayIdValue(DisplayId display_id) { return display_id.value(); }
 constexpr inline fuchsia_hardware_display::wire::DisplayId ToFidlDisplayId(DisplayId display_id) {
   return {.value = display_id.value()};
 }
