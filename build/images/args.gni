@@ -166,11 +166,6 @@ declare_args() {
   # Example value: "//build/images/recovery"
   recovery_label = "//build/images/zedboot"
 
-  # Support SSH authorized_keys files as a build argument. This is only available
-  # for non-production builds and requires inclusion of configuration data from
-  # "//src/developer/sshd-host:authorized_ssh_keys_config_data".
-  authorized_ssh_keys = []
-
   # Enable verbose output from `ffx assembly image`, this creates non-silent
   # build output and therefore should never be 'true' in checked-in configs, and
   # is meant solely for developer debugging.

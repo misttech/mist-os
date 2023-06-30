@@ -200,11 +200,6 @@ if (is_fuchsia) {
         "//src/developer/forensics:feedback_remote_device_id_provider",
       ]
 
-  if (authorized_ssh_keys != []) {
-    recovery_eng_packages +=
-        [ "//src/developer/sshd-host:authorized_ssh_keys_config_data" ]
-  }
-
   recovery_installer_packages =
       recovery_eng_packages - [
         "//src/recovery/system:system_recovery",

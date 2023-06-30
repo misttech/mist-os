@@ -5,7 +5,6 @@
 # DISCLAIMER: This only for IN-TREE TESTS that do not use platform assembly
 # input bundles. Any other use case is not supported.
 
-import("//build/images/args.gni")
 import("//build/security/policies_swd.gni")
 import("//build/zbi/kernel_cmdline.gni")
 import("//bundles/assembly_input_groups/assembly_input_groups.gni")
@@ -62,11 +61,6 @@ assembly_input_groups("network") {
 
 assembly_input_groups("ssh") {
   visibility = [ "*" ]
-  base_packages = [ "//src/developer/sshd-host:config-for_transition" ]
-  if (authorized_ssh_keys != []) {
-    base_packages +=
-        [ "//src/developer/sshd-host:authorized_ssh_keys_config_data" ]
-  }
 }
 
 assembly_input_groups("debug") {

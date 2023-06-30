@@ -76,15 +76,6 @@ config_data_for_assembly("config") {
   outputs = [ "sshd_config" ]
 }
 
-if (authorized_ssh_keys != []) {
-  config_data("authorized_ssh_keys_config_data") {
-    for_pkg = "sshd-host"
-    sources = authorized_ssh_keys
-    outputs = [ "authorized_keys" ]  # /config/data/authorized_keys
-    deps = [ "//build/validate:non_production_tag" ]
-  }
-}
-
 executable("test") {
   testonly = true
   output_name = "sshd-host-test"
