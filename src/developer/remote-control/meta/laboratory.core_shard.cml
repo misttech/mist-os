@@ -41,9 +41,7 @@
             to: "#ffx-laboratory",
         },
         {
-            protocol: [
-                "fuchsia.posix.socket.Provider",
-            ],
+            protocol: [ "fuchsia.posix.socket.Provider" ],
             from: "#network",
             to: "#ffx-laboratory",
         },

@@ -2,30 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "syslog/client.shard.cml"
-    ],
+    include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
-        binary: "bin/camera_factory_bin"
+        binary: "bin/camera_factory_bin",
     },
+    capabilities: [
+        { protocol: "fuchsia.factory.camera.Controller" },
+    ],
     use: [
         {
             protocol: [
                 "fuchsia.camera3.DeviceWatcher",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.sysmem.Allocator",
-                "fuchsia.ui.scenic.Scenic"
+                "fuchsia.ui.scenic.Scenic",
             ],
         },
         {
             storage: "data",
             path: "/data",
-        },
-    ],
-    capabilities: [
-        {
-            protocol: "fuchsia.factory.camera.Controller",
         },
     ],
     expose: [

@@ -20,9 +20,7 @@
             protocol: "fuchsia.hardware.pty.Device",
             from: "#ptysvc",
         },
-        {
-            protocol: "fuchsia.process.Launcher",
-        },
+        { protocol: "fuchsia.process.Launcher" },
     ],
     offer: [
         {

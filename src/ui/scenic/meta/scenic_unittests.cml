@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    "include": [
+    include: [
+        "//src/sys/test_runners/gtest/default.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
-        "//src/sys/test_runners/gtest/default.shard.cml"
     ],
-    "program": {
-        "binary": "bin/scenic_unittests"
+    program: {
+        binary: "bin/scenic_unittests",
     },
     children: [
         {
@@ -20,7 +20,7 @@
         {
             protocol: [
                 "fuchsia.testing.FakeClock",
-                "fuchsia.testing.FakeClockControl"
+                "fuchsia.testing.FakeClockControl",
             ],
             from: "#fake_clock",
         },

@@ -26,9 +26,7 @@
     ],
     use: [
         {
-            protocol: [
-                "fuchsia.scheduler.ProfileProvider",
-            ],
+            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
         },
         {
             protocol: "fuchsia.tracing.provider.Registry",

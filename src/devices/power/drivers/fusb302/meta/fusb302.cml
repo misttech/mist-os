@@ -10,6 +10,7 @@
     program: {
         runner: "driver",
         bind: "meta/bind/fusb302-bind.bindbc",
+
         // TODO(fxbug.dev/98522): Do not colocate when fusb302 no longer
         // requires the banjo version of the GPIO protocol.
         colocate: "true",

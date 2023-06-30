@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 {
     include: [
-        "syslog/client.shard.cml",
         "//src/sys/test_runners/gtest/default.shard.cml",
+        "syslog/client.shard.cml",
     ],
     program: {
         binary: "test/storage_buffer",
