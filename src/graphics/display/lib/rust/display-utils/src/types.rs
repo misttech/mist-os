@@ -5,7 +5,8 @@
 use crate::{error::Result, pixel_format::PixelFormat};
 use {
     fidl_fuchsia_hardware_display::{
-        DisplayId as FidlDisplayId, Info, LayerId as FidlLayerId, INVALID_DISP_ID,
+        BufferCollectionId as FidlCollectionId, DisplayId as FidlDisplayId, Info,
+        LayerId as FidlLayerId, INVALID_DISP_ID,
     },
     fuchsia_async::OnSignals,
     fuchsia_zircon::{self as zx, AsHandleRef},
@@ -65,8 +66,20 @@ impl From<LayerId> for FidlLayerId {
 pub struct ImageId(pub u64);
 
 /// Strongly typed wrapper around a sysmem buffer collection ID.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CollectionId(pub u64);
+
+impl From<FidlCollectionId> for CollectionId {
+    fn from(fidl_collection_id: FidlCollectionId) -> Self {
+        CollectionId(fidl_collection_id.value)
+    }
+}
+
+impl From<CollectionId> for FidlCollectionId {
+    fn from(collection_id: CollectionId) -> Self {
+        FidlCollectionId { value: collection_id.0 }
+    }
+}
 
 /// Enhances the `fuchsia.hardware.display.Info` FIDL struct.
 #[derive(Clone, Debug)]
@@ -232,5 +245,37 @@ mod tests {
     fn display_id_default() {
         let default: DisplayId = Default::default();
         assert_eq!(default, DisplayId(INVALID_DISP_ID));
+    }
+
+    #[fuchsia::test]
+    fn collection_id_from_fidl_collection_id() {
+        assert_eq!(CollectionId(1), CollectionId::from(FidlCollectionId { value: 1 }));
+        assert_eq!(CollectionId(2), CollectionId::from(FidlCollectionId { value: 2 }));
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(CollectionId(LARGE), CollectionId::from(FidlCollectionId { value: LARGE }));
+    }
+
+    #[fuchsia::test]
+    fn fidl_collection_id_from_collection_id() {
+        assert_eq!(FidlCollectionId { value: 1 }, FidlCollectionId::from(CollectionId(1)));
+        assert_eq!(FidlCollectionId { value: 2 }, FidlCollectionId::from(CollectionId(2)));
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(FidlCollectionId { value: LARGE }, FidlCollectionId::from(CollectionId(LARGE)));
+    }
+
+    #[fuchsia::test]
+    fn fidl_collection_id_to_collection_id() {
+        assert_eq!(CollectionId(1), FidlCollectionId { value: 1 }.into());
+        assert_eq!(CollectionId(2), FidlCollectionId { value: 2 }.into());
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(CollectionId(LARGE), FidlCollectionId { value: LARGE }.into());
+    }
+
+    #[fuchsia::test]
+    fn collection_id_to_fidl_collection_id() {
+        assert_eq!(FidlCollectionId { value: 1 }, CollectionId(1).into());
+        assert_eq!(FidlCollectionId { value: 2 }, CollectionId(2).into());
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(FidlCollectionId { value: LARGE }, CollectionId(LARGE).into());
     }
 }

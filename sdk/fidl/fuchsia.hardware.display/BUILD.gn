@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.display") {
   sources = [
+    "buffer-collection.fidl",
     "config.fidl",
     "coordinator.fidl",
     "cursor.fidl",

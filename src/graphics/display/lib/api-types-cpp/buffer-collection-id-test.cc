@@ -40,16 +40,37 @@ TEST(BufferCollectionIdTest, EqualityForDifferentValues) {
   EXPECT_NE(kTwo, kAnotherOne);
 }
 
+TEST(BufferCollectionIdTest, ToFidlBufferCollectionId) {
+  EXPECT_EQ(1u, ToFidlBufferCollectionId(kOne).value);
+  EXPECT_EQ(2u, ToFidlBufferCollectionId(kTwo).value);
+  EXPECT_EQ(kLargeIdValue, ToFidlBufferCollectionId(kLargeId).value);
+}
+
 TEST(BufferCollectionIdTest, ToFidlBufferCollectionIdValue) {
   EXPECT_EQ(1u, ToFidlBufferCollectionIdValue(kOne));
   EXPECT_EQ(2u, ToFidlBufferCollectionIdValue(kTwo));
   EXPECT_EQ(kLargeIdValue, ToFidlBufferCollectionIdValue(kLargeId));
 }
 
+TEST(BufferCollectionIdTest, ToBufferCollectionIdWithFidl) {
+  EXPECT_EQ(kOne,
+            ToBufferCollectionId(fuchsia_hardware_display::wire::BufferCollectionId{.value = 1}));
+  EXPECT_EQ(kTwo,
+            ToBufferCollectionId(fuchsia_hardware_display::wire::BufferCollectionId{.value = 2}));
+  EXPECT_EQ(kLargeId, ToBufferCollectionId(fuchsia_hardware_display::wire::BufferCollectionId{
+                          .value = kLargeIdValue}));
+}
+
 TEST(BufferCollectionIdTest, ToBufferCollectionIdWithFidlValue) {
   EXPECT_EQ(kOne, ToBufferCollectionId(1));
   EXPECT_EQ(kTwo, ToBufferCollectionId(2));
   EXPECT_EQ(kLargeId, ToBufferCollectionId(kLargeIdValue));
+}
+
+TEST(BufferCollectionIdTest, FidlBufferCollectionIdConversionRoundtrip) {
+  EXPECT_EQ(kOne, ToBufferCollectionId(ToFidlBufferCollectionId(kOne)));
+  EXPECT_EQ(kTwo, ToBufferCollectionId(ToFidlBufferCollectionId(kTwo)));
+  EXPECT_EQ(kLargeId, ToBufferCollectionId(ToFidlBufferCollectionId(kLargeId)));
 }
 
 TEST(BufferCollectionIdTest, FidlBufferCollectionIdValueConversionRoundtrip) {

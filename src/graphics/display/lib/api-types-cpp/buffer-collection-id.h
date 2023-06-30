@@ -14,16 +14,22 @@
 
 namespace display {
 
-// More useful representation of `collection_id` field in FIDL protocol
-// `fuchsia.hardware.display/Controller` methods importing, using and releasing
-// sysmem BufferCollections.
+// More useful representation of `fuchsia.hardware.display/BufferCollectionId`.
 //
 // Not to be confused with `DriverBufferCollectionId` which represents
 // BufferCollections imported to display drivers.
 DEFINE_STRONG_INT(BufferCollectionId, uint64_t);
 
+constexpr inline BufferCollectionId ToBufferCollectionId(
+    fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id) {
+  return BufferCollectionId(fidl_buffer_collection_id.value);
+}
 constexpr inline BufferCollectionId ToBufferCollectionId(uint64_t fidl_buffer_collection_id_value) {
   return BufferCollectionId(fidl_buffer_collection_id_value);
+}
+constexpr inline fuchsia_hardware_display::wire::BufferCollectionId ToFidlBufferCollectionId(
+    BufferCollectionId buffer_collection_id) {
+  return {.value = buffer_collection_id.value()};
 }
 constexpr inline uint64_t ToFidlBufferCollectionIdValue(BufferCollectionId buffer_collection_id) {
   return buffer_collection_id.value();
