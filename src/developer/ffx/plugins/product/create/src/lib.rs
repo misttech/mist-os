@@ -287,7 +287,9 @@ fn load_assembly_manifest(
         for image in manifest.images.into_iter() {
             match image {
                 Image::BasePackage(..) => {}
-                Image::BlobFS { path, contents } => {
+                Image::FxfsSparse { path, contents }
+                | Image::Fxfs { path, contents }
+                | Image::BlobFS { path, contents } => {
                     let PackagesMetadata { base, cache } = contents.packages;
                     let all_packages = [base.0, cache.0].concat();
                     for package in all_packages {
@@ -299,7 +301,13 @@ fn load_assembly_manifest(
                     }
                     images.push(Image::BlobFS { path, contents: BlobfsContents::default() });
                 }
-                _ => {
+                Image::ZBI { .. }
+                | Image::VBMeta(_)
+                | Image::FVM(_)
+                | Image::FVMSparse(_)
+                | Image::FVMSparseBlob(_)
+                | Image::FVMFastboot(_)
+                | Image::QemuKernel(_) => {
                     images.push(image);
                 }
             }

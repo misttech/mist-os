@@ -4,7 +4,7 @@
 
 use crate::subpackage_blobs_package::construct_subpackage_blobs_package;
 use anyhow::{Context, Result};
-use assembly_manifest::{AssemblyManifest, Image, PackagesMetadata};
+use assembly_manifest::{AssemblyManifest, PackagesMetadata};
 use assembly_partitions_config::PartitionsConfig;
 use assembly_update_package::{Slot, UpdatePackageBuilder};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
@@ -95,7 +95,7 @@ fn create_update_packages_manifest(
 ) -> Result<UpdatePackagesManifest> {
     let mut packages_manifest = UpdatePackagesManifest::V1(BTreeSet::new());
     for image in &assembly_manifest.images {
-        if let Image::BlobFS { contents, .. } = image {
+        if let Some(contents) = image.get_blobfs_contents() {
             let PackagesMetadata { base, cache } = &contents.packages;
 
             for package in base.0.iter().chain(cache.0.iter()) {

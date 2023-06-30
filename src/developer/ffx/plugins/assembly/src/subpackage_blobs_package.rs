@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use assembly_manifest::{AssemblyManifest, Image, PackagesMetadata};
+use assembly_manifest::{AssemblyManifest, PackagesMetadata};
 use assembly_subpackage_blobs_package::SubpackageBlobsPackageBuilder;
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_merkle::{Hash, MerkleTree};
@@ -36,7 +36,7 @@ pub fn construct_subpackage_blobs_package(
     let mut subpackage_blobs_pkg_builder = SubpackageBlobsPackageBuilder::default();
 
     for image in &assembly_manifest.images {
-        if let Image::BlobFS { contents, .. } = image {
+        if let Some(contents) = image.get_blobfs_contents() {
             let PackagesMetadata { base, cache } = &contents.packages;
 
             for package in base.0.iter().chain(cache.0.iter()) {
@@ -74,7 +74,7 @@ pub fn construct_subpackage_blobs_package(
 mod tests {
     use super::*;
 
-    use assembly_manifest::BlobfsContents;
+    use assembly_manifest::{BlobfsContents, Image};
     use fuchsia_archive::Utf8Reader;
     use fuchsia_pkg::PackageBuilder;
     use pretty_assertions::assert_eq;

@@ -138,6 +138,23 @@ impl Image {
             Image::QemuKernel(s) => *s = source,
         }
     }
+
+    /// For image types that contain blobs, return the contents.
+    pub fn get_blobfs_contents(&self) -> Option<&BlobfsContents> {
+        match self {
+            Image::BlobFS { contents, .. } => Some(contents),
+            Image::Fxfs { contents, .. } => Some(contents),
+            Image::FxfsSparse { contents, .. } => Some(contents),
+            Image::BasePackage(_)
+            | Image::ZBI { .. }
+            | Image::VBMeta(_)
+            | Image::FVM(_)
+            | Image::FVMSparse(_)
+            | Image::FVMSparseBlob(_)
+            | Image::FVMFastboot(_)
+            | Image::QemuKernel(_) => None,
+        }
+    }
 }
 
 impl AssemblyManifest {
