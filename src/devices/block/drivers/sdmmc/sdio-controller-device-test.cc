@@ -1522,4 +1522,34 @@ TEST_F(SdioControllerDeviceTest, RequestCardReset) {
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_SDR104);
 }
 
+TEST_F(SdioControllerDeviceTest, PerformTuning) {
+  sdmmc_.set_command_callback(SDIO_SEND_OP_COND, [](uint32_t out_response[4]) -> void {
+    out_response[0] = OpCondFunctions(2) | SDIO_SEND_OP_COND_RESP_S18A;
+  });
+  sdmmc_.set_host_info({
+      .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104,
+      .max_transfer_size = 0x1000,
+      .max_transfer_size_non_dma = 0x1000,
+      .prefs = 0,
+  });
+
+  EXPECT_OK(dut_->Init());
+  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->AddDevice());
+
+  zx_status_t status = ZX_ERR_IO;
+
+  dut_->SdioPerformTuning(
+      [](void* cookie, zx_status_t status) { *reinterpret_cast<zx_status_t*>(cookie) = status; },
+      &status);
+
+  fdf_testing_run_until_idle();
+
+  EXPECT_OK(status);
+
+  dut_->DdkAsyncRemove();
+  EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(parent_.get()));
+  [[maybe_unused]] auto ptr = dut_.release();
+}
+
 }  // namespace sdmmc

@@ -7,8 +7,10 @@
 #include <fuchsia/hardware/sdio/c/banjo.h>
 #include <fuchsia/hardware/sdmmc/c/banjo.h>
 #include <inttypes.h>
+#include <lib/async/cpp/task.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
+#include <lib/fdf/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/sdio/hw.h>
@@ -211,6 +213,8 @@ zx_status_t SdioControllerDevice::StartSdioIrqThreadIfNeeded() {
 
 zx_status_t SdioControllerDevice::AddDevice() {
   fbl::AutoLock lock(&lock_);
+
+  dispatcher_ = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher());
 
   zx_status_t st = DdkAdd(ddk::DeviceAddArgs("sdmmc-sdio")
                               .set_inspect_vmo(inspector_.DuplicateVmo())
@@ -666,7 +670,24 @@ void SdioControllerDevice::SdioRequestCardReset(sdio_request_card_reset_callback
 }
 
 void SdioControllerDevice::SdioPerformTuning(sdio_perform_tuning_callback callback, void* cookie) {
-  callback(cookie, ZX_ERR_NOT_SUPPORTED);
+  if (dead_) {
+    return callback(cookie, ZX_ERR_CANCELED);
+  }
+
+  if (!tuned_) {
+    // Tuning was not performed during initialization, so there is no need to do it now.
+    return callback(cookie, ZX_OK);
+  }
+
+  if (tuning_in_progress_.exchange(true)) {
+    return callback(cookie, ZX_ERR_ALREADY_BOUND);
+  }
+
+  async::PostTask(dispatcher_, [this, cookie, callback]() {
+    zx_status_t status = sdmmc_.host().PerformTuning(SD_SEND_TUNING_BLOCK);
+    callback(cookie, status);
+    tuning_in_progress_.store(false);
+  });
 }
 
 zx::result<uint8_t> SdioControllerDevice::ReadCccrByte(uint32_t addr) {

@@ -151,17 +151,20 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   sync_completion_t irq_signal_;
 
   fbl::Mutex lock_;
-  SdmmcDevice sdmmc_ TA_GUARDED(lock_);
+  SdmmcDevice sdmmc_;
   std::atomic<bool> dead_ = false;
   std::array<zx::interrupt, SDIO_MAX_FUNCS> sdio_irqs_;
   std::array<SdioFunction, SDIO_MAX_FUNCS> funcs_ TA_GUARDED(lock_);
   sdio_device_hw_info_t hw_info_ TA_GUARDED(lock_);
   bool tuned_ = false;
+  std::atomic<bool> tuning_in_progress_ = false;
 
   inspect::Inspector inspector_;
   inspect::Node root_;
   inspect::UintProperty tx_errors_;
   inspect::UintProperty rx_errors_;
+
+  async_dispatcher_t* dispatcher_ = nullptr;
 };
 
 }  // namespace sdmmc

@@ -6,9 +6,6 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDMMC_ROOT_DEVICE_H_
 
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
-#include <threads.h>
-
-#include <atomic>
 
 #include <ddktl/device.h>
 
@@ -18,12 +15,13 @@
 namespace sdmmc {
 
 class SdmmcRootDevice;
-using SdmmcRootDeviceType = ddk::Device<SdmmcRootDevice>;
+using SdmmcRootDeviceType = ddk::Device<SdmmcRootDevice, ddk::Initializable>;
 
 class SdmmcRootDevice : public SdmmcRootDeviceType {
  public:
   static zx_status_t Bind(void* ctx, zx_device_t* parent);
 
+  void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
 
   zx_status_t Init();
@@ -32,11 +30,7 @@ class SdmmcRootDevice : public SdmmcRootDeviceType {
   SdmmcRootDevice(zx_device_t* parent, const ddk::SdmmcProtocolClient& host)
       : SdmmcRootDeviceType(parent), host_(host) {}
 
-  int WorkerThread();
-
   const ddk::SdmmcProtocolClient host_;
-
-  thrd_t worker_thread_ = 0;
 };
 
 }  // namespace sdmmc

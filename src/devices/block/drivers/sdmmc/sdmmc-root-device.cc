@@ -7,8 +7,6 @@
 #include <inttypes.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
-#include <lib/fit/defer.h>
-#include <zircon/threads.h>
 
 #include <memory>
 
@@ -35,54 +33,37 @@ zx_status_t SdmmcRootDevice::Bind(void* ctx, zx_device_t* parent) {
     return st;
   }
 
-  st = dev->Init();
-
   [[maybe_unused]] auto* placeholder = dev.release();
   return st;
 }
 
-zx_status_t SdmmcRootDevice::Init() {
-  int rc = thrd_create_with_name(
-      &worker_thread_,
-      [](void* ctx) -> int { return reinterpret_cast<SdmmcRootDevice*>(ctx)->WorkerThread(); },
-      this, "sdmmc-worker");
-  if (rc != thrd_success) {
-    DdkAsyncRemove();
-    return thrd_status_to_zx_status(rc);
-  }
-
-  return ZX_OK;
-}
-
 // TODO(hanbinyoon): Simplify further using templated lambda come C++20.
 template <class DeviceType>
-static int MaybeAddDevice(const std::string& name, zx_device_t* zxdev, SdmmcDevice& sdmmc) {
+static zx_status_t MaybeAddDevice(const std::string& name, zx_device_t* zxdev, SdmmcDevice& sdmmc) {
   std::unique_ptr<DeviceType> device;
   if (zx_status_t st = DeviceType::Create(zxdev, sdmmc, &device) != ZX_OK) {
     zxlogf(ERROR, "Failed to create %s device, retcode = %d", name.c_str(), st);
-    return thrd_error;
+    return st;
   }
 
-  if (device->Probe() != ZX_OK) {
-    return thrd_busy;  // Use this to mean probe failure.
+  if (zx_status_t st = device->Probe(); st != ZX_OK) {
+    return ZX_ERR_WRONG_TYPE;  // Use this to mean probe failure.
   }
 
-  if (device->AddDevice() != ZX_OK) {
-    return thrd_error;
+  if (zx_status_t st = device->AddDevice(); st != ZX_OK) {
+    return st;
   }
 
   [[maybe_unused]] auto* placeholder = device.release();
-  return thrd_success;
+  return ZX_OK;
 }
 
-int SdmmcRootDevice::WorkerThread() {
-  auto remove_device_on_error = fit::defer([&]() { DdkAsyncRemove(); });
-
+void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
   SdmmcDevice sdmmc(host_);
   zx_status_t st = sdmmc.Init();
   if (st != ZX_OK) {
     zxlogf(ERROR, "failed to get host info");
-    return thrd_error;
+    return txn.Reply(st);
   }
 
   zxlogf(DEBUG, "host caps dma %d 8-bit bus %d max_transfer_size %" PRIu64 "",
@@ -96,33 +77,22 @@ int SdmmcRootDevice::WorkerThread() {
   // put the card into the idle state.
   if ((st = sdmmc.SdmmcGoIdle()) != ZX_OK) {
     zxlogf(ERROR, "SDMMC_GO_IDLE_STATE failed, retcode = %d", st);
-    return thrd_error;
+    return txn.Reply(st);
   }
 
   // Probe for SDIO first, then SD/MMC.
-  if (auto st = MaybeAddDevice<SdioControllerDevice>("sdio", zxdev(), sdmmc); st != thrd_busy) {
-    if (st == thrd_success)
-      remove_device_on_error.cancel();
-    return st;
+  if ((st = MaybeAddDevice<SdioControllerDevice>("sdio", zxdev(), sdmmc)) != ZX_ERR_WRONG_TYPE) {
+    return txn.Reply(st);
   }
-  if (auto st = MaybeAddDevice<SdmmcBlockDevice>("block", zxdev(), sdmmc); st != thrd_busy) {
-    if (st == thrd_success)
-      remove_device_on_error.cancel();
-    return st;
+  if ((st = MaybeAddDevice<SdmmcBlockDevice>("block", zxdev(), sdmmc)) == ZX_OK) {
+    return txn.Reply(ZX_OK);
   }
 
   zxlogf(ERROR, "failed to probe");
-  return thrd_error;
+  return txn.Reply(st);
 }
 
-void SdmmcRootDevice::DdkRelease() {
-  if (worker_thread_) {
-    // Wait until the probe is done.
-    thrd_join(worker_thread_, nullptr);
-  }
-
-  delete this;
-}
+void SdmmcRootDevice::DdkRelease() { delete this; }
 
 }  // namespace sdmmc
 
