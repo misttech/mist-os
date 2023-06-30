@@ -19,14 +19,6 @@ $ fx build
 
 ## Run the test
 
-Remember to kill a running Scenic before starting the test. In particular, the pixel tests must be
-run on a product without a graphical interface, such as `core`.
-(If the zircon console is running, you don't need to do this.)
-
-```shell
-$ fx shell killall scenic.cmx
-```
-
 To run all the tests, use this fx invocation:
 
 ```shell
