@@ -1,11 +1,5 @@
 // rustc-cfg emitted by the build script:
 //
-// "use_proc_macro"
-//     Link to extern crate proc_macro. Available on any compiler and any target
-//     except wasm32. Requires "proc-macro" Cargo cfg to be enabled (default is
-//     enabled). On wasm32 we never link to proc_macro even if "proc-macro" cfg
-//     is enabled.
-//
 // "wrap_proc_macro"
 //     Wrap types from libproc_macro rather than polyfilling the whole API.
 //     Enabled on rustc 1.29+ as long as procmacro2_semver_exempt is not set,
@@ -109,37 +103,21 @@ fn main() {
         println!("cargo:rustc-cfg=no_source_text");
     }
 
-    let target = env::var("TARGET").unwrap();
-    if !enable_use_proc_macro(&target) {
+    if !cfg!(feature = "proc-macro") {
         return;
     }
-
-    println!("cargo:rustc-cfg=use_proc_macro");
 
     if version.nightly || !semver_exempt {
         println!("cargo:rustc-cfg=wrap_proc_macro");
     }
 
-    if version.nightly
-        && feature_allowed("proc_macro_span")
-        && feature_allowed("proc_macro_span_shrink")
-    {
+    if version.nightly && feature_allowed("proc_macro_span") {
         println!("cargo:rustc-cfg=proc_macro_span");
     }
 
     if semver_exempt && version.nightly {
         println!("cargo:rustc-cfg=super_unstable");
     }
-}
-
-fn enable_use_proc_macro(target: &str) -> bool {
-    // wasm targets don't have the `proc_macro` crate, disable this feature.
-    if target.contains("wasm32") {
-        return false;
-    }
-
-    // Otherwise, only enable it if our feature is actually enabled.
-    cfg!(feature = "proc-macro")
 }
 
 struct RustcVersion {
