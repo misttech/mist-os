@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::{ensure, format_err, Context as _, Error};
-use display_utils::{get_bytes_per_pixel, DisplayId, LayerId, PixelFormat};
+use display_utils::{get_bytes_per_pixel, DisplayId, LayerId, PixelFormat, INVALID_LAYER_ID};
 use fidl::endpoints::{self, ClientEnd};
 use fidl_fuchsia_hardware_display::{
     ConfigStamp, CoordinatorEvent, CoordinatorMarker, CoordinatorProxy, ImageConfig,
-    ProviderSynchronousProxy, VirtconMode, INVALID_DISP_ID,
+    ProviderSynchronousProxy, VirtconMode,
 };
 use fidl_fuchsia_sysmem::{ImageFormatConstraints, PixelFormatType};
 use fuchsia_async::{self as fasync, DurationExt, OnSignals, TimeoutExt};
@@ -742,7 +742,7 @@ impl FrameBuffer {
             initial_virtcon_mode,
             coordinator: proxy,
             config,
-            layer_id: LayerId(INVALID_DISP_ID),
+            layer_id: INVALID_LAYER_ID,
             usage,
             next_image_id: AtomicU64::new(1),
         };

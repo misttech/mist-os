@@ -31,7 +31,7 @@ use fuchsia_zircon::{self as zx, Status};
 use futures::{channel::mpsc::UnboundedSender, StreamExt, TryFutureExt, TryStreamExt};
 use keymaps::Keymap;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     fmt::Debug,
     fs,
     path::{Path, PathBuf},
@@ -207,7 +207,7 @@ pub(crate) struct DisplayDirectAppStrategy<'a> {
     pub app_sender: UnboundedSender<MessageInternal>,
     pub owned: bool,
     pub primary_display: Option<DisplayInfo>,
-    views: BTreeMap<DisplayId, Vec<ViewKey>>,
+    views: HashMap<DisplayId, Vec<ViewKey>>,
 }
 
 impl<'a> DisplayDirectAppStrategy<'a> {

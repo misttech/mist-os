@@ -21,11 +21,9 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
-use display_utils::{LayerId, PixelFormat};
+use display_utils::{LayerId, PixelFormat, INVALID_LAYER_ID};
 use euclid::size2;
-use fidl_fuchsia_hardware_display::{
-    CoordinatorEvent, CoordinatorProxy, ImageConfig, INVALID_DISP_ID,
-};
+use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy, ImageConfig};
 use fuchsia_async::{self as fasync, OnSignals};
 use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
 use fuchsia_trace::{duration, instant};
@@ -117,7 +115,7 @@ impl Display {
         display_id: DisplayId,
         info: fidl_fuchsia_hardware_display::Info,
     ) -> Result<Self, Error> {
-        Ok(Self { coordinator, display_id, info, layer_id: LayerId(INVALID_DISP_ID), mode_idx: 0 })
+        Ok(Self { coordinator, display_id, info, layer_id: INVALID_LAYER_ID, mode_idx: 0 })
     }
 
     pub fn set_mode(&mut self, mode_idx: usize) -> Result<(), Error> {

@@ -14,12 +14,15 @@ use {
 };
 
 /// Strongly typed wrapper around a display ID.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct DisplayId(pub u64);
+
+/// Represents an invalid DisplayId value.
+pub const INVALID_DISPLAY_ID: DisplayId = DisplayId(INVALID_DISP_ID);
 
 impl Default for DisplayId {
     fn default() -> Self {
-        DisplayId(INVALID_DISP_ID)
+        INVALID_DISPLAY_ID
     }
 }
 
@@ -43,9 +46,12 @@ pub struct EventId(pub u64);
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct LayerId(pub u64);
 
+/// Represents an invalid LayerId value.
+pub const INVALID_LAYER_ID: LayerId = LayerId(INVALID_DISP_ID);
+
 impl Default for LayerId {
     fn default() -> Self {
-        LayerId(INVALID_DISP_ID)
+        INVALID_LAYER_ID
     }
 }
 
@@ -177,6 +183,7 @@ mod tests {
         assert_eq!(LayerId(2), LayerId::from(FidlLayerId { value: 2 }));
         const LARGE: u64 = 1 << 63;
         assert_eq!(LayerId(LARGE), LayerId::from(FidlLayerId { value: LARGE }));
+        assert_eq!(INVALID_LAYER_ID, LayerId::from(FidlLayerId { value: INVALID_DISP_ID }));
     }
 
     #[fuchsia::test]
@@ -185,6 +192,7 @@ mod tests {
         assert_eq!(FidlLayerId { value: 2 }, FidlLayerId::from(LayerId(2)));
         const LARGE: u64 = 1 << 63;
         assert_eq!(FidlLayerId { value: LARGE }, FidlLayerId::from(LayerId(LARGE)));
+        assert_eq!(FidlLayerId { value: INVALID_DISP_ID }, FidlLayerId::from(INVALID_LAYER_ID));
     }
 
     #[fuchsia::test]
@@ -193,6 +201,7 @@ mod tests {
         assert_eq!(LayerId(2), FidlLayerId { value: 2 }.into());
         const LARGE: u64 = 1 << 63;
         assert_eq!(LayerId(LARGE), FidlLayerId { value: LARGE }.into());
+        assert_eq!(INVALID_LAYER_ID, FidlLayerId { value: INVALID_DISP_ID }.into());
     }
 
     #[fuchsia::test]
@@ -201,12 +210,13 @@ mod tests {
         assert_eq!(FidlLayerId { value: 2 }, LayerId(2).into());
         const LARGE: u64 = 1 << 63;
         assert_eq!(FidlLayerId { value: LARGE }, LayerId(LARGE).into());
+        assert_eq!(FidlLayerId { value: INVALID_DISP_ID }, INVALID_LAYER_ID.into());
     }
 
     #[fuchsia::test]
     fn layer_id_default() {
         let default: LayerId = Default::default();
-        assert_eq!(default, LayerId(INVALID_DISP_ID));
+        assert_eq!(default, INVALID_LAYER_ID);
     }
 
     #[fuchsia::test]
@@ -215,6 +225,7 @@ mod tests {
         assert_eq!(DisplayId(2), DisplayId::from(FidlDisplayId { value: 2 }));
         const LARGE: u64 = 1 << 63;
         assert_eq!(DisplayId(LARGE), DisplayId::from(FidlDisplayId { value: LARGE }));
+        assert_eq!(INVALID_DISPLAY_ID, DisplayId::from(FidlDisplayId { value: INVALID_DISP_ID }));
     }
 
     #[fuchsia::test]
@@ -223,6 +234,10 @@ mod tests {
         assert_eq!(FidlDisplayId { value: 2 }, FidlDisplayId::from(DisplayId(2)));
         const LARGE: u64 = 1 << 63;
         assert_eq!(FidlDisplayId { value: LARGE }, FidlDisplayId::from(DisplayId(LARGE)));
+        assert_eq!(
+            FidlDisplayId { value: INVALID_DISP_ID },
+            FidlDisplayId::from(INVALID_DISPLAY_ID)
+        );
     }
 
     #[fuchsia::test]
@@ -231,6 +246,7 @@ mod tests {
         assert_eq!(DisplayId(2), FidlDisplayId { value: 2 }.into());
         const LARGE: u64 = 1 << 63;
         assert_eq!(DisplayId(LARGE), FidlDisplayId { value: LARGE }.into());
+        assert_eq!(INVALID_DISPLAY_ID, FidlDisplayId { value: INVALID_DISP_ID }.into());
     }
 
     #[fuchsia::test]
@@ -239,12 +255,13 @@ mod tests {
         assert_eq!(FidlDisplayId { value: 2 }, DisplayId(2).into());
         const LARGE: u64 = 1 << 63;
         assert_eq!(FidlDisplayId { value: LARGE }, DisplayId(LARGE).into());
+        assert_eq!(FidlDisplayId { value: INVALID_DISP_ID }, INVALID_DISPLAY_ID.into());
     }
 
     #[fuchsia::test]
     fn display_id_default() {
         let default: DisplayId = Default::default();
-        assert_eq!(default, DisplayId(INVALID_DISP_ID));
+        assert_eq!(default, INVALID_DISPLAY_ID);
     }
 
     #[fuchsia::test]
