@@ -253,7 +253,7 @@ bool HasSysAdmin() { return HasCapability(CAP_SYS_ADMIN); }
 
 bool IsStarnix() {
   struct utsname buf;
-  return uname(&buf) == 0 && strcmp(buf.release, "starnix") == 0;
+  return uname(&buf) == 0 && strstr(buf.release, "starnix") != nullptr;
 }
 
 }  // namespace test_helper
