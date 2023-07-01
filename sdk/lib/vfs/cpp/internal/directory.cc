@@ -207,10 +207,24 @@ void Directory::Open(fuchsia::io::OpenFlags open_flags, fuchsia::io::OpenFlags p
         ~(fuchsia::io::OpenFlags::POSIX_WRITABLE | fuchsia::io::OpenFlags::POSIX_EXECUTABLE);
   }
 
+  // TODO(https://fxbug.dev/101092): Remove this when flutter_{touch,views}_test no longer open
+  // these protocols with RIGHT_READABLE.
+  const std::string_view protocols[] = {
+      "fuchsia.logger.LogSink",
+      "fuchsia.sysmem.Allocator",
+      "fuchsia.tracing.provider.Registry",
+  };
+  if (std::any_of(
+          std::begin(protocols), std::end(protocols),
+          [&path](const std::string_view& protocol) { return cpp20::ends_with(path, protocol); })) {
+    open_flags &= ~fuchsia::io::OpenFlags::RIGHT_READABLE;
+  }
+
   if (look_path_result.is_dir) {
     open_flags |= fuchsia::io::OpenFlags::DIRECTORY;
   }
-  look_path_result.node.Serve(open_flags, std::move(request), dispatcher);
+  [[maybe_unused]] zx_status_t status =
+      look_path_result.node.Serve(open_flags, std::move(request), dispatcher);
 }
 
 }  // namespace internal

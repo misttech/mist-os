@@ -56,9 +56,7 @@ zx_status_t Service::GetAttr(fuchsia::io::NodeAttributes* out_attributes) const 
   return ZX_OK;
 }
 
-fuchsia::io::OpenFlags Service::GetAllowedFlags() const {
-  return fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE;
-}
+fuchsia::io::OpenFlags Service::GetAllowedFlags() const { return {}; }
 
 fuchsia::io::OpenFlags Service::GetProhibitiveFlags() const { return {}; }
 
