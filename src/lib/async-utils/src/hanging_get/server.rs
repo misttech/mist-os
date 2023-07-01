@@ -54,7 +54,24 @@ where
     /// * `notify` is a function to notify observers of state of the state change.
     pub fn new(state: S, notify: F) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(HangingGetInner::new(state, notify))),
+            inner: Arc::new(Mutex::new(HangingGetInner::new(Some(state), notify))),
+            subscriber_key_generator: subscriber_key::Generator::default(),
+        }
+    }
+
+    /// Create a new broker, but delays any subscribers from being notified until the value is
+    /// initialized.
+    ///
+    /// ## Args:
+    ///
+    /// * `notify` is a function to notify observers of state of the state change.
+    ///
+    /// # Disclaimer:
+    /// This initialier is more prone to cause hangs if code is not properly setup. This
+    /// should only be used for patterns where the is no useful default state.
+    pub fn new_unknown_state(notify: F) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(HangingGetInner::new(None, notify))),
             subscriber_key_generator: subscriber_key::Generator::default(),
         }
     }
@@ -139,7 +156,7 @@ where
     ///   if the state has been updated with success.
     pub fn update<UpdateFn>(&self, update: UpdateFn)
     where
-        UpdateFn: FnOnce(&mut S) -> bool,
+        UpdateFn: FnOnce(&mut Option<S>) -> bool,
     {
         self.inner.lock().update(update)
     }
@@ -157,7 +174,7 @@ where
 /// * `K` - the Key by which Observers are identified.
 /// * For other type args see [HangingGet].
 pub struct HangingGetInner<S, K, O, F: Fn(&S, O) -> bool> {
-    state: S,
+    state: Option<S>,
     notify: F,
     observers: HashMap<K, Window<O>>,
 }
@@ -169,14 +186,14 @@ where
 {
     fn notify_all(&mut self) {
         for window in self.observers.values_mut() {
-            window.notify(&self.notify, &self.state);
+            window.notify(&self.notify, self.state.as_ref().unwrap());
         }
     }
 
     /// Create a new `HangingGetInner`.
     /// `state` is the initial state of the HangingGetInner
     /// `notify` is a `Fn` that is used to notify observers of state.
-    pub fn new(state: S, notify: F) -> Self {
+    pub fn new(state: Option<S>, notify: F) -> Self {
         Self { state, notify, observers: HashMap::new() }
     }
 
@@ -185,31 +202,30 @@ where
     /// Notification will occur regardless of whether the `state` value differs from the value
     /// currently stored by `HangingGetInner`.
     pub fn set(&mut self, state: S) {
-        self.state = state;
+        self.state = Some(state);
         self.notify_all();
     }
 
     /// Modify the internal state in-place using the `state_update` function. Notify all
     /// observers if `state_update` returns true.
-    pub fn update(&mut self, state_update: impl FnOnce(&mut S) -> bool) {
+    pub fn update(&mut self, state_update: impl FnOnce(&mut Option<S>) -> bool) {
         if state_update(&mut self.state) {
             self.notify_all();
         }
     }
 
-    /// Register an observer as a subscriber of the state. Observers are grouped by key and
-    /// all observers will the same key are assumed to have received the latest state update.
-    /// If an observer with a previously unseen key subscribes, it is immediately notified
-    /// to the stated. If an observer with a known key subscribes, it will only be
-    /// notified when the state is updated since last sent to an observer with the same
+    /// Register an observer as a subscriber of the state.
+    ///
+    /// Observers are grouped by key and all observers will the same key are assumed to have
+    /// received the latest state update. If an observer with a previously unseen key subscribes,
+    /// it is immediately notified to the stated. If an observer with a known key subscribes, it
+    /// will only be notified when the state is updated since last sent to an observer with the same
     /// key. All unresolved observers will be resolved to the same value immediately after the state
-    /// is updated.
+    /// is updated. If there is no stored state, then the notification will be delayed until an
+    /// update is made.
     pub fn subscribe(&mut self, key: K, observer: O) -> Result<(), HangingGetServerError> {
-        self.observers.entry(key).or_insert_with(Window::new).observe(
-            observer,
-            &self.notify,
-            &self.state,
-        )
+        let entry = self.observers.entry(key).or_insert_with(Window::new);
+        entry.observe(observer, &self.notify, self.state.as_ref())
     }
 
     /// Deregister all observers that subscribed with `key`. If an observer is subsequently
@@ -239,14 +255,16 @@ impl<O> Window<O> {
         &mut self,
         observer: O,
         f: impl Fn(&S, O) -> bool,
-        current_state: &S,
+        current_state: Option<&S>,
     ) -> Result<(), HangingGetServerError> {
         if self.observer.is_some() {
             return Err(HangingGetServerError::MultipleObservers);
         }
         self.observer = Some(observer);
-        if self.dirty {
-            self.notify(f, current_state);
+        if let Some(current_state) = current_state {
+            if self.dirty {
+                self.notify(f, current_state);
+            }
         }
         Ok(())
     }
@@ -319,44 +337,64 @@ mod tests {
     fn window_add_first_observer_notifies() {
         let state = 0;
         let mut window = Window::new();
-        window.observe(TestObserver::expect_value(state), TestObserver::observe, &state).unwrap();
+        window
+            .observe(TestObserver::expect_value(state), TestObserver::observe, Some(&state))
+            .unwrap();
+    }
+
+    #[test]
+    fn window_none_state_does_not_notify() {
+        let mut window = Window::new();
+        window
+            .observe::<i32>(TestObserver::expect_no_value(), TestObserver::observe, None)
+            .unwrap();
     }
 
     #[test]
     fn window_add_second_observer_does_not_notify() {
         let state = 0;
         let mut window = Window::new();
-        window.observe(TestObserver::expect_value(state), TestObserver::observe, &state).unwrap();
+        window
+            .observe(TestObserver::expect_value(state), TestObserver::observe, Some(&state))
+            .unwrap();
 
         // Second observer added without updating the value
-        window.observe(TestObserver::expect_no_value(), TestObserver::observe, &state).unwrap();
+        window
+            .observe(TestObserver::expect_no_value(), TestObserver::observe, Some(&state))
+            .unwrap();
     }
 
     #[test]
     fn window_add_second_observer_notifies_after_notify_call() {
         let mut state = 0;
         let mut window = Window::new();
-        window.observe(TestObserver::expect_value(state), TestObserver::observe, &state).unwrap();
+        window
+            .observe(TestObserver::expect_value(state), TestObserver::observe, Some(&state))
+            .unwrap();
 
         state = 1;
         window.notify(TestObserver::observe, &state);
 
         // Second observer added without updating the value
-        window.observe(TestObserver::expect_value(state), TestObserver::observe, &state).unwrap();
+        window
+            .observe(TestObserver::expect_value(state), TestObserver::observe, Some(&state))
+            .unwrap();
     }
 
     #[test]
     fn window_add_multiple_observers_are_notified() {
         let mut state = 0;
         let mut window = Window::new();
-        window.observe(TestObserver::expect_value(state), TestObserver::observe, &state).unwrap();
+        window
+            .observe(TestObserver::expect_value(state), TestObserver::observe, Some(&state))
+            .unwrap();
 
         // Second observer added without updating the value
         let o1 = TestObserver::expect_value(1);
         let o2 = TestObserver::expect_no_value();
-        window.observe(o1.clone(), TestObserver::observe, &state).unwrap();
-        let result = window.observe(o2.clone(), TestObserver::observe, &state);
-        assert_eq!(result.unwrap_err(), HangingGetServerError::MultipleObservers);
+        window.observe(o1.clone(), TestObserver::observe, Some(&state)).unwrap();
+        let result = window.observe(o2.clone(), TestObserver::observe, Some(&state));
+        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
         assert!(!o1.has_value());
         state = 1;
         window.notify(TestObserver::observe, &state);
@@ -367,13 +405,13 @@ mod tests {
         let state = 0;
         let mut window = Window::new();
         let o = TestObserver::expect_value(state);
-        window.observe(o, TestObserver::observe, &state).unwrap();
+        window.observe(o, TestObserver::observe, Some(&state)).unwrap();
         assert!(window.observer.is_none());
         assert!(!window.dirty);
         window.notify(TestObserver::observe, &state);
         assert!(window.dirty);
         let o = TestObserver::expect_value(state);
-        window.observe(o, TestObserver::observe, &state).unwrap();
+        window.observe(o, TestObserver::observe, Some(&state)).unwrap();
         assert!(!window.dirty);
     }
 
@@ -383,13 +421,13 @@ mod tests {
         let mut window = Window::new();
 
         let o = TestObserver::expect_value(state);
-        window.observe(o, TestObserver::observe_incomplete, &state).unwrap();
+        window.observe(o, TestObserver::observe_incomplete, Some(&state)).unwrap();
         assert!(window.dirty);
     }
 
     #[test]
     fn hanging_get_inner_subscribe() {
-        let mut hanging = HangingGetInner::new(0, TestObserver::observe);
+        let mut hanging = HangingGetInner::new(Some(0), TestObserver::observe);
         let o = TestObserver::expect_value(0);
         assert!(!o.has_value());
         hanging.subscribe(0, o.clone()).unwrap();
@@ -397,7 +435,7 @@ mod tests {
 
     #[test]
     fn hanging_get_inner_subscribe_then_set() {
-        let mut hanging = HangingGetInner::new(0, TestObserver::observe);
+        let mut hanging = HangingGetInner::new(Some(0), TestObserver::observe);
         let o = TestObserver::expect_value(0);
         hanging.subscribe(0, o.clone()).unwrap();
 
@@ -407,7 +445,7 @@ mod tests {
 
     #[test]
     fn hanging_get_inner_subscribe_twice_then_set() {
-        let mut hanging = HangingGetInner::new(0, TestObserver::observe);
+        let mut hanging = HangingGetInner::new(Some(0), TestObserver::observe);
         hanging.subscribe(0, TestObserver::expect_value(0)).unwrap();
 
         hanging.subscribe(0, TestObserver::expect_value(1)).unwrap();
@@ -416,7 +454,7 @@ mod tests {
 
     #[test]
     fn hanging_get_inner_subscribe_multiple_then_set() {
-        let mut hanging = HangingGetInner::new(0, TestObserver::observe);
+        let mut hanging = HangingGetInner::new(Some(0), TestObserver::observe);
         hanging.subscribe(0, TestObserver::expect_value(0)).unwrap();
 
         // A second subscription with the same client key should not be notified
@@ -433,7 +471,7 @@ mod tests {
 
     #[test]
     fn hanging_get_inner_subscribe_with_two_clients_then_set() {
-        let mut hanging = HangingGetInner::new(0, TestObserver::observe);
+        let mut hanging = HangingGetInner::new(Some(0), TestObserver::observe);
         hanging.subscribe(0, TestObserver::expect_value(0)).unwrap();
         hanging.subscribe(0, TestObserver::expect_value(1)).unwrap();
         hanging.subscribe(1, TestObserver::expect_value(0)).unwrap();
@@ -443,7 +481,7 @@ mod tests {
 
     #[test]
     fn hanging_get_inner_unsubscribe() {
-        let mut hanging = HangingGetInner::new(0, TestObserver::observe);
+        let mut hanging = HangingGetInner::new(Some(0), TestObserver::observe);
         hanging.subscribe(0, TestObserver::expect_value(0)).unwrap();
         hanging.subscribe(0, TestObserver::expect_no_value()).unwrap();
         hanging.unsubscribe(0);
@@ -452,12 +490,100 @@ mod tests {
 
     #[test]
     fn hanging_get_inner_unsubscribe_one_of_many() {
-        let mut hanging = HangingGetInner::new(0, TestObserver::observe);
+        let mut hanging = HangingGetInner::new(Some(0), TestObserver::observe);
 
         hanging.subscribe(0, TestObserver::expect_value(0)).unwrap();
         hanging.subscribe(0, TestObserver::expect_no_value()).unwrap();
         hanging.subscribe(1, TestObserver::expect_value(0)).unwrap();
         hanging.subscribe(1, TestObserver::expect_no_value()).unwrap();
+
+        // Unsubscribe one of the two observers
+        hanging.unsubscribe(0);
+        assert!(!hanging.observers.contains_key(&0));
+        assert!(hanging.observers.contains_key(&1));
+    }
+
+    #[test]
+    fn hanging_get_inner_delayed_subscribe() {
+        let mut hanging = HangingGetInner::new(None, TestObserver::<u8>::observe);
+        let o = TestObserver::expect_no_value();
+        assert!(!o.has_value());
+        hanging.subscribe(0, o.clone()).unwrap();
+    }
+
+    #[test]
+    fn hanging_get_inner_delayed_subscribe_then_set() {
+        let mut hanging = HangingGetInner::new(None, TestObserver::observe);
+        let o = TestObserver::expect_value(1);
+        hanging.subscribe(0, o.clone()).unwrap();
+
+        // Initial value now set.
+        hanging.set(1);
+    }
+
+    #[test]
+    fn hanging_get_inner_delayed_subscribe_twice_then_set() {
+        let mut hanging = HangingGetInner::new(None, TestObserver::observe);
+        hanging.subscribe(0, TestObserver::expect_value(1)).unwrap();
+
+        // Since the first result is delayed, subscribing again is an error.
+        let result = hanging.subscribe(0, TestObserver::expect_no_value());
+        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        hanging.set(1);
+    }
+
+    #[test]
+    fn hanging_get_inner_delayed_subscribe_multiple_then_set() {
+        let mut hanging = HangingGetInner::new(None, TestObserver::observe);
+        hanging.subscribe(0, TestObserver::expect_value(1)).unwrap();
+
+        // A second subscription with the same client key should fail while the subscription hasn't
+        // been notified
+        let o2 = TestObserver::expect_no_value();
+        let result = hanging.subscribe(0, o2.clone());
+        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        assert!(!o2.has_value());
+
+        // A third subscription will also fail for the same reason.
+        let result = hanging.subscribe(0, TestObserver::expect_no_value());
+        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+
+        // Set should notify all observers to the change
+        hanging.set(1);
+    }
+
+    #[test]
+    fn hanging_get_inner_delayed_subscribe_with_two_clients_then_set() {
+        let mut hanging = HangingGetInner::new(None, TestObserver::observe);
+        hanging.subscribe(0, TestObserver::expect_value(1)).unwrap();
+        let result = hanging.subscribe(0, TestObserver::expect_no_value());
+        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        hanging.subscribe(1, TestObserver::expect_value(1)).unwrap();
+        let result = hanging.subscribe(1, TestObserver::expect_no_value());
+        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        hanging.set(1);
+    }
+
+    #[test]
+    fn hanging_get_inner_delayed_unsubscribe() {
+        let mut hanging = HangingGetInner::new(None, TestObserver::observe);
+        hanging.subscribe(0, TestObserver::expect_no_value()).unwrap();
+        let result = hanging.subscribe(0, TestObserver::expect_no_value());
+        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        hanging.unsubscribe(0);
+        hanging.set(1);
+    }
+
+    #[test]
+    fn hanging_get_inner_delayed_unsubscribe_one_of_many() {
+        let mut hanging = HangingGetInner::new(None, TestObserver::observe);
+
+        hanging.subscribe(0, TestObserver::<i32>::expect_no_value()).unwrap();
+        let result = hanging.subscribe(0, TestObserver::expect_no_value());
+        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        hanging.subscribe(1, TestObserver::expect_no_value()).unwrap();
+        let result = hanging.subscribe(1, TestObserver::expect_no_value());
+        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
 
         // Unsubscribe one of the two observers
         hanging.unsubscribe(0);
@@ -526,6 +652,74 @@ mod tests {
         sub2.register(sender).unwrap();
         assert!(ex.run_until_stalled(&mut recv2).is_pending());
 
+        publisher.set(1);
+        let obs1 =
+            ex.run_until_stalled(&mut recv1).expect("receiver 1 received subsequent observation");
+        assert_eq!(obs1, Ok(1));
+        let obs2 =
+            ex.run_until_stalled(&mut recv2).expect("receiver 2 received subsequent observation");
+        assert_eq!(obs2, Ok(1));
+    }
+
+    #[test]
+    fn sync_pub_sub_delayed_updates_and_observes() {
+        let mut ex = fasync::TestExecutor::new();
+        let mut broker = HangingGet::<i32, _, _>::new_unknown_state(|s, o: oneshot::Sender<_>| {
+            o.send(s.clone()).map(|()| true).unwrap()
+        });
+        let publisher = broker.new_publisher();
+        let subscriber = broker.new_subscriber();
+
+        // Initial observation is delayed due to lack of initial state.
+        let (sender, mut recv1) = oneshot::channel();
+        subscriber.register(sender).unwrap();
+        assert!(ex.run_until_stalled(&mut recv1).is_pending());
+
+        // Subsequent registration fails since the original registration is still pending its
+        // observation.
+        let (sender, mut receiver) = oneshot::channel();
+        assert!(subscriber.register(sender).is_err());
+        assert!(ex.run_until_stalled(&mut receiver).expect("sender closed").is_err());
+
+        // Initial observation received now that the initial value is set.
+        publisher.set(1);
+
+        let observation =
+            ex.run_until_stalled(&mut recv1).expect("received subsequent observation");
+        assert_eq!(observation, Ok(1));
+    }
+
+    #[test]
+    fn sync_pub_sub_delayed_multiple_subscribers() {
+        let mut ex = fasync::TestExecutor::new();
+        let mut broker = HangingGet::<i32, _, _>::new_unknown_state(|s, o: oneshot::Sender<_>| {
+            o.send(s.clone()).map(|()| true).unwrap()
+        });
+        let publisher = broker.new_publisher();
+
+        let sub1 = broker.new_subscriber();
+        let sub2 = broker.new_subscriber();
+
+        // Initial observation for subscribers delayed due to lack of initial state.
+        let (sender, mut recv1) = oneshot::channel();
+        sub1.register(sender).unwrap();
+        assert!(ex.run_until_stalled(&mut recv1).is_pending());
+
+        let (sender, mut recv2) = oneshot::channel();
+        sub2.register(sender).unwrap();
+        assert!(ex.run_until_stalled(&mut recv2).is_pending());
+
+        // Subsequent registrations fails since the original registrations are still pending their
+        // observations.
+        let (sender, mut recv3) = oneshot::channel();
+        assert!(sub1.register(sender).is_err());
+        assert!(ex.run_until_stalled(&mut recv3).expect("sender 3 closed").is_err());
+
+        let (sender, mut recv4) = oneshot::channel();
+        assert!(sub2.register(sender).is_err());
+        assert!(ex.run_until_stalled(&mut recv4).expect("sender 4 closed").is_err());
+
+        // Initial observations received now that initial value is set.
         publisher.set(1);
         let obs1 =
             ex.run_until_stalled(&mut recv1).expect("receiver 1 received subsequent observation");

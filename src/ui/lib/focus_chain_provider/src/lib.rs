@@ -85,10 +85,10 @@ impl FocusChainProviderPublisher {
     ) -> Result<(), zx::Status> {
         let new_state = new_state.to_focus_koid_chain()?;
         let publisher = self.publisher.clone();
-        publisher.update(|old_state| match old_state.equivalent(&new_state) {
+        publisher.update(|old_state| match old_state.as_ref().unwrap().equivalent(&new_state) {
             Ok(true) => false,
             Ok(false) => {
-                *old_state = new_state;
+                *old_state = Some(new_state);
                 true
             }
             Err(e) => unreachable!("Unexpected state {e:?}"),

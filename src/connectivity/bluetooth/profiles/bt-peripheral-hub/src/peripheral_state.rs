@@ -46,10 +46,10 @@ impl PeripheralState {
 
     fn notify_peripheral_watchers(&self, info: Vec<Information>) {
         self.publisher.update(move |state| {
-            if *state == info {
+            if state.as_ref() == Some(&info) {
                 false
             } else {
-                *state = info;
+                *state = Some(info);
                 true
             }
         });

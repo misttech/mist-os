@@ -131,10 +131,10 @@ impl GainControl {
     /// Report the speaker gain value received from the Hands Free to the call manager.
     pub fn report_speaker_gain(&mut self, gain: Gain) {
         self.speaker_gain_hanging_get.new_publisher().update(move |s| {
-            if *s == gain.0 {
+            if *s == Some(gain.0) {
                 false
             } else {
-                *s = gain.0;
+                *s = Some(gain.0);
                 true
             }
         });
@@ -143,10 +143,10 @@ impl GainControl {
     /// Report the microphone gain value received from the Hands Free to the call manager.
     pub fn report_microphone_gain(&mut self, gain: Gain) {
         self.microphone_gain_hanging_get.new_publisher().update(move |s| {
-            if *s == gain.0 {
+            if *s == Some(gain.0) {
                 false
             } else {
-                *s = gain.0;
+                *s = Some(gain.0);
                 true
             }
         });
