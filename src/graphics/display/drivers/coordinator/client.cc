@@ -1507,7 +1507,9 @@ Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, ClientId 
       proxy_(proxy),
       is_vc_(is_vc),
       id_(client_id),
-      fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)) {}
+      fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)) {
+  ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
+}
 
 Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, ClientId client_id,
                fidl::ServerEnd<fhd::Coordinator> server_end)
@@ -1517,7 +1519,9 @@ Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, ClientId 
       id_(client_id),
       running_(true),
       fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)),
-      binding_state_(std::move(server_end)) {}
+      binding_state_(std::move(server_end)) {
+  ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
+}
 
 Client::~Client() { ZX_DEBUG_ASSERT(!running_); }
 
