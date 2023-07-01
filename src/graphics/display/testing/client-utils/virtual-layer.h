@@ -16,11 +16,10 @@
 #include "src/graphics/display/testing/client-utils/display.h"
 #include "src/graphics/display/testing/client-utils/image.h"
 
-namespace testing {
-namespace display {
+namespace display_test {
 
 typedef struct custom_layer {
-  ::display::LayerId id;
+  display::LayerId id;
   bool active;
 
   bool done;
@@ -60,19 +59,19 @@ class VirtualLayer {
   virtual size_t GetCurrentImageSize() = 0;
 
   // Gets the display coordinator layer ID for usage on the given display.
-  ::display::LayerId id(::display::DisplayId display_id) const {
+  display::LayerId id(display::DisplayId display_id) const {
     for (unsigned i = 0; i < displays_.size(); i++) {
       if (displays_[i]->id() == display_id && layers_[i].active) {
         return layers_[i].id;
       }
     }
-    return ::display::kInvalidLayerId;
+    return display::kInvalidLayerId;
   }
 
   // Gets the ID of the image on the given display.
-  virtual uint64_t image_id(::display::DisplayId display_id) const = 0;
+  virtual uint64_t image_id(display::DisplayId display_id) const = 0;
 
-  void set_frame_done(::display::DisplayId display_id) {
+  void set_frame_done(display::DisplayId display_id) {
     for (unsigned i = 0; i < displays_.size(); i++) {
       if (displays_[i]->id() == display_id) {
         layers_[i].done = true;
@@ -154,7 +153,7 @@ class PrimaryLayer : public VirtualLayer {
   void* GetCurrentImageBuf() override;
   size_t GetCurrentImageSize() override;
 
-  uint64_t image_id(::display::DisplayId display_id) const override {
+  uint64_t image_id(display::DisplayId display_id) const override {
     for (unsigned i = 0; i < displays_.size(); i++) {
       if (displays_[i]->id() == display_id && layers_[i].active) {
         return layers_[i].import_info[alt_image_].id;
@@ -211,7 +210,7 @@ class CursorLayer : public VirtualLayer {
   void* GetCurrentImageBuf() override { return nullptr; }
   size_t GetCurrentImageSize() override { return 0; }
 
-  uint64_t image_id(::display::DisplayId display_id) const override {
+  uint64_t image_id(display::DisplayId display_id) const override {
     for (unsigned i = 0; i < displays_.size(); i++) {
       if (displays_[i]->id() == display_id && layers_[i].active) {
         return layers_[i].import_info[0].id;
@@ -240,13 +239,12 @@ class ColorLayer : public VirtualLayer {
   void Render(int32_t frame_num) override {}
   void* GetCurrentImageBuf() override { return nullptr; }
   size_t GetCurrentImageSize() override { return 0; }
-  uint64_t image_id(::display::DisplayId display_id) const override {
+  uint64_t image_id(display::DisplayId display_id) const override {
     return fuchsia_hardware_display::wire::kInvalidDispId;
   }
   virtual bool is_done() const override { return true; }
 };
 
-}  // namespace display
-}  // namespace testing
+}  // namespace display_test
 
 #endif  // SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_VIRTUAL_LAYER_H_

@@ -43,8 +43,7 @@ static constexpr uint32_t kAfbcTilePixelHeight = 16u;
 
 namespace fhd = fuchsia_hardware_display;
 
-namespace testing {
-namespace display {
+namespace display_test {
 
 Image::Image(uint32_t width, uint32_t height, int32_t stride,
              fuchsia_images2::wire::PixelFormat format, uint32_t collection_id, void* buf,
@@ -511,5 +510,4 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint64_t im
   return true;
 }
 
-}  // namespace display
-}  // namespace testing
+}  // namespace display_test

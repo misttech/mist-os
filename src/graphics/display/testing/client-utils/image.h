@@ -15,8 +15,7 @@
 #define WAIT_EVENT 0
 #define SIGNAL_EVENT 1
 
-namespace testing {
-namespace display {
+namespace display_test {
 
 typedef struct image_import {
   uint64_t id;
@@ -75,7 +74,6 @@ class Image {
   uint64_t modifier_;
 };
 
-}  // namespace display
-}  // namespace testing
+}  // namespace display_test
 
 #endif  // SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_IMAGE_H_

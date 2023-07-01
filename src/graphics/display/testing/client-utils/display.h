@@ -16,8 +16,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
-namespace testing {
-namespace display {
+namespace display_test {
 
 struct ColorCorrectionArgs {
   ::fidl::Array<float, 3> preoffsets = {nanf("pre"), 0.0, 0.0};
@@ -35,7 +34,7 @@ class Display {
   fuchsia_images2::wire::PixelFormat format() const { return pixel_formats_[format_idx_]; }
   fuchsia_hardware_display::wire::Mode mode() const { return modes_[mode_idx_]; }
   fuchsia_hardware_display::wire::CursorInfo cursor() const { return cursors_[0]; }
-  ::display::DisplayId id() const { return id_; }
+  display::DisplayId id() const { return id_; }
 
   bool set_format_idx(uint32_t idx) {
     format_idx_ = idx;
@@ -58,7 +57,7 @@ class Display {
   bool apply_color_correction_ = false;
   bool grayscale_ = false;
 
-  ::display::DisplayId id_;
+  display::DisplayId id_;
   fbl::Vector<fuchsia_images2::wire::PixelFormat> pixel_formats_;
   fbl::Vector<fuchsia_hardware_display::wire::Mode> modes_;
   fbl::Vector<fuchsia_hardware_display::wire::CursorInfo> cursors_;
@@ -74,7 +73,6 @@ class Display {
   bool using_fallback_sizes_;
 };
 
-}  // namespace display
-}  // namespace testing
+}  // namespace display_test
 
 #endif  // SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_DISPLAY_H_

@@ -35,18 +35,17 @@
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/testing/client-utils/display.h"
-#include "src/graphics/display/testing/client-utils/utils.h"
 #include "src/graphics/display/testing/client-utils/virtual-layer.h"
 
 namespace fhd = fuchsia_hardware_display;
 namespace sysmem = fuchsia_sysmem;
 namespace sysinfo = fuchsia_sysinfo;
 
-using testing::display::ColorLayer;
-using testing::display::CursorLayer;
-using testing::display::Display;
-using testing::display::PrimaryLayer;
-using testing::display::VirtualLayer;
+using display_test::ColorLayer;
+using display_test::CursorLayer;
+using display_test::Display;
+using display_test::PrimaryLayer;
+using display_test::VirtualLayer;
 
 static zx_handle_t device_handle;
 static fidl::WireSyncClient<fhd::Coordinator> dc;
@@ -179,12 +178,11 @@ Display* find_display(fbl::Vector<Display>& displays, const char* id_str) {
 }
 
 bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& layers,
-                           const Display& display,
-                           fbl::Vector<::display::LayerId>* current_layers) {
-  fbl::Vector<::display::LayerId> new_layers;
+                           const Display& display, fbl::Vector<display::LayerId>* current_layers) {
+  fbl::Vector<display::LayerId> new_layers;
 
   for (auto& layer : layers) {
-    ::display::LayerId id = layer->id(display.id());
+    display::LayerId id = layer->id(display.id());
     if (id.value() != fhd::wire::kInvalidDispId) {
       new_layers.push_back(id);
     }
@@ -205,7 +203,7 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
 
     std::vector<fhd::wire::LayerId> current_layers_fidl_id;
     current_layers_fidl_id.reserve(current_layers->size());
-    for (const ::display::LayerId& layer_id : *current_layers) {
+    for (const display::LayerId& layer_id : *current_layers) {
       current_layers_fidl_id.push_back(display::ToFidlLayerId(layer_id));
     }
     if (!dc->SetDisplayLayers(
@@ -672,7 +670,7 @@ int main(int argc, const char* argv[]) {
   printf("Running display test\n");
 
   fbl::Vector<Display> displays;
-  fbl::Vector<fbl::Vector<::display::LayerId>> display_layers;
+  fbl::Vector<fbl::Vector<display::LayerId>> display_layers;
   fbl::Vector<std::unique_ptr<VirtualLayer>> layers;
   std::optional<int32_t> num_frames = 120;  // default to 120 frames. std::nullopt means infinite
   int32_t delay = 0;
@@ -715,19 +713,19 @@ int main(int argc, const char* argv[]) {
   }
 
   for (unsigned i = 0; i < displays.size(); i++) {
-    display_layers.push_back(fbl::Vector<::display::LayerId>());
+    display_layers.push_back(fbl::Vector<display::LayerId>());
   }
 
   argc--;
   argv++;
 
-  testing::display::Image::Pattern image_pattern = testing::display::Image::Pattern::kCheckerboard;
+  display_test::Image::Pattern image_pattern = display_test::Image::Pattern::kCheckerboard;
   uint32_t fgcolor_rgba = 0xffff0000;  // red (default)
   uint32_t bgcolor_rgba = 0xffffffff;  // white (default)
   bool use_color_correction = false;
   int clamp_rgb = -1;
 
-  testing::display::ColorCorrectionArgs color_correction_args;
+  display_test::ColorCorrectionArgs color_correction_args;
 
   float alpha_val = std::nanf("");
   bool enable_alpha = false;
@@ -862,9 +860,9 @@ int main(int argc, const char* argv[]) {
       argc -= 2;
     } else if (strcmp(argv[0], "--pattern") == 0) {
       if (strcmp(argv[1], "checkerboard") == 0) {
-        image_pattern = testing::display::Image::Pattern::kCheckerboard;
+        image_pattern = display_test::Image::Pattern::kCheckerboard;
       } else if (strcmp(argv[1], "border") == 0) {
-        image_pattern = testing::display::Image::Pattern::kBorder;
+        image_pattern = display_test::Image::Pattern::kBorder;
       } else {
         printf("Invalid image pattern \"%s\".\n", argv[1]);
         usage();

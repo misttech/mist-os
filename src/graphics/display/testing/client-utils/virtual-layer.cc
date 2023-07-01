@@ -21,8 +21,7 @@
 
 namespace fhd = fuchsia_hardware_display;
 
-namespace testing {
-namespace display {
+namespace display_test {
 
 static constexpr uint32_t kSrcFrameBouncePeriod = 90;
 static constexpr uint32_t kDestFrameBouncePeriod = 60;
@@ -109,7 +108,7 @@ custom_layer_t* VirtualLayer::CreateLayer(const fidl::WireSyncClient<fhd::Coordi
     printf("Creating layer failed\n");
     return nullptr;
   }
-  layers_[layers_.size() - 1].id = ::display::ToLayerId(result.value().layer_id);
+  layers_[layers_.size() - 1].id = display::ToLayerId(result.value().layer_id);
 
   return &layers_[layers_.size() - 1];
 }
@@ -180,7 +179,7 @@ bool PrimaryLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
 
     fhd::wire::ImageConfig image_config;
     images_[0]->GetConfig(&image_config);
-    const fhd::wire::LayerId fidl_layer_id = ::display::ToFidlLayerId(layer->id);
+    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
     auto set_config_result = dc->SetLayerPrimaryConfig(fidl_layer_id, image_config);
     if (!set_config_result.ok()) {
       printf("Setting layer config failed\n");
@@ -331,7 +330,7 @@ void PrimaryLayer::Render(int32_t frame_num) {
 
 void PrimaryLayer::SetLayerPositions(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
   for (auto& layer : layers_) {
-    const fhd::wire::LayerId fidl_layer_id = ::display::ToFidlLayerId(layer.id);
+    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
     ZX_ASSERT(dc->SetLayerPrimaryPosition(fidl_layer_id, rotation_, layer.src, layer.dest).ok());
   }
 }
@@ -340,7 +339,7 @@ void VirtualLayer::SetLayerImages(const fidl::WireSyncClient<fhd::Coordinator>& 
                                   bool alt_image) {
   for (auto& layer : layers_) {
     const auto& image = layer.import_info[alt_image];
-    const fhd::wire::LayerId fidl_layer_id = ::display::ToFidlLayerId(layer.id);
+    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
     auto result = dc->SetLayerImage(fidl_layer_id, image.id, image.event_ids[WAIT_EVENT],
                                     image.event_ids[SIGNAL_EVENT]);
 
@@ -400,7 +399,7 @@ bool CursorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
     image_config.width = info.width;
     image_config.type = fhd::wire::kTypeSimple;
 
-    const fhd::wire::LayerId fidl_layer_id = ::display::ToFidlLayerId(layer->id);
+    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
     auto result = dc->SetLayerCursorConfig(fidl_layer_id, image_config);
     if (!result.ok()) {
       printf("Setting layer config failed\n");
@@ -423,7 +422,7 @@ void CursorLayer::StepLayout(int32_t frame_num) {
 void CursorLayer::SendLayout(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
   uint32_t display_start = 0;
   for (unsigned i = 0; i < displays_.size(); i++) {
-    const fhd::wire::LayerId fidl_layer_id = ::display::ToFidlLayerId(layers_[i].id);
+    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layers_[i].id);
     ZX_ASSERT(dc->SetLayerCursorPosition(fidl_layer_id, x_pos_ - display_start, y_pos_).ok());
     display_start += displays_[i]->mode().horizontal_resolution;
   }
@@ -450,7 +449,7 @@ bool ColorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
     uint8_t data[kColorLayerBytesPerPixel];
     *reinterpret_cast<uint32_t*>(data) = kColorLayerColor;
 
-    const fhd::wire::LayerId fidl_layer_id = ::display::ToFidlLayerId(layer->id);
+    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
     auto result = dc->SetLayerColorConfig(
         fidl_layer_id, kColorLayerFormat,
         ::fidl::VectorView<uint8_t>::FromExternal(data, kColorLayerBytesPerPixel));
@@ -464,5 +463,4 @@ bool ColorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
   return true;
 }
 
-}  // namespace display
-}  // namespace testing
+}  // namespace display_test

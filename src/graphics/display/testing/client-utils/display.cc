@@ -15,11 +15,10 @@
 
 namespace fhd = fuchsia_hardware_display;
 
-namespace testing {
-namespace display {
+namespace display_test {
 
 Display::Display(const fhd::wire::Info& info) {
-  id_ = ::display::ToDisplayId(info.id);
+  id_ = display::ToDisplayId(info.id);
 
   for (fuchsia_images2::wire::PixelFormat pixel_format : info.pixel_format) {
     ZX_ASSERT(!pixel_format.IsUnknown());
@@ -100,5 +99,4 @@ void Display::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc,
   }
 }
 
-}  // namespace display
-}  // namespace testing
+}  // namespace display_test
