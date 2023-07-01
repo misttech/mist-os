@@ -2467,7 +2467,7 @@ source code.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:83
+From //.gn:86
 
 **Overridden from the default:** `""`
 
@@ -2475,7 +2475,7 @@ From //third_party/pigweed/src/third_party/emboss/emboss.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:83
+From //.gn:86
 
 **Overridden from the default:** `""`
 
@@ -6136,7 +6136,7 @@ libraries such as pw_assert.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:74
+From //.gn:77
 
 **Overridden from the default:** `[]`
 
@@ -6144,7 +6144,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:24
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:74
+From //.gn:77
 
 **Overridden from the default:** `[]`
 
@@ -6347,7 +6347,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_function:define_overrides"`
 
-From //.gn:71
+From //.gn:74
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -6355,7 +6355,7 @@ From //third_party/pigweed/src/pw_function/BUILD.gn:27
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_function:define_overrides"`
 
-From //.gn:71
+From //.gn:74
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -6517,7 +6517,19 @@ From //third_party/pigweed/src/pw_protobuf_compiler/toolchain.gni:28
 
 To override the protobuf compiler used set this to the path, relative to the root_build_dir, to the protoc binary.
 
-**Current value (from the default):** `""`
+**Current value for `target_cpu = "arm64"`:** `"host_x64/protoc"`
+
+From //.gn:99
+
+**Overridden from the default:** `""`
+
+From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:39
+
+**Current value for `target_cpu = "x64"`:** `"host_x64/protoc"`
+
+From //.gn:99
+
+**Overridden from the default:** `""`
 
 From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:39
 
@@ -6525,7 +6537,19 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:39
 
 To override the protobuf compiler used set this to the GN target that builds the protobuf compiler.
 
-**Current value (from the default):** `""`
+**Current value for `target_cpu = "arm64"`:** `"//third_party/protobuf:protoc"`
+
+From //.gn:98
+
+**Overridden from the default:** `""`
+
+From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:36
+
+**Current value for `target_cpu = "x64"`:** `"//third_party/protobuf:protoc"`
+
+From //.gn:98
+
+**Overridden from the default:** `""`
 
 From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:36
 
@@ -6657,7 +6681,19 @@ From //third_party/pigweed/src/pw_sync/backend.gni:35
 
 Backend for the pw_sync module's mutex.
 
-**Current value (from the default):** `""`
+**Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync_baremetal:mutex"`
+
+From //.gn:68
+
+**Overridden from the default:** `""`
+
+From //third_party/pigweed/src/pw_sync/backend.gni:26
+
+**Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync_baremetal:mutex"`
+
+From //.gn:68
+
+**Overridden from the default:** `""`
 
 From //third_party/pigweed/src/pw_sync/backend.gni:26
 
@@ -6707,7 +6743,19 @@ From //third_party/pigweed/src/pw_sync/backend.gni:41
 
 Backend for the pw_sys_io facade.
 
-**Current value (from the default):** `""`
+**Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sys_io_stdio"`
+
+From //.gn:69
+
+**Overridden from the default:** `""`
+
+From //third_party/pigweed/src/pw_sys_io/backend.gni:17
+
+**Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sys_io_stdio"`
+
+From //.gn:69
+
+**Overridden from the default:** `""`
 
 From //third_party/pigweed/src/pw_sys_io/backend.gni:17
 
@@ -6720,7 +6768,7 @@ use Pigweed's boringssl exclusively.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/boringssl"`
 
-From //.gn:80
+From //.gn:83
 
 **Overridden from the default:** `""`
 
@@ -6728,7 +6776,7 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:25
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/boringssl"`
 
-From //.gn:80
+From //.gn:83
 
 **Overridden from the default:** `""`
 
@@ -6788,7 +6836,19 @@ From //third_party/pigweed/src/pw_thread/backend.gni:34
 
 Backend for the pw_thread module's pw::thread::sleep_{for,until}.
 
-**Current value (from the default):** `""`
+**Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_thread_stl:sleep"`
+
+From //.gn:70
+
+**Overridden from the default:** `""`
+
+From //third_party/pigweed/src/pw_thread/backend.gni:20
+
+**Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_thread_stl:sleep"`
+
+From //.gn:70
+
+**Overridden from the default:** `""`
 
 From //third_party/pigweed/src/pw_thread/backend.gni:20
 
