@@ -15,7 +15,7 @@ use fuchsia_runtime;
 use fuchsia_zircon::{self as zx, AsHandleRef, Status};
 use std::cmp;
 
-pub fn linear_image_format_constraints(
+fn linear_image_format_constraints(
     width: u32,
     height: u32,
     pixel_type: PixelFormatType,
@@ -51,7 +51,7 @@ pub fn linear_image_format_constraints(
     }
 }
 
-pub fn buffer_memory_constraints(width: u32, height: u32) -> BufferMemoryConstraints {
+fn buffer_memory_constraints(width: u32, height: u32) -> BufferMemoryConstraints {
     BufferMemoryConstraints {
         min_size_bytes: width * height * 4,
         max_size_bytes: std::u32::MAX,
@@ -65,7 +65,7 @@ pub fn buffer_memory_constraints(width: u32, height: u32) -> BufferMemoryConstra
     }
 }
 
-pub fn buffer_collection_constraints(
+fn buffer_collection_constraints(
     width: u32,
     height: u32,
     pixel_type: PixelFormatType,
@@ -104,7 +104,7 @@ pub fn buffer_collection_constraints(
 }
 
 // See ImageFormatStrideBytesPerWidthPixel
-pub fn stride_bytes_per_width_pixel(pixel_type: PixelFormatType) -> Result<u32, Error> {
+fn stride_bytes_per_width_pixel(pixel_type: PixelFormatType) -> Result<u32, Error> {
     match pixel_type {
         PixelFormatType::R8G8B8A8 => Ok(4),
         PixelFormatType::Bgra32 => Ok(4),
@@ -219,7 +219,7 @@ impl BufferCollectionAllocator {
         collection_client: fidl_fuchsia_sysmem::BufferCollectionProxy,
         set_constraints: bool,
     ) -> Result<fidl_fuchsia_sysmem::BufferCollectionInfo2, Error> {
-        let buffer_collection_constraints = crate::sysmem::buffer_collection_constraints(
+        let buffer_collection_constraints = buffer_collection_constraints(
             self.width,
             self.height,
             self.pixel_type,
