@@ -20,7 +20,13 @@ DEFINE_STRONG_INT(EventId, uint64_t);
 constexpr inline EventId ToEventId(uint64_t fidl_event_id_value) {
   return EventId(fidl_event_id_value);
 }
+constexpr inline EventId ToEventId(fuchsia_hardware_display::wire::EventId fidl_event_id) {
+  return EventId(fidl_event_id.value);
+}
 constexpr inline uint64_t ToFidlEventIdValue(EventId event_id) { return event_id.value(); }
+constexpr inline fuchsia_hardware_display::wire::EventId ToFidlEventId(EventId event_id) {
+  return {.value = event_id.value()};
+}
 
 constexpr EventId kInvalidEventId(fuchsia_hardware_display::wire::kInvalidDispId);
 

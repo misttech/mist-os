@@ -46,6 +46,13 @@ TEST(EventIdTest, EqualityForDifferentValues) {
   EXPECT_NE(kInvalidEventId, kTwo);
 }
 
+TEST(EventIdTest, ToFidlEventId) {
+  EXPECT_EQ(1u, ToFidlEventId(kOne).value);
+  EXPECT_EQ(2u, ToFidlEventId(kTwo).value);
+  EXPECT_EQ(kLargeIdValue, ToFidlEventId(kLargeId).value);
+  EXPECT_EQ(fuchsia_hardware_display::wire::kInvalidDispId, ToFidlEventId(kInvalidEventId).value);
+}
+
 TEST(EventIdTest, ToFidlEventIdValue) {
   EXPECT_EQ(1u, ToFidlEventIdValue(kOne));
   EXPECT_EQ(2u, ToFidlEventIdValue(kTwo));
@@ -53,11 +60,26 @@ TEST(EventIdTest, ToFidlEventIdValue) {
   EXPECT_EQ(fuchsia_hardware_display::wire::kInvalidDispId, ToFidlEventIdValue(kInvalidEventId));
 }
 
+TEST(EventIdTest, ToEventIdWithFidlEventId) {
+  EXPECT_EQ(kOne, ToEventId(fuchsia_hardware_display::wire::EventId{.value = 1}));
+  EXPECT_EQ(kTwo, ToEventId(fuchsia_hardware_display::wire::EventId{.value = 2}));
+  EXPECT_EQ(kLargeId, ToEventId(fuchsia_hardware_display::wire::EventId{.value = kLargeIdValue}));
+  EXPECT_EQ(kInvalidEventId, ToEventId(fuchsia_hardware_display::wire::EventId{
+                                 .value = fuchsia_hardware_display::wire::kInvalidDispId}));
+}
+
 TEST(EventIdTest, ToEventIdWithFidlValue) {
   EXPECT_EQ(kOne, ToEventId(1));
   EXPECT_EQ(kTwo, ToEventId(2));
   EXPECT_EQ(kLargeId, ToEventId(kLargeIdValue));
   EXPECT_EQ(kInvalidEventId, ToEventId(fuchsia_hardware_display::wire::kInvalidDispId));
+}
+
+TEST(EventIdTest, FidlEventIdConversionRoundtrip) {
+  EXPECT_EQ(kOne, ToEventId(ToFidlEventId(kOne)));
+  EXPECT_EQ(kTwo, ToEventId(ToFidlEventId(kTwo)));
+  EXPECT_EQ(kLargeId, ToEventId(ToFidlEventId(kLargeId)));
+  EXPECT_EQ(kInvalidEventId, ToEventId(ToFidlEventId(kInvalidEventId)));
 }
 
 TEST(EventIdTest, FidlEventIdValueConversionRoundtrip) {

@@ -5,8 +5,8 @@
 use crate::{error::Result, pixel_format::PixelFormat};
 use {
     fidl_fuchsia_hardware_display::{
-        BufferCollectionId as FidlCollectionId, DisplayId as FidlDisplayId, Info,
-        LayerId as FidlLayerId, INVALID_DISP_ID,
+        BufferCollectionId as FidlCollectionId, DisplayId as FidlDisplayId, EventId as FidlEventId,
+        Info, LayerId as FidlLayerId, INVALID_DISP_ID,
     },
     fuchsia_async::OnSignals,
     fuchsia_zircon::{self as zx, AsHandleRef},
@@ -39,8 +39,29 @@ impl From<DisplayId> for FidlDisplayId {
 }
 
 /// Strongly typed wrapper around a display driver event ID.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct EventId(pub u64);
+
+/// Represents an invalid EventId value.
+pub const INVALID_EVENT_ID: EventId = EventId(INVALID_DISP_ID);
+
+impl Default for EventId {
+    fn default() -> Self {
+        INVALID_EVENT_ID
+    }
+}
+
+impl From<FidlEventId> for EventId {
+    fn from(fidl_event_id: FidlEventId) -> Self {
+        EventId(fidl_event_id.value)
+    }
+}
+
+impl From<EventId> for FidlEventId {
+    fn from(event_id: EventId) -> Self {
+        FidlEventId { value: event_id.0 }
+    }
+}
 
 /// Strongly typed wrapper around a display layer ID.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -294,5 +315,47 @@ mod tests {
         assert_eq!(FidlCollectionId { value: 2 }, CollectionId(2).into());
         const LARGE: u64 = 1 << 63;
         assert_eq!(FidlCollectionId { value: LARGE }, CollectionId(LARGE).into());
+    }
+
+    #[fuchsia::test]
+    fn event_id_from_fidl_event_id() {
+        assert_eq!(EventId(1), EventId::from(FidlEventId { value: 1 }));
+        assert_eq!(EventId(2), EventId::from(FidlEventId { value: 2 }));
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(EventId(LARGE), EventId::from(FidlEventId { value: LARGE }));
+        assert_eq!(INVALID_EVENT_ID, EventId::from(FidlEventId { value: INVALID_DISP_ID }));
+    }
+
+    #[fuchsia::test]
+    fn fidl_event_id_from_event_id() {
+        assert_eq!(FidlEventId { value: 1 }, FidlEventId::from(EventId(1)));
+        assert_eq!(FidlEventId { value: 2 }, FidlEventId::from(EventId(2)));
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(FidlEventId { value: LARGE }, FidlEventId::from(EventId(LARGE)));
+        assert_eq!(FidlEventId { value: INVALID_DISP_ID }, FidlEventId::from(INVALID_EVENT_ID));
+    }
+
+    #[fuchsia::test]
+    fn fidl_event_id_to_event_id() {
+        assert_eq!(EventId(1), FidlEventId { value: 1 }.into());
+        assert_eq!(EventId(2), FidlEventId { value: 2 }.into());
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(EventId(LARGE), FidlEventId { value: LARGE }.into());
+        assert_eq!(INVALID_EVENT_ID, FidlEventId { value: INVALID_DISP_ID }.into());
+    }
+
+    #[fuchsia::test]
+    fn event_id_to_fidl_event_id() {
+        assert_eq!(FidlEventId { value: 1 }, EventId(1).into());
+        assert_eq!(FidlEventId { value: 2 }, EventId(2).into());
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(FidlEventId { value: LARGE }, EventId(LARGE).into());
+        assert_eq!(FidlEventId { value: INVALID_DISP_ID }, INVALID_EVENT_ID.into());
+    }
+
+    #[fuchsia::test]
+    fn event_id_default() {
+        let default: EventId = Default::default();
+        assert_eq!(default, INVALID_EVENT_ID);
     }
 }
