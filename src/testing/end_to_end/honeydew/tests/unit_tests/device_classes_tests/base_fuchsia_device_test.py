@@ -19,7 +19,6 @@ from honeydew.interfaces.device_classes import \
 from honeydew.interfaces.device_classes import transports_capable
 
 # pylint: disable=protected-access
-# pytype: disable=attribute-error
 _INPUT_ARGS: Dict[str, str] = {
     "device_name": "fuchsia-emulator",
     "ssh_private_key": "/tmp/.ssh/pkey",

@@ -32,7 +32,6 @@ _REGISTERED_DEVICE_CLASSES: Set[Type[fuchsia_device.FuchsiaDevice]] = set()
 _DEFAULT_TRANSPORT = transports.TRANSPORT.SL4F
 
 
-# pytype: disable=not-instantiable
 # List all the public methods in alphabetical order
 def create_device(
     device_name: str,

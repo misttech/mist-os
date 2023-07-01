@@ -32,7 +32,6 @@ guidelines = [
     "isort==5.12.0",          # for sorting imports
     "autoflake==2.1.1",       # for removeing unused imports and unused variables
     "mypy==1.3.0",            # for type checking
-    "pytype==2023.6.2",       # for type checking
 ]
 
 [tool.setuptools.packages.find]

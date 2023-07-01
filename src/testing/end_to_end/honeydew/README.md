@@ -305,20 +305,12 @@ follow the below instructions every time HoneyDew code is changed.
 ```
 
 #### type-checking
-* Ensure code is [mypy] and [pytype] compliant
-* For `mypy`,
-  * Verify `mypy` is properly installed by running `mypy --help`
-  * Run below command and fix all the issues pointed by `mypy`
-    ```shell
-    (fuchsia_python_venv)~/fuchsia$ mypy --config-file=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/pyproject.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/
-    ```
-* For `pytype`,
-  * Verify `pytype` is properly installed by running `pytype --help`
-  * Run below command and fix all the issues pointed by `pytype`
-    ```shell
-    (fuchsia_python_venv)~/fuchsia$ pytype --config=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pytype.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/
-    ```
-
+* Ensure code is [mypy] compliant
+* Verify `mypy` is properly installed by running `mypy --help`
+* Run below command and fix all the issues pointed by `mypy`
+```shell
+(fuchsia_python_venv)~/fuchsia$ mypy --config-file=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/pyproject.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/
+```
 
 ### Code Coverage
 **Running** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/coverage.sh`
@@ -441,8 +433,6 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
 [pylint]: https://pypi.org/project/pylint/
 
 [mypy]: https://mypy.readthedocs.io/en/stable/
-
-[pytype]: https://google.github.io/pytype/
 
 [yapf]: https://github.com/google/yapf
 
