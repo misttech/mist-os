@@ -107,7 +107,6 @@ python_library("fidl_bindings") {
   ]
   sources = [
     "__init__.py",
-    "_client.py",
     "_import.py",
     "_ipc.py",
     "_library.py",
@@ -146,7 +145,6 @@ group("tests") {
   if (host_os != "mac") {
     deps += [
       "tests:fuchsia_controller_errors_test",
-      "tests:fuchsia_controller_fidl_client_test",
       "tests:fuchsia_controller_importing_test",
       "tests:fuchsia_controller_isolate_directory_test",
     ]

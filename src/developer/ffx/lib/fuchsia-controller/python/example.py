@@ -6,10 +6,7 @@ import fidl.fuchsia_developer_ffx as fd_ffx
 import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
 import fidl.fuchsia_diagnostics as f_diagnostics
 import os
-import logging
 import asyncio
-
-logging.basicConfig(level=logging.DEBUG)
 
 
 async def echo():
@@ -23,13 +20,10 @@ async def echo():
 async def target_info_multi_target_isolated():
     isolate = IsolateDir()  # Will create a random tmpdir
     ctx = Context(
-        config={"sdk.root": "."},
-        isolate_dir=isolate,
-        target="fuchsia-emulator")
+        config={"sdk.root": "."}, isolate_dir=isolate, target="emu-one")
     ctx2 = Context(
         config={"sdk.root": "."}, isolate_dir=isolate, target="emu-two")
-    ch = ctx.connect_target_proxy()
-    proxy = fd_ffx.Target.Client(ch)
+    proxy = fd_ffx.Target.Client(ctx.connect_target_proxy())
     proxy2 = fd_ffx.Target.Client(ctx2.connect_target_proxy())
     result2 = proxy2.identity()
     result1 = proxy.identity()
@@ -37,22 +31,8 @@ async def target_info_multi_target_isolated():
     print(f"Target Info Received: {results}")
 
 
-async def multi_echo():
-    ctx = Context()
-    echo_proxy = fd_ffx.Echo.Client(
-        ctx.connect_daemon_protocol(fd_ffx.Echo.MARKER))
-    result1 = echo_proxy.echo_string(value="1foobington")
-    result2 = echo_proxy.echo_string(value="2frobination")
-    result3 = echo_proxy.echo_string(value="3frobinationator")
-    result4 = echo_proxy.echo_string(value="4frobinationatorawoihoiwf")
-    result5 = echo_proxy.echo_string(value="5frobin")
-    results = await asyncio.gather(result1, result2, result3, result4, result5)
-    print(f"Multi-echo results: {results}")
-
-
 async def async_main():
     await echo()
-    await multi_echo()
     await target_info_multi_target_isolated()
 
 
@@ -63,7 +43,6 @@ def main():
         print()
         print(f"Testing synchronous calls, iteration {x}.")
         asyncio.run(echo())
-        asyncio.run(multi_echo())
         asyncio.run(target_info_multi_target_isolated())
 
 
