@@ -57,7 +57,7 @@ source_set("lib") {
     "fidl:controller_hlcpp",
     "//sdk/fidl/fuchsia.camera3:fuchsia.camera3_hlcpp",
     "//sdk/fidl/fuchsia.math:fuchsia.math_hlcpp",
-    "//sdk/fidl/fuchsia.modular:fuchsia.modular_hlcpp",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",

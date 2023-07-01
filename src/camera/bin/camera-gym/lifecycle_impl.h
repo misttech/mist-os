@@ -5,27 +5,24 @@
 #ifndef SRC_CAMERA_BIN_CAMERA_GYM_LIFECYCLE_IMPL_H_
 #define SRC_CAMERA_BIN_CAMERA_GYM_LIFECYCLE_IMPL_H_
 
-#include <fuchsia/modular/cpp/fidl.h>
+#include <fuchsia/process/lifecycle/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fit/function.h>
 
-// This class implements the Lifecycle protocol by invoking a caller-provided closure on Terminate.
-class LifecycleImpl : public fuchsia::modular::Lifecycle {
+// Implementation of the fuchsia.process.lifecycle FIDL protocol that invokes a caller-provided
+// closure on Terminate.
+class LifecycleImpl : public fuchsia::process::lifecycle::Lifecycle {
  public:
   explicit LifecycleImpl(fit::closure on_terminate);
-  ~LifecycleImpl() override;
-  fidl::InterfaceRequestHandler<fuchsia::modular::Lifecycle> GetHandler();
+  ~LifecycleImpl() override = default;
+
+  void Stop() override;
 
  private:
-  void OnNewRequest(fidl::InterfaceRequest<fuchsia::modular::Lifecycle> request);
-
-  // |fuchsia::modular::Lifecycle|
-  void Terminate() override;
-
   async::Loop loop_;
   fit::closure on_terminate_;
-  fidl::BindingSet<fuchsia::modular::Lifecycle> bindings_;
+  fidl::BindingSet<fuchsia::process::lifecycle::Lifecycle> bindings_;
 };
 
 #endif  // SRC_CAMERA_BIN_CAMERA_GYM_LIFECYCLE_IMPL_H_

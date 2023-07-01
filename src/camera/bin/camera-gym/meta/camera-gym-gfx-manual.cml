@@ -4,10 +4,8 @@
 
 // TODO(fxb/122163): Deprecate the gfx version of camera-gym.
 {
-    include: [ "syslog/client.shard.cml" ],
+    include: [ "//src/camera/bin/camera-gym/meta/camera-gym-common.shard.cml" ],
     program: {
-        runner: "elf",
-        binary: "bin/camera_gym_bin",
         args: [
             "--manual",
             "--gfx",
@@ -15,21 +13,11 @@
     },
     capabilities: [
         {
-            protocol: [
-                "fuchsia.camera.gym.Controller",
-                "fuchsia.ui.app.ViewProvider",
-            ],
+            protocol: [ "fuchsia.camera.gym.Controller" ],
         },
     ],
     use: [
-        {
-            protocol: [
-                "fuchsia.camera3.DeviceWatcher",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
-                "fuchsia.ui.scenic.Scenic",
-            ],
-        },
+        // Used for frame capture.
         {
             storage: "tmp",
             path: "/tmp",
@@ -37,15 +25,8 @@
     ],
     expose: [
         {
-            protocol: [
-                "fuchsia.camera.gym.Controller",
-                "fuchsia.ui.app.ViewProvider",
-            ],
+            protocol: [ "fuchsia.camera.gym.Controller" ],
             from: "self",
-        },
-        {
-            protocol: "fuchsia.component.Binder",
-            from: "framework",
         },
     ],
 }

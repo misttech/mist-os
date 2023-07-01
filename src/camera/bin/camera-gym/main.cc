@@ -128,9 +128,9 @@ int SetupFlatland(std::optional<zx::duration> auto_cycle_interval, async::Loop* 
   // Publish the view service.
   context->outgoing()->AddPublicService(collage->GetHandler());
 
-  // Publish a handler for the Lifecycle protocol that cleanly quits the component.
+  // Serve the Lifecycle protocol that cleanly quits the component.
+  // This binds to a process handle, so it's not added to the outgoing directory.
   LifecycleImpl lifecycle([&buffer_collage_loop] { buffer_collage_loop->Quit(); });
-  context->outgoing()->AddPublicService(lifecycle.GetHandler());
 
   buffer_collage_loop->Run();
   cycler_loop->Quit();
@@ -284,9 +284,9 @@ int SetupGFX(bool manual_mode, std::optional<zx::duration> auto_cycle_interval,
   // Publish the view service.
   context->outgoing()->AddPublicService(collage->GetHandler());
 
-  // Publish a handler for the Lifecycle protocol that cleanly quits the component.
+  // Serve the Lifecycle protocol that cleanly quits the component.
+  // This binds to a process handle, so it's not added to the outgoing directory.
   LifecycleImpl lifecycle([&buffer_collage_loop] { buffer_collage_loop->Quit(); });
-  context->outgoing()->AddPublicService(lifecycle.GetHandler());
 
   buffer_collage_loop->Run();
   cycler_loop->Quit();
