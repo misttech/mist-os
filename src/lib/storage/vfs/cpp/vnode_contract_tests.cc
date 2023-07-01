@@ -82,8 +82,8 @@ TEST(Vnode, NegotiateIsCalledIfMultipleCandidateProtocols) {
   ASSERT_OK(zx::channel::create(0u, &client_end, &server_end));
 
   ASSERT_FALSE(vnode->negotiate_called());
-  ASSERT_OK(vfs.Serve(vnode, std::move(server_end),
-                      fs::VnodeConnectionOptions::ReadOnly().set_not_directory()));
+  ASSERT_OK(
+      vfs.Serve(vnode, std::move(server_end), fs::VnodeConnectionOptions().set_not_directory()));
   ASSERT_TRUE(vnode->negotiate_called());
 }
 

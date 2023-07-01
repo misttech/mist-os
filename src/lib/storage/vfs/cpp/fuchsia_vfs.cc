@@ -316,12 +316,27 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
   // If |node_reference| is specified, serve |fuchsia.io/Node| even for |VnodeProtocol::kConnector|
   // nodes. Otherwise, connect the raw channel to the custom service.
   if (!options->flags.node_reference && protocol == VnodeProtocol::kConnector) {
+    if (options->ToIoV1Flags() & ~(fio::OpenFlags::kNodeReference | fio::OpenFlags::kDescribe |
+                                   fio::OpenFlags::kNotDirectory)) {
+      fidl::ServerEnd<fuchsia_io::Node> node(std::move(server_end));
+      constexpr zx_status_t kStatus = ZX_ERR_INVALID_ARGS;
+      // NB: we are not consistent with the use of epitaphs in this VFS nor across VFS
+      // implementations. fuchsia.io/Directory.Open does not specify that an epitaph should be sent
+      // in the absence of fuchsia.io/OpenFlags.DESCRIBE, but doing so provides better error
+      // reporting to clients. This is also the behavior of the Rust VFS.
+      if (options->flags.describe) {
+        [[maybe_unused]] fidl::Status status = fidl::WireSendEvent(node)->OnOpen(kStatus, {});
+      } else {
+        [[maybe_unused]] zx_status_t status = node.Close(kStatus);
+      }
+      return kStatus;
+    }
     if (options->flags.describe) {
       fidl::ServerEnd<fuchsia_io::Node> typed_server_end(std::move(server_end));
-      auto response = fidl::WireSendEvent(typed_server_end)
-                          ->OnOpen(ZX_OK, fio::wire::NodeInfoDeprecated::WithService({}));
-      if (!response.ok()) {
-        return response.status();
+      fidl::Status status = fidl::WireSendEvent(typed_server_end)
+                                ->OnOpen(ZX_OK, fio::wire::NodeInfoDeprecated::WithService({}));
+      if (!status.ok()) {
+        return status.status();
       }
       server_end = typed_server_end.TakeChannel();
     }
@@ -377,7 +392,7 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
     zx::result<VnodeRepresentation> result = connection->GetNodeRepresentation();
     if (result.is_error()) {
       // Ignore errors since there is nothing we can do if this fails.
-      [[maybe_unused]] auto unused_result =
+      [[maybe_unused]] fidl::Status status =
           fidl::WireSendEvent(fidl::ServerEnd<fuchsia_io::Node>(std::move(server_end)))
               ->OnOpen(result.status_value(), fio::wire::NodeInfoDeprecated());
       return result.status_value();
@@ -390,7 +405,7 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
       // immediately closed the connection.  If the caller is doing that, they shouldn't have used
       // the describe flag, but there have been cases where this happened in the past and so we
       // preserve that behaviour for now.
-      [[maybe_unused]] auto result =
+      [[maybe_unused]] fidl::Status status =
           fidl::WireSendEvent(typed_server_end)->OnOpen(ZX_OK, std::move(info));
       server_end = typed_server_end.TakeChannel();
     });

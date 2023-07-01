@@ -42,47 +42,43 @@ TEST(Service, ApiTest) {
     return ZX_OK;
   });
 
-  fs::VnodeConnectionOptions options_readable;
-  options_readable.rights.read = true;
-
   // open
   fbl::RefPtr<fs::Vnode> redirect;
-  auto result = svc->ValidateOptions(options_readable);
+  auto result = svc->ValidateOptions({});
   EXPECT_TRUE(result.is_ok());
-  EXPECT_EQ(ZX_OK, svc->Open(result.value(), &redirect));
+  EXPECT_OK(svc->Open(result.value(), &redirect));
   EXPECT_NULL(redirect);
 
   // get attr
   fs::VnodeAttributes attr;
-  EXPECT_EQ(ZX_OK, svc->GetAttributes(&attr));
+  EXPECT_OK(svc->GetAttributes(&attr));
   EXPECT_EQ(V_TYPE_FILE, attr.mode);
   EXPECT_EQ(1, attr.link_count);
 
   // make some channels we can use for testing
   zx::channel c1, c2;
-  EXPECT_EQ(ZX_OK, zx::channel::create(0u, &c1, &c2));
+  EXPECT_OK(zx::channel::create(0u, &c1, &c2));
   zx_handle_t hc1 = c1.get();
 
   // serve, the connector will return success the first time
   fs::SynchronousVfs vfs;
-  EXPECT_EQ(ZX_OK, vfs.Serve(svc, std::move(c1), options_readable));
+  EXPECT_OK(vfs.Serve(svc, std::move(c1), {}));
   EXPECT_EQ(hc1, bound_channel.get());
 
   // The connector will return failure because bound_channel is still valid we test that the error
   // is propagated back up through Serve,
-  EXPECT_EQ(ZX_ERR_IO, vfs.Serve(svc, std::move(c2), options_readable));
+  EXPECT_EQ(ZX_ERR_IO, vfs.Serve(svc, std::move(c2), {}));
   EXPECT_EQ(hc1, bound_channel.get());
 }
 
 TEST(Service, ServeDirectory) {
   zx::result root = fidl::CreateEndpoints<fio::Directory>();
-  ASSERT_EQ(ZX_OK, root.status_value());
+  ASSERT_OK(root.status_value());
 
   // open client
   zx::channel c1, c2;
-  EXPECT_EQ(ZX_OK, zx::channel::create(0u, &c1, &c2));
-  EXPECT_EQ(ZX_OK,
-            fdio_service_connect_at(root->client.borrow().channel()->get(), "abc", c2.release()));
+  EXPECT_OK(zx::channel::create(0u, &c1, &c2));
+  EXPECT_OK(fdio_service_connect_at(root->client.borrow().channel()->get(), "abc", c2.release()));
 
   // Close client. We test the semantic that a pending open is processed even if the client has been
   // closed.
@@ -99,14 +95,14 @@ TEST(Service, ServeDirectory) {
   });
   directory->AddEntry("abc", vnode);
 
-  EXPECT_EQ(ZX_OK, vfs.ServeDirectory(directory, std::move(root->server)));
+  EXPECT_OK(vfs.ServeDirectory(directory, std::move(root->server)));
   EXPECT_EQ(ZX_ERR_BAD_STATE, loop.RunUntilIdle());
 }
 
 TEST(Service, ServiceNodeIsNotDirectory) {
   // Set up the server
   zx::result root = fidl::CreateEndpoints<fio::Directory>();
-  ASSERT_EQ(ZX_OK, root.status_value());
+  ASSERT_OK(root.status_value());
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   fs::SynchronousVfs vfs(loop.dispatcher());
@@ -119,7 +115,7 @@ TEST(Service, ServiceNodeIsNotDirectory) {
     return ZX_OK;
   });
   directory->AddEntry("abc", vnode);
-  ASSERT_EQ(ZX_OK, vfs.ServeDirectory(directory, std::move(root->server)));
+  ASSERT_OK(vfs.ServeDirectory(directory, std::move(root->server)));
 
   // Call |ValidateOptions| with the directory flag should fail.
   auto result = vnode->ValidateOptions(fs::VnodeConnectionOptions::ReadWrite().set_directory());
@@ -128,7 +124,7 @@ TEST(Service, ServiceNodeIsNotDirectory) {
 
   // Open the service through FIDL with the directory flag, which should fail.
   zx::result abc = fidl::CreateEndpoints<fio::Node>();
-  ASSERT_EQ(ZX_OK, abc.status_value());
+  ASSERT_OK(abc.status_value());
 
   loop.StartThread();
 
@@ -137,7 +133,7 @@ TEST(Service, ServiceNodeIsNotDirectory) {
           ->Open(fio::wire::OpenFlags::kDescribe | fio::wire::OpenFlags::kDirectory |
                      fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable,
                  {}, fidl::StringView("abc"), std::move(abc->server));
-  EXPECT_EQ(open_result.status(), ZX_OK);
+  EXPECT_OK(open_result);
   class EventHandler : public fidl::testing::WireSyncEventHandlerTestBase<fio::Node> {
    public:
     EventHandler() = default;
@@ -163,7 +159,7 @@ TEST(Service, ServiceNodeIsNotDirectory) {
 TEST(Service, OpeningServiceWithNodeReferenceFlag) {
   // Set up the server
   zx::result root = fidl::CreateEndpoints<fio::Directory>();
-  ASSERT_EQ(ZX_OK, root.status_value());
+  ASSERT_OK(root.status_value());
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   fs::SynchronousVfs vfs(loop.dispatcher());
@@ -174,10 +170,10 @@ TEST(Service, OpeningServiceWithNodeReferenceFlag) {
     return ZX_OK;
   });
   directory->AddEntry("abc", vnode);
-  ASSERT_EQ(ZX_OK, vfs.ServeDirectory(directory, std::move(root->server)));
+  ASSERT_OK(vfs.ServeDirectory(directory, std::move(root->server)));
 
   zx::result abc = fidl::CreateEndpoints<fio::Node>();
-  ASSERT_EQ(ZX_OK, abc.status_value());
+  ASSERT_OK(abc.status_value());
 
   loop.StartThread();
 

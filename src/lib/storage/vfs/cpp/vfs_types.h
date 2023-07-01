@@ -203,9 +203,6 @@ inline constexpr VnodeProtocolSet operator|(VnodeProtocol lhs, VnodeProtocol rhs
 
 // Options specified during opening and cloning.
 struct VnodeConnectionOptions {
-  // TODO(fxbug.dev/38160): Harmonize flags and rights to express both fuchsia.io v1 and v2
-  // semantics. For now, these map to the corresponding items in fuchsia.io. Refer to that file for
-  // documentation.
   union Flags {
     uint32_t raw_value = 0;
     fbl::BitFieldMember<uint32_t, 0, 1> create;

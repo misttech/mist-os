@@ -40,7 +40,7 @@ void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
             fidl::ServerEnd<fio::Node> server_end, std::string_view path,
             VnodeConnectionOptions options, Rights parent_rights) {
   vfs->Open(parent, path, options, parent_rights, 0)
-      .visit([vfs, &server_end, options](auto&& result) {
+      .visit([vfs, &server_end, options, path](auto&& result) {
         using ResultT = std::decay_t<decltype(result)>;
         using OpenResult = fs::Vfs::OpenResult;
         if constexpr (std::is_same_v<ResultT, OpenResult::Error>) {
@@ -59,8 +59,22 @@ void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
               vn->OpenRemote(options.ToIoV1Flags(), {}, fidl::StringView::FromExternal(path),
                              std::move(server_end));
         } else if constexpr (std::is_same_v<ResultT, OpenResult::Ok>) {
+          VnodeConnectionOptions options = *result.validated_options;
+          // TODO(https://fxbug.dev/101092): Remove this when web_engine with SDK 13.20230626.3.1 or
+          // later is rolled. The important commit is in the private integration repo, but the next
+          // Fuchsia commit is b615ff398580f3b47c050beb9e8f0fc28907ac67 which can be used with the
+          // sdkrevisions tool.
+          if (options.ToIoV1Flags() == fio::OpenFlags::kRightReadable) {
+            bool is_device =
+                path.length() == 8 &&
+                std::all_of(path.begin(), path.end(), [](char c) { return std::isxdigit(c); });
+            if (path == "000" || is_device) {
+              options.rights.read = false;
+            }
+          }
           // |Vfs::Open| already performs option validation for us.
-          vfs->Serve(result.vnode, server_end.TakeChannel(), result.validated_options);
+          [[maybe_unused]] zx_status_t status =
+              vfs->Serve(result.vnode, server_end.TakeChannel(), options);
         }
       });
 }
