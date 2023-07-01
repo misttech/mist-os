@@ -389,6 +389,28 @@ paths.
    }
    ```
 
+   * {Flutter}
+
+   ```gn
+   import("//build/dart/dart_library.gni")
+   import("//build/flutter/flutter_component.gni")
+   import("//build/components.gni")
+
+   dart_library("lib") {
+     package_name = "my_lib"
+     sources = [ "main.dart" ]
+   }
+
+   flutter_component("my_component") {
+     manifest = "meta/my_component.cml"
+     deps = [ ":lib" ]
+   }
+
+   fuchsia_package("my_package") {
+     deps = [ ":my_component" ]
+   }
+   ```
+
 ### Packages with a single component {#packages-with-single-component}
 
 Packages are units of distribution. It is beneficial to define multiple
@@ -570,6 +592,38 @@ import("//build/components.gni")
 fuchsia_package("my_test_package") {
   testonly = true
   deps = [ "//foo:my_test_component" ]
+}
+```
+
+### Dart and Flutter tests
+
+Dart and Flutter tests differ slightly in that they need to be built with a
+`flutter_test_component()`, which collects all of the test mains into a single
+main invocation. The `flutter_test_component()` can then be used by the
+`fuchsia_test_package()`.
+
+```gn
+import("//build/dart/dart_test_component.gni")
+import("//build/flutter/flutter_test_component.gni")
+import("//build/components.gni")
+
+flutter_test_component("my_flutter_test_component") {
+  testonly = true
+  manifest = "meta/my_flutter_test_component.cml"
+  sources = [ "foo_flutter_test.dart" ]
+}
+
+dart_test_component("my_dart_test_component") {
+  testonly = true
+  manifest = "meta/my_dart_test_component.cml"
+  sources = [ "foo_dart_test.dart" ]
+}
+
+fuchsia_test("my_test_component_test") {
+  test_components = [
+    ":my_dart_test_component",
+    ":my_flutter_test_component"
+  ]
 }
 ```
 

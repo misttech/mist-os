@@ -113,7 +113,7 @@ template("_flutter_asset_manifest") {
 # Defines a component which will run in a flutter_runner or dart_runner
 #
 # This template is not intended to be used directly. Users should use the
-# dart_component template instead.
+# flutter_component and dart_component actions instead.
 #
 # Parameters
 #

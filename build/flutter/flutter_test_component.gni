@@ -1,0 +1,88 @@
+# Copyright 2020 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/flutter/flutter_build_config.gni")
+import("//build/flutter/internal/flutter_dart_test_component.gni")
+
+# Defines a component which runs tests in the flutter test harness
+#
+# Bundles a set of `package:test` tests into a single Fuchsia component
+# with generated helper code to invoke the tests appropriately. The resulting
+# application can take Dart test arguments; pass --help to see full options.
+#
+# ```
+# dart_library("lib") {
+#   package_name = "my_library"
+#   sources = [
+#     "foo.dart",
+#     "bar.dart"
+#   ]
+# }
+#
+# flutter_test_component("my-test-component") {
+#   manifest = "meta/my-test-component.cmx"
+#   sources = [
+#     "foo_test.dart",
+#     "bar_test.dart",
+#   ]
+#
+#   deps = [
+#     ":lib",
+#     "//third_party/dart-pkg/git/flutter/packages/flutter_test",
+#     "//third_party/dart-pkg/pub/test",
+#   ]
+# }
+#
+# fuchsia_test_package("my-integration-test") {
+#   test_components = [ ":my-test-component" ]
+# }
+# ```
+#
+# Parameters
+#
+#   manifest (required)
+#     The path to the component manifest
+#     Type: path
+#
+#   sources (required)
+#     The list of test sources. These sources must be within the test/ directory.
+#     Type: List of paths
+#
+#   language_version (optional)
+#     Specify the Dart language version to use for this test.
+#     Defaults to "2.8".
+#
+#   component_name (optional)
+#     The name of the compnonent to test.
+#     Type: String
+#     Default: target_name
+#
+#   package_root (optional)
+#     Path to the directory hosting the library.
+#     This is useful for generated content, and can be ignored otherwise.
+#     Defaults to ".".
+#
+#   TODO(fxb/57577) We can only specify dart runners for now since flutter
+#     runners do not start up their vms until a view is requested and the test
+#     harness (flutter_tester) does not actually request a view.
+#   build_cfg (optional)
+#     Specifies the parameters for building the component.
+#     See //build/dart/dart_build_config.gni for predefined configs.
+#
+#  deps
+#  visibility
+#  non_dart_deps
+template("flutter_test_component") {
+  if (defined(invoker.build_cfg)) {
+    _build_cfg = invoker.build_cfg
+  } else {
+    _build_cfg = flutter_default_build_cfg
+  }
+
+  flutter_dart_test_component(target_name) {
+    forward_variables_from(invoker, "*", [ "build_cfg" ])
+
+    build_cfg = _build_cfg
+  }
+}

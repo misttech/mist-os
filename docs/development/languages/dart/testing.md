@@ -10,6 +10,8 @@ Multiple Dart test targets are available:
 - [dart_test] runs unit tests that can be run on the host or on a fuchsia
   device. The dart:ui package is not made available to these tests. The test can
   be run with `fx tests --host`.
+- [flutter_test] is just like dart_test except the dart:ui package is made
+  available to it, so it can test widget code.
 
 Note that in order to be built and run on bots, the test targets need to be
 included in the packages that are configured to run there. For example, in
@@ -43,3 +45,4 @@ number.
 
 [dart_fuchsia_test]: https://fuchsia.googlesource.com/fuchsia/+/HEAD/build/dart/dart_test_component.gni
 [dart_test]: /build/dart/test.gni
+[flutter_test]: https://fuchsia.googlesource.com/fuchsia/+/HEAD/build/flutter/flutter_test_component.gni

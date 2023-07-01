@@ -60,8 +60,8 @@ template("_convert_kernel_manifest") {
 # Generates dill files for a Dart application.
 #
 # It is not likely that this target will be used directly. Instead, developers
-# should use the dart_tool or dart_component targets which create a kernel for
-# you.
+# should use the dart_tool or dart/flutter_component targets which create a
+# kernel for you.
 #
 # Parameters
 #
