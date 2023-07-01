@@ -27,7 +27,6 @@ Different languages use different mechanisms to talk to `LogSink`. See the relev
 information:
 
 * [C++ logging]
-* [Dart logging]
 * [Go logging]
 * [Rust logging]
 
@@ -83,7 +82,6 @@ lack a way to express the severity of a message.
 [writing thread will drop logs]: /zircon/system/ulib/syslog/fx_logger.cc?l=130&drc=1bdbf8a4e6f758c3b1782dee352071cc592ca3ab
 [prints a warning]: /src/diagnostics/log_listener/src/main.rs?l=918&drc=3a02d1922c0519b4c7d639879ec0503de9c79f0c
 [C++ logging]: /docs/development/languages/c-cpp/logging.md
-[Dart logging]: /docs/development/languages/dart/logging.md
 [Go logging]: /docs/development/languages/go/logging.md
 [Rust logging]: /docs/development/languages/rust/logging.md
 [kernel's shared ring buffer]: /zircon/kernel/lib/debuglog/debuglog.cc?l=37&drc=1bdbf8a4e6f758c3b1782dee352071cc592ca3ab
