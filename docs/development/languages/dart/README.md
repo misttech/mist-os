@@ -71,6 +71,7 @@ my_package/
 - [Running analysis](analysis.md)
 - [Style](style.md)
 - [Testing](testing.md)
+- [Logging](logging.md)
 - [Using FIDL](fidl.md)
 - [Managing third_party dependencies](third_party.md)
 - [IDEs](ides.md)

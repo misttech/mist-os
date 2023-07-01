@@ -1,0 +1,40 @@
+# Copyright 2018 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components/fuchsia_package.gni")
+import("//build/dart/dart_component.gni")
+import("//build/fidl/fidl.gni")
+
+fidl("test-foo-fidl") {
+  # TODO(fxb/35879): Remove lint exclusions by fixing known FIDL lint violations in this target
+  excluded_checks = [
+    "disallowed-library-name-component",
+    "invalid-case-for-decl-name",
+    "string-bounds-not-specified",
+  ]
+
+  name = "test.fuchsia.service.foo"
+
+  sources = [ "fidl/foo.fidl" ]
+}
+
+# The foo test server used for integration testing
+dart_library("lib") {
+  null_safe = true
+  package_name = "fuchsia-services-foo-test-server"
+  sources = [ "main.dart" ]
+  deps = [
+    ":test-foo-fidl_dart",
+    "//sdk/dart/fidl",
+    "//sdk/dart/fuchsia_logger",
+    "//sdk/dart/fuchsia_services",
+  ]
+}
+
+dart_component("fuchsia-services-foo-test-server") {
+  null_safe = true
+  manifest = "meta/fuchsia-services-foo-test-server.cml"
+  main_package = "fuchsia-services-foo-test-server"
+  deps = [ ":lib" ]
+}

@@ -337,5 +337,8 @@ Widget buildButton(
 ]);
 ```
 
+### DO add [logging statements][dart-logging]
+
 [effective-dart]: https://www.dartlang.org/guides/language/effective-dart
+[dart-logging]: /docs/development/languages/dart/logging.md
 [dartstyle-80-chars]: https://www.dartlang.org/guides/language/effective-dart/style#avoid-lines-longer-than-80-characters
