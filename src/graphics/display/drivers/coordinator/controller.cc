@@ -461,11 +461,11 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
       if (primary_client_) {
         // A previous client applied a config and then disconnected before the vsync. Don't send
         // garbage image IDs to the new primary client.
-        if (primary_client_->id() != applied_client_id_) {
+        if (primary_client_->client_id() != applied_client_id_) {
           zxlogf(DEBUG,
-                 "Dropping vsync. This was meant for client[%d], "
-                 "but client[%d] is currently active.\n",
-                 applied_client_id_, primary_client_->id());
+                 "Dropping vsync. This was meant for client[%" PRIu64 "], but client[%" PRIu64
+                 "] is currently active.\n",
+                 applied_client_id_.value(), primary_client_->client_id().value());
         }
       }
   }
@@ -494,7 +494,7 @@ zx_status_t Controller::DisplayControllerInterfaceGetAudioFormat(
 }
 
 void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc,
-                             ConfigStamp config_stamp, uint32_t layer_stamp, uint32_t client_id) {
+                             ConfigStamp config_stamp, uint32_t layer_stamp, ClientId client_id) {
   zx_time_t timestamp = zx_clock_get_monotonic();
   last_valid_apply_config_timestamp_ns_property_.Set(timestamp);
   last_valid_apply_config_interval_ns_property_.Set(timestamp - last_valid_apply_config_timestamp_);
@@ -681,7 +681,7 @@ void Controller::HandleClientOwnershipChanges() {
 }
 
 void Controller::OnClientDead(ClientProxy* client) {
-  zxlogf(DEBUG, "Client %d dead", client->id());
+  zxlogf(DEBUG, "Client %" PRIu64 " dead", client->client_id().value());
   fbl::AutoLock lock(mtx());
   if (unbinding_) {
     return;
@@ -820,8 +820,10 @@ zx_status_t Controller::CreateClient(
     return ZX_ERR_ALREADY_BOUND;
   }
 
-  auto client = std::make_unique<ClientProxy>(this, is_vc, next_client_id_++,
-                                              std::move(on_display_client_dead));
+  ClientId client_id = next_client_id_;
+  ++next_client_id_;
+  auto client =
+      std::make_unique<ClientProxy>(this, is_vc, client_id, std::move(on_display_client_dead));
 
   zx_status_t status = client->Init(&root_, std::move(coordinator_server_end));
   if (status != ZX_OK) {
@@ -832,7 +834,8 @@ zx_status_t Controller::CreateClient(
   ClientProxy* client_ptr = client.get();
   clients_.push_back(std::move(client));
 
-  zxlogf(DEBUG, "New %s client [%d] connected.", is_vc ? "dc-vc" : "dc", client_ptr->id());
+  zxlogf(DEBUG, "New %s client [%" PRIu64 "] connected.", is_vc ? "main" : "virtcon",
+         client_ptr->client_id().value());
 
   if (is_vc) {
     vc_client_ = client_ptr;

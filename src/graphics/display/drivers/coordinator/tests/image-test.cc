@@ -12,9 +12,9 @@
 #include <lib/fit/defer.h>
 
 #include <fbl/auto_lock.h>
+#include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
 
-#include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
@@ -34,8 +34,8 @@ class ImageTest : public TestBase, public FenceCallback {
     if (display()->ImportVmoImage(&dc_image, std::move(vmo), /*offset=*/0) != ZX_OK) {
       return nullptr;
     }
-    auto image = fbl::AdoptRef(
-        new Image(controller(), dc_image, std::move(dup_vmo), nullptr, /*client_id=*/1u));
+    fbl::RefPtr<Image> image =
+        fbl::AdoptRef(new Image(controller(), dc_image, std::move(dup_vmo), nullptr, ClientId(1)));
     image->id = next_image_id_++;
     return image;
   }

@@ -41,6 +41,7 @@
 #include <fbl/string_printf.h>
 
 #include "src/graphics/display/drivers/coordinator/capture-image.h"
+#include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/capture-image-id.h"
@@ -1501,14 +1502,14 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
   return fpromise::ok(binding);
 }
 
-Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, uint32_t client_id)
+Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, ClientId client_id)
     : controller_(controller),
       proxy_(proxy),
       is_vc_(is_vc),
       id_(client_id),
       fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)) {}
 
-Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, uint32_t client_id,
+Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, ClientId client_id,
                fidl::ServerEnd<fhd::Coordinator> server_end)
     : controller_(controller),
       proxy_(proxy),
@@ -1767,7 +1768,8 @@ void ClientProxy::CloseOnControllerLoop() {
 
 zx_status_t ClientProxy::Init(inspect::Node* parent_node,
                               fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) {
-  node_ = parent_node->CreateChild(fbl::StringPrintf("client-%d", handler_.id()).c_str());
+  node_ =
+      parent_node->CreateChild(fbl::StringPrintf("client-%" PRIu64, handler_.id().value()).c_str());
   node_.CreateBool("primary", !is_vc_, &static_properties_);
   is_owner_property_ = node_.CreateBool("is_owner", false);
 
@@ -1781,7 +1783,7 @@ zx_status_t ClientProxy::Init(inspect::Node* parent_node,
   return ZX_OK;
 }
 
-ClientProxy::ClientProxy(Controller* controller, bool is_vc, uint32_t client_id,
+ClientProxy::ClientProxy(Controller* controller, bool is_vc, ClientId client_id,
                          fit::function<void()> on_client_dead)
     : controller_(controller),
       is_vc_(is_vc),
@@ -1790,7 +1792,7 @@ ClientProxy::ClientProxy(Controller* controller, bool is_vc, uint32_t client_id,
   mtx_init(&mtx_, mtx_plain);
 }
 
-ClientProxy::ClientProxy(Controller* controller, bool is_vc, uint32_t client_id,
+ClientProxy::ClientProxy(Controller* controller, bool is_vc, ClientId client_id,
                          fidl::ServerEnd<fhd::Coordinator> server_end)
     : controller_(controller),
       is_vc_(is_vc),

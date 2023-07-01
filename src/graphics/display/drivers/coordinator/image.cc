@@ -16,12 +16,13 @@
 #include <fbl/intrusive_container_utils.h>
 #include <fbl/string_printf.h>
 
+#include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 
 namespace display {
 
 Image::Image(Controller* controller, const image_t& info, zx::vmo vmo, inspect::Node* parent_node,
-             uint32_t client_id)
+             ClientId client_id)
     : info_(info), controller_(controller), client_id_(client_id), vmo_(std::move(vmo)) {
   ZX_DEBUG_ASSERT(info.type != IMAGE_TYPE_CAPTURE);
   InitializeInspect(parent_node);

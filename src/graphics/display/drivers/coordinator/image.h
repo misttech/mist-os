@@ -18,6 +18,7 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
+#include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
@@ -66,11 +67,13 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
                                                  fbl::SizeOrder::N, DefaultDoublyLinkedListTraits>;
 
   Image(Controller* controller, const image_t& info, zx::vmo vmo, inspect::Node* parent_node,
-        uint32_t client_id);
+        ClientId client_id);
   ~Image();
 
   image_t& info() { return info_; }
-  uint32_t client_id() const { return client_id_; }
+
+  // The client that owns the image.
+  ClientId client_id() const { return client_id_; }
 
   // Marks the image as in use.
   bool Acquire();
@@ -152,9 +155,7 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   image_t info_;
 
   Controller* const controller_;
-
-  // |id_| of the client that created the image.
-  const uint32_t client_id_;
+  const ClientId client_id_;
 
   // Stamp of the latest Controller display configuration that uses this image.
   ConfigStamp latest_controller_config_stamp_ = kInvalidConfigStamp;

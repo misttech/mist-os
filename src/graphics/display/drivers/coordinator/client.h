@@ -42,6 +42,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/capture-image.h"
+#include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
@@ -159,10 +160,10 @@ class DisplayControllerBindingState {
 class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
  public:
   // |controller| must outlive this and |proxy|.
-  Client(Controller* controller, ClientProxy* proxy, bool is_vc, uint32_t id);
+  Client(Controller* controller, ClientProxy* proxy, bool is_vc, ClientId client_id);
 
   // This is used for testing
-  Client(Controller* controller, ClientProxy* proxy, bool is_vc, uint32_t id,
+  Client(Controller* controller, ClientProxy* proxy, bool is_vc, ClientId client_id,
          fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
 
   Client(const Client&) = delete;
@@ -185,7 +186,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   void TearDownTest();
 
   bool IsValid() const { return running_; }
-  uint32_t id() const { return id_; }
+  ClientId id() const { return id_; }
   void CaptureCompleted();
 
   uint8_t GetMinimumRgb() const { return client_minimum_rgb_; }
@@ -285,7 +286,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   Controller* controller_;
   ClientProxy* proxy_;
   const bool is_vc_;
-  const uint32_t id_;
+  const ClientId id_;
   bool running_;
   Image::Map images_;
 
@@ -361,11 +362,11 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
 class ClientProxy {
  public:
   // "client_id" is assigned by the Controller to distinguish clients.
-  ClientProxy(Controller* controller, bool is_vc, uint32_t client_id,
+  ClientProxy(Controller* controller, bool is_vc, ClientId client_id,
               fit::function<void()> on_client_dead);
 
   // This is used for testing
-  ClientProxy(Controller* controller, bool is_vc, uint32_t client_id,
+  ClientProxy(Controller* controller, bool is_vc, ClientId client_id,
               fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
 
   ~ClientProxy();
@@ -401,7 +402,7 @@ class ClientProxy {
   // settings that need to get restored once client takes control again.
   void ReapplySpecialConfigs();
 
-  uint32_t id() const { return handler_.id(); }
+  ClientId client_id() const { return handler_.id(); }
 
   inspect::Node& node() { return node_; }
 

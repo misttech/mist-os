@@ -9,14 +9,13 @@
 
 #include <fbl/auto_lock.h>
 #include <fbl/intrusive_single_list.h>
+#include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
 
-#include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/lib/testing/predicates/status.h"
@@ -41,8 +40,8 @@ class LayerTest : public TestBase {
     };
     EXPECT_OK(display()->ImportVmoImage(&dc_image, zx::vmo(0), 0));
     EXPECT_NE(dc_image.handle, 0u);
-    auto image =
-        fbl::AdoptRef(new Image(controller(), dc_image, zx::vmo(0), nullptr, /*client_id=*/1u));
+    fbl::RefPtr<Image> image =
+        fbl::AdoptRef(new Image(controller(), dc_image, zx::vmo(0), nullptr, ClientId(1)));
     image->id = next_image_id_++;
     image->Acquire();
     return image;

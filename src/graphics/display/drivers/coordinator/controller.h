@@ -17,6 +17,7 @@
 #include <lib/zx/channel.h>
 #include <lib/zx/vmo.h>
 
+#include <cstdint>
 #include <functional>
 #include <list>
 #include <memory>
@@ -30,6 +31,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/capture-image.h"
+#include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
@@ -64,7 +66,7 @@ class Controller : public DeviceType,
   explicit Controller(zx_device_t* parent);
 
   // Creates a new coordinator Controller device with an injected `inspector`.
-  // The `inspector` and inspect data may be duplicated and shared. 
+  // The `inspector` and inspect data may be duplicated and shared.
   Controller(zx_device_t* parent, inspect::Inspector inspector);
 
   Controller(const Controller&) = delete;
@@ -97,7 +99,7 @@ class Controller : public DeviceType,
   void ShowActiveDisplay();
 
   void ApplyConfig(DisplayConfig* configs[], int32_t count, bool vc_client,
-                   ConfigStamp config_stamp, uint32_t layer_stamp, uint32_t client_id)
+                   ConfigStamp config_stamp, uint32_t layer_stamp, ClientId client_id)
       __TA_EXCLUDES(mtx());
 
   void ReleaseImage(Image* image);
@@ -174,14 +176,14 @@ class Controller : public DeviceType,
   DisplayInfo::Map displays_ __TA_GUARDED(mtx());
   bool vc_applied_ = false;
   uint32_t applied_layer_stamp_ = UINT32_MAX;
-  uint32_t applied_client_id_ = 0;
+  ClientId applied_client_id_ = kInvalidClientId;
   DriverCaptureImageId pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
 
   bool supports_capture_ = false;
 
   display::DriverBufferCollectionId next_driver_buffer_collection_id_ __TA_GUARDED(mtx()) =
       display::DriverBufferCollectionId(1);
-  uint32_t next_client_id_ __TA_GUARDED(mtx()) = 1;
+  ClientId next_client_id_ __TA_GUARDED(mtx()) = ClientId(1);
   ClientProxy* vc_client_ __TA_GUARDED(mtx()) = nullptr;
   bool vc_ready_ __TA_GUARDED(mtx());
   ClientProxy* primary_client_ __TA_GUARDED(mtx()) = nullptr;

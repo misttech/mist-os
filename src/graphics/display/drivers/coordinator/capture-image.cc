@@ -16,7 +16,7 @@
 namespace display {
 
 CaptureImage::CaptureImage(Controller* controller, DriverCaptureImageId driver_capture_image_id,
-                           inspect::Node* parent_node, uint32_t client_id)
+                           inspect::Node* parent_node, ClientId client_id)
     : driver_capture_image_id_(driver_capture_image_id),
       client_id_(client_id),
       controller_(controller) {
@@ -31,7 +31,7 @@ void CaptureImage::InitializeInspect(inspect::Node* parent_node) {
   if (!parent_node)
     return;
   node_ = parent_node->CreateChild(fbl::StringPrintf("capture-image-%p", this).c_str());
-  node_.CreateUint("client_id", client_id_, &properties_);
+  node_.CreateUint("client_id", client_id_.value(), &properties_);
 }
 
 }  // namespace display

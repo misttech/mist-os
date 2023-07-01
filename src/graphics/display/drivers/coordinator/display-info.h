@@ -22,6 +22,7 @@
 #include <fbl/string_printf.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
@@ -119,7 +120,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
 
     struct ImageMetadata {
       ImageId image_id;
-      uint64_t client_id;
+      ClientId client_id;
     };
     std::vector<ImageMetadata> images;
   };
