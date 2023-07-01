@@ -11,6 +11,7 @@
 
 #include <memory>
 
+#include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/fake/sysmem-proxy-device.h"
 
 namespace display {
@@ -103,8 +104,10 @@ void FakeDisplayCoordinatorConnector::ConnectClient(OpenCoordinatorRequest reque
   state->MarkCoordinatorClaimed(use_virtcon_coordinator);
   std::weak_ptr<State> state_weak_ptr = state;
 
+  ClientPriority client_priority =
+      request.is_virtcon ? ClientPriority::kVirtcon : ClientPriority::kPrimary;
   zx_status_t status = state->fake_display_stack->coordinator_controller()->CreateClient(
-      request.is_virtcon, std::move(request.coordinator_request),
+      client_priority, std::move(request.coordinator_request),
       /*on_client_dead=*/
       [state_weak_ptr, use_virtcon_coordinator]() mutable {
         std::shared_ptr<State> state = state_weak_ptr.lock();

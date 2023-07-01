@@ -42,6 +42,7 @@
 
 #include "src/graphics/display/drivers/coordinator/capture-image.h"
 #include "src/graphics/display/drivers/coordinator/client-id.h"
+#include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/capture-image-id.h"
@@ -715,12 +716,12 @@ void Client::EnableVsync(EnableVsyncRequestView request,
 
 void Client::SetVirtconMode(SetVirtconModeRequestView request,
                             SetVirtconModeCompleter::Sync& /*_completer*/) {
-  if (!is_vc_) {
-    zxlogf(ERROR, "Illegal non-virtcon ownership");
+  if (priority_ != ClientPriority::kVirtcon) {
+    zxlogf(ERROR, "SetVirtconMode() called by %s client", DebugStringFromClientPriority(priority_));
     TearDown();
     return;
   }
-  controller_->SetVcMode(request->mode);
+  controller_->SetVirtconMode(request->mode);
   // no Reply defined
 }
 
@@ -1115,7 +1116,7 @@ void Client::ApplyConfig() {
       dc_configs[dc_idx++] = &c;
     }
 
-    controller_->ApplyConfig(dc_configs, dc_idx, is_vc_, current_applied_config_stamp,
+    controller_->ApplyConfig(dc_configs, dc_idx, priority_, current_applied_config_stamp,
                              client_apply_count_, id_);
   }
 }
@@ -1502,20 +1503,21 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
   return fpromise::ok(binding);
 }
 
-Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, ClientId client_id)
+Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priority,
+               ClientId client_id)
     : controller_(controller),
       proxy_(proxy),
-      is_vc_(is_vc),
+      priority_(priority),
       id_(client_id),
       fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)) {
   ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
 }
 
-Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, ClientId client_id,
-               fidl::ServerEnd<fhd::Coordinator> server_end)
+Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priority,
+               ClientId client_id, fidl::ServerEnd<fhd::Coordinator> server_end)
     : controller_(controller),
       proxy_(proxy),
-      is_vc_(is_vc),
+      priority_(priority),
       id_(client_id),
       running_(true),
       fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)),
@@ -1774,7 +1776,7 @@ zx_status_t ClientProxy::Init(inspect::Node* parent_node,
                               fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) {
   node_ =
       parent_node->CreateChild(fbl::StringPrintf("client-%" PRIu64, handler_.id().value()).c_str());
-  node_.CreateBool("primary", !is_vc_, &static_properties_);
+  node_.RecordString("priority", DebugStringFromClientPriority(handler_.priority()));
   is_owner_property_ = node_.CreateBool("is_owner", false);
 
   mtx_init(&task_mtx_, mtx_plain);
@@ -1787,20 +1789,18 @@ zx_status_t ClientProxy::Init(inspect::Node* parent_node,
   return ZX_OK;
 }
 
-ClientProxy::ClientProxy(Controller* controller, bool is_vc, ClientId client_id,
+ClientProxy::ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
                          fit::function<void()> on_client_dead)
     : controller_(controller),
-      is_vc_(is_vc),
-      handler_(controller_, this, is_vc_, client_id),
+      handler_(controller_, this, client_priority, client_id),
       on_client_dead_(std::move(on_client_dead)) {
   mtx_init(&mtx_, mtx_plain);
 }
 
-ClientProxy::ClientProxy(Controller* controller, bool is_vc, ClientId client_id,
+ClientProxy::ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
                          fidl::ServerEnd<fhd::Coordinator> server_end)
     : controller_(controller),
-      is_vc_(is_vc),
-      handler_(controller_, this, is_vc_, client_id, std::move(server_end)) {
+      handler_(controller_, this, client_priority, client_id, std::move(server_end)) {
   mtx_init(&mtx_, mtx_plain);
 }
 

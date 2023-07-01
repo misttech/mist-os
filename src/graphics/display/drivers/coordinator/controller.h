@@ -32,6 +32,7 @@
 
 #include "src/graphics/display/drivers/coordinator/capture-image.h"
 #include "src/graphics/display/drivers/coordinator/client-id.h"
+#include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
@@ -95,10 +96,10 @@ class Controller : public DeviceType,
 
   void DisplayCaptureInterfaceOnCaptureComplete();
   void OnClientDead(ClientProxy* client);
-  void SetVcMode(fuchsia_hardware_display::wire::VirtconMode mode);
+  void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
   void ShowActiveDisplay();
 
-  void ApplyConfig(DisplayConfig* configs[], int32_t count, bool vc_client,
+  void ApplyConfig(DisplayConfig* configs[], int32_t count, ClientPriority client_priority,
                    ConfigStamp config_stamp, uint32_t layer_stamp, ClientId client_id)
       __TA_EXCLUDES(mtx());
 
@@ -141,7 +142,7 @@ class Controller : public DeviceType,
 
   // Typically called by OpenController/OpenVirtconController.  However, this is made public
   // for use by testing services which provide a fake display controller.
-  zx_status_t CreateClient(bool is_vc,
+  zx_status_t CreateClient(ClientPriority client_priority,
                            fidl::ServerEnd<fuchsia_hardware_display::Coordinator> client,
                            fit::function<void()> on_client_dead = nullptr);
 
@@ -174,7 +175,7 @@ class Controller : public DeviceType,
   bool kernel_framebuffer_released_ = false;
 
   DisplayInfo::Map displays_ __TA_GUARDED(mtx());
-  bool vc_applied_ = false;
+  ClientPriority applied_client_priority_ = ClientPriority::kPrimary;
   uint32_t applied_layer_stamp_ = UINT32_MAX;
   ClientId applied_client_id_ = kInvalidClientId;
   DriverCaptureImageId pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
@@ -184,11 +185,11 @@ class Controller : public DeviceType,
   display::DriverBufferCollectionId next_driver_buffer_collection_id_ __TA_GUARDED(mtx()) =
       display::DriverBufferCollectionId(1);
   ClientId next_client_id_ __TA_GUARDED(mtx()) = ClientId(1);
-  ClientProxy* vc_client_ __TA_GUARDED(mtx()) = nullptr;
-  bool vc_ready_ __TA_GUARDED(mtx());
+  ClientProxy* virtcon_client_ __TA_GUARDED(mtx()) = nullptr;
+  bool virtcon_client_ready_ __TA_GUARDED(mtx());
   ClientProxy* primary_client_ __TA_GUARDED(mtx()) = nullptr;
-  bool primary_ready_ __TA_GUARDED(mtx());
-  fuchsia_hardware_display::wire::VirtconMode vc_mode_ __TA_GUARDED(mtx()) =
+  bool primary_client_ready_ __TA_GUARDED(mtx());
+  fuchsia_hardware_display::wire::VirtconMode virtcon_mode_ __TA_GUARDED(mtx()) =
       fuchsia_hardware_display::wire::VirtconMode::kInactive;
   ClientProxy* active_client_ __TA_GUARDED(mtx()) = nullptr;
 

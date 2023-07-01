@@ -43,6 +43,7 @@
 
 #include "src/graphics/display/drivers/coordinator/capture-image.h"
 #include "src/graphics/display/drivers/coordinator/client-id.h"
+#include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
@@ -160,10 +161,10 @@ class DisplayControllerBindingState {
 class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
  public:
   // |controller| must outlive this and |proxy|.
-  Client(Controller* controller, ClientProxy* proxy, bool is_vc, ClientId client_id);
+  Client(Controller* controller, ClientProxy* proxy, ClientPriority priority, ClientId client_id);
 
   // This is used for testing
-  Client(Controller* controller, ClientProxy* proxy, bool is_vc, ClientId client_id,
+  Client(Controller* controller, ClientProxy* proxy, ClientPriority priority, ClientId client_id,
          fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
 
   Client(const Client&) = delete;
@@ -187,6 +188,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
 
   bool IsValid() const { return running_; }
   ClientId id() const { return id_; }
+  ClientPriority priority() const { return priority_; }
   void CaptureCompleted();
 
   uint8_t GetMinimumRgb() const { return client_minimum_rgb_; }
@@ -285,7 +287,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
 
   Controller* controller_;
   ClientProxy* proxy_;
-  const bool is_vc_;
+  const ClientPriority priority_;
   const ClientId id_;
   bool running_;
   Image::Map images_;
@@ -361,12 +363,12 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
 // controller. Methods on this class are thread safe.
 class ClientProxy {
  public:
-  // "client_id" is assigned by the Controller to distinguish clients.
-  ClientProxy(Controller* controller, bool is_vc, ClientId client_id,
+  // `client_id` is assigned by the Controller to distinguish clients.
+  ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
               fit::function<void()> on_client_dead);
 
   // This is used for testing
-  ClientProxy(Controller* controller, bool is_vc, ClientId client_id,
+  ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
               fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
 
   ~ClientProxy();
@@ -446,7 +448,6 @@ class ClientProxy {
 
   mtx_t mtx_;
   Controller* controller_;
-  bool is_vc_;
 
   Client handler_;
   bool enable_vsync_ __TA_GUARDED(&mtx_) = false;
@@ -484,7 +485,6 @@ class ClientProxy {
  private:
   inspect::Node node_;
   inspect::BoolProperty is_owner_property_;
-  inspect::ValueList static_properties_;
 };
 
 }  // namespace display

@@ -41,6 +41,7 @@ source_set("shared") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "capture-image.cc",
+    "client-priority.cc",
     "client.cc",
     "controller.cc",
     "display-info.cc",

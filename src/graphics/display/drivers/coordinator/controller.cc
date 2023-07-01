@@ -37,6 +37,7 @@
 #include <fbl/string_printf.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/eld.h"
@@ -260,10 +261,10 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
           zxlogf(WARNING, "Ignoring display with no compatible edid timings");
         }
       }
-      if (vc_client_ && vc_ready_) {
-        vc_client_->OnDisplaysChanged(added_ids, removed_display_ids);
+      if (virtcon_client_ != nullptr && virtcon_client_ready_) {
+        virtcon_client_->OnDisplaysChanged(added_ids, removed_display_ids);
       }
-      if (primary_client_ && primary_ready_) {
+      if (primary_client_ != nullptr && primary_client_ready_) {
         primary_client_->OnDisplaysChanged(added_ids, removed_display_ids);
       }
 
@@ -287,10 +288,10 @@ void Controller::DisplayCaptureInterfaceOnCaptureComplete() {
         pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
       }
       fbl::AutoLock lock(mtx());
-      if (vc_client_ && vc_ready_) {
-        vc_client_->OnCaptureComplete();
+      if (virtcon_client_ != nullptr && virtcon_client_ready_) {
+        virtcon_client_->OnCaptureComplete();
       }
-      if (primary_client_ && primary_ready_) {
+      if (primary_client_ && primary_client_ready_) {
         primary_client_->OnCaptureComplete();
       }
     } else {
@@ -365,7 +366,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
           .source = ConfigStampSource::kPrimary,
       },
       {
-          .client = vc_client_,
+          .client = virtcon_client_,
           .source = ConfigStampSource::kVirtcon,
       },
   };
@@ -455,7 +456,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
       primary_client_->OnDisplayVsync(display_id, timestamp, controller_config_stamp);
       break;
     case ConfigStampSource::kVirtcon:
-      vc_client_->OnDisplayVsync(display_id, timestamp, controller_config_stamp);
+      virtcon_client_->OnDisplayVsync(display_id, timestamp, controller_config_stamp);
       break;
     case ConfigStampSource::kNeither:
       if (primary_client_) {
@@ -493,8 +494,9 @@ zx_status_t Controller::DisplayControllerInterfaceGetAudioFormat(
   return ZX_OK;
 }
 
-void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc,
-                             ConfigStamp config_stamp, uint32_t layer_stamp, ClientId client_id) {
+void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
+                             ClientPriority client_priority, ConfigStamp config_stamp,
+                             uint32_t layer_stamp, ClientId client_id) {
   zx_time_t timestamp = zx_clock_get_monotonic();
   last_valid_apply_config_timestamp_ns_property_.Set(timestamp);
   last_valid_apply_config_interval_ns_property_.Set(timestamp - last_valid_apply_config_timestamp_);
@@ -522,7 +524,8 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
 
   {
     fbl::AutoLock lock(mtx());
-    bool switching_client = (is_vc != vc_applied_ || client_id != applied_client_id_);
+    bool switching_client =
+        (client_priority != applied_client_priority_ || client_id != applied_client_id_);
     // The fact that there could already be a vsync waiting to be handled when a config
     // is applied means that a vsync with no handle for a layer could be interpreted as either
     // nothing in the layer has been presented or everything in the layer can be retired. To
@@ -614,7 +617,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
       }
     }
 
-    vc_applied_ = is_vc;
+    applied_client_priority_ = client_priority;
     applied_layer_stamp_ = layer_stamp;
     applied_client_id_ = client_id;
 
@@ -654,17 +657,17 @@ void Controller::ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_i
   }
 }
 
-void Controller::SetVcMode(fuchsia_hardware_display::wire::VirtconMode vc_mode) {
+void Controller::SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode) {
   fbl::AutoLock lock(mtx());
-  vc_mode_ = vc_mode;
+  virtcon_mode_ = virtcon_mode;
   HandleClientOwnershipChanges();
 }
 
 void Controller::HandleClientOwnershipChanges() {
   ClientProxy* new_active;
-  if (vc_mode_ == fidl_display::wire::VirtconMode::kForced ||
-      (vc_mode_ == fidl_display::wire::VirtconMode::kFallback && primary_client_ == nullptr)) {
-    new_active = vc_client_;
+  if (virtcon_mode_ == fidl_display::wire::VirtconMode::kForced ||
+      (virtcon_mode_ == fidl_display::wire::VirtconMode::kFallback && primary_client_ == nullptr)) {
+    new_active = virtcon_client_;
   } else {
     new_active = primary_client_;
   }
@@ -686,9 +689,9 @@ void Controller::OnClientDead(ClientProxy* client) {
   if (unbinding_) {
     return;
   }
-  if (client == vc_client_) {
-    vc_client_ = nullptr;
-    vc_mode_ = fidl_display::wire::VirtconMode::kInactive;
+  if (client == virtcon_client_) {
+    virtcon_client_ = nullptr;
+    virtcon_mode_ = fidl_display::wire::VirtconMode::kInactive;
   } else if (client == primary_client_) {
     primary_client_ = nullptr;
   } else {
@@ -785,7 +788,9 @@ bool Controller::GetDisplayPhysicalDimensions(DisplayId display_id, uint32_t* ho
   return false;
 }
 
-static void PrintChannelKoids(bool is_vc, const zx::channel& channel) {
+namespace {
+
+void PrintChannelKoids(ClientPriority client_priority, const zx::channel& channel) {
   zx_info_handle_basic_t info{};
   size_t actual, avail;
   zx_status_t status = channel.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), &actual, &avail);
@@ -794,14 +799,17 @@ static void PrintChannelKoids(bool is_vc, const zx::channel& channel) {
     return;
   }
   ZX_DEBUG_ASSERT(actual == avail);
-  zxlogf(INFO, "%s client connecting on channel (c=0x%lx, s=0x%lx)", is_vc ? "vc" : "dc",
-         info.related_koid, info.koid);
+  zxlogf(INFO, "%s client connecting on channel (c=0x%lx, s=0x%lx)",
+         DebugStringFromClientPriority(client_priority), info.related_koid, info.koid);
 }
 
+}  // namespace
+
 zx_status_t Controller::CreateClient(
-    bool is_vc, fidl::ServerEnd<fidl_display::Coordinator> coordinator_server_end,
+    ClientPriority client_priority,
+    fidl::ServerEnd<fidl_display::Coordinator> coordinator_server_end,
     fit::function<void()> on_display_client_dead) {
-  PrintChannelKoids(is_vc, coordinator_server_end.channel());
+  PrintChannelKoids(client_priority, coordinator_server_end.channel());
   fbl::AllocChecker ac;
   std::unique_ptr<async::Task> task = fbl::make_unique_checked<async::Task>(&ac);
   if (!ac.check()) {
@@ -815,15 +823,16 @@ zx_status_t Controller::CreateClient(
     return ZX_ERR_UNAVAILABLE;
   }
 
-  if ((is_vc && vc_client_) || (!is_vc && primary_client_)) {
-    zxlogf(DEBUG, "Already bound");
+  if ((client_priority == ClientPriority::kVirtcon && virtcon_client_ != nullptr) ||
+      (client_priority == ClientPriority::kPrimary && primary_client_ != nullptr)) {
+    zxlogf(DEBUG, "%s client already bound", DebugStringFromClientPriority(client_priority));
     return ZX_ERR_ALREADY_BOUND;
   }
 
   ClientId client_id = next_client_id_;
   ++next_client_id_;
-  auto client =
-      std::make_unique<ClientProxy>(this, is_vc, client_id, std::move(on_display_client_dead));
+  auto client = std::make_unique<ClientProxy>(this, client_priority, client_id,
+                                              std::move(on_display_client_dead));
 
   zx_status_t status = client->Init(&root_, std::move(coordinator_server_end));
   if (status != ZX_OK) {
@@ -834,15 +843,17 @@ zx_status_t Controller::CreateClient(
   ClientProxy* client_ptr = client.get();
   clients_.push_back(std::move(client));
 
-  zxlogf(DEBUG, "New %s client [%" PRIu64 "] connected.", is_vc ? "main" : "virtcon",
-         client_ptr->client_id().value());
+  zxlogf(DEBUG, "New %s client [%" PRIu64 "] connected.",
+         DebugStringFromClientPriority(client_priority), client_ptr->client_id().value());
 
-  if (is_vc) {
-    vc_client_ = client_ptr;
-    vc_ready_ = false;
-  } else {
-    primary_client_ = client_ptr;
-    primary_ready_ = false;
+  switch (client_priority) {
+    case ClientPriority::kVirtcon:
+      virtcon_client_ = client_ptr;
+      virtcon_client_ready_ = false;
+      break;
+    case ClientPriority::kPrimary:
+      primary_client_ = client_ptr;
+      primary_client_ready_ = false;
   }
   HandleClientOwnershipChanges();
 
@@ -853,7 +864,7 @@ zx_status_t Controller::CreateClient(
           if (unbinding_) {
             return;
           }
-          if (client_ptr == vc_client_ || client_ptr == primary_client_) {
+          if (client_ptr == virtcon_client_ || client_ptr == primary_client_) {
             // Add all existing displays to the client
             if (displays_.size() > 0) {
               DisplayId current_displays[displays_.size()];
@@ -868,10 +879,10 @@ zx_status_t Controller::CreateClient(
                   cpp20::span<DisplayId>(current_displays, displays_.size()), removed_display_ids);
             }
 
-            if (vc_client_ == client_ptr) {
-              vc_ready_ = true;
+            if (virtcon_client_ == client_ptr) {
+              virtcon_client_ready_ = true;
             } else {
-              primary_ready_ = true;
+              primary_client_ready_ = true;
             }
           }
         }
@@ -888,12 +899,12 @@ display::DriverBufferCollectionId Controller::GetNextDriverBufferCollectionId() 
 
 void Controller::OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,
                                            OpenCoordinatorForVirtconCompleter::Sync& completer) {
-  completer.Reply(CreateClient(/*is_vc=*/true, std::move(request->coordinator)));
+  completer.Reply(CreateClient(ClientPriority::kVirtcon, std::move(request->coordinator)));
 }
 
 void Controller::OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
                                            OpenCoordinatorForPrimaryCompleter::Sync& completer) {
-  completer.Reply(CreateClient(/*is_vc=*/false, std::move(request->coordinator)));
+  completer.Reply(CreateClient(ClientPriority::kPrimary, std::move(request->coordinator)));
 }
 
 void Controller::OnVsyncMonitor() {
@@ -1030,13 +1041,13 @@ Controller::~Controller() { zxlogf(INFO, "Controller::~Controller"); }
 
 size_t Controller::TEST_imported_images_count() const {
   fbl::AutoLock lock(mtx());
-  size_t vc_images = vc_client_ ? vc_client_->TEST_imported_images_count() : 0;
+  size_t virtcon_images = virtcon_client_ ? virtcon_client_->TEST_imported_images_count() : 0;
   size_t primary_images = primary_client_ ? primary_client_->TEST_imported_images_count() : 0;
   size_t display_images = 0;
   for (const auto& display : displays_) {
     display_images += display.images.size_slow();
   }
-  return vc_images + primary_images + display_images;
+  return virtcon_images + primary_images + display_images;
 }
 
 // ControllerInstance methods

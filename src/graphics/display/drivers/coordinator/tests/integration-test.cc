@@ -58,8 +58,8 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
 
   bool virtcon_client_connected() {
     fbl::AutoLock l(controller()->mtx());
-    return (controller()->vc_client_ != nullptr &&
-            controller()->vc_client_ == controller()->active_client_);
+    return (controller()->virtcon_client_ != nullptr &&
+            controller()->virtcon_client_ == controller()->active_client_);
   }
 
   bool vsync_acknowledge_delivered(uint64_t cookie) {
@@ -85,7 +85,7 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
 
   bool virtcon_client_dead() {
     fbl::AutoLock l(controller()->mtx());
-    return controller()->vc_client_ == nullptr;
+    return controller()->virtcon_client_ == nullptr;
   }
 
   void client_proxy_send_vsync() {
