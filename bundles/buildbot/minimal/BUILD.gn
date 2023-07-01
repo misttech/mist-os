@@ -29,9 +29,12 @@ group("additional_build_targets") {
     # Flutter deps are removed on RISC-V.
     # sdk:tests
 
-    # TODO(fxbug.dev/122609): Enable after removing Go dependencies and fixing
-    # fxbug.dev/129093.
+    # TODO(fxbug.dev/122609): Enable the rest after removing Go dependencies and
+    # fixing fxbug.dev/129093.
     # "//src/connectivity/network:tests",
+    "//src/connectivity/network/tests/fidl:netstack-fidl-tests-with-expectations",
+    "//src/connectivity/network/tests/fidl:netstack-debug-fidl-test",
+    "//src/connectivity/network/tests/fidl:netstack-error-fidl-tests",
 
     # TODO(fxbug.dev/128554): Enable once //src/starnix/containers/debian
     # supports RISC-V.

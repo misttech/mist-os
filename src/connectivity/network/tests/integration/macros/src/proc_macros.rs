@@ -12,6 +12,7 @@ use quote::quote;
 struct Implementation {
     type_name: syn::Path,
     suffix: &'static str,
+    attrs: Vec<syn::Attribute>,
 }
 
 /// A variant tests will be generated for.
@@ -29,6 +30,8 @@ struct TestVariation {
     generics: Vec<syn::TypeParam>,
     /// Suffix of the test name.
     suffix: String,
+    /// Extra attributes that get stuck on the test function.
+    attributes: Vec<syn::Attribute>,
 }
 
 fn str_to_syn_path(path: &str) -> syn::Path {
@@ -80,12 +83,14 @@ fn permutations_over_type_generics<'a>(
     });
 
     Either::Left(itertools::Itertools::multi_cartesian_product(piece_iterators).map(|pieces| {
-        let (mut params, mut generics, mut name_pieces) = (Vec::new(), Vec::new(), vec![""]);
+        let (mut params, mut generics, mut attributes, mut name_pieces) =
+            (Vec::new(), Vec::new(), Vec::new(), vec![""]);
         for piece in pieces {
             match piece {
-                Piece::Instantiated(Implementation { type_name, suffix }) => {
+                Piece::Instantiated(Implementation { type_name, suffix, attrs }) => {
                     params.push(type_name.clone());
                     name_pieces.push(*suffix);
+                    attributes.extend(attrs.into_iter().cloned());
                 }
                 Piece::PassThroughGeneric(type_param) => {
                     params.push(type_param.ident.clone().into());
@@ -94,7 +99,7 @@ fn permutations_over_type_generics<'a>(
             }
         }
         let suffix = name_pieces.join("_");
-        TestVariation { params, generics, suffix }
+        TestVariation { params, generics, suffix, attributes }
     }))
 }
 
@@ -259,12 +264,13 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
     // If we're not emitting any variants we're aware of, just re-emit the
     // function with its name passed in as the first argument.
     if permutations.peek().is_none() {
-        let TestVariation { params: _, generics, suffix } = first_permutation;
+        let TestVariation { params: _, generics, suffix, attributes } = first_permutation;
         // Suffix should be empty for single permutation.
         assert_eq!(suffix, "");
         let args = make_args(name.to_string());
         let result = quote! {
             #(#impl_attrs)*
+            #(#attributes)*
             #[fuchsia_async::run_singlethreaded(test)]
             async fn #name < #(#generics),* > ( #(#impl_inputs),* ) #output #where_clause {
                 #item
@@ -279,7 +285,7 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
     //
     // Glue the first permutation back on so it gets included in the output.
     let impls = std::iter::once(first_permutation).chain(permutations).map(
-        |TestVariation { params, generics, suffix }| {
+        |TestVariation { params, generics, suffix, attributes }| {
             // We don't need to add an "_" between the name and the suffix here as the suffix
             // will start with one.
             let test_name_str = format!("{}{}", name.to_string(), suffix);
@@ -288,6 +294,7 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
 
             quote! {
                 #(#impl_attrs)*
+                #(#attributes)*
                 #[fuchsia_async::run_singlethreaded(test)]
                 async fn #test_name < #(#generics),* > ( #(#impl_inputs),* ) #output #where_clause {
                     #name :: < #(#params),* > ( #(#args),* ).await
@@ -409,20 +416,23 @@ pub fn netstack_test(attrs: TokenStream, input: TokenStream) -> TokenStream {
         .into();
     }
 
+    let disable_on_riscv: syn::Attribute = syn::parse_quote!(#[cfg(not(target_arch = "riscv64"))]);
+
     netstack_test_inner(
         input,
         &[
             Variant {
                 trait_bound: str_to_syn_path("Netstack"),
                 implementations: &[
-                    #[cfg(not(target_arch = "riscv64"))]
                     Implementation {
                         type_name: str_to_syn_path("netstack_testing_common::realms::Netstack2"),
                         suffix: "ns2",
+                        attrs: vec![disable_on_riscv.clone()],
                     },
                     Implementation {
                         type_name: str_to_syn_path("netstack_testing_common::realms::Netstack3"),
                         suffix: "ns3",
+                        attrs: vec![],
                     },
                 ],
             },
@@ -432,35 +442,38 @@ pub fn netstack_test(attrs: TokenStream, input: TokenStream) -> TokenStream {
                     Implementation {
                         type_name: str_to_syn_path("netstack_testing_common::realms::InStack"),
                         suffix: "dhcp_in_stack",
+                        attrs: vec![],
                     },
                     Implementation {
                         type_name: str_to_syn_path("netstack_testing_common::realms::OutOfStack"),
                         suffix: "dhcp_out_of_stack",
+                        attrs: vec![],
                     },
                 ],
             },
             Variant {
                 trait_bound: str_to_syn_path("NetstackAndDhcpClient"),
                 implementations: &[
-                    #[cfg(not(target_arch = "riscv64"))]
                     Implementation {
                         type_name: str_to_syn_path(
                             "netstack_testing_common::realms::Netstack2AndInStackDhcpClient",
                         ),
                         suffix: "ns2_with_dhcp_in_stack",
+                        attrs: vec![disable_on_riscv.clone()],
                     },
-                    #[cfg(not(target_arch = "riscv64"))]
                     Implementation {
                         type_name: str_to_syn_path(
                             "netstack_testing_common::realms::Netstack2AndOutOfStackDhcpClient",
                         ),
                         suffix: "ns2_with_dhcp_out_of_stack",
+                        attrs: vec![disable_on_riscv.clone()],
                     },
                     Implementation {
                         type_name: str_to_syn_path(
                             "netstack_testing_common::realms::Netstack3AndOutOfStackDhcpClient",
                         ),
                         suffix: "ns3_with_dhcp_out_of_stack",
+                        attrs: vec![],
                     },
                 ],
             },
@@ -470,12 +483,14 @@ pub fn netstack_test(attrs: TokenStream, input: TokenStream) -> TokenStream {
                     Implementation {
                         type_name: str_to_syn_path("netstack_testing_common::realms::NetCfgBasic"),
                         suffix: "netcfg_basic",
+                        attrs: vec![],
                     },
                     Implementation {
                         type_name: str_to_syn_path(
                             "netstack_testing_common::realms::NetCfgAdvanced",
                         ),
                         suffix: "netcfg_advanced",
+                        attrs: vec![],
                     },
                 ],
             },
@@ -485,10 +500,12 @@ pub fn netstack_test(attrs: TokenStream, input: TokenStream) -> TokenStream {
                     Implementation {
                         type_name: str_to_syn_path("net_types::ip::Ipv6"),
                         suffix: "v6",
+                        attrs: vec![],
                     },
                     Implementation {
                         type_name: str_to_syn_path("net_types::ip::Ipv4"),
                         suffix: "v4",
+                        attrs: vec![],
                     },
                 ],
             },
@@ -571,10 +588,12 @@ mod tests {
                         Implementation {
                             type_name: syn::parse_str("ImplA1").unwrap(),
                             suffix: "a1",
+                            attrs: vec![],
                         },
                         Implementation {
                             type_name: syn::parse_str("ImplA2").unwrap(),
                             suffix: "a2",
+                            attrs: vec![],
                         },
                     ],
                 },
@@ -584,10 +603,12 @@ mod tests {
                         Implementation {
                             type_name: syn::parse_str("ImplB1").unwrap(),
                             suffix: "b1",
+                            attrs: vec![],
                         },
                         Implementation {
                             type_name: syn::parse_str("ImplB2").unwrap(),
                             suffix: "b2",
+                            attrs: vec![],
                         },
                     ],
                 },
