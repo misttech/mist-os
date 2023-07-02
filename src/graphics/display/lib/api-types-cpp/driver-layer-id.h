@@ -5,9 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DRIVER_LAYER_ID_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DRIVER_LAYER_ID_H_
 
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
-
 #include <cstdint>
 
 #include <fbl/strong_int.h>
