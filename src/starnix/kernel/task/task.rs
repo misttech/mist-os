@@ -316,23 +316,55 @@ impl TaskStateCode {
 /// which process a wait can target. It is necessary to shared this data with the `ThreadGroup` so
 /// that it is available while the task is being dropped and so is not accessible from a weak
 /// pointer.
-#[derive(Debug)]
-pub struct TaskPersistentInfo {
+#[derive(Clone, Debug)]
+pub struct TaskPersistentInfoState {
+    /// Immutable information about the task
+    tid: pid_t,
+    pid: pid_t,
+
+    /// The command of this task.
+    command: CString,
+
     /// The security credentials for this task.
-    ///
-    /// This is necessary because credentials need to be read from operations on Node, and other
-    /// locks may be taken at the time. No other lock may be held while this lock is taken.
-    pub creds: Credentials,
+    creds: Credentials,
 
     /// The signal this task generates on exit.
-    pub exit_signal: Option<Signal>,
+    exit_signal: Option<Signal>,
 }
 
-impl TaskPersistentInfo {
-    fn new(creds: Credentials, exit_signal: Option<Signal>) -> Arc<Mutex<Self>> {
-        Arc::new(Mutex::new(Self { creds, exit_signal }))
+impl TaskPersistentInfoState {
+    fn new(
+        tid: pid_t,
+        pid: pid_t,
+        command: CString,
+        creds: Credentials,
+        exit_signal: Option<Signal>,
+    ) -> TaskPersistentInfo {
+        Arc::new(Mutex::new(Self { tid, pid, command, creds, exit_signal }))
+    }
+
+    pub fn tid(&self) -> pid_t {
+        self.tid
+    }
+
+    pub fn pid(&self) -> pid_t {
+        self.pid
+    }
+
+    pub fn command(&self) -> &CString {
+        &self.command
+    }
+
+    pub fn creds(&self) -> &Credentials {
+        &self.creds
+    }
+
+    pub fn exit_signal(&self) -> &Option<Signal> {
+        &self.exit_signal
     }
 }
+
+pub type TaskPersistentInfo = Arc<Mutex<TaskPersistentInfoState>>;
 
 /// A unit of execution.
 ///
@@ -401,15 +433,9 @@ pub struct Task {
 
     /// The information of the task that needs to be available to the `ThreadGroup` while computing
     /// which process a wait can target.
-    /// Contains the task credentials and the exit signal.
+    /// Contains the command line, the task credentials and the exit signal.
     /// See `TaskPersistentInfo` for more information.
-    pub persistent_info: Arc<Mutex<TaskPersistentInfo>>,
-
-    /// The command of this task.
-    ///
-    /// This is guarded by its own lock because it is use to display the task description, and
-    /// other locks may be taken at the time. No other lock may be held while this lock is taken.
-    command: RwLock<CString>,
+    pub persistent_info: TaskPersistentInfo,
 
     /// For vfork and clone() with CLONE_VFORK, this is set when the task exits or calls execve().
     /// It allows the calling task to block until the fork has been completed. Only populated
@@ -429,6 +455,12 @@ pub struct PageFaultExceptionReport {
 }
 
 impl Task {
+    /// Upgrade a weak reference to a Task, returning a ESRCH errno if the weak reference cannot be
+    /// upgraded.
+    pub fn from_weak(weak: &Weak<Task>) -> Result<Arc<Task>, Errno> {
+        weak.upgrade().ok_or_else(|| errno!(ESRCH))
+    }
+
     /// Internal function for creating a Task object. Useful when you need to specify the value of
     /// every field. create_process and create_thread are more likely to be what you want.
     ///
@@ -466,6 +498,7 @@ impl Task {
             }
             result
         };
+        let pid = thread_group.leader;
         let task = Task {
             id,
             thread_group,
@@ -475,7 +508,6 @@ impl Task {
             fs,
             abstract_socket_namespace,
             abstract_vsock_namespace,
-            command: RwLock::new(command),
             vfork_event,
             mutable_state: RwLock::new(TaskMutableState {
                 clear_child_tid: UserRef::default(),
@@ -490,14 +522,13 @@ impl Task {
                 seccomp_filters,
                 robust_list_head,
             }),
-            persistent_info: TaskPersistentInfo::new(creds, exit_signal),
+            persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,
         };
         #[cfg(any(test, debug_assertions))]
         {
             let _l1 = task.read();
-            let _l2 = task.command.read();
-            let _l3 = task.persistent_info.lock();
+            let _l2 = task.persistent_info.lock();
         }
         task
     }
@@ -992,13 +1023,13 @@ impl Task {
     }
 
     pub fn command(&self) -> CString {
-        self.command.read().clone()
+        self.persistent_info.lock().command.clone()
     }
 
     pub fn set_command_name(&self, name: CString) {
         // Truncate to 16 bytes, including null byte.
         let bytes = name.to_bytes();
-        *self.command.write() = if bytes.len() > 15 {
+        self.persistent_info.lock().command = if bytes.len() > 15 {
             // SAFETY: Substring of a CString will contain no null bytes.
             CString::new(&bytes[..15]).unwrap()
         } else {
@@ -1687,7 +1718,7 @@ impl fmt::Debug for Task {
             "{}:{}[{}]",
             self.thread_group.leader,
             self.id,
-            self.command.read().to_string_lossy()
+            self.persistent_info.lock().command.to_string_lossy()
         )
     }
 }

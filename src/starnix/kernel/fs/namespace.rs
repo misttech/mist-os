@@ -544,7 +544,7 @@ pub fn create_filesystem(
     Ok(WhatToMount::Fs(fs))
 }
 
-struct ProcMountsFileSource(Arc<Task>);
+struct ProcMountsFileSource(Weak<Task>);
 
 impl DynamicFileSource for ProcMountsFileSource {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
@@ -552,7 +552,7 @@ impl DynamicFileSource for ProcMountsFileSource {
         // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
         // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do
         // extra work to maintain it.
-        let task = self.0.clone();
+        let task = Task::from_weak(&self.0)?;
         let root = task.fs().root();
         let ns = task.fs().namespace();
         for_each_mount(&ns.root_mount, &mut |mount| {
@@ -576,8 +576,7 @@ pub struct ProcMountsFile {
 }
 
 impl ProcMountsFile {
-    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        let task = task.clone();
+    pub fn new_node(task: Weak<Task>) -> impl FsNodeOps {
         SimpleFileNode::new(move || {
             Ok(Self { dynamic_file: DynamicFile::new(ProcMountsFileSource(task.clone())) })
         })
@@ -620,10 +619,10 @@ impl FileOps for ProcMountsFile {
 }
 
 #[derive(Clone)]
-pub struct ProcMountinfoFile(Arc<Task>);
+pub struct ProcMountinfoFile(Weak<Task>);
 impl ProcMountinfoFile {
-    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(task.clone()))
+    pub fn new_node(task: Weak<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task))
     }
 }
 impl DynamicFileSource for ProcMountinfoFile {
@@ -647,7 +646,7 @@ impl DynamicFileSource for ProcMountinfoFile {
         // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
         // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do
         // extra work to maintain it.
-        let task = self.0.clone();
+        let task = Task::from_weak(&self.0)?;
         let root = task.fs().root();
         let ns = task.fs().namespace();
         for_each_mount(&ns.root_mount, &mut |mount| {
