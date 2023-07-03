@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <net/if.h>
+#include <net/if_arp.h>
 #include <netinet/in.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -43,10 +44,10 @@ class IoctlInvalidTest : public IoctlTest,
 TEST_P(IoctlInvalidTest, InvalidRequest) {
   const auto [req, family, name, data, expected_errno] = GetParam();
 
-  // TODO(fxbug.dev/129749): This test does not work because SIOCGIFADDR with
-  // any family value returns 0.  Need to find out why.
-  if (!test_helper::IsStarnix()) {
-    GTEST_SKIP() << "IoctlInvalidTests do not work on Linux yet";
+  // TODO(fxbug.dev/129749): This test does not work with SIOC{G,S}IFADDR as
+  // any family value returns 0. Need to find out why.
+  if ((req == SIOCGIFADDR || req == SIOCSIFADDR) && !test_helper::IsStarnix()) {
+    GTEST_SKIP() << "IoctlInvalidTests with SIOCGIFADDR/SIOCSIFADDR do not work on Linux yet";
   }
   if (req == SIOCSIFADDR && !test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "SIOCSIFADDR requires root, skipping...";
@@ -62,6 +63,13 @@ TEST_P(IoctlInvalidTest, InvalidRequest) {
 
 INSTANTIATE_TEST_SUITE_P(IoctlInvalidTest, IoctlInvalidTest,
                          ::testing::Values(
+                             IoctlInvalidTestCase{
+                                 .req = SIOCGIFHWADDR,
+                                 .family = AF_INET,
+                                 .name = kUnknownIfName,
+                                 .data = 0,
+                                 .expected_errno = ENODEV,
+                             },
                              // TODO(https://fxbug.dev/129547): Check for ENODEV.
                              IoctlInvalidTestCase{
                                  .req = SIOCGIFADDR,
@@ -125,6 +133,18 @@ TEST_F(IoctlTest, SIOCSIFADDR_Success) {
   }
   ASSERT_NO_FATAL_FAILURE(SetIfAddr(fd, INADDR_ANY));
   ASSERT_NO_FATAL_FAILURE(SetIfAddr(fd, INADDR_LOOPBACK));
+}
+
+TEST_F(IoctlTest, SIOCGIFHWADDR_Success) {
+  ifreq ifr = {};
+  strncpy(ifr.ifr_name, kLoopbackIfName, IFNAMSIZ);
+  ASSERT_EQ(ioctl(fd.get(), SIOCGIFHWADDR, &ifr), 0) << strerror(errno);
+
+  EXPECT_EQ(strncmp(ifr.ifr_name, kLoopbackIfName, IFNAMSIZ), 0);
+  sockaddr* s = &ifr.ifr_hwaddr;
+  EXPECT_EQ(s->sa_family, ARPHRD_LOOPBACK);
+  constexpr char kAllZeroes[sizeof(sockaddr{}.sa_data)] = {0};
+  EXPECT_EQ(memcmp(s->sa_data, kAllZeroes, sizeof(kAllZeroes)), 0);
 }
 
 }  // namespace

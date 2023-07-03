@@ -659,7 +659,6 @@
                 "NetdeviceTest.InterfaceQLEN",
                 "NetdeviceTest.Netmask",
                 "NetdeviceTest.EthtoolGetTSInfo",
-                "NetdeviceTest.Loopback",
                 "NetdeviceTest.InterfaceFlags",
 
                 // socket_netlink_route_test

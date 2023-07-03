@@ -21,7 +21,10 @@ use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
 use net_types::ip::IpAddress as _;
 use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NetlinkPayload};
-use netlink_packet_route::{rtnl::address::nlas::Nla as AddressNla, AddressMessage, RtnlMessage};
+use netlink_packet_route::{
+    rtnl::{address::nlas::Nla as AddressNla, link::nlas::Nla as LinkNla},
+    AddressMessage, LinkMessage, RtnlMessage,
+};
 use static_assertions::{const_assert, const_assert_eq};
 use std::{
     ffi::CStr,
@@ -446,6 +449,109 @@ impl SocketOps for ZxioBackedSocket {
                     )?;
                 }
 
+                Ok(SUCCESS)
+            }
+            SIOCGIFHWADDR => {
+                let user_addr = UserAddress::from(arg);
+                let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
+                let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
+                    .to_str()
+                    .map_err(|std::str::Utf8Error { .. }| errno!(EINVAL))?;
+                let socket = new_socket_file(
+                    current_task,
+                    SocketDomain::Netlink,
+                    SocketType::Datagram,
+                    OpenFlags::RDWR,
+                    SocketProtocol::from_raw(NetlinkFamily::Route.as_raw()),
+                )?;
+
+                // Send the request to get the link details with the requested
+                // interface name.
+                {
+                    let mut msg = NetlinkMessage::new(
+                        {
+                            let mut header = NetlinkHeader::default();
+                            header.flags = netlink_packet_core::NLM_F_REQUEST;
+                            header
+                        },
+                        NetlinkPayload::InnerMessage(RtnlMessage::GetLink({
+                            let mut msg = LinkMessage::default();
+                            msg.nlas = vec![LinkNla::IfName(iface_name.to_string())];
+                            msg
+                        })),
+                    );
+                    msg.finalize();
+                    let mut buf = vec![0; msg.buffer_len()];
+                    msg.serialize(&mut buf[..]);
+                    assert_eq!(
+                        socket.write(current_task, &mut VecInputBuffer::from(buf))?,
+                        msg.buffer_len(),
+                        "netlink sockets do not support partial writes",
+                    );
+                }
+
+                // Read the response to get the link-layer address or error.
+                let hw_addr_and_type = {
+                    let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
+                    read_buf.reset();
+                    let n = socket.read(current_task, &mut read_buf)?;
+
+                    let msg = NetlinkMessage::<RtnlMessage>::deserialize(&read_buf.data()[..n])
+                        .expect("netlink should always send well-formed messages");
+                    match msg.payload {
+                        NetlinkPayload::Error(e) => {
+                            // `e.code` is an `i32` and may hold negative values so
+                            // we need to do an `as u64` cast instead of `try_into`.
+                            // Note that `ErrnoCode::from_return_value` will
+                            // cast the value to an `i64` to check that it is a
+                            // valid (negative) errno value.
+                            let code = ErrnoCode::from_return_value(e.code as u64);
+                            return Err(Errno::new(code, "error code from RTM_GETLINK", None));
+                        }
+                        NetlinkPayload::InnerMessage(RtnlMessage::NewLink(msg)) => {
+                            let hw_type = msg.header.link_layer_type;
+                            msg.nlas.into_iter().find_map(|nla| {
+                                if let LinkNla::Address(addr) = nla {
+                                    Some((addr, hw_type))
+                                } else {
+                                    None
+                                }
+                            })
+                        }
+                        // netlink is only expected to return an error or
+                        // RTM_NEWLINK response for our RTM_GETLINK request.
+                        payload => panic!("unexpected message = {:?}", payload),
+                    }
+                };
+
+                let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(
+                    ifreq {
+                        // Safety: The `ifr_ifrn` union only has one field, so it
+                        // must be `ifrn_name`.
+                        ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
+                        ifr_ifru.ifru_hwaddr: hw_addr_and_type.map(|(addr_bytes, sa_family)| {
+                            let mut addr = sockaddr {
+                                sa_family,
+                                sa_data: Default::default(),
+                            };
+                            // We need to manually assign from one to the other
+                            // because we may be copying a vector of `u8` into
+                            // an array of `i8` and regular `copy_from_slice`
+                            // expects both src/dst slices to have the same
+                            // element type.
+                            //
+                            // See /src/starnix/lib/linux_uapi/src/types.rs,
+                            // `c_char` is an `i8` on `x86_64` and a `u8` on
+                            // `arm64` and `riscv`.
+                            addr.sa_data.iter_mut().zip(addr_bytes.into_iter())
+                                .for_each(|(sa_data_byte, link_addr_byte): (&mut c_char, u8)| {
+                                    *sa_data_byte = link_addr_byte as c_char;
+                                });
+                            addr
+                        }).unwrap_or_else(Default::default),
+                    }
+                );
+                current_task.mm.write_object(UserRef::new(user_addr), &out_ifreq)?;
                 Ok(SUCCESS)
             }
             SIOCGIFINDEX => {
