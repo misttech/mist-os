@@ -154,13 +154,15 @@ pub async fn serve_scanning_loop(
             (completed_sme_request, scan_results) = ongoing_scan => {
                 // Send scan results to Location
                 if let Ok(ref results) = scan_results {
-                    location_sensor_updates.push(location_sensor_updater
-                        .update_scan_results(results.clone())
-                        .on_timeout(zx::Duration::from_seconds(SCAN_CONSUMER_MAX_SECONDS_ALLOWED), || {
-                            error!("Timed out waiting for location sensor to get results");
-                            ()
-                        })
-                    );
+                    if !results.is_empty() {
+                        location_sensor_updates.push(location_sensor_updater
+                            .update_scan_results(results.clone())
+                            .on_timeout(zx::Duration::from_seconds(SCAN_CONSUMER_MAX_SECONDS_ALLOWED), || {
+                                error!("Timed out waiting for location sensor to get results");
+                                ()
+                            })
+                        );
+                    }
                 }
                 // Send scan results to requesters
                 queue.handle_completed_sme_scan(completed_sme_request, scan_results, zx::Time::get_monotonic());
