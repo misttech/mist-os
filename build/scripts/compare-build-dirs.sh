@@ -28,9 +28,20 @@ Example: Compare two clean builds with same output dir:
 EOF
 }
 
-# This JSON formatter only overwrites the file in place.
-# Usage: json_format --format FILE
-readonly json_format=third_party/catapult/telemetry/json_format
+script="$0"  # This is the name of the invoking script, not this one.
+script_basename="$(basename "$script")"
+script_dir="$(dirname "$script")"
+
+source "$script_dir"/../../build/rbe/common-setup.sh
+
+project_root="$default_project_root"
+
+# json formatting (as pipe): jq . < stdin > stdout
+readonly jq="$project_root"/prebuilt/third_party/jq/"$HOST_PLATFORM"/bin/jq
+
+function json_format() {
+  "$jq" . < "$1" > "$1".formatted
+}
 
 # GLOBAL MUTABLES
 # Accumulate paths to unexpected differences here.
@@ -42,13 +53,8 @@ unclassified_diffs=()
 unclassified_matches=()
 
 function diff_json() {
-  # json_format doesn't have an option to output to stdout,
-  # so we must copy it to temporary files.
-  cp "$1"{,.formatted}
-  cp "$2"{,.formatted}
-  chmod +w "$1".formatted "$2.formatted"
-  "$json_format" --format "$1".formatted || { echo "Failed to format $1" ; return 1;}
-  "$json_format" --format "$2".formatted || { echo "Failed to format $2" ; return 1;}
+  json_format "$1" || { echo "Failed to format $1" ; return 1;}
+  json_format "$2" || { echo "Failed to format $2" ; return 1;}
   diff -u "$1".formatted "$2".formatted
   # return with the exit code of diff
 }
