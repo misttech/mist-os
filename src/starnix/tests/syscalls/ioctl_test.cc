@@ -63,17 +63,22 @@ TEST_P(IoctlInvalidTest, InvalidRequest) {
 INSTANTIATE_TEST_SUITE_P(IoctlInvalidTest, IoctlInvalidTest,
                          ::testing::Values(
                              IoctlInvalidTestCase{
+                                 .req = SIOCGIFINDEX,
+                                 .family = AF_INET,
+                                 .name = kUnknownIfName,
+                                 .expected_errno = ENODEV,
+                             },
+                             IoctlInvalidTestCase{
                                  .req = SIOCGIFHWADDR,
                                  .family = AF_INET,
                                  .name = kUnknownIfName,
                                  .expected_errno = ENODEV,
                              },
-                             // TODO(https://fxbug.dev/129547): Check for ENODEV.
                              IoctlInvalidTestCase{
                                  .req = SIOCGIFADDR,
                                  .family = AF_INET,
                                  .name = kUnknownIfName,
-                                 .expected_errno = test_helper::IsStarnix() ? ENOENT : ENODEV,
+                                 .expected_errno = ENODEV,
                              },
                              IoctlInvalidTestCase{
                                  .req = SIOCGIFADDR,
@@ -81,12 +86,11 @@ INSTANTIATE_TEST_SUITE_P(IoctlInvalidTest, IoctlInvalidTest,
                                  .name = kLoopbackIfName,
                                  .expected_errno = EINVAL,
                              },
-                             // TODO(https://fxbug.dev/129547): Check for ENODEV.
                              IoctlInvalidTestCase{
                                  .req = SIOCSIFADDR,
                                  .family = AF_INET,
                                  .name = kUnknownIfName,
-                                 .expected_errno = ENOENT,
+                                 .expected_errno = ENODEV,
                              },
                              IoctlInvalidTestCase{
                                  .req = SIOCSIFADDR,
@@ -140,6 +144,15 @@ TEST_F(IoctlTest, SIOCGIFHWADDR_Success) {
   EXPECT_EQ(s->sa_family, ARPHRD_LOOPBACK);
   constexpr char kAllZeroes[sizeof(sockaddr{}.sa_data)] = {0};
   EXPECT_EQ(memcmp(s->sa_data, kAllZeroes, sizeof(kAllZeroes)), 0);
+}
+
+TEST_F(IoctlTest, SIOCGIFINDEX_Success) {
+  ifreq ifr = {};
+  strncpy(ifr.ifr_name, kLoopbackIfName, IFNAMSIZ);
+  ASSERT_EQ(ioctl(fd.get(), SIOCGIFINDEX, &ifr), 0) << strerror(errno);
+
+  EXPECT_EQ(strncmp(ifr.ifr_name, kLoopbackIfName, IFNAMSIZ), 0);
+  EXPECT_GT(ifr.ifr_ifindex, 0);
 }
 
 }  // namespace
