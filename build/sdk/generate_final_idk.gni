@@ -2,9 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/sdk/config.gni")
 import("//build/toolchain/goma.gni")
 import("//build/toolchain/rbe.gni")
-import("config.gni")
+import("//sdk/config.gni")
 
 # Generate a final Fuchsia IDK archive, which merges outputs from different
 # arch-specific sub-builds into a single one. The generated archive will
@@ -87,6 +88,8 @@ template("generate_final_idk") {
                rebase_path(_exported_dir, root_build_dir),
                "--stamp-file",
                rebase_path(_exported_dir_stamp, root_build_dir),
+               "--sdk-id",
+               sdk_id,
                "--sdk-targets",
              ] + _sdk_targets
 

@@ -130,6 +130,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-directory", help="Output IDK directory.")
     parser.add_argument("--output-archive", help="Output IDK archive.")
+    parser.add_argument("--sdk-id", help="The sdk_id value for this IDK.")
     parser.add_argument(
         "--sdk-targets",
         nargs="+",
@@ -270,7 +271,9 @@ def main():
             sdk_labels_list=', '.join(f'"{l}"' for l in args.sdk_targets),
         )
         if args.use_goma and args.goma_dir:
-            args_gn_content += 'goma_dir = "%s"\n' % args.goma_dir
+            args_gn_content += f'goma_dir = "{args.goma_dir}"\n'
+        if args.sdk_id:
+            args_gn_content += f'sdk_id = "{args.sdk_id}"\n'
 
         # Only build host tools in the x64 sub-build, to save
         # considerable time.
