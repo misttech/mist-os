@@ -72,9 +72,12 @@ fn main() {
 * This crate supports below platforms, welcome to contribute with other arch and platforms
 
     - x86_64 Linux
-    - x86_64 MacOs
+    - x86_64 macOS
     - x86_64 Windows
+    - x86_64 Fuchsia
     - aarch64 Linux
+    - aarch64 macOS
+    - aarch64 Fuchsia
 
 ## License
 

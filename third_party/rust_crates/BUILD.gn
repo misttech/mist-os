@@ -439,11 +439,9 @@ group("log") {
   visibility = third_party_rust_crate_log_visibility
 }
 
-if (!(current_os == "fuchsia")) {
-  group("loom") {
-    public_deps = [ ":loom-v0_5_6" ]
-    testonly = true
-  }
+group("loom") {
+  public_deps = [ ":loom-v0_5_6" ]
+  testonly = true
 }
 
 group("lru-cache") {
@@ -4456,10 +4454,10 @@ rust_library("futures-util-v0_3_19") {
   visibility = [ ":*" ]
 }
 
-rust_library("generator-v0_7_4") {
+rust_library("generator-v0_7_5") {
   crate_name = "generator"
-  crate_root = "//third_party/rust_crates/vendor/generator-0.7.4/src/lib.rs"
-  output_name = "generator-a1d2e33639bec451"
+  crate_root = "//third_party/rust_crates/vendor/generator-0.7.5/src/lib.rs"
+  output_name = "generator-76a988bf2831d99"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -4477,8 +4475,8 @@ rust_library("generator-v0_7_4") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=a1d2e33639bec451",
-    "-Cextra-filename=-a1d2e33639bec451",
+    "-Cmetadata=76a988bf2831d99",
+    "-Cextra-filename=-76a988bf2831d99",
   ]
 
   visibility = []
@@ -5733,7 +5731,7 @@ rust_library("loom-v0_5_6") {
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":generator-v0_7_4" ]
+  deps += [ ":generator-v0_7_5" ]
   deps += [ ":scoped-tls-v1_0_1" ]
   deps += [ ":tracing-v0_1_34" ]
   deps += [ ":tracing-subscriber-v0_3_1" ]
