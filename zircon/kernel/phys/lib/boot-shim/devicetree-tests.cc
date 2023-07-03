@@ -632,7 +632,7 @@ class RiscvDevicetreeTimerItemTest : public zxtest::Test {
   static void SetUpTestSuite() {
     auto loaded_dtb = LoadDtb("cpus_riscv.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    cpus_ = std::move(loaded_dtb).value();
+    cpus_dtb_ = std::move(loaded_dtb).value();
 
     loaded_dtb = LoadDtb("sifive-hifive-unmatched.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
@@ -648,25 +648,25 @@ class RiscvDevicetreeTimerItemTest : public zxtest::Test {
   }
 
   static void TearDownTestSuite() {
-    cpus_ = std::nullopt;
+    cpus_dtb_ = std::nullopt;
     sifive_hifive_unmatched_dtb_ = std::nullopt;
     vision_five_2_dtb_ = std::nullopt;
     qemu_riscv_dtb_ = std::nullopt;
   }
 
-  devicetree::Devicetree cpus() { return cpus_->fdt(); }
+  devicetree::Devicetree cpus_dtb() { return cpus_dtb_->fdt(); }
   devicetree::Devicetree sifive_hifive_unmatched() { return sifive_hifive_unmatched_dtb_->fdt(); }
   devicetree::Devicetree vision_five_2() { return vision_five_2_dtb_->fdt(); }
   devicetree::Devicetree qemu_riscv() { return qemu_riscv_dtb_->fdt(); }
 
  private:
-  static std::optional<LoadedDtb> cpus_;
+  static std::optional<LoadedDtb> cpus_dtb_;
   static std::optional<LoadedDtb> sifive_hifive_unmatched_dtb_;
   static std::optional<LoadedDtb> vision_five_2_dtb_;
   static std::optional<LoadedDtb> qemu_riscv_dtb_;
 };
 
-std::optional<LoadedDtb> RiscvDevicetreeTimerItemTest::cpus_ = std::nullopt;
+std::optional<LoadedDtb> RiscvDevicetreeTimerItemTest::cpus_dtb_ = std::nullopt;
 std::optional<LoadedDtb> RiscvDevicetreeTimerItemTest::sifive_hifive_unmatched_dtb_ = std::nullopt;
 std::optional<LoadedDtb> RiscvDevicetreeTimerItemTest::vision_five_2_dtb_ = std::nullopt;
 std::optional<LoadedDtb> RiscvDevicetreeTimerItemTest::qemu_riscv_dtb_ = std::nullopt;
@@ -676,7 +676,7 @@ TEST_F(RiscvDevicetreeTimerItemTest, ParseTimerFromCpus) {
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
-  auto fdt = cpus();
+  auto fdt = cpus_dtb();
   boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreeTimerItem> shim("test", fdt);
   shim.Init();
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
@@ -761,6 +761,150 @@ TEST_F(RiscvDevicetreeTimerItemTest, SifiveHifiveUnmatached) {
       EXPECT_GE(payload.size(), sizeof(zbi_dcfg_riscv_generic_timer_driver_t));
       auto* dcfg = reinterpret_cast<zbi_dcfg_riscv_generic_timer_driver_t*>(payload.data());
       EXPECT_EQ(dcfg->freq_hz, 0xf4240);
+      present = true;
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
+class RiscvDevicetreePlicItemTest : public zxtest::Test {
+ public:
+  static void SetUpTestSuite() {
+    auto loaded_dtb = LoadDtb("plic_riscv.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    plic_dtb_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("sifive-hifive-unmatched.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    sifive_hifive_unmatched_dtb_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("vision-five-2.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    vision_five_2_dtb_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("qemu-riscv.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    qemu_riscv_dtb_ = std::move(loaded_dtb).value();
+  }
+
+  static void TearDownTestSuite() {
+    plic_dtb_ = std::nullopt;
+    sifive_hifive_unmatched_dtb_ = std::nullopt;
+    vision_five_2_dtb_ = std::nullopt;
+    qemu_riscv_dtb_ = std::nullopt;
+  }
+
+  devicetree::Devicetree plic() { return plic_dtb_->fdt(); }
+  devicetree::Devicetree sifive_hifive_unmatched() { return sifive_hifive_unmatched_dtb_->fdt(); }
+  devicetree::Devicetree vision_five_2() { return vision_five_2_dtb_->fdt(); }
+  devicetree::Devicetree qemu_riscv() { return qemu_riscv_dtb_->fdt(); }
+
+ private:
+  static std::optional<LoadedDtb> plic_dtb_;
+  static std::optional<LoadedDtb> sifive_hifive_unmatched_dtb_;
+  static std::optional<LoadedDtb> vision_five_2_dtb_;
+  static std::optional<LoadedDtb> qemu_riscv_dtb_;
+};
+
+std::optional<LoadedDtb> RiscvDevicetreePlicItemTest::plic_dtb_ = std::nullopt;
+std::optional<LoadedDtb> RiscvDevicetreePlicItemTest::sifive_hifive_unmatched_dtb_ = std::nullopt;
+std::optional<LoadedDtb> RiscvDevicetreePlicItemTest::vision_five_2_dtb_ = std::nullopt;
+std::optional<LoadedDtb> RiscvDevicetreePlicItemTest::qemu_riscv_dtb_ = std::nullopt;
+
+TEST_F(RiscvDevicetreePlicItemTest, ParsePlic) {
+  std::array<std::byte, 512> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = plic();
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreePlicItem> shim("test", fdt);
+
+  shim.Init();
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  auto clear_err = fit::defer([&]() { image.ignore_error(); });
+
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_RISCV_PLIC) {
+      ASSERT_GE(payload.size(), sizeof(zbi_dcfg_riscv_plic_driver_t));
+      auto* plic_dcfg = reinterpret_cast<zbi_dcfg_riscv_plic_driver_t*>(payload.data());
+      EXPECT_EQ(plic_dcfg->mmio_phys, 0xc000000);
+      EXPECT_EQ(plic_dcfg->num_irqs, 0x60);
+      present = true;
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
+TEST_F(RiscvDevicetreePlicItemTest, Qemu) {
+  std::array<std::byte, 512> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = qemu_riscv();
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreePlicItem> shim("test", fdt);
+
+  shim.Init();
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  auto clear_err = fit::defer([&]() { image.ignore_error(); });
+
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_RISCV_PLIC) {
+      ASSERT_GE(payload.size(), sizeof(zbi_dcfg_riscv_plic_driver_t));
+      auto* plic_dcfg = reinterpret_cast<zbi_dcfg_riscv_plic_driver_t*>(payload.data());
+      EXPECT_EQ(plic_dcfg->mmio_phys, 0xc000000);
+      EXPECT_EQ(plic_dcfg->num_irqs, 0x60);
+      present = true;
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
+TEST_F(RiscvDevicetreePlicItemTest, VisionFive2) {
+  std::array<std::byte, 512> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = vision_five_2();
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreePlicItem> shim("test", fdt);
+
+  shim.Init();
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  auto clear_err = fit::defer([&]() { image.ignore_error(); });
+
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_RISCV_PLIC) {
+      ASSERT_GE(payload.size(), sizeof(zbi_dcfg_riscv_plic_driver_t));
+      auto* plic_dcfg = reinterpret_cast<zbi_dcfg_riscv_plic_driver_t*>(payload.data());
+      EXPECT_EQ(plic_dcfg->mmio_phys, 0xc000000);
+      EXPECT_EQ(plic_dcfg->num_irqs, 0x88);
+      present = true;
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
+TEST_F(RiscvDevicetreePlicItemTest, HifiveSifiveUnmatched) {
+  std::array<std::byte, 512> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = sifive_hifive_unmatched();
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreePlicItem> shim("test", fdt);
+
+  shim.Init();
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  auto clear_err = fit::defer([&]() { image.ignore_error(); });
+
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_RISCV_PLIC) {
+      ASSERT_GE(payload.size(), sizeof(zbi_dcfg_riscv_plic_driver_t));
+      auto* plic_dcfg = reinterpret_cast<zbi_dcfg_riscv_plic_driver_t*>(payload.data());
+      EXPECT_EQ(plic_dcfg->mmio_phys, 0xc000000);
+      EXPECT_EQ(plic_dcfg->num_irqs, 0x45);
       present = true;
     }
   }

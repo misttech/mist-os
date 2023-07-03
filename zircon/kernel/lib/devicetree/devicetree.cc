@@ -178,6 +178,31 @@ fit::result<PropertyDecoder::PathResolveError, ResolvedPath> PropertyDecoder::Re
   return fit::ok(ResolvedPath{.prefix = maybe_aliased_path});
 }
 
+std::optional<uint64_t> PropertyDecoder::TranslateAddress(uint64_t address) const {
+  // Root, we are done.
+  if (!parent()) {
+    return address;
+  }
+
+  auto ranges_prop = parent()->FindProperty("ranges");
+  // No more translations are possible.
+  if (!ranges_prop) {
+    return address;
+  }
+
+  auto ranges = ranges_prop->AsRanges(*parent());
+  // We can't translate if we fail to parse.
+  if (!ranges) {
+    return std::nullopt;
+  }
+
+  if (auto parent_address = ranges->TranslateChildAddress(address)) {
+    return parent()->TranslateAddress(*parent_address);
+  }
+
+  return std::nullopt;
+}
+
 std::optional<RegProperty> RegProperty::Create(uint32_t num_address_cells, uint32_t num_size_cells,
                                                ByteView bytes) {
   if (num_address_cells > 2 || num_size_cells > 2) {
@@ -215,10 +240,6 @@ std::optional<RangesProperty> RangesProperty::Create(uint32_t num_address_cells,
 
 std::optional<RangesProperty> RangesProperty::Create(const PropertyDecoder& decoder,
                                                      ByteView bytes) {
-  if (!decoder.num_address_cells() || !decoder.num_size_cells()) {
-    return std::nullopt;
-  }
-
   if (!decoder.parent()) {
     return std::nullopt;
   }

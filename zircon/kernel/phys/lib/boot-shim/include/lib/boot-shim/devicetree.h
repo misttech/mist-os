@@ -173,7 +173,6 @@ class ArmDevicetreeGicItem
 
   constexpr bool IsGicChildNode() const { return gic_ != nullptr; }
 
-  std::optional<devicetree::RangesProperty> ranges_;
   const devicetree::Node* gic_ = nullptr;
   bool matched_ = false;
 };
@@ -400,6 +399,29 @@ class RiscvDevicetreeTimerItem
  public:
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
+};
+
+// Parses interrupt controller node that is compatible with PLIC (Platform Level Interrupt
+// Controller bindings. For the time being, it only parses the mmio base for the plic register bank
+// and the number of IRQs. Until the zbi item representing the riscv PLIC is extended to represent
+// the contexts(hart_id, priority), the 'interrupt-extended' property is not yet decoded.
+//
+// See:
+// https://www.kernel.org/doc/Documentation/devicetree/bindings/interrupt-controller/sifive%2Cplic-1.0.0.txt
+class RiscvDevicetreePlicItem
+    : public DevicetreeItemBase<RiscvDevicetreePlicItem, 1>,
+      public SingleOptionalItem<zbi_dcfg_riscv_plic_driver_t, ZBI_TYPE_KERNEL_DRIVER,
+                                ZBI_KERNEL_DRIVER_RISCV_PLIC> {
+ public:
+  static constexpr auto kCompatibleDevices = cpp20::to_array({"sifive,plic-1.0.0", "riscv,plic0"});
+
+  // Matcher API.
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+
+ private:
+  devicetree::ScanState HandlePlicNode(const devicetree::NodePath& path,
+                                       const devicetree::PropertyDecoder& decoder);
 };
 
 }  // namespace boot_shim

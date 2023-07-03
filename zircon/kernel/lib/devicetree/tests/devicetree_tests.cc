@@ -772,6 +772,102 @@ TEST(PropertyDecoderTest, CellCountsNullOptWhenNotPresent) {
   }
 }
 
+TEST(PropertyDecoder, AddressTranslation) {
+  struct Range {
+    std::array<uint32_t, 1> child;
+    std::array<uint32_t, 1> parent;
+    std::array<uint32_t, 1> length;
+  };
+  static_assert(std::has_unique_object_representations_v<Range>);
+  static_assert(sizeof(Range) == 12);
+
+  std::array<Range, 2> ranges_1 = {
+      Range{
+          .child = {byte_swap(2000)},
+          .parent = {byte_swap(1000)},
+          .length = {byte_swap(50)},
+      },
+      Range{
+          .child = {byte_swap(3000)},
+          .parent = {byte_swap(1050)},
+          .length = {byte_swap(50)},
+      },
+  };
+
+  std::array<Range, 2> ranges_2 = {
+      Range{
+          .child = {byte_swap(1000)},
+          .parent = {byte_swap(2000)},
+          .length = {byte_swap(50)},
+      },
+      Range{
+          .child = {byte_swap(1050)},
+          .parent = {byte_swap(3000)},
+          .length = {byte_swap(50)},
+      },
+  };
+
+  // Creates a structure
+  // root
+  //   node_1 ranges_1
+  //     node_2 ranges _2
+  //       node_3
+  //
+  // The translation should of an arbitrary addres on child of node, should apply two
+  // transformation to reach the view from the root, which are reverse transformations,
+  // meaning |decoder.TranslateAddress(a)| = a.
+
+  PropertyBuilder root_builder;
+  root_builder.Add("#address-cells", 1);
+  devicetree::PropertyDecoder root_decoder(root_builder.Build());
+
+  devicetree::ByteView range_1_view(reinterpret_cast<uint8_t*>(ranges_1.data()),
+                                    ranges_1.size() * sizeof(Range));
+  PropertyBuilder node_1_builder;
+  node_1_builder.Add("#address-cells", 1);
+  node_1_builder.Add("ranges", range_1_view);
+  devicetree::PropertyDecoder node_1_decoder(&root_decoder, node_1_builder.Build());
+
+  devicetree::ByteView range_2_view(reinterpret_cast<uint8_t*>(ranges_2.data()),
+                                    ranges_2.size() * sizeof(Range));
+  PropertyBuilder node_2_builder;
+  node_2_builder.Add("#address-cells", 1);
+  node_2_builder.Add("ranges", range_2_view);
+  devicetree::PropertyDecoder node_2_decoder(&node_1_decoder, node_2_builder.Build());
+
+  devicetree::PropertyDecoder node_3_decoder(&node_2_decoder, {});
+
+  // node 1 has the same domain as the root so no translation is necessary.
+  EXPECT_EQ(node_1_decoder.TranslateAddress(999), 999);
+  EXPECT_EQ(*node_1_decoder.TranslateAddress(1000), 1000);
+  EXPECT_EQ(*node_1_decoder.TranslateAddress(1001), 1001);
+  EXPECT_EQ(*node_1_decoder.TranslateAddress(1050), 1050);
+  EXPECT_EQ(*node_1_decoder.TranslateAddress(1051), 1051);
+  EXPECT_EQ(node_1_decoder.TranslateAddress(2000), 2000);
+
+  //  node 2 address are subject to node 1's ranges, such that its domain
+  // its properly translated into node 1's domain. Unlike node 1, node 2 translation
+  // is only possible by the the ranges property set in its parent, hence 999 and 2000
+  // are out of the domain.
+  EXPECT_FALSE(node_2_decoder.TranslateAddress(1999));
+  EXPECT_EQ(*node_2_decoder.TranslateAddress(2000), 1000);
+  EXPECT_EQ(*node_2_decoder.TranslateAddress(2001), 1001);
+  EXPECT_FALSE(node_2_decoder.TranslateAddress(2051));
+  EXPECT_FALSE(node_2_decoder.TranslateAddress(2999));
+  EXPECT_EQ(*node_2_decoder.TranslateAddress(3000), 1050);
+  EXPECT_EQ(*node_2_decoder.TranslateAddress(3001), 1051);
+  EXPECT_FALSE(node_2_decoder.TranslateAddress(3050));
+
+  // Just like the relationship node 2 has with node 1, node 3 has to node 2,
+  // address are transformed from one domain to the other.
+  EXPECT_FALSE(node_3_decoder.TranslateAddress(999));
+  EXPECT_EQ(*node_3_decoder.TranslateAddress(1000), 1000);
+  EXPECT_EQ(*node_3_decoder.TranslateAddress(1001), 1001);
+  EXPECT_EQ(*node_3_decoder.TranslateAddress(1050), 1050);
+  EXPECT_EQ(*node_3_decoder.TranslateAddress(1051), 1051);
+  EXPECT_FALSE(node_3_decoder.TranslateAddress(2000));
+}
+
 TEST(RegisterBlockPropertyTest, Accessors) {
   RegisterBlockPropertyBuilder register_block{.address_cells = 1, .size_cells = 1};
   register_block.Add(0xACED, 0xD1CE);

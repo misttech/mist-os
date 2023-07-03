@@ -598,6 +598,14 @@ class PropertyDecoder {
     return cell_counts_.LookUp(cell_counts_.interrupt, properties_.end());
   }
 
+  // Translate |address| from this node's view to the root's view of the address.
+  // Each bus translation is commonly defined by |ranges| property. Lack of this property
+  // means no translation is possible or some other means of translation needs to happen.
+  //
+  // This method will recursively translate address into parent's bus until it meets a node without
+  // a |ranges| property. Root node is not allowed to have a |ranges| property.
+  std::optional<uint64_t> TranslateAddress(uint64_t address) const;
+
  private:
   struct CellCounts {
     explicit constexpr CellCounts() = default;

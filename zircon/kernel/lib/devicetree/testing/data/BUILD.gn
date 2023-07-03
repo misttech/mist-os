@@ -34,6 +34,7 @@ dts_synthetic = [
   "synthetic/memory_reservations.dts",
   "synthetic/reserved_memory.dts",
   "synthetic/simple_with_properties.dts",
+  "synthetic/plic_riscv.dts",
   "synthetic/psci-hvc.dts",
   "synthetic/psci-smc.dts",
 ]

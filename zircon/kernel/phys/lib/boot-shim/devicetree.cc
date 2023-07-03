@@ -135,13 +135,12 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicChildNode(
         if (!reg) {
           return;
         }
-        dcfg.use_msi = true;
 
         uint64_t base_address = *(*reg)[0].address();
-        if (ranges_) {
-          base_address = ranges_->TranslateChildAddress(base_address).value_or(base_address);
+        if (auto root_address = decoder.TranslateAddress(base_address)) {
+          dcfg.use_msi = true;
+          dcfg.msi_frame_phys = *root_address;
         }
-        dcfg.msi_frame_phys = base_address;
       }
     } else if constexpr (std::is_same_v<dtype, zbi_dcfg_arm_gic_v3_driver_t>) {
       // TODO(fxbug.dev/128235) : no support yet.
@@ -253,15 +252,11 @@ devicetree::ScanState ArmDevicetreeGicItem::OnNode(const devicetree::NodePath& p
   }
 
   // Figure out which interrupt controller this is.
-  const auto& [compatible, interrupt_controller, msi_controller, ranges] =
-      decoder.FindProperties("compatible", "interrupt-controller", "msi-controller", "ranges");
+  const auto& [compatible, interrupt_controller, msi_controller] =
+      decoder.FindProperties("compatible", "interrupt-controller", "msi-controller");
 
   if (!interrupt_controller || !compatible) {
     return devicetree::ScanState::kActive;
-  }
-
-  if (ranges) {
-    ranges_ = ranges->AsRanges(decoder);
   }
 
   auto compatible_list = compatible->AsStringList();
@@ -588,6 +583,71 @@ devicetree::ScanState RiscvDevicetreeTimerItem::OnNode(const devicetree::NodePat
   }
 
   return devicetree::ScanState::kDoneWithSubtree;
+}
+
+devicetree::ScanState RiscvDevicetreePlicItem::OnNode(const devicetree::NodePath& path,
+                                                      const devicetree::PropertyDecoder& decoder) {
+  auto compatibles = decoder.FindProperty("compatible");
+
+  if (!compatibles) {
+    return devicetree::ScanState::kActive;
+  }
+
+  auto supported_devices = compatibles->AsStringList();
+  if (!supported_devices) {
+    return devicetree::ScanState::kActive;
+  }
+
+  for (auto compatible_device : kCompatibleDevices) {
+    for (auto supported_device : *supported_devices) {
+      if (compatible_device == supported_device) {
+        return HandlePlicNode(path, decoder);
+      }
+    }
+  }
+
+  return devicetree::ScanState::kActive;
+}
+
+devicetree::ScanState RiscvDevicetreePlicItem::HandlePlicNode(
+    const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
+  auto [reg, num_irqs] = decoder.FindProperties("reg", "riscv,ndev");
+  if (!reg) {
+    OnError("PLIC Node did not contain a 'reg' property.");
+    return devicetree::ScanState::kDone;
+  }
+
+  bool base_address_ok = false;
+  zbi_dcfg_riscv_plic_driver_t dcfg{};
+  if (auto reg_val = reg->AsReg(decoder); reg_val) {
+    if (auto address = (*reg_val)[0].address()) {
+      if (auto root_address = decoder.TranslateAddress(*address)) {
+        dcfg.mmio_phys = *root_address;
+        base_address_ok = true;
+      }
+    }
+  }
+
+  if (!base_address_ok) {
+    OnError("Error parsing PLIC node's reg address.");
+    return devicetree::ScanState::kDone;
+  }
+
+  if (!num_irqs) {
+    OnError("PLIC Node did not contain 'riscv,ndev' property.");
+    return devicetree::ScanState::kDone;
+  }
+
+  if (auto num_irqs_val = num_irqs->AsUint32()) {
+    dcfg.num_irqs = *num_irqs_val;
+  } else {
+    OnError("Error parsing PLIC node's 'riscv,ndev' property.");
+    return devicetree::ScanState::kDone;
+  }
+
+  set_payload(dcfg);
+
+  return devicetree::ScanState::kDone;
 }
 
 }  // namespace boot_shim
