@@ -34,7 +34,6 @@ struct IoctlInvalidTestCase {
   uint16_t req;
   uint16_t family;
   const char* name;
-  uint8_t data;
   int expected_errno;
 };
 
@@ -42,7 +41,7 @@ class IoctlInvalidTest : public IoctlTest,
                          public ::testing::WithParamInterface<IoctlInvalidTestCase> {};
 
 TEST_P(IoctlInvalidTest, InvalidRequest) {
-  const auto [req, family, name, data, expected_errno] = GetParam();
+  const auto [req, family, name, expected_errno] = GetParam();
 
   // TODO(fxbug.dev/129749): This test does not work with SIOC{G,S}IFADDR as
   // any family value returns 0. Need to find out why.
@@ -54,7 +53,7 @@ TEST_P(IoctlInvalidTest, InvalidRequest) {
   }
 
   ifreq ifr;
-  ifr.ifr_addr = {.sa_family = family}, ifr.ifr_addr.sa_data[0] = data;
+  ifr.ifr_addr = {.sa_family = family};
   strncpy(ifr.ifr_name, name, IFNAMSIZ);
 
   ASSERT_EQ(ioctl(fd.get(), req, &ifr), -1);
@@ -67,7 +66,6 @@ INSTANTIATE_TEST_SUITE_P(IoctlInvalidTest, IoctlInvalidTest,
                                  .req = SIOCGIFHWADDR,
                                  .family = AF_INET,
                                  .name = kUnknownIfName,
-                                 .data = 0,
                                  .expected_errno = ENODEV,
                              },
                              // TODO(https://fxbug.dev/129547): Check for ENODEV.
@@ -75,14 +73,12 @@ INSTANTIATE_TEST_SUITE_P(IoctlInvalidTest, IoctlInvalidTest,
                                  .req = SIOCGIFADDR,
                                  .family = AF_INET,
                                  .name = kUnknownIfName,
-                                 .data = 0,
                                  .expected_errno = test_helper::IsStarnix() ? ENOENT : ENODEV,
                              },
                              IoctlInvalidTestCase{
                                  .req = SIOCGIFADDR,
                                  .family = AF_INET6,
                                  .name = kLoopbackIfName,
-                                 .data = 0,
                                  .expected_errno = EINVAL,
                              },
                              // TODO(https://fxbug.dev/129547): Check for ENODEV.
@@ -90,20 +86,19 @@ INSTANTIATE_TEST_SUITE_P(IoctlInvalidTest, IoctlInvalidTest,
                                  .req = SIOCSIFADDR,
                                  .family = AF_INET,
                                  .name = kUnknownIfName,
-                                 .data = 0,
                                  .expected_errno = ENOENT,
                              },
                              IoctlInvalidTestCase{
                                  .req = SIOCSIFADDR,
                                  .family = AF_INET6,
                                  .name = kLoopbackIfName,
-                                 .data = 0,
                                  .expected_errno = EINVAL,
                              }));
 
 void GetIfAddr(fbl::unique_fd& fd, in_addr_t expected_addr) {
   ifreq ifr;
-  ifr.ifr_addr = {.sa_family = AF_INET}, strncpy(ifr.ifr_name, kLoopbackIfName, IFNAMSIZ);
+  ifr.ifr_addr = {.sa_family = AF_INET};
+  strncpy(ifr.ifr_name, kLoopbackIfName, IFNAMSIZ);
   ASSERT_EQ(ioctl(fd.get(), SIOCGIFADDR, &ifr), 0) << strerror(errno);
 
   EXPECT_EQ(strncmp(ifr.ifr_name, kLoopbackIfName, IFNAMSIZ), 0);
