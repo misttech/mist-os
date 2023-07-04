@@ -80,7 +80,6 @@ impl Namespace {
 ///
 /// The mounts in a namespace form a mount tree, with `mountpoint` pointing to the parent and
 /// `submounts` pointing to the children.
-#[must_use = "Must be manually destroyed with `Mount::unmount()`"]
 pub struct Mount {
     root: DirEntryHandle,
     flags: Mutex<MountFlags>,
@@ -174,10 +173,6 @@ impl Mount {
             fs,
             state: Default::default(),
         })
-    }
-
-    pub fn unmount(self) {
-        std::mem::forget(self)
     }
 
     /// A namespace node referring to the root of the mount.
@@ -487,8 +482,6 @@ impl Drop for Mount {
         }
         state.take_from_peer_group();
         state.take_from_upstream();
-        // The last reference to the mount has been dropped. Notify the filesystem
-        self.fs.unmount();
     }
 }
 
