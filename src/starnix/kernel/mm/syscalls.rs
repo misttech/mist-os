@@ -255,7 +255,12 @@ pub fn sys_membarrier(
     cpu_id: i32,
 ) -> Result<u32, Errno> {
     // TODO(fxbug.dev/103867): This membarrier implementation does not do any real work.
-    not_implemented!("membarrier: cmd: 0x{:x}, flags: 0x{:x}, cpu_id: 0x{:x}", cmd, flags, cpu_id);
+    not_implemented_log_once!(
+        "membarrier: cmd: 0x{:x}, flags: 0x{:x}, cpu_id: 0x{:x}",
+        cmd,
+        flags,
+        cpu_id
+    );
     match cmd {
         uapi::membarrier_cmd_MEMBARRIER_CMD_QUERY => Ok(0),
         uapi::membarrier_cmd_MEMBARRIER_CMD_PRIVATE_EXPEDITED_RSEQ => Ok(0),
