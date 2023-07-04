@@ -66,13 +66,11 @@ void FdioTest::SetUp() {
 }
 
 void FdioTest::TearDown() {
-  [[maybe_unused]] zx::channel root_client;
-  ASSERT_EQ(fdio_fd_transfer(root_fd_.release(), root_client.reset_and_get_address()), ZX_OK);
-  fidl::UnownedClientEnd<fuchsia_io::Directory> dir(
-      fdio_cpp::UnownedFdioCaller(export_root_fd_.get()).channel());
-  auto admin_client = component::ConnectAt<fuchsia_fs::Admin>(dir);
-  ASSERT_EQ(admin_client.status_value(), ZX_OK);
-  ASSERT_EQ(fidl::WireCall(*admin_client)->Shutdown().status(), ZX_OK);
+  fdio_cpp::UnownedFdioCaller export_root(export_root_fd_);
+  zx::result admin_client = component::ConnectAt<fuchsia_fs::Admin>(export_root.directory());
+  ASSERT_TRUE(admin_client.is_ok()) << admin_client.status_string();
+  fidl::WireResult result = fidl::WireCall(admin_client.value())->Shutdown();
+  ASSERT_TRUE(result.ok()) << result.FormatDescription();
 }
 
 zx_handle_t FdioTest::export_root() {
