@@ -8,12 +8,6 @@
 use std::{future::Future, pin::Pin};
 
 use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
-use ffx_core::macro_deps::futures::{
-    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-    future::{select, Either},
-    stream::FuturesUnordered,
-    StreamExt,
-};
 use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream, ServerEnd};
 use fidl_fuchsia_developer_ffx::{
     TargetCollectionMarker, TargetCollectionRequest, TargetMarker, TargetRequest,
@@ -26,6 +20,12 @@ use fidl_fuchsia_diagnostics::{
 };
 use fidl_fuchsia_diagnostics_host::{
     ArchiveAccessorMarker, ArchiveAccessorRequest, ArchiveAccessorRequestStream,
+};
+use futures::{
+    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+    future::{select, Either},
+    stream::FuturesUnordered,
+    StreamExt,
 };
 
 const NODENAME: &str = "Rust";

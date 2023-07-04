@@ -6,8 +6,8 @@ use std::io::Write;
 
 use diagnostics_data::LogTextDisplayOptions;
 use error::LogError;
-use ffx_core::macro_deps::fidl::endpoints::create_proxy;
 use fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fidl::endpoints::create_proxy;
 use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetQuery};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
@@ -204,11 +204,12 @@ mod tests {
     };
     use assert_matches::assert_matches;
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
-    use ffx_core::macro_deps::{futures::StreamExt, selectors::parse_log_interest_selector};
-    use fho::macro_deps::ffx_writer::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::TargetCollectionMarker;
     use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
+    use futures::StreamExt;
     use log_command::{log_formatter::LogData, parse_time, DumpCommand};
+    use selectors::parse_log_interest_selector;
 
     #[fuchsia::test]
     async fn json_logger_test() {
@@ -373,7 +374,7 @@ mod tests {
             test_buffers.stdout.into_string(),
             "[00000.000000][][][ffx] INFO: Hello world!\n".to_string()
         );
-        assert_matches!(event_stream.next().await, Some(TestEvent::SeverityChanged(selectors)) if selectors == severity);
+        assert_matches!(event_stream.next().await, Some(TestEvent::SeverityChanged(s)) if s == severity);
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
     }
 

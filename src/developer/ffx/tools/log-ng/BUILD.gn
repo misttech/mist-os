@@ -19,11 +19,11 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host_rust",
     "//src/developer/ffx/config:lib",
-    "//src/developer/ffx/core:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/diagnostics/lib/log-command",
     "//src/lib/diagnostics/data/rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
@@ -37,9 +37,12 @@ rustc_library("lib") {
   ]
 
   test_deps = [
+    "//src/developer/ffx/lib/writer:lib",
+    "//src/lib/diagnostics/selectors",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde_json",
   ]
 }

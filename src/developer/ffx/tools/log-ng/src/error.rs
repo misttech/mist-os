@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use ffx_config::api::ConfigError;
-use ffx_core::macro_deps::fidl;
 use fidl_fuchsia_developer_ffx::{OpenTargetError, TargetConnectionError};
 use fidl_fuchsia_developer_remotecontrol::{ConnectCapabilityError, IdentifyHostError};
 use thiserror::Error;
