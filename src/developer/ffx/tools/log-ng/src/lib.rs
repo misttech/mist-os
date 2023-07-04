@@ -4,15 +4,22 @@
 
 use std::io::Write;
 
-use diagnostics_data::LogsData;
+use diagnostics_data::LogTextDisplayOptions;
 use error::LogError;
-use ffx_core::macro_deps::{fidl::endpoints::create_proxy, futures::StreamExt};
+use ffx_core::macro_deps::fidl::endpoints::create_proxy;
 use fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetQuery};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
-use log_command::{log_socket_stream::LogsDataStream, LogCommand, LogSubCommand, WatchCommand};
+use log_command::{
+    filter::LogFilterCriteria,
+    log_formatter::{
+        dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
+        LogFormatterOptions, NoOpSymbolizer, WriterContainer,
+    },
+    LogCommand, LogSubCommand, WatchCommand,
+};
 
 mod error;
 #[cfg(test)]
@@ -33,7 +40,7 @@ pub struct LogTool {
 
 #[async_trait::async_trait(?Send)]
 impl FfxMain for LogTool {
-    type Writer = MachineWriter<LogsData>;
+    type Writer = MachineWriter<LogEntry>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         log_main(writer, self.rcs_proxy, self.target_collection, self.cmd).await?;
@@ -43,14 +50,29 @@ impl FfxMain for LogTool {
 
 // Main logging event loop.
 async fn log_main(
-    writer: impl ToolIO<OutputItem = LogsData> + Write,
+    writer: impl ToolIO<OutputItem = LogEntry> + Write + 'static,
     rcs_proxy: RemoteControlProxy,
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
 ) -> Result<(), LogError> {
+    let is_json = writer.is_machine();
     let node_name = rcs_proxy.identify_host().await??.nodename;
     let target_query = TargetQuery { string_matcher: node_name, ..Default::default() };
-    log_loop(target_collection_proxy, target_query, cmd, writer).await?;
+    log_loop(
+        target_collection_proxy,
+        target_query,
+        cmd,
+        DefaultLogFormatter::new(
+            LogFilterCriteria::default(),
+            writer,
+            LogFormatterOptions {
+                // TODO(https://fxbug.dev/121413): Add support for log options.
+                display: if is_json { None } else { Some(LogTextDisplayOptions::default()) },
+                ..Default::default()
+            },
+        ),
+    )
+    .await?;
     Ok(())
 }
 
@@ -119,30 +141,14 @@ async fn connect_to_rcs(
     Ok(rcs_client)
 }
 
-// TODO: Get rid of this method and replace it with
-// the formatter once it lands.
-pub async fn dump_logs_from_socket<W>(
-    socket: fuchsia_async::Socket,
-    writer: &mut W,
-) -> Result<(), anyhow::Error>
-where
-    W: Write + ToolIO<OutputItem = LogsData>,
-{
-    let mut decoder = LogsDataStream::new(socket);
-    while let Some(log) = decoder.next().await {
-        writer.item(&log)?;
-    }
-    Ok(())
-}
-
 async fn log_loop<W>(
     target_collection_proxy: TargetCollectionProxy,
     target_query: TargetQuery,
     cmd: LogCommand,
-    mut writer: W,
+    mut formatter: impl LogFormatter + BootTimeAccessor + WriterContainer<W>,
 ) -> Result<(), LogError>
 where
-    W: ToolIO<OutputItem = LogsData> + Write,
+    W: ToolIO<OutputItem = LogEntry> + Write,
 {
     let stream_mode = get_stream_mode(cmd.clone())?;
     // TODO(https://fxbug.dev/129624): Add support for reconnect handling to Overnet.
@@ -156,12 +162,13 @@ where
         if !cmd.select.is_empty() {
             connection.log_settings_client.set_interest(&cmd.select).await?;
         }
-        let maybe_err = dump_logs_from_socket(connection.log_socket, &mut writer).await;
+        let maybe_err =
+            dump_logs_from_socket(connection.log_socket, &mut formatter, &NoOpSymbolizer {}).await;
         if stream_mode == fidl_fuchsia_diagnostics::StreamMode::Snapshot {
             break;
         }
         if let Err(value) = maybe_err {
-            writeln!(writer.stderr(), "{value}")?;
+            writeln!(formatter.writer().stderr(), "{value}")?;
         }
     }
     Ok(())
@@ -197,11 +204,11 @@ mod tests {
     };
     use assert_matches::assert_matches;
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
-    use ffx_core::macro_deps::selectors::parse_log_interest_selector;
+    use ffx_core::macro_deps::{futures::StreamExt, selectors::parse_log_interest_selector};
     use fho::macro_deps::ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::TargetCollectionMarker;
     use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
-    use log_command::{parse_time, DumpCommand};
+    use log_command::{log_formatter::LogData, parse_time, DumpCommand};
 
     #[fuchsia::test]
     async fn json_logger_test() {
@@ -227,22 +234,27 @@ mod tests {
         ));
         let test_buffers = TestBuffers::default();
         let mut main_result = task_manager.spawn_result(
-            tool.main(MachineWriter::<LogsData>::new_test(Some(Format::Json), &test_buffers)),
+            tool.main(MachineWriter::<LogEntry>::new_test(Some(Format::Json), &test_buffers)),
         );
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
         main_result.next().await.unwrap().unwrap();
         assert_eq!(
-            &serde_json::from_str::<LogsData>(&test_buffers.stdout.into_string()).unwrap(),
-            &LogsDataBuilder::new(BuilderArgs {
-                component_url: Some("ffx".into()),
-                moniker: "ffx".into(),
-                severity: Severity::Info,
-                timestamp_nanos: Timestamp::from(0),
-            })
-            .set_message("Hello world!")
-            .build()
+            serde_json::from_str::<LogEntry>(&test_buffers.stdout.into_string()).unwrap(),
+            LogEntry {
+                timestamp: 0.into(),
+                data: LogData::TargetLog(
+                    LogsDataBuilder::new(BuilderArgs {
+                        component_url: Some("ffx".into()),
+                        moniker: "ffx".into(),
+                        severity: Severity::Info,
+                        timestamp_nanos: Timestamp::from(0),
+                    })
+                    .set_message("Hello world!")
+                    .build(),
+                ),
+            }
         );
     }
 
@@ -271,7 +283,7 @@ mod tests {
         ));
         let test_buffers = TestBuffers::default();
         let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogsData>::new_test(None, &test_buffers)));
+            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
 
         // Run all tasks until exit.
         task_manager.run().await;
@@ -311,7 +323,7 @@ mod tests {
         ));
         let test_buffers = TestBuffers::default();
         let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogsData>::new_test(None, &test_buffers)));
+            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -351,7 +363,7 @@ mod tests {
         ));
         let test_buffers = TestBuffers::default();
         let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogsData>::new_test(None, &test_buffers)));
+            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.

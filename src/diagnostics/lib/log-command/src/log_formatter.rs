@@ -10,11 +10,13 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::{Local, TimeZone};
 use diagnostics_data::{
-    LogTextColor, LogTextDisplayOptions, LogTextPresenter, LogsData, Timestamp,
+    LogTextColor, LogTextDisplayOptions, LogTextPresenter, LogTimeDisplayFormat, LogsData,
+    Timestamp,
 };
+use ffx_writer::ToolIO;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::time::SystemTime;
+use std::{fmt::Display, io::Write, time::SystemTime};
 use thiserror::Error;
 
 const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
@@ -59,6 +61,15 @@ pub struct LogEntry {
     pub data: LogData,
     /// The timestamp of the log translated to UTC
     pub timestamp: Timestamp,
+}
+
+// Required if we want to use ffx's built-in I/O, but
+// this isn't really applicable to us because we have
+// custom formatting rules.
+impl Display for LogEntry {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        unreachable!("UNSUPPORTED -- This type cannot be formatted with std format.");
+    }
 }
 
 /// A trait for symbolizing log entries
@@ -114,28 +125,18 @@ pub trait BootTimeAccessor {
     fn get_boot_timestamp(&self) -> i64;
 }
 
-/// display options
-#[derive(Clone, Debug)]
-pub enum DisplayOption {
-    Text(LogTextDisplayOptions),
-    Json,
-}
-
 /// Log formatter options
 #[derive(Clone, Debug)]
 pub struct LogFormatterOptions {
     /// Text display options
-    pub display: DisplayOption,
+    pub display: Option<LogTextDisplayOptions>,
     /// If true, highlights spam, if false, filters it out.
     pub highlight_spam: bool,
 }
 
 impl Default for LogFormatterOptions {
     fn default() -> Self {
-        LogFormatterOptions {
-            display: DisplayOption::Text(Default::default()),
-            highlight_spam: false,
-        }
+        LogFormatterOptions { display: Some(Default::default()), highlight_spam: false }
     }
 }
 
@@ -157,14 +158,20 @@ pub enum FormatterError {
 }
 
 /// Default formatter implementation
-pub struct DefaultLogFormatter<'a> {
-    writer: Box<dyn std::io::Write + 'a>,
+pub struct DefaultLogFormatter<W>
+where
+    W: Write + ToolIO<OutputItem = LogEntry>,
+{
+    writer: W,
     filters: LogFilterCriteria,
     options: LogFormatterOptions,
 }
 
 #[async_trait(?Send)]
-impl<'a> LogFormatter for DefaultLogFormatter<'_> {
+impl<W> LogFormatter for DefaultLogFormatter<W>
+where
+    W: Write + ToolIO<OutputItem = LogEntry>,
+{
     async fn push_log(&mut self, log_entry: LogEntry) -> Result<()> {
         let is_spam = self.filters.is_spam(&log_entry);
 
@@ -172,15 +179,15 @@ impl<'a> LogFormatter for DefaultLogFormatter<'_> {
             return Ok(());
         }
         match self.options.display {
-            DisplayOption::Text(mut text_options) => {
+            Some(mut text_options) => {
                 if self.options.highlight_spam && is_spam {
                     text_options.color = LogTextColor::Highlight;
                 }
                 let mut options_for_this_line_only = self.options.clone();
-                options_for_this_line_only.display = DisplayOption::Text(text_options);
+                options_for_this_line_only.display = Some(text_options);
                 self.format_text_log(options_for_this_line_only, log_entry)?;
             }
-            DisplayOption::Json => {
+            None => {
                 match log_entry {
                     LogEntry { data: LogData::SymbolizedTargetLog(_, ref symbolized), .. } => {
                         if symbolized.is_empty() {
@@ -189,11 +196,37 @@ impl<'a> LogFormatter for DefaultLogFormatter<'_> {
                     }
                     _ => {}
                 }
-                writeln!(self.writer, "{}", serde_json::to_string(&log_entry)?)?;
+                self.writer.item(&log_entry)?;
             }
         };
 
         Ok(())
+    }
+}
+
+impl<W> BootTimeAccessor for DefaultLogFormatter<W>
+where
+    W: Write + ToolIO<OutputItem = LogEntry>,
+{
+    fn set_boot_timestamp(&mut self, boot_ts_nanos: i64) {
+        match &mut self.options.display {
+            Some(LogTextDisplayOptions {
+                time_format: LogTimeDisplayFormat::WallTime { ref mut offset, .. },
+                ..
+            }) => {
+                *offset = boot_ts_nanos;
+            }
+            _ => (),
+        }
+    }
+    fn get_boot_timestamp(&self) -> i64 {
+        match &self.options.display {
+            Some(LogTextDisplayOptions {
+                time_format: LogTimeDisplayFormat::WallTime { ref offset, .. },
+                ..
+            }) => *offset,
+            _ => 0,
+        }
     }
 }
 
@@ -221,13 +254,29 @@ fn format_ffx_event(msg: &str, timestamp: Option<Timestamp>) -> String {
     format!("[{}][<ffx>]: {}", dt, msg)
 }
 
-impl<'a> DefaultLogFormatter<'a> {
-    pub fn new(
-        filters: LogFilterCriteria,
-        writer: impl std::io::Write + 'a,
-        options: LogFormatterOptions,
-    ) -> Self {
-        Self { filters, writer: Box::new(writer), options }
+/// Object which contains a Writer that can be borrowed
+pub trait WriterContainer<W>
+where
+    W: Write + ToolIO<OutputItem = LogEntry>,
+{
+    fn writer(&mut self) -> &mut W;
+}
+
+impl<W> WriterContainer<W> for DefaultLogFormatter<W>
+where
+    W: Write + ToolIO<OutputItem = LogEntry>,
+{
+    fn writer(&mut self) -> &mut W {
+        &mut self.writer
+    }
+}
+
+impl<W> DefaultLogFormatter<W>
+where
+    W: Write + ToolIO<OutputItem = LogEntry>,
+{
+    pub fn new(filters: LogFilterCriteria, writer: W, options: LogFormatterOptions) -> Self {
+        Self { filters, writer, options }
     }
 
     // This function's arguments are copied to make lifetimes in push_log easier since borrowing
@@ -238,8 +287,8 @@ impl<'a> DefaultLogFormatter<'a> {
         log_entry: LogEntry,
     ) -> Result<(), FormatterError> {
         let text_options = match options.display {
-            DisplayOption::Text(o) => o,
-            DisplayOption::Json => {
+            Some(o) => o,
+            None => {
                 unreachable!("If we are here, we can only be formatting text");
             }
         };
@@ -277,6 +326,16 @@ impl<'a> DefaultLogFormatter<'a> {
     }
 }
 
+/// Symbolizer that does nothing.
+pub struct NoOpSymbolizer;
+
+#[async_trait(?Send)]
+impl Symbolize for NoOpSymbolizer {
+    async fn symbolize(&self, entry: LogEntry) -> LogEntry {
+        entry
+    }
+}
+
 #[async_trait(?Send)]
 pub trait LogFormatter {
     async fn push_log(&mut self, log_entry: LogEntry) -> anyhow::Result<()>;
@@ -285,21 +344,13 @@ pub trait LogFormatter {
 #[cfg(test)]
 mod test {
     use assert_matches::assert_matches;
-    use diagnostics_data::{LogsDataBuilder, Severity};
+    use diagnostics_data::{LogsDataBuilder, Severity, Timezone};
+    use ffx_writer::{Format, MachineWriter, TestBuffers};
     use std::{cell::Cell, time::Duration};
 
     use super::*;
 
     const DEFAULT_TS_NANOS: u64 = 1615535969000000000;
-
-    struct NoOpSymbolizer {}
-
-    #[async_trait(?Send)]
-    impl Symbolize for NoOpSymbolizer {
-        async fn symbolize(&self, entry: LogEntry) -> LogEntry {
-            entry
-        }
-    }
 
     struct FakeFormatter {
         logs: Vec<LogEntry>,
@@ -325,6 +376,31 @@ mod test {
             self.logs.push(log_entry);
             Ok(())
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_boot_timestamp_setter() {
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let options = LogFormatterOptions {
+            display: Some(LogTextDisplayOptions {
+                time_format: LogTimeDisplayFormat::WallTime { tz: Timezone::Utc, offset: 0 },
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let mut formatter =
+            DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
+        formatter.set_boot_timestamp(1234);
+        assert_eq!(formatter.get_boot_timestamp(), 1234);
+
+        // Boot timestamp not supported when using JSON output.
+        let buffers = TestBuffers::default();
+        let output = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let options = LogFormatterOptions { display: None, ..Default::default() };
+        let mut formatter = DefaultLogFormatter::new(LogFilterCriteria::default(), output, options);
+        formatter.set_boot_timestamp(1234);
+        assert_eq!(formatter.get_boot_timestamp(), 0);
     }
 
     struct AlternatingSpamFilter {
@@ -435,127 +511,131 @@ mod test {
 
     #[fuchsia::test]
     async fn test_default_formatter() {
-        let mut stdout = vec![];
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions::default();
         let mut formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
+            DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
         formatter.push_log(log_entry()).await.unwrap();
         drop(formatter);
         assert_eq!(
-            String::from_utf8(stdout).unwrap(),
+            buffers.stdout.clone().into_string(),
             "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message\n"
         );
     }
 
     #[fuchsia::test]
     async fn test_default_formatter_with_hidden_metadata() {
-        let mut stdout = vec![];
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
         let mut options = LogFormatterOptions::default();
-        options.display = DisplayOption::Text(LogTextDisplayOptions {
-            show_metadata: false,
-            ..Default::default()
-        });
+        options.display =
+            Some(LogTextDisplayOptions { show_metadata: false, ..Default::default() });
         let mut formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
+            DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
         formatter.push_log(log_entry()).await.unwrap();
         drop(formatter);
         assert_eq!(
-            String::from_utf8(stdout).unwrap(),
+            buffers.stdout.clone().into_string(),
             "[1615535969.000000][some/moniker][tag1,tag2] WARN: message\n"
         );
     }
 
     #[fuchsia::test]
     async fn test_default_formatter_with_json() {
-        let mut output = vec![];
-        let options = LogFormatterOptions { display: DisplayOption::Json, highlight_spam: false };
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(Some(Format::Json), &buffers);
+        let options = LogFormatterOptions { display: None, ..Default::default() };
         {
-            let mut formatter = DefaultLogFormatter::new(
-                LogFilterCriteria::default(),
-                &mut output,
-                options.clone(),
-            );
+            let mut formatter =
+                DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
             formatter.push_log(log_entry()).await.unwrap();
         }
-        assert_eq!(serde_json::from_slice::<LogEntry>(&output).unwrap(), log_entry());
+        assert_eq!(
+            serde_json::from_str::<LogEntry>(&buffers.stdout.clone().into_string()).unwrap(),
+            log_entry()
+        );
     }
 
     #[fuchsia::test]
     async fn test_default_formatter_symbolized_log_message() {
-        let mut stdout = vec![];
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions::default();
-        let mut formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
+        let mut formatter = DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options);
         let mut entry = log_entry();
         entry.data = assert_matches!(entry.data.clone(), LogData::TargetLog(d)=>LogData::SymbolizedTargetLog(d, "symbolized".to_string()));
         formatter.push_log(entry).await.unwrap();
         drop(formatter);
         assert_eq!(
-            String::from_utf8(stdout).unwrap(),
+            buffers.stdout.clone().into_string(),
             "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: symbolized\n"
         );
     }
 
     #[fuchsia::test]
     async fn test_default_formatter_symbolized_json_log_message() {
-        let mut stdout = vec![];
-        let options = LogFormatterOptions { display: DisplayOption::Json, highlight_spam: false };
-        let mut formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(Some(Format::Json), &buffers);
+        let options = LogFormatterOptions { display: None, ..Default::default() };
+        let mut formatter = DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options);
         let mut entry = log_entry();
         entry.data = assert_matches!(entry.data.clone(), LogData::TargetLog(d)=>LogData::SymbolizedTargetLog(d, "symbolized".to_string()));
         formatter.push_log(entry.clone()).await.unwrap();
         drop(formatter);
-        assert_eq!(serde_json::from_slice::<LogEntry>(&stdout).unwrap(), entry);
+        assert_eq!(
+            serde_json::from_str::<LogEntry>(&buffers.stdout.clone().into_string()).unwrap(),
+            entry
+        );
     }
 
     #[fuchsia::test]
     async fn test_default_formatter_symbolize_failed_json_log_message() {
-        let mut stdout = vec![];
-        let options = LogFormatterOptions { display: DisplayOption::Json, highlight_spam: false };
-        let mut formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let options = LogFormatterOptions { display: None, ..Default::default() };
+        let mut formatter = DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options);
         let mut entry = log_entry();
         entry.data = assert_matches!(entry.data.clone(), LogData::TargetLog(d)=>LogData::SymbolizedTargetLog(d, "".to_string()));
         formatter.push_log(entry.clone()).await.unwrap();
         drop(formatter);
-        assert_eq!(stdout.is_empty(), true);
+        assert_eq!(buffers.stdout.clone().into_string().is_empty(), true);
     }
 
     #[fuchsia::test]
     async fn test_default_formatter_disconnect_event() {
-        let mut stdout = vec![];
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions::default();
         let mut formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
+            DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
         let mut entry = log_entry();
         entry.data = LogData::FfxEvent(EventType::TargetDisconnected);
         formatter.push_log(entry).await.unwrap();
         drop(formatter);
         assert_eq!(
-            String::from_utf8(stdout).unwrap(),
+            buffers.stdout.clone().into_string(),
             format!("[1970-01-01 00:00:00.000][<ffx>]: {LOGGER_DISCONNECTED}\n")
         );
     }
 
     #[fuchsia::test]
     async fn test_spam_list_applies_highlighting_only_to_spam_line() {
-        let options = LogFormatterOptions {
-            display: DisplayOption::Text(Default::default()),
-            highlight_spam: true,
-        };
+        let options =
+            LogFormatterOptions { display: Some(Default::default()), highlight_spam: true };
 
         let mut filter = LogFilterCriteria::default();
         filter.with_spam_filter(AlternatingSpamFilter { last_message_was_spam: Cell::new(false) });
-        let mut output = vec![];
+        let buffers = TestBuffers::default();
+        let output = MachineWriter::<LogEntry>::new_test(None, &buffers);
         {
-            let mut formatter = DefaultLogFormatter::new(filter, &mut output, options.clone());
+            let mut formatter = DefaultLogFormatter::new(filter, output, options.clone());
             formatter.push_log(log_entry()).await.unwrap();
             formatter.push_log(log_entry()).await.unwrap();
             formatter.push_log(log_entry()).await.unwrap();
         }
         assert_eq!(
-            String::from_utf8(output).unwrap(),
+            buffers.stdout.into_string(),
             "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message
 \u{1b}[38;5;11m[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message\u{1b}[m
 [1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message\n",
@@ -569,15 +649,16 @@ mod test {
 
         let mut filter = LogFilterCriteria::default();
         filter.with_spam_filter(AlternatingSpamFilter { last_message_was_spam: Cell::new(false) });
-        let mut output = vec![];
+        let buffers = TestBuffers::default();
+        let output = MachineWriter::<LogEntry>::new_test(None, &buffers);
         {
-            let mut formatter = DefaultLogFormatter::new(filter, &mut output, options.clone());
+            let mut formatter = DefaultLogFormatter::new(filter, output, options.clone());
             formatter.push_log(log_entry()).await.unwrap();
             formatter.push_log(log_entry()).await.unwrap();
             formatter.push_log(log_entry()).await.unwrap();
         }
         assert_eq!(
-            String::from_utf8(output).unwrap(),
+            buffers.stdout.into_string(),
             "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message
 [1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message\n",
             "should only get two messages"
@@ -586,32 +667,34 @@ mod test {
 
     #[fuchsia::test]
     async fn test_default_formatter_started_event() {
-        let mut stdout = vec![];
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions::default();
         let mut formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
+            DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
         let mut entry = log_entry();
         entry.data = LogData::FfxEvent(EventType::LoggingStarted);
         formatter.push_log(entry).await.unwrap();
         drop(formatter);
         assert_eq!(
-            String::from_utf8(stdout).unwrap(),
+            buffers.stdout.clone().into_string(),
             "[1970-01-01 00:00:00.000][<ffx>]: logger started.\n"
         );
     }
 
     #[fuchsia::test]
     async fn test_default_formatter_malformed_log() {
-        let mut stdout = vec![];
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions::default();
         let mut formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
+            DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
         let mut entry = log_entry();
         entry.data = LogData::MalformedTargetLog("Invalid log".to_string());
         formatter.push_log(entry).await.unwrap();
         drop(formatter);
         assert_eq!(
-            String::from_utf8(stdout).unwrap(),
+            buffers.stdout.clone().into_string(),
             format!("[1970-01-01 00:00:00.000][<ffx>]: {MALFORMED_TARGET_LOG}Invalid log\n")
         );
     }
