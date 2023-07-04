@@ -27,7 +27,6 @@ dart_library("lib") {
   deps = [
     ":test-foo-fidl_dart",
     "//sdk/dart/fidl",
-    "//sdk/dart/fuchsia_logger",
     "//sdk/dart/fuchsia_services",
   ]
 }

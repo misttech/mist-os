@@ -39,7 +39,6 @@ flutter_test("fuchsia_services_package_unittests") {
 
   deps = [
     ":fuchsia_services",
-    "//sdk/dart/fuchsia_logger",
     "//sdk/fidl/fuchsia.io:fuchsia.io_dart",
     "//third_party/dart-pkg/pub/test",
   ]
@@ -61,7 +60,6 @@ dart_test_component("integration-test-component") {
     ":fuchsia_services",
     "test_support:test-foo-fidl_dart",
     "//sdk/dart/fidl",
-    "//sdk/dart/fuchsia_logger",
     "//sdk/dart/fuchsia_vfs",
     "//sdk/dart/zircon",
     "//sdk/fidl/fuchsia.io:fuchsia.io_dart",

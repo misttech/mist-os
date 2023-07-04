@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:fuchsia_logger/logger.dart';
 import 'package:fuchsia_services/services.dart'; // ignore: implementation_imports
 import 'package:test/test.dart';
 
 void main() {
-  setupLogger(name: 'fuchsia-services-test');
   // We don't use createAndServe here because the test case gets no outgoing directory handle,
   // so it would crash.
   final context = ComponentContext.create();
