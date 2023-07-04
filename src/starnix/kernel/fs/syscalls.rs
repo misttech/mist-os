@@ -2028,15 +2028,12 @@ pub fn sys_syncfs(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno>
 }
 
 pub fn sys_fsync(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> {
-    let _file = current_task.files.get(fd)?;
-    not_implemented!("fsync");
-    Ok(())
+    let file = current_task.files.get(fd)?;
+    file.sync(current_task)
 }
 
 pub fn sys_fdatasync(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> {
-    let _file = current_task.files.get(fd)?;
-    not_implemented!("fdatasync");
-    Ok(())
+    sys_fsync(current_task, fd)
 }
 
 pub fn sys_fadvise64(

@@ -135,6 +135,13 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         target: SeekTarget,
     ) -> Result<off_t, Errno>;
 
+    /// Syncs cached state associated with the file descriptor to persistent storage.
+    ///
+    /// The method blocks until the synchronization is complete.
+    fn sync(&self, _file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno> {
+        Ok(())
+    }
+
     /// Returns a VMO representing this file. At least the requested protection flags must
     /// be set on the VMO. Reading or writing the VMO must read or write the file. If this is not
     /// possible given the requested protection, an error must be returned.
@@ -1059,6 +1066,10 @@ impl FileObject {
         let new_offset = self.ops().seek(self, current_task, *offset_guard, target)?;
         *offset_guard = new_offset;
         Ok(new_offset)
+    }
+
+    pub fn sync(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.ops().sync(self, current_task)
     }
 
     pub fn get_vmo(
