@@ -6,6 +6,7 @@
         "//sdk/lib/driver_test_realm/meta/realm_builder.shard.cml",
         "//sdk/lib/inspect/client.shard.cml",
         "//sdk/lib/sys/component/realm_builder.shard.cml",
+        "//sdk/lib/sys/testing/system-test.shard.cml",
         "//sdk/lib/syslog/client.shard.cml",
         "//sdk/lib/trace/client.shard.cml",
     ],
@@ -15,7 +16,8 @@
         },
     ],
 
-    // The use of these protocols makes these tests not-fully-hermetic
+    // The use of these protocols makes these tests not-fully-hermetic,
+    // hence the inclusion of system-test.shard.cml above.
     offer: [
         {
             protocol: [

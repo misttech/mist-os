@@ -94,13 +94,11 @@ executable("codec_detect_hw_decode_test_bin") {
 fuchsia_test_component("codec_detect_hw_encode") {
   manifest = "meta/codec_detect_hw_encode_test.cml"
   deps = [ ":codec_detect_hw_encode_test_bin" ]
-  test_type = "system"
 }
 
 fuchsia_test_component("codec_detect_hw_decode") {
   manifest = "meta/codec_detect_hw_decode_test.cml"
   deps = [ ":codec_detect_hw_decode_test_bin" ]
-  test_type = "system"
 }
 
 fuchsia_test_package("codec_detect_hw_decode_test") {

@@ -171,7 +171,6 @@ fuchsia_test_component("audio_decoder_test_comp") {
     ":audio_decoder_test_bin",
     ":sbc_file",
   ]
-  test_type = "system"
 }
 
 fuchsia_test_package("audio_decoder_test") {
@@ -251,7 +250,6 @@ fuchsia_test_component("audio_encoder_test_comp") {
     ":audio_encoder_test_bin",
     ":sbc_file",
   ]
-  test_type = "system"
 }
 
 fuchsia_test_package("audio_encoder_test") {
@@ -352,7 +350,6 @@ fuchsia_test_component("audio_roundtrip_test_comp") {
     ":audio_roundtrip_test_bin",
     ":cvsd_file",
   ]
-  test_type = "system"
 }
 
 fuchsia_test_package("audio_roundtrip_test") {
@@ -445,7 +442,6 @@ fuchsia_test_component("h264_decoder_test_comp") {
   component_name = "h264_decoder_test"
   manifest = "meta/h264_decoder_test.cml"
   deps = [ ":h264_decoder_test_bin" ]
-  test_type = "system"
 }
 
 fuchsia_test_package("h264_decoder_test") {
@@ -493,7 +489,6 @@ fuchsia_test_component("h264_encoder_test_comp") {
   component_name = "h264_encoder_test"
   manifest = "meta/h264_encoder_test.cml"
   deps = [ ":h264_encoder_test_bin" ]
-  test_type = "system"
 }
 
 fuchsia_test_package("h264_encoder_test") {
@@ -536,7 +531,6 @@ rustc_test("h265_encoder_test_bin") {
 fuchsia_test_component("h265-encoder-test") {
   manifest = "meta/h265_encoder_test.cml"
   deps = [ ":h265_encoder_test_bin" ]
-  test_type = "system"
 }
 
 fuchsia_test_package("h265-encoder-tests") {

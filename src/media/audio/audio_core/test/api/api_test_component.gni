@@ -49,7 +49,8 @@ template("audio_core_api_test_component") {
     testonly = true
   }
 
-  fuchsia_test_component(target_name) {
+  fuchsia_component(target_name) {
+    testonly = true
     manifest = get_target_outputs(":${cml_target}")
     manifest = manifest[0]
     deps = [ ":${target_name}-bin" ]
@@ -57,7 +58,6 @@ template("audio_core_api_test_component") {
     if (defined(invoker.component_deps)) {
       deps += invoker.component_deps
     }
-    forward_variables_from(invoker, [ "test_type" ])
   }
 
   executable("${target_name}-bin") {

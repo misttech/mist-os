@@ -44,11 +44,7 @@ template("vp9_file_decoder_conformance_test") {
 
   fuchsia_unittest_package(target_name) {
     restricted_features = [ "allow_non_hermetic_packages" ]
-    forward_variables_from(invoker,
-                           [
-                             "test_specs",
-                             "test_type",
-                           ])
+    forward_variables_from(invoker, [ "test_specs" ])
 
     # Currently there is no way of changing the command line arguments of a device
     # test programmatically besides changing them in the manifest file. If a new
