@@ -353,13 +353,7 @@
                 "NetworkNamespaceTest.LoopbackExists",
 
                 // packet_socket_dgram_test
-                "BasicCookedPacketTest.WrongType",
-                "AllInetTests/CookedPacketTest.Receive/*",
-                "AllInetTests/CookedPacketTest.Send/*",
-                "AllInetTests/CookedPacketTest.BindReceive/*",
-                "AllInetTests/CookedPacketTest.DoubleBindSucceeds/*",
                 "AllInetTests/CookedPacketTest.BindDrop/*",
-                "AllInetTests/CookedPacketTest.BindFail/*",
                 "AllInetTests/CookedPacketTest.ReceiveOutbound/*",
 
                 // packet_socket_raw_test
@@ -369,8 +363,6 @@
 
                 // packet_socket_test
                 "AllPacketSocketTests/PacketSocketTest.GetSockName/*",
-                "AllPacketSocketTests/PacketSocketTest.RebindProtocol/*",
-                "AllPacketSocketTests/PacketSocketTest.ReceiveSentBoundToProtocolAll/*",
 
                 // pause_test
                 "PauseTest.OnlyReturnsWhenSignalHandled",
@@ -378,7 +370,6 @@
                 // ping_socket_test
                 "PingSocket.PayloadTooLarge",
                 "PingSocket.ReceiveIPPacketInfo",
-                "PingSocket.ReceiveIPv6PktInfo",
 
                 // pivot_root_test
                 "PivotRootTest.WithoutCapability",
@@ -517,7 +508,6 @@
 
                 // raw_socket_test
                 "RawSocketTest.ReceiveIPPacketInfo",
-                "RawSocketTest.ReceiveIPv6PacketInfo",
                 "AllInetTests/RawSocketTest.SetSocketDetachFilterNoInstalledFilter/*",
 
                 // readahead_test
@@ -551,7 +541,6 @@
                 "AbstractUnixSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "AbstractUnixSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
                 "AbstractUnixSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
-                "AbstractUnixSockets/UnixSocketPairTest.NetdeviceIoctlsSucceed/*",
                 "AbstractUnixSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredRecvEndAfterSendEnd/*",
                 "AbstractUnixSockets/UnixSocketPairCmsgTest.WriteBeforeSoPassCredRecvEndAfterSendEnd/*",
 
@@ -591,7 +580,6 @@
                 "FilesystemUnixSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "FilesystemUnixSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
                 "FilesystemUnixSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
-                "FilesystemUnixSockets/UnixSocketPairTest.NetdeviceIoctlsSucceed/*",
                 "FilesystemUnixSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredRecvEndAfterSendEnd/*",
                 "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteBeforeSoPassCredRecvEndAfterSendEnd/*",
 
@@ -628,17 +616,6 @@
                 "IPv4Sockets/IPv4DatagramBasedUnboundSocketTest.TestMultipleJoinsOnSingleSocket/*",
 
                 // socket_ipv4_udp_unbound_loopback_test
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackNicNoDefaultSendIf/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackNic/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfaceIndexAndAddr/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNic/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicConnect/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelf/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelfConnect/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelfNoLoop/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastDropNic/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestTwoSocketsJoinSameMulticastGroup/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToMcastThenJoinThenReceive/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPPKTINFO/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastIPPacketInfo/*",
@@ -647,12 +624,8 @@
                 "IPv4UDPSockets/IPv4UDPUnboundSocketNogotsanTest.UDPConnectPortExhaustion/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketNogotsanTest.UDPBindPortExhaustion/*",
 
-                // socket_ipv6_udp_unbound_external_networking_test
-                "IPv6UDPUnboundSockets/IPv6UDPUnboundExternalNetworkingSocketTest.TestJoinLeaveMulticast/*",
-
                 // socket_ipv6_udp_unbound_loopback_test
                 "IPv6UDPSockets/IPv6UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
-                "IPv6UDPSockets/IPv6UDPUnboundSocketTest.IPv6PacketInfo/*",
 
                 // socket_netdevice_test
                 "NetdeviceTest.InterfaceName",
@@ -685,7 +658,6 @@
                 "AllConnectedSockets/PersistentListenerConnectStressTest.ShutdownCloseSecond/*",
 
                 // socket_unix_pair_test - https://fxbug.dev/79408
-                "AllUnixDomainSockets/UnixSocketPairTest.NetdeviceIoctlsSucceed/*",
                 "AllUnixDomainSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredRecvEndAfterSendEnd/*",
                 "AllUnixDomainSockets/UnixSocketPairCmsgTest.WriteBeforeSoPassCredRecvEndAfterSendEnd/*",
 
@@ -1035,14 +1007,6 @@
 
                 // TODO(fxbug.dev/128870): Investigate failure on arm.
                 "SigstopTest.RestartSyscall",
-
-                // packet_socket_raw_test
-                // These tests cause the test runner to crash when looking up
-                // the ID of the loopback interface.
-                "AllInetTests/RawPacketTest.Receive/*",
-                "AllInetTests/RawPacketTest.SendFromLoopback/*",
-                "AllInetTests/RawPacketTest.SendFromUnspec/*",
-                "AllInetTests/RawPacketTest.GetSocketErrorBind/*",
             ],
         },
     ],
