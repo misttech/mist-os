@@ -87,4 +87,5 @@ fuchsia_unittest_package("decryptor_adapter_tests") {
   test_specs = {
     environments = basic_envs
   }
+  test_type = "system"
 }

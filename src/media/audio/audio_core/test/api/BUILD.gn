@@ -51,6 +51,7 @@ source_set("fidelity_results") {
 audio_core_api_test_component("activity-reporter-test") {
   source = "activity_reporter_test.cc"
   executable_deps = []
+  test_type = "system"
 }
 
 audio_core_api_test_component("audio-capturer-test") {
@@ -60,6 +61,7 @@ audio_core_api_test_component("audio-capturer-test") {
     "//src/media/audio/lib/clock",
     "//src/media/audio/lib/clock/testing",
   ]
+  test_type = "system"
 }
 
 audio_core_api_test_component("audio-capturer-pipeline-test") {
@@ -96,6 +98,7 @@ audio_core_api_test_component("audio_core_thermal_test") {
 audio_core_api_test_component("audio-device-enumerator-test") {
   source = "audio_device_enumerator_test.cc"
   executable_deps = [ "//src/media/audio/audio_core/v1/testing" ]
+  test_type = "system"
 }
 
 audio_core_api_test_component("audio-policy-pipeline-test") {
@@ -110,6 +113,7 @@ audio_core_api_test_component("audio-renderer-test") {
     "//src/media/audio/lib/clock",
     "//src/media/audio/lib/clock/testing",
   ]
+  test_type = "system"
 }
 
 audio_core_api_test_component("audio-renderer-pipeline-test") {
@@ -123,17 +127,20 @@ audio_core_api_test_component("audio-renderer-pipeline-test") {
 audio_core_api_test_component("audio-test") {
   source = "audio_test.cc"
   executable_deps = [ "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp" ]
+  test_type = "system"
 }
 
 audio_core_api_test_component("audio-tuner-test") {
   source = "audio_tuner_test.cc"
   executable_deps =
       [ "//sdk/fidl/fuchsia.media.tuning:fuchsia.media.tuning_hlcpp" ]
+  test_type = "system"
 }
 
 audio_core_api_test_component("gain-control-test") {
   source = "gain_control_test.cc"
   executable_deps = []
+  test_type = "system"
 }
 
 audio_core_api_test_component("ultrasound-test") {
@@ -142,22 +149,26 @@ audio_core_api_test_component("ultrasound-test") {
     "//src/media/audio/lib/clock",
     "//src/media/audio/lib/clock/testing",
   ]
+  test_type = "system"
 }
 
 audio_core_api_test_component("usage-gain-reporter-test") {
   source = "usage_gain_reporter_test.cc"
   executable_deps =
       [ "//sdk/fidl/fuchsia.media.audio:fuchsia.media.audio_hlcpp" ]
+  test_type = "system"
 }
 
 audio_core_api_test_component("usage-reporter-test") {
   source = "usage_reporter_test.cc"
   executable_deps = []
+  test_type = "system"
 }
 
 audio_core_api_test_component("volume-control-test") {
   source = "volume_control_test.cc"
   executable_deps = []
+  test_type = "system"
 }
 
 # These tests can run anywhere, including in emulators.
