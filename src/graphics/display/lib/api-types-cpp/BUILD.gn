@@ -23,6 +23,7 @@ source_set("api-types-cpp") {
     "layer-id.h",
     "transform.cc",
     "transform.h",
+    "vsync-ack-cookie.h",
   ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
@@ -45,6 +46,7 @@ test("api-types-cpp-tests-bin") {
     "image-id-test.cc",
     "layer-id-test.cc",
     "transform-test.cc",
+    "vsync-ack-cookie-test.cc",
   ]
   deps = [
     ":api-types-cpp",

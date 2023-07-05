@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
+#include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace fhd = fuchsia_hardware_display;
@@ -198,8 +199,9 @@ void TestFidlClient::OnEventMsgAsync(async_dispatcher_t* dispatcher, async::Wait
         TA_NO_THREAD_SAFETY_ANALYSIS {
       client_->vsync_count_++;
       client_->recent_presented_config_stamp_ = event->applied_config_stamp;
-      if (event->cookie) {
-        client_->cookie_ = event->cookie;
+      VsyncAckCookie vsync_ack_cookie = ToVsyncAckCookie(event->cookie);
+      if (vsync_ack_cookie != kInvalidVsyncAckCookie) {
+        client_->vsync_ack_cookie_ = vsync_ack_cookie;
       }
     }
 

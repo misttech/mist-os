@@ -56,6 +56,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
+#include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 
 namespace display {
 
@@ -202,7 +203,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
 
   // Used for testing
   sync_completion_t* fidl_unbound() { return &fidl_unbound_; }
-  uint64_t LatestAckedCookie() const { return acked_cookie_; }
+  VsyncAckCookie LatestAckedCookie() const { return acked_cookie_; }
 
   // fidl::WireServer<fuchsia_hardware_display::Coordinator> overrides:
   void ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& _completer) override;
@@ -356,7 +357,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // completes. The deferred release is tracked here.
   CaptureImageId pending_release_capture_image_id_ = kInvalidCaptureImageId;
 
-  uint64_t acked_cookie_ = 0;
+  VsyncAckCookie acked_cookie_ = kInvalidVsyncAckCookie;
 };
 
 // ClientProxy manages interactions between its Client instance and the
@@ -461,18 +462,18 @@ class ClientProxy {
   uint32_t chn_oom_print_freq_ = 0;
   uint64_t total_oom_errors_ = 0;
 
-  using vsync_msg_t = struct vsync_msg {
+  struct VsyncMessageData {
     DisplayId display_id;
     zx_time_t timestamp;
     ConfigStamp config_stamp;
   };
 
-  fbl::RingBuffer<vsync_msg_t, kVsyncBufferSize> buffered_vsync_messages_;
-  uint64_t initial_cookie_ = 0;
-  uint64_t cookie_sequence_ = 0;
+  fbl::RingBuffer<VsyncMessageData, kVsyncBufferSize> buffered_vsync_messages_;
+  VsyncAckCookie initial_cookie_ = VsyncAckCookie(0);
+  VsyncAckCookie cookie_sequence_ = VsyncAckCookie(0);
 
   uint64_t number_of_vsyncs_sent_ = 0;
-  uint64_t last_cookie_sent_ = 0;
+  VsyncAckCookie last_cookie_sent_ = kInvalidVsyncAckCookie;
   bool acknowledge_request_sent_ = false;
 
   fit::function<void()> on_client_dead_;

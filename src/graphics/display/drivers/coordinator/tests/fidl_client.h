@@ -23,6 +23,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
+#include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 
 namespace display {
 
@@ -96,7 +97,7 @@ class TestFidlClient {
     return ToConfigStamp(recent_presented_config_stamp_);
   }
 
-  uint64_t get_cookie() const { return cookie_; }
+  VsyncAckCookie vsync_ack_cookie() const { return vsync_ack_cookie_; }
 
   fbl::Mutex* mtx() const { return &mtx_; }
 
@@ -104,7 +105,7 @@ class TestFidlClient {
   mutable fbl::Mutex mtx_;
   async_dispatcher_t* dispatcher_ = nullptr;
   uint64_t vsync_count_ TA_GUARDED(mtx()) = 0;
-  uint64_t cookie_ = 0;
+  VsyncAckCookie vsync_ack_cookie_ = kInvalidVsyncAckCookie;
   uint64_t next_image_id_ TA_GUARDED(mtx()) = 1;
   fuchsia_hardware_display::wire::ConfigStamp recent_presented_config_stamp_;
   const fidl::WireSyncClient<fuchsia_sysmem::Allocator>& sysmem_;

@@ -27,6 +27,7 @@
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -62,10 +63,10 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
             controller()->virtcon_client_ == controller()->active_client_);
   }
 
-  bool vsync_acknowledge_delivered(uint64_t cookie) {
+  bool vsync_acknowledge_delivered(VsyncAckCookie vsync_ack_cookie) {
     fbl::AutoLock l(controller()->mtx());
     fbl::AutoLock cl(&controller()->primary_client_->mtx_);
-    return controller()->primary_client_->handler_.LatestAckedCookie() == cookie;
+    return controller()->primary_client_->handler_.LatestAckedCookie() == vsync_ack_cookie;
   }
 
   void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, DisplayId display_id) {
@@ -292,24 +293,26 @@ TEST_F(IntegrationTest, AcknowledgeVsync) {
   ASSERT_TRUE(primary_client->Bind(dispatcher()));
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil([&]() { return primary_client_connected(); }, zx::sec(1)));
   EXPECT_EQ(0u, primary_client->vsync_count());
-  EXPECT_EQ(0u, primary_client->get_cookie());
+  EXPECT_EQ(kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
 
   // send vsyncs upto watermark level
   for (uint32_t i = 0; i < ClientProxy::kVsyncMessagesWatermark; i++) {
     client_proxy_send_vsync();
   }
-  EXPECT_TRUE(
-      RunLoopWithTimeoutOrUntil([&]() { return primary_client->get_cookie() != 0; }, zx::sec(3)));
+  EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
+      [&]() { return primary_client->vsync_ack_cookie() != kInvalidVsyncAckCookie; }, zx::sec(3)));
   EXPECT_EQ(ClientProxy::kVsyncMessagesWatermark, primary_client->vsync_count());
 
   // acknowledge
   {
     fbl::AutoLock lock(primary_client->mtx());
     // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)primary_client->dc_->AcknowledgeVsync(primary_client->get_cookie());
+    (void)primary_client->dc_->AcknowledgeVsync(
+        ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
-      [&]() { return vsync_acknowledge_delivered(primary_client->get_cookie()); }, zx::sec(1)));
+      [&]() { return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()); },
+      zx::sec(1)));
 }
 
 TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
@@ -329,7 +332,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
         [&]() { return (primary_client->vsync_count() == expected_vsync_count); }, zx::sec(3)));
     EXPECT_EQ(expected_vsync_count, primary_client->vsync_count());
   }
-  EXPECT_NE(0u, primary_client->get_cookie());
+  EXPECT_NE(kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   constexpr uint32_t kNumVsync = 5;
@@ -342,10 +345,12 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
   {
     fbl::AutoLock lock(primary_client->mtx());
     // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)primary_client->dc_->AcknowledgeVsync(primary_client->get_cookie());
+    (void)primary_client->dc_->AcknowledgeVsync(
+        ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
-      [&]() { return vsync_acknowledge_delivered(primary_client->get_cookie()); }, zx::sec(1)));
+      [&]() { return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()); },
+      zx::sec(1)));
 
   // After acknowledge, we should expect to get all the stored messages + the latest vsync
   client_proxy_send_vsync();
@@ -371,7 +376,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
       [&]() { return primary_client->vsync_count() == ClientProxy::kMaxVsyncMessages; },
       zx::sec(3)));
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->vsync_count());
-  EXPECT_NE(0u, primary_client->get_cookie());
+  EXPECT_NE(kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a lot
   constexpr uint32_t kNumVsync = ClientProxy::kVsyncBufferSize * 10;
@@ -384,10 +389,12 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
   {
     fbl::AutoLock lock(primary_client->mtx());
     // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)primary_client->dc_->AcknowledgeVsync(primary_client->get_cookie());
+    (void)primary_client->dc_->AcknowledgeVsync(
+        ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
-      [&]() { return vsync_acknowledge_delivered(primary_client->get_cookie()); }, zx::sec(1)));
+      [&]() { return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()); },
+      zx::sec(1)));
 
   // After acknowledge, we should expect to get all the stored messages + the latest vsync
   client_proxy_send_vsync();
@@ -414,7 +421,7 @@ TEST_F(IntegrationTest, InvalidVSyncCookie) {
       [&]() { return (primary_client->vsync_count() == ClientProxy::kMaxVsyncMessages); },
       zx::sec(3)));
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->vsync_count());
-  EXPECT_NE(0u, primary_client->get_cookie());
+  EXPECT_NE(kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   constexpr uint32_t kNumVsync = 5;
@@ -430,7 +437,8 @@ TEST_F(IntegrationTest, InvalidVSyncCookie) {
     (void)primary_client->dc_->AcknowledgeVsync(0xdeadbeef);
   }
   EXPECT_FALSE(RunLoopWithTimeoutOrUntil(
-      [&]() { return vsync_acknowledge_delivered(primary_client->get_cookie()); }, zx::sec(1)));
+      [&]() { return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()); },
+      zx::sec(1)));
 
   // We should still not receive vsync events since acknowledge did not use valid cookie
   client_proxy_send_vsync();
@@ -456,7 +464,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
         [&]() { return primary_client->vsync_count() == expected_vsync_count; }, zx::sec(3)));
     EXPECT_EQ(expected_vsync_count, primary_client->vsync_count());
   }
-  EXPECT_NE(0u, primary_client->get_cookie());
+  EXPECT_NE(kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   constexpr uint32_t kNumVsync = 5;
@@ -469,10 +477,12 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
   {
     fbl::AutoLock lock(primary_client->mtx());
     // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)primary_client->dc_->AcknowledgeVsync(primary_client->get_cookie());
+    (void)primary_client->dc_->AcknowledgeVsync(
+        ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
-      [&]() { return vsync_acknowledge_delivered(primary_client->get_cookie()); }, zx::sec(1)));
+      [&]() { return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()); },
+      zx::sec(1)));
 
   // After acknowledge, we should expect to get all the stored messages + the latest vsync
   client_proxy_send_vsync();
@@ -484,7 +494,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
   }
 
   // save old cookie
-  uint64_t old_cookie = primary_client->get_cookie();
+  VsyncAckCookie old_vsync_ack_cookie = primary_client->vsync_ack_cookie();
 
   // send vsyncs until max vsync
   for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
@@ -497,7 +507,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
         [&]() { return (primary_client->vsync_count() == expected_vsync_count); }, zx::sec(3)));
     EXPECT_EQ(expected_vsync_count, primary_client->vsync_count());
   }
-  EXPECT_NE(0u, primary_client->get_cookie());
+  EXPECT_NE(kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   for (uint32_t i = 0; i < ClientProxy::kVsyncBufferSize; i++) {
@@ -509,10 +519,11 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
   {
     fbl::AutoLock lock(primary_client->mtx());
     // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)primary_client->dc_->AcknowledgeVsync(old_cookie);
+    (void)primary_client->dc_->AcknowledgeVsync(ToFidlVsyncAckCookieValue(old_vsync_ack_cookie));
   }
   EXPECT_FALSE(RunLoopWithTimeoutOrUntil(
-      [&]() { return vsync_acknowledge_delivered(primary_client->get_cookie()); }, zx::sec(1)));
+      [&]() { return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()); },
+      zx::sec(1)));
 
   // Since we did not acknowledge with most recent cookie, we should not get any vsync events back
   client_proxy_send_vsync();
@@ -528,10 +539,12 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
   {
     fbl::AutoLock lock(primary_client->mtx());
     // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)primary_client->dc_->AcknowledgeVsync(primary_client->get_cookie());
+    (void)primary_client->dc_->AcknowledgeVsync(
+        ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
-      [&]() { return vsync_acknowledge_delivered(primary_client->get_cookie()); }, zx::sec(1)));
+      [&]() { return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()); },
+      zx::sec(1)));
 
   // After acknowledge, we should expect to get all the stored messages + the latest vsync
   client_proxy_send_vsync();
