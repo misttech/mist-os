@@ -11,8 +11,7 @@ use {
         errors::map_to_status,
         fxblob::{
             blob::FxBlob,
-            delivery_blob::FxDeliveryBlob,
-            writer::{BlobWriterProtocol, FxUnsealedBlob},
+            writer::{BlobWriterProtocol, FxDeliveryBlob},
         },
         node::{FxNode, GetResult, OpenedNode},
         volume::{FxVolume, RootDir},
@@ -30,7 +29,7 @@ use {
     },
     fuchsia_hash::Hash,
     fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
-    fuchsia_zircon::{self as zx, Status},
+    fuchsia_zircon::Status,
     futures::{FutureExt, TryStreamExt},
     fxfs::{
         errors::FxfsError,
@@ -130,11 +129,7 @@ impl BlobDirectory {
         let store = self.store();
         let fs = store.filesystem();
         let name = path.next().unwrap();
-        let (name, is_delivery_blob) =
-            name.strip_prefix(DELIVERY_PATH_PREFIX).map_or((name, false), |name| (name, true));
-        if is_delivery_blob && !self.directory.store().filesystem().options().allow_delivery_blobs {
-            bail!(FxfsError::NotSupported);
-        }
+        let name = name.strip_prefix(DELIVERY_PATH_PREFIX).unwrap_or(name);
         let hash = Hash::from_str(name).map_err(|_| FxfsError::InvalidArgs)?;
 
         // TODO(fxbug.dev/122125): Create the transaction here if we might need to create the object
@@ -177,15 +172,9 @@ impl BlobDirectory {
                 )
                 .await?;
 
-                let node = if is_delivery_blob {
-                    OpenedNode::new(
-                        FxDeliveryBlob::new(self.clone(), hash, handle) as Arc<dyn FxNode>
-                    )
-                } else {
-                    OpenedNode::new(
-                        FxUnsealedBlob::new(self.clone(), hash, handle) as Arc<dyn FxNode>
-                    )
-                };
+                let node = OpenedNode::new(
+                    FxDeliveryBlob::new(self.clone(), hash, handle) as Arc<dyn FxNode>
+                );
 
                 // Add the object to the graveyard so that it's cleaned up if we crash.
                 store.add_to_graveyard(&mut transaction, node.object_id());
@@ -278,10 +267,11 @@ impl BlobDirectory {
             tracing::error!("lookup failed: {:?}", e);
             CreateBlobError::Internal
         })?;
-        if !node.is::<FxUnsealedBlob>() {
+        if !node.is::<FxDeliveryBlob>() {
             return Err(CreateBlobError::AlreadyExists);
         }
-        let unsealed_blob = node.downcast::<FxUnsealedBlob>().unwrap_or_else(|_| unreachable!());
+        let blob = node.downcast::<FxDeliveryBlob>().unwrap_or_else(|_| unreachable!());
+
         let (client, server_end) = create_proxy::<BlobWriterMarker>().map_err(|e| {
             tracing::error!("create_proxy failed for the BlobWriter protocol: {:?}", e);
             CreateBlobError::Internal
@@ -293,7 +283,7 @@ impl BlobDirectory {
         let client_end = ClientEnd::new(client_channel.into());
         let this = self.clone();
         self.volume().scope().spawn(async move {
-            if let Err(e) = this.handle_blob_writer_requests(unsealed_blob, server_end).await {
+            if let Err(e) = this.handle_blob_writer_requests(blob, server_end).await {
                 tracing::error!("Failed to handle blob writer requests: {}", e);
             }
         });
@@ -302,7 +292,7 @@ impl BlobDirectory {
 
     async fn handle_blob_writer_requests(
         self: &Arc<Self>,
-        blob: OpenedNode<FxUnsealedBlob>,
+        blob: OpenedNode<FxDeliveryBlob>,
         server_end: ServerEnd<BlobWriterMarker>,
     ) -> Result<(), Error> {
         let mut stream = server_end.into_stream()?;
@@ -313,7 +303,7 @@ impl BlobDirectory {
                         Ok(vmo) => Ok(vmo),
                         Err(e) => {
                             tracing::error!("blob service: get_vmo failed: {:?}", e);
-                            Err(zx::Status::INTERNAL.into_raw())
+                            Err(map_to_status(e).into_raw())
                         }
                     };
                     responder.send(res).unwrap_or_else(|e| {
@@ -325,7 +315,7 @@ impl BlobDirectory {
                         Ok(()) => Ok(()),
                         Err(e) => {
                             tracing::error!("blob service: bytes_ready failed: {:?}", e);
-                            Err(zx::Status::INTERNAL.into_raw())
+                            Err(map_to_status(e).into_raw())
                         }
                     };
                     responder.send(res).unwrap_or_else(|e| {
@@ -418,14 +408,6 @@ impl DirectoryEntry for BlobDirectory {
                 } else if node.is::<FxBlob>() {
                     let node = node.downcast::<FxBlob>().unwrap_or_else(|_| unreachable!());
                     FxBlob::create_connection_async(node, scope, flags, object_request)
-                } else if node.is::<FxUnsealedBlob>() {
-                    let node = node.downcast::<FxUnsealedBlob>().unwrap_or_else(|_| unreachable!());
-                    object_request.create_connection(
-                        scope,
-                        node.take(),
-                        flags,
-                        FidlIoConnection::create,
-                    )
                 } else if node.is::<FxDeliveryBlob>() {
                     let node = node.downcast::<FxDeliveryBlob>().unwrap_or_else(|_| unreachable!());
                     object_request.create_connection(
@@ -505,6 +487,7 @@ mod tests {
             testing::open_file_checked,
         },
         assert_matches::assert_matches,
+        delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
         fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _},
         fuchsia_fs::directory::{
             readdir_inclusive, DirEntry, DirentKind, WatchEvent, WatchMessage, Watcher,
@@ -544,21 +527,24 @@ mod tests {
             let mut builder = MerkleTreeBuilder::new();
             builder.write(&data);
             hash = builder.finish().root();
-
+            let compressed_data: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Always);
             let blob = open_file_checked(
                 fixture.root(),
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE,
-                &format!("{}", hash),
+                &format!("{}", delivery_blob_path(hash)),
             )
             .await;
-            blob.resize(data.len() as u64)
+            blob.resize(compressed_data.len() as u64)
                 .await
                 .expect("FIDL call failed")
                 .expect("truncate failed");
             assert_eq!(
-                blob.write(&data[..1]).await.expect("FIDL call failed").expect("write failed"),
+                blob.write(&compressed_data[..1])
+                    .await
+                    .expect("FIDL call failed")
+                    .expect("write failed"),
                 1u64
             );
             // Before the blob is finished writing, it shouldn't appear in the directory.
@@ -568,8 +554,11 @@ mod tests {
             );
 
             assert_eq!(
-                blob.write(&data[1..]).await.expect("FIDL call failed").expect("write failed"),
-                1u64
+                blob.write(&compressed_data[1..])
+                    .await
+                    .expect("FIDL call failed")
+                    .expect("write failed"),
+                compressed_data.len() as u64 - 1
             );
         }
 
@@ -609,20 +598,22 @@ mod tests {
             hashes.push(hash.clone());
             filenames.push(filename.clone());
 
+            let compressed_data: Vec<u8> = Type1Blob::generate(&datum, CompressionMode::Always);
+
             let blob = open_file_checked(
                 fixture.root(),
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE,
-                &format!("{}", hash),
+                &format!("{}", delivery_blob_path(hash)),
             )
             .await;
-            blob.resize(datum.len() as u64)
+            blob.resize(compressed_data.len() as u64)
                 .await
                 .expect("FIDL call failed")
                 .expect("truncate failed");
-            let len = datum.len();
-            for chunk in datum[..len - 1].chunks(fio::MAX_TRANSFER_SIZE as usize) {
+            let len = compressed_data.len();
+            for chunk in compressed_data[..len - 1].chunks(fio::MAX_TRANSFER_SIZE as usize) {
                 assert_eq!(
                     blob.write(chunk).await.expect("FIDL call failed").expect("write failed"),
                     chunk.len() as u64
@@ -635,7 +626,7 @@ mod tests {
             );
 
             assert_eq!(
-                blob.write(&datum[len - 1..])
+                blob.write(&compressed_data[len - 1..])
                     .await
                     .expect("FIDL call failed")
                     .expect("write failed"),
@@ -675,7 +666,7 @@ mod tests {
         Status::ok(status).unwrap();
         fixture
             .root()
-            .rename(&format!("{}", hash), token.unwrap().into(), "foo")
+            .rename(&format!("{}", delivery_blob_path(hash)), token.unwrap().into(), "foo")
             .await
             .expect("FIDL failed")
             .expect_err("rename should fail");

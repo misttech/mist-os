@@ -118,6 +118,11 @@
                     "use_fvm": {
                         "description": "True if FVM should be used",
                         "type": "boolean"
+                    },
+                    "allow_delivery_blobs": {
+                        "default": false,
+                        "description": "True if the filesystem supports delivery blobs",
+                        "type": "boolean"
                     }
                 },
                 "required": [

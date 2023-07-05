@@ -152,7 +152,7 @@ impl FilesystemConfig for Blobfs {
             .await;
         Box::new(
             FsmFilesystem::new(
-                fs_management::Blobfs::default(),
+                fs_management::Blobfs { allow_delivery_blobs: true, ..Default::default() },
                 block_device,
                 /*as_blob=*/ false,
             )
@@ -448,6 +448,7 @@ mod tests {
         super::*,
         crate::block_devices::RamdiskFactory,
         blob_writer::BlobWriter,
+        delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
         fidl::endpoints::{create_proxy, ServerEnd},
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
         fuchsia_merkle::MerkleTree,
@@ -466,8 +467,9 @@ mod tests {
 
         let ramdisk_factory = RamdiskFactory::new(BLOCK_SIZE, BLOCK_COUNT).await;
         let mut fs = filesystem.start_filesystem(&ramdisk_factory).await;
-        let blob_path = fs.benchmark_dir().join(BLOB_NAME);
-
+        let blob_path = fs.benchmark_dir().join(delivery_blob_path(BLOB_NAME));
+        let compressed_data: Vec<u8> =
+            Type1Blob::generate(BLOB_CONTENTS.as_bytes(), CompressionMode::Always);
         {
             let mut file = OpenOptions::new()
                 .create_new(true)
@@ -475,8 +477,8 @@ mod tests {
                 .truncate(true)
                 .open(&blob_path)
                 .unwrap();
-            file.set_len(BLOB_CONTENTS.len() as u64).unwrap();
-            file.write_all(BLOB_CONTENTS.as_bytes()).unwrap();
+            file.set_len(compressed_data.len() as u64).unwrap();
+            file.write_all(&compressed_data).unwrap();
         }
         fs.clear_cache().await;
         {
@@ -492,6 +494,8 @@ mod tests {
     async fn check_blob_filesystem_new_write_api(filesystem: &dyn FilesystemConfig) {
         const BLOB_CONTENTS: &str = "blob-contents";
         let merkle = MerkleTree::from_reader(BLOB_CONTENTS.as_bytes()).unwrap().root();
+        let compressed_data: Vec<u8> =
+            Type1Blob::generate(BLOB_CONTENTS.as_bytes(), CompressionMode::Always);
 
         let ramdisk_factory = RamdiskFactory::new(BLOCK_SIZE, BLOCK_COUNT).await;
         let mut fs = filesystem.start_filesystem(&ramdisk_factory).await;
@@ -506,10 +510,10 @@ mod tests {
             .expect("transport error on BlobCreator.Create")
             .expect("failed to create blob");
         let writer = writer_client_end.into_proxy().unwrap();
-        let mut blob_writer = BlobWriter::create(writer, BLOB_CONTENTS.len() as u64)
+        let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
             .await
             .expect("failed to create BlobWriter");
-        blob_writer.write(BLOB_CONTENTS.as_bytes()).await.unwrap();
+        blob_writer.write(&compressed_data).await.unwrap();
 
         let root = fuchsia_fs::directory::open_directory_no_describe(
             fs.exposed_dir(),

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
     device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory},
     fidl::endpoints::{create_proxy, Proxy as _, ServerEnd},
     fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
@@ -349,7 +350,7 @@ impl DiskBuilder {
             .await
             .expect("failed to create blob volume");
         let blob_volume_root = blob_volume.root();
-        self.blob_hash = Some(self.write_test_blob(blob_volume_root, &BLOB_CONTENTS).await);
+        self.blob_hash = Some(self.write_test_blob(blob_volume_root, &BLOB_CONTENTS, true).await);
 
         if self.data_spec.format.is_some() {
             self.init_data_fxfs(FxfsType::FxBlob(fs, crypt_realm)).await;
@@ -433,7 +434,8 @@ impl DiskBuilder {
         blobfs.format().await.expect("format failed");
         blobfs.fsck().await.expect("failed to fsck blobfs");
         let serving_blobfs = blobfs.serve().await.expect("failed to serve blobfs");
-        self.blob_hash = Some(self.write_test_blob(serving_blobfs.root(), &BLOB_CONTENTS).await);
+        self.blob_hash =
+            Some(self.write_test_blob(serving_blobfs.root(), &BLOB_CONTENTS, false).await);
         serving_blobfs.shutdown().await.expect("shutdown failed");
         if self.volumes_spec.create_data_partition {
             let data_label = if self.legacy_data_label { "minfs" } else { "data" };
@@ -600,18 +602,28 @@ impl DiskBuilder {
 
     /// Write a blob to the fxfs blob volume to ensure that on format, the blob volume does not get
     /// wiped.
-    async fn write_test_blob(&self, blob_volume_root: &fio::DirectoryProxy, data: &[u8]) -> Hash {
+    async fn write_test_blob(
+        &self,
+        blob_volume_root: &fio::DirectoryProxy,
+        data: &[u8],
+        as_delivery_blob: bool,
+    ) -> Hash {
         let mut builder = MerkleTreeBuilder::new();
         builder.write(&data);
         let hash = builder.finish().root();
+        let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
+        let (name, data) = if as_delivery_blob {
+            (delivery_blob_path(hash), compressed_data.as_slice())
+        } else {
+            (hash.to_string(), data)
+        };
 
         let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
         let flags = fio::OpenFlags::CREATE
             | fio::OpenFlags::RIGHT_READABLE
             | fio::OpenFlags::RIGHT_WRITABLE;
-        let path = &format!("{}", hash);
         blob_volume_root
-            .open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))
+            .open(flags, fio::ModeType::empty(), &name, ServerEnd::new(server_end.into_channel()))
             .expect("open failed");
         let _: Vec<_> = blob.query().await.expect("open file failed");
 

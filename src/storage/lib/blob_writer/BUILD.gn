@@ -46,6 +46,7 @@ rustc_test("blob-writer-test") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
+    "//src/lib/storage/delivery_blob",
     "//src/lib/storage/fs_management/rust:fs_management",
     "//src/lib/storage/ramdevice_client/rust:ramdevice_client",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",

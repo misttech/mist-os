@@ -28,6 +28,10 @@ zx::result<> MkfsWithDefault(const char* device_path, DiskFormat df, LaunchCallb
       .component_url = options.component_url,
   };
 
+  if (df == DiskFormat::kDiskFormatFxfs) {
+    mount_options.allow_delivery_blobs = true;
+  }
+
   zx::result device = component::Connect<fuchsia_hardware_block::Block>(device_path);
   if (device.is_error()) {
     return device.take_error();

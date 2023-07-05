@@ -150,6 +150,10 @@ impl BlobWriter {
         }
         Ok(())
     }
+
+    pub fn vmo_size(&self) -> u64 {
+        self.vmo_len
+    }
 }
 
 #[cfg(test)]

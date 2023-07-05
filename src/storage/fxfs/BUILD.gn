@@ -278,6 +278,7 @@ fs_test_config("fxfs") {
 
       device_block_count = 24576
       device_block_size = 512
+      allow_delivery_blobs = true
     },
   ]
 }

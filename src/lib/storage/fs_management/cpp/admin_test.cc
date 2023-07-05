@@ -81,6 +81,9 @@ class OutgoingDirectoryFixture : public testing::Test {
         }
         break;
     }
+    if (format == kDiskFormatFxfs) {
+      options_.allow_delivery_blobs = true;
+    }
   }
 
   void SetUp() override {

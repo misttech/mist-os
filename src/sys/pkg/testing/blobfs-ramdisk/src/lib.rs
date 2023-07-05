@@ -10,6 +10,7 @@
 
 use {
     anyhow::{anyhow, Context as _, Error},
+    delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
     fdio::{SpawnAction, SpawnOptions},
     fidl::endpoints::{ClientEnd, Proxy, ServerEnd},
     fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -334,9 +335,10 @@ impl BlobfsRamdisk {
 
     fn write_blob_sync(&self, merkle: &Hash, bytes: &[u8]) -> Result<(), Error> {
         use std::io::Write as _;
-        let mut file = self.root_dir().unwrap().new_file(merkle.to_string(), 0o600)?;
-        file.set_len(bytes.len().try_into().unwrap())?;
-        file.write_all(bytes)?;
+        let mut file = self.root_dir().unwrap().new_file(delivery_blob_path(merkle), 0o600)?;
+        let compressed_data = Type1Blob::generate(bytes, CompressionMode::Always);
+        file.set_len(compressed_data.len().try_into().unwrap())?;
+        file.write_all(&compressed_data)?;
         Ok(())
     }
 
@@ -611,10 +613,10 @@ mod tests {
     #[allow(clippy::zero_prefixed_literal)]
     fn write_blob(dir: &openat::Dir, payload: &[u8]) -> String {
         let merkle = fuchsia_merkle::MerkleTree::from_reader(payload).unwrap().root().to_string();
-
-        let mut f = dir.new_file(&merkle, 0600).unwrap();
-        f.set_len(payload.len() as u64).unwrap();
-        f.write_all(payload).unwrap();
+        let compressed_data = Type1Blob::generate(payload, CompressionMode::Always);
+        let mut f = dir.new_file(delivery_blob_path(&merkle), 0600).unwrap();
+        f.set_len(compressed_data.len() as u64).unwrap();
+        f.write_all(&compressed_data).unwrap();
 
         merkle
     }
@@ -675,14 +677,17 @@ mod tests {
 
         let bytes = [1u8; 40];
         let hash = fuchsia_merkle::MerkleTree::from_reader(&bytes[..]).unwrap().root();
+        let compressed_data = Type1Blob::generate(&bytes, CompressionMode::Always);
 
         let blob_creator = blobfs.blob_creator_proxy().unwrap().unwrap();
         let blob_writer = blob_creator.create(&hash, false).await.unwrap().unwrap();
-        let mut blob_writer =
-            blob_writer::BlobWriter::create(blob_writer.into_proxy().unwrap(), bytes.len() as u64)
-                .await
-                .unwrap();
-        let () = blob_writer.write(&bytes).await.unwrap();
+        let mut blob_writer = blob_writer::BlobWriter::create(
+            blob_writer.into_proxy().unwrap(),
+            compressed_data.len() as u64,
+        )
+        .await
+        .unwrap();
+        let () = blob_writer.write(&compressed_data).await.unwrap();
 
         assert_eq!(list_blobs(&root), vec![hash.to_string()]);
 

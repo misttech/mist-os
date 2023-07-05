@@ -5,6 +5,7 @@
 use {
     async_trait::async_trait,
     blob_writer::BlobWriter,
+    delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
     fidl_fuchsia_fxfs::BlobCreatorProxy,
     fidl_fuchsia_io as fio,
     fuchsia_component::client::connect_to_protocol_at_dir_svc,
@@ -309,7 +310,7 @@ fn errno_error() -> std::io::Error {
 async fn write_blob_with_fidl(blob_root: &fio::DirectoryProxy, data: &[u8], merkle: &str) {
     let blob = fuchsia_fs::directory::open_file(
         blob_root,
-        merkle,
+        &delivery_blob_path(merkle),
         fuchsia_fs::OpenFlags::CREATE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
     )
     .await
@@ -320,7 +321,7 @@ async fn write_blob_with_fidl(blob_root: &fio::DirectoryProxy, data: &[u8], merk
     while written != blob_size {
         // Don't try to write more than MAX_TRANSFER_SIZE bytes at a time.
         let bytes_to_write = std::cmp::min(fio::MAX_TRANSFER_SIZE, (blob_size - written) as u64);
-        let bytes_written =
+        let bytes_written: u64 =
             blob.write(&data[written..written + bytes_to_write as usize]).await.unwrap().unwrap();
         assert_eq!(bytes_written, bytes_to_write);
         written += bytes_written as usize;
@@ -356,8 +357,9 @@ async fn write_blobs_with_fidl_benchmark(
     .unwrap();
     for blob in blobs {
         let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
+        let compressed_data = Type1Blob::generate(&blob, CompressionMode::Always);
         let total_duration = OperationTimer::start();
-        write_blob_with_fidl(&blob_root, &blob, &merkle.to_string()).await;
+        write_blob_with_fidl(&blob_root, &compressed_data, &merkle.to_string()).await;
         durations.push(total_duration.stop());
     }
     durations
@@ -373,8 +375,9 @@ async fn write_blobs_with_blob_writer_benchmark(
             .expect("failed to connect to the BlobCreator service");
     for blob in blobs {
         let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
+        let compressed_data = Type1Blob::generate(&blob, CompressionMode::Always);
         let timer = OperationTimer::start();
-        write_blob_with_blob_writer(&blob_proxy, &blob, &merkle.into()).await;
+        write_blob_with_blob_writer(&blob_proxy, &compressed_data, &merkle.into()).await;
         durations.push(timer.stop());
     }
     durations
@@ -393,8 +396,9 @@ async fn write_realistic_blobs_with_fidl_benchmark(
     for blob in blobs {
         let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
         let blob_root_clone = std::clone::Clone::clone(&blob_root);
+        let compressed_data = Type1Blob::generate(&blob, CompressionMode::Always);
         let blob_future = async move {
-            write_blob_with_fidl(&blob_root_clone, &blob, &merkle.to_string()).await;
+            write_blob_with_fidl(&blob_root_clone, &compressed_data, &merkle.to_string()).await;
         };
         futures.push(blob_future);
     }
@@ -417,8 +421,9 @@ async fn write_realistic_blobs_with_blob_writer_benchmark(
     for blob in blobs {
         let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
         let blob_proxy_clone = blob_proxy.clone();
+        let compressed_data = Type1Blob::generate(&blob, CompressionMode::Always);
         let blob_future = async move {
-            write_blob_with_blob_writer(&blob_proxy_clone, &blob, &merkle.into()).await;
+            write_blob_with_blob_writer(&blob_proxy_clone, &compressed_data, &merkle.into()).await;
         };
         futures.push(blob_future);
     }

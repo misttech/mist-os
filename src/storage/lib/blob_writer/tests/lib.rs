@@ -6,6 +6,7 @@
 mod tests {
     use {
         blob_writer::BlobWriter,
+        delivery_blob::{CompressionMode, Type1Blob},
         fidl::endpoints::{create_proxy, ServerEnd},
         fidl_fuchsia_fxfs::MountOptions,
         fidl_fuchsia_io::{self as fio, MAX_TRANSFER_SIZE},
@@ -42,22 +43,19 @@ mod tests {
         builder.write(&data);
         let hash = builder.finish().root();
 
+        let compressed_data: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Always);
+
         let writer_client_end = blob_proxy
             .create(&hash.into(), false)
             .await
             .expect("transport error on BlobCreator.Create")
             .expect("failed to create blob");
         let writer = writer_client_end.into_proxy().unwrap();
-        let mut blob_writer = BlobWriter::create(writer, data.len() as u64)
+        let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
             .await
             .expect("failed to create BlobWriter");
 
-        let list_of_writes =
-            vec![(0..8192), (8192..24576), (24576..32768), (32768..98304), (98304..196608)];
-
-        for write in list_of_writes {
-            blob_writer.write(&data[write]).await.unwrap();
-        }
+        blob_writer.write(&compressed_data).await.unwrap();
 
         let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
         vol.root()
@@ -106,6 +104,8 @@ mod tests {
         builder.write(&data);
         let hash = builder.finish().root();
 
+        let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
+
         let writer_client_end = blob_proxy
             .create(&hash.into(), false)
             .await
@@ -113,26 +113,12 @@ mod tests {
             .expect("failed to create blob");
         let writer = writer_client_end.into_proxy().unwrap();
 
-        let mut blob_writer = BlobWriter::create(writer, data.len() as u64)
+        let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
             .await
             .expect("failed to create BlobWriter");
+        assert!(compressed_data.len() as u64 > blob_writer.vmo_size());
 
-        let list_of_writes = vec![
-            (0..8192),
-            (8192..24576),
-            (24576..32768),
-            (32768..98304),
-            (98304..196608),
-            (196608..204800),
-            (204800..237568),
-            (237568..303104),
-            (303104..401408),
-            (401408..499712),
-        ];
-
-        for write in list_of_writes {
-            blob_writer.write(&data[write]).await.unwrap();
-        }
+        blob_writer.write(&compressed_data).await.unwrap();
 
         let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
         vol.root()

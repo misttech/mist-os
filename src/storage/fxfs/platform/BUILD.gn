@@ -22,7 +22,6 @@ rustc_library("platform") {
       "src/fuchsia/file.rs",
       "src/fuchsia/fxblob.rs",
       "src/fuchsia/fxblob/blob.rs",
-      "src/fuchsia/fxblob/delivery_blob.rs",
       "src/fuchsia/fxblob/directory.rs",
       "src/fuchsia/fxblob/testing.rs",
       "src/fuchsia/fxblob/writer.rs",

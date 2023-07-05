@@ -27,6 +27,7 @@ rustc_binary("fuchsia-storage-benchmarks") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
+    "//src/lib/storage/delivery_blob",
     "//src/lib/storage/fs_management/rust:fs_management",
     "//src/lib/storage/ramdevice_client",
     "//src/lib/trace/rust:trace",

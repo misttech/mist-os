@@ -92,9 +92,6 @@ pub struct Options {
     /// If true, don't do an initial reap of the graveyard at mount time.  This is useful for
     /// testing.
     pub skip_initial_reap: bool,
-
-    /// If true, allow delivery blobs to be written to any blob volumes.
-    pub allow_delivery_blobs: bool,
 }
 
 impl Default for Options {
@@ -105,7 +102,6 @@ impl Default for Options {
             pre_commit_hook: None,
             post_commit_hook: None,
             skip_initial_reap: false,
-            allow_delivery_blobs: false,
         }
     }
 }
@@ -364,13 +360,6 @@ impl FxFilesystemBuilder {
     /// Enables or disables running fsck after every transaction. Defaults to `false`.
     pub fn fsck_after_every_transaction(mut self, fsck_after_every_transaction: bool) -> Self {
         self.fsck_after_every_transaction = fsck_after_every_transaction;
-        self
-    }
-
-    /// Sets whether to allow RFC 0207 compliant delivery blobs to be written to blob volumes.
-    /// See [`Options::allow_delivery_blobs`]. Defaults to `false`.
-    pub fn allow_delivery_blobs(mut self, allow_delivery_blobs: bool) -> Self {
-        self.options.allow_delivery_blobs = allow_delivery_blobs;
         self
     }
 

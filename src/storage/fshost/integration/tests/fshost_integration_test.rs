@@ -495,6 +495,7 @@ async fn set_data_and_blob_max_bytes_zero_new_write_api() {
     let mut builder = MerkleTreeBuilder::new();
     builder.write(&blob_contents);
     let hash = builder.finish().root();
+    let compressed_data: Vec<u8> = Type1Blob::generate(&blob_contents, CompressionMode::Always);
 
     let blob_proxy = fixture
         .realm
@@ -508,10 +509,10 @@ async fn set_data_and_blob_max_bytes_zero_new_write_api() {
         .expect("transport error on BlobCreator.Create")
         .expect("failed to create blob");
     let writer = writer_client_end.into_proxy().unwrap();
-    let mut blob_writer = BlobWriter::create(writer, blob_contents.len() as u64)
+    let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
         .await
         .expect("failed to create BlobWriter");
-    blob_writer.write(&blob_contents).await.unwrap();
+    blob_writer.write(&compressed_data).await.unwrap();
 
     fixture.tear_down().await;
 }
@@ -1031,6 +1032,9 @@ async fn verify_blobs() {
 }
 
 #[fuchsia::test]
+// Fxblob always enables delivery support.
+#[cfg_attr(feature = "fxblob", ignore)]
+
 async fn delivery_blob_support_disabled() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("blobfs_allow_delivery_blobs", false);

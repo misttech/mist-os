@@ -25,6 +25,7 @@ use {
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{lock::Mutex, TryStreamExt},
     fxfs::{
+        errors::FxfsError,
         filesystem::{
             mkfs, Filesystem as _, FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem,
             MIN_BLOCK_SIZE,
@@ -275,6 +276,10 @@ impl Component {
         options: StartOptions,
     ) -> Result<(), Error> {
         info!(?options, "Received start request");
+        if !options.allow_delivery_blobs {
+            return Err(FxfsError::InvalidArgs)
+                .with_context(|| format!("Fxfs only supports delivery blobs"));
+        }
         let mut state = self.state.lock().await;
         // TODO(fxbug.dev/93066): This is not very graceful.  It would be better for the client to
         // explicitly shut down all volumes first, and make this fail if there are remaining active
@@ -287,7 +292,6 @@ impl Component {
         assert!((zx::system_get_page_size() as u64) == MIN_BLOCK_SIZE);
 
         let fs = FxFilesystemBuilder::new()
-            .allow_delivery_blobs(options.allow_delivery_blobs)
             .fsck_after_every_transaction(options.fsck_after_every_transaction)
             .read_only(options.read_only)
             .background_task_spawner(spawn_on_pager_executor)
@@ -543,7 +547,7 @@ mod tests {
                         write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                         write_compression_level: 0,
                         cache_eviction_policy_override: EvictionPolicyOverride::None,
-                        allow_delivery_blobs: false,
+                        allow_delivery_blobs: true,
                     },
                 )
                 .await

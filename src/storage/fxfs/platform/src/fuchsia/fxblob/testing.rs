@@ -8,6 +8,7 @@ use {
         volume::FxVolume,
     },
     async_trait::async_trait,
+    delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
     fidl_fuchsia_io::{self as fio, MAX_TRANSFER_SIZE},
     fuchsia_merkle::{Hash, MerkleTreeBuilder},
     fxfs::object_store::{directory::Directory, HandleOptions, ObjectStore, StoreObjectHandle},
@@ -36,17 +37,21 @@ impl BlobFixture for TestFixture {
         let mut builder = MerkleTreeBuilder::new();
         builder.write(&data);
         let hash = builder.finish().root();
+        let delivery_data: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Never);
 
         let blob = open_file_checked(
             self.root(),
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE,
-            &format!("{}", hash),
+            &format!("{}", delivery_blob_path(hash)),
         )
         .await;
-        blob.resize(data.len() as u64).await.expect("FIDL call failed").expect("truncate failed");
-        for chunk in data.chunks(MAX_TRANSFER_SIZE as usize) {
+        blob.resize(delivery_data.len() as u64)
+            .await
+            .expect("FIDL call failed")
+            .expect("truncate failed");
+        for chunk in delivery_data.chunks(MAX_TRANSFER_SIZE as usize) {
             assert_eq!(
                 blob.write(&chunk).await.expect("FIDL call failed").expect("write failed"),
                 chunk.len() as u64

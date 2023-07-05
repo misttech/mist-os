@@ -35,6 +35,7 @@ rustc_library("fshost_test_fixture") {
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/lib/storage/block_client/rust:remote-block-device",
+    "//src/lib/storage/delivery_blob",
     "//src/lib/storage/fs_management/rust:fs_management",
     "//src/lib/storage/key-bag",
     "//src/lib/storage/ramdevice_client/rust",
