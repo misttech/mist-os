@@ -667,8 +667,10 @@ instance or a [child collection][doc-collections].
         directory, or runner capabilities.
     - `void`: The source is intentionally omitted. Only valid when `availability` is
         `optional` or `transitional`.
-- `to`: (_`string or array of strings`_) A capability target or array of targets, each of which is a [reference](#references) to the
-    child or collection to which the capability is being offered, of the form `#<target-name>`.
+- `to`: (_`string or array of strings`_) Capability target(s). One of:
+    - `#<target-name>` or [`#name1`, ...]: A [reference](#references) to a child or collection,
+      or an array of references.
+    - `all`: Short-hand for an `offer` clause containing all child [references](#references).
 - `as`: (_optional `string`_) An explicit [name](#name) for the capability as it will be known by the target. If omitted,
     defaults to the original name. `as` cannot be used when an array of multiple names is
     provided.

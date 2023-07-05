@@ -1,8 +1,12 @@
-// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 //! A library of common utilities used by `cmc` and related tools.
+//! To manually regenerate reference documentation from doc comments in
+//! this file, see the instructions at:
+//!
+//!   tools/lib/reference_doc/macro/derive-reference-doc-tests/src/test_data/README.md
 
 pub mod error;
 pub mod features;
@@ -2525,8 +2529,10 @@ pub struct Offer {
     ///     `optional` or `transitional`.
     pub from: OneOrMany<OfferFromRef>,
 
-    /// A capability target or array of targets, each of which is a [reference](#references) to the
-    /// child or collection to which the capability is being offered, of the form `#<target-name>`.
+    /// Capability target(s). One of:
+    /// - `#<target-name>` or [`#name1`, ...]: A [reference](#references) to a child or collection,
+    ///   or an array of references.
+    /// - `all`: Short-hand for an `offer` clause containing all child [references](#references).
     pub to: OneOrMany<OfferToRef>,
 
     /// An explicit [name](#name) for the capability as it will be known by the target. If omitted,
