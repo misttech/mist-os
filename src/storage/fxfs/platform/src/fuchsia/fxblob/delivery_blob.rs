@@ -117,20 +117,20 @@ impl Inner {
     fn storage_size(&self) -> usize {
         let header = self.header();
         if header.is_compressed {
+            let seek_table = self.decompressor().seek_table();
+            if seek_table.is_empty() {
+                return 0;
+            }
             // TODO(fxbug.dev/127530): If the uncompressed size of the blob is smaller than the
             // filesystem's block size, we should decompress it before persisting it on disk.
-            let last_chunk = self.decompressor().seek_table().last().unwrap();
-            return last_chunk.compressed_range.end;
+            return seek_table.last().unwrap().compressed_range.end;
         }
         // Data is uncompressed, storage size is equal to the payload length.
-        return header.payload_length;
+        header.payload_length
     }
 
-    async fn write_payload(&mut self, handle: &StoreObjectHandle<FxVolume>) -> Result<(), Status> {
+    async fn write_payload(&mut self, handle: &StoreObjectHandle<FxVolume>) -> Result<(), Error> {
         debug_assert!(self.allocated_space);
-        if self.buffer.is_empty() {
-            return Ok(()); // Wait for more data.
-        }
         let final_write =
             (self.payload_persisted as usize + self.buffer.len()) == self.header().payload_length;
         let block_size = handle.block_size() as usize;
@@ -142,7 +142,7 @@ impl Inner {
         let len =
             if final_write { self.buffer.len() } else { round_down(self.buffer.len(), block_size) };
         // Move data into transfer buffer, zero pad if required.
-        let aligned_len = round_up(len, block_size).ok_or(Status::OUT_OF_RANGE)?;
+        let aligned_len = round_up(len, block_size).ok_or(FxfsError::OutOfRange)?;
         let mut buffer = handle.allocate_buffer(aligned_len);
         buffer.as_mut_slice()[..len].copy_from_slice(&self.buffer[..len]);
         buffer.as_mut_slice()[len..].fill(0);
@@ -153,10 +153,7 @@ impl Inner {
             // Data is compressed, decompress to update Merkle tree.
             decompressor
                 .update(data, &mut |chunk_data| self.tree_builder.write(chunk_data))
-                .map_err(|e| {
-                    error!(error = ?e, "Failed to decompress archive");
-                    return Err(Status::IO_DATA_INTEGRITY);
-                })?;
+                .context("Failed to decompress archive")?;
         } else {
             // Data is uncompressed, use payload to update Merkle tree.
             self.tree_builder.write(data);
@@ -165,8 +162,7 @@ impl Inner {
         debug_assert!(self.payload_persisted >= self.payload_offset);
         handle
             .overwrite(self.payload_persisted - self.payload_offset, buffer.as_mut(), false)
-            .await
-            .map_err(map_to_status)?;
+            .await?;
         self.payload_persisted += len as u64;
         Ok(())
     }
@@ -178,6 +174,10 @@ impl Inner {
     ) -> Result<Option<BlobMetadata>, Error> {
         // We only write metadata if the Merkle tree has multiple levels or the data is compressed.
         let is_compressed = self.header().is_compressed;
+        // Special case: handle empty compressed archive.
+        if is_compressed && self.decompressor().seek_table().is_empty() {
+            return Ok(None);
+        }
         if merkle_tree.as_ref().len() > 1 || is_compressed {
             let mut hashes = vec![];
             hashes.reserve(merkle_tree.as_ref()[0].len());
@@ -451,7 +451,7 @@ impl FileIo for FxDeliveryBlob {
                 let Some((seek_table, chunk_data)) = decode_archive(&inner.buffer, archive_length)
                     .context("Failed to decode chunked archive")?
                 else {
-                    return Ok(());
+                    return Ok(());  // Not enough data to decode archive header/seek table.
                 };
                 // We store the seek table out-of-line with the data, so we don't persist that
                 // part of the payload directly.
@@ -655,6 +655,16 @@ mod tests {
             );
         }
         assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_write_compressed_empty() {
+        let fixture = new_blob_fixture().await;
+        let hash = MerkleTreeBuilder::new().finish().root();
+        let payload = Type1Blob::generate(&[], CompressionMode::Always);
+        resize_and_write(&fixture, &delivery_blob_path(hash), &payload).await.unwrap();
+        assert!(fixture.read_blob(&format!("{}", hash)).await.is_empty());
         fixture.close().await;
     }
 

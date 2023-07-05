@@ -150,8 +150,7 @@ impl SerializedType1Blob {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::CompressionMode;
+    use {super::*, crate::CompressionMode};
 
     const TEST_DATA: &[u8] = &[1, 2, 3, 4];
 

@@ -79,7 +79,7 @@ impl From<DeliveryBlobError> for zx::Status {
     fn from(value: DeliveryBlobError) -> Self {
         match value {
             // Unsupported delivery blob type.
-            DeliveryBlobError::InvalidType => zx::Status::PROTOCOL_NOT_SUPPORTED,
+            DeliveryBlobError::InvalidType => zx::Status::NOT_SUPPORTED,
             // Potentially corrupted delivery blob.
             DeliveryBlobError::BadMagic | DeliveryBlobError::IntegrityError => {
                 zx::Status::IO_DATA_INTEGRITY
@@ -219,5 +219,59 @@ impl Type1Blob {
                 return Ok(None);
             };
         serialized_header.decode().map(|metadata| Some((metadata, payload)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use {super::*, rand::Rng};
+
+    const DATA_LEN: usize = 500_000;
+
+    #[test]
+    fn compression_mode_never() {
+        let data: Vec<u8> = vec![0; DATA_LEN];
+        let delivery_blob = Type1Blob::generate(&data, CompressionMode::Never);
+        // Payload should be uncompressed and have the same size as the original input data.
+        let (header, _) = Type1Blob::parse(&delivery_blob).unwrap().unwrap();
+        assert!(!header.is_compressed);
+        assert_eq!(header.payload_length, data.len());
+    }
+
+    #[test]
+    fn compression_mode_always() {
+        let data: Vec<u8> = {
+            let range = rand::distributions::Uniform::<u8>::new_inclusive(0, 255);
+            rand::thread_rng().sample_iter(&range).take(DATA_LEN).collect()
+        };
+        let delivery_blob = Type1Blob::generate(&data, CompressionMode::Always);
+        let (header, _) = Type1Blob::parse(&delivery_blob).unwrap().unwrap();
+        // Payload is not very compressible, so we expect it to be larger than the original.
+        assert!(header.is_compressed);
+        assert!(header.payload_length > data.len());
+    }
+
+    #[test]
+    fn compression_mode_attempt_uncompressible() {
+        let data: Vec<u8> = {
+            let range = rand::distributions::Uniform::<u8>::new_inclusive(0, 255);
+            rand::thread_rng().sample_iter(&range).take(DATA_LEN).collect()
+        };
+        // Data is random and therefore shouldn't be very compressible.
+        let delivery_blob = Type1Blob::generate(&data, CompressionMode::Attempt);
+        let (header, _) = Type1Blob::parse(&delivery_blob).unwrap().unwrap();
+        assert!(!header.is_compressed);
+        assert_eq!(header.payload_length, data.len());
+    }
+
+    #[test]
+    fn compression_mode_attempt_compressible() {
+        let data: Vec<u8> = vec![0; DATA_LEN];
+        let delivery_blob = Type1Blob::generate(&data, CompressionMode::Attempt);
+        let (header, _) = Type1Blob::parse(&delivery_blob).unwrap().unwrap();
+        // Payload should be compressed and smaller than the original input.
+        assert!(header.is_compressed);
+        assert!(header.payload_length < data.len());
     }
 }
