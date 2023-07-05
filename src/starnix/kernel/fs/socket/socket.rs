@@ -383,8 +383,14 @@ impl Socket {
         // TODO(https://fxbug.dev/129059): Share this implementation with `fdio`
         // by moving things to `zxio`.
 
-        // The following IOCTLs are supported on all sockets for compatibility
-        // With Linux.
+        // The following netdevice IOCTLs are supported on all sockets for
+        // compatibility with Linux.
+        //
+        // Per https://man7.org/linux/man-pages/man7/netdevice.7.html,
+        //
+        //     Linux supports some standard ioctls to configure network devices.
+        //     They can be used on any socket's file descriptor regardless of
+        //     the family or type.
         match request {
             SIOCGIFADDR => {
                 let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
