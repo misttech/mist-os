@@ -84,4 +84,5 @@ fuchsia_unittest_package("security-policy-vmex-integration-test") {
     ":test_root",
     "//src/sys/component_manager/tests/security_policy:cm_for_test",
   ]
+  test_type = "system"
 }

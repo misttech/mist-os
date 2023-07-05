@@ -280,14 +280,14 @@ resource("component_manager_tests_invalid_manifest") {
   outputs = [ "meta/{{source_file_part}}" ]
 }
 
-fuchsia_component("component-manager-tests-cmp") {
-  testonly = true
+fuchsia_test_component("component-manager-tests-cmp") {
   deps = [
     ":lib_test",
     "//src/lib/process_builder:test_util",
   ]
   component_name = "component_manager_tests"
   manifest = "meta/component_manager_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("component-manager-tests") {

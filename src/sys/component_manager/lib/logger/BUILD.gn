@@ -45,4 +45,5 @@ rustc_library("logger") {
 fuchsia_unittest_package("component_manager_logger_test") {
   manifest = "meta/component_manager_logger_test.cml"
   deps = [ ":logger_test" ]
+  test_type = "system"
 }

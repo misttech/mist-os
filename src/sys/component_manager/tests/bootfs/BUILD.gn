@@ -30,11 +30,11 @@ rustc_test("bin") {
   sources = [ "src/lib.rs" ]
 }
 
-fuchsia_component("component") {
-  testonly = true
+fuchsia_test_component("component") {
   component_name = "bootfs"
   manifest = "meta/bootfs.cml"
   deps = [ ":bin" ]
+  test_type = "system"
 }
 
 # Run with `fx test bootfs-tests`.

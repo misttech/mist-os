@@ -19,7 +19,4 @@
             from: "self",
         },
     ],
-    facets: {
-        "fuchsia.test": { type: "system" },
-    },
 }
