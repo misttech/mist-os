@@ -20,7 +20,9 @@ use futures::prelude::*;
     "target_update",
     ManagerProxy = "core/system-update:expose:fuchsia.update.Manager",
     ChannelControlProxy = "core/system-update:expose:fuchsia.update.channelcontrol.ChannelControl"
-    InstallerProxy = "core/system-updater:expose:fuchsia.update.installer.Installer",
+    // TODO(https://fxbug.dev/123798): Connect to this at
+    // core/system-update/system-updater once that move rolls through.
+    InstallerProxy = "core:expose:fuchsia.update.installer.Installer",
 )]
 pub async fn update_cmd(
     update_manager_proxy: ManagerProxy,
