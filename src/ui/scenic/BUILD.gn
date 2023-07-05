@@ -15,13 +15,6 @@ group("scenic") {
   public_deps = [ ":scenic_pkg" ]
 }
 
-config("flatland_config") {
-  defines = []
-  if (use_flatland_by_default) {
-    defines += [ "USE_FLATLAND_BY_DEFAULT" ]
-  }
-}
-
 group("tests") {
   testonly = true
 
@@ -356,15 +349,4 @@ group("scenic_with_default_config") {
     ":component_v2",
     ":scenic_config",
   ]
-}
-
-group("frame-scheduler-min-predicted-frame-duration-in-us--15000") {
-  public_deps = [ ":frame_scheduler_min_predicted_frame_duration_in_us__15000" ]
-}
-
-config_data("frame_scheduler_min_predicted_frame_duration_in_us__15000") {
-  for_pkg = "scenic"
-  sources = [ rebase_path(
-          "data/frame_scheduler_min_predicted_frame_duration_in_us__15000") ]
-  outputs = [ "scenic_config" ]
 }

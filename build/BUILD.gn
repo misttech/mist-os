@@ -439,7 +439,6 @@ group("config_data_template_allowlist") {
     "//src/tests/intl/tzdata:*",
     "//src/ui/a11y/lib/semantics/tests:__single-font-collection_local_font_bundle_config_data",
     "//src/ui/a11y/lib/semantics/tests:single-font-collection_font_manifest_config_data",
-    "//src/ui/scenic:frame_scheduler_min_predicted_frame_duration_in_us__15000",
     "//src/ui/scenic/config:chromebook",
     "//third_party/network-conformance/*",
     "//vendor/google/*",

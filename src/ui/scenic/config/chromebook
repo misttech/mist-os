@@ -1,4 +1,0 @@
-{
-  "frame_scheduler_min_predicted_frame_duration_in_us" : 14000,
-  "flatland_enable_display_composition": true
-}
