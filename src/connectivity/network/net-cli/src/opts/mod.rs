@@ -227,6 +227,7 @@ pub struct IfAddr {
 pub enum IfAddrEnum {
     Add(IfAddrAdd),
     Del(IfAddrDel),
+    Wait(IfAddrWait),
 }
 
 #[derive(FromArgs, Clone, Debug, PartialEq)]
@@ -254,6 +255,20 @@ pub struct IfAddrDel {
     pub addr: String,
     #[argh(positional, from_str_fn(parse_netmask_or_prefix_length))]
     pub prefix: Option<u8>,
+}
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "wait")]
+/// waits for an address to be assigned on the network interface.
+///
+/// by default waits for any address; if --ipv6 is specified, waits for an IPv6
+/// address.
+pub struct IfAddrWait {
+    #[argh(positional, arg_name = "nicid or name:ifname")]
+    pub interface: InterfaceIdentifier,
+    /// wait for an IPv6 address
+    #[argh(switch)]
+    pub ipv6: bool,
 }
 
 #[derive(FromArgs, Clone, Debug, PartialEq)]

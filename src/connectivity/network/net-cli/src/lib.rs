@@ -642,6 +642,52 @@ async fn do_if<C: NetCliDepsConnector>(
                 }
                 info!("Address {} deleted from interface {}", addr, id);
             }
+            opts::IfAddrEnum::Wait(opts::IfAddrWait { interface, ipv6 }) => {
+                let id = interface.find_nicid(connector).await?;
+                let interfaces_state =
+                    connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
+                let mut state = finterfaces_ext::InterfaceState::<()>::Unknown(id);
+
+                let assigned_addr = finterfaces_ext::wait_interface_with_id(
+                    finterfaces_ext::event_stream_from_state(
+                        &interfaces_state,
+                        finterfaces_ext::IncludedAddresses::OnlyAssigned,
+                    )?,
+                    &mut state,
+                    |finterfaces_ext::PropertiesAndState { properties, state: _ }| {
+                        let finterfaces_ext::Properties { addresses, .. } = properties;
+                        let addr = if ipv6 {
+                            addresses.iter().find_map(
+                                |finterfaces_ext::Address {
+                                     addr: fnet::Subnet { addr, .. },
+                                     ..
+                                 }| {
+                                    match addr {
+                                        fnet::IpAddress::Ipv4(_) => None,
+                                        fnet::IpAddress::Ipv6(_) => Some(addr),
+                                    }
+                                },
+                            )
+                        } else {
+                            addresses.first().map(
+                                |finterfaces_ext::Address {
+                                     addr: fnet::Subnet { addr, .. },
+                                     ..
+                                 }| addr,
+                            )
+                        };
+                        addr.map(|addr| {
+                            let fnet_ext::IpAddress(addr) = (*addr).into();
+                            addr
+                        })
+                    },
+                )
+                .await
+                .context("wait for assigned address")?;
+
+                out.line(format!("{assigned_addr}"))?;
+                info!("Address {} assigned on interface {}", assigned_addr, id);
+            }
         },
         opts::IfEnum::Bridge(opts::IfBridge { interfaces }) => {
             let stack = connect_with_context::<fstack::StackMarker, _>(connector).await?;
@@ -1397,15 +1443,15 @@ mod tests {
     use fidl_fuchsia_net_routes as froutes;
     use fidl_fuchsia_net_routes_ext as froutes_ext;
     use fuchsia_async::{self as fasync, TimeoutExt as _};
-    use net_declare::{fidl_ip, fidl_ip_v4};
+    use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet};
     use std::{convert::TryInto as _, fmt::Debug};
     use test_case::test_case;
 
-    const IF_ADDR_V4: fnet::Subnet = net_declare::fidl_subnet!("192.168.0.1/32");
-    const IF_ADDR_V6: fnet::Subnet = net_declare::fidl_subnet!("fd00::1/64");
+    const IF_ADDR_V4: fnet::Subnet = fidl_subnet!("192.168.0.1/32");
+    const IF_ADDR_V6: fnet::Subnet = fidl_subnet!("fd00::1/64");
 
-    const MAC_1: fnet::MacAddress = net_declare::fidl_mac!("01:02:03:04:05:06");
-    const MAC_2: fnet::MacAddress = net_declare::fidl_mac!("02:03:04:05:06:07");
+    const MAC_1: fnet::MacAddress = fidl_mac!("01:02:03:04:05:06");
+    const MAC_2: fnet::MacAddress = fidl_mac!("02:03:04:05:06:07");
 
     #[derive(Default)]
     struct TestConnector {
@@ -2208,6 +2254,125 @@ mod tests {
                 },
             }
         }
+    }
+
+    const INTERFACE_NAME: &str = "if1";
+
+    fn interface_properties(
+        addrs: Vec<(fnet::Subnet, finterfaces::AddressAssignmentState)>,
+    ) -> finterfaces::Properties {
+        finterfaces_ext::Properties {
+            id: INTERFACE_ID.try_into().unwrap(),
+            name: INTERFACE_NAME.to_string(),
+            device_class: finterfaces::DeviceClass::Device(
+                fhardware_network::DeviceClass::Ethernet,
+            ),
+            online: true,
+            addresses: addrs
+                .into_iter()
+                .map(|(addr, assignment_state)| finterfaces_ext::Address {
+                    addr,
+                    assignment_state,
+                    valid_until: fuchsia_zircon_types::ZX_TIME_INFINITE,
+                })
+                .collect(),
+            has_default_ipv4_route: false,
+            has_default_ipv6_route: false,
+        }
+        .into()
+    }
+
+    #[test_case(
+        false,
+        vec![
+            finterfaces::Event::Existing(interface_properties(vec![])),
+            finterfaces::Event::Idle(finterfaces::Empty),
+            finterfaces::Event::Changed(interface_properties(vec![
+                (fidl_subnet!("192.168.0.1/32"), finterfaces::AddressAssignmentState::Assigned)
+            ])),
+        ],
+        "192.168.0.1";
+        "wait for an address to be assigned"
+    )]
+    #[test_case(
+        false,
+        vec![
+            finterfaces::Event::Existing(interface_properties(vec![
+                (fidl_subnet!("192.168.0.1/32"), finterfaces::AddressAssignmentState::Assigned),
+                (fidl_subnet!("fd00::1/64"), finterfaces::AddressAssignmentState::Assigned),
+            ])),
+        ],
+        "192.168.0.1";
+        "prefer first when any address requested"
+    )]
+    #[test_case(
+        true,
+        vec![
+            finterfaces::Event::Existing(interface_properties(vec![
+                (fidl_subnet!("192.168.0.1/32"), finterfaces::AddressAssignmentState::Assigned)
+            ])),
+            finterfaces::Event::Idle(finterfaces::Empty),
+            finterfaces::Event::Changed(interface_properties(vec![
+                (fidl_subnet!("fd00::1/64"), finterfaces::AddressAssignmentState::Assigned)
+            ])),
+        ],
+        "fd00::1";
+        "wait for IPv6 when IPv6 address requested"
+    )]
+    #[fasync::run_singlethreaded(test)]
+    async fn if_addr_wait(ipv6: bool, events: Vec<finterfaces::Event>, expected_output: &str) {
+        let interface = TestInterface { nicid: INTERFACE_ID, name: INTERFACE_NAME };
+
+        let (interfaces_state, mut request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>().unwrap();
+
+        let interfaces_handler = async move {
+            let (finterfaces::WatcherOptions { include_non_assigned_addresses, .. }, server_end, _) =
+                request_stream
+                    .next()
+                    .await
+                    .expect("should call state")
+                    .expect("should succeed")
+                    .into_get_watcher()
+                    .expect("request should be GetWatcher");
+            assert_eq!(include_non_assigned_addresses, Some(false));
+            let mut request_stream: finterfaces::WatcherRequestStream =
+                server_end.into_stream().expect("server end into request stream");
+            for event in events {
+                request_stream
+                    .next()
+                    .await
+                    .expect("should call watcher")
+                    .expect("should succeed")
+                    .into_watch()
+                    .expect("request should be Watch")
+                    .send(&event)
+                    .expect("send response");
+            }
+        };
+
+        let connector =
+            TestConnector { interfaces_state: Some(interfaces_state), ..Default::default() };
+        let mut out = ffx_writer::Writer::new_test(None);
+        let run_command = do_if(
+            &mut out,
+            opts::IfEnum::Addr(opts::IfAddr {
+                addr_cmd: opts::IfAddrEnum::Wait(opts::IfAddrWait {
+                    interface: interface.identifier(false),
+                    ipv6,
+                }),
+            }),
+            &connector,
+        )
+        .map(|r| r.expect("command should succeed"));
+
+        let ((), ()) = futures::future::join(interfaces_handler, run_command).await;
+
+        let output = out.test_output().unwrap();
+        pretty_assertions::assert_eq!(
+            trim_whitespace_for_comparison(&output),
+            trim_whitespace_for_comparison(expected_output),
+        );
     }
 
     fn wanted_net_if_list_json() -> String {
