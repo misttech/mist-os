@@ -71,8 +71,8 @@ struct unique_type<T[]> {
   using incomplete_array = std::unique_ptr<T[]>;
 };
 
-inline void* checked(size_t size, AllocChecker* ac, void* mem) {
-  ac->arm(size, mem != nullptr);
+inline void* checked(size_t size, AllocChecker& ac, void* mem) {
+  ac.arm(size, mem != nullptr);
   return mem;
 }
 
@@ -91,7 +91,7 @@ typename internal::unique_type<T>::single make_unique_checked(AllocChecker* ac, 
 // These can be used as follows:
 //
 //    fbl::AllocChecker ac;
-//    Object* foo = new (&ac) Object();
+//    Object* foo = new (ac) Object();
 //    if (!ac.check()) {
 //      // failed.
 //    }
@@ -106,31 +106,46 @@ typename internal::unique_type<T>::single make_unique_checked(AllocChecker* ac, 
 //     operator is paired with the correct `delete`/`delete[]` operator.
 //
 #if _KERNEL
-inline void* operator new(size_t size, fbl::AllocChecker* ac) noexcept {
+inline void* operator new(size_t size, fbl::AllocChecker& ac) noexcept {
   return fbl::internal::checked(size, ac, malloc(size));
 }
-inline void* operator new(size_t size, std::align_val_t align, fbl::AllocChecker* ac) noexcept {
+inline void* operator new(size_t size, std::align_val_t align, fbl::AllocChecker& ac) noexcept {
   return fbl::internal::checked(size, ac, memalign(static_cast<size_t>(align), size));
 }
-inline void* operator new[](size_t size, fbl::AllocChecker* ac) noexcept {
+inline void* operator new[](size_t size, fbl::AllocChecker& ac) noexcept {
   return fbl::internal::checked(size, ac, malloc(size));
 }
-inline void* operator new[](size_t size, std::align_val_t align, fbl::AllocChecker* ac) noexcept {
+inline void* operator new[](size_t size, std::align_val_t align, fbl::AllocChecker& ac) noexcept {
   return fbl::internal::checked(size, ac, memalign(static_cast<size_t>(align), size));
 }
 #else
-inline void* operator new(size_t size, fbl::AllocChecker* ac) noexcept {
+inline void* operator new(size_t size, fbl::AllocChecker& ac) noexcept {
   return fbl::internal::checked(size, ac, operator new(size, std::nothrow_t()));
 }
-inline void* operator new(size_t size, std::align_val_t align, fbl::AllocChecker* ac) noexcept {
+inline void* operator new(size_t size, std::align_val_t align, fbl::AllocChecker& ac) noexcept {
   return fbl::internal::checked(size, ac, operator new(size, align, std::nothrow_t()));
 }
-inline void* operator new[](size_t size, fbl::AllocChecker* ac) noexcept {
+inline void* operator new[](size_t size, fbl::AllocChecker& ac) noexcept {
   return fbl::internal::checked(size, ac, operator new[](size, std::nothrow_t()));
 }
-inline void* operator new[](size_t size, std::align_val_t align, fbl::AllocChecker* ac) noexcept {
+inline void* operator new[](size_t size, std::align_val_t align, fbl::AllocChecker& ac) noexcept {
   return fbl::internal::checked(size, ac, operator new[](size, align, std::nothrow_t()));
 }
 #endif  // !_KERNEL
+
+// For compatibility with older uses, ac can either be passed by reference (ac)
+// or by explicit pointer (&ac).
+inline void* operator new(size_t size, fbl::AllocChecker* ac) noexcept {
+  return operator new(size, *ac);
+}
+inline void* operator new(size_t size, std::align_val_t align, fbl::AllocChecker* ac) noexcept {
+  return operator new(size, align, *ac);
+}
+inline void* operator new[](size_t size, fbl::AllocChecker* ac) noexcept {
+  return operator new[](size, *ac);
+}
+inline void* operator new[](size_t size, std::align_val_t align, fbl::AllocChecker* ac) noexcept {
+  return operator new[](size, align, *ac);
+}
 
 #endif  // FBL_ALLOC_CHECKER_H_

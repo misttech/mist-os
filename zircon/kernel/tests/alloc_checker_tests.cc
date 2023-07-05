@@ -90,7 +90,7 @@ static bool alloc_checker_new() {
 
   const int kCount = 128;
   fbl::AllocChecker ac;
-  ktl::unique_ptr<StructWithCtor[]> arr(new (&ac) StructWithCtor[kCount]);
+  ktl::unique_ptr<StructWithCtor[]> arr(new (ac) StructWithCtor[kCount]);
   EXPECT_EQ(ac.check(), true);
 
   // Check that the constructor got run.
@@ -114,7 +114,7 @@ static bool alloc_checker_new_fails() {
   // Use a type with a constructor to check that we are not attempting to
   // run the constructor when the allocation fails.
   fbl::AllocChecker ac;
-  EXPECT_EQ(new (&ac) StructWithCtor[large_size], nullptr);
+  EXPECT_EQ(new (ac) StructWithCtor[large_size], nullptr);
   EXPECT_EQ(ac.check(), false);
 #endif
 
@@ -146,7 +146,7 @@ static bool test_array_size_overflow_check() {
   // declared as "noexcept" (which AllocChecker relies on anyway),
   // otherwise the compiler might generate code that raises an exception
   // (again, depending on C++ version).
-  EXPECT_EQ(new (&ac) LargeStruct[count], nullptr);
+  EXPECT_EQ(new (ac) LargeStruct[count], nullptr);
   EXPECT_EQ(ac.check(), false);
 #endif
 
@@ -171,7 +171,7 @@ static bool test_negative_array_size() {
   // compiler may complain at compile time that the program is ill-formed
   // (possibly depending on C++ version).
   int count = -1;
-  EXPECT_EQ(new (&ac) char[count], nullptr);
+  EXPECT_EQ(new (ac) char[count], nullptr);
   EXPECT_EQ(ac.check(), false);
 #endif
 
