@@ -288,8 +288,8 @@ pub enum CapabilityAllowlistSource {
 pub enum AbiRevisionError {
     #[error("Missing a component target ABI revision.")]
     Absent,
-    #[error("Unsupported component target ABI revision: {0}.")]
-    Unsupported(AbiRevision),
+    #[error("Unsupported component target ABI revision: {0}. The following revisions are supported: {1}")]
+    Unsupported(AbiRevision, String),
 }
 
 /// The enforcement and validation policy to apply to component target ABI revisions.
@@ -347,7 +347,11 @@ impl AbiRevisionPolicy {
                 if is_supported_abi {
                     Ok(())
                 } else {
-                    Err(AbiRevisionError::Unsupported(abi))
+                    let supported_abis: Vec<_> = version_history::get_supported_abi_revisions()
+                        .into_iter()
+                        .map(|v| format!("{}", version_history::AbiRevision(v)))
+                        .collect();
+                    Err(AbiRevisionError::Unsupported(abi, supported_abis.join(",")))
                 }
             }
             _ => Err(AbiRevisionError::Absent),
@@ -1273,6 +1277,10 @@ mod tests {
         // This test assumes the platform does not support a u64::MAX ABI value.
         let invalid_abi = AbiRevision(u64::MAX);
         let valid_abi = version_history::LATEST_VERSION.abi_revision;
+        let supported_abis: Vec<_> = version_history::get_supported_abi_revisions()
+            .into_iter()
+            .map(|v| format!("{}", version_history::AbiRevision(v)))
+            .collect();
         let test_scenarios = vec![
             (AbiRevisionPolicy::AllowAll, None, Ok(())),
             (AbiRevisionPolicy::AllowAll, Some(invalid_abi), Ok(())),
@@ -1288,7 +1296,7 @@ mod tests {
             (
                 AbiRevisionPolicy::EnforcePresenceAndCompatibility,
                 Some(invalid_abi),
-                Err(AbiRevisionError::Unsupported(invalid_abi)),
+                Err(AbiRevisionError::Unsupported(invalid_abi, supported_abis.join(","))),
             ),
             (AbiRevisionPolicy::EnforcePresenceAndCompatibility, Some(valid_abi), Ok(())),
         ];
