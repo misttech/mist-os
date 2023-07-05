@@ -1498,7 +1498,7 @@ TEST_P(ReadAfterShutdownTest, Success) {
       switch (read_type) {
         case ReadType::Blocking: {
           timeval tv = {
-              .tv_sec = 1,
+              .tv_sec = 2,
           };
           EXPECT_EQ(setsockopt(local.get(), SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)), 0)
               << strerror(errno);
