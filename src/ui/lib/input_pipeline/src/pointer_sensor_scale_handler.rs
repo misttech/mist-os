@@ -19,7 +19,7 @@ pub struct PointerSensorScaleHandler {
     mutable_state: RefCell<MutableState>,
 
     /// The inventory of this handler's Inspect status.
-    _inspect_status: InputHandlerStatus,
+    pub inspect_status: InputHandlerStatus,
 }
 
 struct MutableState {
@@ -43,7 +43,7 @@ impl UnhandledInputHandler for PointerSensorScaleHandler {
         self: Rc<Self>,
         unhandled_input_event: input_device::UnhandledInputEvent,
     ) -> Vec<input_device::InputEvent> {
-        match unhandled_input_event {
+        match unhandled_input_event.clone() {
             input_device::UnhandledInputEvent {
                 device_event:
                     input_device::InputDeviceEvent::Mouse(mouse_binding::MouseEvent {
@@ -72,6 +72,8 @@ impl UnhandledInputHandler for PointerSensorScaleHandler {
                 event_time,
                 trace_id: _,
             } => {
+                self.inspect_status
+                    .count_received_event(input_device::InputEvent::from(unhandled_input_event));
                 let scaled_motion = self.scale_motion(raw_motion, event_time);
                 let input_event = input_device::InputEvent {
                     device_event: input_device::InputDeviceEvent::Mouse(
@@ -128,6 +130,8 @@ impl UnhandledInputHandler for PointerSensorScaleHandler {
                 event_time,
                 trace_id: _,
             } => {
+                self.inspect_status
+                    .count_received_event(input_device::InputEvent::from(unhandled_input_event));
                 let scaled_wheel_delta_v = self.scale_scroll(wheel_delta_v, event_time);
                 let scaled_wheel_delta_h = self.scale_scroll(wheel_delta_h, event_time);
                 let input_event = input_device::InputEvent {
@@ -219,7 +223,7 @@ impl PointerSensorScaleHandler {
                 last_move_timestamp: None,
                 last_scroll_timestamp: None,
             }),
-            _inspect_status: inspect_status,
+            inspect_status,
         })
     }
 
@@ -416,10 +420,13 @@ impl PointerSensorScaleHandler {
 mod tests {
     use {
         super::*,
+        crate::input_handler::InputHandler,
+        crate::testing_utilities,
         assert_matches::assert_matches,
-        fuchsia_inspect, fuchsia_zircon as zx,
+        fuchsia_async as fasync, fuchsia_inspect, fuchsia_zircon as zx,
         maplit::hashset,
         std::cell::Cell,
+        std::ops::Add,
         test_util::{assert_gt, assert_lt, assert_near},
     };
 
@@ -481,6 +488,81 @@ mod tests {
                     events_received_count: 0u64,
                     events_handled_count: 0u64,
                     last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn pointer_sensor_scale_handler_inspect_counts_events() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let handler = PointerSensorScaleHandler::new(&fake_handlers_node);
+
+        let event_time1 = zx::Time::get_monotonic();
+        let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
+        let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
+
+        let input_events = vec![
+            testing_utilities::create_mouse_event(
+                mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 }),
+                None, /* wheel_delta_v */
+                None, /* wheel_delta_h */
+                None, /* is_precision_scroll */
+                mouse_binding::MousePhase::Wheel,
+                hashset! {},
+                hashset! {},
+                event_time1,
+                &DEVICE_DESCRIPTOR,
+            ),
+            testing_utilities::create_mouse_event(
+                mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
+                    millimeters: Position { x: 1.5 / COUNTS_PER_MM, y: 4.5 / COUNTS_PER_MM },
+                }),
+                None, /* wheel_delta_v */
+                None, /* wheel_delta_h */
+                None, /* is_precision_scroll */
+                mouse_binding::MousePhase::Move,
+                hashset! {},
+                hashset! {},
+                event_time2,
+                &DEVICE_DESCRIPTOR,
+            ),
+            // Should not count non-mouse input events.
+            testing_utilities::create_fake_input_event(event_time2),
+            // Should not count received events that have already been handled.
+            testing_utilities::create_mouse_event_with_handled(
+                mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 }),
+                None, /* wheel_delta_v */
+                None, /* wheel_delta_h */
+                None, /* is_precision_scroll */
+                mouse_binding::MousePhase::Wheel,
+                hashset! {},
+                hashset! {},
+                event_time3,
+                &DEVICE_DESCRIPTOR,
+                input_device::Handled::Yes,
+            ),
+        ];
+
+        for input_event in input_events {
+            let _ = handler.clone().handle_input_event(input_event).await;
+        }
+
+        let last_received_event_time: u64 = event_time2.into_nanos().try_into().unwrap();
+
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                pointer_sensor_scale_handler: {
+                    events_received_count: 2u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: last_received_event_time,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,

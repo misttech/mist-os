@@ -62,7 +62,7 @@ pub struct MouseInjectorHandler {
     configuration_proxy: pointerinjector_config::SetupProxy,
 
     /// The inventory of this handler's Inspect status.
-    _inspect_status: InputHandlerStatus,
+    pub inspect_status: InputHandlerStatus,
 }
 
 struct MutableState {
@@ -95,6 +95,8 @@ impl InputHandler for MouseInjectorHandler {
                 handled: input_device::Handled::No,
                 trace_id: _,
             } => {
+                self.inspect_status
+                    .count_received_event(input_device::InputEvent::from(input_event.clone()));
                 // TODO(fxbug.dev/90317): Investigate latency introduced by waiting for update_cursor_renderer
                 if let Err(e) =
                     self.update_cursor_renderer(mouse_event, &mouse_device_descriptor).await
@@ -243,7 +245,7 @@ impl MouseInjectorHandler {
             max_position: Position { x: display_size.width, y: display_size.height },
             injector_registry_proxy,
             configuration_proxy,
-            _inspect_status: inspect_status,
+            inspect_status,
         });
 
         Ok(handler)
@@ -2232,6 +2234,110 @@ mod tests {
                     events_received_count: 0u64,
                     events_handled_count: 0u64,
                     last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mouse_injector_handler_inspect_counts_events() {
+        // Set up fidl streams.
+        let (configuration_proxy, mut configuration_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
+                .expect("Failed to create pointerinjector Setup proxy and stream.");
+        let (injector_registry_proxy, injector_registry_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
+                .expect("Failed to create pointerinjector Registry proxy and stream.");
+        let (sender, _) = futures::channel::mpsc::channel::<CursorMessage>(1);
+
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+
+        // Create mouse handler.
+        let mouse_handler_fut = MouseInjectorHandler::new_handler(
+            configuration_proxy,
+            injector_registry_proxy,
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
+            sender,
+            &fake_handlers_node,
+        );
+        let config_request_stream_fut =
+            handle_configuration_request_stream(&mut configuration_request_stream);
+        let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
+        let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
+
+        let cursor_location = mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 });
+        let event_time1 = zx::Time::get_monotonic();
+        let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
+        let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
+
+        let input_events = vec![
+            create_mouse_event(
+                cursor_location,
+                None, /* wheel_delta_v */
+                None, /* wheel_delta_h */
+                None, /* is_precision_scroll */
+                mouse_binding::MousePhase::Down,
+                HashSet::from_iter(vec![1]),
+                HashSet::from_iter(vec![1]),
+                event_time1,
+                &DESCRIPTOR,
+            ),
+            create_mouse_event(
+                cursor_location,
+                None, /* wheel_delta_v */
+                None, /* wheel_delta_h */
+                None, /* is_precision_scroll */
+                mouse_binding::MousePhase::Up,
+                HashSet::from_iter(vec![1]),
+                HashSet::new(),
+                event_time2,
+                &DESCRIPTOR,
+            ),
+            create_mouse_event_with_handled(
+                cursor_location,
+                None, /* wheel_delta_v */
+                None, /* wheel_delta_h */
+                None, /* is_precision_scroll */
+                mouse_binding::MousePhase::Down,
+                HashSet::from_iter(vec![1]),
+                HashSet::from_iter(vec![1]),
+                event_time3,
+                &DESCRIPTOR,
+                input_device::Handled::Yes,
+            ),
+        ];
+
+        // Create a channel for the the registered device's handle to be forwarded to the
+        // DeviceRequestStream handler. This allows the registry_fut to complete and allows
+        // handle_input_event() to continue.
+        let (injector_stream_sender, _) = mpsc::unbounded::<Vec<pointerinjector::Event>>();
+        let registry_fut = handle_registry_request_stream2(
+            injector_registry_request_stream,
+            injector_stream_sender,
+        );
+
+        // Run all futures until the handler future completes.
+        let _registry_task = fasync::Task::local(registry_fut);
+
+        for input_event in input_events {
+            mouse_handler.clone().handle_input_event(input_event).await;
+        }
+
+        let last_received_event_time: u64 = event_time2.into_nanos().try_into().unwrap();
+
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                mouse_injector_handler: {
+                    events_received_count: 2u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: last_received_event_time,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,

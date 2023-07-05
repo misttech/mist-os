@@ -47,7 +47,7 @@ pub struct TouchInjectorHandler {
     configuration_proxy: pointerinjector_config::SetupProxy,
 
     /// The inventory of this handler's Inspect status.
-    _inspect_status: InputHandlerStatus,
+    pub inspect_status: InputHandlerStatus,
 }
 
 #[derive(Debug)]
@@ -67,7 +67,6 @@ impl UnhandledInputHandler for TouchInjectorHandler {
         unhandled_input_event: input_device::UnhandledInputEvent,
     ) -> Vec<input_device::InputEvent> {
         fuchsia_trace::duration!("input", "presentation_on_event");
-
         match unhandled_input_event {
             input_device::UnhandledInputEvent {
                 device_event: input_device::InputDeviceEvent::TouchScreen(ref touch_event),
@@ -76,6 +75,9 @@ impl UnhandledInputHandler for TouchInjectorHandler {
                 event_time,
                 trace_id,
             } => {
+                self.inspect_status.count_received_event(input_device::InputEvent::from(
+                    unhandled_input_event.clone(),
+                ));
                 fuchsia_trace::flow_end!("input", "report-to-event", trace_id.unwrap_or(0.into()));
                 // Create a new injector if this is the first time seeing device_id.
                 if let Err(e) = self.ensure_injector_registered(&touch_device_descriptor).await {
@@ -191,7 +193,7 @@ impl TouchInjectorHandler {
             display_size,
             injector_registry_proxy,
             configuration_proxy,
-            _inspect_status: inspect_status,
+            inspect_status,
         });
 
         Ok(handler)
@@ -432,8 +434,10 @@ impl TouchInjectorHandler {
 mod tests {
     use {
         super::*,
+        crate::input_handler::InputHandler,
         crate::testing_utilities::{
-            create_touch_contact, create_touch_pointer_sample_event, create_touch_screen_event,
+            create_fake_input_event, create_touch_contact, create_touch_pointer_sample_event,
+            create_touch_screen_event, create_touch_screen_event_with_handled,
             create_touchpad_event,
         },
         assert_matches::assert_matches,
@@ -444,6 +448,7 @@ mod tests {
         pretty_assertions::assert_eq,
         std::collections::HashSet,
         std::convert::TryFrom as _,
+        std::ops::Add,
     };
 
     const TOUCH_ID: u32 = 1;
@@ -926,6 +931,99 @@ mod tests {
                     events_received_count: 0u64,
                     events_handled_count: 0u64,
                     last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn touch_injector_handler_inspect_counts_events() {
+        // Set up fidl streams.
+        let (configuration_proxy, mut configuration_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
+                .expect("Failed to create pointerinjector Setup proxy and stream.");
+        let (injector_registry_proxy, _) =
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
+                .expect("Failed to create pointerinjector Registry proxy and stream.");
+
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+
+        // Create touch handler.
+        let touch_handler_fut = TouchInjectorHandler::new_handler(
+            configuration_proxy,
+            injector_registry_proxy,
+            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            &fake_handlers_node,
+        );
+        let config_request_stream_fut =
+            handle_configuration_request_stream(&mut configuration_request_stream);
+        let (touch_handler_res, _) = futures::join!(touch_handler_fut, config_request_stream_fut);
+        let touch_handler = touch_handler_res.expect("Failed to create touch handler");
+
+        let contact = create_touch_contact(TOUCH_ID, Position { x: 20.0, y: 40.0 });
+        let descriptor = get_touch_screen_device_descriptor();
+        let event_time1 = zx::Time::get_monotonic();
+        let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
+        let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
+
+        let input_events = vec![
+            create_touch_screen_event(
+                hashmap! {
+                    fidl_ui_input::PointerEventPhase::Add
+                        => vec![contact.clone()],
+                },
+                event_time1,
+                &descriptor,
+            ),
+            create_touch_screen_event(
+                hashmap! {
+                    fidl_ui_input::PointerEventPhase::Move
+                        => vec![contact.clone()],
+                },
+                event_time2,
+                &descriptor,
+            ),
+            // Should not count non-touch input event.
+            create_fake_input_event(event_time2),
+            // Should not count received event that has already been handled.
+            create_touch_screen_event_with_handled(
+                hashmap! {
+                    fidl_ui_input::PointerEventPhase::Move
+                        => vec![contact.clone()],
+                },
+                event_time2,
+                &descriptor,
+                input_device::Handled::Yes,
+            ),
+            create_touch_screen_event(
+                hashmap! {
+                    fidl_ui_input::PointerEventPhase::Remove
+                        => vec![contact.clone()],
+                },
+                event_time3,
+                &descriptor,
+            ),
+        ];
+
+        for input_event in input_events {
+            touch_handler.clone().handle_input_event(input_event).await;
+        }
+
+        let last_received_event_time: u64 = event_time3.into_nanos().try_into().unwrap();
+
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                touch_injector_handler: {
+                    events_received_count: 3u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: last_received_event_time,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,
