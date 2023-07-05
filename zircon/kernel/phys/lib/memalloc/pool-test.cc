@@ -595,7 +595,7 @@ PREFIX: | [0x0000000000001000, 0x0000000000002000) |      4K | free RAM
   }
 }
 
-TEST(MemallocPoolTests, GetContainingRange) {
+TEST(MemallocPoolTests, FindContainingRange) {
   PoolContext ctx;
   Range ranges[] = {
       // RAM: [0, 3*kChunkSize)
@@ -624,12 +624,12 @@ TEST(MemallocPoolTests, GetContainingRange) {
   ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
   ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {expected}));
 
-  EXPECT_EQ(expected[0], *ctx.pool.GetContainingRange(kDefaultMinAddr));
-  EXPECT_EQ(expected[0], *ctx.pool.GetContainingRange(kChunkSize - 1));
-  EXPECT_EQ(expected[1], *ctx.pool.GetContainingRange(kChunkSize));
-  EXPECT_EQ(expected[1], *ctx.pool.GetContainingRange(2 * kChunkSize));
-  EXPECT_EQ(expected[1], *ctx.pool.GetContainingRange(3 * kChunkSize - 1));
-  EXPECT_FALSE(ctx.pool.GetContainingRange(3 * kChunkSize));
+  EXPECT_EQ(expected[0], *ctx.pool.FindContainingRange(kDefaultMinAddr));
+  EXPECT_EQ(expected[0], *ctx.pool.FindContainingRange(kChunkSize - 1));
+  EXPECT_EQ(expected[1], *ctx.pool.FindContainingRange(kChunkSize));
+  EXPECT_EQ(expected[1], *ctx.pool.FindContainingRange(2 * kChunkSize));
+  EXPECT_EQ(expected[1], *ctx.pool.FindContainingRange(3 * kChunkSize - 1));
+  EXPECT_EQ(ctx.pool.end(), ctx.pool.FindContainingRange(3 * kChunkSize));
 }
 
 TEST(MemallocPoolTests, DefaultAllocationBounds) {

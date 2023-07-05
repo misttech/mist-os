@@ -47,6 +47,30 @@ constexpr int kRangeColWidth = 2 * 16 + 3 + 4 + 1;
 // A rough estimate: 4 digits, a decimal point, and a letter for a size.
 constexpr int kSizeColWidth = 7;
 
+// A shared routine for the const and mutable versions of
+// Pool::FindContainingRange() below.
+template <class Ranges>
+auto FindContainingRangeAmong(Ranges&& ranges, uint64_t addr, uint64_t size)
+    -> decltype(ranges.begin()) {
+  ZX_DEBUG_ASSERT(size <= kMax - addr);
+
+  // Despite the name, this function gives us the first range that is
+  // lexicographically >= [addr, addr + size)
+  auto next = std::lower_bound(ranges.begin(), ranges.end(), Range{.addr = addr, .size = size});
+  uint64_t range_end = addr + size;
+  if (next != ranges.end() && addr >= next->addr) {
+    return range_end <= next->end() ? next : ranges.end();
+  }
+  // If the first range lexicographically >= [addr, addr + size) is
+  // ranges_.begin() and we did not enter the previous branch, then addr + size
+  // exceeds the right endpoint of ranges_.begin().
+  if (next == ranges.begin()) {
+    return ranges.end();
+  }
+  auto prev = std::prev(next);
+  return (prev->addr <= addr && range_end <= prev->end()) ? prev : ranges.end();
+}
+
 }  // namespace
 
 fit::result<fit::failed> Pool::Init(cpp20::span<internal::RangeIterationContext> state,
@@ -151,11 +175,6 @@ fit::result<fit::failed, Pool::Node*> Pool::NewNode(const Range& range) {
   return fit::ok(static_cast<Node*>(node));
 }
 
-const Range* Pool::GetContainingRange(uint64_t addr) {
-  auto it = GetContainingNode(addr, 1);
-  return it == ranges_.end() ? nullptr : &*it;
-}
-
 fit::result<fit::failed, uint64_t> Pool::Allocate(Type type, uint64_t size, uint64_t alignment,
                                                   std::optional<uint64_t> min_addr,
                                                   std::optional<uint64_t> max_addr) {
@@ -229,7 +248,7 @@ fit::result<fit::failed> Pool::Free(uint64_t addr, uint64_t size) {
     return fit::ok();
   }
 
-  auto it = GetContainingNode(addr, size);
+  auto it = FindContainingRange(addr, size);
   ZX_ASSERT_MSG(it != ranges_.end(), "Pool::Free(): provided address range is untracked");
 
   // Double-freeing is a no-op.
@@ -261,7 +280,7 @@ fit::result<fit::failed, uint64_t> Pool::Resize(const Range& original, uint64_t 
   ZX_ASSERT(cpp20::has_single_bit(min_alignment));
   ZX_ASSERT(original.addr % min_alignment == 0);
 
-  auto it = GetContainingNode(original.addr, original.size);
+  auto it = FindContainingRange(original.addr, original.size);
   ZX_ASSERT_MSG(it != ranges_.end(), "`original` is not a subset of a tracked range");
 
   // Already appropriately sized; nothing to do.
@@ -409,7 +428,7 @@ fit::result<fit::failed> Pool::UpdateFreeRamSubranges(Type type, uint64_t addr, 
 
 fit::result<fit::failed, Pool::mutable_iterator> Pool::InsertSubrange(
     const Range& range, std::optional<mutable_iterator> parent_it) {
-  auto it = parent_it.value_or(GetContainingNode(range.addr, range.size));
+  auto it = parent_it.value_or(FindContainingRange(range.addr, range.size));
   ZX_DEBUG_ASSERT(it != ranges_.end());
 
   //     .------------.
@@ -483,24 +502,12 @@ fit::result<fit::failed, Pool::mutable_iterator> Pool::InsertSubrange(
   return fit::ok(std::next(it));
 }
 
-Pool::mutable_iterator Pool::GetContainingNode(uint64_t addr, uint64_t size) {
-  ZX_DEBUG_ASSERT(size <= kMax - addr);
+Pool::iterator Pool::FindContainingRange(uint64_t addr, uint64_t size) const {
+  return FindContainingRangeAmong(ranges_, addr, size);
+}
 
-  // Despite the name, this function gives us the first range that is
-  // lexicographically >= [addr, addr + size)
-  auto next = std::lower_bound(ranges_.begin(), ranges_.end(), Range{.addr = addr, .size = size});
-  uint64_t range_end = addr + size;
-  if (next != ranges_.end() && addr >= next->addr) {
-    return range_end <= next->end() ? next : ranges_.end();
-  }
-  // If the first range lexicographically >= [addr, addr + size) is
-  // ranges_.begin() and we did not enter the previous branch, then addr + size
-  // exceeds the right endpoint of ranges_.begin().
-  if (next == ranges_.begin()) {
-    return ranges_.end();
-  }
-  auto prev = std::prev(next);
-  return (prev->addr <= addr && range_end <= prev->end()) ? prev : ranges_.end();
+Pool::mutable_iterator Pool::FindContainingRange(uint64_t addr, uint64_t size) {
+  return FindContainingRangeAmong(ranges_, addr, size);
 }
 
 Pool::mutable_iterator Pool::Coalesce(mutable_iterator it) {

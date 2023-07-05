@@ -15,6 +15,7 @@
 #include <stdio.h>
 
 #include <array>
+#include <cstdint>
 #include <string_view>
 
 #include <fbl/intrusive_double_list.h>
@@ -160,9 +161,9 @@ class Pool {
   // Returns the number of tracked, normalized ranges.
   size_t size() const { return num_ranges_; }
 
-  // Returns a pointer to the tracked, normalized range containing the
-  // provided address, if one exists.
-  const Range* GetContainingRange(uint64_t addr);
+  // Returns an iterator pointing to the tracked, normalized range containing
+  // the provided address if one exists, or else end().
+  iterator FindContainingRange(uint64_t addr) const { return FindContainingRange(addr, 1); }
 
   // Attempts to allocate memory out of free RAM of the prescribed type, size,
   // and alignment. An optional upper address bound may be passed: if
@@ -298,7 +299,8 @@ class Pool {
 
   // Returns an iterator pointing to the node whose range contains
   // [addr, addr + size), returning ranges_.end() if no such node exists.
-  mutable_iterator GetContainingNode(uint64_t addr, uint64_t size);
+  iterator FindContainingRange(uint64_t addr, uint64_t size) const;
+  mutable_iterator FindContainingRange(uint64_t addr, uint64_t size);
 
   // Converts as much of [addr, addr + size) as bookkeeping memory as possible,
   // returning the address just after what it was able to convert.
