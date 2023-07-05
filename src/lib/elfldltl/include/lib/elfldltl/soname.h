@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cstdint>
 #include <string_view>
+#include <type_traits>
 
 #include "abi-ptr.h"
 #include "abi-span.h"
@@ -33,6 +34,13 @@ class Soname {
 
   constexpr Soname& operator=(const Soname&) noexcept = default;
 
+  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>,
+            typename = std::enable_if_t<std::is_constructible_v<Ptr, const char*>>>
+  constexpr Soname& operator=(std::string_view name) noexcept {
+    *this = Soname{name};
+    return *this;
+  }
+
   template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
   constexpr std::string_view str() const {
     return {name_.get(), size_};
@@ -49,6 +57,15 @@ class Soname {
   constexpr bool operator!=(const Soname& other) const {
     return other.hash_ != hash_ || other.str() != str();
   }
+
+#if __cpp_impl_three_way_comparison >= 201907L
+
+  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
+  constexpr auto operator<=>(const Soname& other) const {
+    return str() <=> other.str();
+  }
+
+#else  // No operator<=>.
 
   template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
   constexpr bool operator<(const Soname& other) const {
@@ -69,6 +86,8 @@ class Soname {
   constexpr bool operator>=(const Soname& other) const {
     return str() >= other.str();
   }
+
+#endif  // operator<=>
 
  private:
   // This stores a pointer and 32-bit length directly rather than just using
