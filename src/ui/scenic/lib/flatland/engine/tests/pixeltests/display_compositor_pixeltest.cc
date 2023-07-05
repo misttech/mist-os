@@ -178,11 +178,13 @@ CompareConfig GetCompareConfigForBoard(std::string_view board_name, int display_
 
   if (board_name == "vim3") {
     // TODO(fxbug.dev/125842): For VIM3 with 1920-width displays, the last 2
-    // rows of the captured image on sherlock may contain only zeroes; so we
-    // ignore these rows.
+    // rows of the captured image may contain only zeroes; so we ignore these
+    // rows.
     const int end_row = (display_width == 1920) ? (display_height - 2) : display_height;
     return CompareConfig{
-        .start_row = 0,
+        // On VIM3 the first row may contain incorrect pixels, possibly due to
+        // display engine hardware bug, so we ignore the first row.
+        .start_row = 1,
         .start_column = 0,
 
         .end_row = end_row,
