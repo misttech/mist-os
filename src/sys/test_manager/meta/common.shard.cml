@@ -5,7 +5,6 @@
     include: [
         "//sdk/ctf/test_realm/meta/test-collection.shard.cml",
         "//src/lib/vulkan/vulkan_test_realm.shard.cml",
-        "//src/media/testing/drm_test_realm.shard.cml",
         "//src/sys/test_manager/meta/chromium_system_test_realm.shard.cml",
         "//src/sys/test_manager/meta/chromium_test_realm.shard.cml",
         "//src/sys/test_manager/meta/google_test_realm.shard.cml",
