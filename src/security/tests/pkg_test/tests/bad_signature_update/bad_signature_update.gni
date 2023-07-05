@@ -161,6 +161,9 @@ template("bad_signature_update") {
     component_name = "bad_signature_update"
     manifest = "//src/security/tests/pkg_test/tests/bad_signature_update/meta/bad_signature_update.cml"
     deps = [ "//src/security/tests/pkg_test/tests/bad_signature_update:bad_signature_update-test" ]
+
+    # For fuchsia.kernel.VmexResource.
+    test_type = "system"
   }
 
   fuchsia_test_package("${test_name}-package") {

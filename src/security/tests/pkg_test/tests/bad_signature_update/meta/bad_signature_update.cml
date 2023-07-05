@@ -7,7 +7,6 @@
         "//sdk/lib/syslog/client.shard.cml",
         "//src/connectivity/network/meta/isolated-network-offers.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
-        "sys/testing/system-test.shard.cml", // For fuchsia.kernel.VmexResource.
     ],
     program: {
         binary: "bin/bad_signature_update",

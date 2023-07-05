@@ -69,11 +69,13 @@ source_set("test_common") {
   ]
 }
 
-fuchsia_component("optee_test_cmp") {
-  testonly = true
+fuchsia_test_component("optee_test_cmp") {
   component_name = "optee_test"
   manifest = "meta/optee_test.cml"
   deps = [ ":optee_test_bin" ]
+
+  # Depends on config_data which is a system capability.
+  test_type = "system"
 }
 
 fuchsia_component("tee_manager_optee_test_cmp") {
@@ -101,11 +103,13 @@ executable("optee_test_bin") {
   deps = [ ":test_common" ]
 }
 
-fuchsia_component("optee_smoke_test_cmp") {
-  testonly = true
+fuchsia_test_component("optee_smoke_test_cmp") {
   component_name = "optee_smoke_test"
   manifest = "meta/optee_smoke_test.cml"
   deps = [ ":optee_smoke_test_bin" ]
+
+  # Depends on config_data which is a system capability.
+  test_type = "system"
 }
 
 fuchsia_component("tee_manager_optee_smoke_test_cmp") {
