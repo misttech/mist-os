@@ -15,6 +15,7 @@ group("tests") {
     ":depfile_test($host_toolchain)",
     ":dlwrap_test($host_toolchain)",
     ":fuchsia_test($host_toolchain)",
+    ":linker_test($host_toolchain)",
     ":output_leak_scanner_test($host_toolchain)",
     ":prebuilt_tool_remote_wrapper_test($host_toolchain)",
     ":relativize_args_test($host_toolchain)",
@@ -36,6 +37,7 @@ if (is_host) {
   _depfile_sources = [ "depfile.py" ]
   _output_leak_scanner_sources =
       [ "output_leak_scanner.py" ] + _fuchsia_sources + _cl_utils_sources
+  _linker_sources = [ "linker.py" ] + _cl_utils_sources
   _textpb_sources = [ "textpb.py" ]
 
   _remotetool_sources =
@@ -103,6 +105,14 @@ if (is_host) {
   python_host_test("fuchsia_test") {
     main_source = "fuchsia_test.py"
     sources = _fuchsia_sources
+  }
+
+  python_library("linker") {
+    sources = _linker_sources
+  }
+  python_host_test("linker_test") {
+    main_source = "linker_test.py"
+    sources = _linker_sources
   }
 
   python_library("output_leak_scanner") {

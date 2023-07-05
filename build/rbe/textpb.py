@@ -40,7 +40,6 @@ _VALUE_RE = re.compile(r'[^ \t\r\n]+')  # Anything text that is not space
 
 
 def _lex_line(line: str) -> Iterable[Token]:
-    prev: Token = None
     while line:  # is not empty
         next_char = line[0]
 
