@@ -93,8 +93,8 @@ class JobDispatcher final
   fbl::RefPtr<JobDispatcher> parent() { return fbl::RefPtr<JobDispatcher>(parent_); }
 
   // Job methods.
-  zx_status_t get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const final;
-  zx_status_t set_name(const char* name, size_t len) final;
+  [[nodiscard]] zx_status_t get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const final;
+  [[nodiscard]] zx_status_t set_name(const char* name, size_t len) final;
   uint32_t max_height() const { return max_height_; }
 
   // The sentinel nodes marking the beginning and the end of this job's contents

@@ -199,7 +199,8 @@ void DumpJobList() {
   printf("%7s %s\n", "koid", "name");
   auto walker = MakeJobWalker([](JobDispatcher* job) {
     char name[ZX_MAX_NAME_LEN];
-    job->get_name(name);
+    [[maybe_unused]] zx_status_t status = job->get_name(name);
+    DEBUG_ASSERT(status == ZX_OK);
     printf("%7" PRIu64 " '%s'\n", job->get_koid(), name);
   });
   GetRootJobDispatcher()->EnumerateChildrenRecursive(&walker);

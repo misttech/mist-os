@@ -145,7 +145,8 @@ fbl::RefPtr<JobDispatcher> JobDispatcher::CreateRootJob() {
   if (!ac.check()) {
     panic("root-job: failed to allocate\n");
   }
-  job->set_name(kRootJobName, sizeof(kRootJobName));
+  [[maybe_unused]] zx_status_t status = job->set_name(kRootJobName, sizeof(kRootJobName));
+  DEBUG_ASSERT(status == ZX_OK);
   return job;
 }
 
@@ -390,7 +391,8 @@ bool JobDispatcher::KillJobWithKillOnOOM() {
     auto& job = oom_jobs[i];
     if (job->Kill(ZX_TASK_RETCODE_OOM_KILL)) {
       char name[ZX_MAX_NAME_LEN];
-      job->get_name(name);
+      [[maybe_unused]] zx_status_t status = job->get_name(name);
+      DEBUG_ASSERT(status == ZX_OK);
       printf("OOM: killing %" PRIu64 " '%s'\n", job->get_koid(), name);
       return true;
     }
@@ -490,7 +492,8 @@ void JobDispatcher::CriticalProcessKill(fbl::RefPtr<ProcessDispatcher> dead_proc
   dead_process->get_name(proc_name);
 
   char job_name[ZX_MAX_NAME_LEN];
-  get_name(job_name);
+  [[maybe_unused]] zx_status_t status = get_name(job_name);
+  DEBUG_ASSERT(status == ZX_OK);
 
   printf("critical-process: process '%s' (%" PRIu64 ") died, killing job '%s' (%" PRIu64 ")\n",
          proc_name, dead_process->get_koid(), job_name, get_koid());

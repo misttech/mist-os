@@ -47,7 +47,8 @@ void tree_to_string(JobDispatcher* root, int indent, TreeString* buf) {
     buf->Append(" ");
 
   char name[ZX_MAX_NAME_LEN];
-  root->get_name(name);
+  [[maybe_unused]] zx_status_t status = root->get_name(name);
+  DEBUG_ASSERT(status == ZX_OK);
   buf->Append(name);
 
   if (root->get_kill_on_oom())
@@ -82,7 +83,7 @@ bool oom_job_kill_trivial() {
   KernelHandle<JobDispatcher> root;
   zx_rights_t rights;
   ASSERT_EQ(JobDispatcher::Create(0, GetRootJobDispatcher(), &root, &rights), ZX_OK, "root create");
-  root.dispatcher()->set_name("root", 4);
+  EXPECT_OK(root.dispatcher()->set_name("root", 4));
   root.dispatcher()->set_kill_on_oom(true);
 
   TreeString buf;
@@ -111,36 +112,36 @@ bool oom_job_kill_ordering() {
   KernelHandle<JobDispatcher> root;
   zx_rights_t rights;
   ASSERT_EQ(JobDispatcher::Create(0, GetRootJobDispatcher(), &root, &rights), ZX_OK, "root create");
-  root.dispatcher()->set_name("root", 4);
+  EXPECT_OK(root.dispatcher()->set_name("root", 4));
 
   KernelHandle<JobDispatcher> child1, child2;
   KernelHandle<JobDispatcher> gchild1, gchild2, gchild3;
   KernelHandle<JobDispatcher> gchild4, gchild5;
 
   ASSERT_EQ(JobDispatcher::Create(0, root.dispatcher(), &child1, &rights), ZX_OK);
-  child1.dispatcher()->set_name("child1", 6);
+  EXPECT_OK(child1.dispatcher()->set_name("child1", 6));
 
   ASSERT_EQ(JobDispatcher::Create(0, root.dispatcher(), &child2, &rights), ZX_OK);
-  child2.dispatcher()->set_name("child2", 6);
+  EXPECT_OK(child2.dispatcher()->set_name("child2", 6));
   child2.dispatcher()->set_kill_on_oom(true);
 
   ASSERT_EQ(JobDispatcher::Create(0, child1.dispatcher(), &gchild1, &rights), ZX_OK);
-  gchild1.dispatcher()->set_name("gchild1", 7);
+  EXPECT_OK(gchild1.dispatcher()->set_name("gchild1", 7));
 
   ASSERT_EQ(JobDispatcher::Create(0, child1.dispatcher(), &gchild2, &rights), ZX_OK);
   gchild2.dispatcher()->set_kill_on_oom(true);
-  gchild2.dispatcher()->set_name("gchild2", 7);
+  EXPECT_OK(gchild2.dispatcher()->set_name("gchild2", 7));
 
   ASSERT_EQ(JobDispatcher::Create(0, child1.dispatcher(), &gchild3, &rights), ZX_OK);
-  gchild3.dispatcher()->set_name("gchild3", 7);
+  EXPECT_OK(gchild3.dispatcher()->set_name("gchild3", 7));
 
   ASSERT_EQ(JobDispatcher::Create(0, child2.dispatcher(), &gchild4, &rights), ZX_OK);
   gchild4.dispatcher()->set_kill_on_oom(true);
-  gchild4.dispatcher()->set_name("gchild4", 7);
+  EXPECT_OK(gchild4.dispatcher()->set_name("gchild4", 7));
 
   ASSERT_EQ(JobDispatcher::Create(0, child2.dispatcher(), &gchild5, &rights), ZX_OK);
   gchild5.dispatcher()->set_kill_on_oom(true);
-  gchild5.dispatcher()->set_name("gchild5", 7);
+  EXPECT_OK(gchild5.dispatcher()->set_name("gchild5", 7));
 
   TreeString buf;
   ktl::array<int, 3> per_level_count = {0};
