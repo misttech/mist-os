@@ -252,11 +252,11 @@ void TestDevice::Corrupt(uint64_t blkno, key_slot_t slot) {
 
   ASSERT_OK(block_client::SingleReadBytes(parent_block(), block, block_size_, blkno * block_size_));
 
-  zx::result channel = component::Clone(parent_block(), component::AssumeProtocolComposesNode);
+  zx::result channel = component::Clone(parent_volume(), component::AssumeProtocolComposesNode);
   ASSERT_OK(channel);
 
-  std::unique_ptr<FdioVolume> volume;
-  ASSERT_OK(FdioVolume::Unlock(std::move(channel.value()), key_, 0, &volume));
+  zx::result volume = FdioVolume::Unlock(std::move(channel.value()), key_, 0);
+  ASSERT_OK(volume);
 
   zx_off_t off;
   ASSERT_OK(volume->GetSlotOffset(slot, &off));

@@ -12,6 +12,7 @@
 #include <lib/driver-integration-test/fixture.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -23,6 +24,7 @@
 
 #include <memory>
 #include <optional>
+#include <utility>
 
 #include <fbl/macros.h>
 #include <fbl/mutex.h>
@@ -126,26 +128,24 @@ class TestDevice final {
 
   // Returns space reserved for metadata
   zx::result<size_t> reserved_blocks() const {
-    zx::result channel = component::Clone(parent_block(), component::AssumeProtocolComposesNode);
+    zx::result channel = component::Clone(parent_volume(), component::AssumeProtocolComposesNode);
     if (channel.is_error()) {
       return channel.take_error();
     }
-    std::unique_ptr<FdioVolume> volume;
-    if (zx_status_t status = FdioVolume::Unlock(std::move(channel.value()), key_, 0, &volume);
-        status) {
-      return zx::error(status);
+    zx::result volume = FdioVolume::Unlock(std::move(channel.value()), key_, 0);
+    if (volume.is_error()) {
+      return volume.take_error();
     }
     return zx::ok(volume->reserved_blocks());
   }
   zx::result<size_t> reserved_slices() const {
-    zx::result channel = component::Clone(parent_block(), component::AssumeProtocolComposesNode);
+    zx::result channel = component::Clone(parent_volume(), component::AssumeProtocolComposesNode);
     if (channel.is_error()) {
       return channel.take_error();
     }
-    std::unique_ptr<FdioVolume> volume;
-    if (zx_status_t status = FdioVolume::Unlock(std::move(channel.value()), key_, 0, &volume);
-        status) {
-      return zx::error(status);
+    zx::result volume = FdioVolume::Unlock(std::move(channel.value()), key_, 0);
+    if (volume.is_error()) {
+      return volume.take_error();
     }
     return zx::ok(volume->reserved_slices());
   }

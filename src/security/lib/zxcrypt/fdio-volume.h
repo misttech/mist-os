@@ -5,7 +5,9 @@
 #ifndef SRC_SECURITY_LIB_ZXCRYPT_FDIO_VOLUME_H_
 #define SRC_SECURITY_LIB_ZXCRYPT_FDIO_VOLUME_H_
 
-#include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/zx/result.h>
 
 #include <memory>
 
@@ -14,39 +16,30 @@
 
 namespace zxcrypt {
 
-// |zxcrypt::FdioVolume| is a zxcrypt volume which does IO via a file descriptor
-// to an underlying block device without any support from the zxcrypt driver
-// implementation.  It can be used on the host to prepare zxcrypt images, and is
-// often more convenient for testing.
+// |zxcrypt::FdioVolume| is a zxcrypt volume with an underlying block device. It can be used on the
+// host to prepare zxcrypt images, and is often more convenient for testing.
 class __EXPORT FdioVolume final : public Volume {
  public:
-  explicit FdioVolume(fidl::ClientEnd<fuchsia_hardware_block::Block> channel);
+  explicit FdioVolume(fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> channel);
 
-  // Creates a new zxcrypt volume associated with the given file descriptor,
-  // |block|, and returns it via |out|, if provided.  This will format
-  // the block device as zxcrypt using the given |key|, which will be
-  // associated with key slot 0.  This method takes ownership of
-  // |block|.  Note that |key| is not strengthened
-  // and MUST have cryptographic key length of at least 128 bits.
-  static zx_status_t Create(fidl::ClientEnd<fuchsia_hardware_block::Block> channel,
-                            const crypto::Secret& key, std::unique_ptr<FdioVolume>* out = nullptr);
+  // Creates a new zxcrypt volume associated with the given block volume, |channel|. This will
+  // format the block device as zxcrypt using the given |key|, which will be associated with key
+  // slot 0. Note that |key| is not strengthened and MUST have cryptographic key length of at least
+  // 128 bits.
+  static zx::result<std::unique_ptr<FdioVolume>> Create(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> channel, const crypto::Secret& key);
 
-  // Opens a zxcrypt volume on the block device described by |block|
-  // using the |key| corresponding to given key |slot|.  This method takes
-  // ownership of |block|.  Note that |key| is not strengthened and MUST
-  // have cryptographic key length of at least 128 bits.  This is a convenience
-  // method that calls |Init()| and then |FdioVolume::Unlock()|.
-  static zx_status_t Unlock(fidl::ClientEnd<fuchsia_hardware_block::Block> channel,
-                            const crypto::Secret& key, key_slot_t slot,
-                            std::unique_ptr<FdioVolume>* out);
+  // This is a convenience method that calls |Init| and then |Unlock|.
+  static zx::result<std::unique_ptr<FdioVolume>> Unlock(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> channel, const crypto::Secret& key,
+      key_slot_t slot);
 
   // Returns a new volume object corresponding to the block device given by
-  // |block| and populated with the block and FVM information.
-  static zx_status_t Init(fidl::ClientEnd<fuchsia_hardware_block::Block> channel,
-                          std::unique_ptr<FdioVolume>* out = nullptr);
+  // |channel| and populated with the block and FVM information.
+  static zx::result<std::unique_ptr<FdioVolume>> Init(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> channel);
 
-  // Opens a zxcrypt volume on the block device described by |fd| using the |key| corresponding to
-  // given key |slot|.
+  // Opens a zxcrypt volume using the |key| corresponding to given key |slot|.
   zx_status_t Unlock(const crypto::Secret& key, key_slot_t slot);
 
   // Adds a given |key| to the given key |slot|.  This key can then be used to |Open| the
@@ -79,7 +72,7 @@ class __EXPORT FdioVolume final : public Volume {
   zx_status_t Flush() override;
 
   // The underlying block device.
-  fidl::ClientEnd<fuchsia_hardware_block::Block> channel_;
+  fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device_;
 };
 
 }  // namespace zxcrypt
