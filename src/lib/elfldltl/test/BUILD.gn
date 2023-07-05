@@ -50,6 +50,7 @@ test("elfldltl-unittests") {
     "//sdk/lib/stdcompat",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/symbolizer-markup",
+    "//src/lib/trivial-allocator",
   ]
 
   if (is_elf) {

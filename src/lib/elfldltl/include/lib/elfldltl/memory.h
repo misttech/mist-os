@@ -5,11 +5,17 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_MEMORY_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_MEMORY_H_
 
+#include <lib/stdcompat/functional.h>
 #include <lib/stdcompat/span.h>
 
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
+#include <tuple>
+
+#include <fbl/alloc_checker.h>
 
 namespace elfldltl {
 
@@ -99,9 +105,14 @@ struct NoArrayFromFile {
 };
 
 // This is an implementation of the Allocator API for File::ReadArrayFromFile
-// that uses plain `new T[count]`.  Its return value object owns the data via
-// `std::unique_ptr<T[]>`.
-template <typename T>
+// that uses plain `new (alloc_checker) T[count]`.  Its return value object
+// owns the data via `std::unique_ptr<T[]>` or equivalent type given as the
+// optional second template parameter.  The optional third and later template
+// arguments can be used to work with a custom `operator new[]` that takes
+// additional arguments of those types; those arguments must be passed to the
+// constructor and will be passed by reference before the implicit
+// fbl::AllocChecker argument in `new (args..., alloc_checker) T[count]`.
+template <typename T, typename Ptr = std::unique_ptr<T[]>, typename... Args>
 class NewArrayFromFile {
  public:
   class Result {
@@ -110,8 +121,7 @@ class NewArrayFromFile {
     Result(const Result&) = delete;
     constexpr Result(Result&&) noexcept = default;
 
-    constexpr explicit Result(std::unique_ptr<T[]> ptr, size_t size)
-        : ptr_(std::move(ptr)), size_(size) {}
+    constexpr explicit Result(Ptr ptr, size_t size) : ptr_(std::move(ptr)), size_(size) {}
 
     Result& operator=(const Result&) noexcept = delete;
     constexpr Result& operator=(Result&&) noexcept = default;
@@ -125,17 +135,32 @@ class NewArrayFromFile {
     constexpr operator cpp20::span<T>() const { return get(); }
 
    private:
-    std::unique_ptr<T[]> ptr_;
+    Ptr ptr_;
     size_t size_ = 0;
   };
 
+  constexpr explicit NewArrayFromFile(Args... args) : args_{std::forward<Args>(args)...} {}
+
+  constexpr NewArrayFromFile(NewArrayFromFile&&) = default;
+
+  constexpr NewArrayFromFile& operator=(NewArrayFromFile&&) = default;
+
   std::optional<Result> operator()(size_t size) const {
-    // Uninitialized a la C++20 std::make_unique_for_overwrite.
-    if (T* ptr = new T[size]) [[likely]] {
-      return Result{std::unique_ptr<T[]>(ptr), size};
-    }
-    return std::nullopt;
+    return std::apply(cpp20::bind_front(New, size), args_);
   }
+
+ private:
+  static std::optional<Result> New(size_t size, Args&... args) {
+    // Uninitialized a la C++20 std::make_unique_for_overwrite.
+    fbl::AllocChecker ac;
+    T* ptr = new (args..., ac) T[size];
+    if (!ac.check()) [[unlikely]] {
+      return std::nullopt;
+    }
+    return Result{Ptr(ptr), size};
+  }
+
+  std::tuple<Args...> args_;
 };
 
 // This is an implementation of the Allocator API for File::ReadArrayFromFile

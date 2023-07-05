@@ -4,6 +4,9 @@
 
 #include <lib/elfldltl/memory.h>
 #include <lib/stdcompat/span.h>
+#include <lib/trivial-allocator/basic-leaky-allocator.h>
+#include <lib/trivial-allocator/new.h>
+#include <lib/trivial-allocator/single-heap-allocator.h>
 
 #include <string_view>
 
@@ -12,6 +15,8 @@
 namespace {
 
 using namespace std::literals;
+
+constexpr std::string_view kFoobar = "foobar";
 
 constexpr uintptr_t kBaseAddress = 0x12340;
 constexpr std::string_view kHeaderBytes = "HeaderOf16Bytes\0"sv;
@@ -101,8 +106,30 @@ TEST(ElfldltlMemoryTests, NoArrayFromFile) {
 }
 
 TEST(ElfldltlMemoryTests, NewArrayFromFile) {
-  constexpr std::string_view kFoobar = "foobar";
   auto result = elfldltl::NewArrayFromFile<char>()(kFoobar.size());
+  static_assert(std::is_convertible_v<decltype(result.value()), cpp20::span<char>>);
+  ASSERT_TRUE(result.has_value());
+  auto owner = std::move(result).value();
+  cpp20::span<char> chars = owner;
+  std::copy(kFoobar.begin(), kFoobar.end(), chars.begin());
+  EXPECT_EQ(kFoobar, std::string_view(chars.data(), chars.size()));
+}
+
+TEST(ElfldltlMemoryTests, NewArrayFromFileWithCustomAllocator) {
+  // Use a custom allocator via `new (allocator, ac) T[...]`.
+  std::byte backing_buffer[32];
+  trivial_allocator::SingleHeapAllocator backing_allocator({backing_buffer});
+  trivial_allocator::BasicLeakyAllocator allocator(backing_allocator);
+
+  // We need the std::unique_ptr<char[]> API with get() and release(),
+  // but there's no actual `delete` operation that should be done.
+  struct NoDelete {
+    constexpr void operator()(char* ptr) {}
+  };
+  using Ptr = std::unique_ptr<char, NoDelete>;
+
+  using NewArray = elfldltl::NewArrayFromFile<char, Ptr, decltype(allocator)&>;
+  auto result = NewArray{allocator}(kFoobar.size());
   static_assert(std::is_convertible_v<decltype(result.value()), cpp20::span<char>>);
   ASSERT_TRUE(result.has_value());
   auto owner = std::move(result).value();

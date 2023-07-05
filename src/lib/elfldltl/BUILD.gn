@@ -11,14 +11,16 @@ has_fd = !is_kernel && toolchain_variant.tags + [ "standalone" ] -
                        [ "standalone" ] == toolchain_variant.tags
 
 library_headers("headers") {
-  public_deps = [ "//sdk/lib/stdcompat" ]
+  public_deps = [
+    "//sdk/lib/stdcompat",
+
+    # <lib/elfldltl/memory.h> has #include <fbl/alloc_checker.h>.
+    "//zircon/system/ulib/fbl",
+  ]
   if (has_fd) {
     public_deps += [
       # <lib/elfldltl/mapped-fd-file.h> has #include <lib/fit/result.h>.
       "//sdk/lib/fit",
-
-      # <lib/elfldltl/fd.h> has #include <fbl/unique_fd.h>.
-      "//zircon/system/ulib/fbl",
     ]
   }
   if (is_fuchsia && !is_kernel) {
