@@ -42,7 +42,6 @@ per-file set-petal=abarth@google.com
 per-file set-relay=tamird@google.com
 per-file             setup-go = olivernewman@google.com
 per-file show-package=brunodalbo@google.com
-per-file size-check=gopichitluri@google.com
 per-file smoke-test=surajmalhotra@google.com
 per-file snapshot=frousseau@google.com
 per-file sniff.fx = file: /src/connectivity/network/OWNERS
