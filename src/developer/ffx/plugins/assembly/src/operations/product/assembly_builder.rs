@@ -13,6 +13,7 @@ use assembly_config_schema::{
 };
 use assembly_domain_config::DomainConfigPackage;
 use assembly_driver_manifest::{DriverManifestBuilder, BASE_DRIVER_MANIFEST_PATH};
+use assembly_package_set::{PackageEntry, PackageSet};
 use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf};
 use assembly_platform_configuration::{
     ComponentConfigs, DomainConfig, DomainConfigs, PackageConfigs, PackageConfiguration,
@@ -665,72 +666,6 @@ fn remove_package_from_sets<'a, 'b: 'a, const N: usize>(
     }
 
     Ok(matches_name)
-}
-
-#[derive(Debug, Serialize)]
-struct PackageEntry {
-    path: Utf8PathBuf,
-    manifest: PackageManifest,
-}
-
-impl PackageEntry {
-    fn parse_from(path: impl Into<Utf8PathBuf>) -> Result<Self> {
-        let path = path.into();
-        let manifest = PackageManifest::try_load_from(&path)
-            .with_context(|| format!("parsing {path} as a package manifest"))?;
-        Ok(Self { path, manifest })
-    }
-
-    fn name(&self) -> &str {
-        self.manifest.name().as_ref()
-    }
-}
-
-/// A named set of packages with their manifests parsed into memory, keyed by package name.
-#[derive(Debug, Serialize)]
-struct PackageSet {
-    map: NamedMap<PackageEntry>,
-}
-
-impl PackageSet {
-    /// Construct a PackageSet.
-    fn new(name: &str) -> Self {
-        PackageSet { map: NamedMap::new(name) }
-    }
-
-    /// Add the package described by the ProductPackageSetEntry to the
-    /// PackageSet
-    fn add_package(&mut self, entry: PackageEntry) -> Result<()> {
-        self.map.try_insert_unique(entry.name().to_owned(), entry)
-    }
-
-    /// Parse the given path as a PackageManifest, and add it to the PackageSet.
-    fn add_package_from_path<P: Into<Utf8PathBuf>>(&mut self, path: P) -> Result<()> {
-        {
-            let entry = PackageEntry::parse_from(path)?;
-            self.add_package(entry)
-        }
-        .with_context(|| format!("Adding package to set: {}", self.map.name))
-    }
-
-    /// Convert the PackageSet into an iterable collection of Paths.
-    fn into_paths(self) -> impl Iterator<Item = Utf8PathBuf> {
-        self.map.entries.into_values().map(|e| e.path)
-    }
-}
-
-impl std::ops::Deref for PackageSet {
-    type Target = NamedMap<PackageEntry>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.map
-    }
-}
-
-impl std::ops::DerefMut for PackageSet {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.map
-    }
 }
 
 /// A named set of file entries, keyed by file destination.

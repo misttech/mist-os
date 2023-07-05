@@ -9,9 +9,9 @@ use assembly_config_schema::ImageAssemblyConfig;
 use assembly_images_config::{Zbi, ZbiCompression};
 use assembly_manifest::{AssemblyManifest, Image};
 use assembly_package_list::{PackageList, WritablePackageList};
+use assembly_package_set::PackageSet;
 use assembly_tool::Tool;
 use camino::{Utf8Path, Utf8PathBuf};
-use fuchsia_pkg::PackageManifest;
 use utf8_path::path_relative_from_current_dir;
 use zbi::ZbiBuilder;
 
@@ -69,15 +69,17 @@ pub fn construct_zbi(
     // meta.far.
     let mut bootfs_package_list = PackageList::default();
 
+    // Add the packages to a set first, to ensure uniqueness, and ensure a deterministic order.
+    let mut bootfs_package_set = PackageSet::new("bootfs packages");
     for bootfs_package in &product.bootfs_packages {
-        let manifest = PackageManifest::try_load_from(bootfs_package)?;
+        bootfs_package_set.add_package_from_path(bootfs_package)?;
+    }
 
-        for blob_info in manifest.blobs() {
+    for entry in bootfs_package_set.into_values() {
+        for blob_info in entry.manifest.blobs() {
             zbi_builder.add_bootfs_blob(&blob_info.source_path, blob_info.merkle);
         }
-
-        // Note: this utility does not assert uniqueness of bootfs packages.
-        bootfs_package_list.add_package(manifest)?;
+        bootfs_package_list.add_package(entry.manifest)?;
     }
 
     // Write the bootfs package index to the gendir, unconditionally, to satisfy
