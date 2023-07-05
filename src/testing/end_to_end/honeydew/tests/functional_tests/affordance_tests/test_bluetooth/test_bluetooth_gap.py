@@ -37,6 +37,16 @@ class BluetoothGapAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
         self.device.bluetooth_gap.request_discovery(True)
 
+    def test_bluetooth_set_discoverable(self) -> None:
+        """Test case for bluetooth_gap.set_discoverable()"""
+
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.bluetooth_gap.set_discoverable(True)
+            return
+
+        self.device.bluetooth_gap.set_discoverable(True)
+
 
 if __name__ == "__main__":
     test_runner.main()

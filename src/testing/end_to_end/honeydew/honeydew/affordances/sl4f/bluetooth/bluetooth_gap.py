@@ -10,6 +10,7 @@ from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
 from honeydew.transports import sl4f as sl4f_transport
 
 _SL4F_METHODS: Dict[str, str] = {
+    "BluetoothSetDiscoverable": "bt_sys_facade.BluetoothSetDiscoverable",
     "BluetoothInitSys": "bt_sys_facade.BluetoothInitSys",
     "BluetoothRequestDiscovery": "bt_sys_facade.BluetoothRequestDiscovery",
 }
@@ -54,3 +55,17 @@ class BluetoothGap(bluetooth_gap.BluetoothGap):
         self._sl4f.run(
             method=_SL4F_METHODS["BluetoothRequestDiscovery"],
             params={"discovery": discovery})
+
+    def set_discoverable(self, discoverable: bool) -> None:
+        """Sets device to be discoverable by others.
+
+        Args:
+            discoverable: True to be discoverable by others, False to be not
+                          discoverable by others.
+
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
+        """
+        self._sl4f.run(
+            method=_SL4F_METHODS["BluetoothSetDiscoverable"],
+            params={"discoverable": discoverable})

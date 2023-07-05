@@ -26,3 +26,12 @@ class BluetoothGap(bluetooth_gap.BluetoothGap):
             discovery: True to start discovery, False to stop discovery.
         """
         raise NotImplementedError
+
+    def set_discoverable(self, discoverable: bool) -> None:
+        """Sets device to be discoverable by others.
+
+        Args:
+            discoverable: True to be discoverable by others, False to be not
+                          discoverable by others.
+        """
+        raise NotImplementedError

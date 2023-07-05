@@ -22,3 +22,12 @@ class BluetoothGap(abc.ABC):
         Args:
             discovery: True to start discovery, False to stop discovery.
         """
+
+    @abc.abstractmethod
+    def set_discoverable(self, discoverable: bool) -> None:
+        """Sets device to be discoverable by others.
+
+        Args:
+            discoverable: True to be discoverable by others, False to be not
+                          discoverable by others.
+        """

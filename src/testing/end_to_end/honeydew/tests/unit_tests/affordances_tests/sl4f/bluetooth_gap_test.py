@@ -66,6 +66,24 @@ class BluetoothGapSL4FTests(unittest.TestCase):
 
         self.sl4f_obj.run.assert_called()
 
+    @parameterized.expand(
+        [
+            ({
+                "label": "set_discoverable_true",
+                "discoverable": True
+            },),
+            ({
+                "label": "set_discoverable_false",
+                "discoverable": False
+            },),
+        ],
+        name_func=_custom_test_name_func)
+    def test_set_discoverable(self, parameterized_dict) -> None:
+        """Test for Bluetooth.set_discoverable() method."""
+        self.bluetooth_obj.set_discoverable(
+            discoverable=parameterized_dict["discoverable"])
+        self.sl4f_obj.run.assert_called()
+
 
 if __name__ == "__main__":
     unittest.main()

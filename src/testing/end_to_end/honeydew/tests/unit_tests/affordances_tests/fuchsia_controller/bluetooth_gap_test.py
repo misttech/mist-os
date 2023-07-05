@@ -31,6 +31,11 @@ class BluetoothFCTests(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             self.bluetooth_obj.request_discovery(discovery=True)
 
+    def test_set_discoverable(self) -> None:
+        """Test for Bluetooth.set_discoverable() method."""
+        with self.assertRaises(NotImplementedError):
+            self.bluetooth_obj.set_discoverable(discoverable=True)
+
 
 if __name__ == "__main__":
     unittest.main()
