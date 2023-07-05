@@ -9,9 +9,11 @@
 #define LIB_FIDL_CPP_WIRE_CHANNEL_H_
 
 #include <lib/fidl/cpp/wire/client.h>
+// IWYU pragma: begin_exports
 #include <lib/fidl/cpp/wire/internal/arrow.h>
 #include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+// IWYU pragma: begin_exports
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
