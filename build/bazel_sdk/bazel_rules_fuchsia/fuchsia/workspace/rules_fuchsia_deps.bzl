@@ -13,7 +13,7 @@ load(
 
 # buildifier: disable=function-docstring
 def rules_fuchsia_deps():
-    assert_bazel_version(min = "5.1.0")
+    assert_bazel_version(min = "6.0.0")
     maybe(
         name = "rules_python",
         repo_rule = http_archive,

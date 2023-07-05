@@ -76,21 +76,7 @@ def workspace_path(repo_ctx, local_path):
     if local_path.startswith("/"):
         return local_path
 
-    # Using repo_ctx.workspace_root will only work when Bazel 6.0 ships.
-    # See see https://github.com/bazelbuild/bazel/issues/16042.
-    #
-    # The following is a work-around that will fail is the main project
-    # uses a WORKSPACE, instead of WORKSPACE.bazel, file. Unfortunately,
-    # Bazel will complain directly when trying to resolve a Label() to
-    # a non-existing file so it is not possible to check for both cases
-    # with Path.exist.
-    bazel_version_major = native.bazel_version.split(".")[0]
-    if int(bazel_version_major) >= 6:
-        workspace_root = repo_ctx.workspace_root
-    else:
-        workspace_root = repo_ctx.path(Label("@//:WORKSPACE.bazel")).dirname
-
-    return "%s/%s" % (workspace_root, local_path)
+    return "%s/%s" % (repo_ctx.workspace_root, local_path)
 
 def fetch_cipd_contents(ctx, cipd_bin, cipd_ensure_file, root = "."):
     """Fetches the contents of a cipd bucket and places them in the root.
