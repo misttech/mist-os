@@ -5,6 +5,8 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_DRIVER_BASE_H_
 #define LIB_DRIVER_COMPONENT_CPP_DRIVER_BASE_H_
 
+#if __Fuchsia_API_level__ >= 13
+
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/component/outgoing/cpp/structured_config.h>
 #include <lib/driver/component/cpp/prepare_stop_completer.h>
@@ -190,5 +192,7 @@ class DriverBase {
 };
 
 }  // namespace fdf
+
+#endif
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_DRIVER_BASE_H_

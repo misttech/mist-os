@@ -5,6 +5,8 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_INTERNAL_SYMBOLS_H_
 #define LIB_DRIVER_COMPONENT_CPP_INTERNAL_SYMBOLS_H_
 
+#if __Fuchsia_API_level__ >= 13
+
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 
 namespace fdf_internal {
@@ -53,5 +55,7 @@ T GetSymbol(const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol
 }
 
 }  // namespace fdf_internal
+
+#endif
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_INTERNAL_SYMBOLS_H_

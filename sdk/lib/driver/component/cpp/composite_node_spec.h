@@ -5,6 +5,8 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_COMPOSITE_NODE_SPEC_H_
 #define LIB_DRIVER_COMPONENT_CPP_COMPOSITE_NODE_SPEC_H_
 
+#if __Fuchsia_API_level__ >= 13
+
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 
 #include <string_view>
@@ -213,5 +215,7 @@ inline fuchsia_driver_framework::BindRule MakeRejectBindRule(const std::string_v
 }
 
 }  // namespace fdf
+
+#endif
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_COMPOSITE_NODE_SPEC_H_

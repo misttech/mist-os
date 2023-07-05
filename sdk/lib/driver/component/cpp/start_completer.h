@@ -5,6 +5,8 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_START_COMPLETER_H_
 #define LIB_DRIVER_COMPONENT_CPP_START_COMPLETER_H_
 
+#if __Fuchsia_API_level__ >= 13
+
 #include <lib/driver/symbols/symbols.h>
 #include <lib/zx/result.h>
 
@@ -50,5 +52,7 @@ class StartCompleter {
 };
 
 }  // namespace fdf
+
+#endif
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_START_COMPLETER_H_

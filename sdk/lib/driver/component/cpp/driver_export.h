@@ -5,6 +5,8 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_DRIVER_EXPORT_H_
 #define LIB_DRIVER_COMPONENT_CPP_DRIVER_EXPORT_H_
 
+#if __Fuchsia_API_level__ >= 13
+
 #include <lib/driver/component/cpp/internal/lifecycle.h>
 
 // The given |driver| needs to be a subclass of |fdf::DriverBase|.
@@ -12,5 +14,7 @@
 // `T(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);`
 #define FUCHSIA_DRIVER_EXPORT(driver) \
   FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf_internal::Lifecycle<driver>)
+
+#endif
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_DRIVER_EXPORT_H_

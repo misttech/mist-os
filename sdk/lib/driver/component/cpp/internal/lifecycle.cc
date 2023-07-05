@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#if __Fuchsia_API_level__ >= 13
+
 #include <lib/driver/component/cpp/internal/lifecycle.h>
 #include <lib/driver/component/cpp/internal/start_args.h>
 
@@ -21,3 +23,5 @@ fdf::DriverStartArgs FromEncoded(const EncodedDriverStartArgs& encoded_start_arg
 }
 
 }  // namespace fdf_internal
+
+#endif

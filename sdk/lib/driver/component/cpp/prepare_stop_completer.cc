@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#if __Fuchsia_API_level__ >= 13
+
 #include <lib/driver/component/cpp/prepare_stop_completer.h>
 #include <zircon/assert.h>
 
@@ -26,3 +28,5 @@ void PrepareStopCompleter::operator()(zx::result<> result) {
 }
 
 }  // namespace fdf
+
+#endif

@@ -5,6 +5,8 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_INTERNAL_BASIC_FACTORY_H_
 #define LIB_DRIVER_COMPONENT_CPP_INTERNAL_BASIC_FACTORY_H_
 
+#if __Fuchsia_API_level__ >= 13
+
 #include <lib/driver/component/cpp/driver_base.h>
 
 namespace fdf_internal {
@@ -35,5 +37,7 @@ class BasicFactory {
 };
 
 }  // namespace fdf_internal
+
+#endif
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_INTERNAL_BASIC_FACTORY_H_

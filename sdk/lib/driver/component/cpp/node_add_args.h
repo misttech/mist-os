@@ -5,6 +5,8 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_NODE_ADD_ARGS_H_
 #define LIB_DRIVER_COMPONENT_CPP_NODE_ADD_ARGS_H_
 
+#if __Fuchsia_API_level__ >= 13
+
 #include <fidl/fuchsia.component.decl/cpp/fidl.h>
 #include <fidl/fuchsia.component.decl/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
@@ -102,5 +104,7 @@ inline fuchsia_driver_framework::wire::NodeProperty MakeProperty(fidl::AnyArena&
 }
 
 }  // namespace fdf
+
+#endif
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_NODE_ADD_ARGS_H_

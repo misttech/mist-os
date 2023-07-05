@@ -10,11 +10,13 @@ group("tests") {
   deps = [ ":driver-component-cpp-tests" ]
 }
 
+# This library is available on Fuchsia API level 13 and above.
 sdk_source_set("cpp") {
-  category = "experimental"
+  category = "partner"
   sdk_name = "driver_component_cpp"
 
   include_base = "//sdk"
+  public_configs = [ "//sdk/config" ]
 
   sources = [
     "composite_node_spec.h",

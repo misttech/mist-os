@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#if __Fuchsia_API_level__ >= 13
+
 #include <lib/driver/component/cpp/node_add_args.h>
 
 namespace fdf {
@@ -45,3 +47,5 @@ fcd::wire::Offer MakeOffer(fidl::AnyArena& arena, std::string_view service_name,
 }
 
 }  // namespace fdf
+
+#endif

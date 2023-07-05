@@ -5,6 +5,8 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_INTERNAL_START_ARGS_H_
 #define LIB_DRIVER_COMPONENT_CPP_INTERNAL_START_ARGS_H_
 
+#if __Fuchsia_API_level__ >= 13
+
 #include <fidl/fuchsia.component.runner/cpp/fidl.h>
 #include <fidl/fuchsia.data/cpp/fidl.h>
 #include <lib/driver/symbols/symbols.h>
@@ -168,5 +170,7 @@ inline zx::result<fidl::UnownedClientEnd<fuchsia_io::Directory>> NsValue(
 }
 
 }  // namespace fdf_internal
+
+#endif
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_INTERNAL_START_ARGS_H_
