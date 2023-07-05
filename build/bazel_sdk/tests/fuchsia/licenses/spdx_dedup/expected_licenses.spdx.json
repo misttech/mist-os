@@ -24,18 +24,18 @@
         },
         {
             "SPDXID": "SPDXRef-Package-1",
-            "name": "license foo",
-            "licenseConcluded": "LicenseRef-9f6f610a28625e454a3ea1cd259c6ae6"
-        },
-        {
-            "SPDXID": "SPDXRef-Package-2",
             "name": "license bar",
             "licenseConcluded": "LicenseRef-0839dfb2a0be0df9ab64ee38eedfb053"
         },
         {
-            "SPDXID": "SPDXRef-Package-3",
+            "SPDXID": "SPDXRef-Package-2",
             "name": "license bar",
             "licenseConcluded": "LicenseRef-ea07f3176348d446c17a1a8d2b831105"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-3",
+            "name": "license foo",
+            "licenseConcluded": "LicenseRef-9f6f610a28625e454a3ea1cd259c6ae6"
         },
         {
             "SPDXID": "SPDXRef-Package-4",
@@ -77,19 +77,6 @@
     ],
     "hasExtractedLicensingInfos": [
         {
-            "name": "license foo",
-            "licenseId": "LicenseRef-9f6f610a28625e454a3ea1cd259c6ae6",
-            "extractedText": "I am test license 1",
-            "crossRefs": [
-                {
-                    "url": "https://fuchsia.googlesource.com/sdk-integration/tests/fuchsia/licenses/spdx_dedup/license_1.txt"
-                },
-                {
-                    "url": "https://fuchsia.googlesource.com/sdk-integration/tests/fuchsia/licenses/spdx_dedup/license_1_copy.txt"
-                }
-            ]
-        },
-        {
             "name": "license bar",
             "licenseId": "LicenseRef-0839dfb2a0be0df9ab64ee38eedfb053",
             "extractedText": "I am test license 2",
@@ -104,6 +91,19 @@
             "licenseId": "LicenseRef-ea07f3176348d446c17a1a8d2b831105",
             "extractedText": "I am test license 1",
             "crossRefs": [
+                {
+                    "url": "https://fuchsia.googlesource.com/sdk-integration/tests/fuchsia/licenses/spdx_dedup/license_1_copy.txt"
+                }
+            ]
+        },
+        {
+            "name": "license foo",
+            "licenseId": "LicenseRef-9f6f610a28625e454a3ea1cd259c6ae6",
+            "extractedText": "I am test license 1",
+            "crossRefs": [
+                {
+                    "url": "https://fuchsia.googlesource.com/sdk-integration/tests/fuchsia/licenses/spdx_dedup/license_1.txt"
+                },
                 {
                     "url": "https://fuchsia.googlesource.com/sdk-integration/tests/fuchsia/licenses/spdx_dedup/license_1_copy.txt"
                 }

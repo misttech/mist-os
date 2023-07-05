@@ -37,6 +37,11 @@ def _create_doc_from_licenses_used_json(
     assert 'licenses' in licenses_used_dict
     json_list = licenses_used_dict['licenses']
 
+    # Sort the list to make the output more deterministic.
+    def sort_by(d):
+        return d["package_name"]
+    json_list = sorted(json_list, key=sort_by)
+
     package_id_factory = SpdxPackageIdFactory()
     license_id_factory = SpdxLicenseIdFactory()
 
