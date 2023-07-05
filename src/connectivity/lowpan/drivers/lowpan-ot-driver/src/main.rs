@@ -8,11 +8,10 @@
 
 use anyhow::Error;
 use fidl_fuchsia_factory_lowpan::{FactoryRegisterMarker, FactoryRegisterProxyInterface};
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_lowpan_driver::{RegisterMarker, RegisterProxyInterface};
 use fidl_fuchsia_lowpan_spinel::{
     DeviceMarker as SpinelDeviceMarker, DeviceProxy as SpinelDeviceProxy,
-    DeviceSetupProxy as SpinelDeviceSetupProxy,
+    DeviceSetupMarker as SpinelDeviceSetupMarker,
 };
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at};
 
@@ -68,45 +67,40 @@ const RESET_EXPONENTIAL_BACKOFF_TIMER_MIN: i64 = 5;
 
 impl Config {
     async fn open_spinel_device_proxy(&self) -> Result<SpinelDeviceProxy, Error> {
-        use std::fs::File;
         use std::path::Path;
-        const OT_PROTOCOL_PATH: &str = "/dev/class/ot-radio";
 
-        let mut found_device_path =
-            Path::new(self.ot_radio_path.as_deref().unwrap_or(OT_PROTOCOL_PATH)).to_owned();
+        let path = self.ot_radio_path.as_deref().unwrap_or("/dev/class/ot-radio");
 
         // If we are just given a directory, try to infer the full path.
-        if found_device_path.is_dir() {
-            let ot_radio_dir =
-                File::open(found_device_path.clone()).context("opening dir in devmgr")?;
+        let spinel_device_setup_proxy = if Path::new(path).is_dir() {
+            let directory_proxy =
+                fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::empty())?;
 
-            let directory_proxy = fio::DirectoryProxy::new(fuchsia_async::Channel::from_channel(
-                fdio::clone_channel(&ot_radio_dir)?,
-            )?);
-
-            let ot_radio_devices = fuchsia_fs::directory::readdir(&directory_proxy).await?;
+            let entries = fuchsia_fs::directory::readdir(&directory_proxy).await?;
 
             // Should have 1 device that implements OT_RADIO
-            if ot_radio_devices.len() != 1 {
-                return Err(format_err!(
-                    "There are {} devices in {:?}, expecting only one",
-                    ot_radio_devices.len(),
-                    found_device_path
-                ));
+            match entries.as_slice() {
+                [entry] => {
+                    info!("Attempting to use Spinel RCP at {}/{}", path, entry.name.as_str());
+
+                    fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+                        SpinelDeviceSetupMarker,
+                    >(&directory_proxy, entry.name.as_str())
+                }
+                ot_radio_devices => {
+                    return Err(format_err!(
+                        "There are {} devices in {}, expecting only one",
+                        ot_radio_devices.len(),
+                        path
+                    ));
+                }
             }
+        } else {
+            info!("Attempting to use Spinel RCP at {}", path);
 
-            let last_device: &fuchsia_fs::directory::DirEntry = ot_radio_devices.last().unwrap();
-
-            found_device_path = found_device_path.join(last_device.name.clone());
+            fuchsia_component::client::connect_to_protocol_at_path::<SpinelDeviceSetupMarker>(path)
         }
-
-        info!("Attempting to use Spinel RCP at {:?}", found_device_path.to_str().unwrap());
-
-        let file = File::open(found_device_path).context("Error opening Spinel RCP")?;
-
-        let spinel_device_setup_proxy = SpinelDeviceSetupProxy::new(fasync::Channel::from_channel(
-            fdio::clone_channel(&file)?,
-        )?);
+        .context("Error opening Spinel RCP")?;
 
         let (client_side, server_side) = fidl::endpoints::create_endpoints::<SpinelDeviceMarker>();
 
@@ -293,14 +287,14 @@ where
 
     let lowpan_device_task = register_and_serve_driver(name, registry, driver_ref);
 
-    info!("Registered OpenThread LoWPAN device {:?}", name);
+    info!("Registered OpenThread LoWPAN device {}", name);
 
     let lowpan_device_factory_task = async move {
         if let Some(factory_registry) = factory_registry {
             if let Err(err) =
                 register_and_serve_driver_factory(name, factory_registry, driver_ref).await
             {
-                warn!("Unable to register and serve factory commands for {:?}: {:?}", name, err);
+                warn!("Unable to register and serve factory commands for {}: {:?}", name, err);
             }
         }
 
@@ -322,7 +316,7 @@ where
     .try_collect::<()>()
     .await?;
 
-    info!("OpenThread LoWPAN device {:?} has shutdown.", name);
+    info!("OpenThread LoWPAN device {} has shutdown.", name);
 
     Ok(())
 }
