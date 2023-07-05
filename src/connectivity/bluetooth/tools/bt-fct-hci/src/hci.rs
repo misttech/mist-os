@@ -4,16 +4,13 @@
 
 use {
     anyhow::Error,
-    fidl_fuchsia_hardware_bluetooth::HciProxy,
     fuchsia_async as fasync,
     fuchsia_zircon::{Channel, MessageBuf},
     futures::Stream,
-    std::convert::TryFrom,
     std::{
+        convert::TryFrom as _,
         fmt,
-        fs::OpenOptions,
         marker::Unpin,
-        path::PathBuf,
         pin::Pin,
         task::{Context, Poll},
     },
@@ -36,7 +33,7 @@ pub struct CommandChannel {
 impl CommandChannel {
     /// Create a new CommandChannel from a device path. This opens a new command channel, returning
     /// an error if the device doesn't exist or the channel cannot be created.
-    pub fn new(device_path: PathBuf) -> Result<CommandChannel, Error> {
+    pub fn new(device_path: &str) -> Result<CommandChannel, Error> {
         let channel = open_command_channel(device_path)?;
         CommandChannel::from_channel(channel)
     }
@@ -178,17 +175,17 @@ impl fmt::Display for EventPacket {
     }
 }
 
-fn open_command_channel(device_path: PathBuf) -> Result<Channel, Error> {
-    let hci_device = OpenOptions::new().read(true).write(true).open(&device_path)?;
-    let hci_channel = fasync::Channel::from_channel(fdio::clone_channel(&hci_device)?)?;
-    let interface = HciProxy::new(hci_channel);
+fn open_command_channel(device_path: &str) -> Result<Channel, Error> {
+    let interface = fuchsia_component::client::connect_to_protocol_at_path::<
+        fidl_fuchsia_hardware_bluetooth::HciMarker,
+    >(device_path)?;
     let (ours, theirs) = Channel::create();
     interface.open_command_channel(theirs)?;
     Ok(ours)
 }
 
 pub fn open_default_device() -> Result<CommandChannel, Error> {
-    CommandChannel::new(DEFAULT_DEVICE.into())
+    CommandChannel::new(DEFAULT_DEVICE)
 }
 
 #[cfg(test)]
