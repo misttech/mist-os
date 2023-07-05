@@ -11,14 +11,30 @@ use {
 #[derive(AsBytes, FromZeroes, FromBytes, PartialEq, Eq, Clone, Copy, Debug, Default)]
 pub struct StatusCode(pub u16);
 
+impl StatusCode {
+    pub fn into_fidl_or_refused_unspecified(self) -> fidl_ieee80211::StatusCode {
+        self.try_into().unwrap_or_else(|_| fidl_ieee80211::StatusCode::RefusedReasonUnspecified)
+    }
+}
+
 impl From<fidl_ieee80211::StatusCode> for StatusCode {
     fn from(fidl_status_code: fidl_ieee80211::StatusCode) -> StatusCode {
         StatusCode(fidl_status_code as u16)
     }
 }
 
+// TODO(fxbug.dev/130163): Replace uses of this `From` implementation with `TryFrom` and then
+//                         remove this.
 impl From<StatusCode> for Option<fidl_ieee80211::StatusCode> {
     fn from(status_code: StatusCode) -> Option<fidl_ieee80211::StatusCode> {
         fidl_ieee80211::StatusCode::from_primitive(status_code.0)
+    }
+}
+
+impl TryFrom<StatusCode> for fidl_ieee80211::StatusCode {
+    type Error = ();
+
+    fn try_from(status: StatusCode) -> Result<fidl_ieee80211::StatusCode, ()> {
+        fidl_ieee80211::StatusCode::from_primitive(status.0).ok_or(())
     }
 }

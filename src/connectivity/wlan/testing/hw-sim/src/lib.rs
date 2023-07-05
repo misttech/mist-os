@@ -155,6 +155,33 @@ pub fn send_open_authentication_success(
     Ok(())
 }
 
+pub fn send_open_authentication(
+    channel: &Channel,
+    bssid: &Bssid,
+    status: impl Into<mac::StatusCode>,
+    phy: &WlantapPhyProxy,
+) -> Result<(), anyhow::Error> {
+    let (buf, _bytes_written) = write_frame_with_dynamic_buf!(vec![], {
+        headers: {
+            mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
+                mac::FrameControl(0)
+                    .with_frame_type(mac::FrameType::MGMT)
+                    .with_mgmt_subtype(mac::MgmtSubtype::AUTH),
+                CLIENT_MAC_ADDR,
+                *bssid,
+                mac::SequenceControl(0).with_seq_num(123),
+            ),
+            mac::AuthHdr: &mac::AuthHdr {
+                auth_alg_num: mac::AuthAlgorithmNumber::OPEN,
+                auth_txn_seq_num: 2,
+                status_code: status.into(),
+            },
+        },
+    })?;
+    phy.rx(&buf, &create_rx_info(channel, 0))?;
+    Ok(())
+}
+
 pub fn send_association_response(
     channel: &Channel,
     bssid: &Bssid,

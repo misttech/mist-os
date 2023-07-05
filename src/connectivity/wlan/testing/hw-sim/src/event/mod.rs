@@ -59,6 +59,7 @@ mod convert;
 mod extract;
 mod filter;
 
+pub mod action;
 pub mod branch;
 pub mod buffered;
 
