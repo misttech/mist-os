@@ -489,10 +489,11 @@ bool JobDispatcher::Kill(int64_t return_code) {
 
 void JobDispatcher::CriticalProcessKill(fbl::RefPtr<ProcessDispatcher> dead_process) {
   char proc_name[ZX_MAX_NAME_LEN];
-  dead_process->get_name(proc_name);
+  [[maybe_unused]] zx_status_t status = dead_process->get_name(proc_name);
+  DEBUG_ASSERT(status == ZX_OK);
 
   char job_name[ZX_MAX_NAME_LEN];
-  [[maybe_unused]] zx_status_t status = get_name(job_name);
+  status = get_name(job_name);
   DEBUG_ASSERT(status == ZX_OK);
 
   printf("critical-process: process '%s' (%" PRIu64 ") died, killing job '%s' (%" PRIu64 ")\n",

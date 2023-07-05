@@ -97,7 +97,8 @@ void RootJobObserver::OnCancel(zx_signals_t signals) {}
 void RootJobObserver::CriticalProcessKill(fbl::RefPtr<ProcessDispatcher> dead_process) {
   Guard<Mutex> guard(CriticalProcessNameLock::Get());
   if (gCriticalProcessKoid == ZX_KOID_INVALID) {
-    dead_process->get_name(gCriticalProcessName);
+    [[maybe_unused]] zx_status_t status = dead_process->get_name(gCriticalProcessName);
+    DEBUG_ASSERT(status == ZX_OK);
     gCriticalProcessKoid = dead_process->get_koid();
   }
 }

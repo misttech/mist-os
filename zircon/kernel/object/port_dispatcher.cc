@@ -75,7 +75,8 @@ bool IsDefaultAllocatedEphemeral(const PortPacket& port_packet) {
 void RaisePacketLimitException(zx_koid_t koid, size_t num_packets) {
   auto process = ProcessDispatcher::GetCurrent();
   char pname[ZX_MAX_NAME_LEN];
-  process->get_name(pname);
+  [[maybe_unused]] zx_status_t status = process->get_name(pname);
+  DEBUG_ASSERT(status == ZX_OK);
   printf("KERN: port (%zu) has %zu packets (%s). Raising exception\n", koid, num_packets, pname);
   Thread::Current::SignalPolicyException(ZX_EXCP_POLICY_CODE_PORT_TOO_MANY_PACKETS, 0u);
 }

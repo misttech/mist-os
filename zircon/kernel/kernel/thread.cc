@@ -1610,7 +1610,8 @@ Thread* Thread::CreateIdleThread(cpu_num_t cpu_num) {
 
 void Thread::OwnerName(char (&out_name)[ZX_MAX_NAME_LEN]) const {
   if (user_thread_) {
-    user_thread_->process()->get_name(out_name);
+    [[maybe_unused]] zx_status_t status = user_thread_->process()->get_name(out_name);
+    DEBUG_ASSERT(status == ZX_OK);
     return;
   }
   memcpy(out_name, "kernel", 7);

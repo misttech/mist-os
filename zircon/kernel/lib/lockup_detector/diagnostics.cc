@@ -184,7 +184,8 @@ void DumpCommonDiagnostics(cpu_num_t cpu, FILE* output_target, FailureSeverity s
     if (user_thread != nullptr) {
       ProcessDispatcher* process = user_thread->process();
       char name[ZX_MAX_NAME_LEN]{};
-      process->get_name(name);
+      [[maybe_unused]] zx_status_t status = process->get_name(name);
+      DEBUG_ASSERT(status == ZX_OK);
       fprintf(output_target, "process: name=%s\n", name);
     }
   }

@@ -188,7 +188,8 @@ void DumpProcessList() {
     FormatHandleTypeCount(*process, handle_counts, sizeof(handle_counts));
 
     char pname[ZX_MAX_NAME_LEN];
-    process->get_name(pname);
+    [[maybe_unused]] zx_status_t status = process->get_name(pname);
+    DEBUG_ASSERT(status == ZX_OK);
     printf("%7" PRIu64 " %s [%s]\n", process->get_koid(), handle_counts, pname);
   });
   GetRootJobDispatcher()->EnumerateChildrenRecursive(&walker);
@@ -222,7 +223,8 @@ void DumpProcessChannels(fbl::RefPtr<ProcessDispatcher> process,
           if (koid_filter != ZX_KOID_INVALID && koid_filter != koid && koid_filter != peer_koid)
             return ZX_OK;
           if (!printed_header) {
-            process->get_name(pname);
+            [[maybe_unused]] zx_status_t status = process->get_name(pname);
+            DEBUG_ASSERT(status == ZX_OK);
             printf("%7" PRIu64 " [%s]\n", process->get_koid(), pname);
             printed_header = true;
           }
@@ -302,7 +304,8 @@ void DumpProcessHandles(zx_koid_t id) {
   }
 
   char pname[ZX_MAX_NAME_LEN];
-  pd->get_name(pname);
+  [[maybe_unused]] zx_status_t status = pd->get_name(pname);
+  DEBUG_ASSERT(status == ZX_OK);
   printf("process %" PRIu64 " ('%s') handles:\n", id, pname);
   printf("%7s %10s %10s: {%s} [type]\n", "koid", "handle", "rights", kRightsHeader);
 
@@ -342,7 +345,8 @@ void DumpHandlesForKoid(zx_koid_t id) {
 
       char pname[ZX_MAX_NAME_LEN];
       char rights_mask[sizeof(kRightsHeader)];
-      process->get_name(pname);
+      [[maybe_unused]] zx_status_t status = process->get_name(pname);
+      DEBUG_ASSERT(status == ZX_OK);
       FormatHandleRightsMask(rights, rights_mask, sizeof(rights_mask));
       printf("%7" PRIu64 " %#10x: {%s} [%s]\n", process->get_koid(), rights, rights_mask, pname);
 
@@ -369,7 +373,8 @@ void ktrace_report_live_processes() {
 
   auto walker = MakeProcessWalker([](ProcessDispatcher* process) {
     char name[ZX_MAX_NAME_LEN];
-    process->get_name(name);
+    [[maybe_unused]] zx_status_t status = process->get_name(name);
+    DEBUG_ASSERT(status == ZX_OK);
     KTRACE_KERNEL_OBJECT_ALWAYS(process->get_koid(), ZX_OBJ_TYPE_PROCESS, name);
   });
   GetRootJobDispatcher()->EnumerateChildrenRecursive(&walker);
@@ -1054,7 +1059,8 @@ void DumpProcessMemoryUsage(const char* prefix, size_t min_pages) {
     VmObject::AttributionCounts page_counts = process->PageCount();
     if (page_counts.uncompressed >= min_pages) {
       char pname[ZX_MAX_NAME_LEN];
-      process->get_name(pname);
+      [[maybe_unused]] zx_status_t status = process->get_name(pname);
+      DEBUG_ASSERT(status == ZX_OK);
       printf("%sproc %5" PRIu64 " %4zuM '%s'\n", prefix, process->get_koid(),
              page_counts.uncompressed / 256, pname);
     }

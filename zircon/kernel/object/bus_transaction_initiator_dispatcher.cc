@@ -185,7 +185,8 @@ void BusTransactionInitiatorDispatcher::PrintQuarantineWarningLocked(BtiPageLeak
   } else {
     // Get the name of the user mode process and thread which closed the handle
     // to the object which eventually resulted in the leak.
-    ProcessDispatcher::GetCurrent()->get_name(proc_name);
+    [[maybe_unused]] zx_status_t status = ProcessDispatcher::GetCurrent()->get_name(proc_name);
+    DEBUG_ASSERT(status == ZX_OK);
     thread_disp->get_name(thread_name);
   }
 

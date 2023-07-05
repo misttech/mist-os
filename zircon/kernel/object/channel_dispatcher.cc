@@ -454,13 +454,15 @@ void ChannelDispatcher::WriteSelf(MessagePacketPtr msg) {
       if (size == kWarnPendingMessageCount) {
         const auto* process = ProcessDispatcher::GetCurrent();
         char pname[ZX_MAX_NAME_LEN];
-        process->get_name(pname);
+        [[maybe_unused]] zx_status_t status = process->get_name(pname);
+        DEBUG_ASSERT(status == ZX_OK);
         printf("KERN: warning! channel (%zu) has %zu messages (%s) (write).\n", get_koid(), size,
                pname);
       } else if (size > kMaxPendingMessageCount) {
         const auto* process = ProcessDispatcher::GetCurrent();
         char pname[ZX_MAX_NAME_LEN];
-        process->get_name(pname);
+        [[maybe_unused]] zx_status_t status = process->get_name(pname);
+        DEBUG_ASSERT(status == ZX_OK);
         printf("KERN: channel (%zu) has %zu messages (%s) (write). Raising exception.\n",
                get_koid(), size, pname);
         Thread::Current::SignalPolicyException(ZX_EXCP_POLICY_CODE_CHANNEL_FULL_WRITE, 0u);

@@ -764,7 +764,8 @@ void VmAspace::MarkAsLatencySensitive() {
       return;
     }
     ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
-    up->get_name(name);
+    [[maybe_unused]] zx_status_t status = up->get_name(name);
+    DEBUG_ASSERT(status == ZX_OK);
     if (strncmp(name, "audio_core.cm", ZX_MAX_NAME_LEN) != 0 &&
         strncmp(name, "waves_host.cm", ZX_MAX_NAME_LEN) != 0) {
       return;

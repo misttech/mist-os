@@ -318,7 +318,8 @@ void ProcessDispatcher::Exit(int64_t retcode) {
       retcode_ = retcode;
       if (critical_to_job_ && critical_to_job_ == GetRootJobDispatcher()) {
         char pname[ZX_MAX_NAME_LEN];
-        get_name(pname);
+        [[maybe_unused]] zx_status_t status = get_name(pname);
+        DEBUG_ASSERT(status == ZX_OK);
         printf("KERN: process '%s' (%lu) critical to root job exited %ld\n", pname, get_koid(),
                retcode);
       }
@@ -351,7 +352,8 @@ void ProcessDispatcher::Kill(int64_t retcode) {
       retcode_ = retcode;
       if (critical_to_job_ && critical_to_job_ == GetRootJobDispatcher()) {
         char pname[ZX_MAX_NAME_LEN];
-        get_name(pname);
+        [[maybe_unused]] zx_status_t status = get_name(pname);
+        DEBUG_ASSERT(status == ZX_OK);
         printf("KERN: process '%s' (%lu) critical to root job killed with %ld\n", pname, get_koid(),
                retcode);
       }
