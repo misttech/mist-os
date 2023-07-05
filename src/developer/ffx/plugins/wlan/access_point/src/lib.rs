@@ -3,15 +3,35 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Error, donut_lib, ffx_core::ffx_plugin, ffx_wlan_ap_args as arg_types, ffx_wlan_common,
+    anyhow::Error,
+    async_trait::async_trait,
+    donut_lib, ffx_wlan_ap_args as arg_types, ffx_wlan_common,
+    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_wlan_policy as wlan_policy,
 };
 
-#[ffx_plugin(
-    wlan_policy::AccessPointProviderProxy = "core/wlancfg:expose:fuchsia.wlan.policy.AccessPointProvider",
-    wlan_policy::AccessPointListenerProxy = "core/wlancfg:expose:fuchsia.wlan.policy.AccessPointListener"
-)]
-pub async fn handle_client_command(
+#[derive(FfxTool)]
+pub struct AccessPointTool {
+    #[command]
+    cmd: arg_types::ApCommand,
+    #[with(moniker("/core/wlancfg"))]
+    ap_provider: wlan_policy::AccessPointProviderProxy,
+    #[with(moniker("/core/wlancfg"))]
+    ap_listener: wlan_policy::AccessPointListenerProxy,
+}
+
+fho::embedded_plugin!(AccessPointTool);
+
+#[async_trait(?Send)]
+impl FfxMain for AccessPointTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        handle_client_command(self.ap_provider, self.ap_listener, self.cmd).await?;
+        Ok(())
+    }
+}
+
+async fn handle_client_command(
     ap_provider: wlan_policy::AccessPointProviderProxy,
     ap_listener: wlan_policy::AccessPointListenerProxy,
     cmd: arg_types::ApCommand,

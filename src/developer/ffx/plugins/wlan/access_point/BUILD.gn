@@ -12,7 +12,9 @@ ffx_plugin("ffx_wlan_ap") {
   deps = [
     "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_rust",
     "//src/connectivity/wlan/wlancfg/tool/policy:donut-lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/plugins/wlan/common:ffx-wlan-common",
+    "//third_party/rust_crates:async-trait",
   ]
   args_deps = [
     "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_rust",

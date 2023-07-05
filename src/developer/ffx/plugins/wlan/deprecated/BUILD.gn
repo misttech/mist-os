@@ -12,6 +12,8 @@ ffx_plugin("ffx_wlan_deprecated") {
   deps = [
     "//sdk/fidl/fuchsia.wlan.product.deprecatedconfiguration:fuchsia.wlan.product.deprecatedconfiguration_rust",
     "//src/connectivity/wlan/wlancfg/tool/policy:donut-lib",
+    "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:async-trait",
   ]
   args_deps = [ "//third_party/rust_crates:eui48" ]
 }

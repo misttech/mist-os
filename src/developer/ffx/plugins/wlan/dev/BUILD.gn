@@ -12,6 +12,8 @@ ffx_plugin("ffx_wlan_dev") {
   deps = [
     "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_rust",
     "//src/connectivity/wlan/tools/wlantool/wlan_dev:wlan-dev",
+    "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:async-trait",
   ]
   args_deps = [
     "//src/connectivity/wlan/tools/wlantool/wlan_dev:wlan-dev",
