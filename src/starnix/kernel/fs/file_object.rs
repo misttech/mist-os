@@ -142,6 +142,13 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         Ok(())
     }
 
+    /// Syncs cached data, and only enough metadata to retrieve said data, to persistent storage.
+    ///
+    /// The method blocks until the synchronization is complete.
+    fn data_sync(&self, file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.sync(file, current_task)
+    }
+
     /// Returns a VMO representing this file. At least the requested protection flags must
     /// be set on the VMO. Reading or writing the VMO must read or write the file. If this is not
     /// possible given the requested protection, an error must be returned.
@@ -1070,6 +1077,10 @@ impl FileObject {
 
     pub fn sync(&self, current_task: &CurrentTask) -> Result<(), Errno> {
         self.ops().sync(self, current_task)
+    }
+
+    pub fn data_sync(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.ops().data_sync(self, current_task)
     }
 
     pub fn get_vmo(

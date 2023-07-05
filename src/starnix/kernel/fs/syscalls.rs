@@ -2033,7 +2033,8 @@ pub fn sys_fsync(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> 
 }
 
 pub fn sys_fdatasync(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> {
-    sys_fsync(current_task, fd)
+    let file = current_task.files.get(fd)?;
+    file.data_sync(current_task)
 }
 
 pub fn sys_fadvise64(
