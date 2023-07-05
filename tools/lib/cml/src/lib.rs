@@ -2546,12 +2546,10 @@ pub struct Offer {
     /// - `strong`: a strong dependency, which is used to determine shutdown
     ///     ordering. Component manager is guaranteed to stop the target before the
     ///     source. This is the default.
-    /// - `weak_for_migration`: a weak dependency, which is ignored during
+    /// - `weak`: a weak dependency, which is ignored during
     ///     shutdown. When component manager stops the parent realm, the source may
     ///     stop before the clients. Clients of weak dependencies must be able to
-    ///     handle these dependencies becoming unavailable. This type exists to keep
-    ///     track of weak dependencies that resulted from migrations into v2
-    ///     components.
+    ///     handle these dependencies becoming unavailable.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dependency: Option<DependencyType>,
 

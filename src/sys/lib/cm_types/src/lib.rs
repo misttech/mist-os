@@ -759,6 +759,7 @@ impl Default for AllowedOffers {
 pub enum DependencyType {
     Strong,
     Weak,
+    // TODO(fxb/130005): Remove this.
     WeakForMigration,
 }
 
