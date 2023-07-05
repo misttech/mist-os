@@ -1,8 +1,50 @@
 # Bluetooth
 
-The Fuchsia Bluetooth system aims to provide a dual mode implementation of the
-Bluetooth Host Subsystem (5.0+) supporting a framework for developing Low Energy
-and Traditional profiles.
+The Fuchsia Bluetooth system (a.k.a. Sapphire) provides a modern, dual mode
+implementation of the Bluetooth Host Subsystem (5.0+) supporting a number of
+Low Energy and Traditional profiles.
+
+## High-level Architecture Overview
+
+The Sapphire stack is organized in three major layers with communication
+between layers happening via FIDL and Zircon channels: driver, host, and
+profile.
+
+The driver layer is responsible for discovery and communication with controller
+hardware in two stages:
+ - transport: implements the HCI Transport protocol on the underlying
+   hardware bus (USB, Serial, or SD)
+ - vendor: loads firmware and manages handling and/or encoding vendor-specific
+   commands.  Controllers that do not require firmware are handled using the
+   `passthrough` vendor driver.
+
+SCO, ACL, and HCI sockets are connected to the bt-host component through the
+[Bluetooth Hardware HCI Protocol](/sdk/fidl/fuchsia.hardware.bluetooth/hci.fidl).
+
+The host layer is comprised of the bt-init, bt-host, and bt-gap components.
+
+The bt-init component is eagerly started on a Fuchsia system to discover and
+connect bt-host components as well as manage the lifetime of ambient profile
+components and route protocols through pairing and RFCOMM passthrough
+components.
+
+One bt-host is started for each connected controller, and manages
+host state as well as sending commands and receiving events, tracking state,
+and managing connections.  It also contains Low Energy advertising and GATT
+handlers, and an SDP server.  L2CAP and GATT traffic is routed through bt-host
+and sent to the above associated profiles.
+
+The bt-gap component coordinates the system Bluetooth state to all of the
+bt-host components, serves the [system APIs](/sdk/fidl/fuchsia.bluetooth.sys)
+and routes connections from profile and protocol components to the active
+host.
+
+The profile layer encompasses all profile components included in the product
+assembly.  Profiles are enabled by including them.
+They register themselves with the host layer when started.
+Common profile configurations will be provided in separate Assembly Input Bundles
+and are documented in their individual directories and/or bundles.
+Profile components are independently testable and updatable.
 
 Source code shortcuts:
 
@@ -12,19 +54,21 @@ Source code shortcuts:
     *   [BR/EDR (Profile)](/sdk/fidl/fuchsia.bluetooth.bredr)
     *   [GATT](/sdk/fidl/fuchsia.bluetooth.gatt)
     *   [LE](/sdk/fidl/fuchsia.bluetooth.le)
--   [Private API](/src/connectivity/bluetooth/fidl)
--   [Tools](tools/)
--   [Host Subsystem Driver](core/bt-host)
+-   [Private API](fidl)
+-   [Tools](tools)
+-   [bt-host](core/bt-host)
+-   [bt-gap component](core/bt-gap)
+-   [bt-init component](core/bt-init)
+-   [Profiles](profiles)
 -   [HCI Drivers](hci)
--   [HCI Transport Drivers](hci/transport)
+    *   [Transport Drivers](hci/transport)
+    *   [Vendor Drivers](hci/vendor)
 
-For more orientation, see
+For more information about the structure of the Sapphire stack, please refer to the
+[Bluetooth Architecture guide](/docs/development/bluetooth/concepts/architecture.md),
+or READMEs in specific subdirectories.
 
--   [System Architecture](/docs/development/bluetooth/concepts/architecture.md)
--   [Respectful Code](#Respectful-Code)
-
-For a note on used (and avoided) vocabulary, see
-[Bluetooth Vocabulary](docs/vocabulary.md)
+For a note on used (and avoided) vocabulary, see [Bluetooth Vocabulary](docs/vocabulary.md)
 
 ## Getting Started
 
@@ -37,9 +81,9 @@ Examples using Fuchsia's Bluetooth Low Energy APIs can be found
 
 Dual-mode (LE + Classic) GAP operations that are typically exposed to privileged
 clients are performed using the
-[fuchsia.bluetooth.sys](/sdk/fidl/fuchsia.bluetooth.sys) library. This API is
+[fuchsia.bluetooth.sys](/sdk/fidl/fuchsia.bluetooth.sys) protocol. This API is
 intended for managing local adapters, device discovery & discoverability,
-pairing/bonding, and other settings.
+pairing/bonding, and global settings.
 
 [`bt-cli`](tools/bt-cli) is a command-line front-end for privileged access
 operations:
@@ -107,37 +151,49 @@ To see all options for running these tests, run `fx test --help`.
 ##### Running on the Fuchsia Emulator
 
 If you don't have physical hardware available, you can run the tests in the
-Fuchsia emulator (FEMU) using the same commands as above. See
-[FEMU set up instructions](/docs/get-started/set_up_femu.md).
+Fuchsia emulator (FEMU) using the same commands as above. See the
+[instructions for FEMU](/docs/get-started/set_up_femu.md).
 
 #### Integration Tests
 
-See the [Integration Test README](tests/integration/README.md). TODO(fxbug.dev/96421): This link is
-very outdated, rewrite and update.
+`TODO(fxbug.dev/96421): Updated Integration Documentation`
 
 ### Controlling Log Verbosity
 
 #### Logging in Drivers
 
-The most reliable way to enable higher log verbosity is with kernel command line
-parameters. These can be configured through the `fx set` command:
+The most reliable way to enable higher log verbosity is to enable them using kernel command
+line parameters. The `//src/connectivity/bluetooth:driver-debug-logging` target is provided as a
+convenience to add all the existing chipsets and should be included in `dev_bootfs_labels`,
+for example using the `fx set` command:
 
 ```
-  fx set workstation_eng.x64 --args="dev_bootfs_labels=[\"//src/connectivity/bluetooth:driver-debug-logging\"]"
+  fx set core.x64 --args="dev_bootfs_labels=[\"//src/connectivity/bluetooth:driver-debug-logging\"]"
 ```
 
-This will enable debug-level logging for all supported chipsets. Using `fx set`
-writes these values into the image, so they will survive a restart. For more
-detail on driver logging, see
-[Zircon driver logging](/docs/concepts/drivers/driver-development.md#logging)
+Using `fx set` writes these values into the image, so they will survive a system restart.
+For more detail on driver logging, see
+[Zircon driver logging](/docs/development/drivers/diagnostics/logging.md)
 
-### Inspecting Component State
+#### Other components
 
-The Bluetooth system supports inspection through the
-[Inspect API](/docs/development/diagnostics/inspect). bt-gap, bt-host, bt-a2dp,
-and bt-snoop all expose information though Inspect.
+All other components can be controlled at runtime, using the diagnostics selector method.
+For example, to show all logs up to `DEBUG` level in the A2DP profile component, use:
 
-#### Usage
+```
+ffx log --select core/bt-a2dp#DEBUG
+```
+
+Component monikers can be found using `ffx component list`.
+
+### Inspecting Bluetooth State
+
+On Fuchsia, Sapphire supports inspection through the
+[Inspect API](/docs/development/diagnostics/inspect). With the exception of the
+driver layer, all components expose information through inspect.  Each component's
+documentation includes an example of the expected inspect tree.
+
+#### Example Usage
 
 *   bt-host: `ffx inspect show bootstrap/driver_manager --file class/bt-host/000.inspect`
     exposes information about the controller, peers, and services.
@@ -145,13 +201,16 @@ and bt-snoop all expose information though Inspect.
     managed by bt-gap, pairing capabilities, stored bonds, and actively connected peers.
 *   bt-a2dp: `ffx inspect show core/bt-a2dp` exposes information on audio streaming
     capabilities and active streams
-*   bt-snoop: `ffx inspect show core/bt-snoop` exposes information about which hci
+*   bt-snoop: `ffx inspect show core/bt-snoop` exposes information about which HCI
     devices are being logged and how much data is stored.
 *   All core Bluetooth components `ffx inspect show core/bluetooth-core/*`
 *   All other Bluetooth components: `ffx inspect show core/bt-*`
 
-See the [iquery documentation](/docs/development/diagnostics/inspect/iquery) for
-complete instructions on using `iquery`.
+
+See the [ffx documentation](/docs/reference/tools/sdk/ffx) for complete instructions
+on using `inspect`.
+
+`TODO(fxbug.dev/54127): Find a better link for ffx inspect usage`
 
 ### Respectful Code
 
@@ -167,5 +226,5 @@ longer allow uses of the prior terms. For more information, see the
 [Appropriate Language Mapping Table](https://specificationrefs.bluetooth.com/language-mapping/Appropriate_Language_Mapping_Table.pdf)
 published by the Bluetooth SIG.
 
-See the Fuchsia project [guide](/docs/best-practices/respectful_code.md) on best
+See the Fuchsia project [guide](/docs/contribute/respectful_code.md) on best
 practices for more information.

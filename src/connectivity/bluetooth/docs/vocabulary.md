@@ -12,10 +12,10 @@ This term is overloaded between an instance of the Bluetooth host subsystem
 driver-layer, and the 'host' machine when performing operations on a separate
 device under test (the 'target', e.g. Fuchsia test hardware)
 
-*   When referring solely to the Bluetooth Host driver, use the term 'bt-host'
-    or 'bt-host driver'.
-*   When referring to the Bluetooth Host Subsystem, use the full term
-    ('Bluetooth Host Subsystem')
+*   When referring solely to the Bluetooth Host software (in `core/bt-host`),
+    use the term 'bt-host' or 'bt-host driver'.
+*   When referring to the Bluetooth Host Subsystem (including the bt-gap and
+    bt-init components), use the full term ('Bluetooth Host Subsystem')
 *   When referring to a host machine in a host/target setup, the term 'host' may
     be used.
 *   Do not use any of these terms outside these definitions
@@ -24,13 +24,13 @@ device under test (the 'target', e.g. Fuchsia test hardware)
 
 ## Adapter
 
-The term adapter has historically been used in our code base to roughly refer to
-either the controller hardware or the bt-host driver. It's use is ambiguous and
+The term adapter has historically been used to refer to either the
+controller hardware or the bt-host driver. Its use is ambiguous and
 unclear. It should be avoided.
 
 *   **Avoid using the term 'adapter'**
 *   If referring to the bluetooth hardware, use the term 'controller'. E.g. "A
-    fuchsia system may contain multiple active *controllers* at once"
+    Fuchsia system may contain multiple active *controllers* at once"
 *   If referring to the bt-host driver (for example, within bt-gap), then use
     the term 'bt-host' as directed above.
 
