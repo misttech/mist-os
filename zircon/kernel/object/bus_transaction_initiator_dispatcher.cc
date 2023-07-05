@@ -190,7 +190,8 @@ void BusTransactionInitiatorDispatcher::PrintQuarantineWarningLocked(BtiPageLeak
   }
 
   // Fetch the BTI name (if any).
-  this->get_name(bti_name);
+  [[maybe_unused]] zx_status_t status = this->get_name(bti_name);
+  DEBUG_ASSERT(status == ZX_OK);
 
   // If any of these strings are empty, replace them with just "<unknown>".
   if (!proc_name[0]) {

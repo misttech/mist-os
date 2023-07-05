@@ -50,8 +50,8 @@ class BusTransactionInitiatorDispatcher final
   void ReleaseQuarantine();
 
   void on_zero_handles() final;
-  zx_status_t set_name(const char* name, size_t len) final __NONNULL((2));
-  zx_status_t get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const final;
+  [[nodiscard]] zx_status_t set_name(const char* name, size_t len) final __NONNULL((2));
+  [[nodiscard]] zx_status_t get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const final;
 
   Iommu& iommu() const { return iommu_->iommu(); }
   uint64_t bti_id() const { return bti_id_; }
