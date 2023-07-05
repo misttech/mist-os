@@ -121,7 +121,7 @@ var ipv6ndpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{30, 2}:  Pass,
 	{30, 3}:  Pass,
 	{30, 4}:  Inconclusive,
-	{30, 5}:  Flaky, // TODO(https://fxbug.dev/129642): Fix.
+	{30, 5}:  Pass,
 	{30, 6}:  Pass,
 	{30, 7}:  Pass,
 	{30, 8}:  Pass,
