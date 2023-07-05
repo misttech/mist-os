@@ -6,13 +6,13 @@ use {
     crate::consumer_controls_binding::ConsumerControlsEvent,
     crate::input_device,
     crate::input_handler::{InputHandlerStatus, UnhandledInputHandler},
-    anyhow::{anyhow, format_err, Context as _, Error},
+    anyhow::{anyhow, Context as _, Error},
     async_trait::async_trait,
     async_utils::hanging_get::server::HangingGet,
-    fidl::endpoints::ProtocolMarker,
+    fidl::endpoints::DiscoverableProtocolMarker as _,
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_io as fio,
     fidl_fuchsia_media::AudioRenderUsage,
-    fidl_fuchsia_media_sounds::PlayerMarker,
+    fidl_fuchsia_media_sounds::{PlaySoundError, PlayerMarker},
     fidl_fuchsia_recovery::FactoryResetMarker,
     fidl_fuchsia_recovery_policy::{DeviceRequest, DeviceRequestStream},
     fidl_fuchsia_recovery_ui::{
@@ -20,8 +20,7 @@ use {
         FactoryResetCountdownWatchResponder,
     },
     fuchsia_async::{Duration, Task, Time, TimeoutExt, Timer},
-    fuchsia_component, fuchsia_inspect,
-    fuchsia_zircon::Channel,
+    fuchsia_component, fuchsia_inspect, fuchsia_zircon as zx,
     futures::StreamExt,
     std::{
         cell::RefCell,
@@ -175,16 +174,17 @@ impl FactoryResetHandler {
                     FactoryResetState::Disallowed if allowed => {
                         // Update state and delete file
                         self.set_factory_reset_state(FactoryResetState::Idle);
-                        fs::remove_file(FACTORY_RESET_DISALLOWED_PATH).map_err(|error| {
-                            anyhow!("Failed to SetIsLocalResetAllowed to true: {:?}", error)
-                        })?;
+                        fs::remove_file(FACTORY_RESET_DISALLOWED_PATH).with_context(|| {
+                            format!("failed to remove {}", FACTORY_RESET_DISALLOWED_PATH)
+                        })?
                     }
                     _ if !allowed => {
                         // Update state and create file
                         self.set_factory_reset_state(FactoryResetState::Disallowed);
-                        File::create(FACTORY_RESET_DISALLOWED_PATH).map_err(|error| {
-                            anyhow!("Failed to SetIsLocalResetAllowed to false: {:?}", error)
-                        })?;
+                        let _: File =
+                            File::create(FACTORY_RESET_DISALLOWED_PATH).with_context(|| {
+                                format!("failed to create {}", FACTORY_RESET_DISALLOWED_PATH)
+                            })?;
                     }
                     _ => (),
                 }
@@ -316,28 +316,34 @@ impl FactoryResetHandler {
     async fn play_reset_sound(self: &Rc<Self>) -> Result<(), Error> {
         tracing::debug!("Getting sound");
         // Get sound
-        let sound_file = File::open(FACTORY_RESET_SOUND_PATH)
-            .context("Failed to open factory reset sound file")?;
-        let sound_channel = Channel::from(fdio::transfer_fd(sound_file)?);
-        let sound_endpoint = fidl::endpoints::ClientEnd::<fio::FileMarker>::new(sound_channel);
+        let (sound_endpoint, server_end) = fidl::endpoints::create_endpoints::<fio::FileMarker>();
+        let () = fuchsia_fs::file::open_channel_in_namespace(
+            FACTORY_RESET_SOUND_PATH,
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            server_end,
+        )
+        .context("Failed to open factory reset sound file")?;
 
         tracing::debug!("Playing sound");
         // Play sound
         let sound_player = fuchsia_component::client::connect_to_protocol::<PlayerMarker>()
-            .with_context(|| format!("failed to connect to {}", PlayerMarker::DEBUG_NAME))?;
+            .with_context(|| format!("failed to connect to {}", PlayerMarker::PROTOCOL_NAME))?;
 
         tracing::debug!("Connected to player");
         let sound_id = 0;
-        let _duration = sound_player
+        let _duration: i64 = sound_player
             .add_sound_from_file(sound_id, sound_endpoint)
-            .await?
-            .map_err(|status| format_err!("AddSoundFromFile failed {}", status))?;
+            .await
+            .context("AddSoundFromFile error")?
+            .map_err(zx::Status::from_raw)
+            .context("AddSoundFromFile failed")?;
         tracing::debug!("Added sound from file");
 
         sound_player
             .play_sound(sound_id, AudioRenderUsage::Media)
-            .await?
-            .map_err(|err| format_err!("PlaySound failed: {:?}", err))?;
+            .await
+            .context("PlaySound error")?
+            .map_err(|err: PlaySoundError| anyhow!("PlaySound failed: {:?}", err))?;
 
         tracing::debug!("Played sound");
 
@@ -349,7 +355,7 @@ impl FactoryResetHandler {
         tracing::info!("Beginning reset sequence");
         if let Err(error) = self
             .play_reset_sound()
-            .on_timeout(EARCON_TIMEOUT, || Err(format_err!("play_reset_sound took too long")))
+            .on_timeout(EARCON_TIMEOUT, || Err(anyhow!("play_reset_sound took too long")))
             .await
         {
             tracing::warn!("Failed to play reset sound: {:?}", error);
@@ -357,9 +363,11 @@ impl FactoryResetHandler {
 
         // Trigger reset
         self.set_factory_reset_state(FactoryResetState::Resetting);
-        tracing::info!("Calling {}.Reset", FactoryResetMarker::DEBUG_NAME);
+        tracing::info!("Calling {}.Reset", FactoryResetMarker::PROTOCOL_NAME);
         let factory_reset = fuchsia_component::client::connect_to_protocol::<FactoryResetMarker>()
-            .with_context(|| format!("failed to connect to {}", FactoryResetMarker::DEBUG_NAME))?;
+            .with_context(|| {
+                format!("failed to connect to {}", FactoryResetMarker::PROTOCOL_NAME)
+            })?;
         factory_reset.reset().await.context("failed while calling Reset")?;
         Ok(())
     }
@@ -421,7 +429,7 @@ mod tests {
         fidl_fuchsia_recovery_policy::{DeviceMarker, DeviceProxy},
         fidl_fuchsia_recovery_ui::{FactoryResetCountdownMarker, FactoryResetCountdownProxy},
         fuchsia_async::TestExecutor,
-        fuchsia_inspect, fuchsia_zircon as zx,
+        fuchsia_inspect,
         pin_utils::pin_mut,
         pretty_assertions::assert_eq,
         std::task::Poll,
@@ -518,22 +526,6 @@ mod tests {
         }
     }
 
-    fn get_countdown_state(
-        proxy: &FactoryResetCountdownProxy,
-        executor: &mut TestExecutor,
-    ) -> FactoryResetCountdownState {
-        let countdown_proxy_clone = proxy.clone();
-        let countdown_state_fut = async move {
-            countdown_proxy_clone.watch().await.expect("Failed to get countdown state")
-        };
-        pin_mut!(countdown_state_fut);
-
-        match executor.run_until_stalled(&mut countdown_state_fut) {
-            Poll::Ready(countdown_state) => countdown_state,
-            _ => panic!("Failed to get countdown state"),
-        }
-    }
-
     #[fuchsia::test]
     async fn is_reset_requested_looks_for_reset_signal() {
         let reset_event = create_reset_consumer_controls_event();
@@ -556,7 +548,7 @@ mod tests {
         let reset_handler = FactoryResetHandler::new(&test_node);
         let countdown_proxy = create_factory_reset_countdown_proxy(reset_handler.clone());
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Idle);
     }
 
@@ -568,11 +560,24 @@ mod tests {
         let reset_handler = FactoryResetHandler::new(&test_node);
         let countdown_proxy = create_factory_reset_countdown_proxy(reset_handler.clone());
 
+        let get_countdown_state = |executor: &mut TestExecutor| {
+            let mut fut = countdown_proxy.watch();
+            loop {
+                // NB: cannot call run_singlethreaded on an executor with a fake clock.
+                match executor.run_until_stalled(&mut fut) {
+                    Poll::Pending => continue,
+                    Poll::Ready(state) => {
+                        return state.expect("Failed to get countdown state");
+                    }
+                }
+            }
+        };
+
         // The initial state should be no scheduled reset time and the
         // FactoryRestHandler state should be FactoryResetState::Idle
-        let countdown_state = get_countdown_state(&countdown_proxy, &mut executor);
+        let countdown_state = get_countdown_state(&mut executor);
         let handler_state = reset_handler.factory_reset_state();
-        assert!(countdown_state.scheduled_reset_time.is_none());
+        assert_eq!(countdown_state.scheduled_reset_time, None);
         assert_eq!(handler_state, FactoryResetState::Idle);
 
         // Send a reset event
@@ -580,12 +585,14 @@ mod tests {
         let handle_input_event_fut =
             reset_handler.clone().handle_unhandled_input_event(reset_event);
         pin_mut!(handle_input_event_fut);
-        assert!(executor.run_until_stalled(&mut handle_input_event_fut).is_ready());
+        assert_matches!(executor.run_until_stalled(&mut handle_input_event_fut), Poll::Ready(events) => {
+            assert_matches!(events.as_slice(), [input_device::InputEvent { .. }]);
+        });
 
         // The next state will be FactoryResetState::ButtonCountdown with no scheduled reset
-        let countdown_state = get_countdown_state(&countdown_proxy, &mut executor);
+        let countdown_state = get_countdown_state(&mut executor);
         let handler_state = reset_handler.factory_reset_state();
-        assert!(countdown_state.scheduled_reset_time.is_none());
+        assert_eq!(countdown_state.scheduled_reset_time, None);
         assert_matches!(handler_state, FactoryResetState::ButtonCountdown { deadline: _ });
 
         // Skip ahead 500ms for the ButtonCountdown
@@ -594,9 +601,9 @@ mod tests {
 
         // After the ButtonCountdown the reset_handler enters the
         // FactoryResetState::ResetCountdown state WITH a scheduled reset time.
-        let countdown_state = get_countdown_state(&countdown_proxy, &mut executor);
+        let countdown_state = get_countdown_state(&mut executor);
         let handler_state = reset_handler.factory_reset_state();
-        assert!(countdown_state.scheduled_reset_time.is_some());
+        assert_matches!(countdown_state.scheduled_reset_time, Some(_));
         assert_matches!(handler_state, FactoryResetState::ResetCountdown { deadline: _ });
 
         // Skip ahead 10s for the ResetCountdown
@@ -605,9 +612,9 @@ mod tests {
 
         // After the ResetCountdown the reset_handler enters the
         // FactoryResetState::Resetting state with no scheduled reset time.
-        let countdown_state = get_countdown_state(&countdown_proxy, &mut executor);
+        let countdown_state = get_countdown_state(&mut executor);
         let handler_state = reset_handler.factory_reset_state();
-        assert!(countdown_state.scheduled_reset_time.is_none());
+        assert_eq!(countdown_state.scheduled_reset_time, None);
         assert_eq!(handler_state, FactoryResetState::Resetting);
 
         Ok(())
@@ -622,7 +629,7 @@ mod tests {
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Idle);
 
         // Set FactoryResetState to Disallow
@@ -631,7 +638,7 @@ mod tests {
 
         // State should now be in Disallow and scheduled_reset_time should be None
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Disallowed);
 
         // Send reset event
@@ -647,7 +654,7 @@ mod tests {
 
         // State should be FactoryResetState::Idle with no scheduled reset
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Idle);
     }
 
@@ -662,21 +669,21 @@ mod tests {
         let countdown_proxy = create_factory_reset_countdown_proxy(reset_handler.clone());
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
-        let reset_state = executor.run_singlethreaded(async {
-            countdown_proxy.watch().await.expect("Failed to get countdown state")
-        });
-        assert!(reset_state.scheduled_reset_time.is_none());
+        let reset_state = executor
+            .run_singlethreaded(countdown_proxy.watch())
+            .expect("Failed to get countdown state");
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Idle);
 
-        let reset_handler_clone = reset_handler.clone();
-        let handle_allowed_event_fut = reset_handler_clone.handle_allowed_event(&reset_event);
+        let handle_allowed_event_fut = reset_handler.handle_allowed_event(&reset_event);
         futures::pin_mut!(handle_allowed_event_fut);
-        let _ = executor.run_until_stalled(&mut handle_allowed_event_fut);
+        assert_eq!(executor.run_until_stalled(&mut handle_allowed_event_fut), Poll::Pending);
 
-        let watch_res = executor.run_singlethreaded(countdown_proxy.watch());
         // This should result in the reset handler entering the ButtonCountdown state
-        assert!(watch_res.is_ok());
-        assert!(watch_res.unwrap().scheduled_reset_time.is_none());
+        assert_matches!(
+            executor.run_singlethreaded(countdown_proxy.watch()),
+            Ok(FactoryResetCountdownState { scheduled_reset_time: None, .. })
+        );
         assert_matches!(
             reset_handler.factory_reset_state(),
             FactoryResetState::ButtonCountdown { deadline: _ }
@@ -692,7 +699,7 @@ mod tests {
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Idle);
 
         let non_reset_event = create_non_reset_consumer_controls_event();
@@ -762,7 +769,7 @@ mod tests {
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Idle);
 
         // Send reset event
@@ -771,7 +778,7 @@ mod tests {
 
         // State should now be ButtonCountdown and scheduled_reset_time should be None
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_matches!(
             reset_handler.factory_reset_state(),
             FactoryResetState::ButtonCountdown { deadline: _ }
@@ -783,7 +790,7 @@ mod tests {
 
         // State should now be in Disallow and scheduled_reset_time should be None
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Disallowed);
     }
 
@@ -796,7 +803,7 @@ mod tests {
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Idle);
 
         // Send reset event
@@ -805,7 +812,7 @@ mod tests {
 
         // State should now be ButtonCountdown and scheduled_reset_time should be None
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_matches!(
             reset_handler.factory_reset_state(),
             FactoryResetState::ButtonCountdown { deadline: _ }
@@ -813,7 +820,7 @@ mod tests {
 
         // State should now be ResetCountdown and scheduled_reset_time should be Some
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_some());
+        assert_matches!(reset_state.scheduled_reset_time, Some(_));
         assert_matches!(
             reset_handler.factory_reset_state(),
             FactoryResetState::ResetCountdown { deadline: _ }
@@ -825,7 +832,7 @@ mod tests {
 
         // State should now be in Disallow and scheduled_reset_time should be None
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Disallowed);
     }
 
@@ -838,7 +845,7 @@ mod tests {
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Idle);
 
         // Send reset event
@@ -847,7 +854,7 @@ mod tests {
 
         // State should now be ButtonCountdown and scheduled_reset_time should be None
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_matches!(
             reset_handler.factory_reset_state(),
             FactoryResetState::ButtonCountdown { deadline: _ }
@@ -859,7 +866,7 @@ mod tests {
 
         // State should now be in Idle and scheduled_reset_time should be None
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Idle);
     }
 
@@ -872,7 +879,7 @@ mod tests {
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Idle);
 
         // Send reset event
@@ -881,7 +888,7 @@ mod tests {
 
         // State should now be ButtonCountdown and scheduled_reset_time should be None
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_matches!(
             reset_handler.factory_reset_state(),
             FactoryResetState::ButtonCountdown { deadline: _ }
@@ -889,7 +896,7 @@ mod tests {
 
         // State should now be ResetCountdown and scheduled_reset_time should be Some
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_some());
+        assert_matches!(reset_state.scheduled_reset_time, Some(_));
         assert_matches!(
             reset_handler.factory_reset_state(),
             FactoryResetState::ResetCountdown { deadline: _ }
@@ -901,7 +908,7 @@ mod tests {
 
         // State should now be in Idle and scheduled_reset_time should be None
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
-        assert!(reset_state.scheduled_reset_time.is_none());
+        assert_eq!(reset_state.scheduled_reset_time, None);
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Idle);
     }
 

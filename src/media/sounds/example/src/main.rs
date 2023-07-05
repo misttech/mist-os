@@ -53,8 +53,10 @@ async fn main() -> Result<()> {
         }
     }
 
+    let file = resource_file("sfx.wav").await?;
+
     player_proxy
-        .add_sound_from_file(0, resource_file("sfx.wav")?)
+        .add_sound_from_file(0, file)
         .await?
         .map_err(|status| anyhow::format_err!("AddSoundFromFile failed {}", status))?;
 
@@ -106,23 +108,47 @@ async fn main() -> Result<()> {
 }
 
 /// Creates a file channel from a resource file.
-fn resource_file(name: &str) -> Result<fidl::endpoints::ClientEnd<fio::FileMarker>> {
+async fn resource_file(name: &str) -> Result<fidl::endpoints::ClientEnd<fio::FileMarker>> {
+    let open = |directory| {
+        use fidl::endpoints::Proxy as _;
+
+        let proxy = fuchsia_fs::file::open_in_namespace(
+            &format!("{directory}/{name}"),
+            fio::OpenFlags::RIGHT_READABLE,
+        )?;
+
+        Ok::<_, anyhow::Error>(proxy.into_channel().unwrap())
+    };
+
     // We try two paths here, because normal components see their package data resources in
     // /pkg/data and shell tools see them in /pkgfs/packages/<pkg>>/0/data.
-    Ok(fidl::endpoints::ClientEnd::<fio::FileMarker>::new(zx::Channel::from(fdio::transfer_fd(
-        File::open(format!("/pkg/data/{}", name))
-            .or_else(|_| File::open(format!("/pkgfs/packages/soundplayer_example/0/data/{}", name)))
-            .context("Opening package data file")?,
-    )?)))
+    let pkg = open("/pkg/data")?;
+    let pkgfs = open("/pkgfs/packages/soundplayer_example/0/data")?;
+
+    let file = futures::select! {
+        signals = pkg.on_closed().fuse() => {
+            let _: zx::Signals = signals?;
+            pkgfs
+        }
+        signals = pkgfs.on_closed().fuse() => {
+            let _: zx::Signals = signals?;
+            pkg
+        }
+    }
+    .into_zx_channel();
+
+    Ok::<_, anyhow::Error>(file.into())
 }
 
 /// Creates a file channel from a file name.
 fn sound_file(name: &str) -> Result<fidl::endpoints::ClientEnd<fio::FileMarker>> {
-    // We try two paths here, because normal components see their package data resources in
-    // /pkg/data and shell tools see them in /pkgfs/packages/<pkg>>/0/data.
-    Ok(fidl::endpoints::ClientEnd::<fio::FileMarker>::new(zx::Channel::from(fdio::transfer_fd(
-        File::open(name).context("Opening sound file")?,
-    )?)))
+    let (client_end, server_end) = fidl::endpoints::create_endpoints();
+    let () = fuchsia_fs::file::open_channel_in_namespace(
+        name,
+        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        server_end,
+    )?;
+    Ok(client_end)
 }
 
 /// Creates a VMO-based sound containing a decaying sine wave using the slope iteration method.

@@ -382,9 +382,11 @@ impl TempDirFake {
     ///
     /// Panics on error.
     pub fn backing_dir_as_openat_dir(&self) -> openat::Dir {
+        // NB: openat::Dir::open() uses O_PATH which causes fdio not to apply
+        // POSIX_WRITABLE, and we need this to be writable.
         let file = std::fs::File::open(self.dir.path()).unwrap();
-        let handle = fdio::transfer_fd(file).unwrap();
-        fdio::create_fd(handle).unwrap()
+        let fd = std::os::fd::IntoRawFd::into_raw_fd(file);
+        unsafe { std::os::fd::FromRawFd::from_raw_fd(fd) }
     }
 }
 
