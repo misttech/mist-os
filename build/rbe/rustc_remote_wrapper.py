@@ -26,6 +26,7 @@ import sys
 import cl_utils
 import depfile
 import fuchsia
+import linker
 import rustc
 import remote_action
 
@@ -726,12 +727,28 @@ class RustRemoteAction(object):
             return
         sysroot_triple = fuchsia.rustc_target_to_sysroot_triple(self.target)
         if c_sysroot_dir:
+            # Some sysroot files are linker scripts to be expanded.
+            if sysroot_triple:
+                search_paths = [
+                    c_sysroot_dir / 'usr/lib' / sysroot_triple,
+                    c_sysroot_dir / 'lib' / sysroot_triple,
+                ]
+            else:
+                search_paths = [c_sysroot_dir / 'lib']
+
+            link = linker.LinkerInvocation(
+                working_dir_abs=self.working_dir, search_paths=search_paths)
+
+            def linker_script_expander(path: Path) -> Iterable[Path]:
+                yield from link.expand_possible_linker_script(path)
+
             yield from self.yield_verbose(
                 'C sysroot files',
                 fuchsia.c_sysroot_files(
                     sysroot_dir=c_sysroot_dir,
                     sysroot_triple=sysroot_triple,
                     with_libgcc=self._rust_action.want_sysroot_libgcc,
+                    linker_script_expander=linker_script_expander,
                 ))
 
     def _remote_linker_inputs(self) -> Iterable[Path]:

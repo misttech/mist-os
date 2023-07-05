@@ -14,7 +14,7 @@ import os
 import platform
 import sys
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
 _SCRIPT_PATH = Path(__file__)
 _SCRIPT_BASENAME = _SCRIPT_PATH.name
@@ -152,9 +152,11 @@ def check_determinism_command(
         str(exec_root / _CHECK_DETERMINISM_SCRIPT),
     ] + ([f'--label={label}'] if label else []) + [
         '--check-repeatability',
-    ] + ([f'--miscomparison-export-dir={miscomparison_export_dir}'] if miscomparison_export_dir else []) + [
-        '--outputs',
-    ] + [str(p) for p in outputs] + ['--'] + (command or [])
+    ] + (
+        [f'--miscomparison-export-dir={miscomparison_export_dir}']
+        if miscomparison_export_dir else []) + [
+            '--outputs',
+        ] + [str(p) for p in outputs] + ['--'] + (command or [])
 
 
 # On platforms where ELF utils are unavailable, hardcode rustc's shlibs.
@@ -283,9 +285,8 @@ def remote_rustc_to_rust_lld_path(rustc: Path) -> str:
 
 
 # Built lib/{sysroot_triple}/... files
+# Entries here are not already covered by some other linker script.
 _SYSROOT_LIB_FILES = (
-    'libc.so.6',
-    'libpthread.so.0',
     'libm.so.6',
     'librt.so.1',
     'libutil.so.1',
@@ -293,11 +294,7 @@ _SYSROOT_LIB_FILES = (
 
 # Built /usr/lib/{sysroot_triple}/... files
 _SYSROOT_USR_LIB_FILES = (
-    'libc.so',
-    'libc_nonshared.a',
-    'libpthread.so',
     'libpthread.a',
-    'libpthread_nonshared.a',
     'libm.so',
     'libm.a',
     'librt.so',
@@ -312,38 +309,47 @@ _SYSROOT_USR_LIB_FILES = (
     'crtn.o',
 )
 
+# These are known linker scripts that need to be read
+# to locate other underlying files needed.
+_SYSROOT_USR_LIB_LINKER_SCRIPTS = (
+    'libc.so',
+    'libpthread.so',
+    'libmvec.so',
+)
 
-def c_sysroot_files(sysroot_dir: Path, sysroot_triple: str,
-                    with_libgcc: bool) -> Iterable[Path]:
+
+def c_sysroot_files(
+        sysroot_dir: Path, sysroot_triple: str, with_libgcc: bool,
+        linker_script_expander: Callable[[Path],
+                                         Iterable[Path]]) -> Iterable[Path]:
     """Expanded list of sysroot files under the Fuchsia build output dir.
+
+    TODO: cache this per build to avoid repeating deduction
 
     Args:
       sysroot_dir: path to the sysroot, relative to the working dir.
       sysroot_triple: platform-specific subdir of sysroot, based on target.
       with_libgcc: if using `-lgcc`, include additions libgcc support files.
+      linker_script_expander: function that expands a linker script to the set
+        of files referenced by it.
 
     Yields:
       paths to sysroot files needed for remote/sandboxed linking,
       all relative to the current working dir.
     """
     if sysroot_triple:
-        if sysroot_triple.startswith('aarch64-linux'):
-            yield sysroot_dir / 'lib' / sysroot_triple / 'ld-linux-aarch64.so.1'
-        elif sysroot_triple.startswith('riscv64-linux'):
-            yield sysroot_dir / 'lib' / sysroot_triple / 'ld-linux-riscv64-lp64d.so.1'
-        elif sysroot_triple.startswith('x86_64-linux'):
-            yield sysroot_dir / 'lib' / sysroot_triple / 'ld-linux-x86-64.so.2'
-
         for f in _SYSROOT_LIB_FILES:
             yield sysroot_dir / 'lib' / sysroot_triple / f
         for f in _SYSROOT_USR_LIB_FILES:
             yield sysroot_dir / 'usr/lib' / sysroot_triple / f
 
+        for f in _SYSROOT_USR_LIB_LINKER_SCRIPTS:
+            f_path = sysroot_dir / 'usr/lib' / sysroot_triple / f
+            if f_path.is_file():
+                yield from linker_script_expander(f_path)
+
         for f in [
-            sysroot_dir / 'lib' / sysroot_triple / 'libmvec.so.1',
-            sysroot_dir / 'usr/lib' / sysroot_triple / 'libmvec.a',
-            sysroot_dir / 'usr/lib' / sysroot_triple / 'libmvec.so',
-            sysroot_dir / 'usr/lib' / sysroot_triple / 'libmvec_nonshared.a',
+                sysroot_dir / 'usr/lib' / sysroot_triple / 'libmvec.a',
         ]:
             if f.is_file():
                 yield f
@@ -360,14 +366,15 @@ def c_sysroot_files(sysroot_dir: Path, sysroot_triple: str,
                 sysroot_dir / 'usr/lib' / sysroot_triple / 'libc.a',
             ]
     else:
-        yield from [
-            sysroot_dir / 'lib/libc.so',
-            sysroot_dir / 'lib/libdl.so',
-            sysroot_dir / 'lib/libm.so',
-            sysroot_dir / 'lib/libpthread.so',
-            sysroot_dir / 'lib/librt.so',
-            sysroot_dir / 'lib/Scrt1.o',
-        ]
+        for f in (
+                sysroot_dir / 'lib/libc.so',
+                sysroot_dir / 'lib/libdl.so',
+                sysroot_dir / 'lib/libm.so',
+                sysroot_dir / 'lib/libpthread.so',
+                sysroot_dir / 'lib/librt.so',
+                sysroot_dir / 'lib/Scrt1.o',
+        ):
+            yield from linker_script_expander(f)
 
         # Not every sysroot dir has a libzircon.
         libzircon_so = sysroot_dir / 'lib/libzircon.so'

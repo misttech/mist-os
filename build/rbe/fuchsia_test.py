@@ -7,6 +7,7 @@ import os
 
 import unittest
 from pathlib import Path
+from typing import Iterable
 from unittest import mock
 
 import fuchsia
@@ -78,8 +79,8 @@ class RustStdlibDirTests(unittest.TestCase):
 class RustcTargetToSysrootTripleTests(unittest.TestCase):
 
     def test_known(self):
-        for t in ('x86_64-linux-gnu', 'aarch64-linux-gnu',
-                  'riscv64gc-fuchsia', 'x86_64-fuchsia'):
+        for t in ('x86_64-linux-gnu', 'aarch64-linux-gnu', 'riscv64gc-fuchsia',
+                  'x86_64-fuchsia'):
             fuchsia.rustc_target_to_sysroot_triple(t)
 
     def test_unknown(self):
@@ -100,6 +101,10 @@ class RustcTargetToClangTargetTests(unittest.TestCase):
             fuchsia.rustc_target_to_clang_target('pdp11-alien-vax')
 
 
+def fake_linker_script_expander(path: Path) -> Iterable[Path]:
+    yield path
+
+
 class CSysrootFilesTest(unittest.TestCase):
 
     def test_list(self):
@@ -109,18 +114,21 @@ class CSysrootFilesTest(unittest.TestCase):
                 fuchsia.c_sysroot_files(
                     sysroot_dir=Path('path/to/built/sysroot'),
                     sysroot_triple='x86_64-linux-foo',
+                    linker_script_expander=fake_linker_script_expander,
                     with_libgcc=True,
                 ))
             list(
                 fuchsia.c_sysroot_files(
                     sysroot_dir=Path('path/to/built/sysroot'),
                     sysroot_triple='riscv64-linux-foo',
+                    linker_script_expander=fake_linker_script_expander,
                     with_libgcc=True,
                 ))
             list(
                 fuchsia.c_sysroot_files(
                     sysroot_dir=Path('path/to/built/sysroot'),
                     sysroot_triple='aarch64-linux-foo',
+                    linker_script_expander=fake_linker_script_expander,
                     with_libgcc=True,
                 ))
 

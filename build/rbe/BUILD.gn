@@ -54,7 +54,7 @@ if (is_host) {
   _rustc_sources = [ "rustc.py" ] + _cl_utils_sources
   _rustc_remote_wrapper_sources =
       [ "rustc_remote_wrapper.py" ] + _rustc_sources + _remote_action_sources +
-      _fuchsia_sources + _cl_utils_sources
+      _fuchsia_sources + _cl_utils_sources + _linker_sources
   _prebuilt_tool_remote_wrapper_sources =
       [ "prebuilt_tool_remote_wrapper.py" ] + _fuchsia_sources +
       _cl_utils_sources + _remote_action_sources
