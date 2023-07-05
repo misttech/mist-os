@@ -35,7 +35,7 @@ void ArchSetUpIdentityAddressSpace(page_table::AddressSpaceBuilder& builder);
 
 // Maps in the global UART's registers, assuming that they fit within a single
 // page.
-void MapUart(page_table::AddressSpaceBuilder& builder, memalloc::Pool& pool);
+void MapUart(page_table::AddressSpaceBuilder& builder);
 
 // A page_table::MemoryManager that allocates by way of Allocator.
 class AllocationMemoryManager final : public page_table::MemoryManager {

@@ -8,6 +8,8 @@
 #include <lib/memalloc/range.h>
 #include <lib/page-table/builder.h>
 #include <lib/uart/uart.h>
+#include <zircon/limits.h>
+#include <zircon/types.h>
 
 #include <ktl/algorithm.h>
 #include <ktl/byte.h>
@@ -19,16 +21,17 @@
 
 #include <ktl/enforce.h>
 
-void MapUart(page_table::AddressSpaceBuilder& builder, memalloc::Pool& pool) {
+void MapUart(page_table::AddressSpaceBuilder& builder) {
   // Meets the signature expected of uart::BasicIoProvider's constructor.
   // TODO(fxbug.dev/129541): |mapper| callable should provide base and length.
   auto mapper = [&builder](uint64_t uart_mmio_base) -> volatile void* {
-    uint64_t base = uart_mmio_base & ~(ZX_PAGE_SIZE - 1);
+    uint64_t base = uart_mmio_base & ~(uint64_t{ZX_PAGE_SIZE} - 1);
     uint64_t size = ZX_PAGE_SIZE;
     zx_status_t status = builder.MapRegion(page_table::Vaddr(base), page_table::Paddr(base), size,
                                            page_table::CacheAttributes::kDevice);
     if (status != ZX_OK) {
-      ZX_PANIC("Failed to map in UART range");
+      ZX_PANIC("Failed to map in UART range: [%#" PRIx64 ", %#" PRIx64 ")", uart_mmio_base,
+               uart_mmio_base + ZX_PAGE_SIZE);
     }
     return reinterpret_cast<volatile void*>(uart_mmio_base);
   };

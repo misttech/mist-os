@@ -1034,13 +1034,6 @@ This option determines what kind of PSCI reset operation (if any)
 the early boot kernel will use if it needs to panic and crash.
 If this is "disabled", the machine may enter an infinite loop on panic.
 
-### kernel.arm64.phys.map-all-device-memory=\<bool>
-
-**Default:** `false`
-
-Whether to map all peripheral ranges in as device memory. If false, only the ranges actually used
-by physboot (e.g., the UART's) will be mapped.
-
 ### kernel.arm64.phys.mmu=\<bool>
 
 **Default:** `true`

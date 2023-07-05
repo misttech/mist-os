@@ -124,34 +124,21 @@ void EnablePaging(Paddr root) {
 }  // namespace
 
 void ArchSetUpIdentityAddressSpace(page_table::AddressSpaceBuilder& builder) {
-  bool map_device_memory = gBootOptions->phys_map_all_device_memory;
-  auto& pool = Allocation::GetPool();
+  MapUart(builder);
 
-  // If we are mapping in all peripheral ranges, then the UART page will be
-  // mapped below along with the rest.
-  if (!map_device_memory) {
-    MapUart(builder, pool);
-  }
-
-  auto map = [map_device_memory, &builder](const memalloc::Range& range) {
-    if (range.type == memalloc::Type::kReserved ||
-        (range.type == memalloc::Type::kPeripheral && !map_device_memory)) {
+  auto map = [&builder](const memalloc::Range& range) {
+    if (range.type != memalloc::Type::kFreeRam && !memalloc::IsExtendedType(range.type)) {
       return;
     }
 
-    auto result = builder.MapRegion(Vaddr(range.addr), Paddr(range.addr), range.size,
-                                    range.type == memalloc::Type::kPeripheral
-                                        ? page_table::CacheAttributes::kDevice
-                                        : page_table::CacheAttributes::kNormal);
-    if (result != ZX_OK) {
-      ZX_PANIC("Failed to map in range.");
+    auto status = builder.MapRegion(Vaddr(range.addr), Paddr(range.addr), range.size,
+                                    page_table::CacheAttributes::kNormal);
+    if (status != ZX_OK) {
+      ZX_PANIC("Failed to identity-map range [%#" PRIx64 ", %#" PRIx64 ")", range.addr,
+               range.end());
     }
   };
 
-  // Map in all RAM as normal memory and, depending on the value of
-  // kernel.arm64.phys.map-all-device-memory, all peripheral ranges as device
-  // memory.
-  //
   // We merge ranges of kFreeRam or extended type on the fly, mapping the
   // previously constructed range when we have hit a hole or the end.
   constexpr auto normalize_range = [](const memalloc::Range& range) -> memalloc::Range {
@@ -164,7 +151,7 @@ void ArchSetUpIdentityAddressSpace(page_table::AddressSpaceBuilder& builder) {
   };
 
   ktl::optional<memalloc::Range> prev;
-  for (const memalloc::Range& raw_range : pool) {
+  for (const memalloc::Range& raw_range : Allocation::GetPool()) {
     auto range = normalize_range(raw_range);
     if (!prev) {
       prev = range;
