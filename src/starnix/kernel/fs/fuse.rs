@@ -848,12 +848,7 @@ impl FuseConnection {
                     // If interrupted by another process, send an interrupt command to the server
                     // the first time, then wait unconditionally.
                     if first_loop {
-                        self.state.lock().interrupt(
-                            task,
-                            node,
-                            unique_id,
-                            configuration.clone(),
-                        )?;
+                        state.interrupt(task, node, unique_id, configuration.clone())?;
                         first_loop = false;
                     }
                 }
