@@ -5,12 +5,10 @@
 use {
     anyhow::{Context, Result},
     driver_tools::args::DriverCommand,
-    fidl::endpoints::{self, Proxy},
     fidl_fuchsia_device_manager as fdm, fidl_fuchsia_driver_development as fdd,
     fidl_fuchsia_driver_playground as fdp, fidl_fuchsia_driver_registrar as fdr,
     fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftm, fuchsia_async as fasync,
     fuchsia_component::client,
-    std::fs::File,
 };
 
 struct DriverConnector {}
@@ -38,18 +36,14 @@ impl driver_connector::DriverConnector for DriverConnector {
         if select {
             anyhow::bail!("The 'driver' tool cannot use the select flag. Please use 'ffx driver' in order to select a component.");
         }
-        let raw_dir = File::open("/dev")?;
-        let zx_channel = fdio::clone_channel(&raw_dir)?;
-        let fasync_channel = fasync::Channel::from_channel(zx_channel)?;
-        Ok(fio::DirectoryProxy::from_channel(fasync_channel))
+        fuchsia_fs::directory::open_in_namespace("/dev", fuchsia_fs::OpenFlags::empty())
+            .map_err(Into::into)
     }
 
     async fn get_device_watcher_proxy(&self) -> Result<fdm::DeviceWatcherProxy> {
-        let (proxy, server) = endpoints::create_proxy::<fdm::DeviceWatcherMarker>()
-            .context("Failed to create proxy")?;
-        fdio::service_connect("/svc/fuchsia.hardware.usb.DeviceWatcher", server.into_channel())
-            .context("Failed to connect to USB service")?;
-        Ok(proxy)
+        fuchsia_component::client::connect_to_protocol_at_path::<fdm::DeviceWatcherMarker>(
+            "/svc/fuchsia.hardware.usb.DeviceWatcher",
+        )
     }
 
     async fn get_driver_registrar_proxy(&self, select: bool) -> Result<fdr::DriverRegistrarProxy> {
