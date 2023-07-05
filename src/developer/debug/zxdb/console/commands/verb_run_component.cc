@@ -55,32 +55,46 @@ void RunVerbRunComponent(const Command& cmd, fxl::RefPtr<CommandContext> cmd_con
     return cmd_context->ReportError(err);
   }
 
-  if (cmd.args().empty()) {
-    return cmd_context->ReportError(Err("No component to run. Try \"run-component <url>\"."));
+  if (cmd.args().size() != 1) {
+    return cmd_context->ReportError(Err("\"run-component\" accepts exactly 1 argument."));
   }
 
   if (cmd.args()[0].find("://") == std::string::npos ||
-      (!debug::StringEndsWith(cmd.args()[0], ".cm") &&
-       !debug::StringEndsWith(cmd.args()[0], ".cmx"))) {
+      (!debug::StringEndsWith(cmd.args()[0], ".cm"))) {
     return cmd_context->ReportError(
         Err("The first argument must be a component URL. Try \"help run-component\"."));
   }
 
-  if (debug::StringEndsWith(cmd.args()[0], ".cm")) {
-    // Output warning about this possibly not working.
-    OutputBuffer warning(Syntax::kWarning, GetExclamation());
-    warning.Append(
-        " run-component won't work for many v2 components. See \"help run-component\".\n");
-    cmd_context->Output(warning);
-  }
+  // Output warning about this possibly not working.
+  OutputBuffer warning(Syntax::kWarning, GetExclamation());
+  warning.Append(" run-component won't work for many v2 components. See \"help run-component\".\n");
+  cmd_context->Output(warning);
 
   // Launch the component.
-  debug_ipc::LaunchRequest request;
-  request.inferior_type = debug_ipc::InferiorType::kComponent;
-  request.argv = cmd.args();
+  if (cmd.target()->session()->ipc_version() < 56) {
+    // For compatibility.
+    // TODO: remove me after kMinimumProtocolVersion >= 56.
+    debug_ipc::RunBinaryRequest request;
+    request.inferior_type = debug_ipc::InferiorType::kComponent;
+    request.argv = cmd.args();
 
-  cmd.target()->session()->remote_api()->Launch(
-      request, [cmd_context](Err err, debug_ipc::LaunchReply reply) mutable {
+    cmd.target()->session()->remote_api()->RunBinary(
+        request, [cmd_context](Err err, debug_ipc::RunBinaryReply reply) mutable {
+          if (!err.has_error() && reply.status.has_error()) {
+            return cmd_context->ReportError(
+                Err("Failed to launch component: %s", reply.status.message().c_str()));
+          }
+          if (err.has_error()) {
+            cmd_context->ReportError(err);
+          }
+        });
+    return;
+  }
+
+  debug_ipc::RunComponentRequest request;
+  request.url = cmd.args()[0];
+  cmd.target()->session()->remote_api()->RunComponent(
+      request, [cmd_context](Err err, debug_ipc::RunComponentReply reply) mutable {
         if (!err.has_error() && reply.status.has_error()) {
           return cmd_context->ReportError(
               Err("Failed to launch component: %s", reply.status.message().c_str()));

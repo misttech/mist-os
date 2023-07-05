@@ -39,13 +39,12 @@ class ComponentManager {
   // exiting events.
   virtual void SetDebugAgent(DebugAgent* debug_agent) = 0;
 
-  // Launches the component with the given command line.
-  //
-  // The component URL is in argv[0].
-  virtual debug::Status LaunchComponent(const std::vector<std::string>& argv) = 0;
+  // Launches the component.
+  virtual debug::Status LaunchComponent(std::string url) = 0;
 
   // Launches a test.
-  virtual debug::Status LaunchTest(std::string url, std::vector<std::string> case_filters) = 0;
+  virtual debug::Status LaunchTest(std::string url, std::optional<std::string> realm,
+                                   std::vector<std::string> case_filters) = 0;
 
   // Notification that a process has started.
   //

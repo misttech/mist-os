@@ -183,7 +183,8 @@ void DebugAgent::OnStatus(const debug_ipc::StatusRequest& request, debug_ipc::St
   }
 }
 
-void DebugAgent::OnLaunch(const debug_ipc::LaunchRequest& request, debug_ipc::LaunchReply* reply) {
+void DebugAgent::OnRunBinary(const debug_ipc::RunBinaryRequest& request,
+                             debug_ipc::RunBinaryReply* reply) {
   reply->timestamp = GetNowTimestamp();
   if (request.argv.empty()) {
     reply->status = debug::Status("No launch arguments provided");
@@ -193,17 +194,42 @@ void DebugAgent::OnLaunch(const debug_ipc::LaunchRequest& request, debug_ipc::La
     case debug_ipc::InferiorType::kBinary:
       LaunchProcess(request, reply);
       return;
-    case debug_ipc::InferiorType::kComponent:
-      reply->status = system_interface_->GetComponentManager().LaunchComponent(request.argv);
+    case debug_ipc::InferiorType::kComponent: {
+      // For compatibility
+      if (request.argv.size() != 1) {
+        reply->status = debug::Status("run-component cannot accept command line arguments");
+        return;
+      }
+      debug_ipc::RunComponentReply run_component_reply;
+      OnRunComponent({.url = request.argv[0]}, &run_component_reply);
+      reply->status = run_component_reply.status;
       return;
-    case debug_ipc::InferiorType::kTest:
-      reply->status = system_interface_->GetComponentManager().LaunchTest(
-          request.argv[0], {request.argv.begin() + 1, request.argv.end()});
+    }
+    case debug_ipc::InferiorType::kTest: {
+      // For compatibility
+      debug_ipc::RunTestReply run_test_reply;
+      // argv.empty() is checked above.
+      OnRunTest(
+          {.url = request.argv[0], .case_filters = {request.argv.begin() + 1, request.argv.end()}},
+          &run_test_reply);
+      reply->status = run_test_reply.status;
       return;
+    }
     case debug_ipc::InferiorType::kLast:
       reply->status = debug::Status("Invalid inferior type to launch.");
       return;
   }
+}
+
+void DebugAgent::OnRunComponent(const debug_ipc::RunComponentRequest& request,
+                                debug_ipc::RunComponentReply* reply) {
+  reply->status = system_interface_->GetComponentManager().LaunchComponent(request.url);
+}
+
+void DebugAgent::OnRunTest(const debug_ipc::RunTestRequest& request,
+                           debug_ipc::RunTestReply* reply) {
+  reply->status = system_interface_->GetComponentManager().LaunchTest(request.url, request.realm,
+                                                                      request.case_filters);
 }
 
 void DebugAgent::OnKill(const debug_ipc::KillRequest& request, debug_ipc::KillReply* reply) {
@@ -706,8 +732,8 @@ debug::Status DebugAgent::AttachToExistingProcess(zx_koid_t process_koid,
   return debug::Status();
 }
 
-void DebugAgent::LaunchProcess(const debug_ipc::LaunchRequest& request,
-                               debug_ipc::LaunchReply* reply) {
+void DebugAgent::LaunchProcess(const debug_ipc::RunBinaryRequest& request,
+                               debug_ipc::RunBinaryReply* reply) {
   FX_DCHECK(!request.argv.empty());
   DEBUG_LOG(Process) << "Launching binary " << request.argv.front();
 

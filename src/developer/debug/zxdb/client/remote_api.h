@@ -6,13 +6,10 @@
 #define SRC_DEVELOPER_DEBUG_ZXDB_CLIENT_REMOTE_API_H_
 
 #include "lib/fit/function.h"
-#include "lib/syslog/cpp/macros.h"
 #include "src/developer/debug/ipc/protocol.h"
-#include "src/lib/fxl/macros.h"
+#include "src/developer/debug/zxdb/common/err.h"
 
 namespace zxdb {
-
-class Err;
 
 // Abstracts the IPC layer for sending messages to the debug agent. This allows mocking of the
 // interface without dealing with the innards of the serialization.
@@ -30,7 +27,7 @@ class RemoteAPI {
 #define FN(msg_type)                                                                      \
   virtual void msg_type(const debug_ipc::msg_type##Request& request,                      \
                         fit::callback<void(const Err&, debug_ipc::msg_type##Reply)> cb) { \
-    FX_NOTIMPLEMENTED();                                                                  \
+    cb(Err("Message type " #msg_type "is not supported"), {});                            \
   }
 
   FOR_EACH_REQUEST_TYPE(FN)

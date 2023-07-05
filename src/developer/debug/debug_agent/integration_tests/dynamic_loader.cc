@@ -150,12 +150,12 @@ TEST(DynamicLoader, LoadUnload) {
     agent.Connect(&backend.stream());
     backend.set_remote_api(&agent);
 
-    debug_ipc::LaunchRequest launch_request = {};
+    debug_ipc::RunBinaryRequest launch_request = {};
     launch_request.argv = {"/pkg/bin/load_so_exe"};
     launch_request.inferior_type = debug_ipc::InferiorType::kBinary;
 
-    debug_ipc::LaunchReply launch_reply;
-    agent.OnLaunch(launch_request, &launch_reply);
+    debug_ipc::RunBinaryReply launch_reply;
+    agent.OnRunBinary(launch_request, &launch_reply);
 
     ASSERT_TRUE(launch_reply.status.ok());
     loop->Run();

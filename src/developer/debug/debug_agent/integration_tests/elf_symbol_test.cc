@@ -21,7 +21,7 @@ namespace {
 // This test is an integration test to verify that the debug agent is able to
 // successfully locate Elf symbols after linking.
 //
-// 1. Launch a process (through RemoteAPI::OnLaunch) control by the debug agent.
+// 1. Launch a process (through RemoteAPI::OnRunBinary) control by the debug agent.
 //
 // 2. Get the module notication (NotifyModules message) for the process launched
 //    in (1). We look over the modules for a module (debug_agent_test_so) that
@@ -94,11 +94,11 @@ TEST(ElfSymbol, Lookup) {
     RemoteAPI* remote_api = mock_stream_backend.remote_api();
 
     // We launch the test binary.
-    debug_ipc::LaunchRequest launch_request = {};
+    debug_ipc::RunBinaryRequest launch_request = {};
     launch_request.argv.push_back(kTestExecutablePath);
     launch_request.inferior_type = debug_ipc::InferiorType::kBinary;
-    debug_ipc::LaunchReply launch_reply;
-    remote_api->OnLaunch(launch_request, &launch_reply);
+    debug_ipc::RunBinaryReply launch_reply;
+    remote_api->OnRunBinary(launch_request, &launch_reply);
     ASSERT_EQ(launch_reply.status, ZX_OK)
         << "Expected ZX_OK, Got: " << debug::ZxStatusToString(launch_reply.status);
 

@@ -5,6 +5,7 @@
 #ifndef SRC_DEVELOPER_DEBUG_IPC_PROTOCOL_H_
 #define SRC_DEVELOPER_DEBUG_IPC_PROTOCOL_H_
 
+#include "lib/syslog/cpp/macros.h"
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/arch.h"
 #include "src/developer/debug/shared/register_info.h"
@@ -34,7 +35,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to FUCHSIA_API_LEVEL specified in platform_version.json.
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 55;
+constexpr uint32_t kCurrentProtocolVersion = 56;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
@@ -104,7 +105,7 @@ static_assert(static_cast<int>(debug::Arch::kArm64) == 2);
   FN(Detach)                      \
   FN(UpdateFilter)                \
   FN(Kill)                        \
-  FN(Launch)                      \
+  FN(RunBinary)                   \
   FN(Modules)                     \
   FN(Pause)                       \
   FN(ProcessTree)                 \
@@ -120,7 +121,9 @@ static_assert(static_cast<int>(debug::Arch::kArm64) == 2);
   FN(WriteMemory)                 \
   FN(LoadInfoHandleTable)         \
   FN(UpdateGlobalSettings)        \
-  FN(SaveMinidump)
+  FN(SaveMinidump)                \
+  FN(RunComponent)                \
+  FN(RunTest)
 
 // The "notify" messages are sent unrequested from the agent to the client.
 //
@@ -154,7 +157,7 @@ struct MsgHeader {
     kDetach = 5,
     kUpdateFilter = 6,
     kKill = 7,
-    kLaunch = 8,
+    kRunBinary = 8,
     kModules = 9,
     kPause = 10,
     kProcessTree = 11,
@@ -171,6 +174,8 @@ struct MsgHeader {
     kLoadInfoHandleTable = 22,
     kUpdateGlobalSettings = 23,
     kSaveMinidump = 24,
+    kRunComponent = 25,
+    kRunTest = 26,
 
     kNotifyException = 101,
     kNotifyIO = 102,
@@ -244,29 +249,6 @@ struct StatusReply {
   std::vector<ProcessRecord> limbo;
 
   void Serialize(Serializer& ser, uint32_t ver) { ser | processes | limbo; }
-};
-
-struct LaunchRequest {
-  InferiorType inferior_type = InferiorType::kLast;
-
-  // argv[0] is the app to launch.
-  std::vector<std::string> argv;
-
-  void Serialize(Serializer& ser, uint32_t ver) { ser | inferior_type | argv; }
-};
-struct LaunchReply {
-  uint64_t timestamp = kTimestampDefault;
-
-  // Result of launch.
-  debug::Status status;
-
-  // process_id and process_name are only valid when inferior_type is kBinary.
-  uint64_t process_id = 0;
-  std::string process_name;
-
-  void Serialize(Serializer& ser, uint32_t ver) {
-    ser | timestamp | status | process_id | process_name;
-  }
 };
 
 struct KillRequest {
@@ -598,6 +580,67 @@ struct WriteRegistersReply {
   std::vector<debug::RegisterValue> registers;
 
   void Serialize(Serializer& ser, uint32_t ver) { ser | status | registers; }
+};
+
+// Run -------------------------------------------------------------------------
+
+struct RunBinaryRequest {
+#if INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 < 56
+  // TODO: remove inferior_type field after kMinimumProtocolVersion >= 56
+  InferiorType inferior_type = InferiorType::kBinary;
+#endif
+
+  // argv[0] is the app to launch.
+  std::vector<std::string> argv;
+
+  void Serialize(Serializer& ser, uint32_t ver) {
+    if (ver < 56) {
+      ser | inferior_type;
+    } else {
+      FX_CHECK(inferior_type == InferiorType::kBinary);
+    }
+    ser | argv;
+  }
+};
+struct RunBinaryReply {
+  uint64_t timestamp = kTimestampDefault;
+
+  // Result of launch.
+  debug::Status status;
+
+  // process_id and process_name are only valid when inferior_type is kBinary.
+  uint64_t process_id = 0;
+  std::string process_name;
+
+  void Serialize(Serializer& ser, uint32_t ver) {
+    ser | timestamp | status | process_id | process_name;
+  }
+};
+
+struct RunComponentRequest {
+  std::string url;
+
+  void Serialize(Serializer& ser, uint32_t ver) { ser | url; }
+};
+
+struct RunComponentReply {
+  debug::Status status;
+
+  void Serialize(Serializer& ser, uint32_t ver) { ser | status; }
+};
+
+struct RunTestRequest {
+  std::string url;
+  std::optional<std::string> realm;
+  std::vector<std::string> case_filters;
+
+  void Serialize(Serializer& ser, uint32_t ver) { ser | url | realm | case_filters; }
+};
+
+struct RunTestReply {
+  debug::Status status;
+
+  void Serialize(Serializer& ser, uint32_t ver) { ser | status; }
 };
 
 // Notifications ---------------------------------------------------------------

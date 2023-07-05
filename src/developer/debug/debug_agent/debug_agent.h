@@ -89,43 +89,11 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
 
   // RemoteAPI implementation.
   uint32_t GetVersion() override { return ipc_version_; }
-  void OnHello(const debug_ipc::HelloRequest& request, debug_ipc::HelloReply* reply) override;
-  void OnStatus(const debug_ipc::StatusRequest& request, debug_ipc::StatusReply* reply) override;
-  void OnLaunch(const debug_ipc::LaunchRequest& request, debug_ipc::LaunchReply* reply) override;
-  void OnKill(const debug_ipc::KillRequest& request, debug_ipc::KillReply* reply) override;
-  void OnAttach(const debug_ipc::AttachRequest& request, debug_ipc::AttachReply* reply) override;
-  void OnDetach(const debug_ipc::DetachRequest& request, debug_ipc::DetachReply* reply) override;
-  void OnPause(const debug_ipc::PauseRequest& request, debug_ipc::PauseReply* reply) override;
-  void OnResume(const debug_ipc::ResumeRequest& request, debug_ipc::ResumeReply* reply) override;
-  void OnModules(const debug_ipc::ModulesRequest& request, debug_ipc::ModulesReply* reply) override;
-  void OnProcessTree(const debug_ipc::ProcessTreeRequest& request,
-                     debug_ipc::ProcessTreeReply* reply) override;
-  void OnThreads(const debug_ipc::ThreadsRequest& request, debug_ipc::ThreadsReply* reply) override;
-  void OnReadMemory(const debug_ipc::ReadMemoryRequest& request,
-                    debug_ipc::ReadMemoryReply* reply) override;
-  void OnReadRegisters(const debug_ipc::ReadRegistersRequest& request,
-                       debug_ipc::ReadRegistersReply* reply) override;
-  void OnWriteRegisters(const debug_ipc::WriteRegistersRequest& request,
-                        debug_ipc::WriteRegistersReply* reply) override;
-  void OnAddOrChangeBreakpoint(const debug_ipc::AddOrChangeBreakpointRequest& request,
-                               debug_ipc::AddOrChangeBreakpointReply* reply) override;
-  void OnRemoveBreakpoint(const debug_ipc::RemoveBreakpointRequest& request,
-                          debug_ipc::RemoveBreakpointReply* reply) override;
-  void OnSysInfo(const debug_ipc::SysInfoRequest& request, debug_ipc::SysInfoReply* reply) override;
-  void OnThreadStatus(const debug_ipc::ThreadStatusRequest& request,
-                      debug_ipc::ThreadStatusReply* reply) override;
-  void OnAddressSpace(const debug_ipc::AddressSpaceRequest& request,
-                      debug_ipc::AddressSpaceReply* reply) override;
-  void OnUpdateFilter(const debug_ipc::UpdateFilterRequest& request,
-                      debug_ipc::UpdateFilterReply* reply) override;
-  void OnWriteMemory(const debug_ipc::WriteMemoryRequest& request,
-                     debug_ipc::WriteMemoryReply* reply) override;
-  void OnLoadInfoHandleTable(const debug_ipc::LoadInfoHandleTableRequest& request,
-                             debug_ipc::LoadInfoHandleTableReply* reply) override;
-  void OnUpdateGlobalSettings(const debug_ipc::UpdateGlobalSettingsRequest& request,
-                              debug_ipc::UpdateGlobalSettingsReply* reply) override;
-  void OnSaveMinidump(const debug_ipc::SaveMinidumpRequest& request,
-                      debug_ipc::SaveMinidumpReply* reply) override;
+#define FN(type) \
+  void On##type(const debug_ipc::type##Request& request, debug_ipc::type##Reply* reply) override;
+
+  FOR_EACH_REQUEST_TYPE(FN)
+#undef FN
 
   // Implements |LogBackend|.
   void WriteLog(debug::LogSeverity severity, const debug::FileLineFunction& location,
@@ -156,7 +124,7 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
   debug::Status AttachToLimboProcess(zx_koid_t process_koid, debug_ipc::AttachReply* reply);
   debug::Status AttachToExistingProcess(zx_koid_t process_koid, debug_ipc::AttachReply* reply);
 
-  void LaunchProcess(const debug_ipc::LaunchRequest&, debug_ipc::LaunchReply*);
+  void LaunchProcess(const debug_ipc::RunBinaryRequest&, debug_ipc::RunBinaryReply*);
 
   // Process Limbo ---------------------------------------------------------------------------------
 

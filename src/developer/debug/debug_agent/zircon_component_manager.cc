@@ -348,8 +348,12 @@ std::optional<debug_ipc::ComponentInfo> ZirconComponentManager::FindComponentInf
 class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<TestLauncher> {
  public:
   // This function can only be called once.
-  debug::Status Launch(std::string url, std::vector<std::string> case_filters,
+  debug::Status Launch(std::string url, std::optional<std::string> realm,
+                       std::vector<std::string> case_filters,
                        ZirconComponentManager* component_manager, DebugAgent* debug_agent) {
+    if (realm) {
+      return debug::Status("Realm parameter is not supported yet");
+    }
     test_url_ = std::move(url);
     component_manager_ = component_manager->GetWeakPtr();
     debug_agent_ = debug_agent ? debug_agent->GetWeakPtr() : nullptr;
@@ -488,17 +492,14 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
   fuchsia::diagnostics::BatchIteratorPtr log_listener_;
 };
 
-debug::Status ZirconComponentManager::LaunchTest(std::string url,
+debug::Status ZirconComponentManager::LaunchTest(std::string url, std::optional<std::string> realm,
                                                  std::vector<std::string> case_filters) {
-  return fxl::MakeRefCounted<TestLauncher>()->Launch(std::move(url), std::move(case_filters), this,
-                                                     debug_agent_);
+  return fxl::MakeRefCounted<TestLauncher>()->Launch(std::move(url), std::move(realm),
+                                                     std::move(case_filters), this, debug_agent_);
 }
 
-debug::Status ZirconComponentManager::LaunchComponent(const std::vector<std::string>& argv) {
-  if (argv.empty()) {
-    return debug::Status("No argument provided for LaunchComponent");
-  }
-  if (cpp20::ends_with(std::string_view{argv[0]}, ".cmx")) {
+debug::Status ZirconComponentManager::LaunchComponent(std::string url) {
+  if (cpp20::ends_with(std::string_view{url}, ".cmx")) {
     return debug::Status("V1 components are no longer supported.");
   }
 
@@ -506,16 +507,12 @@ debug::Status ZirconComponentManager::LaunchComponent(const std::vector<std::str
   constexpr char kCollection[] = "ffx-laboratory";
 
   // url: fuchsia-pkg://fuchsia.com/crasher#meta/cpp_crasher.cm
-  std::string url = argv[0];
   size_t name_start = url.find_last_of('/') + 1;
   // name: cpp_crasher
   std::string name = url.substr(name_start, url.find_last_of('.') - name_start);
   // moniker: /core/ffx-laboratory:cpp_crasher
   std::string moniker = std::string(kParentMoniker + 1) + "/" + kCollection + ":" + name;
 
-  if (argv.size() != 1) {
-    return debug::Status("v2 components cannot accept command line arguments");
-  }
   if (expected_v2_components_.count(moniker)) {
     return debug::Status(url + " is already launched");
   }

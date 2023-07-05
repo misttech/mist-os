@@ -8,6 +8,7 @@
 #include <cstdint>
 
 #include "src/developer/debug/zxdb/client/remote_api.h"
+#include "src/lib/fxl/macros.h"
 
 namespace zxdb {
 

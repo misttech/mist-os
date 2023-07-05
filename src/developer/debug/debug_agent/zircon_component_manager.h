@@ -28,8 +28,9 @@ class ZirconComponentManager : public ComponentManager {
   // ComponentManager implementation.
   void SetDebugAgent(DebugAgent* debug_agent) override { debug_agent_ = debug_agent; }
   std::optional<debug_ipc::ComponentInfo> FindComponentInfo(zx_koid_t job_koid) const override;
-  debug::Status LaunchComponent(const std::vector<std::string>& argv) override;
-  debug::Status LaunchTest(std::string url, std::vector<std::string> case_filters) override;
+  debug::Status LaunchComponent(std::string url) override;
+  debug::Status LaunchTest(std::string url, std::optional<std::string> realm,
+                           std::vector<std::string> case_filters) override;
   bool OnProcessStart(const ProcessHandle& process, StdioHandles* out_stdio,
                       std::string* process_name_override) override;
 

@@ -404,11 +404,6 @@ void MinidumpRemoteAPI::Hello(const debug_ipc::HelloRequest& request,
   Succeed(std::move(cb), reply);
 }
 
-void MinidumpRemoteAPI::Launch(const debug_ipc::LaunchRequest& request,
-                               fit::callback<void(const Err&, debug_ipc::LaunchReply)> cb) {
-  ErrNoLive(std::move(cb));
-}
-
 void MinidumpRemoteAPI::Kill(const debug_ipc::KillRequest& request,
                              fit::callback<void(const Err&, debug_ipc::KillReply)> cb) {
   ErrNoLive(std::move(cb));

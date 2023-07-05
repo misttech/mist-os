@@ -26,13 +26,13 @@ class TargetSink : public RemoteAPI {
   ~TargetSink() = default;
 
   void set_launch_err(const Err& err) { launch_err_ = err; }
-  void set_launch_reply(const debug_ipc::LaunchReply& reply) { launch_reply_ = reply; }
+  void set_launch_reply(const debug_ipc::RunBinaryReply& reply) { launch_reply_ = reply; }
 
   void set_attach_err(const Err& err) { attach_err_ = err; }
   void set_attach_reply(const debug_ipc::AttachReply& reply) { attach_reply_ = reply; }
 
-  void Launch(const debug_ipc::LaunchRequest& request,
-              fit::callback<void(const Err&, debug_ipc::LaunchReply)> cb) override {
+  void RunBinary(const debug_ipc::RunBinaryRequest& request,
+                 fit::callback<void(const Err&, debug_ipc::RunBinaryReply)> cb) override {
     MessageLoop::Current()->PostTask(
         FROM_HERE, [this, cb = std::move(cb)]() mutable { cb(launch_err_, launch_reply_); });
   }
@@ -62,7 +62,7 @@ class TargetSink : public RemoteAPI {
  private:
   // These two variables are returned from Launch().
   Err launch_err_;
-  debug_ipc::LaunchReply launch_reply_;
+  debug_ipc::RunBinaryReply launch_reply_;
 
   // These two variables are returned from Attach().
   Err attach_err_;
@@ -128,7 +128,7 @@ TEST_F(TargetImplTest, LaunchKill) {
   // Specify a successful reply.
   const uint64_t kKoid = 1234;
   sink().set_launch_err(Err());
-  debug_ipc::LaunchReply requested_reply;
+  debug_ipc::RunBinaryReply requested_reply;
   requested_reply.process_id = kKoid;
   requested_reply.process_name = "my name";
   sink().set_launch_reply(requested_reply);

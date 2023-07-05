@@ -135,11 +135,11 @@ TEST(WriteRegisterTest, BranchOnRAX) {
     RemoteAPI* remote_api = stream_backend.remote_api();
 
     // We launch the test binary.
-    debug_ipc::LaunchRequest launch_request = {};
+    debug_ipc::RunBinaryRequest launch_request = {};
     launch_request.argv.push_back(kTestExecutablePath);
     launch_request.argv.push_back(kBranchOnRAXTest);
-    debug_ipc::LaunchReply launch_reply;
-    remote_api->OnLaunch(launch_request, &launch_reply);
+    debug_ipc::RunBinaryReply launch_reply;
+    remote_api->OnRunBinary(launch_request, &launch_reply);
     ASSERT_EQ(launch_reply.status, static_cast<uint32_t>(ZX_OK))
         << "Expected ZX_OK, Got: " << debug::ZxStatusToString(launch_reply.status);
 
@@ -213,11 +213,11 @@ TEST(WriteRegisterTest, JumpPC) {
     RemoteAPI* remote_api = stream_backend.remote_api();
 
     // We launch the test binary.
-    debug_ipc::LaunchRequest launch_request = {};
+    debug_ipc::RunBinaryRequest launch_request = {};
     launch_request.argv.push_back(kTestExecutablePath);
     launch_request.argv.push_back(kPCJump);
-    debug_ipc::LaunchReply launch_reply;
-    remote_api->OnLaunch(launch_request, &launch_reply);
+    debug_ipc::RunBinaryReply launch_reply;
+    remote_api->OnRunBinary(launch_request, &launch_reply);
     ASSERT_EQ(launch_reply.status, static_cast<uint32_t>(ZX_OK))
         << "Expected ZX_OK, Got: " << debug::ZxStatusToString(launch_reply.status);
 

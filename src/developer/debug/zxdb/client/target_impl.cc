@@ -105,12 +105,12 @@ void TargetImpl::Launch(CallbackWithTimestamp callback) {
 
   state_ = State::kStarting;
 
-  debug_ipc::LaunchRequest request;
+  debug_ipc::RunBinaryRequest request;
   request.inferior_type = debug_ipc::InferiorType::kBinary;
   request.argv = args_;
-  session()->remote_api()->Launch(
+  session()->remote_api()->RunBinary(
       request, [callback = std::move(callback), weak_target = impl_weak_factory_.GetWeakPtr()](
-                   const Err& err, debug_ipc::LaunchReply reply) mutable {
+                   const Err& err, debug_ipc::RunBinaryReply reply) mutable {
         TargetImpl::OnLaunchOrAttachReplyThunk(weak_target, std::move(callback), err,
                                                reply.process_id, reply.status, reply.process_name,
                                                reply.timestamp, std::nullopt);

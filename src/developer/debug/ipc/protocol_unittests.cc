@@ -143,13 +143,13 @@ TEST(Protocol, StatusReply) {
 
 // Launch ------------------------------------------------------------------------------------------
 
-TEST(Protocol, LaunchRequest) {
-  LaunchRequest initial;
+TEST(Protocol, RunBinaryRequest) {
+  RunBinaryRequest initial;
   initial.inferior_type = InferiorType::kBinary;
   initial.argv.push_back("/usr/bin/WINWORD.EXE");
   initial.argv.push_back("--dosmode");
 
-  LaunchRequest second;
+  RunBinaryRequest second;
   ASSERT_TRUE(SerializeDeserialize(initial, &second));
   EXPECT_EQ(second.inferior_type, InferiorType::kBinary);
   ASSERT_EQ(initial.argv.size(), second.argv.size());
@@ -157,15 +157,15 @@ TEST(Protocol, LaunchRequest) {
     EXPECT_EQ(initial.argv[i], second.argv[i]);
 }
 
-TEST(Protocol, LaunchReply) {
-  LaunchReply initial;
+TEST(Protocol, RunBinaryReply) {
+  RunBinaryReply initial;
   initial.status = debug::Status(debug::Status::InternalValues(), debug::Status::kPlatformError,
                                  1346, "message");
   initial.process_id = 0x1234;
   initial.process_name = "winword.exe";
   initial.timestamp = kTestTimestampDefault;
 
-  LaunchReply second;
+  RunBinaryReply second;
   ASSERT_TRUE(SerializeDeserialize(initial, &second));
   EXPECT_EQ(initial.status, second.status);
   EXPECT_EQ(initial.process_id, second.process_id);

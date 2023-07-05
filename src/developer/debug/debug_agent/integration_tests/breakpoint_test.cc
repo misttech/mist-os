@@ -29,7 +29,7 @@ namespace {
 //    also getting the loaded base address of the .so, we can get the offset of the function within
 //    the module.
 //
-// 2. Launch a process (through RemoteAPI::OnLaunch) control by the debug agent.
+// 2. Launch a process (through RemoteAPI::OnRunBinary) control by the debug agent.
 //
 // 3. Get the module notication (NotifyModules message) for the process launched in (2). We look
 //    over the modules for the same module (debug_agent_test_so) that was loaded by this newly
@@ -156,11 +156,11 @@ TEST(BreakpointIntegration, DISABLED_SWBreakpoint) {
     agent.Connect(&mock_stream_backend.stream());
 
     // We launch the test binary.
-    debug_ipc::LaunchRequest launch_request = {};
+    debug_ipc::RunBinaryRequest launch_request = {};
     launch_request.argv.push_back(kTestExecutablePath);
     launch_request.inferior_type = debug_ipc::InferiorType::kBinary;
-    debug_ipc::LaunchReply launch_reply;
-    remote_api->OnLaunch(launch_request, &launch_reply);
+    debug_ipc::RunBinaryReply launch_reply;
+    remote_api->OnRunBinary(launch_request, &launch_reply);
     ASSERT_TRUE(launch_reply.status.ok());
 
     // We run the loop which will stop at the new thread notification.
@@ -288,11 +288,11 @@ TEST(BreakpointIntegration, DISABLED_HWBreakpoint) {
     DEBUG_LOG(Test) << "Launching binary.";
 
     // We launch the test binary.
-    debug_ipc::LaunchRequest launch_request = {};
+    debug_ipc::RunBinaryRequest launch_request = {};
     launch_request.inferior_type = debug_ipc::InferiorType::kBinary;
     launch_request.argv.push_back(kTestExecutablePath);
-    debug_ipc::LaunchReply launch_reply;
-    remote_api->OnLaunch(launch_request, &launch_reply);
+    debug_ipc::RunBinaryReply launch_reply;
+    remote_api->OnRunBinary(launch_request, &launch_reply);
     ASSERT_TRUE(launch_reply.status.ok());
 
     // We run the loop which will stop at the new thread notification.

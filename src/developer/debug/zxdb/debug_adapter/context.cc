@@ -102,7 +102,7 @@ void DebugAdapterContext::DidResolveConnection(const Err& err) {
 void DebugAdapterContext::Init() {
   // Register handlers with dap module.
   dap_->registerHandler([this](const dap::LaunchRequestZxdb& req) {
-    DEBUG_LOG(DebugAdapter) << "LaunchRequest received";
+    DEBUG_LOG(DebugAdapter) << "RunBinaryRequest received";
     return OnRequestLaunch(this, req);
   });
 

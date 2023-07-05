@@ -80,8 +80,8 @@ class WatchpointStreamBackend : public LocalStreamBackend {
 
 constexpr uint32_t kWatchpointId = 0x1234;
 
-std::pair<LaunchRequest, LaunchReply> GetLaunchRequest(const WatchpointStreamBackend& backend,
-                                                       std::string exe);
+std::pair<RunBinaryRequest, RunBinaryReply> GetLaunchRequest(const WatchpointStreamBackend& backend,
+                                                             std::string exe);
 
 std::pair<AddOrChangeBreakpointRequest, AddOrChangeBreakpointReply> GetWatchpointRequest(
     const WatchpointStreamBackend& backend, uint64_t address);
@@ -115,7 +115,7 @@ TEST(Watchpoint, DISABLED_DefaultCase) {
 
     static constexpr const char kExecutable[] = "/pkg/bin/watchpoint_test_exe";
     auto [lnch_request, lnch_reply] = GetLaunchRequest(backend, kExecutable);
-    remote_api->OnLaunch(lnch_request, &lnch_reply);
+    remote_api->OnRunBinary(lnch_request, &lnch_reply);
     ASSERT_TRUE(lnch_reply.status.ok());
 
     backend.ResumeAllThreadsAndRunLoop();
@@ -161,9 +161,9 @@ TEST(Watchpoint, DISABLED_DefaultCase) {
 
 // Helpers ---------------------------------------------------------------------
 
-std::pair<LaunchRequest, LaunchReply> GetLaunchRequest(const WatchpointStreamBackend& backend,
-                                                       std::string exe) {
-  LaunchRequest launch_request = {};
+std::pair<RunBinaryRequest, RunBinaryReply> GetLaunchRequest(const WatchpointStreamBackend& backend,
+                                                             std::string exe) {
+  RunBinaryRequest launch_request = {};
   launch_request.argv = {exe};
   launch_request.inferior_type = InferiorType::kBinary;
   return {launch_request, {}};

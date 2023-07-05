@@ -28,11 +28,10 @@ class MockComponentManager : public ComponentManager {
     return std::nullopt;
   }
 
-  debug::Status LaunchComponent(const std::vector<std::string>& argv) override {
-    return debug::Status("Not supported");
-  }
+  debug::Status LaunchComponent(std::string url) override { return debug::Status("Not supported"); }
 
-  debug::Status LaunchTest(std::string url, std::vector<std::string> case_filters) override {
+  debug::Status LaunchTest(std::string url, std::optional<std::string> realm,
+                           std::vector<std::string> case_filters) override {
     return debug::Status("Not supported");
   }
 

@@ -41,11 +41,9 @@ class MinidumpRemoteAPI : public RemoteAPI, public DownloadObserver {
   // The process ID for the (presumably only) process in this dump.
   uint64_t ProcessID() { return minidump_->ProcessID(); }
 
-  // RemoteAPI implementation.
+  // RemoteAPI implementation. Not all APIs are implemented.
   void Hello(const debug_ipc::HelloRequest& request,
              fit::callback<void(const Err&, debug_ipc::HelloReply)> cb) override;
-  void Launch(const debug_ipc::LaunchRequest& request,
-              fit::callback<void(const Err&, debug_ipc::LaunchReply)> cb) override;
   void Kill(const debug_ipc::KillRequest& request,
             fit::callback<void(const Err&, debug_ipc::KillReply)> cb) override;
   void Attach(const debug_ipc::AttachRequest& request,

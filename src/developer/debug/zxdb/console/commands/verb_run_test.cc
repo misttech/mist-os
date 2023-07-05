@@ -17,9 +17,11 @@
 namespace zxdb {
 namespace {
 
+constexpr int kRealmSwitch = 1;
+
 const char kShortHelp[] = "run-test: Run the test.";
 const char kHelp[] =
-    R"(run-test <url> [ <case filter>* ]
+    R"(run-test [ -r <realm> ] <url> [ <case filter>* ]
 
   Runs the test with the given URL. Optional case filters can be provided to
   specify the test cases to run. The test will be launched in a similar fashion
@@ -31,6 +33,10 @@ const char kHelp[] =
   to navigate between test cases.
 
 Arguments
+
+  -r <realm>
+  --realm <realm>
+      The realm to launch the test in. Required for non-hermetic tests.
 
   <url>
       The URL of the test to run.
@@ -45,7 +51,7 @@ Examples
   run-test fuchsia-pkg://fuchsia.com/pkg#meta/some_test.cm SomeTest.Case1
 )";
 
-void Exec(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
+void RunTest(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
   // No nouns should be provided.
   if (Err err = cmd.ValidateNouns({}); err.has_error()) {
     return cmd_context->ReportError(err);
@@ -62,12 +68,37 @@ void Exec(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
   }
 
   // Launch the test.
-  debug_ipc::LaunchRequest request;
-  request.inferior_type = debug_ipc::InferiorType::kTest;
-  request.argv = cmd.args();
+  if (cmd.target()->session()->ipc_version() < 56) {
+    // For compatibility.
+    // TODO: remove me after kMinimumProtocolVersion >= 56.
+    if (cmd.HasSwitch(kRealmSwitch)) {
+      return cmd_context->ReportError(Err("\"--realm\" is not supported in this IPC version."));
+    }
+    debug_ipc::RunBinaryRequest request;
+    request.inferior_type = debug_ipc::InferiorType::kTest;
+    request.argv = cmd.args();
 
-  cmd.target()->session()->remote_api()->Launch(
-      request, [cmd_context](Err err, debug_ipc::LaunchReply reply) mutable {
+    cmd.target()->session()->remote_api()->RunBinary(
+        request, [cmd_context](Err err, debug_ipc::RunBinaryReply reply) mutable {
+          if (!err.has_error() && reply.status.has_error()) {
+            err = Err("Could not start test: %s", reply.status.message().c_str());
+          }
+          if (err.has_error()) {
+            cmd_context->ReportError(err);
+          }
+        });
+    return;
+  }
+
+  debug_ipc::RunTestRequest request;
+  request.url = cmd.args()[0];
+  if (cmd.HasSwitch(kRealmSwitch)) {
+    request.realm = cmd.GetSwitchValue(kRealmSwitch);
+  }
+  request.case_filters = {cmd.args().begin() + 1, cmd.args().end()};
+
+  cmd.target()->session()->remote_api()->RunTest(
+      request, [cmd_context](Err err, debug_ipc::RunTestReply reply) mutable {
         if (!err.has_error() && reply.status.has_error()) {
           err = Err("Could not start test: %s", reply.status.message().c_str());
         }
@@ -80,7 +111,9 @@ void Exec(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetRunTestVerbRecord() {
-  return {&Exec, {"run-test"}, kShortHelp, kHelp, CommandGroup::kProcess};
+  VerbRecord verb{&RunTest, {"run-test"}, kShortHelp, kHelp, CommandGroup::kProcess};
+  verb.switches.emplace_back(kRealmSwitch, true, "realm", 'r');
+  return verb;
 }
 
 }  // namespace zxdb

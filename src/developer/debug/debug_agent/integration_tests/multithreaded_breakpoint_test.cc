@@ -115,9 +115,9 @@ class BreakpointStreamBackend : public LocalStreamBackend {
   TestStage test_stage_ = TestStage::kWaitingForThreadToStart;
 };
 
-std::pair<LaunchRequest, LaunchReply> GetLaunchRequest(const BreakpointStreamBackend& backend,
-                                                       std::string exe) {
-  LaunchRequest launch_request = {};
+std::pair<RunBinaryRequest, RunBinaryReply> GetLaunchRequest(const BreakpointStreamBackend& backend,
+                                                             std::string exe) {
+  RunBinaryRequest launch_request = {};
   launch_request.argv = {exe, fxl::StringPrintf("%lu", backend.thread_count())};
   launch_request.inferior_type = InferiorType::kBinary;
   return {launch_request, {}};
@@ -182,7 +182,7 @@ TEST(MultithreadedBreakpoint, DISABLED_SWBreakpoint) {
 
     static constexpr const char kExecutable[] = "/pkg/bin/multithreaded_breakpoint_test_exe";
     auto [lnch_request, lnch_reply] = GetLaunchRequest(backend, kExecutable);
-    remote_api->OnLaunch(lnch_request, &lnch_reply);
+    remote_api->OnRunBinary(lnch_request, &lnch_reply);
     ASSERT_TRUE(lnch_reply.status.ok());
 
     backend.ResumeAllThreadsAndRunLoop();

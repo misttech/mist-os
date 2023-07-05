@@ -413,12 +413,11 @@ void InterceptionWorkflow::Launch(zxdb::Target* target, const std::vector<std::s
 
   if (command[0] == "run") {
     // The component workflow.
-    debug_ipc::LaunchRequest request;
-    request.inferior_type = debug_ipc::InferiorType::kComponent;
-    request.argv = std::vector<std::string>(command.begin() + 1, command.end());
-    session_->remote_api()->Launch(
+    debug_ipc::RunComponentRequest request;
+    request.url = command[1];
+    session_->remote_api()->RunComponent(
         request, [this, target = target->GetWeakPtr(), on_err = std::move(on_err)](
-                     const zxdb::Err& err, debug_ipc::LaunchReply reply) {
+                     const zxdb::Err& err, debug_ipc::RunComponentReply reply) {
           if (err.ok() && (reply.status.has_error())) {
             zxdb::Err status_err(zxdb::ErrType::kGeneral, reply.status.message());
             on_err(status_err);
@@ -426,7 +425,7 @@ void InterceptionWorkflow::Launch(zxdb::Target* target, const std::vector<std::s
             on_err(err);
           }
           if (target->GetProcess() != nullptr) {
-            SetBreakpoints(target->GetProcess(), reply.timestamp);
+            SetBreakpoints(target->GetProcess(), debug_ipc::kTimestampDefault);
           }
         });
     return;
