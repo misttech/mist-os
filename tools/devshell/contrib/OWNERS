@@ -21,7 +21,6 @@ per-file             gc = file: /src/sys/pkg/OWNERS
 per-file             gen-cargo = computerdruid@google.com,tmandry@google.com
 per-file gerrit-split-cl.fx=tombergan@google.com,yifeit@google.com
 per-file             goma = file: /build/OWNERS
-per-file grep=smithdave@google.com
 per-file iquery=crjohns@google.com
 per-file             is-incremental-publisher-running = file: /src/sys/pkg/OWNERS
 per-file lint=haowei@google.com,phosek@google.com
