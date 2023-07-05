@@ -9,7 +9,6 @@ use crate::light_sensor::led_watcher::{CancelableTask, LedWatcher, LedWatcherHan
 use crate::light_sensor::types::{AdjustmentSetting, Calibration, Rgbc, SensorConfiguration};
 use anyhow::{format_err, Context, Error};
 use async_trait::async_trait;
-use async_utils::hanging_get;
 use async_utils::hanging_get::server::HangingGet;
 use fidl_fuchsia_input_report::{FeatureReport, InputDeviceProxy, SensorFeatureReport};
 use fidl_fuchsia_lightsensor::{
@@ -25,7 +24,6 @@ use futures::TryStreamExt;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-type Subscriber = hanging_get::server::Subscriber<LightSensorData, SensorWatchResponder, NotifyFn>;
 type NotifyFn = Box<dyn Fn(&LightSensorData, SensorWatchResponder) -> bool>;
 type SensorHangingGet = HangingGet<LightSensorData, SensorWatchResponder, NotifyFn>;
 
@@ -187,65 +185,9 @@ impl ActiveSetting {
     }
 }
 
-enum SubscriptionEntry {
-    Error(Option<Error>),
-    Subscription(Subscriber),
-    Responders(Vec<SensorWatchResponder>),
-}
-
-impl SubscriptionEntry {
-    fn new(hanging_get: Option<&mut SensorHangingGet>) -> Self {
-        match hanging_get {
-            Some(hanging_get) => Self::Subscription(hanging_get.new_subscriber()),
-            None => Self::Responders(vec![]),
-        }
-    }
-
-    fn register(&mut self, responder: SensorWatchResponder) -> Option<Result<(), Error>> {
-        match self {
-            // Error comes from registration error during `init_hanging_get`. It's ok to `take` here
-            // because on error the stream loop exits, so this will never be hit twice.
-            Self::Error(e) => Some(Err(e.take().unwrap())),
-            Self::Subscription(subscriber) => {
-                Some(subscriber.register(responder).context("registering responder for Watch call"))
-            }
-            Self::Responders(responders) => {
-                responders.push(responder);
-                None
-            }
-        }
-    }
-
-    fn update(&mut self, hanging_get: &mut SensorHangingGet) {
-        let mut update = Self::Subscription(hanging_get.new_subscriber());
-        std::mem::swap(self, &mut update);
-        let previous = update;
-        match previous {
-            Self::Responders(responders) => {
-                let Self::Subscription(subscriber) = self else {
-                    unreachable!();
-                };
-                for responder in responders {
-                    if let Err(e) = subscriber
-                        .register(responder)
-                        .context("registering responder for Watch call")
-                    {
-                        *self = Self::Error(Some(e));
-                        return;
-                    }
-                }
-            }
-            _ => unreachable!(),
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct LightSensorHandler<T> {
-    hanging_get: Rc<RefCell<Option<SensorHangingGet>>>,
-    /// Tracks the queue of subcribers that attempt to watch before the first reading is available
-    /// from the `InputReport`. They will get the initial reading when it becomes available.
-    subscriber_queue: Rc<RefCell<Vec<Rc<RefCell<SubscriptionEntry>>>>>,
+    hanging_get: Rc<RefCell<SensorHangingGet>>,
     calibrator: Option<T>,
     active_setting: Rc<RefCell<ActiveSettingState>>,
     rgbc_to_lux_coefs: Rgbc<f32>,
@@ -296,10 +238,15 @@ impl<T> LightSensorHandler<T> {
         input_handlers_node: &fuchsia_inspect::Node,
     ) -> Rc<Self> {
         let calibrator = calibrator.into();
-        // We cannot provide a default value for the light sensor yet until we have a reading from
-        // the driver. For now, just store a None that we will update once we have an initial
-        // reading.
-        let hanging_get = Rc::new(RefCell::new(None));
+        let hanging_get = Rc::new(RefCell::new(HangingGet::new_unknown_state(Box::new(
+            |sensor_data: &LightSensorData, responder: SensorWatchResponder| -> bool {
+                if let Err(e) = responder.send(&FidlLightSensorData::from(*sensor_data)) {
+                    tracing::warn!("Failed to send updated data to client: {e:?}",);
+                }
+                true
+            },
+        )
+            as NotifyFn)));
         let active_setting =
             Rc::new(RefCell::new(ActiveSettingState::Uninitialized(configuration.settings)));
         let inspect_status = Rc::new(InputHandlerStatus::new(
@@ -309,7 +256,6 @@ impl<T> LightSensorHandler<T> {
         ));
         Rc::new(Self {
             hanging_get,
-            subscriber_queue: Rc::new(RefCell::new(vec![])),
             calibrator,
             active_setting,
             rgbc_to_lux_coefs: configuration.rgbc_to_lux_coefficients,
@@ -320,43 +266,19 @@ impl<T> LightSensorHandler<T> {
         })
     }
 
-    /// Initialize the hanging-get using `reading` as the initial value. Any queued subscribers
-    /// will register their responders via `SubscriptionEntry::update`. Note that we keep track of
-    /// multiple responders per subscriber so we can end the stream early if necessary. This can
-    /// result in difficult to debug service disconnects since the fidl stream disconnection will
-    /// not happen when the API call occurs.
-    fn init_hanging_get(&self, reading: LightSensorData) -> SensorHangingGet {
-        let mut hanging_get = HangingGet::new(
-            reading,
-            Box::new(|sensor_data: &LightSensorData, responder: SensorWatchResponder| -> bool {
-                if let Err(e) = responder.send(&FidlLightSensorData::from(*sensor_data)) {
-                    tracing::warn!("Failed to send updated data to client: {e:?}",);
-                }
-                true
-            }) as NotifyFn,
-        );
-        for entry in self.subscriber_queue.borrow_mut().drain(..) {
-            entry.borrow_mut().update(&mut hanging_get);
-        }
-
-        hanging_get
-    }
-
     pub async fn handle_light_sensor_request_stream(
         self: &Rc<Self>,
         mut stream: SensorRequestStream,
     ) -> Result<(), Error> {
-        let entry =
-            Rc::new(RefCell::new(SubscriptionEntry::new(self.hanging_get.borrow_mut().as_mut())));
-        self.subscriber_queue.borrow_mut().push(Rc::clone(&entry));
+        let subscriber = self.hanging_get.borrow_mut().new_subscriber();
         while let Some(request) =
             stream.try_next().await.context("Error handling light sensor request stream")?
         {
             match request {
                 SensorRequest::Watch { responder } => {
-                    if let Some(Err(e)) = entry.borrow_mut().register(responder) {
-                        return Err(e);
-                    }
+                    subscriber
+                        .register(responder)
+                        .context("registering responder for Watch call")?;
                 }
             }
         }
@@ -547,22 +469,14 @@ where
                     return vec![input_event];
                 }
             };
-            let reading = LightSensorData {
+            let publisher = self.hanging_get.borrow_mut().new_publisher();
+            publisher.set(LightSensorData {
                 rgbc,
                 si_rgbc,
                 is_calibrated,
                 calculated_lux: lux,
                 correlated_color_temperature: cct,
-            };
-            match &mut *self.hanging_get.borrow_mut() {
-                Some(hanging_get) => {
-                    let publisher = hanging_get.new_publisher();
-                    publisher.set(reading);
-                }
-                this @ None => {
-                    *this = Some(self.init_hanging_get(reading));
-                }
-            }
+            });
             input_event.handled = Handled::Yes;
         }
         vec![input_event]
