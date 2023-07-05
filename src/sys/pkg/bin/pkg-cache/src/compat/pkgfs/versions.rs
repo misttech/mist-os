@@ -48,6 +48,9 @@ pub struct PkgfsVersions {
 }
 
 impl PkgfsVersions {
+    #[allow(dead_code)]
+    // TODO(fxbug.dev/126227) Delete the pkgfs/versions code two weeks after no longer exposing
+    // the directory.
     pub fn new(
         base_packages: Arc<BasePackages>,
         non_base_packages: Arc<async_lock::RwLock<PackageIndex>>,

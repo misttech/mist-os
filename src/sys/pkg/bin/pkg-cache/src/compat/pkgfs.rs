@@ -99,27 +99,21 @@ async fn read_dirents<'a>(
 ///       validation/
 ///         missing
 /// The "system" directory will only be added and served if `system_image.is_some()`.
+// TODO(fxbug.dev/126227) Delete the unused pkgfs/versions parameters two weeks after no longer
+// exposing the directory. Variables kept as unused to make reverting easier.
 pub fn make_dir(
     base_packages: Arc<crate::BasePackages>,
-    package_index: Arc<async_lock::RwLock<crate::PackageIndex>>,
-    non_static_allow_list: Arc<system_image::NonStaticAllowList>,
-    executability_restrictions: system_image::ExecutabilityRestrictions,
+    _package_index: Arc<async_lock::RwLock<crate::PackageIndex>>,
+    _non_static_allow_list: Arc<system_image::NonStaticAllowList>,
+    _executability_restrictions: system_image::ExecutabilityRestrictions,
     blobfs: blobfs::Client,
     system_image: Option<system_image::SystemImage>,
-    pkgfs_versions_visibility: versions::Visibility,
+    _pkgfs_versions_visibility: versions::Visibility,
 ) -> Result<Arc<dyn DirectoryEntry>, anyhow::Error> {
     let dir = vfs::pseudo_directory! {
         "packages" => Arc::new(packages::PkgfsPackages::new(
             Arc::clone(&base_packages),
             blobfs.clone(),
-        )),
-        "versions" => Arc::new(versions::PkgfsVersions::new(
-            Arc::clone(&base_packages),
-            Arc::clone(&package_index),
-            Arc::clone(&non_static_allow_list),
-            executability_restrictions,
-            blobfs.clone(),
-            pkgfs_versions_visibility,
         )),
         "ctl" => vfs::pseudo_directory! {
             "validation" => Arc::new(validation::Validation::new(

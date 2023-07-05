@@ -569,7 +569,6 @@ where
                     .capability(Capability::directory("pkgfs"))
                     .capability(Capability::directory("system"))
                     .capability(Capability::directory("pkgfs-packages"))
-                    .capability(Capability::directory("pkgfs-versions"))
                     .from(&pkg_cache)
                     .to(Ref::parent()),
             )
@@ -601,12 +600,6 @@ where
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
             )
             .expect("open pkgfs-packages"),
-            pkgfs_versions: fuchsia_fs::directory::open_directory_no_describe(
-                realm_instance.root.get_exposed_dir(),
-                "pkgfs-versions",
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            )
-            .expect("open pkgfs-versions"),
             pkgfs: fuchsia_fs::directory::open_directory_no_describe(
                 realm_instance.root.get_exposed_dir(),
                 "pkgfs",
@@ -637,7 +630,6 @@ struct Proxies {
     package_cache: fpkg::PackageCacheProxy,
     retained_packages: fpkg::RetainedPackagesProxy,
     pkgfs_packages: fio::DirectoryProxy,
-    pkgfs_versions: fio::DirectoryProxy,
     pkgfs: fio::DirectoryProxy,
 }
 

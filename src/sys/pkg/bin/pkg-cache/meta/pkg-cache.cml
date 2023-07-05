@@ -48,11 +48,6 @@
             rights: [ "r*" ],
             path: "/pkgfs/packages/build-info/0/data",
         },
-        {
-            directory: "pkgfs-versions",
-            rights: [ "rx*" ],
-            path: "/pkgfs/versions",
-        },
     ],
     use: [
         {
@@ -94,7 +89,6 @@
                 "config-data",
                 "pkgfs",
                 "pkgfs-packages",
-                "pkgfs-versions",
                 "root-ssl-certificates",
                 "system",
             ],
@@ -104,6 +98,8 @@
     config: {
         // If true, the exposed pkgfs/versions directory will only contain base packages.
         // Otherwise, it will contain both base packages and packages active in the dynamic index.
+        // TODO(fxbug.dev/126227) Delete two weeks after pkgfs/versions is no longer exposed. Kept
+        // to make reverting easier.
         pkgfs_versions_base_only: { type: "bool" },
 
         // If true, pkg-cache will load the system_image package and use the settings contained
