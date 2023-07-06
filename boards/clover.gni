@@ -71,4 +71,5 @@ board_is_phys = true
 images_config_label = "//boards/images:clover"
 zedboot_images_config_label = "//boards/images:zedboot_vim3"
 bringup_images_config_label = "//boards/images:bringup_vim3"
+bringup_fastboot_images_config_label = "//boards/images:bringup_fastboot_vim3"
 partitions_config_label = "//boards/partitions:clover"

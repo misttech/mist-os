@@ -94,6 +94,9 @@ assembled_system("bringup_non_fastboot") {
 # Builds a bringup image that we can RAM boot with fastboot boot.
 assembled_system("bringup_fastboot") {
   forward_variables_from(bringup_base, "*")
+  if (bringup_fastboot_images_config_label != false) {
+    assembly_images_config_label = bringup_fastboot_images_config_label
+  }
   zbi_signing_script = "concat_zbi_and_vbmeta.sh"
   zbi_signing_args = []
   if (use_vbmeta || use_vboot) {

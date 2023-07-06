@@ -20,4 +20,5 @@ board_is_phys = false
 images_config_label = "//boards/images:qemu-riscv64"
 zedboot_images_config_label = "//boards/images:zedboot_qemu"
 bringup_images_config_label = "//boards/images:bringup_qemu"
+bringup_fastboot_images_config_label = "//boards/images:bringup_fastboot_qemu"
 partitions_config_label = "//boards/partitions:qemu-riscv64"

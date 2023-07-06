@@ -260,6 +260,65 @@ generated_images_config("bringup_qemu") {
   forward_variables_from(_default_bringup_zbi, "*")
 }
 
+##########################################
+# bringup fastboot images configurations #
+##########################################
+
+_bringup_fastboot_outdir =
+    get_label_info("//build/images/bringup:bringup_fastboot", "target_out_dir")
+_bringup_fastboot_outdir = rebase_path(_bringup_fastboot_outdir, root_build_dir)
+
+_default_bringup_fastboot_zbi = {
+  zbi = {
+    name = "bringup_fastboot"
+    compression = "zstd"
+    signing_script = "//build/images/bringup/concat_zbi_and_vbmeta.sh"
+    signing_args = []
+  }
+}
+
+_bringup_fastboot_vbmeta_args = [
+  "-v",
+  "${_bringup_fastboot_outdir}/bringup_fastboot/bringup_fastboot.vbmeta",
+]
+
+generated_images_config("bringup_fastboot_default") {
+  forward_variables_from(_default_bringup_fastboot_zbi, "*")
+  forward_variables_from(_default_vbmeta, "*")
+  zbi.signing_args += _bringup_fastboot_vbmeta_args
+}
+
+generated_images_config("bringup_fastboot_vim3") {
+  forward_variables_from(_default_bringup_fastboot_zbi, "*")
+  forward_variables_from(_vim3_vbmeta, "*")
+  zbi.signing_args += _bringup_fastboot_vbmeta_args
+}
+
+generated_images_config("bringup_fastboot_imx8mmevk") {
+  forward_variables_from(_default_bringup_fastboot_zbi, "*")
+
+  _rebased_script = rebase_path(
+          "//zircon/kernel/target/arm64/board/imx8mmevk/package-image.sh",
+          root_build_dir)
+  zbi.signing_args += [ "-s ${_rebased_script}" ]
+  zbi.signing_args += vboot_action.args
+  deps = [ "//zircon/kernel/target/arm64/boot-shim:imx8mmevk" ]
+}
+
+generated_images_config("bringup_fastboot_chromebook-x64") {
+  forward_variables_from(_default_bringup_fastboot_zbi, "*")
+  forward_variables_from(_default_vbmeta, "*")
+
+  _rebased_script = rebase_path(vboot_action.script, root_build_dir)
+  zbi.signing_args += _bringup_fastboot_vbmeta_args
+  zbi.signing_args += [ "-s ${_rebased_script}" ]
+  zbi.signing_args += vboot_action.args
+}
+
+generated_images_config("bringup_fastboot_qemu") {
+  forward_variables_from(_default_bringup_fastboot_zbi, "*")
+}
+
 group("images") {
   public_deps = [
     # Fuchsia images configs
@@ -288,5 +347,12 @@ group("images") {
     ":bringup_imx8mmevk",
     ":bringup_qemu",
     ":bringup_vim3",
+
+    # bringup fastboot images configs
+    ":bringup_fastboot_chromebook-x64",
+    ":bringup_fastboot_default",
+    ":bringup_fastboot_imx8mmevk",
+    ":bringup_fastboot_qemu",
+    ":bringup_fastboot_vim3",
   ]
 }

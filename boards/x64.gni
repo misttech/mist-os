@@ -93,6 +93,8 @@ board_is_emu = true
 images_config_label = "//boards/images:x64"
 zedboot_images_config_label = "//boards/images:zedboot_default"
 bringup_images_config_label = "//boards/images:bringup_default"
+bringup_fastboot_images_config_label =
+    "//boards/images:bringup_fastboot_default"
 partitions_config_label = "//boards/partitions:x64"
 partitions_config_contents += [ "$root_build_dir/fuchsia.esp.blk" ]
 

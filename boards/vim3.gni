@@ -127,3 +127,4 @@ partitions_config_contents +=
     [ "//prebuilt/third_party/firmware/vim3/u-boot.bin.unsigned" ]
 zedboot_images_config_label = "//boards/images:zedboot_vim3"
 bringup_images_config_label = "//boards/images:bringup_vim3"
+bringup_fastboot_images_config_label = "//boards/images:bringup_fastboot_vim3"
