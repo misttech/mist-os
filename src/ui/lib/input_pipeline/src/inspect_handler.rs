@@ -5,15 +5,35 @@
 use crate::input_device::{Handled, InputDeviceEvent, InputDeviceType, InputEvent};
 use crate::input_handler::InputHandler;
 use async_trait::async_trait;
-use fuchsia_inspect::{self as inspect, Inspector, NumericProperty, Property};
+use fuchsia_inspect::{
+    self as inspect, ExponentialHistogramParams, HistogramProperty, Inspector, NumericProperty,
+    Property,
+};
 use fuchsia_zircon as zx;
 use futures::lock::Mutex;
 use futures::FutureExt;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
 use std::sync::Arc;
 
 const MAX_RECENT_EVENT_LOG_SIZE: usize = 125;
+const LATENCY_HISTOGRAM_PROPERTIES: ExponentialHistogramParams<i64> = ExponentialHistogramParams {
+    floor: 0,
+    initial_step: 1,
+    step_multiplier: 10,
+    // Seven buckets allows us to report
+    // *      < 0 msec (added automatically by Inspect)
+    // *      0-1 msec
+    // *     1-10 msec
+    // *   10-100 msec
+    // * 100-1000 msec
+    // *     1-10 sec
+    // *   10-100 sec
+    // * 100-1000 sec
+    // *    >1000 sec (added automatically by Inspect)
+    buckets: 7,
+};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 enum EventType {
@@ -152,9 +172,9 @@ impl CircularBuffer {
 /// may be exposed in the metrics.  No PII information should ever be exposed
 /// this way.
 #[derive(Debug)]
-pub struct InspectHandler {
+pub struct InspectHandler<F> {
     /// A function that obtains the current timestamp.
-    now: fn() -> zx::Time,
+    now: RefCell<F>,
     /// A node that contains the statistics about this particular handler.
     _node: inspect::Node,
     /// The number of total events that this handler has seen so far.
@@ -169,13 +189,17 @@ pub struct InspectHandler {
     events_by_type: HashMap<EventType, EventCounters>,
     /// Log of recent events in the order they were received.
     recent_events_log: Option<Arc<Mutex<CircularBuffer>>>,
+    /// Histogram of latency from the binding timestamp for an `InputEvent` until
+    /// the time the `InputEvent` was observed by this handler. Reported in milliseconds,
+    /// because values less than 1 msec aren't especially interesting.
+    pipeline_latency_ms: inspect::IntExponentialHistogramProperty,
 }
 
 #[async_trait(?Send)]
-impl InputHandler for InspectHandler {
+impl<F: FnMut() -> zx::Time + 'static> InputHandler for InspectHandler<F> {
     async fn handle_input_event(self: Rc<Self>, input_event: InputEvent) -> Vec<InputEvent> {
         let event_time = input_event.event_time;
-        let now = (self.now)();
+        let now = (self.now.borrow_mut())();
         self.events_count.add(1);
         self.last_seen_timestamp_ns.set(now.into_nanos());
         self.last_generated_timestamp_ns.set(event_time.into_nanos());
@@ -187,32 +211,33 @@ impl InputHandler for InspectHandler {
         if let Some(recent_events_log) = &self.recent_events_log {
             recent_events_log.lock().await.push(input_event.clone());
         }
+        self.pipeline_latency_ms.insert((now - event_time).into_millis());
         vec![input_event]
     }
 }
 
-impl InspectHandler {
-    /// Creates a new inspect handler instance.
-    ///
-    /// `node` is the inspect node that will receive the stats.
-    pub fn new(
-        node: inspect::Node,
-        supported_input_devices: &HashSet<&InputDeviceType>,
-        displays_recent_events: bool,
-    ) -> Rc<Self> {
-        Self::new_with_now(
-            node,
-            zx::Time::get_monotonic,
-            supported_input_devices,
-            displays_recent_events,
-        )
-    }
+/// Creates a new inspect handler instance.
+///
+/// `node` is the inspect node that will receive the stats.
+pub fn make_inspect_handler(
+    node: inspect::Node,
+    supported_input_devices: &HashSet<&InputDeviceType>,
+    displays_recent_events: bool,
+) -> Rc<InspectHandler<fn() -> zx::Time>> {
+    InspectHandler::new_internal(
+        node,
+        zx::Time::get_monotonic,
+        supported_input_devices,
+        displays_recent_events,
+    )
+}
 
+impl<F> InspectHandler<F> {
     /// Creates a new inspect handler instance, using `now` to supply the current timestamp.
     /// Expected to be useful in testing mainly.
-    fn new_with_now(
+    fn new_internal(
         node: inspect::Node,
-        now: fn() -> zx::Time,
+        now: F,
         supported_input_devices: &HashSet<&InputDeviceType>,
         displays_recent_events: bool,
     ) -> Rc<Self> {
@@ -224,11 +249,14 @@ impl InspectHandler {
             true => {
                 let recent_events =
                     Arc::new(Mutex::new(CircularBuffer::new(MAX_RECENT_EVENT_LOG_SIZE)));
-                Self::record_lazy_recent_events(&node, Arc::clone(&recent_events));
+                record_lazy_recent_events(&node, Arc::clone(&recent_events));
                 Some(recent_events)
             }
             false => None,
         };
+
+        let pipeline_latency_ms = node
+            .create_int_exponential_histogram("pipeline_latency_ms", LATENCY_HISTOGRAM_PROPERTIES);
 
         let mut events_by_type = HashMap::new();
         if supported_input_devices.contains(&InputDeviceType::Keyboard) {
@@ -251,26 +279,27 @@ impl InspectHandler {
         EventCounters::add_new_into(&mut events_by_type, &node, EventType::Fake);
 
         Rc::new(Self {
-            now,
+            now: RefCell::new(now),
             _node: node,
             events_count: event_count,
             last_seen_timestamp_ns,
             last_generated_timestamp_ns,
             events_by_type,
             recent_events_log,
+            pipeline_latency_ms,
         })
     }
+}
 
-    fn record_lazy_recent_events(node: &inspect::Node, recent_events: Arc<Mutex<CircularBuffer>>) {
-        node.record_lazy_child("recent_events_log", move || {
-            let recent_events_clone = Arc::clone(&recent_events);
-            async move {
-                let inspector = Inspector::default();
-                Ok(recent_events_clone.lock().await.record_all_lazy_inspect(inspector))
-            }
-            .boxed()
-        });
-    }
+fn record_lazy_recent_events(node: &inspect::Node, recent_events: Arc<Mutex<CircularBuffer>>) {
+    node.record_lazy_child("recent_events_log", move || {
+        let recent_events_clone = Arc::clone(&recent_events);
+        async move {
+            let inspector = Inspector::default();
+            Ok(recent_events_clone.lock().await.record_all_lazy_inspect(inspector))
+        }
+        .boxed()
+    });
 }
 
 #[cfg(test)]
@@ -285,7 +314,12 @@ mod tests {
             MouseDeviceDescriptor, MouseLocation, MousePhase, PrecisionScroll, RawWheelDelta,
             WheelDelta,
         },
-        testing_utilities,
+        testing_utilities::{
+            consumer_controls_device_descriptor, create_consumer_controls_event,
+            create_fake_handled_input_event, create_fake_input_event, create_keyboard_event,
+            create_mouse_event, create_touch_contact, create_touch_screen_event,
+            create_touchpad_event,
+        },
         touch_binding::{TouchScreenDeviceDescriptor, TouchpadDeviceDescriptor},
         utils::Position,
     };
@@ -293,8 +327,9 @@ mod tests {
     use fidl_fuchsia_input_report::InputDeviceMarker;
     use fuchsia_async as fasync;
     use fuchsia_inspect::{assert_data_tree, AnyProperty};
-    use maplit::hashmap;
+    use maplit::{hashmap, hashset};
     use std::collections::HashSet;
+    use test_case::test_case;
 
     fn fixed_now() -> zx::Time {
         zx::Time::ZERO + zx::Duration::from_nanos(42)
@@ -306,14 +341,14 @@ mod tests {
         assert_eq!(circular_buffer._size, MAX_RECENT_EVENT_LOG_SIZE);
 
         let first_event_time = zx::Time::get_monotonic();
-        circular_buffer.push(testing_utilities::create_fake_input_event(first_event_time));
+        circular_buffer.push(create_fake_input_event(first_event_time));
         let second_event_time = zx::Time::get_monotonic();
-        circular_buffer.push(testing_utilities::create_fake_input_event(second_event_time));
+        circular_buffer.push(create_fake_input_event(second_event_time));
 
         // Fill up `events` VecDeque
         for _i in 2..MAX_RECENT_EVENT_LOG_SIZE {
             let curr_event_time = zx::Time::get_monotonic();
-            circular_buffer.push(testing_utilities::create_fake_input_event(curr_event_time));
+            circular_buffer.push(create_fake_input_event(curr_event_time));
             match circular_buffer._events.back() {
                 Some(event) => assert_eq!(event.event_time, curr_event_time),
                 None => assert!(false),
@@ -328,7 +363,7 @@ mod tests {
 
         // CircularBuffer `events` should be full, pushing another event should remove the first event.
         let last_event_time = zx::Time::get_monotonic();
-        circular_buffer.push(testing_utilities::create_fake_input_event(last_event_time));
+        circular_buffer.push(create_fake_input_event(last_event_time));
         match circular_buffer._events.front() {
             Some(event) => assert_eq!(event.event_time, second_event_time),
             None => assert!(false),
@@ -345,7 +380,7 @@ mod tests {
 
         let recent_events_log =
             Arc::new(Mutex::new(CircularBuffer::new(MAX_RECENT_EVENT_LOG_SIZE)));
-        InspectHandler::record_lazy_recent_events(inspector.root(), Arc::clone(&recent_events_log));
+        record_lazy_recent_events(inspector.root(), Arc::clone(&recent_events_log));
 
         let keyboard_descriptor = InputDeviceDescriptor::Keyboard(KeyboardDeviceDescriptor {
             keys: vec![fidl_fuchsia_input::Key::A, fidl_fuchsia_input::Key::B],
@@ -380,14 +415,14 @@ mod tests {
             create_proxy_and_stream::<InputDeviceMarker>().expect("proxy created");
 
         let recent_events = vec![
-            testing_utilities::create_keyboard_event(
+            create_keyboard_event(
                 fidl_fuchsia_input::Key::A,
                 fidl_fuchsia_ui_input3::KeyEventType::Pressed,
                 None,
                 &keyboard_descriptor,
                 None,
             ),
-            testing_utilities::create_consumer_controls_event(
+            create_consumer_controls_event(
                 vec![
                     fidl_fuchsia_input_report::ConsumerControlButton::VolumeUp,
                     fidl_fuchsia_input_report::ConsumerControlButton::VolumeUp,
@@ -399,9 +434,9 @@ mod tests {
                     fidl_fuchsia_input_report::ConsumerControlButton::Reboot,
                 ],
                 zx::Time::get_monotonic(),
-                &testing_utilities::consumer_controls_device_descriptor(),
+                &consumer_controls_device_descriptor(),
             ),
-            testing_utilities::create_mouse_event(
+            create_mouse_event(
                 MouseLocation::Absolute(Position { x: 7.0f32, y: 15.0f32 }),
                 Some(WheelDelta {
                     raw_data: RawWheelDelta::Ticks(5i64),
@@ -418,20 +453,20 @@ mod tests {
                 zx::Time::get_monotonic(),
                 &mouse_descriptor,
             ),
-            testing_utilities::create_touch_screen_event(
+            create_touch_screen_event(
                 hashmap! {
                     fidl_fuchsia_ui_input::PointerEventPhase::Add
-                        => vec![testing_utilities::create_touch_contact(1u32, Position { x: 10.0, y: 30.0 })],
+                        => vec![create_touch_contact(1u32, Position { x: 10.0, y: 30.0 })],
                     fidl_fuchsia_ui_input::PointerEventPhase::Move
-                        => vec![testing_utilities::create_touch_contact(1u32, Position { x: 11.0, y: 31.0 })],
+                        => vec![create_touch_contact(1u32, Position { x: 11.0, y: 31.0 })],
                 },
                 zx::Time::get_monotonic(),
                 &touch_screen_descriptor,
             ),
-            testing_utilities::create_touchpad_event(
+            create_touchpad_event(
                 vec![
-                    testing_utilities::create_touch_contact(1u32, Position { x: 0.0, y: 0.0 }),
-                    testing_utilities::create_touch_contact(2u32, Position { x: 10.0, y: 10.0 }),
+                    create_touch_contact(1u32, Position { x: 0.0, y: 0.0 }),
+                    create_touch_contact(2u32, Position { x: 10.0, y: 10.0 }),
                 ],
                 pressed_buttons,
                 zx::Time::get_monotonic(),
@@ -454,7 +489,7 @@ mod tests {
                 handled: input_device::Handled::No,
                 trace_id: None,
             },
-            testing_utilities::create_keyboard_event(
+            create_keyboard_event(
                 fidl_fuchsia_input::Key::B,
                 fidl_fuchsia_ui_input3::KeyEventType::Pressed,
                 None,
@@ -551,14 +586,14 @@ mod tests {
             &input_device::InputDeviceType::Touch,
         ]);
 
-        let handler = super::InspectHandler::new_with_now(
+        let handler = super::InspectHandler::new_internal(
             test_node,
             fixed_now,
             &supported_input_devices,
             /* displays_recent_events = */ false,
         );
         assert_data_tree!(inspector, root: {
-            test_node: {
+            test_node: contains {
                 events_count: 0u64,
                 last_seen_timestamp_ns: 0i64,
                 last_generated_timestamp_ns: 0i64,
@@ -609,12 +644,10 @@ mod tests {
 
         handler
             .clone()
-            .handle_input_event(testing_utilities::create_fake_input_event(zx::Time::from_nanos(
-                43i64,
-            )))
+            .handle_input_event(create_fake_input_event(zx::Time::from_nanos(43i64)))
             .await;
         assert_data_tree!(inspector, root: {
-            test_node: {
+            test_node: contains {
                 events_count: 1u64,
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 43i64,
@@ -665,12 +698,10 @@ mod tests {
 
         handler
             .clone()
-            .handle_input_event(testing_utilities::create_fake_input_event(zx::Time::from_nanos(
-                44i64,
-            )))
+            .handle_input_event(create_fake_input_event(zx::Time::from_nanos(44i64)))
             .await;
         assert_data_tree!(inspector, root: {
-            test_node: {
+            test_node: contains {
                 events_count: 2u64,
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 44i64,
@@ -721,12 +752,10 @@ mod tests {
 
         handler
             .clone()
-            .handle_input_event(testing_utilities::create_fake_handled_input_event(
-                zx::Time::from_nanos(44),
-            ))
+            .handle_input_event(create_fake_handled_input_event(zx::Time::from_nanos(44)))
             .await;
         assert_data_tree!(inspector, root: {
-            test_node: {
+            test_node: contains {
                 events_count: 3u64,
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 44i64,
@@ -789,14 +818,14 @@ mod tests {
             &input_device::InputDeviceType::Touch,
         ]);
 
-        let handler = super::InspectHandler::new_with_now(
+        let handler = super::InspectHandler::new_internal(
             test_node,
             fixed_now,
             &supported_input_devices,
             /* displays_recent_events = */ true,
         );
         assert_data_tree!(inspector, root: {
-            test_node: {
+            test_node: contains {
                 events_count: 0u64,
                 last_seen_timestamp_ns: 0i64,
                 last_generated_timestamp_ns: 0i64,
@@ -848,12 +877,10 @@ mod tests {
 
         handler
             .clone()
-            .handle_input_event(testing_utilities::create_fake_input_event(zx::Time::from_nanos(
-                43i64,
-            )))
+            .handle_input_event(create_fake_input_event(zx::Time::from_nanos(43i64)))
             .await;
         assert_data_tree!(inspector, root: {
-            test_node: {
+            test_node: contains {
                 events_count: 1u64,
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 43i64,
@@ -909,12 +936,10 @@ mod tests {
 
         handler
             .clone()
-            .handle_input_event(testing_utilities::create_fake_input_event(zx::Time::from_nanos(
-                44i64,
-            )))
+            .handle_input_event(create_fake_input_event(zx::Time::from_nanos(44i64)))
             .await;
         assert_data_tree!(inspector, root: {
-            test_node: {
+            test_node: contains {
                 events_count: 2u64,
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 44i64,
@@ -973,12 +998,10 @@ mod tests {
 
         handler
             .clone()
-            .handle_input_event(testing_utilities::create_fake_handled_input_event(
-                zx::Time::from_nanos(44),
-            ))
+            .handle_input_event(create_fake_handled_input_event(zx::Time::from_nanos(44)))
             .await;
         assert_data_tree!(inspector, root: {
-            test_node: {
+            test_node: contains {
                 events_count: 3u64,
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 44i64,
@@ -1037,5 +1060,44 @@ mod tests {
                },
             }
         });
+    }
+
+    #[test_case([i64::MIN]; "min value")]
+    #[test_case([-1]; "negative value")]
+    #[test_case([0]; "zero")]
+    #[test_case([1]; "positive value")]
+    #[test_case([i64::MAX]; "max value")]
+    #[test_case([1_000_000, 10_000_000, 100_000_000, 1000_000_000]; "multiple values")]
+    #[fuchsia::test(allow_stalls = false)]
+    async fn updates_latency_histogram(
+        latencies_nsec: impl IntoIterator<Item = i64> + Clone + 'static,
+    ) {
+        let inspector = inspect::Inspector::default();
+        let root = inspector.root();
+        let test_node = root.create_child("test_node");
+
+        let mut seen_timestamps = latencies_nsec.clone().into_iter().map(zx::Time::from_nanos);
+        let now = move || {
+            seen_timestamps.next().expect("internal error: test has more events than latencies")
+        };
+        let handler = super::InspectHandler::new_internal(
+            test_node,
+            now,
+            &hashset! {},
+            /* displays_recent_events = */ false,
+        );
+        for _latency in latencies_nsec.clone() {
+            handler.clone().handle_input_event(create_fake_input_event(zx::Time::ZERO)).await;
+        }
+
+        let mut histogram_assertion =
+            fuchsia_inspect::HistogramAssertion::exponential(super::LATENCY_HISTOGRAM_PROPERTIES);
+        histogram_assertion
+            .insert_values(latencies_nsec.into_iter().map(|nsec| nsec / 1000 / 1000));
+        assert_data_tree!(inspector, root: {
+            test_node: contains {
+                pipeline_latency_ms: histogram_assertion
+            }
+        })
     }
 }

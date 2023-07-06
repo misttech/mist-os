@@ -489,7 +489,7 @@ fn add_inspect_handler(
     supported_input_devices: &HashSet<&input_device::InputDeviceType>,
     displays_recent_events: bool,
 ) -> InputPipelineAssembly {
-    assembly.add_handler(input_pipeline::inspect_handler::InspectHandler::new(
+    assembly.add_handler(input_pipeline::inspect_handler::make_inspect_handler(
         node,
         supported_input_devices,
         displays_recent_events,
