@@ -4,6 +4,7 @@
 
 // Add fuzz-manager to core
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "fuzz-manager",

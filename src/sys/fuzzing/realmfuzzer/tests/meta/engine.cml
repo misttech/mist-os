@@ -7,6 +7,7 @@
     include: [
         "//src/sys/fuzzing/realmfuzzer/engine/default.shard.cml",
         "//src/sys/test_runners/gtest/default.shard.cml",
+        "inspect/offer.shard.cml",
     ],
     program: {
         binary: "test/realmfuzzer_integration_tests",

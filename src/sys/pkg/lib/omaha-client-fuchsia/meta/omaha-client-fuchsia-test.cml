@@ -4,6 +4,7 @@
 {
     include: [
         "//src/connectivity/network/meta/isolated-network.shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/offer.shard.cml",
     ],
     children: [

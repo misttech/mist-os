@@ -4,6 +4,7 @@
 {
     include: [
         "//src/sys/core/meta/core_proxy.core_shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/offer.shard.cml",
     ],
     children: [

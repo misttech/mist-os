@@ -54,7 +54,10 @@
             to: "#omaha-client-service",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
             from: "parent",
             to: "#omaha-client-service",
         },
