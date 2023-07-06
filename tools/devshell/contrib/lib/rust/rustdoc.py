@@ -8,6 +8,8 @@
 import argparse
 import json
 import os
+from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -22,6 +24,49 @@ def manifest_path_from_path_or_gn_target(arg):
         gn_target = rust.GnTarget(arg)
         gn_target.label_name += ".actual"
         return gn_target.manifest_path()
+
+
+def update_stamp(rust_dir, env, args):
+    """rustdoc doesn't emit dep-info, so we have to use rustc to emit it and
+    then update the mtime of a stamp file (that cargo uses to trigger
+    re-builds) with the most recently modified file.
+    TODO: once https://github.com/rust-lang/cargo/issues/12266 is resolved this
+    logic can be removed.
+    """
+    depinfo = subprocess.run(
+        [ # yapf: disable
+            rust_dir / "cargo", "rustc",
+            "--manifest-path=" + str(args.manifest_path),
+            "--",
+            "--emit", "dep-info=/dev/stdout",
+        ] + (["--target="+args.target] if args.target else []),
+        env=env,
+        cwd=ROOT_PATH / "third_party/rust_crates",
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    stamp = args.manifest_path.parent / "docs_input_stamp"
+    stamp.touch()
+    latest = max(d.stat().st_mtime_ns for d in parse_deps(depinfo.stdout))
+    os.utime(stamp, ns=(latest, latest))
+
+
+def parse_deps(depinfo):
+    deps = set()
+    for line in depinfo.splitlines(keepends=True):
+        parts = line.split(': ', 1)
+        if len(parts) < 2:
+            continue
+        # depinfo lines have a space separated list of paths after a colon,
+        # but since the paths can contain spaces we have to handle backslash
+        # escaping, for example the line:
+        # foo: bar/baz quux bl\ ah
+        # should be parsed as ["bar/baz", "quux", "bl ah"]
+        deps |= set(
+            Path(p.replace('\\ ', ' '))
+            for p in re.findall(r'((?:[^\s\\]|\\.)*)\s', parts[-1]))
+    return deps
 
 
 def main():
@@ -109,6 +154,8 @@ def main():
 
     if args.doc_private:
         call_args.append("--document-private-items")
+
+    update_stamp(rust_dir, env, args)
 
     # run cargo from third_party/rust_crates which has an appropriate .cargo/config
     return subprocess.call(

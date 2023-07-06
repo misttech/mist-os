@@ -13,7 +13,10 @@ import("//build/testing/host_test_data.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":clippy_test($host_toolchain)" ]
+  deps = [
+    ":clippy_test($host_toolchain)",
+    ":rustdoc_test($host_toolchain)",
+  ]
 }
 
 # The dep chain A->B->C will exercise the functionality of both direct and
@@ -61,7 +64,7 @@ if (is_host) {
   host = "host_${host_cpu}"
 
   python_host_test("clippy_test") {
-    main_source = "test.py"
+    main_source = "clippy_test.py"
     extra_args = [ host ]
     deps = [
       ":copy_clippy",
@@ -148,6 +151,14 @@ if (is_host) {
     deps = [
       ":copy_clippy",
       ":copy_other_toolchain",
+    ]
+  }
+
+  python_host_test("rustdoc_test") {
+    main_source = "rustdoc_test.py"
+    sources = [
+      "//tools/devshell/contrib/lib/rust/rust.py",
+      "//tools/devshell/contrib/lib/rust/rustdoc.py",
     ]
   }
 }
