@@ -73,4 +73,29 @@ CheckOptions:
     value:           'NULL'
   - key:             readability-braces-around-statements.ShortStatementLines
     value:           '2'
+  - key:             misc-include-cleaner.IgnoreHeaders
+    # The following files are ignored when clang-tidy analyzes header
+    # inclusions:
+    # - Internal headers (path contains "internal" directory or filename ends
+    #   with internal.h)
+    # - Header files included by another convenience headers provided by the
+    #   libraries, as well as the convenience headers themselves. This includes
+    #   but is not limited to:
+    #   - FIDL C++ binding internal files (use <fidl/[library]/cpp/fidl.h> and
+    #     <fidl/[library]/cpp/wire.h> instead)
+    #   - Zircon categorized syscalls headers (use <zircon/syscalls.h> instead).
+    #   - Inspect headers (use <lib/inspect/cpp/inspect.h> instead).
+    #   - banjo C/C++ headers (always use banjo C++ headers instead).
+    #   - DDK tracing headers (<lib/ddk/trace/event.h> includes an internal
+    #     header to support tracing).'
+    value:           '
+                     .*/internal/.*\.h;
+                     .*internal\.h;
+                     lib/ddk/trace/event\.h;
+                     lib/inspect/cpp/[^/]+\.h;
+                     lib/inspect/cpp/vmo/.*\.h;
+                     fidl/.*/cpp/.*;
+                     zircon/syscalls/.*\.h;
+                     .*/c/banjo\.h;
+                     '
 ...
