@@ -8,8 +8,6 @@ rustc_test("open_ap_connect") {
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
-    "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_rust",
-    "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//src/connectivity/wlan/testing/hw-sim:wlan-hw-sim",
     "//src/lib/fuchsia-async",
     "//src/lib/zircon/rust:fuchsia-zircon",

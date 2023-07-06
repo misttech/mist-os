@@ -4,13 +4,18 @@
 
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_tap::WlantapPhyEvent,
     fuchsia_zircon::DurationNum,
     futures::channel::oneshot,
     hex,
     std::panic,
-    wlan_common::{assert_variant, mac},
-    wlan_hw_sim::*,
+    wlan_hw_sim::{
+        event::{
+            branch,
+            buffered::{ActionFrame, AssocRespFrame, AuthFrame, Buffered, MgmtFrame},
+            Handler,
+        },
+        *,
+    },
 };
 
 /// Test WLAN AP implementation by simulating a client that sends out authentication and
@@ -55,72 +60,50 @@ async fn open_ap_connect() {
 
 async fn verify_auth_resp(helper: &mut test_utils::TestHelper) {
     let (sender, receiver) = oneshot::channel::<()>();
-    let mut sender = Some(sender);
-    let event_handler = event::matched(move |_, event| match event {
-        WlantapPhyEvent::Tx { ref args } => {
-            if let Some(mac::MacFrame::Mgmt { mgmt_hdr, body, .. }) =
-                mac::MacFrame::parse(&args.packet.data[..], false)
-            {
-                assert_variant!(
-                    mac::MgmtBody::parse({ mgmt_hdr.frame_ctrl }.mgmt_subtype(), body),
-                    Some(mac::MgmtBody::Authentication { auth_hdr, .. }) => {
-                        assert_eq!({ auth_hdr.status_code }, fidl_ieee80211::StatusCode::Success.into());
-                        sender.take().map(|s| s.send(()));
-                    },
-                    "expected authentication frame"
-                );
-            }
-        }
-        _ => {}
-    });
     helper
         .run_until_complete_or_timeout(
             5.seconds(),
             "waiting for authentication response",
-            event_handler,
+            event::on_transmit(event::extract(|frame: Buffered<AuthFrame>| {
+                let frame = frame.get();
+                assert_eq!(
+                    { frame.auth_hdr.status_code },
+                    fidl_ieee80211::StatusCode::Success.into()
+                );
+            }))
+            .and(event::once(|_, _| sender.send(()).expect("failed to send completion message"))),
             receiver,
         )
         .await
-        .unwrap_or_else(|oneshot::Canceled| panic!());
+        .expect("failed to verify authentication response");
 }
 
 async fn verify_assoc_resp(helper: &mut test_utils::TestHelper) {
     let (sender, receiver) = oneshot::channel::<()>();
-    let mut sender = Some(sender);
     helper
         .run_until_complete_or_timeout(
             5.seconds(),
             "waiting for association response",
-            event::matched(move |_, event| match event {
-                WlantapPhyEvent::Tx { ref args } => {
-                    if let Some(mac::MacFrame::Mgmt { mgmt_hdr, body, .. }) =
-                        mac::MacFrame::parse(&args.packet.data[..], false)
-                    {
-                        match mac::MgmtBody::parse({ mgmt_hdr.frame_ctrl }.mgmt_subtype(), body) {
-                            Some(mac::MgmtBody::AssociationResp { assoc_resp_hdr, .. }) => {
-                                assert_eq!(
-                                    { assoc_resp_hdr.status_code },
-                                    fidl_ieee80211::StatusCode::Success.into()
-                                );
-                                sender.take().map(|s| s.send(()));
-                            }
-                            Some(mac::MgmtBody::Unsupported { subtype })
-                                if subtype == mac::MgmtSubtype::ACTION => {}
-                            other => {
-                                // We might still be servicing things from the channel after the initial
-                                // association frame but if the sender has not been taken, then we haven't
-                                // serviced an association frame at all.
-                                if sender.is_some() {
-                                    panic!("expected association response frame, got {:?}", other);
-                                }
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }),
+            event::on_transmit(branch::or((
+                event::extract(|_: Buffered<ActionFrame<false>>| {}),
+                event::until_first_match(branch::or((
+                    event::extract(|frame: Buffered<AssocRespFrame>| {
+                        let frame = frame.get();
+                        assert_eq!(
+                            { frame.assoc_resp_hdr.status_code },
+                            fidl_ieee80211::StatusCode::Success.into(),
+                        );
+                    })
+                    .and(event::once(|_, _| {
+                        sender.send(()).expect("failed to send completion message")
+                    })),
+                    event::extract(|_: Buffered<MgmtFrame>| {
+                        panic!("unexpected management frame (out of order)");
+                    }),
+                ))),
+            ))),
             receiver,
         )
         .await
-        .unwrap_or_else(|oneshot::Canceled| panic!());
+        .expect("failed to verify association response");
 }

@@ -15,20 +15,29 @@ use {
     fidl_fuchsia_wlan_device_service::DeviceMonitorMarker,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_sme::{self as fidl_sme, ClientSmeProxy, ConnectRequest},
-    fidl_fuchsia_wlan_tap as wlantap, fuchsia_async as fasync,
+    fidl_fuchsia_wlan_tap as fidl_tap, fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon::DurationNum,
     futures::{
         channel::oneshot, future, join, stream::TryStreamExt, FutureExt, StreamExt, TryFutureExt,
     },
     pin_utils::pin_mut,
-    std::{panic, thread, time},
+    std::{fmt::Display, panic, sync::Arc, thread, time},
     wlan_common::{bss::Protection::Open, fake_fidl_bss_description, TimeUnit},
-    wlan_hw_sim::*,
+    wlan_hw_sim::{
+        event::{action, branch, Handler},
+        *,
+    },
 };
 
 pub const CLIENT1_MAC_ADDR: [u8; 6] = [0x68, 0x62, 0x6f, 0x6e, 0x69, 0x6c];
 pub const CLIENT2_MAC_ADDR: [u8; 6] = [0x68, 0x62, 0x6f, 0x6e, 0x69, 0x6d];
+
+#[derive(Debug)]
+struct ClientPhy<N> {
+    proxy: Arc<fidl_tap::WlantapPhyProxy>,
+    identifier: N,
+}
 
 async fn connect(
     client_sme: &ClientSmeProxy,
@@ -71,6 +80,52 @@ async fn canary(mut finish_receiver: oneshot::Receiver<()>) {
     }
 }
 
+fn transmit_to_clients<'h>(
+    clients: impl IntoIterator<Item = &'h ClientPhy<impl Display + 'h>>,
+) -> impl Handler<(), fidl_tap::WlantapPhyEvent> + 'h {
+    let handlers: Vec<_> = clients
+        .into_iter()
+        .map(|client| {
+            event::on_transmit(
+                action::send_packet(&client.proxy, rx_info_with_default_ap()).context(format!(
+                    "failed to send packet from AP to client {}",
+                    client.identifier
+                )),
+            )
+        })
+        .collect();
+    branch::try_and(handlers).expect("failed to transmit from AP")
+}
+
+fn scan_and_transmit_to_ap<'h>(
+    ap: &'h Arc<fidl_tap::WlantapPhyProxy>,
+    client: &'h ClientPhy<impl Display>,
+) -> impl Handler<(), fidl_tap::WlantapPhyEvent> + 'h {
+    let probes = [ProbeResponse {
+        channel: WLANCFG_DEFAULT_AP_CHANNEL.clone(),
+        bssid: AP_MAC_ADDR,
+        ssid: AP_SSID.clone(),
+        protection: Open,
+        rssi_dbm: 0,
+        wsc_ie: None,
+    }];
+    branch::or((
+        event::on_transmit(
+            action::send_packet(ap, rx_info_with_default_ap())
+                .context(format!("failed to send packet from client {} to AP", client.identifier)),
+        ),
+        event::on_scan(
+            action::send_advertisements_and_scan_completion(&client.proxy, probes).context(
+                format!(
+                    "failed to send probe response and scan completion to client {}",
+                    client.identifier
+                ),
+            ),
+        ),
+    ))
+    .expect("failed to scan and transmit from client")
+}
+
 /// Spawn two client and one AP wlantap devices. Verify that both clients connect to the AP by
 /// sending ethernet frames.
 #[fuchsia_async::run_singlethreaded(test)]
@@ -94,7 +149,7 @@ async fn multiple_clients_ap() {
         .create_device(wlantap_config_client(format!("wlantap-client-1"), CLIENT1_MAC_ADDR), None)
         .await
         .expect("create client1");
-    let client1_proxy = client1_helper.proxy();
+    let client1_proxy = ClientPhy { proxy: client1_helper.proxy(), identifier: 1 };
     let client1_sme = get_client_sme(&wlan_monitor_svc, client1_iface_id).await;
     let (client1_confirm_sender, client1_confirm_receiver) = oneshot::channel();
 
@@ -102,27 +157,16 @@ async fn multiple_clients_ap() {
         .create_device(wlantap_config_client(format!("wlantap-client-2"), CLIENT2_MAC_ADDR), None)
         .await
         .expect("create client2");
-    let client2_proxy = client2_helper.proxy();
+    let client2_proxy = ClientPhy { proxy: client2_helper.proxy(), identifier: 2 };
     let client2_sme = get_client_sme(&wlan_monitor_svc, client2_iface_id).await;
     let (client2_confirm_sender, client2_confirm_receiver) = oneshot::channel();
 
     let (finish_sender, finish_receiver) = oneshot::channel();
-    let mut ap_handler = EventHandlerBuilder::new()
-        .on_debug_name("ap")
-        .on_tx(|tx_args: &wlantap::TxArgs| {
-            client1_proxy
-                .rx(&tx_args.packet.data, &rx_info_with_default_ap())
-                .expect("client 1 rx failed");
-            client2_proxy
-                .rx(&tx_args.packet.data, &rx_info_with_default_ap())
-                .expect("client 2 rx failed");
-        })
-        .build();
     let ap_fut = ap_helper
         .run_until_complete_or_timeout(
             std::i64::MAX.nanos(),
             "serving as an AP",
-            event::matched(|_, event| ap_handler(event)),
+            transmit_to_clients([&client1_proxy, &client2_proxy]),
             future::join(client1_confirm_receiver, client2_confirm_receiver).then(|_| {
                 finish_sender.send(()).expect("sending finish notification");
                 future::ok(())
@@ -151,28 +195,11 @@ async fn multiple_clients_ap() {
     let client1_connect_fut = connect(&client1_sme, &mut client1_connect_req);
     pin_mut!(client1_connect_fut);
     thread::sleep(time::Duration::from_secs(3)); // Wait for the policy layer. See fxbug.dev/74991.
-    let mut client1_handler = EventHandlerBuilder::new()
-        .on_debug_name("client1")
-        .on_start_scan(start_scan_handler(
-            &client1_proxy,
-            Ok(vec![ProbeResponse {
-                channel: WLANCFG_DEFAULT_AP_CHANNEL.clone(),
-                bssid: AP_MAC_ADDR,
-                ssid: AP_SSID.clone(),
-                protection: Open,
-                rssi_dbm: 0,
-                wsc_ie: None,
-            }]),
-        ))
-        .on_tx(|tx_args: &wlantap::TxArgs| {
-            ap_proxy.rx(&tx_args.packet.data, &rx_info_with_default_ap()).expect("ap rx failed")
-        })
-        .build();
     let client1_fut = client1_helper
         .run_until_complete_or_timeout(
             std::i64::MAX.nanos(),
             "connecting to AP",
-            event::matched(|_, event| client1_handler(event)),
+            scan_and_transmit_to_ap(&ap_proxy, &client1_proxy),
             client1_connect_fut.and_then(|()| {
                 client1_confirm_sender.send(()).expect("sending confirmation");
                 future::ok(())
@@ -201,28 +228,11 @@ async fn multiple_clients_ap() {
     let client2_connect_fut = connect(&client2_sme, &mut client2_connect_req);
     pin_mut!(client2_connect_fut);
     thread::sleep(time::Duration::from_secs(3)); // Wait for the policy layer. See fxbug.dev/74991.
-    let mut client2_handler = EventHandlerBuilder::new()
-        .on_debug_name("client2")
-        .on_start_scan(start_scan_handler(
-            &client2_proxy,
-            Ok(vec![ProbeResponse {
-                channel: WLANCFG_DEFAULT_AP_CHANNEL.clone(),
-                bssid: AP_MAC_ADDR,
-                ssid: AP_SSID.clone(),
-                protection: Open,
-                rssi_dbm: 0,
-                wsc_ie: None,
-            }]),
-        ))
-        .on_tx(|tx_args: &wlantap::TxArgs| {
-            ap_proxy.rx(&tx_args.packet.data, &rx_info_with_default_ap()).expect("ap rx failed")
-        })
-        .build();
     let client2_fut = client2_helper
         .run_until_complete_or_timeout(
             std::i64::MAX.nanos(),
             "connecting to AP",
-            event::matched(|_, event| client2_handler(event)),
+            scan_and_transmit_to_ap(&ap_proxy, &client2_proxy),
             client2_connect_fut.and_then(|()| {
                 client2_confirm_sender.send(()).expect("sending confirmation");
                 future::ok(())
