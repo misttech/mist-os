@@ -264,7 +264,7 @@ be visible to Driver Manager. These package labels are also considered to be in 
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:20
+From //products/common/bringup.gni:19
 
 **Overridden from the default:** `[]`
 
@@ -272,7 +272,7 @@ From //BUILD.gn:38
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:20
+From //products/common/bringup.gni:19
 
 **Overridden from the default:** `[]`
 
@@ -2467,7 +2467,7 @@ source code.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:87
+From //.gn:86
 
 **Overridden from the default:** `""`
 
@@ -2475,7 +2475,7 @@ From //third_party/pigweed/src/third_party/emboss/emboss.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:87
+From //.gn:86
 
 **Overridden from the default:** `""`
 
@@ -4597,7 +4597,7 @@ From //build/config/BUILDCONFIG.gn:1428
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:21
+From //products/common/bringup.gni:20
 
 **Overridden from the default:** `[]`
 
@@ -4605,7 +4605,7 @@ From //BUILD.gn:39
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:21
+From //products/common/bringup.gni:20
 
 **Overridden from the default:** `[]`
 
@@ -4615,7 +4615,7 @@ From //BUILD.gn:39
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:24
+From //products/common/bringup.gni:23
 
 **Overridden from the default:** `[]`
 
@@ -4623,7 +4623,7 @@ From //BUILD.gn:47
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:24
+From //products/common/bringup.gni:23
 
 **Overridden from the default:** `[]`
 
@@ -4633,7 +4633,7 @@ From //BUILD.gn:47
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:27
+From //products/common/bringup.gni:26
 
 **Overridden from the default:** `[]`
 
@@ -4641,7 +4641,7 @@ From //BUILD.gn:56
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:27
+From //products/common/bringup.gni:26
 
 **Overridden from the default:** `[]`
 
@@ -4675,7 +4675,7 @@ From //BUILD.gn:73
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:30
+From //products/common/bringup.gni:29
 
 **Overridden from the default:** `[]`
 
@@ -4683,7 +4683,7 @@ From //BUILD.gn:65
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:30
+From //products/common/bringup.gni:29
 
 **Overridden from the default:** `[]`
 
@@ -4885,7 +4885,7 @@ they must be separated into their own list.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:18
+From //products/common/bringup.gni:17
 
 **Overridden from the default:** `[]`
 
@@ -4893,7 +4893,7 @@ From //build/images/args.gni:99
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:18
+From //products/common/bringup.gni:17
 
 **Overridden from the default:** `[]`
 
@@ -5622,7 +5622,7 @@ package flavors.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:32
+From //products/common/bringup.gni:31
 
 **Overridden from the default:** `[]`
 
@@ -5630,7 +5630,7 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:32
+From //products/common/bringup.gni:31
 
 **Overridden from the default:** `[]`
 
@@ -5849,7 +5849,7 @@ From //src/graphics/lib/magma/gnbuild/magma.gni:22
 
 A list of binary labels to include in ZBIs built for this product.
 
-**Current value for `target_cpu = "arm64"`:** `["//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
+**Current value for `target_cpu = "arm64"`:** `["//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
 From //products/bringup.gni:14
 
@@ -5857,7 +5857,7 @@ From //products/bringup.gni:14
 
 From //build/product.gni:14
 
-**Current value for `target_cpu = "x64"`:** `["//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
+**Current value for `target_cpu = "x64"`:** `["//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
 From //products/bringup.gni:14
 
@@ -5986,7 +5986,7 @@ Backend for the pw_assert module's CHECK facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_assert"`
 
-From //.gn:65
+From //.gn:64
 
 **Overridden from the default:** `""`
 
@@ -5994,7 +5994,7 @@ From //third_party/pigweed/src/pw_assert/backend.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_assert"`
 
-From //.gn:65
+From //.gn:64
 
 **Overridden from the default:** `""`
 
@@ -6088,7 +6088,7 @@ Explicitly setting a target's visibility overrides this default.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/*"]`
 
-From //.gn:62
+From //.gn:61
 
 **Overridden from the default:** `"*"`
 
@@ -6096,7 +6096,7 @@ From //third_party/pigweed/src/pw_build/defaults.gni:38
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/*"]`
 
-From //.gn:62
+From //.gn:61
 
 **Overridden from the default:** `"*"`
 
@@ -6136,7 +6136,7 @@ libraries such as pw_assert.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:78
+From //.gn:77
 
 **Overridden from the default:** `[]`
 
@@ -6144,7 +6144,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:24
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:78
+From //.gn:77
 
 **Overridden from the default:** `[]`
 
@@ -6215,7 +6215,7 @@ Backend for the pw_chrono module's system_clock.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_clock"`
 
-From //.gn:68
+From //.gn:67
 
 **Overridden from the default:** `""`
 
@@ -6223,7 +6223,7 @@ From //third_party/pigweed/src/pw_chrono/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_clock"`
 
-From //.gn:68
+From //.gn:67
 
 **Overridden from the default:** `""`
 
@@ -6347,7 +6347,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_function:define_overrides"`
 
-From //.gn:75
+From //.gn:74
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -6355,7 +6355,7 @@ From //third_party/pigweed/src/pw_function/BUILD.gn:27
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_function:define_overrides"`
 
-From //.gn:75
+From //.gn:74
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -6367,7 +6367,7 @@ Backend for the pw_log module.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_log"`
 
-From //.gn:66
+From //.gn:65
 
 **Overridden from the default:** `""`
 
@@ -6375,7 +6375,7 @@ From //third_party/pigweed/src/pw_log/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_log"`
 
-From //.gn:66
+From //.gn:65
 
 **Overridden from the default:** `""`
 
@@ -6519,7 +6519,7 @@ To override the protobuf compiler used set this to the path, relative to the roo
 
 **Current value for `target_cpu = "arm64"`:** `"host_x64/protoc"`
 
-From //.gn:100
+From //.gn:99
 
 **Overridden from the default:** `""`
 
@@ -6527,7 +6527,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:39
 
 **Current value for `target_cpu = "x64"`:** `"host_x64/protoc"`
 
-From //.gn:100
+From //.gn:99
 
 **Overridden from the default:** `""`
 
@@ -6539,7 +6539,7 @@ To override the protobuf compiler used set this to the GN target that builds the
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:99
+From //.gn:98
 
 **Overridden from the default:** `""`
 
@@ -6547,7 +6547,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:36
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:99
+From //.gn:98
 
 **Overridden from the default:** `""`
 
@@ -6683,7 +6683,7 @@ Backend for the pw_sync module's mutex.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync_baremetal:mutex"`
 
-From //.gn:69
+From //.gn:68
 
 **Overridden from the default:** `""`
 
@@ -6691,7 +6691,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:26
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync_baremetal:mutex"`
 
-From //.gn:69
+From //.gn:68
 
 **Overridden from the default:** `""`
 
@@ -6745,7 +6745,7 @@ Backend for the pw_sys_io facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sys_io_stdio"`
 
-From //.gn:70
+From //.gn:69
 
 **Overridden from the default:** `""`
 
@@ -6753,7 +6753,7 @@ From //third_party/pigweed/src/pw_sys_io/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sys_io_stdio"`
 
-From //.gn:70
+From //.gn:69
 
 **Overridden from the default:** `""`
 
@@ -6768,7 +6768,7 @@ use Pigweed's boringssl exclusively.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/boringssl"`
 
-From //.gn:84
+From //.gn:83
 
 **Overridden from the default:** `""`
 
@@ -6776,7 +6776,7 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:25
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/boringssl"`
 
-From //.gn:84
+From //.gn:83
 
 **Overridden from the default:** `""`
 
@@ -6838,7 +6838,7 @@ Backend for the pw_thread module's pw::thread::sleep_{for,until}.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_thread_stl:sleep"`
 
-From //.gn:71
+From //.gn:70
 
 **Overridden from the default:** `""`
 
@@ -6846,7 +6846,7 @@ From //third_party/pigweed/src/pw_thread/backend.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_thread_stl:sleep"`
 
-From //.gn:71
+From //.gn:70
 
 **Overridden from the default:** `""`
 
@@ -7695,7 +7695,7 @@ an extension mechanism for SDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:34
+From //products/common/bringup.gni:33
 
 **Overridden from the default:** `[]`
 
@@ -7703,7 +7703,7 @@ From //BUILD.gn:89
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:34
+From //products/common/bringup.gni:33
 
 **Overridden from the default:** `[]`
 
