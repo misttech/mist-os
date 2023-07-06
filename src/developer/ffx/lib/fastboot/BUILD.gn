@@ -26,7 +26,7 @@ if (is_host) {
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-async",
       "//src/lib/gcs:lib",
-      "//src/storage/lib/sparse",
+      "//src/storage/lib/sparse/rust:lib",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-fs",
       "//third_party/rust_crates:async-trait",
