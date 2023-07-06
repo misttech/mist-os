@@ -17,7 +17,6 @@
         {
             name: "perfetto-bridge",
             url: "#meta/perfetto-bridge.cm",
-            startup: "eager",
         },
         {
             name: "perfetto_producer",
