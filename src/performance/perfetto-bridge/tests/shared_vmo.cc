@@ -28,8 +28,8 @@ std::unique_ptr<SharedVmo> SharedVmo::AdoptVmo(zx::vmo vmo) {
 
   zx_vaddr_t vmar_base;
   zx::vmar vmar;
-  result = zx::vmar(zx_vmar_root_self())
-               .allocate(ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0, vmo_size, &vmar, &vmar_base);
+  result = zx::vmar::root_self()->allocate(ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0, vmo_size,
+                                           &vmar, &vmar_base);
   if (result != ZX_OK) {
     return nullptr;
   }
