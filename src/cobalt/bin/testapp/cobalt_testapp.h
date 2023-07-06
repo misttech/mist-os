@@ -5,7 +5,6 @@
 #ifndef SRC_COBALT_BIN_TESTAPP_COBALT_TESTAPP_H_
 #define SRC_COBALT_BIN_TESTAPP_COBALT_TESTAPP_H_
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/binding.h>
@@ -60,7 +59,6 @@ class CobaltTestApp {
 
   std::unique_ptr<async::Loop> loop_;
   std::unique_ptr<sys::ComponentContext> context_;
-  fuchsia::sys::ComponentControllerPtr controller_;
   fuchsia::cobalt::ControllerSyncPtr cobalt_controller_;
   fuchsia::cobalt::SystemDataUpdaterSyncPtr system_data_updater_;
   fuchsia::diagnostics::ArchiveAccessorSyncPtr inspect_archive_;

@@ -5,7 +5,6 @@
 #ifndef SRC_PERFORMANCE_TRACE_COMMANDS_RECORD_H_
 #define SRC_PERFORMANCE_TRACE_COMMANDS_RECORD_H_
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/zx/process.h>
 #include <lib/zx/time.h>
@@ -71,8 +70,6 @@ class RecordCommand : public CommandWithController {
   void OnAlert(std::string alert_name);
 
   async_dispatcher_t* dispatcher_;
-  fuchsia::sys::ComponentControllerPtr component_controller_;
-  fuchsia::sys::EnvironmentControllerPtr environment_controller_;
   zx::process spawned_app_;
   async::WaitMethod<RecordCommand, &RecordCommand::OnSpawnedAppExit> wait_spawned_app_;
 

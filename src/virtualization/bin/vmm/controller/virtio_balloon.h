@@ -6,7 +6,6 @@
 #define SRC_VIRTUALIZATION_BIN_VMM_CONTROLLER_VIRTIO_BALLOON_H_
 
 #include <fidl/fuchsia.virtualization.hardware/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
@@ -34,7 +33,6 @@ class VirtioBalloon
 
  private:
   fidl::BindingSet<fuchsia::virtualization::BalloonController> bindings_;
-  fuchsia::sys::ComponentControllerPtr controller_;
   fidl::WireSharedClient<fuchsia_virtualization_hardware::VirtioBalloon> balloon_;
 
   zx_status_t ConfigureQueue(uint16_t queue, uint16_t size, zx_gpaddr_t desc, zx_gpaddr_t avail,

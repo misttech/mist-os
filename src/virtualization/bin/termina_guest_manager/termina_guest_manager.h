@@ -5,7 +5,6 @@
 #ifndef SRC_VIRTUALIZATION_BIN_TERMINA_GUEST_MANAGER_TERMINA_GUEST_MANAGER_H_
 #define SRC_VIRTUALIZATION_BIN_TERMINA_GUEST_MANAGER_TERMINA_GUEST_MANAGER_H_
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
 

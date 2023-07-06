@@ -5,7 +5,6 @@
 #ifndef SRC_VIRTUALIZATION_BIN_VMM_CONTROLLER_VIRTIO_CONSOLE_H_
 #define SRC_VIRTUALIZATION_BIN_VMM_CONTROLLER_VIRTIO_CONSOLE_H_
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/virtualization/hardware/cpp/fidl.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/zx/socket.h>
@@ -34,7 +33,6 @@ class VirtioConsole : public VirtioComponentDevice<VIRTIO_ID_CONSOLE, kVirtioCon
                     async_dispatcher_t* dispatcher);
 
  private:
-  fuchsia::sys::ComponentControllerPtr controller_;
   // Use a sync pointer for consistency of virtual machine execution.
   fuchsia::virtualization::hardware::VirtioConsoleSyncPtr console_;
 

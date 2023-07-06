@@ -212,7 +212,6 @@ hlcpp_visibility = [
   "//src/lib/intl/intl_property_provider_impl:*",
   "//src/lib/intl/lookup/rust:*",
   "//src/lib/intl/time_zone_info:*",
-  "//src/lib/loader:*",
   "//src/lib/metrics_buffer:*",
   "//src/lib/process:*",
   "//src/lib/test-suite:*",

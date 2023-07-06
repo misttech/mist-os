@@ -15,7 +15,6 @@
 #include <fuchsia/posix/socket/cpp/fidl.h>
 #include <fuchsia/process/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
@@ -155,8 +154,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
             {.capabilities = {Protocol{fuchsia::web::ContextProvider::Name_}},
              .source = ChildRef{kWebContextProvider},
              .targets = {target}},
-            {.capabilities = {Protocol{fuchsia::sys::Environment::Name_},
-                              Protocol{fuchsia::logger::LogSink::Name_},
+            {.capabilities = {Protocol{fuchsia::logger::LogSink::Name_},
                               Protocol{fuchsia::media::ProfileProvider::Name_},
                               Protocol{fuchsia::media::AudioDeviceEnumerator::Name_}},
              .source = ParentRef(),

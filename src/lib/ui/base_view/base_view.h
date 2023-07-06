@@ -13,9 +13,7 @@
 #include <lib/ui/scenic/cpp/session.h>
 #include <lib/ui/scenic/cpp/view_ref_pair.h>
 
-#include "src/lib/ui/base_view/embedded_view_utils.h"
 #include "src/lib/ui/base_view/math.h"
-
 
 // Deprecated. See fxb/103477.
 

@@ -6,7 +6,6 @@
 #define SRC_VIRTUALIZATION_BIN_VMM_CONTROLLER_VIRTIO_GPU_H_
 
 #include <fidl/fuchsia.virtualization.hardware/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/virtualization/hardware/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/sys/cpp/component_context.h>
@@ -37,7 +36,6 @@ class VirtioGpu
     READY,
   } state_ = State::NOT_READY;
   std::shared_ptr<sys::ServiceDirectory> services_;
-  fuchsia::sys::ComponentControllerPtr controller_;
   // Use a sync pointer for consistency of virtual machine execution.
   fidl::WireSharedClient<fuchsia_virtualization_hardware::VirtioGpu> gpu_;
 

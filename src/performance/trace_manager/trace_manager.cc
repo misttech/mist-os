@@ -4,7 +4,6 @@
 
 #include "src/performance/trace_manager/trace_manager.h"
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/tracing/cpp/fidl.h>
 #include <lib/fidl/cpp/clone.h>
 #include <lib/fpromise/bridge.h>

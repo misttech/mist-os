@@ -10,7 +10,6 @@
 #define SRC_TESTS_FIDL_COMPATIBILITY_HLCPP_CLIENT_APP_H_
 
 #include <fidl/test/compatibility/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/sys/cpp/component_context.h>
 
 #include <memory>

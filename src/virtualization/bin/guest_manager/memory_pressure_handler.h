@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.memorypressure/cpp/fidl.h>
 #include <fidl/fuchsia.virtualization/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/zx/time.h>

@@ -15,7 +15,6 @@
 #include <fuchsia/posix/socket/cpp/fidl.h>
 #include <fuchsia/process/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
@@ -473,8 +472,6 @@ class WebEngineTest : public ui_testing::PortableUITest,
   uint32_t display_width() { return display_size().width; }
   uint32_t display_height() { return display_size().height; }
 
-  fuchsia::sys::ComponentControllerPtr& client_component() { return client_component_; }
-
   bool use_flatland() override { return std::get<0>(this->GetParam()).use_flatland; }
 
   uint32_t display_rotation() override { return std::get<0>(this->GetParam()).display_rotation; }
@@ -506,8 +503,6 @@ class WebEngineTest : public ui_testing::PortableUITest,
   }
 
   std::shared_ptr<ResponseState> response_state_ = std::make_shared<ResponseState>();
-
-  fuchsia::sys::ComponentControllerPtr client_component_;
 
   static constexpr auto kFontsProvider = "fonts_provider";
   static constexpr auto kFontsProviderUrl = "#meta/font_provider_hermetic_for_test.cm";
@@ -553,22 +548,6 @@ TEST_P(WebEngineTest, ChromiumTap) {
   FX_LOGS(INFO) << "Initializing scene";
   LaunchClient();
   FX_LOGS(INFO) << "Client launched";
-
-  // Note well: unlike cpp-gfx-client, the web app may be rendering before it is hittable.
-  // Nonetheless, waiting for rendering is better than injecting the touch immediately. In the event
-  // that the app is not hittable, `TryInject()` will retry.
-  client_component().events().OnTerminated = [](int64_t return_code,
-                                                fuchsia::sys::TerminationReason reason) {
-    // Unlike the C++ app, the process hosting the web app's logic doesn't retain the view
-    // token for the life of the app (the process passes that token on to the web engine
-    // process). Consequently, we can't just rely on the IsViewDisconnected message to
-    // detect early termination of the app.
-    if (return_code != 0) {
-      FX_LOGS(FATAL) << "web-touch-input-chromium terminated abnormally with return_code="
-                     << return_code << ", reason="
-                     << static_cast<std::underlying_type_t<decltype(reason)>>(reason);
-    }
-  };
 
   TryInject();
   RunLoopUntil([this] {

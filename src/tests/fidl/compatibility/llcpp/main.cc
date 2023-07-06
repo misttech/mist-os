@@ -7,7 +7,6 @@
 #include <fidl/fidl.test.compatibility/cpp/wire_types.h>
 #include <fidl/fidl.test.imported/cpp/wire.h>
 #include <fidl/fidl.test.imported/cpp/wire_types.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/directory.h>

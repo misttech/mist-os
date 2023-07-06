@@ -6,7 +6,6 @@
 #define SRC_CAMERA_BIN_CAMERA_GYM_CONTROLLER_CLIENT_CONTROLLER_CLIENT_APP_H_
 
 #include <fuchsia/camera/gym/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fit/function.h>
 #include <lib/sys/cpp/component_context.h>

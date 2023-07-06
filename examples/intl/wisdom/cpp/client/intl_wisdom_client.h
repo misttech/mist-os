@@ -5,7 +5,6 @@
 #ifndef EXAMPLES_INTL_WISDOM_CPP_CLIENT_INTL_WISDOM_CLIENT_H_
 #define EXAMPLES_INTL_WISDOM_CPP_CLIENT_INTL_WISDOM_CLIENT_H_
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/sys/cpp/component_context.h>
 
 #include "examples/intl/wisdom/cpp/client/icu_headers.h"
@@ -41,7 +40,6 @@ class IntlWisdomClient {
   IntlWisdomClient& operator=(const IntlWisdomClient&) = delete;
 
   std::unique_ptr<sys::ComponentContext> startup_context_;
-  fuchsia::sys::ComponentControllerPtr controller_;
   fuchsia::examples::intl::wisdom::IntlWisdomServerPtr server_;
 };
 

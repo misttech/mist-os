@@ -9,8 +9,6 @@ source_set("base_view") {
   sources = [
     "base_view.cc",
     "base_view.h",
-    "embedded_view_utils.cc",
-    "embedded_view_utils.h",
     "math.h",
     "view_provider_component.cc",
     "view_provider_component.h",

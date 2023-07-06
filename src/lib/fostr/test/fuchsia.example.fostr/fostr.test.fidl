@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 library fuchsia.example.fostr;
 
+open protocol ExampleProtocol {};
+
 type ExampleBits = strict bits {
     A = 1;
     B = 2;

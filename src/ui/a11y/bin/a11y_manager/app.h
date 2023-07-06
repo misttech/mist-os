@@ -10,7 +10,6 @@
 #include <fuchsia/accessibility/virtualkeyboard/cpp/fidl.h>
 #include <fuchsia/intl/cpp/fidl.h>
 #include <fuchsia/settings/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/ui/focus/cpp/fidl.h>
 #include <fuchsia/ui/input/accessibility/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>

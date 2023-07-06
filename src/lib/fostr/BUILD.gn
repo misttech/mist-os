@@ -61,17 +61,12 @@ test("fostr-test-bin") {
     ":fostr",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/fidl/cpp",
     "//src/lib/fostr/fidl/fuchsia.example.fostr",
     "//src/lib/fostr/fidl/fuchsia.example.fostr2",
     "//src/lib/fsl",
-    "//src/lib/testing/predicates",
-
-    # TODO(fxbug.dev/7945): Remove dependency on fuchsia.sys. We should instead be
-    # using the fuchsia.example.fostr library to avoid changes in unrelated code
-    # to break tests here.
-    "//sdk/fidl/fuchsia.sys:fuchsia.sys_hlcpp",
-    "//sdk/lib/fidl/cpp",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]

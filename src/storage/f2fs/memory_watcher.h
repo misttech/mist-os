@@ -6,7 +6,6 @@
 #define SRC_STORAGE_F2FS_MEMORY_WATCHER_H_
 
 #include <fidl/fuchsia.memorypressure/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/client.h>

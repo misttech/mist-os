@@ -6,7 +6,6 @@
 
 #include <fuchsia/camera/test/cpp/fidl.h>
 #include <fuchsia/camera2/hal/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/syslog/cpp/macros.h>

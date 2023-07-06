@@ -7,7 +7,6 @@
 #include <fuchsia/intl/cpp/fidl.h>
 #include <fuchsia/settings/cpp/fidl.h>
 #include <fuchsia/settings/cpp/fidl_test_base.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>

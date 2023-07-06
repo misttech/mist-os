@@ -4,7 +4,6 @@
 
 #include "src/performance/trace/tests/run_test.h"
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/directory.h>

@@ -5,7 +5,6 @@
 #ifndef SRC_VIRTUALIZATION_BIN_VMM_CONTROLLER_VIRTIO_BLOCK_H_
 #define SRC_VIRTUALIZATION_BIN_VMM_CONTROLLER_VIRTIO_BLOCK_H_
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/virtualization/hardware/cpp/fidl.h>
 #include <lib/sys/cpp/component_context.h>
 
@@ -28,7 +27,6 @@ class VirtioBlock
  private:
   fuchsia::virtualization::BlockMode mode_;
   fuchsia::virtualization::BlockFormat format_;
-  fuchsia::sys::ComponentControllerPtr controller_;
   // Use a sync pointer for consistency of virtual machine execution.
   fuchsia::virtualization::hardware::VirtioBlockSyncPtr block_;
 

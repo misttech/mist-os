@@ -5,7 +5,6 @@
 #ifndef SRC_VIRTUALIZATION_BIN_VMM_CONTROLLER_VIRTIO_RNG_H_
 #define SRC_VIRTUALIZATION_BIN_VMM_CONTROLLER_VIRTIO_RNG_H_
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/virtualization/hardware/cpp/fidl.h>
 #include <lib/sys/cpp/component_context.h>
 
@@ -27,7 +26,6 @@ class VirtioRng
                     async_dispatcher_t* dispatcher);
 
  private:
-  fuchsia::sys::ComponentControllerPtr controller_;
   // Use a sync pointer for consistency of virtual machine execution.
   fuchsia::virtualization::hardware::VirtioRngSyncPtr rng_;
 

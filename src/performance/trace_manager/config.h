@@ -5,8 +5,6 @@
 #ifndef SRC_PERFORMANCE_TRACE_MANAGER_CONFIG_H_
 #define SRC_PERFORMANCE_TRACE_MANAGER_CONFIG_H_
 
-#include <fuchsia/sys/cpp/fidl.h>
-
 #include <map>
 #include <string>
 
@@ -30,12 +28,8 @@ class Config {
   // category being described by a short string.
   const std::map<std::string, std::string>& known_categories() const { return known_categories_; }
 
-  // Well-known providers to start automatically.
-  const std::map<std::string, fuchsia::sys::LaunchInfoPtr>& providers() const { return providers_; }
-
  private:
   std::map<std::string, std::string> known_categories_;
-  std::map<std::string, fuchsia::sys::LaunchInfoPtr> providers_;
 };
 
 }  // namespace tracing

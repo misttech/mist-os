@@ -5,7 +5,6 @@
 #ifndef SRC_DEVELOPER_DEBUG_DEBUG_AGENT_ZIRCON_COMPONENT_MANAGER_H_
 #define SRC_DEVELOPER_DEBUG_DEBUG_AGENT_ZIRCON_COMPONENT_MANAGER_H_
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/sys2/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/sys/cpp/service_directory.h>

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/web/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
@@ -23,54 +22,6 @@
 // See also: https://chromium.googlesource.com/chromium/src/+/HEAD/fuchsia
 namespace {
 using namespace component_testing;
-
-// This is a black box smoke test for whether the web runner in a given system
-// is capable of performing basic operations.
-//
-// This tests if launching a component with an HTTP URL triggers an HTTP GET for
-// the main resource, and if an HTML response with an <img> tag triggers a
-// subresource load for the image.
-//
-// See also:
-// https://chromium.googlesource.com/chromium/src/+/HEAD/fuchsia/runners/web/web_runner_smoke_test.cc
-//
-// Web Runner migration to Component Framework V2 is in progress
-// https://bugs.chromium.org/p/chromium/issues/detail?id=1065707 This test case should be replaced
-// when web_runner v2 is available.
-//
-// TODO(fxbug.dev/105686): This tests is currently disabled, awaiting migration to use existing test
-// utilities in src/ui/tests.
-TEST(WebRunnerIntegrationTest, DISABLED_Smoke) {
-  web_runner_tests::TestServer server;
-  FX_CHECK(server.FindAndBindPort());
-
-  fuchsia::sys::LaunchInfo launch_info;
-  launch_info.url = fxl::StringPrintf("http://localhost:%d/foo.html", server.port());
-
-  fuchsia::sys::LauncherSyncPtr launcher;
-  sys::ServiceDirectory::CreateFromNamespace()->Connect(launcher.NewRequest());
-
-  fuchsia::sys::ComponentControllerSyncPtr controller;
-  launcher->CreateComponent(std::move(launch_info), controller.NewRequest());
-
-  ASSERT_TRUE(server.Accept());
-
-  std::string expected_prefix = "GET /foo.html HTTP";
-  // We need to overallocate the first time to drain the read since we expect
-  // the subsresource load on the same connection.
-  std::string buf(4096, 0);
-  ASSERT_TRUE(server.Read(&buf));
-  EXPECT_EQ(expected_prefix, buf.substr(0, expected_prefix.size()));
-
-  FX_CHECK(server.WriteContent("<!doctype html><img src=\"/img.png\">"));
-
-  expected_prefix = "GET /img.png HTTP";
-  buf.resize(expected_prefix.size());
-  ASSERT_TRUE(server.Read(&buf));
-
-  ASSERT_GE(buf.size(), expected_prefix.size());
-  EXPECT_EQ(expected_prefix, std::string(buf.data(), expected_prefix.size()));
-}
 
 class MockNavigationEventListener : public fuchsia::web::NavigationEventListener {
  public:

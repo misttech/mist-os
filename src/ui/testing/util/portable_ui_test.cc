@@ -6,7 +6,6 @@
 
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/display/singleton/cpp/fidl.h>
@@ -55,7 +54,6 @@ void PortableUITest::SetUpRealmBase() {
   realm_builder_.AddRoute(
       Route{.capabilities = {Protocol{fuchsia::logger::LogSink::Name_},
                              Protocol{fuchsia::scheduler::ProfileProvider::Name_},
-                             Protocol{fuchsia::sys::Environment::Name_},
                              Protocol{fuchsia::sysmem::Allocator::Name_},
                              Protocol{fuchsia::vulkan::loader::Loader::Name_},
                              Protocol{fuchsia::tracing::provider::Registry::Name_}},

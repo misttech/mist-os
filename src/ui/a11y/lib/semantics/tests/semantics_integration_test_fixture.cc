@@ -15,7 +15,6 @@
 #include <fuchsia/posix/socket/cpp/fidl.h>
 #include <fuchsia/process/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
@@ -78,7 +77,6 @@ std::vector<ui_testing::UITestRealm::Config> SemanticsIntegrationTestV2::UIConfi
   std::vector<ui_testing::UITestRealm::Config> configs;
   const std::vector<component_testing::Capability> passthrough_capabilities = {
       Protocol{fuchsia::kernel::VmexResource::Name_},
-      Protocol{fuchsia::sys::Environment::Name_},
       Protocol{fuchsia::process::Launcher::Name_},
       Directory{
           .name = "root-ssl-certificates",

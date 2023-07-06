@@ -5,7 +5,6 @@
 #ifndef SRC_PERFORMANCE_TRACE_TESTS_RUN_TEST_H_
 #define SRC_PERFORMANCE_TRACE_TESTS_RUN_TEST_H_
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>

@@ -6,7 +6,6 @@
 
 #include <fuchsia/feedback/cpp/fidl.h>
 #include <fuchsia/math/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/fpromise/result.h>
 #include <lib/inspect/cpp/vmo/types.h>

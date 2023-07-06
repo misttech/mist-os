@@ -5,7 +5,6 @@
 #ifndef SRC_VIRTUALIZATION_BIN_VMM_CONTROLLER_VIRTIO_MAGMA_H_
 #define SRC_VIRTUALIZATION_BIN_VMM_CONTROLLER_VIRTIO_MAGMA_H_
 
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/zx/vmar.h>
 #include <zircon/compiler.h>
@@ -30,7 +29,6 @@ class VirtioMagma
                     ::sys::ComponentContext* context, async_dispatcher_t* dispatcher);
 
  private:
-  fuchsia::sys::ComponentControllerPtr controller_;
   // Use a sync pointer for consistency of virtual machine execution.
   fuchsia::virtualization::hardware::VirtioMagmaSyncPtr magma_;
 

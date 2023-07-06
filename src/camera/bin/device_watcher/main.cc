@@ -7,7 +7,6 @@
 #include <fuchsia/camera3/cpp/fidl.h>
 #include <fuchsia/component/cpp/fidl.h>
 #include <fuchsia/hardware/camera/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>

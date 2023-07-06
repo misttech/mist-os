@@ -5,7 +5,6 @@
 #include "src/performance/trace/commands/record.h"
 
 #include <errno.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/fdio/spawn.h>
@@ -315,7 +314,13 @@ void RecordCommand::Start(const fxl::CommandLine& command_line) {
       return;
     }
     if (!options_.app.empty()) {
-      options_.spawn ? LaunchSpawnedApp() : LaunchComponentApp();
+      if (!options_.spawn) {
+        FX_LOGS(ERROR) << "`--spawn` must be set";
+        tracing_ = false;
+        Done(EXIT_FAILURE);
+        return;
+      }
+      LaunchSpawnedApp();
     }
     StartTimer();
   });
@@ -366,61 +371,6 @@ static std::string JoinArgsForLogging(const std::vector<std::string>& args) {
   }
 
   return result;
-}
-
-void RecordCommand::LaunchComponentApp() {
-  fuchsia::sys::LaunchInfo launch_info;
-  launch_info.url = options_.app;
-  launch_info.arguments = options_.args;
-
-  // Include the arguments here for when invoked by traceutil: It's useful to
-  // see how the passed command+args ended up after shell processing.
-  FX_LOGS(INFO) << "Launching: " << launch_info.url << " " << JoinArgsForLogging(options_.args);
-
-  fuchsia::sys::LauncherPtr launcher;
-  if (options_.environment_name.has_value()) {
-    fuchsia::sys::EnvironmentPtr environment;
-    context()->svc()->Connect(environment.NewRequest());
-    fuchsia::sys::EnvironmentPtr nested_environment;
-    environment->CreateNestedEnvironment(
-        nested_environment.NewRequest(), environment_controller_.NewRequest(),
-        options_.environment_name.value(), nullptr,
-        fuchsia::sys::EnvironmentOptions{/*inherit_parent_services*/ true,
-                                         /*allow_parent_runners*/ true,
-                                         /*kill_on_oom*/ true,
-                                         /*delete_storage_on_death*/ true});
-
-    nested_environment->GetLauncher(launcher.NewRequest());
-  } else {
-    context()->svc()->Connect(launcher.NewRequest());
-  }
-  launcher->CreateComponent(std::move(launch_info), component_controller_.NewRequest());
-
-  component_controller_.set_error_handler([this](zx_status_t error) {
-    out() << "Error launching component: " << error << "/" << zx_status_get_string(error)
-          << std::endl;
-    if (!options_.decouple)
-      // The trace might have been already stopped by the |Wait()| callback. In
-      // that case, |TerminateTrace| below does nothing.
-      TerminateTrace(EXIT_FAILURE);
-  });
-  component_controller_.events().OnTerminated =
-      [this](int64_t return_code, fuchsia::sys::TerminationReason termination_reason) {
-        out() << "Application exited with return code " << return_code << std::endl;
-        // Disable the error handler, the application has terminated. We can see things like
-        // PEER_CLOSED for channels here which we don't care about any more.
-        component_controller_.set_error_handler([](zx_status_t error) {});
-        if (!options_.decouple) {
-          if (options_.return_child_result) {
-            TerminateTrace(return_code);
-          } else {
-            TerminateTrace(EXIT_SUCCESS);
-          }
-        }
-      };
-  if (options_.detach) {
-    component_controller_->Detach();
-  }
 }
 
 void RecordCommand::LaunchSpawnedApp() {

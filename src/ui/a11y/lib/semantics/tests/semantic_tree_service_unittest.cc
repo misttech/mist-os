@@ -5,7 +5,6 @@
 #include "src/ui/a11y/lib/semantics/semantic_tree_service.h"
 
 #include <fuchsia/accessibility/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/fd.h>

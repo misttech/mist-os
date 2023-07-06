@@ -4,7 +4,6 @@
 
 #include <fuchsia/example/fostr/cpp/fidl.h>
 #include <fuchsia/example/fostr2/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 
@@ -665,8 +664,8 @@ TEST(FidlTypes, StdVectorOfInt8) {
 
 TEST(FidlTypes, UnboundBinding) {
   std::ostringstream os;
-  fuchsia::sys::ServiceProvider* impl = nullptr;
-  fidl::Binding<fuchsia::sys::ServiceProvider> binding(impl);
+  fuchsia::example::fostr::ExampleProtocol* impl = nullptr;
+  fidl::Binding<fuchsia::example::fostr::ExampleProtocol> binding(impl);
 
   os << binding;
   EXPECT_EQ("<not bound>", os.str());
@@ -676,8 +675,8 @@ TEST(FidlTypes, Binding) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   std::ostringstream os;
-  fuchsia::sys::ServiceProvider* impl = nullptr;
-  fidl::Binding<fuchsia::sys::ServiceProvider> binding(impl);
+  fuchsia::example::fostr::ExampleProtocol* impl = nullptr;
+  fidl::Binding<fuchsia::example::fostr::ExampleProtocol> binding(impl);
   auto interface_handle = binding.NewBinding();
 
   os << binding;
@@ -694,7 +693,7 @@ TEST(FidlTypes, Binding) {
 
 TEST(FidlTypes, UnboundInterfaceHandle) {
   std::ostringstream os;
-  fidl::InterfaceHandle<fuchsia::sys::ServiceProvider> interface_handle;
+  fidl::InterfaceHandle<fuchsia::example::fostr::ExampleProtocol> interface_handle;
 
   os << interface_handle;
   EXPECT_EQ("<not valid>", os.str());
@@ -704,8 +703,8 @@ TEST(FidlTypes, InterfaceHandle) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   std::ostringstream os;
-  fuchsia::sys::ServiceProvider* impl = nullptr;
-  fidl::Binding<fuchsia::sys::ServiceProvider> binding(impl);
+  fuchsia::example::fostr::ExampleProtocol* impl = nullptr;
+  fidl::Binding<fuchsia::example::fostr::ExampleProtocol> binding(impl);
   auto interface_handle = binding.NewBinding();
 
   os << interface_handle;
@@ -722,7 +721,7 @@ TEST(FidlTypes, InterfaceHandle) {
 
 TEST(FidlTypes, UnboundInterfacePtr) {
   std::ostringstream os;
-  fidl::InterfacePtr<fuchsia::sys::ServiceProvider> interface_ptr;
+  fidl::InterfacePtr<fuchsia::example::fostr::ExampleProtocol> interface_ptr;
 
   os << interface_ptr;
   EXPECT_EQ("<not bound>", os.str());
@@ -732,7 +731,7 @@ TEST(FidlTypes, InterfacePtr) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   std::ostringstream os;
-  fidl::InterfacePtr<fuchsia::sys::ServiceProvider> interface_ptr;
+  fidl::InterfacePtr<fuchsia::example::fostr::ExampleProtocol> interface_ptr;
   auto interface_request = interface_ptr.NewRequest();
 
   os << interface_ptr;
@@ -749,7 +748,7 @@ TEST(FidlTypes, InterfacePtr) {
 
 TEST(FidlTypes, InvalidInterfaceRequest) {
   std::ostringstream os;
-  fidl::InterfaceRequest<fuchsia::sys::ServiceProvider> interface_request;
+  fidl::InterfaceRequest<fuchsia::example::fostr::ExampleProtocol> interface_request;
 
   os << interface_request;
   EXPECT_EQ("<not valid>", os.str());
@@ -759,7 +758,7 @@ TEST(FidlTypes, InterfaceRequest) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   std::ostringstream os;
-  fidl::InterfacePtr<fuchsia::sys::ServiceProvider> interface_ptr;
+  fidl::InterfacePtr<fuchsia::example::fostr::ExampleProtocol> interface_ptr;
   auto interface_request = interface_ptr.NewRequest();
 
   os << interface_request;

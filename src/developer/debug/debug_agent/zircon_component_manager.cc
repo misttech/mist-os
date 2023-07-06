@@ -6,7 +6,6 @@
 
 #include <fuchsia/diagnostics/cpp/fidl.h>
 #include <fuchsia/io/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/sys2/cpp/fidl.h>
 #include <fuchsia/test/manager/cpp/fidl.h>
 #include <lib/fit/defer.h>
