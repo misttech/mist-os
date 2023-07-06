@@ -1384,7 +1384,6 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         // TODO(https://fxbug.dev/104300): Check if local_ip is a unicast address.
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
             |ip_transport_ctx, Sockets { bound_state: socket_bound_state, port_alloc, inactive, socketmap }| {
-                debug!("bind {id:?} to {addr:?}:{}", port.map_or(0, NonZeroU16::get));
                 let port = match port {
                     None => {
                         let addr = addr.as_ref().map(ZonedAddr::addr);
@@ -1397,6 +1396,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     }
                     Some(port) => port,
                 };
+                debug!("bind {id:?} to {addr:?}:{}", port.get());
                 let inactive_entry = match inactive.entry(id.into()) {
                     IdMapEntry::Vacant(_) => panic!("invalid unbound ID"),
                     IdMapEntry::Occupied(o) => o,
