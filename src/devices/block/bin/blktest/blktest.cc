@@ -197,7 +197,7 @@ TEST(BlkdevTests, blkdev_test_fifo_basic) {
   // Send a handle to the vmo to the block device, get a vmoid which identifies it
   zx::result vmoid_result = block_client.RegisterVmo(vmo);
   ASSERT_OK(vmoid_result);
-  vmoid_t vmoid = vmoid_result.value().TakeId();
+  vmoid_t vmoid = vmoid_result->get();
 
   // Batch write the VMO to the blkdev
   // Split it into two requests, spread across the disk
@@ -264,7 +264,7 @@ TEST(BlkdevTests, DISABLED_blkdev_test_fifo_whole_disk) {
   // Send a handle to the vmo to the block device, get a vmoid which identifies it
   zx::result vmoid_result = block_client.RegisterVmo(vmo);
   ASSERT_OK(vmoid_result);
-  vmoid_t vmoid = vmoid_result.value().TakeId();
+  vmoid_t vmoid = vmoid_result->get();
 
   // Batch write the VMO to the blkdev
   block_fifo_request_t request = {
@@ -311,6 +311,7 @@ void CreateVmoHelper(block_client::Client& block_client, TestVmoObject& obj, siz
   ASSERT_NO_FATAL_FAILURE(obj.RandomizeVmo(block_size));
   zx::result vmoid = block_client.RegisterVmo(obj.vmo);
   ASSERT_OK(vmoid);
+  // Intentional leak
   obj.vmoid.id = vmoid.value().TakeId();
 }
 
@@ -631,6 +632,7 @@ TEST(BlkdevTests, blkdev_test_fifo_bad_client_bad_vmo) {
   {
     zx::result vmoid = block_client.RegisterVmo(obj.vmo);
     ASSERT_OK(vmoid);
+    // Intentional leak
     obj.vmoid.id = vmoid.value().TakeId();
   }
 

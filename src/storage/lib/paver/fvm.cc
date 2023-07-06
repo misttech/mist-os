@@ -875,7 +875,7 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
     block_fifo_request_t request = {
         .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
         .group = 0,
-        .vmoid = vmoid->TakeId(),
+        .vmoid = vmoid->get(),
     };
 
     LOG("Streaming partition %zu\n", p);

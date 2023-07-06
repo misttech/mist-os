@@ -327,7 +327,9 @@ class VmoClient : public fbl::RefCounted<VmoClient> {
   void Transaction(block_fifo_request_t* requests, size_t count) {
     ASSERT_OK(client_->Transaction(requests, count));
   }
-  zx::result<storage::Vmoid> RegisterVmo(const zx::vmo& vmo) { return client_->RegisterVmo(vmo); }
+  zx::result<storage::OwnedVmoid> RegisterVmo(const zx::vmo& vmo) {
+    return client_->RegisterVmo(vmo);
+  }
 
   fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device() const { return device_; }
 
@@ -367,7 +369,7 @@ class VmoBuf {
   fbl::RefPtr<VmoClient> client_;
   zx::vmo vmo_;
   std::unique_ptr<uint8_t[]> buf_;
-  storage::Vmoid vmoid_;
+  storage::OwnedVmoid vmoid_;
 };
 
 VmoClient::VmoClient(fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device)

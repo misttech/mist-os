@@ -456,7 +456,7 @@ class Target {
   void* buf_ = nullptr;
   // kBlock fields
   std::unique_ptr<block_client::Client> block_;
-  storage::Vmoid vmoid_;
+  storage::OwnedVmoid vmoid_;
   // kSkipBlock Fields
   fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock> skip_block_;
   zx::unowned_vmo vmo_;

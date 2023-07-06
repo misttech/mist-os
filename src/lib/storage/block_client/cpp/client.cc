@@ -11,6 +11,7 @@
 #include <zircon/types.h>
 
 #include <fbl/macros.h>
+#include <storage/buffer/owned_vmoid.h>
 
 #include "src/devices/block/drivers/core/block-fifo.h"
 
@@ -21,20 +22,39 @@ Client::Client(fidl::ClientEnd<fuchsia_hardware_block::Session> session, zx::fif
 
 Client::~Client() { [[maybe_unused]] fidl::WireResult result = fidl::WireCall(session_)->Close(); }
 
-zx::result<storage::Vmoid> Client::RegisterVmo(const zx::vmo& vmo) {
+zx_status_t Client::BlockAttachVmo(const zx::vmo& vmo, storage::Vmoid* out) {
   zx::vmo dup;
   if (zx_status_t status = vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup); status != ZX_OK) {
-    return zx::error(status);
+    return status;
   }
   const fidl::WireResult result = fidl::WireCall(session_)->AttachVmo(std::move(dup));
   if (!result.ok()) {
-    return zx::error(result.status());
+    return result.status();
   }
   fit::result response = result.value();
   if (response.is_error()) {
-    return response.take_error();
+    return response.error_value();
   }
-  return zx::ok(storage::Vmoid(response->vmoid.id));
+  *out = storage::Vmoid(response->vmoid.id);
+  return ZX_OK;
+}
+
+zx_status_t Client::BlockDetachVmo(storage::Vmoid vmoid) {
+  if (!vmoid.IsAttached()) {
+    return ZX_OK;
+  }
+  block_fifo_request_t request = {};
+  request.command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0};
+  request.vmoid = vmoid.TakeId();
+  return Transaction(&request, 1);
+}
+
+zx::result<storage::OwnedVmoid> Client::RegisterVmo(const zx::vmo& vmo) {
+  storage::Vmoid vmoid;
+  if (zx_status_t status = BlockAttachVmo(vmo, &vmoid); status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(storage::OwnedVmoid(std::move(vmoid), this));
 }
 
 zx_status_t Client::Transaction(block_fifo_request_t* requests, size_t count) {

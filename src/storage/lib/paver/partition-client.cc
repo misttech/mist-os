@@ -17,6 +17,7 @@
 
 #include <fbl/algorithm.h>
 #include <fbl/unique_fd.h>
+#include <storage/buffer/owned_vmoid.h>
 
 #include "src/storage/lib/paver/pave-logging.h"
 
@@ -85,18 +86,17 @@ zx::result<> BlockPartitionClient::RegisterFastBlockIo() {
   return zx::ok();
 }
 
-zx::result<storage::Vmoid> BlockPartitionClient::Setup(const zx::vmo& vmo) {
+zx::result<storage::OwnedVmoid> BlockPartitionClient::RegisterVmoid(const zx::vmo& vmo) {
   auto status = RegisterFastBlockIo();
   if (status.is_error()) {
     return status.take_error();
   }
 
-  auto register_status = client_->RegisterVmo(vmo);
-  if (register_status.is_error()) {
-    return register_status.take_error();
+  storage::OwnedVmoid vmoid(client_.get());
+  if (zx_status_t status = vmoid.AttachVmo(vmo); status != ZX_OK) {
+    return zx::error(status);
   }
-
-  return zx::ok(std::move(register_status.value()));
+  return zx::ok(std::move(vmoid));
 }
 
 zx::result<> BlockPartitionClient::Read(const zx::vmo& vmo, size_t size) {
@@ -104,6 +104,15 @@ zx::result<> BlockPartitionClient::Read(const zx::vmo& vmo, size_t size) {
 }
 
 zx::result<> BlockPartitionClient::Read(const zx::vmo& vmo, size_t size, size_t dev_offset,
+                                        size_t vmo_offset) {
+  zx::result vmoid = RegisterVmoid(vmo);
+  if (vmoid.is_error()) {
+    return vmoid.take_error();
+  }
+  return Read(vmoid->get(), size, dev_offset, vmo_offset);
+}
+
+zx::result<> BlockPartitionClient::Read(vmoid_t vmoid, size_t size, size_t dev_offset,
                                         size_t vmo_offset) {
   zx::result block_size = GetBlockSize();
   if (block_size.is_error()) {
@@ -114,15 +123,11 @@ zx::result<> BlockPartitionClient::Read(const zx::vmo& vmo, size_t size, size_t 
     ERROR("Error reading partition data: Too large\n");
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
-  zx::result vmoid = Setup(vmo);
-  if (vmoid.is_error()) {
-    return vmoid.take_error();
-  }
 
   block_fifo_request_t request = {
       .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
       .group = 0,
-      .vmoid = vmoid.value().TakeId(),
+      .vmoid = vmoid,
       .length = static_cast<uint32_t>(length),
       .vmo_offset = vmo_offset,
       .dev_offset = dev_offset,
@@ -142,6 +147,15 @@ zx::result<> BlockPartitionClient::Write(const zx::vmo& vmo, size_t vmo_size) {
 
 zx::result<> BlockPartitionClient::Write(const zx::vmo& vmo, size_t vmo_size, size_t dev_offset,
                                          size_t vmo_offset) {
+  zx::result vmoid = RegisterVmoid(vmo);
+  if (vmoid.is_error()) {
+    return vmoid.take_error();
+  }
+  return Write(vmoid->get(), vmo_size, dev_offset, vmo_offset);
+}
+
+zx::result<> BlockPartitionClient::Write(vmoid_t vmoid, size_t vmo_size, size_t dev_offset,
+                                         size_t vmo_offset) {
   zx::result block_size = GetBlockSize();
   if (block_size.is_error()) {
     return block_size.take_error();
@@ -151,15 +165,11 @@ zx::result<> BlockPartitionClient::Write(const zx::vmo& vmo, size_t vmo_size, si
     ERROR("Error writing partition data: Too large\n");
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
-  zx::result vmoid = Setup(vmo);
-  if (vmoid.is_error()) {
-    return vmoid.take_error();
-  }
 
   block_fifo_request_t request = {
       .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
       .group = 0,
-      .vmoid = vmoid.value().TakeId(),
+      .vmoid = vmoid,
       .length = static_cast<uint32_t>(length),
       .vmo_offset = vmo_offset,
       .dev_offset = dev_offset,

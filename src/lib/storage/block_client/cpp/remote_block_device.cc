@@ -62,7 +62,7 @@ zx_status_t RemoteBlockDevice::BlockAttachVmo(const zx::vmo& vmo, storage::Vmoid
   if (vmoid.is_error()) {
     return vmoid.error_value();
   }
-  *out_vmoid = std::move(vmoid.value());
+  *out_vmoid = storage::Vmoid(vmoid->TakeId());
   return ZX_OK;
 }
 

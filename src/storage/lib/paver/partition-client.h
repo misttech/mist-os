@@ -12,13 +12,16 @@
 #include <lib/zx/vmo.h>
 #include <zircon/types.h>
 
+#include <cstddef>
 #include <optional>
 #include <vector>
 
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 #include <fbl/unique_fd.h>
+#include <storage/buffer/owned_vmoid.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
 #include "src/lib/storage/block_client/cpp/client.h"
 
 namespace paver {
@@ -91,10 +94,19 @@ class BlockPartitionClient final : public BlockDevicePartitionClient {
 
   zx::result<size_t> GetBlockSize() final;
   zx::result<size_t> GetPartitionSize() final;
+
   zx::result<> Read(const zx::vmo& vmo, size_t size) final;
   zx::result<> Read(const zx::vmo& vmo, size_t size, size_t dev_offset, size_t vmo_offset);
+  // Optimized Read variant for an existing vmoid registered with `RegisterVmoid`.
+  zx::result<> Read(vmoid_t vmoid, size_t size, size_t dev_offset, size_t vmo_offset);
+
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) final;
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size, size_t dev_offset, size_t vmo_offset);
+  // Optimized Write variant for an existing vmoid registered with `RegisterVmoid`.
+  zx::result<> Write(vmoid_t vmoid, size_t vmo_size, size_t dev_offset, size_t vmo_offset);
+
+  zx::result<storage::OwnedVmoid> RegisterVmoid(const zx::vmo& vmo);
+
   zx::result<> Trim() final;
   zx::result<> Flush() final;
 
@@ -110,7 +122,6 @@ class BlockPartitionClient final : public BlockDevicePartitionClient {
   BlockPartitionClient& operator=(BlockPartitionClient&&) = delete;
 
  private:
-  zx::result<storage::Vmoid> Setup(const zx::vmo& vmo);
   zx::result<> RegisterFastBlockIo();
   zx::result<std::reference_wrapper<fuchsia_hardware_block::wire::BlockInfo>> ReadBlockInfo();
 

@@ -32,6 +32,7 @@
 #include <fbl/macros.h>
 #include <fbl/mutex.h>
 #include <fbl/unique_fd.h>
+#include <storage/buffer/owned_vmoid.h>
 
 #include "src/lib/storage/block_client/cpp/client.h"
 
@@ -225,7 +226,7 @@ class BlockChecker : public Checker {
           .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
           .reqid = 0,
           .group = group_,
-          .vmoid = vmoid_,
+          .vmoid = vmoid_.get(),
           .length = static_cast<uint32_t>(length / info_.block_size),
           .vmo_offset = 0,
           .dev_offset = (block_idx * block_size) / info_.block_size,
@@ -249,7 +250,7 @@ class BlockChecker : public Checker {
           .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
           .reqid = 0,
           .group = group_,
-          .vmoid = vmoid_,
+          .vmoid = vmoid_.get(),
           .length = static_cast<uint32_t>(length / info_.block_size),
           .vmo_offset = 0,
           .dev_offset = (block_idx * block_size) / info_.block_size,
@@ -269,12 +270,12 @@ class BlockChecker : public Checker {
 
  private:
   BlockChecker(fzl::OwnedVmoMapper mapper, fuchsia_hardware_block::wire::BlockInfo info,
-               block_client::Client& client, storage::Vmoid vmoid, groupid_t group)
+               block_client::Client& client, storage::OwnedVmoid vmoid, groupid_t group)
       : Checker(mapper.start()),
         mapper_(std::move(mapper)),
         info_(info),
         client_(client),
-        vmoid_(vmoid.TakeId()),
+        vmoid_(std::move(vmoid)),
         group_(group) {}
   ~BlockChecker() override = default;
 
@@ -283,7 +284,7 @@ class BlockChecker : public Checker {
   fzl::OwnedVmoMapper mapper_;
   fuchsia_hardware_block::wire::BlockInfo info_;
   block_client::Client& client_;
-  vmoid_t vmoid_;
+  storage::OwnedVmoid vmoid_;
   groupid_t group_;
 };
 

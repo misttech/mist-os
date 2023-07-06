@@ -8,11 +8,14 @@
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/zx/fifo.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
 #include <zircon/types.h>
 
 #include <condition_variable>
 #include <mutex>
 
+#include <storage/buffer/owned_vmoid.h>
 #include <storage/buffer/vmoid_registry.h>
 
 #include "src/devices/block/drivers/core/block-fifo.h"
@@ -27,12 +30,15 @@ namespace block_client {
 // becomes available.
 //
 // When the Client is destroyed, its session will be synchronously closed.
-class Client {
+class Client : public storage::VmoidRegistry {
  public:
   Client(fidl::ClientEnd<fuchsia_hardware_block::Session> session, zx::fifo fifo);
   ~Client();
 
-  zx::result<storage::Vmoid> RegisterVmo(const zx::vmo& vmo);
+  zx_status_t BlockAttachVmo(const zx::vmo& vmo, storage::Vmoid* out) override;
+  zx_status_t BlockDetachVmo(storage::Vmoid vmoid) override;
+
+  zx::result<storage::OwnedVmoid> RegisterVmo(const zx::vmo& vmo);
 
   // Issues a group of block requests over the underlying fifo, and waits for a response.
   zx_status_t Transaction(block_fifo_request_t* requests, size_t count);
