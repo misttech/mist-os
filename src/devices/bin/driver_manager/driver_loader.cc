@@ -61,9 +61,8 @@ const Driver* DriverLoader::UrlToDriver(const std::string& url) {
 }
 
 void DriverLoader::WaitForBaseDrivers(fit::callback<void()> callback) {
-  // TODO(dgilhooley): Change this back to an ERROR once DriverIndex is used in all tests.
   if (!driver_index_.is_valid()) {
-    LOGF(INFO, "%s: DriverIndex is not initialized", __func__);
+    LOGF(ERROR, "%s: DriverIndex is not initialized", __func__);
     return;
   }
 
