@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    cap::{multishot, multishot::Sender, Handle},
+    cap::open::Open,
     cm_types::Path,
     fidl::endpoints::create_endpoints,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio,
     fuchsia_zircon::{HandleBased, Status},
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
@@ -19,7 +19,7 @@ use {
     thiserror::Error,
     vfs::{
         directory::entry::DirectoryEntry, directory::helper::DirectlyMutable,
-        directory::immutable::simple as pfs, execution_scope::ExecutionScope, service,
+        directory::immutable::simple as pfs, execution_scope::ExecutionScope,
     },
 };
 
@@ -60,37 +60,24 @@ impl Namespace {
         };
     }
 
-    /// Add a sender capability `sender` at `path`. As a result, the framework will create a
+    /// Add an open capability `open` at `path`. As a result, the framework will create a
     /// namespace entry at the parent directory of `path`.
-    pub fn add_sender(
-        self: &mut Self,
-        sender: Sender<Handle>,
-        path: &Path,
-    ) -> Result<(), NamespaceError> {
+    pub fn add_open(self: &mut Self, open: Open, path: &Path) -> Result<(), NamespaceError> {
         self.namespace_checker
             .add(path)
             .map_err(|_e: ShadowError| NamespaceError::Shadow(path.clone()))?;
 
-        let open_fn = move |scope: ExecutionScope, channel: fasync::Channel| {
-            let sender = sender.clone();
-            scope.spawn(async move {
-                // TODO: if the receiver broke away, how should we raise this error to the user?
-                let _ = sender.0.send(channel.into_zx_channel().into_handle().into()).await;
-            });
-        };
         let c_str = CString::new(path.dirname().to_string())
             .map_err(|_| NamespaceError::EmbeddedNul(path.dirname().to_string()))?;
         let service_dir = self.dirs.entry(c_str).or_insert_with(|| {
             make_dir_with_not_found_logging(path.dirname().clone().into(), self.not_found.clone())
         });
-        service_dir.clone().add_entry(path.basename(), service::endpoint(open_fn)).map_err(
-            |e| {
-                if e == Status::ALREADY_EXISTS {
-                    return NamespaceError::Duplicate(path.clone());
-                }
-                panic!("unexpected error {e}");
-            },
-        )?;
+        service_dir.clone().add_entry(path.basename(), open.into_remote()).map_err(|e| {
+            if e == Status::ALREADY_EXISTS {
+                return NamespaceError::Duplicate(path.clone());
+            }
+            panic!("unexpected error {e}");
+        })?;
 
         Ok(())
     }
@@ -215,6 +202,7 @@ impl NamespaceChecker {
 mod tests {
     use {
         super::*,
+        crate::test_util::multishot,
         anyhow::Result,
         assert_matches::assert_matches,
         fidl::{endpoints::Proxy, AsHandleRef, Peered},
@@ -243,18 +231,18 @@ mod tests {
         assert_matches!(paths_valid(vec!["/a", "/b", "/c"]), Ok(()));
     }
 
-    fn sender_cap() -> Sender<Handle> {
-        let (sender, _receiver) = multishot::<Handle>();
-        sender
+    fn open_cap() -> Open {
+        let (open, _receiver) = multishot();
+        open
     }
 
     #[fuchsia::test]
     fn test_duplicate() {
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_sender(sender_cap(), &Path::from_str("/svc/a").unwrap()).expect("");
+        namespace.add_open(open_cap(), &Path::from_str("/svc/a").unwrap()).expect("");
         // Adding again will fail.
         assert_matches!(
-            namespace.add_sender(sender_cap(), &Path::from_str("/svc/a").unwrap()),
+            namespace.add_open(open_cap(), &Path::from_str("/svc/a").unwrap()),
             Err(NamespaceError::Duplicate(path))
             if path.as_str() == "/svc/a"
         );
@@ -271,10 +259,10 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_one_sender_end_to_end() {
-        let (sender, receiver) = multishot::<Handle>();
+        let (open, receiver) = multishot();
 
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_sender(sender, &Path::from_str("/svc/a").unwrap()).unwrap();
+        namespace.add_open(open.into(), &Path::from_str("/svc/a").unwrap()).unwrap();
         let (mut ns, fut) = namespace.serve();
         let fut = fasync::Task::spawn(fut);
 
@@ -305,8 +293,8 @@ mod tests {
     #[fuchsia::test]
     async fn test_two_senders_in_same_namespace_entry() {
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_sender(sender_cap(), &Path::from_str("/svc/a").unwrap()).unwrap();
-        namespace.add_sender(sender_cap(), &Path::from_str("/svc/b").unwrap()).unwrap();
+        namespace.add_open(open_cap(), &Path::from_str("/svc/a").unwrap()).unwrap();
+        namespace.add_open(open_cap(), &Path::from_str("/svc/b").unwrap()).unwrap();
         let (mut ns, fut) = namespace.serve();
         let fut = fasync::Task::spawn(fut);
 
@@ -331,8 +319,8 @@ mod tests {
     #[fuchsia::test]
     async fn test_two_senders_in_different_namespace_entries() {
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_sender(sender_cap(), &Path::from_str("/svc1/a").unwrap()).unwrap();
-        namespace.add_sender(sender_cap(), &Path::from_str("/svc2/b").unwrap()).unwrap();
+        namespace.add_open(open_cap(), &Path::from_str("/svc1/a").unwrap()).unwrap();
+        namespace.add_open(open_cap(), &Path::from_str("/svc2/b").unwrap()).unwrap();
         let (ns, fut) = namespace.serve();
         let fut = fasync::Task::spawn(fut);
 
@@ -367,7 +355,7 @@ mod tests {
     async fn test_not_found() {
         let (not_found_sender, mut not_found_receiver) = unbounded();
         let mut namespace = Namespace::new(not_found_sender);
-        namespace.add_sender(sender_cap(), &Path::from_str("/svc/a").unwrap()).unwrap();
+        namespace.add_open(open_cap(), &Path::from_str("/svc/a").unwrap()).unwrap();
         let (mut ns, fut) = namespace.serve();
         let fut = fasync::Task::spawn(fut);
 

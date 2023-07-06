@@ -7,11 +7,10 @@
 mod cap;
 pub mod dict;
 pub mod handle;
-pub mod multishot;
+pub mod open;
 
 pub use self::cap::{AnyCapability, AnyCloneCapability, Capability, CloneCapability, Remote};
 pub use self::handle::{CloneHandle, Handle};
-pub use self::multishot::multishot;
 
 pub type CloneDict = dict::Dict<AnyCloneCapability>;
 pub type Dict = dict::Dict<AnyCapability>;

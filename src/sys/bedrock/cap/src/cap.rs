@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::handle::{CloneHandle, Handle},
+    crate::{
+        handle::{CloneHandle, Handle},
+        open::Open,
+    },
     downcast_rs::{impl_downcast, Downcast},
     dyn_clone::{clone_trait_object, DynClone},
     fuchsia_zircon as zx,
@@ -10,13 +13,11 @@ use {
 };
 
 /// The capability trait, implemented by all capabilities.
-pub trait Capability: Downcast + Remote + Send + Sync {}
+pub trait Capability: Downcast + Remote + TryIntoOpen + Send + Sync {}
 impl_downcast!(Capability);
 
 /// Trait object used to hold any kind of capability.
 pub type AnyCapability = Box<dyn Capability>;
-
-impl Capability for AnyCapability {}
 
 impl std::fmt::Debug for AnyCapability {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -42,8 +43,6 @@ impl<T: Capability + Clone> CloneCapability for T {}
 
 pub type AnyCloneCapability = Box<dyn CloneCapability>;
 
-impl Capability for AnyCloneCapability {}
-
 impl TryFrom<zx::Handle> for AnyCloneCapability {
     type Error = zx::Status;
 
@@ -62,19 +61,46 @@ pub trait Remote {
     ///
     /// # Lifetime
     ///
-    /// The lifetime of the future, if any, and the handle, are tied together. The handle will
-    /// be closed if the future is completed, and the future will complete if the handle is closed.
+    /// - If the user drops the future, work backing the handle will be terminated. For example,
+    ///   if the framework serves the peer handle to this handle, the peer will be closed.
+    /// - If the user drops the handle, the future will complete.
     fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>);
 }
 
-impl Remote for AnyCapability {
-    fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        (*self).to_zx_handle()
+/// This error is returned when a capability does not support the open operation.
+pub struct DoesNotSupportOpen;
+
+/// This trait is introduced as an extra indirection behind [TryInto<Open>] because
+/// [TryInto] is not object-safe [1]. The type-erased `dyn Capability` will require all
+/// traits behind `Capability` to be object-safe.
+///
+/// [1]: https://doc.rust-lang.org/reference/items/traits.html#object-safety
+pub trait TryIntoOpen {
+    /// Attempt to transform the capability into an [Open] capability, which let us mount it
+    /// as a node inside a `fuchsia.io` directory and open it using `fuchsia.io/Directory.Open`.
+    fn try_into_open(self: Box<Self>) -> Result<Open, DoesNotSupportOpen> {
+        Err(DoesNotSupportOpen {})
     }
 }
 
-impl Remote for AnyCloneCapability {
-    fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        (*self).to_zx_handle()
+impl<T: Into<Open>> TryIntoOpen for T {
+    fn try_into_open(self: Box<Self>) -> Result<Open, DoesNotSupportOpen> {
+        Ok((*self).into())
+    }
+}
+
+impl TryInto<Open> for AnyCapability {
+    type Error = DoesNotSupportOpen;
+
+    fn try_into(self: Self) -> Result<Open, Self::Error> {
+        self.try_into_open()
+    }
+}
+
+impl TryInto<Open> for AnyCloneCapability {
+    type Error = DoesNotSupportOpen;
+
+    fn try_into(self: Self) -> Result<Open, Self::Error> {
+        self.try_into_open()
     }
 }

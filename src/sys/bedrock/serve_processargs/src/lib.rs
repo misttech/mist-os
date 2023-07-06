@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    cap::{dict::Key, multishot::Sender, AnyCapability, Dict, Handle},
+    cap::{dict::Key, open::Open, AnyCapability, Dict},
     fuchsia_runtime::{HandleInfo, HandleType},
     futures::channel::mpsc::UnboundedSender,
     futures::future::{BoxFuture, FutureExt},
@@ -26,9 +26,9 @@ pub enum Delivery {
     /// As a result, a namespace entry will be created in the resulting processargs, corresponding
     /// to the parent directory, e.g. "/svc/foo".
     ///
-    /// For example, installing a `cap::multishot::Sender` at "/svc/fuchsia.examples.Echo" will
+    /// For example, installing a `cap::open::Open` at "/svc/fuchsia.examples.Echo" will
     /// cause the framework to spin up a `fuchsia.io/Directory` implementation backing "/svc",
-    /// containing a protocol connector object named "fuchsia.examples.Echo".
+    /// containing a filesystem object named "fuchsia.examples.Echo".
     ///
     /// Not all capability types are installable as `fuchsia.io` objects. A one-shot handle is not
     /// supported because `fuchsia.io` does not have a protocol for delivering one-shot handles.
@@ -90,10 +90,10 @@ pub fn add_to_processargs(
     let dict = visit_map(delivery_map, dict, &mut |cap: AnyCapability, delivery: &Delivery| {
         match delivery {
             Delivery::NamespacedObject(path) => {
-                let cap = cap
-                    .downcast::<Sender<Handle>>()
-                    .map_err(|_| DeliveryError::NamespacedObjectNotSender(path.clone()))?;
-                namespace.add_sender(*cap, path).map_err(DeliveryError::NamespaceError)
+                let open: Open = cap
+                    .try_into()
+                    .map_err(|_| DeliveryError::NamespacedObjectDoesNotSupportOpen(path.clone()))?;
+                namespace.add_open(open, path).map_err(DeliveryError::NamespaceError)
             }
             // TODO: implement namespace entry
             Delivery::NamespaceEntry(_) => todo!(),
@@ -135,10 +135,8 @@ pub enum DeliveryError {
     #[error("namespace configuration error: `{0}`")]
     NamespaceError(namespace::NamespaceError),
 
-    #[error(
-        "to install the capability as a namespaced object at `{0}`, it must be a sender capability"
-    )]
-    NamespacedObjectNotSender(cm_types::Path),
+    #[error("to install the capability as a namespaced object at `{0}`, it must support Open")]
+    NamespacedObjectDoesNotSupportOpen(cm_types::Path),
 }
 
 fn translate_handle(
@@ -200,12 +198,47 @@ fn validate_handle_type(handle_type: HandleType) -> Result<(), DeliveryError> {
 }
 
 #[cfg(test)]
+mod test_util {
+    use {
+        cap::{open::Open, Handle},
+        fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_zircon::HandleBased,
+        vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, service},
+    };
+
+    pub struct Receiver(pub async_channel::Receiver<Handle>);
+
+    pub fn multishot() -> (Open, Receiver) {
+        let (sender, receiver) = async_channel::unbounded::<Handle>();
+
+        let open_fn = move |scope: ExecutionScope, channel: fasync::Channel| {
+            let sender = sender.clone();
+            scope.spawn(async move {
+                let capability = Handle::from(channel.into_zx_channel().into_handle());
+                let _ = sender.send(capability).await;
+            });
+        };
+        let service = service::endpoint(open_fn);
+
+        let open_fn = move |scope: ExecutionScope,
+                            flags: fio::OpenFlags,
+                            path: vfs::path::Path,
+                            server_end: zx::Channel| {
+            service.clone().open(scope, flags, path, server_end.into());
+        };
+
+        let open = Open::new(open_fn, fio::DirentType::Service);
+
+        (open, Receiver(receiver))
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use {
         super::*,
         anyhow::Result,
         assert_matches::assert_matches,
-        cap::{multishot, Handle},
         fidl::endpoints::Proxy,
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::directory::DirEntry,
@@ -214,6 +247,7 @@ mod tests {
         maplit::hashmap,
         namespace::ignore_not_found as ignore,
         std::str::FromStr,
+        test_util::multishot,
     };
 
     #[fuchsia::test]
@@ -381,13 +415,13 @@ mod tests {
     /// connections to that protocol.
     #[fuchsia::test]
     async fn test_namespace_end_to_end() -> Result<()> {
-        let (sender, receiver) = multishot::<Handle>();
-        let peer_closed_sender = multishot::<Handle>().0;
+        let (open, receiver) = multishot();
+        let peer_closed_open = multishot().0;
 
         let mut processargs = ProcessArgs::new();
         let mut dict = Dict::new();
-        dict.entries.insert("normal".to_string(), Box::new(sender));
-        dict.entries.insert("closed".to_string(), Box::new(peer_closed_sender));
+        dict.entries.insert("normal".to_string(), Box::new(open));
+        dict.entries.insert("closed".to_string(), Box::new(peer_closed_open));
         let delivery_map = hashmap! {
             "normal".to_string() => DeliveryMapEntry::Delivery(
                 Delivery::NamespacedObject(cm_types::Path::from_str("/svc/fuchsia.Normal").unwrap())
@@ -440,11 +474,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn dropping_future_stops_everything() -> Result<()> {
-        let (sender, _receiver) = multishot::<Handle>();
+        let (open, _receiver) = multishot();
 
         let mut processargs = ProcessArgs::new();
         let mut dict = Dict::new();
-        dict.entries.insert("a".to_string(), Box::new(sender));
+        dict.entries.insert("a".to_string(), Box::new(open));
         let delivery_map = hashmap! {
             "a".to_string() => DeliveryMapEntry::Delivery(
                 Delivery::NamespacedObject(cm_types::Path::from_str("/svc/a").unwrap())

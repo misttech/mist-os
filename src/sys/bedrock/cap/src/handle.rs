@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::cap::{Capability, Remote},
+    crate::cap::{Capability, Remote, TryIntoOpen},
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
     futures::future::BoxFuture,
 };
@@ -38,6 +38,8 @@ impl Remote for Handle {
         ((*self).into(), None)
     }
 }
+
+impl TryIntoOpen for Handle {}
 
 /// A capability that represents a cloneable Zircon handle.
 ///
@@ -77,6 +79,8 @@ impl Remote for CloneHandle {
         ((*self).into(), None)
     }
 }
+
+impl TryIntoOpen for CloneHandle {}
 
 impl Clone for CloneHandle {
     fn clone(&self) -> Self {

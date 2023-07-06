@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::cap::{AnyCapability, AnyCloneCapability, Capability, Remote},
+    crate::cap::{AnyCapability, AnyCloneCapability, Capability, Remote, TryIntoOpen},
     anyhow::{Context, Error},
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_component_bedrock as fbedrock, fuchsia_async as fasync, fuchsia_zircon as zx,
@@ -100,6 +100,9 @@ impl Remote for Dict<AnyCloneCapability> {
         self.to_zx_handle()
     }
 }
+
+impl TryIntoOpen for Dict<AnyCapability> {}
+impl TryIntoOpen for Dict<AnyCloneCapability> {}
 
 impl Capability for Dict<AnyCapability> {}
 impl Capability for Dict<AnyCloneCapability> {}
