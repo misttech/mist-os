@@ -67,5 +67,10 @@
             from: "#sysinfo",
             to: "#realm_builder",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#sysinfo" ],
+        },
     ],
 }
