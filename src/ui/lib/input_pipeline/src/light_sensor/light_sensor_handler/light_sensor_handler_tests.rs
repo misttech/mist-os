@@ -846,7 +846,7 @@ async fn light_sensor_handler_inspect_counts_events() {
         settings: get_adjustment_settings(),
     };
 
-    let (device_proxy, _, _) = get_mock_device_proxy();
+    let (device_proxy, _, _task) = get_mock_device_proxy();
     let inspector = fuchsia_inspect::Inspector::default();
     let fake_handlers_node = inspector.root().create_child("input_handlers_node");
     let handler =
@@ -894,7 +894,7 @@ async fn light_sensor_handler_inspect_counts_events() {
         input_handlers_node: {
             light_sensor_handler: {
                 events_received_count: 1u64,
-                events_handled_count: 0u64,
+                events_handled_count: 1u64,
                 last_received_timestamp_ns: last_event_timestamp,
                 "fuchsia.inspect.Health": {
                     status: "STARTING_UP",

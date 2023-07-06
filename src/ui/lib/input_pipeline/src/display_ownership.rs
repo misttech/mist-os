@@ -229,14 +229,17 @@ impl DisplayOwnership {
                         output.unbounded_send(event).context("unable to send handled event")?;
                         continue;
                     }
+                    self.inspect_status.count_received_event(input_device::InputEvent::from(event.clone()));
                     match event.device_event {
                         input_device::InputDeviceEvent::Keyboard(ref e) => {
-                            self.inspect_status.count_received_event(input_device::InputEvent::from(event.clone()));
                             self.key_state.borrow_mut().update(e.get_event_type(), e.get_key());
                         },
                         _ => {},
                     }
                     let is_display_ownership_lost = self.is_display_ownership_lost();
+                    if is_display_ownership_lost {
+                        self.inspect_status.count_handled_event();
+                    }
                     output.unbounded_send(
                         input_device::InputEvent::from(event)
                             .into_handled_if(is_display_ownership_lost)
@@ -588,7 +591,8 @@ mod tests {
             .unwrap();
         loop_done.next().await;
 
-        // Lose display.
+        // Lose display
+        // Input event is marked `Handled` if received after display ownership is lost
         wrangler.set_unowned();
         loop_done.next().await;
         test_sender
@@ -610,7 +614,7 @@ mod tests {
             input_handlers_node: {
                 display_ownership: {
                     events_received_count: 3u64,
-                    events_handled_count: 0u64,
+                    events_handled_count: 1u64,
                     last_received_timestamp_ns: 42u64,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",

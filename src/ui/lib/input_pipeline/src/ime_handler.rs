@@ -81,6 +81,7 @@ impl UnhandledInputHandler for ImeHandler {
                 let key_event = create_key_event(&keyboard_device_event, event_time);
                 self.dispatch_key(key_event).await;
                 // Consume the input event.
+                self.inspect_status.count_handled_event();
                 vec![input_device::InputEvent::from(unhandled_input_event).into_handled()]
             }
             _ => vec![input_device::InputEvent::from(unhandled_input_event)],
@@ -904,7 +905,7 @@ mod tests {
             input_handlers_node: {
                 ime_handler: {
                     events_received_count: 3u64,
-                    events_handled_count: 0u64,
+                    events_handled_count: 3u64,
                     last_received_timestamp_ns: last_event_timestamp,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",

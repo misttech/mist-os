@@ -122,6 +122,7 @@ impl InputHandler for MouseInjectorHandler {
 
                 // Consume the input event.
                 input_event.handled = input_device::Handled::Yes;
+                self.inspect_status.count_handled_event();
             }
             _ => {}
         }
@@ -2336,7 +2337,7 @@ mod tests {
             input_handlers_node: {
                 mouse_injector_handler: {
                     events_received_count: 2u64,
-                    events_handled_count: 0u64,
+                    events_handled_count: 2u64,
                     last_received_timestamp_ns: last_received_event_time,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",

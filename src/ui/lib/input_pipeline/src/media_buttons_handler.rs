@@ -65,6 +65,7 @@ impl UnhandledInputHandler for MediaButtonsHandler {
                 self.inner.borrow_mut().last_event = Some(media_buttons_event);
 
                 // Consume the input event.
+                self.inspect_status.count_handled_event();
                 vec![input_device::InputEvent::from(unhandled_input_event).into_handled()]
             }
             _ => vec![input_device::InputEvent::from(unhandled_input_event)],
@@ -745,40 +746,55 @@ mod tests {
 
         // Unhandled input event should be counted by inspect.
         let descriptor = testing_utilities::consumer_controls_device_descriptor();
-        let unhandled_input_event = input_device::InputEvent {
-            device_event: input_device::InputDeviceEvent::ConsumerControls(
-                consumer_controls_binding::ConsumerControlsEvent::new(vec![
-                    fidl_input_report::ConsumerControlButton::VolumeUp,
-                ]),
-            ),
-            device_descriptor: descriptor.clone(),
-            event_time: zx::Time::get_monotonic(),
-            handled: input_device::Handled::No,
-            trace_id: None,
-        };
-        let last_event_timestamp: u64 =
-            unhandled_input_event.clone().event_time.into_nanos().try_into().unwrap();
-        media_buttons_handler.clone().handle_input_event(unhandled_input_event).await;
+        let events = vec![
+            input_device::InputEvent {
+                device_event: input_device::InputDeviceEvent::ConsumerControls(
+                    consumer_controls_binding::ConsumerControlsEvent::new(vec![
+                        fidl_input_report::ConsumerControlButton::VolumeUp,
+                    ]),
+                ),
+                device_descriptor: descriptor.clone(),
+                event_time: zx::Time::get_monotonic(),
+                handled: input_device::Handled::No,
+                trace_id: None,
+            },
+            // Handled input event should be ignored.
+            input_device::InputEvent {
+                device_event: input_device::InputDeviceEvent::ConsumerControls(
+                    consumer_controls_binding::ConsumerControlsEvent::new(vec![
+                        fidl_input_report::ConsumerControlButton::VolumeUp,
+                    ]),
+                ),
+                device_descriptor: descriptor.clone(),
+                event_time: zx::Time::get_monotonic(),
+                handled: input_device::Handled::Yes,
+                trace_id: None,
+            },
+            input_device::InputEvent {
+                device_event: input_device::InputDeviceEvent::ConsumerControls(
+                    consumer_controls_binding::ConsumerControlsEvent::new(vec![
+                        fidl_input_report::ConsumerControlButton::VolumeDown,
+                    ]),
+                ),
+                device_descriptor: descriptor.clone(),
+                event_time: zx::Time::get_monotonic(),
+                handled: input_device::Handled::No,
+                trace_id: None,
+            },
+        ];
 
-        // Handled input event should be ignored.
-        let handled_input_event = input_device::InputEvent {
-            device_event: input_device::InputDeviceEvent::ConsumerControls(
-                consumer_controls_binding::ConsumerControlsEvent::new(vec![
-                    fidl_input_report::ConsumerControlButton::VolumeUp,
-                ]),
-            ),
-            device_descriptor: descriptor.clone(),
-            event_time: zx::Time::get_monotonic(),
-            handled: input_device::Handled::Yes,
-            trace_id: None,
-        };
-        media_buttons_handler.clone().handle_input_event(handled_input_event).await;
+        let last_event_timestamp: u64 =
+            events[2].clone().event_time.into_nanos().try_into().unwrap();
+
+        for event in events {
+            media_buttons_handler.clone().handle_input_event(event).await;
+        }
 
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_handlers_node: {
                 media_buttons_handler: {
-                    events_received_count: 1u64,
-                    events_handled_count: 0u64,
+                    events_received_count: 2u64,
+                    events_handled_count: 2u64,
                     last_received_timestamp_ns: last_event_timestamp,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",

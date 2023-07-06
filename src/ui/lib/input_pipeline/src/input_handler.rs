@@ -173,6 +173,10 @@ impl InputHandlerStatus {
         self.events_received_count.add(1);
         self.last_received_timestamp_ns.set(event.event_time.into_nanos().try_into().unwrap());
     }
+
+    pub fn count_handled_event(&self) {
+        self.events_handled_count.add(1);
+    }
 }
 
 #[cfg(test)]

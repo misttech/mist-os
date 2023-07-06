@@ -93,6 +93,7 @@ impl UnhandledInputHandler for TouchInjectorHandler {
                 }
 
                 // Consume the input event.
+                self.inspect_status.count_handled_event();
                 vec![input_device::InputEvent::from(unhandled_input_event).into_handled()]
             }
             _ => vec![input_device::InputEvent::from(unhandled_input_event)],
@@ -1022,7 +1023,7 @@ mod tests {
             input_handlers_node: {
                 touch_injector_handler: {
                     events_received_count: 3u64,
-                    events_handled_count: 0u64,
+                    events_handled_count: 3u64,
                     last_received_timestamp_ns: last_received_event_time,
                     "fuchsia.inspect.Health": {
                         status: "STARTING_UP",

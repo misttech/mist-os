@@ -436,7 +436,7 @@ where
             trace_id: _,
         } = input_event
         {
-            self.inspect_status.count_received_event(InputEvent::from(input_event.clone()));
+            self.inspect_status.count_received_event(input_event.clone());
             // Validate descriptor matches.
             if !(light_sensor_descriptor.vendor_id == self.vendor_id
                 && light_sensor_descriptor.product_id == self.product_id)
@@ -448,7 +448,6 @@ where
                 );
                 return vec![input_event];
             }
-
             let LightReading { rgbc, si_rgbc, is_calibrated, lux, cct } = match self
                 .get_calibrated_data(
                     light_sensor_event.rgbc,
@@ -461,6 +460,7 @@ where
                     // Event is handled but saturated data is not useful for clients. Mark as
                     // handled but do not publish data.
                     input_event.handled = Handled::Yes;
+                    self.inspect_status.count_handled_event();
                     return vec![input_event];
                 }
                 Err(SaturatedError::Anyhow(e)) => {
@@ -478,6 +478,7 @@ where
                 correlated_color_temperature: cct,
             });
             input_event.handled = Handled::Yes;
+            self.inspect_status.count_handled_event();
         }
         vec![input_event]
     }
