@@ -38,7 +38,6 @@ per-file             rustdoc = tmandry@google.com
 per-file        test-rustdoc = josephry@google.com
 per-file             rustfmt = tmandry@google.com
 per-file set-petal=abarth@google.com
-per-file set-relay=tamird@google.com
 per-file             setup-go = olivernewman@google.com
 per-file show-package=brunodalbo@google.com
 per-file smoke-test=surajmalhotra@google.com
