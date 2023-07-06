@@ -46,6 +46,7 @@ template("cvf") {
 
     tool = "//tools/configc"
     tool_output_name = "configc"
+    mnemonic = "CONFIGC"
 
     compiled_output = "${target_out_dir}/${output_name}.cvf"
     inputs = [
@@ -100,6 +101,7 @@ template("fidl_config_client_lib_source") {
 
     tool = "//tools/configc"
     tool_output_name = "configc"
+    mnemonic = "CONFIGC"
 
     fidl_format_tool_label = "//tools/fidl/fidlc:fidl-format($host_toolchain)"
     fidl_format_tool_path =
@@ -177,6 +179,7 @@ template("rust_config_client_lib_source") {
 
     tool = "//tools/configc"
     tool_output_name = "configc"
+    mnemonic = "CONFIGC"
 
     inputs = [
       compiled_manifest,
@@ -263,6 +266,7 @@ template("cpp_config_client_lib_source") {
 
     tool = "//tools/configc"
     tool_output_name = "configc"
+    mnemonic = "CONFIGC"
 
     inputs = [
       compiled_manifest,
@@ -390,6 +394,7 @@ template("dump_structured_config") {
 
     tool = "//tools/configc"
     tool_output_name = "configc"
+    mnemonic = "CONFIGC"
 
     inputs = [
       invoker.cm,
