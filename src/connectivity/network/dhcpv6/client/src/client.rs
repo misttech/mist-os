@@ -824,7 +824,7 @@ mod tests {
         ReceivedMessage { transaction_id: *msg.transaction_id(), client_id: client_id }
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_create_client_with_unsupported_config() {
         let information_configs = [None];
 
@@ -875,7 +875,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_client_stops_on_channel_close() {
         let (client_proxy, server_end) =
             create_proxy::<ClientMarker>().expect("failed to create test client proxy");
@@ -927,7 +927,7 @@ mod tests {
     #[test_case(client_proxy_watch_servers; "watch_servers")]
     #[test_case(client_proxy_watch_address; "watch_address")]
     #[test_case(client_proxy_watch_prefixes; "watch_prefixes")]
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_client_should_return_error_on_double_watch<Fut, F>(watch: F)
     where
         Fut: Future<Output = Result<(), fidl::Error>>,
@@ -1004,7 +1004,7 @@ mod tests {
         ]
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_client_starts_with_valid_args() {
         for information_config in valid_information_configs().iter() {
             for non_temporary_address_config in get_valid_non_temporary_address_configs().iter() {
@@ -1046,7 +1046,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_client_starts_in_correct_mode() {
         for information_config in [None].into_iter().chain(valid_information_configs()) {
             for non_temporary_address_config in
@@ -1103,7 +1103,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_client_fails_to_start_with_invalid_args() {
         for params in vec![
             // Missing required field.
@@ -1201,7 +1201,7 @@ mod tests {
         Ok(())
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_client_should_respond_to_dns_watch_requests() {
         let mut exec = fasync::TestExecutor::new();
         let transaction_id = [1, 2, 3];
@@ -1430,7 +1430,7 @@ mod tests {
         } // drop `test_fut` so `client_fut` is no longer mutably borrowed.
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_client_should_respond_with_dns_servers_on_first_watch_if_non_empty() {
         let transaction_id = [1, 2, 3];
 
@@ -1488,7 +1488,7 @@ mod tests {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn watch_prefixes() {
         const SERVER_ID: [u8; 3] = [3, 4, 5];
         const PREFERRED_LIFETIME_SECS: u32 = 1000;
@@ -1747,7 +1747,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_client_schedule_and_cancel_timers() {
         let (_client_end, client_stream) =
             create_request_stream::<ClientMarker>().expect("failed to create test request stream");
@@ -1832,7 +1832,7 @@ mod tests {
         client.cancel_timer(dhcpv6_core::client::ClientTimerType::Retransmission);
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handle_next_event_on_stateless_client() {
         let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>()
             .expect("failed to create test proxy and stream");
@@ -1987,7 +1987,7 @@ mod tests {
         assert_matches!(client.handle_next_event(&mut buf).await, Ok(None));
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handle_next_event_on_stateful_client() {
         let (client_proxy, client_stream) =
             create_proxy_and_stream::<ClientMarker>().expect("failed to create test fidl channel");
@@ -2026,7 +2026,7 @@ mod tests {
         assert_matches!(client.handle_next_event(&mut buf).await, Ok(None));
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     #[should_panic]
     async fn test_handle_next_event_respects_timer_order() {
         let (_client_end, client_stream) =
@@ -2105,7 +2105,7 @@ mod tests {
         assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handle_next_event_fails_on_recv_err() {
         struct StubSocket {}
         impl<'a> AsyncSocket<'a> for StubSocket {
