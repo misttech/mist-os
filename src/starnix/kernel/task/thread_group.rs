@@ -17,7 +17,7 @@ use crate::{
     auth::Credentials,
     device::terminal::*,
     drop_notifier::DropNotifier,
-    lock::{MutexGuard, RwLock},
+    lock::{Mutex, MutexGuard, RwLock},
     logging::{log_error, not_implemented},
     mutable_state::*,
     selinux::SeLinuxThreadGroupState,
@@ -94,9 +94,6 @@ pub struct ThreadGroupMutableState {
 
     pub selinux: SeLinuxThreadGroupState,
 
-    /// The resource limits for this thread group.
-    pub limits: ResourceLimits,
-
     /// Time statistics accumulated from the children.
     pub children_time_stats: TaskTimeStats,
 }
@@ -151,6 +148,11 @@ pub struct ThreadGroup {
 
     /// The mutable state of the ThreadGroup.
     mutable_state: RwLock<ThreadGroupMutableState>,
+
+    /// The resource limits for this thread group.  This is outside mutable_state
+    /// to avoid deadlocks where the thread_group lock is held when acquiring
+    /// the task lock, and vice versa.
+    pub limits: Mutex<ResourceLimits>,
 
     /// The next unique identifier for a seccomp filter.  These are required to be
     /// able to distinguish identical seccomp filters, which are treated differently
@@ -243,6 +245,7 @@ impl ThreadGroup {
             leader,
             signal_actions,
             drop_notifier: Default::default(),
+            limits: Mutex::new(Default::default()),
             next_seccomp_filter_id: Default::default(),
             mutable_state: RwLock::new(ThreadGroupMutableState {
                 parent: parent.as_ref().map(|p| Arc::clone(p.base)),
@@ -261,7 +264,6 @@ impl ThreadGroup {
                 zombie_leader: None,
                 terminating: false,
                 selinux: Default::default(),
-                limits: Default::default(),
                 children_time_stats: Default::default(),
             }),
         });
@@ -753,7 +755,7 @@ impl ThreadGroup {
     }
 
     pub fn get_rlimit(self: &Arc<Self>, resource: Resource) -> u64 {
-        self.read().limits.get(resource).rlim_cur
+        self.limits.lock().get(resource).rlim_cur
     }
 
     pub fn adjust_rlimits(
@@ -762,17 +764,9 @@ impl ThreadGroup {
         resource: Resource,
         maybe_new_limit: Option<rlimit>,
     ) -> Result<rlimit, Errno> {
-        let mut state = self.write();
-        let old_limit = state.limits.get(resource);
-        if let Some(new_limit) = maybe_new_limit {
-            if new_limit.rlim_max > old_limit.rlim_max
-                && !current_task.creds().has_capability(CAP_SYS_RESOURCE)
-            {
-                return error!(EPERM);
-            }
-            state.limits.set(resource, new_limit);
-        }
-        Ok(old_limit)
+        let can_increase_rlimit = current_task.creds().has_capability(CAP_SYS_RESOURCE);
+        let mut limit_state = self.limits.lock();
+        limit_state.get_and_set(resource, maybe_new_limit, can_increase_rlimit)
     }
 
     pub fn time_stats(&self) -> TaskTimeStats {

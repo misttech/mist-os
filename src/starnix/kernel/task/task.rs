@@ -1568,12 +1568,22 @@ impl CurrentTask {
         let code: Vec<sock_filter> =
             self.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
 
-        let new_filter = SeccompFilter::from_cbpf(
+        let new_filter = Arc::new(SeccompFilter::from_cbpf(
             &code,
             self.thread_group.next_seccomp_filter_id.fetch_add(1, Ordering::SeqCst),
-        )?;
+        )?);
 
+        let mut maybe_fd: Option<FdNumber> = None;
+
+        if flags & SECCOMP_FILTER_FLAG_NEW_LISTENER != 0 {
+            let mut task_state = self.mutable_state.write();
+            maybe_fd = Some(task_state.seccomp_filters.create_listener(self)?);
+        }
+
+        // We take the process lock here because we can't change any of the threads
+        // while doing a tsync.  So, you hold the process lock while making any changes.
         let state = self.thread_group.write();
+
         if flags & SECCOMP_FILTER_FLAG_TSYNC != 0 {
             // TSYNC synchronizes all filters for all threads in the current process to
             // the current thread's
@@ -1620,12 +1630,17 @@ impl CurrentTask {
             self.set_seccomp_state(SeccompStateValue::UserDefined)?;
         }
 
-        self.set_seccomp_state(SeccompStateValue::UserDefined)?;
-
-        Ok(().into())
+        if let Some(fd) = maybe_fd {
+            Ok(fd.into())
+        } else {
+            Ok(().into())
+        }
     }
 
-    pub fn run_seccomp_filters(&self, syscall: &Syscall) -> Option<Errno> {
+    pub fn run_seccomp_filters(
+        &mut self,
+        syscall: &Syscall,
+    ) -> Option<Result<SyscallResult, Errno>> {
         // Implementation of SECCOMP_FILTER_STRICT, which has slightly different semantics
         // from user-defined seccomp filters.
         if self.seccomp_filter_state.get() == SeccompStateValue::Strict {
@@ -1708,6 +1723,15 @@ impl CurrentTask {
             }
             curr_ptr = curr.next;
         }
+    }
+
+    /// Returns a ref to this thread's SeccompNotifier.
+    pub fn get_seccomp_notifier(&mut self) -> Option<SeccompNotifierHandle> {
+        self.mutable_state.write().seccomp_filters.notifier.clone()
+    }
+
+    pub fn set_seccomp_notifier(&mut self, notifier: Option<SeccompNotifierHandle>) {
+        self.mutable_state.write().seccomp_filters.notifier = notifier;
     }
 }
 

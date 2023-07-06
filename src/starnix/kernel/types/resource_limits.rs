@@ -149,6 +149,8 @@ impl Default for ResourceLimits {
     }
 }
 
+// NB: ResourceLimits objects are accessed using a lock.  To avoid the risk of
+// deadlock, we try to avoid lock acquisition in ResourceLimits.
 impl ResourceLimits {
     pub fn get(&self, resource: Resource) -> rlimit {
         *self.values.get(&resource).unwrap_or(&INFINITE_LIMIT)
@@ -156,5 +158,21 @@ impl ResourceLimits {
 
     pub fn set(&mut self, resource: Resource, value: rlimit) {
         self.values.insert(resource, value);
+    }
+
+    pub fn get_and_set(
+        &mut self,
+        resource: Resource,
+        maybe_new_limit: Option<rlimit>,
+        can_increase_rlimit: bool,
+    ) -> Result<rlimit, Errno> {
+        let old_limit = *self.values.get(&resource).unwrap_or(&INFINITE_LIMIT);
+        if let Some(new_limit) = maybe_new_limit {
+            if new_limit.rlim_max > old_limit.rlim_max && !can_increase_rlimit {
+                return error!(EPERM);
+            }
+            self.values.insert(resource, new_limit);
+        }
+        Ok(old_limit)
     }
 }

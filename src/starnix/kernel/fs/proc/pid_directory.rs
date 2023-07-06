@@ -519,8 +519,7 @@ impl LimitsFile {
 impl DynamicFileSource for LimitsFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let task = Task::from_weak(&self.0)?;
-        let state = task.thread_group.read();
-        let limits = &state.limits;
+        let limits = task.thread_group.limits.lock();
 
         let write_limit = |sink: &mut DynamicFileBuf, value| {
             if value == RLIM_INFINITY as u64 {
@@ -673,7 +672,6 @@ impl DynamicFileSource for StatFile {
                 duration_to_scheduler_clock(thread_group.children_time_stats.system_time) as u64;
 
             stats[16] = thread_group.tasks_count() as u64;
-            stats[21] = thread_group.limits.get(Resource::RSS).rlim_max;
         }
 
         let time_stats = match self.scope {
@@ -692,6 +690,7 @@ impl DynamicFileSource for StatFile {
         let page_size = *PAGE_SIZE as usize;
         stats[19] = mem_stats.vm_size as u64;
         stats[20] = (mem_stats.vm_rss / page_size) as u64;
+        stats[21] = task.thread_group.limits.lock().get(Resource::RSS).rlim_max;
 
         {
             let mm_state = task.mm.state.read();

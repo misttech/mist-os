@@ -356,8 +356,8 @@ pub fn set_rlimits(current_task: &CurrentTask, rlimits: &[String]) -> Result<(),
     let set_rlimit = |resource, value| {
         current_task
             .thread_group
-            .write()
             .limits
+            .lock()
             .set(resource, rlimit { rlim_cur: value, rlim_max: value });
     };
 

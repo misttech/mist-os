@@ -1069,6 +1069,12 @@ pub fn sys_seccomp(
             {
                 return error!(EINVAL);
             }
+            if (flags & SECCOMP_FILTER_FLAG_NEW_LISTENER != 0)
+                && (flags & SECCOMP_FILTER_FLAG_TSYNC != 0)
+                && (flags & SECCOMP_FILTER_FLAG_TSYNC_ESRCH == 0)
+            {
+                return error!(EINVAL);
+            }
             if !current_task.read().no_new_privs()
                 && !current_task.creds().has_capability(CAP_SYS_ADMIN)
             {
@@ -1462,8 +1468,8 @@ mod tests {
 
         current_task
             .thread_group
-            .write()
             .limits
+            .lock()
             .set(Resource::RTPRIO, rlimit { rlim_cur: 255, rlim_max: 255 });
 
         let scheduler = sys_sched_getscheduler(&current_task, 0).unwrap();

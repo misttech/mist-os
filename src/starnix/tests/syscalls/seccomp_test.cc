@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <poll.h>
 #include <signal.h>
+#include <sys/ioctl.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
 
@@ -399,6 +401,176 @@ TEST(SeccompTest, TsyncEsrch) {
     }
     cv.notify_all();
     t.join();
+  });
+}
+
+TEST(SeccompTest, UserNotifMissingListener) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    install_filter_block(kFilteredSyscall, SECCOMP_RET_USER_NOTIF);
+    EXPECT_EQ(-1, syscall(kFilteredSyscall));
+    EXPECT_EQ(ENOSYS, errno);
+  });
+}
+
+// Installs a filter that blocks the given syscall.
+int install_filter_user_notif(uint32_t syscall_nr) {
+  EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
+
+  sock_filter filter[] = {
+      // A = seccomp_data.nr
+      BPF_STMT(BPF_LD | BPF_ABS | BPF_W, offsetof(struct seccomp_data, nr)),
+      // if (A == sysno) goto kill
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, syscall_nr, 1, 0),
+      // allow: return SECCOMP_RET_ALLOW
+      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+      // notify: return SECCOMP_RET_USER_NOTIF
+      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
+  };
+  sock_fprog prog = {.len = ARRAY_SIZE(filter), .filter = filter};
+  return static_cast<int>(
+      syscall(__NR_seccomp, SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_NEW_LISTENER, &prog));
+}
+
+TEST(SeccompTest, UserNotifBlocking) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    const int kFilterReturnValue = 0xbadcafe;
+    int fd = install_filter_user_notif(kFilteredSyscall);
+    EXPECT_GT(fd, 0);
+
+    {
+      int fail = install_filter_user_notif(kFilteredSyscall);
+      EXPECT_EQ(fail, -1);
+      EXPECT_EQ(errno, EBUSY);
+    }
+
+    test_helper::ForkHelper helper;
+    helper.OnlyWaitForForkedChildren();
+    pid_t pid = helper.RunInForkedProcess(
+        [kFilterReturnValue] { EXPECT_EQ(kFilterReturnValue, syscall(kFilteredSyscall)); });
+
+    struct seccomp_notif req;
+
+    // When req has a non-zero field, ioctl returns EINVAL
+    req.id = 1;
+    EXPECT_EQ(-1, ioctl(fd, SECCOMP_IOCTL_NOTIF_RECV, &req))
+        << "ioctl did not return correct error code";
+
+    memset(&req, 0, sizeof(req));
+    EXPECT_NE(-1, ioctl(fd, SECCOMP_IOCTL_NOTIF_RECV, &req))
+        << "ioctl failed unexpectedly with errno " << errno;
+    EXPECT_EQ(pid, static_cast<pid_t>(req.pid));
+    EXPECT_EQ(kFilteredSyscall, static_cast<unsigned int>(req.data.nr));
+
+    struct seccomp_notif_resp resp;
+    resp.id = req.id;
+    resp.val = kFilterReturnValue;
+    resp.flags = resp.error = 0;
+
+    // Test that setting both legal flags value + legal val value is an error.
+    resp.flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
+    EXPECT_EQ(-1, ioctl(fd, SECCOMP_IOCTL_NOTIF_SEND, &resp));
+    EXPECT_EQ(errno, EINVAL);
+
+    // Test illegal flags value
+    resp.flags = ~resp.flags;
+    EXPECT_EQ(-1, ioctl(fd, SECCOMP_IOCTL_NOTIF_SEND, &resp));
+    EXPECT_EQ(errno, EINVAL);
+
+    // cookie value should still be valid.
+    EXPECT_EQ(0, ioctl(fd, SECCOMP_IOCTL_NOTIF_ID_VALID, &resp.id));
+
+    // Okay, let's do this for real.
+    resp.flags = 0;
+    EXPECT_NE(-1, ioctl(fd, SECCOMP_IOCTL_NOTIF_SEND, &resp))
+        << "ioctl failed with errno " << errno;
+    EXPECT_TRUE(helper.WaitForChildren());
+
+    // cookie value should no longer be valid
+    EXPECT_EQ(-1, ioctl(fd, SECCOMP_IOCTL_NOTIF_ID_VALID, &resp.id));
+    EXPECT_EQ(errno, ENOENT);
+  });
+}
+
+TEST(SeccompTest, UserNotifNonBlocking) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    int fd;
+    std::thread t([&fd] {
+      fd = install_filter_user_notif(kFilteredSyscall);
+      EXPECT_GT(fd, 0);
+
+      test_helper::ForkHelper helper;
+      helper.OnlyWaitForForkedChildren();
+      pid_t pid = helper.RunInForkedProcess([] {
+        // Call 1: resp.error = -enotnam, get -1 result and errno set.
+        EXPECT_EQ(-1, syscall(kFilteredSyscall));
+        EXPECT_EQ(ENOTNAM, errno);
+
+        errno = 0;
+        // Call 2: resp.error = enotnam, get enotnam result and no errno.
+        EXPECT_EQ(ENOTNAM, syscall(kFilteredSyscall));
+        EXPECT_EQ(0, errno);
+
+        // Call 3: Zeros all around.
+        EXPECT_EQ(0, syscall(kFilteredSyscall));
+        EXPECT_EQ(0, errno);
+      });
+
+      struct seccomp_notif_resp resps[3];
+      resps[0] = {.error = -ENOTNAM, .flags = 0};
+      resps[1] = {.error = ENOTNAM, .flags = 0};
+      resps[2] = {.error = 0, .flags = 0};
+
+      for (int i = 0; i < 3; i++) {
+        // Do receive and send in separate threads.  This increases the chance that we'll actually
+        // exercise the blocking case for poll() for the sender, which, if it followed the receiver,
+        // would probably not block.
+        pollfd pfd[] = {{.fd = fd, .events = POLLIN, .revents = 0}};
+        EXPECT_NE(-1, poll(pfd, ARRAY_SIZE(pfd), -1)) << "poll failed with errno " << errno;
+        EXPECT_EQ(POLLIN, pfd[0].revents);
+
+        struct seccomp_notif req;
+        memset(&req, 0, sizeof(req));
+        EXPECT_NE(-1, ioctl(fd, SECCOMP_IOCTL_NOTIF_RECV, &req))
+            << "ioctl failed with errno " << errno;
+        EXPECT_EQ(pid, static_cast<pid_t>(req.pid));
+        EXPECT_EQ(kFilteredSyscall, static_cast<unsigned int>(req.data.nr));
+
+        resps[i].id = req.id;
+
+        pfd[0].events = POLLOUT;
+        pfd[0].revents = 0;
+        EXPECT_NE(-1, poll(pfd, ARRAY_SIZE(pfd), -1)) << "poll failed with errno " << errno;
+        EXPECT_EQ(POLLOUT, pfd[0].revents);
+
+        EXPECT_NE(-1, ioctl(fd, SECCOMP_IOCTL_NOTIF_SEND, &resps[i]))
+            << "ioctl failed with errno " << errno;
+      }
+
+      EXPECT_TRUE(helper.WaitForChildren());
+    });
+    t.join();
+
+    // Every thread using the filter has terminated, so fd should be POLLHUP.
+    pollfd pfd[] = {{.fd = fd, .events = POLLHUP, .revents = 0}};
+    EXPECT_NE(-1, poll(pfd, ARRAY_SIZE(pfd), -1)) << "poll failed with errno " << errno;
+  });
+}
+
+TEST(SeccompTest, UserNotifClose) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([] {
+    int fd = install_filter_user_notif(kFilteredSyscall);
+    EXPECT_GT(fd, 0);
+    close(fd);
+    EXPECT_EQ(-1, syscall(kFilteredSyscall));
+    EXPECT_EQ(ENOSYS, errno);
   });
 }
 

@@ -22,6 +22,7 @@ use crate::{
     syscalls::{
         decls::{Syscall, SyscallDecl},
         table::dispatch_syscall,
+        SyscallResult,
     },
     task::*,
     types::*,
@@ -70,17 +71,22 @@ pub fn execute_syscall(
 
     current_task.registers.save_registers_for_restart(&syscall);
 
-    // Inlined fast path for seccomp, so that we don't incur the cost
-    // of a method call when running the filters.
-    if current_task.seccomp_filter_state.get() != SeccompStateValue::None {
-        if let Some(errno) = current_task.run_seccomp_filters(&syscall) {
-            current_task.registers.set_return_register(errno.return_value());
-            return Some(ErrorContext { error: errno, syscall });
-        }
-    }
-
     log_trace!("{:?}", syscall);
-    match dispatch_syscall(current_task, &syscall) {
+
+    let result: Result<SyscallResult, Errno> =
+        if current_task.seccomp_filter_state.get() != SeccompStateValue::None {
+            // Inlined fast path for seccomp, so that we don't incur the cost
+            // of a method call when running the filters.
+            if let Some(res) = current_task.run_seccomp_filters(&syscall) {
+                res
+            } else {
+                dispatch_syscall(current_task, &syscall)
+            }
+        } else {
+            dispatch_syscall(current_task, &syscall)
+        };
+
+    match result {
         Ok(return_value) => {
             log_trace!("-> {:#x}", return_value.value());
             current_task.registers.set_return_register(return_value.value());
