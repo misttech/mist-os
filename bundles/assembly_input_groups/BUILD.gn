@@ -54,8 +54,6 @@ assembly_input_groups("network") {
     "//src/connectivity/network/mdns/bundles:services",
     "//src/sys/pkg:tools",
   ]
-  core_realm_shards =
-      [ "//src/sys/pkg/bin/system-updater:system-updater-core-shard" ]
 }
 
 assembly_input_groups("ssh") {

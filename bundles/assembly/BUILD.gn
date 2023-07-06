@@ -664,6 +664,7 @@ assembly_input_bundle("common_minimal") {
                     "//src/connectivity/network/meta/persistence.core_shard.cml",
                     "//src/intl/tzdata_provider/meta/tzdata_provider.core_shard.cml",
                     "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
+                    "//src/sys/pkg/bin/system-updater/meta/system_updater.core_shard.cml",
 
                     # TODO(fxbug.dev/112433): The trace manager core shard should only
                     # appear in eng builds, however, many components do not properly

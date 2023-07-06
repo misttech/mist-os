@@ -12,7 +12,6 @@ assert(images_config_label != false,
 
 core_realm_definition("core") {
   testonly = true
-  deps = [ "//src/sys/pkg/bin/system-updater:system-updater-core-shard" ]
 }
 
 assembled_system("overnet") {

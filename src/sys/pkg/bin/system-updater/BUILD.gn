@@ -164,10 +164,6 @@ fuchsia_structured_config_values("config_values_from_gn_isolated") {
   values = structured_config_values
 }
 
-core_shard("system-updater-core-shard") {
-  shard_file = "meta/system_updater.core_shard.cml"
-}
-
 group("tests") {
   testonly = true
   deps = [
