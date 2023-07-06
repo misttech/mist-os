@@ -580,6 +580,9 @@ mod tests {
             read: false,
             data: 0x1122334455667788,
         };
+        #[cfg(target_arch = "riscv64")]
+        const GUEST_MEM_PACKET: sys::zx_packet_guest_mem_t =
+            sys::zx_packet_guest_mem_t { addr: 0x8877665544332211, reserved: [0; 3] };
         const KEY: u64 = 0x5555555555555555;
         const STATUS: i32 = sys::ZX_ERR_INTERNAL;
 
