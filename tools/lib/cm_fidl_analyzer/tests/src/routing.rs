@@ -179,10 +179,11 @@ impl RoutingTestModelBuilder for RoutingTestBuilderForAnalyzer {
         config.namespace_capabilities = self.namespace_capabilities;
         config.builtin_capabilities = self.builtin_capabilities;
 
-        let mut security_policy = SecurityPolicy::default();
-        security_policy.capability_policy = self.capability_policy;
-        security_policy.debug_capability_policy = self.debug_capability_policy;
-        config.security_policy = security_policy;
+        config.security_policy = Arc::new(SecurityPolicy {
+            capability_policy: self.capability_policy,
+            debug_capability_policy: self.debug_capability_policy,
+            ..Default::default()
+        });
 
         config.component_id_index_path = self.component_id_index_path;
         let component_id_index = match config.component_id_index_path {

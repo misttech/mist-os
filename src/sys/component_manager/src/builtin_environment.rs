@@ -295,7 +295,7 @@ impl BuiltinEnvironmentBuilder {
             .runners
             .into_iter()
             .map(|(name, runner)| {
-                Arc::new(BuiltinRunner::new(name, runner, Arc::downgrade(&runtime_config)))
+                Arc::new(BuiltinRunner::new(name, runner, runtime_config.security_policy.clone()))
             })
             .collect();
 

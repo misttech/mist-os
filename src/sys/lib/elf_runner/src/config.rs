@@ -132,8 +132,7 @@ mod tests {
         super::*,
         ::routing::{
             config::{
-                AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists, RuntimeConfig,
-                SecurityPolicy,
+                AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists, SecurityPolicy,
             },
             policy::{PolicyError, ScopedPolicyChecker},
         },
@@ -150,29 +149,24 @@ mod tests {
 
     lazy_static! {
         static ref TEST_MONIKER: AbsoluteMoniker = AbsoluteMoniker::root();
-        static ref PERMISSIVE_RUNTIME_CONFIG: Arc<RuntimeConfig> = {
-            Arc::new(RuntimeConfig {
-                security_policy: SecurityPolicy {
-                    job_policy: JobPolicyAllowlists {
-                        ambient_mark_vmo_exec: vec![
-                            AllowlistEntryBuilder::build_exact_from_moniker(&TEST_MONIKER),
-                        ],
-                        main_process_critical: vec![
-                            AllowlistEntryBuilder::build_exact_from_moniker(&TEST_MONIKER),
-                        ],
-                        create_raw_processes: vec![
-                            AllowlistEntryBuilder::build_exact_from_moniker(&TEST_MONIKER),
-                        ],
-                    },
-                    capability_policy: HashMap::new(),
-                    debug_capability_policy: HashMap::new(),
-                    child_policy: ChildPolicyAllowlists { reboot_on_terminate: vec![] },
-                },
-                ..Default::default()
-            })
-        };
-        static ref RESTRICTIVE_RUNTIME_CONFIG: Arc<RuntimeConfig> =
-            Arc::new(RuntimeConfig::default());
+        static ref PERMISSIVE_SECURITY_POLICY: Arc<SecurityPolicy> = Arc::new(SecurityPolicy {
+            job_policy: JobPolicyAllowlists {
+                ambient_mark_vmo_exec: vec![AllowlistEntryBuilder::build_exact_from_moniker(
+                    &TEST_MONIKER
+                ),],
+                main_process_critical: vec![AllowlistEntryBuilder::build_exact_from_moniker(
+                    &TEST_MONIKER
+                ),],
+                create_raw_processes: vec![AllowlistEntryBuilder::build_exact_from_moniker(
+                    &TEST_MONIKER
+                ),],
+            },
+            capability_policy: HashMap::new(),
+            debug_capability_policy: HashMap::new(),
+            child_policy: ChildPolicyAllowlists { reboot_on_terminate: vec![] },
+        });
+        static ref RESTRICTIVE_SECURITY_POLICY: Arc<SecurityPolicy> =
+            Arc::new(SecurityPolicy::default());
     }
 
     macro_rules! assert_error_is_invalid_value {
@@ -231,10 +225,8 @@ mod tests {
         value: fdata::DictionaryValue,
         expected: ElfProgramConfig,
     ) {
-        let checker = ScopedPolicyChecker::new(
-            Arc::downgrade(&(*PERMISSIVE_RUNTIME_CONFIG)),
-            TEST_MONIKER.clone(),
-        );
+        let checker =
+            ScopedPolicyChecker::new(PERMISSIVE_SECURITY_POLICY.clone(), TEST_MONIKER.clone());
         let program = new_program_stanza(key, value);
 
         let actual = ElfProgramConfig::parse_and_check(&program, &checker).unwrap();
@@ -250,10 +242,8 @@ mod tests {
         value: fdata::DictionaryValue,
         policy: &str,
     ) {
-        let checker = ScopedPolicyChecker::new(
-            Arc::downgrade(&(*RESTRICTIVE_RUNTIME_CONFIG)),
-            TEST_MONIKER.clone(),
-        );
+        let checker =
+            ScopedPolicyChecker::new(RESTRICTIVE_SECURITY_POLICY.clone(), TEST_MONIKER.clone());
         let program = new_program_stanza(key, value);
 
         let actual = ElfProgramConfig::parse_and_check(&program, &checker);
@@ -266,10 +256,8 @@ mod tests {
     fn test_parse_and_check_with_invalid_value(key: &str, value: fdata::DictionaryValue) {
         // Use a permissive policy because we want to fail *iff* value set for
         // key is invalid.
-        let checker = ScopedPolicyChecker::new(
-            Arc::downgrade(&(*PERMISSIVE_RUNTIME_CONFIG)),
-            TEST_MONIKER.clone(),
-        );
+        let checker =
+            ScopedPolicyChecker::new(PERMISSIVE_SECURITY_POLICY.clone(), TEST_MONIKER.clone());
         let program = new_program_stanza(key, value);
 
         let actual = ElfProgramConfig::parse_and_check(&program, &checker);
@@ -288,10 +276,8 @@ mod tests {
     fn test_parse_and_check_with_invalid_type(key: &str, value: fdata::DictionaryValue) {
         // Use a permissive policy because we want to fail *iff* value set for
         // key is invalid.
-        let checker = ScopedPolicyChecker::new(
-            Arc::downgrade(&(*PERMISSIVE_RUNTIME_CONFIG)),
-            TEST_MONIKER.clone(),
-        );
+        let checker =
+            ScopedPolicyChecker::new(PERMISSIVE_SECURITY_POLICY.clone(), TEST_MONIKER.clone());
         let program = new_program_stanza(key, value);
 
         let actual = ElfProgramConfig::parse_and_check(&program, &checker);

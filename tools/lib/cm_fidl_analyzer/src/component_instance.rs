@@ -187,8 +187,8 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
         Ok(self.parent.upgrade()?)
     }
 
-    fn policy_checker(&self) -> GlobalPolicyChecker {
-        self.policy_checker.clone()
+    fn policy_checker(&self) -> &GlobalPolicyChecker {
+        &self.policy_checker
     }
 
     fn config_parent_overrides(&self) -> Option<&Vec<cm_rust::ConfigOverride>> {

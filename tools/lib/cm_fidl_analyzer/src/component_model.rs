@@ -226,7 +226,7 @@ impl ModelBuilderForAnalyzer {
                 runtime_config.builtin_capabilities.clone(),
             ),
             instances: HashMap::new(),
-            policy_checker: GlobalPolicyChecker::new(Arc::clone(&runtime_config)),
+            policy_checker: GlobalPolicyChecker::new(runtime_config.security_policy.clone()),
             component_id_index,
         };
 

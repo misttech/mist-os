@@ -10,7 +10,7 @@ use {
         },
     },
     ::routing::{
-        capability_source::InternalCapability, config::RuntimeConfig, policy::ScopedPolicyChecker,
+        capability_source::InternalCapability, config::SecurityPolicy, policy::ScopedPolicyChecker,
     },
     async_trait::async_trait,
     cm_runner::Runner,
@@ -37,16 +37,16 @@ pub trait BuiltinRunnerFactory: Send + Sync {
 pub struct BuiltinRunner {
     name: Name,
     runner: Arc<dyn BuiltinRunnerFactory>,
-    config: Weak<RuntimeConfig>,
+    security_policy: Arc<SecurityPolicy>,
 }
 
 impl BuiltinRunner {
     pub fn new(
         name: Name,
         runner: Arc<dyn BuiltinRunnerFactory>,
-        config: Weak<RuntimeConfig>,
+        security_policy: Arc<SecurityPolicy>,
     ) -> Self {
-        Self { name, runner, config }
+        Self { name, runner, security_policy }
     }
 
     /// Construct a `HooksRegistration` that will route our runner as a framework capability.
@@ -74,8 +74,10 @@ impl Hook for BuiltinRunner {
                     .target_moniker
                     .unwrap_instance_moniker_or(ModelError::UnexpectedComponentManagerMoniker)?;
                 if *runner_name == self.name {
-                    let checker =
-                        ScopedPolicyChecker::new(self.config.clone(), target_moniker.clone());
+                    let checker = ScopedPolicyChecker::new(
+                        self.security_policy.clone(),
+                        target_moniker.clone(),
+                    );
                     let runner = self.runner.clone().get_scoped_runner(checker);
                     *capability_provider.lock().await =
                         Some(Box::new(RunnerCapabilityProvider::new(runner)));
@@ -196,22 +198,16 @@ mod tests {
     // Test plumbing a `BuiltinRunner` through the hook system.
     #[fuchsia::test]
     async fn builtin_runner_hook() -> Result<(), Error> {
-        let config = Arc::new(RuntimeConfig {
-            security_policy: SecurityPolicy {
-                job_policy: JobPolicyAllowlists {
-                    ambient_mark_vmo_exec: vec![AllowlistEntryBuilder::new().exact("foo").build()],
-                    ..Default::default()
-                },
+        let policy = Arc::new(SecurityPolicy {
+            job_policy: JobPolicyAllowlists {
+                ambient_mark_vmo_exec: vec![AllowlistEntryBuilder::new().exact("foo").build()],
                 ..Default::default()
             },
             ..Default::default()
         });
         let runner = Arc::new(MockRunner::new());
-        let builtin_runner = Arc::new(BuiltinRunner::new(
-            "elf".parse().unwrap(),
-            runner.clone(),
-            Arc::downgrade(&config),
-        ));
+        let builtin_runner =
+            Arc::new(BuiltinRunner::new("elf".parse().unwrap(), runner.clone(), policy));
 
         let hooks = Hooks::new();
         hooks.install(builtin_runner.hooks()).await;

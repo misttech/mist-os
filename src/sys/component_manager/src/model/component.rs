@@ -1106,8 +1106,8 @@ impl ComponentInstanceInterface for ComponentInstance {
         self.environment.as_ref()
     }
 
-    fn policy_checker(&self) -> GlobalPolicyChecker {
-        self.context.policy().clone()
+    fn policy_checker(&self) -> &GlobalPolicyChecker {
+        &self.context.policy()
     }
 
     fn component_id_index(&self) -> Arc<ComponentIdIndex> {

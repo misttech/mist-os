@@ -35,7 +35,6 @@ struct Config {
     log_destination: Option<LogDestination>,
     log_all_events: Option<bool>,
     builtin_boot_resolver: Option<BuiltinBootResolver>,
-    reboot_on_terminate_enabled: Option<bool>,
     realm_builder_resolver_and_runner: Option<RealmBuilderResolverAndRunner>,
     enable_introspection: Option<bool>,
     abi_revision_policy: Option<AbiRevisionPolicy>,
@@ -251,7 +250,6 @@ impl TryFrom<Config> for component_internal::Config {
             log_destination: config.log_destination.map(|d| d.into()),
             log_all_events: config.log_all_events,
             builtin_boot_resolver: config.builtin_boot_resolver.map(Into::into),
-            reboot_on_terminate_enabled: config.reboot_on_terminate_enabled,
             realm_builder_resolver_and_runner: config
                 .realm_builder_resolver_and_runner
                 .map(Into::into),
@@ -381,7 +379,6 @@ impl Config {
             log_destination: merge_field!(self, another, log_destination),
             log_all_events: merge_field!(self, another, log_all_events),
             builtin_boot_resolver: merge_field!(self, another, builtin_boot_resolver),
-            reboot_on_terminate_enabled: merge_field!(self, another, reboot_on_terminate_enabled),
             realm_builder_resolver_and_runner: merge_field!(
                 self,
                 another,
@@ -581,7 +578,6 @@ mod tests {
             log_destination: "klog",
             log_all_events: true,
             builtin_boot_resolver: "boot",
-            reboot_on_terminate_enabled: true,
             realm_builder_resolver_and_runner: "namespace",
         }"#;
         let config = compile_str(input).expect("failed to compile");
@@ -693,7 +689,6 @@ mod tests {
                 log_destination: Some(component_internal::LogDestination::Klog),
                 log_all_events: Some(true),
                 builtin_boot_resolver: Some(component_internal::BuiltinBootResolver::Boot),
-                reboot_on_terminate_enabled: Some(true),
                 realm_builder_resolver_and_runner: Some(
                     component_internal::RealmBuilderResolverAndRunner::Namespace
                 ),
@@ -849,8 +844,7 @@ mod tests {
         File::create(&input_path).unwrap().write_all(input.as_bytes()).unwrap();
 
         let another_input_path = tmp_dir.path().join("bar.json");
-        let another_input =
-            "{\"list_children_batch_size\": 42, \"reboot_on_terminate_enabled\": true}";
+        let another_input = "{\"list_children_batch_size\": 42}";
         File::create(&another_input_path).unwrap().write_all(another_input.as_bytes()).unwrap();
 
         let args =
@@ -862,7 +856,6 @@ mod tests {
         let config: component_internal::Config = unpersist(&bytes)?;
         assert_eq!(config.debug, Some(true));
         assert_eq!(config.list_children_batch_size, Some(42));
-        assert_eq!(config.reboot_on_terminate_enabled, Some(true));
         Ok(())
     }
 

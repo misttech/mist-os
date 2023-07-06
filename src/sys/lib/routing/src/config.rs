@@ -22,6 +22,7 @@ use {
         convert::TryFrom,
         iter::FromIterator,
         path::Path,
+        sync::Arc,
     },
     thiserror::Error,
     tracing::warn,
@@ -37,7 +38,7 @@ pub struct RuntimeConfig {
     pub list_children_batch_size: usize,
 
     /// Security policy configuration.
-    pub security_policy: SecurityPolicy,
+    pub security_policy: Arc<SecurityPolicy>,
 
     /// If true, component manager will be in debug mode. In this mode, component manager
     /// provides the `EventSource` protocol and exposes this protocol. The root component
@@ -94,12 +95,6 @@ pub struct RuntimeConfig {
     /// Which builtin resolver to use for the fuchsia-boot scheme. If not supplied this defaults to
     /// the NONE option.
     pub builtin_boot_resolver: BuiltinBootResolver,
-
-    /// If true, allow components to set the `OnTerminate=REBOOT` option.
-    ///
-    /// This lets a parent component designate that the system should reboot if a child terminates
-    /// (except when it's shut down).
-    pub reboot_on_terminate_enabled: bool,
 
     /// If and how the realm builder resolver and runner are enabled.
     pub realm_builder_resolver_and_runner: RealmBuilderResolverAndRunner,
@@ -186,7 +181,7 @@ impl AllowlistEntryBuilder {
 }
 
 /// Runtime security policy.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SecurityPolicy {
     /// Allowlists for Zircon job policy.
     pub job_policy: JobPolicyAllowlists,
@@ -243,7 +238,7 @@ impl DebugCapabilityAllowlistEntry {
 }
 
 /// Allowlists for Zircon job policy. Part of runtime security policy.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct JobPolicyAllowlists {
     /// Entries for components allowed to be given the ZX_POL_AMBIENT_MARK_VMO_EXEC job policy.
     ///
@@ -389,7 +384,6 @@ impl Default for RuntimeConfig {
             log_destination: LogDestination::Syslog,
             log_all_events: false,
             builtin_boot_resolver: BuiltinBootResolver::None,
-            reboot_on_terminate_enabled: false,
             realm_builder_resolver_and_runner: RealmBuilderResolverAndRunner::None,
             abi_revision_policy: Default::default(),
         }
@@ -547,26 +541,21 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
             as_usize_or_default(config.list_children_batch_size, default.list_children_batch_size);
         let num_threads = as_usize_or_default(config.num_threads, default.num_threads);
 
-        let root_component_url = match config.root_component_url {
-            Some(url) => Some(Url::new(url)?),
-            None => None,
-        };
+        let root_component_url = config.root_component_url.map(Url::new).transpose()?;
 
-        let security_policy = if let Some(security_policy) = config.security_policy {
-            SecurityPolicy::try_from(security_policy).context("Unable to parse security policy")?
-        } else {
-            SecurityPolicy::default()
-        };
-
-        let log_all_events =
-            if let Some(log_all_events) = config.log_all_events { log_all_events } else { false };
+        let security_policy = config
+            .security_policy
+            .map(SecurityPolicy::try_from)
+            .transpose()
+            .context("Unable to parse security policy")?
+            .unwrap_or_default();
 
         let abi_revision_policy =
             config.abi_revision_policy.map(AbiRevisionPolicy::from).unwrap_or_default();
 
         Ok(RuntimeConfig {
             list_children_batch_size,
-            security_policy,
+            security_policy: Arc::new(security_policy),
             namespace_capabilities: Self::translate_namespace_capabilities(
                 config.namespace_capabilities,
             )?,
@@ -585,13 +574,10 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
             root_component_url,
             component_id_index_path: config.component_id_index_path,
             log_destination: config.log_destination.unwrap_or(default.log_destination),
-            log_all_events,
+            log_all_events: config.log_all_events.unwrap_or(default.log_all_events),
             builtin_boot_resolver: config
                 .builtin_boot_resolver
                 .unwrap_or(default.builtin_boot_resolver),
-            reboot_on_terminate_enabled: config
-                .reboot_on_terminate_enabled
-                .unwrap_or(default.reboot_on_terminate_enabled),
             realm_builder_resolver_and_runner: config
                 .realm_builder_resolver_and_runner
                 .unwrap_or(default.realm_builder_resolver_and_runner),
@@ -823,7 +809,6 @@ mod tests {
             builtin_capabilities: None,
             root_component_url: None,
             component_id_index_path: None,
-            reboot_on_terminate_enabled: None,
             ..Default::default()
         }, RuntimeConfig::default()),
         all_leaf_nodes_none => (component_internal::Config {
@@ -849,7 +834,6 @@ mod tests {
             component_id_index_path: None,
             log_destination: None,
             log_all_events: None,
-            reboot_on_terminate_enabled: None,
             ..Default::default()
         }, RuntimeConfig {
             debug: false,
@@ -955,7 +939,6 @@ mod tests {
                 log_destination: Some(component_internal::LogDestination::Klog),
                 log_all_events: Some(true),
                 builtin_boot_resolver: Some(component_internal::BuiltinBootResolver::None),
-                reboot_on_terminate_enabled: Some(true),
                 realm_builder_resolver_and_runner: Some(component_internal::RealmBuilderResolverAndRunner::None),
                 abi_revision_policy: Some(component_internal::AbiRevisionPolicy::AllowAll),
                 ..Default::default()
@@ -967,7 +950,7 @@ mod tests {
                 list_children_batch_size: 42,
                 maintain_utc_clock: true,
                 use_builtin_process_launcher: false,
-                security_policy: SecurityPolicy {
+                security_policy: Arc::new(SecurityPolicy {
                     job_policy: JobPolicyAllowlists {
                         ambient_mark_vmo_exec: vec![
                             AllowlistEntryBuilder::new().build(),
@@ -1057,7 +1040,7 @@ mod tests {
                             AllowlistEntryBuilder::new().exact("something").exact("important").build(),
                         ],
                     },
-                },
+                }),
                 num_threads: 24,
                 namespace_capabilities: vec![
                     cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
@@ -1081,7 +1064,6 @@ mod tests {
                 log_destination: LogDestination::Klog,
                 log_all_events: true,
                 builtin_boot_resolver: BuiltinBootResolver::None,
-                reboot_on_terminate_enabled: true,
                 realm_builder_resolver_and_runner: RealmBuilderResolverAndRunner::None,
             }
         ),
@@ -1110,7 +1092,6 @@ mod tests {
                 builtin_capabilities: None,
                 root_component_url: None,
                 component_id_index_path: None,
-                reboot_on_terminate_enabled: None,
                 ..Default::default()
             },
             AllowlistEntryParseError,
@@ -1178,7 +1159,6 @@ mod tests {
                 builtin_capabilities: None,
                 root_component_url: None,
                 component_id_index_path: None,
-                reboot_on_terminate_enabled: None,
                 ..Default::default()
             },
             PolicyConfigError,
@@ -1197,7 +1177,6 @@ mod tests {
                 builtin_capabilities: None,
                 root_component_url: Some("invalid url".to_string()),
                 component_id_index_path: None,
-                reboot_on_terminate_enabled: None,
                 ..Default::default()
             },
             ParseError,

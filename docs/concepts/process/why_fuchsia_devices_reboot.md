@@ -104,7 +104,7 @@ reboots.
 
 ### Critical component failure
 
-If a component marked `reboot_on_terminate` crashed, the device reboots.
+If a component marked `"on_terminate": "reboot"` crashed, the device reboots.
 
 ### Factory data reset
 

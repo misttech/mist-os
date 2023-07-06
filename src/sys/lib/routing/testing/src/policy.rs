@@ -15,7 +15,7 @@ use {
         config::{
             AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey,
             CapabilityAllowlistSource, ChildPolicyAllowlists, DebugCapabilityAllowlistEntry,
-            DebugCapabilityKey, JobPolicyAllowlists, RuntimeConfig, SecurityPolicy,
+            DebugCapabilityKey, JobPolicyAllowlists, SecurityPolicy,
         },
         policy::GlobalPolicyChecker,
     },
@@ -69,8 +69,8 @@ where
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for framework capability sources.
     fn global_policy_checker_can_route_capability_framework_cap(&self) -> Result<(), Error> {
-        let mut config_builder = CapabilityAllowlistConfigBuilder::new();
-        config_builder.add_capability_policy(
+        let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
+        policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentInstance(
                     AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap(),
@@ -84,7 +84,7 @@ where
                 AllowlistEntryBuilder::new().exact("foo").exact("bar").exact("baz").build(),
             ],
         );
-        let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
+        let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let component = self.make_component(vec!["foo:0", "bar:0"].try_into().unwrap());
 
         let protocol_capability = CapabilitySource::<C>::Framework {
@@ -117,8 +117,8 @@ where
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for namespace capability sources.
     fn global_policy_checker_can_route_capability_namespace_cap(&self) -> Result<(), Error> {
-        let mut config_builder = CapabilityAllowlistConfigBuilder::new();
-        config_builder.add_capability_policy(
+        let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
+        policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
                 source_name: "fuchsia.boot.RootResource".parse().unwrap(),
@@ -131,7 +131,7 @@ where
                 AllowlistEntryBuilder::new().exact("root").exact("core").build(),
             ],
         );
-        let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
+        let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
 
         let protocol_capability = CapabilitySource::<C>::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
@@ -171,8 +171,8 @@ where
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for component capability sources.
     fn global_policy_checker_can_route_capability_component_cap(&self) -> Result<(), Error> {
-        let mut config_builder = CapabilityAllowlistConfigBuilder::new();
-        config_builder.add_capability_policy(
+        let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
+        policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentInstance(
                     AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
@@ -187,7 +187,7 @@ where
                 AllowlistEntryBuilder::new().exact("root").exact("core").build(),
             ],
         );
-        let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
+        let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let component = self.make_component(vec!["foo:0"].try_into().unwrap());
 
         let protocol_capability = CapabilitySource::<C>::Component {
@@ -223,8 +223,8 @@ where
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for capability sources of type `Capability`.
     fn global_policy_checker_can_route_capability_capability_cap(&self) -> Result<(), Error> {
-        let mut config_builder = CapabilityAllowlistConfigBuilder::new();
-        config_builder.add_capability_policy(
+        let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
+        policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentInstance(
                     AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
@@ -239,7 +239,7 @@ where
                 AllowlistEntryBuilder::new().exact("root").exact("core").build(),
             ],
         );
-        let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
+        let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let component = self.make_component(vec!["foo:0"].try_into().unwrap());
 
         let protocol_capability = CapabilitySource::<C>::Capability {
@@ -278,8 +278,8 @@ where
 
     // Tests `GlobalPolicyChecker::can_route_debug_capability()` for capability sources of type `Capability`.
     fn global_policy_checker_can_route_debug_capability_capability_cap(&self) -> Result<(), Error> {
-        let mut config_builder = CapabilityAllowlistConfigBuilder::new();
-        config_builder.add_debug_capability_policy(
+        let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
+        policy_builder.add_debug_capability_policy(
             DebugCapabilityKey {
                 source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
@@ -289,7 +289,7 @@ where
             AllowlistEntryBuilder::new().exact("foo").build(),
             AllowlistEntryBuilder::new().exact("foo").build(),
         );
-        config_builder.add_debug_capability_policy(
+        policy_builder.add_debug_capability_policy(
             DebugCapabilityKey {
                 source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
@@ -299,7 +299,7 @@ where
             AllowlistEntryBuilder::new().exact("foo").build(),
             AllowlistEntryBuilder::new().exact("root").exact("bootstrap").build(),
         );
-        let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
+        let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let component = self.make_component(vec!["foo:0"].try_into().unwrap());
 
         let protocol_capability = CapabilitySource::<C>::Component {
@@ -366,8 +366,8 @@ where
     fn global_policy_checker_can_route_debug_capability_with_realm_allowlist_entry(
         &self,
     ) -> Result<(), Error> {
-        let mut config_builder = CapabilityAllowlistConfigBuilder::new();
-        config_builder.add_debug_capability_policy(
+        let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
+        policy_builder.add_debug_capability_policy(
             DebugCapabilityKey {
                 source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
@@ -377,7 +377,7 @@ where
             AllowlistEntryBuilder::new().exact("bar").build(),
             AllowlistEntryBuilder::new().exact("root").exact("bootstrap1").any_descendant(),
         );
-        config_builder.add_debug_capability_policy(
+        policy_builder.add_debug_capability_policy(
             DebugCapabilityKey {
                 source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
@@ -387,7 +387,7 @@ where
             AllowlistEntryBuilder::new().exact("foo").any_descendant(),
             AllowlistEntryBuilder::new().exact("root").exact("bootstrap2").build(),
         );
-        config_builder.add_debug_capability_policy(
+        policy_builder.add_debug_capability_policy(
             DebugCapabilityKey {
                 source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
@@ -397,7 +397,7 @@ where
             AllowlistEntryBuilder::new().exact("baz").any_descendant(),
             AllowlistEntryBuilder::new().exact("root").exact("bootstrap3").any_descendant(),
         );
-        let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
+        let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
 
         // source, dest, env
         let valid_cases = vec![
@@ -484,8 +484,8 @@ where
     fn global_policy_checker_can_route_debug_capability_with_collection_allowlist_entry(
         &self,
     ) -> Result<(), Error> {
-        let mut config_builder = CapabilityAllowlistConfigBuilder::new();
-        config_builder.add_debug_capability_policy(
+        let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
+        policy_builder.add_debug_capability_policy(
             DebugCapabilityKey {
                 source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
@@ -498,7 +498,7 @@ where
                 .exact("bootstrap")
                 .any_descendant_in_collection("coll1"),
         );
-        config_builder.add_debug_capability_policy(
+        policy_builder.add_debug_capability_policy(
             DebugCapabilityKey {
                 source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
@@ -508,7 +508,7 @@ where
             AllowlistEntryBuilder::new().exact("foo").any_descendant_in_collection("coll2"),
             AllowlistEntryBuilder::new().exact("root").exact("bootstrap2").build(),
         );
-        config_builder.add_debug_capability_policy(
+        policy_builder.add_debug_capability_policy(
             DebugCapabilityKey {
                 source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
@@ -521,7 +521,7 @@ where
                 .exact("bootstrap3")
                 .any_descendant_in_collection("coll4"),
         );
-        let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
+        let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
 
         // source, dest, env
         let valid_cases = vec![
@@ -609,8 +609,8 @@ where
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for builtin capabilities.
     fn global_policy_checker_can_route_capability_builtin_cap(&self) -> Result<(), Error> {
-        let mut config_builder = CapabilityAllowlistConfigBuilder::new();
-        config_builder.add_capability_policy(
+        let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
+        policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
                 source_name: "test".parse().unwrap(),
@@ -622,7 +622,7 @@ where
                 AllowlistEntryBuilder::new().exact("root").exact("core").build(),
             ],
         );
-        let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
+        let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
 
         let dir_capability = CapabilitySource::<C>::Builtin {
             capability: InternalCapability::Directory("test".parse().unwrap()),
@@ -657,8 +657,8 @@ where
     fn global_policy_checker_can_route_capability_with_realm_allowlist_entry(
         &self,
     ) -> Result<(), Error> {
-        let mut config_builder = CapabilityAllowlistConfigBuilder::new();
-        config_builder.add_capability_policy(
+        let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
+        policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
                 source_name: "fuchsia.boot.RootResource".parse().unwrap(),
@@ -670,7 +670,7 @@ where
                 AllowlistEntryBuilder::new().exact("core").exact("tests").any_descendant(),
             ],
         );
-        let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
+        let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let protocol_capability = CapabilitySource::<C>::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.boot.RootResource".parse().unwrap(),
@@ -714,8 +714,8 @@ where
     fn global_policy_checker_can_route_capability_with_collection_allowlist_entry(
         &self,
     ) -> Result<(), Error> {
-        let mut config_builder = CapabilityAllowlistConfigBuilder::new();
-        config_builder.add_capability_policy(
+        let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
+        policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
                 source_name: "fuchsia.boot.RootResource".parse().unwrap(),
@@ -727,7 +727,7 @@ where
                 AllowlistEntryBuilder::new().exact("core").any_descendant_in_collection("tests"),
             ],
         );
-        let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
+        let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let protocol_capability = CapabilitySource::<C>::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.boot.RootResource".parse().unwrap(),
@@ -759,14 +759,14 @@ where
     }
 }
 
-// Creates a RuntimeConfig based on the capability allowlist entries provided during
+// Creates a SecurityPolicy based on the capability allowlist entries provided during
 // construction.
-struct CapabilityAllowlistConfigBuilder {
+struct CapabilityAllowlistPolicyBuilder {
     capability_policy: HashMap<CapabilityAllowlistKey, HashSet<AllowlistEntry>>,
     debug_capability_policy: HashMap<DebugCapabilityKey, HashSet<DebugCapabilityAllowlistEntry>>,
 }
 
-impl CapabilityAllowlistConfigBuilder {
+impl CapabilityAllowlistPolicyBuilder {
     pub fn new() -> Self {
         Self { capability_policy: HashMap::new(), debug_capability_policy: HashMap::new() }
     }
@@ -797,20 +797,17 @@ impl CapabilityAllowlistConfigBuilder {
     }
 
     /// Creates a configuration from the provided policies.
-    pub fn build(&self) -> Arc<RuntimeConfig> {
-        let config = Arc::new(RuntimeConfig {
-            security_policy: SecurityPolicy {
-                job_policy: JobPolicyAllowlists {
-                    ambient_mark_vmo_exec: vec![],
-                    main_process_critical: vec![],
-                    create_raw_processes: vec![],
-                },
-                capability_policy: self.capability_policy.clone(),
-                debug_capability_policy: self.debug_capability_policy.clone(),
-                child_policy: ChildPolicyAllowlists { reboot_on_terminate: vec![] },
+    pub fn build(&self) -> SecurityPolicy {
+        SecurityPolicy {
+            job_policy: JobPolicyAllowlists {
+                ambient_mark_vmo_exec: vec![],
+                main_process_critical: vec![],
+                create_raw_processes: vec![],
             },
+            capability_policy: self.capability_policy.clone(),
+            debug_capability_policy: self.debug_capability_policy.clone(),
+            child_policy: ChildPolicyAllowlists { reboot_on_terminate: vec![] },
             ..Default::default()
-        });
-        config
+        }
     }
 }

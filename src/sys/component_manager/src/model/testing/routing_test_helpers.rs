@@ -85,7 +85,6 @@ pub struct RoutingTestBuilder {
     capability_policy: HashMap<CapabilityAllowlistKey, HashSet<AllowlistEntry>>,
     debug_capability_policy: HashMap<DebugCapabilityKey, HashSet<DebugCapabilityAllowlistEntry>>,
     child_policy: ChildPolicyAllowlists,
-    reboot_on_terminate_enabled: bool,
 }
 
 impl RoutingTestBuilder {
@@ -105,7 +104,6 @@ impl RoutingTestBuilder {
             capability_policy: HashMap::new(),
             debug_capability_policy: HashMap::new(),
             child_policy: ChildPolicyAllowlists::default(),
-            reboot_on_terminate_enabled: false,
         }
     }
 
@@ -146,11 +144,6 @@ impl RoutingTestBuilder {
 
     pub fn set_component_id_index_path(mut self, index_path: String) -> Self {
         self.component_id_index_path = Some(index_path);
-        self
-    }
-
-    pub fn set_reboot_on_terminate_enabled(mut self, val: bool) -> Self {
-        self.reboot_on_terminate_enabled = val;
         self
     }
 
@@ -294,14 +287,13 @@ impl RoutingTest {
             root_component_url: Some(
                 Url::new(format!("test:///{}", builder.root_component)).unwrap(),
             ),
-            security_policy: SecurityPolicy {
+            security_policy: Arc::new(SecurityPolicy {
                 capability_policy: builder.capability_policy,
                 debug_capability_policy: builder.debug_capability_policy,
                 child_policy: builder.child_policy,
                 ..Default::default()
-            },
+            }),
             component_id_index_path: builder.component_id_index_path,
-            reboot_on_terminate_enabled: builder.reboot_on_terminate_enabled,
             ..Default::default()
         };
         let inspector = inspect::Inspector::default();

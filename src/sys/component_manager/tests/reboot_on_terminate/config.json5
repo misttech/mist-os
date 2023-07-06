@@ -31,7 +31,6 @@
         },
     ],
     realm_builder_resolver_and_runner: "namespace",
-    reboot_on_terminate_enabled: true,
     security_policy: {
         child_policy: {
             reboot_on_terminate: [

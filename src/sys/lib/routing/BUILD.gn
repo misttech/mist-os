@@ -102,3 +102,11 @@ group("host-routing-tests") {
   testonly = true
   public_deps = [ ":routing_test($host_toolchain)" ]
 }
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":fuchsia-routing-tests",
+    ":host-routing-tests",
+  ]
+}

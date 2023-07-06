@@ -644,7 +644,7 @@ pub enum StartActionError {
         #[source]
         err: Box<RouteAndOpenCapabilityError>,
     },
-    #[error("Couldn't start `{moniker}` because it uses reboot_on_terminate but is not allowed to by policy: {err}")]
+    #[error("Couldn't start `{moniker}` because it uses `\"on_terminate\": \"reboot\"` but is not allowed to by policy: {err}")]
     RebootOnTerminateForbidden {
         moniker: AbsoluteMoniker,
         #[source]

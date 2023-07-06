@@ -238,12 +238,7 @@ impl ElfRunner {
         let url = resolved_url.clone();
         let main_process_critical = program_config.main_process_critical;
         let res: Result<ElfComponent, StartComponentError> = self
-            .start_component_helper(
-                start_info,
-                checker.get_scope().clone(),
-                resolved_url,
-                program_config,
-            )
+            .start_component_helper(start_info, checker.scope.clone(), resolved_url, program_config)
             .await;
         match res {
             Err(e) if main_process_critical => {
@@ -597,7 +592,7 @@ mod tests {
         super::runtime_dir::RuntimeDirectory,
         super::*,
         ::routing::{
-            config::{AllowlistEntryBuilder, JobPolicyAllowlists, RuntimeConfig, SecurityPolicy},
+            config::{AllowlistEntryBuilder, JobPolicyAllowlists, SecurityPolicy},
             policy::ScopedPolicyChecker,
         },
         anyhow::{Context, Error},
@@ -853,7 +848,7 @@ mod tests {
 
         let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-            Arc::downgrade(&Arc::new(RuntimeConfig::default())),
+            Arc::new(SecurityPolicy::default()),
             AbsoluteMoniker::root(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
@@ -1125,7 +1120,7 @@ mod tests {
         // Config does not allowlist any monikers to have access to the job policy.
         let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-            Arc::downgrade(&Arc::new(RuntimeConfig::default())),
+            Arc::new(SecurityPolicy::default()),
             AbsoluteMoniker::root(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
@@ -1147,19 +1142,16 @@ mod tests {
         let (runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>()?;
         let start_info = with_mark_vmo_exec(lifecycle_startinfo(runtime_dir_server));
 
-        let config = Arc::new(RuntimeConfig {
-            security_policy: SecurityPolicy {
-                job_policy: JobPolicyAllowlists {
-                    ambient_mark_vmo_exec: vec![AllowlistEntryBuilder::new().exact("foo").build()],
-                    ..Default::default()
-                },
+        let policy = SecurityPolicy {
+            job_policy: JobPolicyAllowlists {
+                ambient_mark_vmo_exec: vec![AllowlistEntryBuilder::new().exact("foo").build()],
                 ..Default::default()
             },
             ..Default::default()
-        });
+        };
         let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-            Arc::downgrade(&config),
+            Arc::new(policy),
             AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
@@ -1192,10 +1184,10 @@ mod tests {
         let (_runtime_dir, runtime_dir_server) = create_endpoints::<fio::DirectoryMarker>();
         let start_info = with_main_process_critical(hello_world_startinfo(runtime_dir_server));
 
-        // Config does not allowlist any monikers to be marked as critical
+        // Default policy does not allowlist any monikers to be marked as critical
         let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-            Arc::downgrade(&Arc::new(RuntimeConfig::default())),
+            Arc::new(SecurityPolicy::default()),
             AbsoluteMoniker::root(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
@@ -1221,23 +1213,18 @@ mod tests {
         // to a binary that does not exist in the test package.
         let start_info = with_main_process_critical(invalid_binary_startinfo(runtime_dir_server));
 
-        // Config does not allowlist any monikers to be marked as critical without being
+        // Policy does not allowlist any monikers to be marked as critical without being
         // allowlisted, so make sure we permit this one.
-        let config = Arc::new(RuntimeConfig {
-            security_policy: SecurityPolicy {
-                job_policy: JobPolicyAllowlists {
-                    main_process_critical: vec![AllowlistEntryBuilder::new().build()],
-                    ..Default::default()
-                },
+        let policy = SecurityPolicy {
+            job_policy: JobPolicyAllowlists {
+                main_process_critical: vec![AllowlistEntryBuilder::new().build()],
                 ..Default::default()
             },
             ..Default::default()
-        });
+        };
         let runner = new_elf_runner_for_test();
-        let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-            Arc::downgrade(&config),
-            AbsoluteMoniker::root(),
-        ));
+        let runner = runner
+            .get_scoped_runner(ScopedPolicyChecker::new(Arc::new(policy), AbsoluteMoniker::root()));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
             .expect("could not create component controller endpoints");
 
@@ -1315,7 +1302,7 @@ mod tests {
 
             let runner = new_elf_runner_for_test();
             let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-                Arc::downgrade(&Arc::new(RuntimeConfig::default())),
+                Arc::new(SecurityPolicy::default()),
                 AbsoluteMoniker::root(),
             ));
             let (client_controller, server_controller) =
@@ -1372,7 +1359,7 @@ mod tests {
 
         let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-            Arc::downgrade(&Arc::new(RuntimeConfig::default())),
+            Arc::new(SecurityPolicy::default()),
             AbsoluteMoniker::root(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
@@ -1507,7 +1494,7 @@ mod tests {
         let connector = LauncherConnectorForTest { sender: payload_tx };
         let runner = ElfRunner::new(Box::new(connector), None, CrashRecords::new());
         let policy_checker = ScopedPolicyChecker::new(
-            Arc::downgrade(&Arc::new(RuntimeConfig::default())),
+            Arc::new(SecurityPolicy::default()),
             AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
         );
 

@@ -53,7 +53,7 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     fn config_parent_overrides(&self) -> Option<&Vec<cm_rust::ConfigOverride>>;
 
     /// Returns the `GlobalPolicyChecker` for this component instance.
-    fn policy_checker(&self) -> GlobalPolicyChecker;
+    fn policy_checker(&self) -> &GlobalPolicyChecker;
 
     /// Returns the `ComponentIdIndex` available to this component instance, if it is still available.
     fn component_id_index(&self) -> Arc<ComponentIdIndex>;

@@ -76,11 +76,8 @@ type Config = table {
     /// If not present, interpreted as BuiltinBootResolver.NONE.
    14: builtin_boot_resolver BuiltinBootResolver;
 
-    /// If true, allow components to set the `OnTerminate=REBOOT` option.
-    ///
-    /// This lets a parent copmonent designate that the system should reboot if a child terminates
-    /// (except when it's shut down).
-   15: reboot_on_terminate_enabled bool;
+    /// Used to be reboot_on_terminate_enabled.
+   15: reserved;
 
     /// If and how the realm builder resolver and runner will be used. Typically
     /// these capabilities from realm builder are available to a nested
