@@ -19,6 +19,9 @@
 #ifdef __Fuchsia__
 #include <lib/zx/vmo.h>
 #endif
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+#include <android/hardware_buffer.h>
+#endif
 
 struct VkReadbackSubmitOptions {
   // The first submission must include an image transition.
@@ -46,7 +49,7 @@ class VkReadbackTest {
   static constexpr int kWidth = 64;
   static constexpr int kHeight = 64;
 
-  enum Extension { NONE, VK_FUCHSIA_EXTERNAL_MEMORY };
+  enum Extension { NONE, VK_FUCHSIA_EXTERNAL_MEMORY, VK_ANDROID_EXTERNAL_MEMORY };
 
   // Depending on how the test is initialized, it may be a self contained
   // instance, an instance that imports external memory or an instance that
@@ -60,6 +63,11 @@ class VkReadbackTest {
 #ifdef __Fuchsia__
   // Constructor for an instance that imports an external memory VMO.
   explicit VkReadbackTest(zx::vmo exported_memory_vmo);
+#endif
+
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+  // Does not take ownership of the hardware buffer.
+  explicit VkReadbackTest(AHardwareBuffer* buffer);
 #endif
 
   virtual ~VkReadbackTest();
@@ -117,13 +125,17 @@ class VkReadbackTest {
   std::optional<uint32_t> FindReadableMemoryType(vk::DeviceSize allocation_size,
                                                  uint32_t memory_type_bits);
 
+  bool AllocateDeviceMemory();
+
 #ifdef __Fuchsia__
   [[nodiscard]] bool AllocateFuchsiaImportedMemory(zx::vmo exported_memory_vmo);
   [[nodiscard]] bool AssignExportedMemoryHandle();
   void VerifyExpectedImageFormats() const;
 #endif
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+  bool AllocateAndroidImportedMemory(AHardwareBuffer* ahb);
+#endif
 
-  Extension ext_;
   bool is_initialized_ = false;
   bool vulkan_initialized_ = false;
   bool image_initialized_ = false;
@@ -134,10 +146,12 @@ class VkReadbackTest {
   vk::UniqueDeviceMemory device_memory_;
 
   // Import/export
-  vk::UniqueDeviceMemory imported_device_memory_;
   ImportExport import_export_;
 #ifdef __Fuchsia__
   zx::vmo exported_memory_vmo_;
+#endif
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+  AHardwareBuffer* exported_memory_ahb_ = nullptr;
 #endif
 
   vk::UniqueCommandPool command_pool_;
@@ -146,7 +160,7 @@ class VkReadbackTest {
   VulkanExtensionSupportState timeline_semaphore_support_ =
       VulkanExtensionSupportState::kNotSupported;
 
-  uint64_t bind_offset_ = 0;
+  std::optional<uint64_t> bind_offset_;
 
   // Submit() validation state.
   bool submit_called_with_transition_ = false;

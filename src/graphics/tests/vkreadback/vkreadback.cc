@@ -37,15 +37,18 @@ constexpr uint64_t round_up(uint64_t val, uint64_t alignment) {
 }  // namespace
 
 VkReadbackTest::VkReadbackTest(Extension ext)
-    : ext_(ext),
-      import_export_((ext == VK_FUCHSIA_EXTERNAL_MEMORY) ? EXPORT_EXTERNAL_MEMORY : SELF) {}
+    : import_export_((ext == VK_FUCHSIA_EXTERNAL_MEMORY) ? EXPORT_EXTERNAL_MEMORY : SELF) {}
 
 #ifdef __Fuchsia__
 VkReadbackTest::VkReadbackTest(zx::vmo exported_memory_vmo)
-    : ext_(VK_FUCHSIA_EXTERNAL_MEMORY),
-      import_export_(IMPORT_EXTERNAL_MEMORY),
+    : import_export_(IMPORT_EXTERNAL_MEMORY),
       exported_memory_vmo_(std::move(exported_memory_vmo)) {}
 #endif  // __Fuchsia__
+
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+VkReadbackTest::VkReadbackTest(AHardwareBuffer* buffer)
+    : import_export_(IMPORT_EXTERNAL_MEMORY), exported_memory_ahb_(buffer) {}
+#endif
 
 VkReadbackTest::~VkReadbackTest() = default;
 
@@ -141,11 +144,14 @@ bool VkReadbackTest::InitVulkan(uint32_t vk_api_version) {
     RTN_MSG(false, "InitVulkan failed.  Already initialized.\n");
   }
   std::vector<const char*> enabled_extension_names;
-#ifdef __Fuchsia__
   if (import_export_ == IMPORT_EXTERNAL_MEMORY || import_export_ == EXPORT_EXTERNAL_MEMORY) {
+#ifdef __Fuchsia__
     enabled_extension_names.push_back(VK_FUCHSIA_EXTERNAL_MEMORY_EXTENSION_NAME);
-  }
+#elif defined(VK_USE_PLATFORM_ANDROID_KHR)
+    enabled_extension_names.push_back(
+        VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
 #endif
+  }
 
   vk::ApplicationInfo app_info;
   app_info.pApplicationName = "vkreadback";
@@ -165,6 +171,7 @@ bool VkReadbackTest::InitVulkan(uint32_t vk_api_version) {
   auto ext_features = vk::PhysicalDeviceTimelineSemaphoreFeaturesKHR().setTimelineSemaphore(true);
 
   timeline_semaphore_support_ = GetVulkanTimelineSemaphoreSupport(vk_api_version);
+
   switch (timeline_semaphore_support_) {
     case VulkanExtensionSupportState::kSupportedInCore:
       device_info.setPNext(&features);
@@ -241,19 +248,84 @@ bool VkReadbackTest::InitImage() {
     image_create_info_chain.get<vk::ExternalMemoryImageCreateInfo>().handleTypes =
         vk::ExternalMemoryHandleTypeFlagBits::eZirconVmoFUCHSIA;
 #endif
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+    image_create_info_chain.get<vk::ExternalMemoryImageCreateInfo>().handleTypes =
+        vk::ExternalMemoryHandleTypeFlagBits::eAndroidHardwareBufferANDROID;
+#endif
   }
 
-  const auto& device = ctx_->device();
   vk::ResultValue<vk::UniqueImage> create_image_result =
-      device->createImageUnique(image_create_info_chain.get());
+      ctx_->device()->createImageUnique(image_create_info_chain.get());
   RTN_IF_VKH_ERR(false, create_image_result.result, "vk::Device::createImageUnique()\n");
   image_ = std::move(create_image_result.value);
 
+  //
+  // Create the device memory to be bound to this image.
+  //
+  if (import_export_ == IMPORT_EXTERNAL_MEMORY) {
+#ifdef __Fuchsia__
+    if (!AllocateFuchsiaImportedMemory(std::move(exported_memory_vmo_))) {
+      RTN_MSG(false, "AllocateFuchsiaImportedMemory failed.\n");
+    }
+#elif defined(VK_USE_PLATFORM_ANDROID_KHR)
+    if (!AllocateAndroidImportedMemory(exported_memory_ahb_)) {
+      RTN_MSG(false, "AllocateAndroidImportedMemory failed.\n");
+    }
+#endif
+  } else {
+    if (!AllocateDeviceMemory()) {
+      RTN_MSG(false, "AllocateDeviceMemory failed.\n");
+    }
+  }
+
+  if (!device_memory_) {
+    RTN_MSG(false, "No device memory");
+  }
+
+  if (import_export_ == EXPORT_EXTERNAL_MEMORY) {
+#ifdef __Fuchsia__
+    if (!AssignExportedMemoryHandle()) {
+      RTN_MSG(false, "AssignExportedMemoryHandle failed.\n");
+    }
+#endif  // __Fuchsia__
+  }
+
+  vk::Result bind_image_result =
+      ctx_->device()->bindImageMemory(*image_, *device_memory_, bind_offset_ ? *bind_offset_ : 0);
+  RTN_IF_VKH_ERR(false, bind_image_result, "vk::Device::bindImageMemory()\n");
+
+  VkDeviceSize device_memory_size;
+  {
+    // Now that image is bound we can reliably get image size on Android.
+    auto image_mem_reqs =
+        ctx_->device()->getImageMemoryRequirements2(vk::ImageMemoryRequirementsInfo2(*image_));
+
+    device_memory_size = image_mem_reqs.memoryRequirements.size;
+  }
+
+  if (import_export_ != IMPORT_EXTERNAL_MEMORY) {
+    auto [map_device_memory_result, device_memory_address] = ctx_->device()->mapMemory(
+        *device_memory_, 0 /* offset= */, VK_WHOLE_SIZE, vk::MemoryMapFlags{});
+    RTN_IF_VKH_ERR(false, map_device_memory_result, "vk::Device::mapMemory()\n");
+
+    constexpr int kFill = 0xab;
+    memset(device_memory_address, kFill, device_memory_size + (bind_offset_ ? *bind_offset_ : 0));
+
+    ctx_->device()->unmapMemory(*device_memory_);
+  }
+
+  image_initialized_ = true;
+
+  return true;
+}
+
+bool VkReadbackTest::AllocateDeviceMemory() {
   vk::StructureChain<vk::MemoryRequirements2, vk::MemoryDedicatedRequirements>
       memory_requirements_chain =
-          device->getImageMemoryRequirements2<vk::MemoryRequirements2,
-                                              vk::MemoryDedicatedRequirements>(
-              vk::ImageMemoryRequirementsInfo2(*image_));
+          ctx_->device()
+              ->getImageMemoryRequirements2<vk::MemoryRequirements2,
+                                            vk::MemoryDedicatedRequirements>(
+                  vk::ImageMemoryRequirementsInfo2(*image_));
   const vk::MemoryRequirements& image_memory_requirements =
       memory_requirements_chain.get<vk::MemoryRequirements2>().memoryRequirements;
   use_dedicated_memory_ =
@@ -270,11 +342,11 @@ bool VkReadbackTest::InitImage() {
     constexpr uint32_t kOffset = 128;
     bind_offset_ = kPageSize + kOffset;
     if (image_memory_requirements.alignment) {
-      bind_offset_ = round_up(bind_offset_, image_memory_requirements.alignment);
+      bind_offset_ = round_up(*bind_offset_, image_memory_requirements.alignment);
     }
   }
 
-  vk::DeviceSize allocation_size = image_memory_requirements.size + bind_offset_;
+  vk::DeviceSize allocation_size = image_memory_requirements.size + *bind_offset_;
   std::optional<uint32_t> memory_type =
       FindReadableMemoryType(allocation_size, image_memory_requirements.memoryTypeBits);
   if (!memory_type) {
@@ -304,35 +376,10 @@ bool VkReadbackTest::InitImage() {
   }
 
   vk::ResultValue<vk::UniqueDeviceMemory> allocate_memory_result =
-      device->allocateMemoryUnique(mem_alloc_info_chain.get());
+      ctx_->device()->allocateMemoryUnique(mem_alloc_info_chain.get());
   RTN_IF_VKH_ERR(false, allocate_memory_result.result, "vk::Device::allocateMemory()\n");
+
   device_memory_ = std::move(allocate_memory_result.value);
-
-#ifdef __Fuchsia__
-  if (import_export_ == IMPORT_EXTERNAL_MEMORY) {
-    if (!AllocateFuchsiaImportedMemory(std::move(exported_memory_vmo_))) {
-      RTN_MSG(false, "AllocateFuchsiaImportedMemory failed.\n");
-    }
-  } else if (import_export_ == EXPORT_EXTERNAL_MEMORY) {
-    if (!AssignExportedMemoryHandle()) {
-      RTN_MSG(false, "AssignExportedMemoryHandle failed.\n");
-    }
-  }
-#endif  // __Fuchsia__
-
-  auto [map_device_memory_result, device_memory_address] =
-      device->mapMemory(*device_memory_, 0 /* offset= */, VK_WHOLE_SIZE, vk::MemoryMapFlags{});
-  RTN_IF_VKH_ERR(false, map_device_memory_result, "vk::Device::mapMemory()\n");
-
-  constexpr int kFill = 0xab;
-  memset(device_memory_address, kFill, image_memory_requirements.size + bind_offset_);
-
-  device->unmapMemory(*device_memory_);
-
-  vk::Result bind_image_result = device->bindImageMemory(*image_, *device_memory_, bind_offset_);
-  RTN_IF_VKH_ERR(false, bind_image_result, "vk::Device::bindImageMemory()\n");
-
-  image_initialized_ = true;
 
   return true;
 }
@@ -413,7 +460,7 @@ bool VkReadbackTest::AllocateFuchsiaImportedMemory(zx::vmo exported_memory_vmo) 
   RTN_IF_VKH_ERR(false, allocate_memory_result.result,
                  "vk::Device::allocateMemory() failed for import memory\n");
 
-  imported_device_memory_ = std::move(allocate_memory_result.value);
+  device_memory_ = std::move(allocate_memory_result.value);
   // After vk::Device::allocateMemory() succeeds, Vulkan owns the VMO handle.
   std::ignore = exported_memory_vmo.release();
 
@@ -445,6 +492,42 @@ bool VkReadbackTest::AssignExportedMemoryHandle() {
   return true;
 }
 #endif  // __Fuchsia__
+
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+bool VkReadbackTest::AllocateAndroidImportedMemory(AHardwareBuffer* ahb) {
+  auto [handle_properties_result, handle_properties] =
+      ctx_->device()->getAndroidHardwareBufferPropertiesANDROID(*ahb, ctx_->loader());
+  RTN_IF_VKH_ERR(false, handle_properties_result,
+                 "vkGetAndroidHardwareBufferPropertiesANDROID failed.\n");
+
+  std::optional<uint32_t> memory_type =
+      FindReadableMemoryType(handle_properties.allocationSize, handle_properties.memoryTypeBits);
+  if (!memory_type) {
+    RTN_MSG(false, "Can't find host mappable memory type for android hardware buffer.\n");
+  }
+
+  vk::StructureChain<vk::MemoryAllocateInfo, vk::ImportAndroidHardwareBufferInfoANDROID>
+      imported_mem_alloc_info_chain;
+
+  vk::MemoryAllocateInfo& imported_mem_alloc_info =
+      imported_mem_alloc_info_chain.get<vk::MemoryAllocateInfo>();
+  imported_mem_alloc_info.allocationSize = handle_properties.allocationSize;
+  imported_mem_alloc_info.memoryTypeIndex = *memory_type;
+
+  vk::ImportAndroidHardwareBufferInfoANDROID& import_memory_handle_info =
+      imported_mem_alloc_info_chain.get<vk::ImportAndroidHardwareBufferInfoANDROID>();
+  import_memory_handle_info.buffer = ahb;
+
+  vk::ResultValue<vk::UniqueDeviceMemory> allocate_memory_result =
+      ctx_->device()->allocateMemoryUnique(imported_mem_alloc_info);
+  RTN_IF_VKH_ERR(false, allocate_memory_result.result,
+                 "vk::Device::allocateMemory() failed for import memory\n");
+
+  device_memory_ = std::move(allocate_memory_result.value);
+
+  return true;
+}
+#endif  // VK_USE_PLATFORM_ANDROID_KHR
 
 bool VkReadbackTest::FillCommandBuffer(VkReadbackSubmitOptions options,
                                        vk::UniqueCommandBuffer command_buffer) {
@@ -612,20 +695,19 @@ void VkReadbackTest::TransferSubmittedStateFrom(const VkReadbackTest& export_sou
 
   submit_called_with_transition_ = export_source.submit_called_with_transition_;
   submit_called_with_barrier_ = export_source.submit_called_with_barrier_;
+  bind_offset_ = export_source.bind_offset_;
 }
 
 bool VkReadbackTest::Readback() {
   EXPECT_TRUE(submit_called_with_barrier_)
       << "Readback() called after Submit() without include_end_barrier option";
 
-  vk::DeviceMemory device_memory =
-      ext_ == VkReadbackTest::NONE ? *device_memory_ : *imported_device_memory_;
-
   auto [map_result, map_address] = ctx_->device()->mapMemory(
-      device_memory, /* offset= */ vk::DeviceSize{}, VK_WHOLE_SIZE, vk::MemoryMapFlags{});
+      *device_memory_, /* offset= */ vk::DeviceSize{}, VK_WHOLE_SIZE, vk::MemoryMapFlags{});
   RTN_IF_VKH_ERR(false, map_result, "vk::Device::mapMemory()\n");
 
-  auto* data = reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(map_address) + bind_offset_);
+  auto* data = reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(map_address) +
+                                           (bind_offset_ ? *bind_offset_ : 0));
 
   // ABGR ordering of clear color value.
   const uint32_t kExpectedClearColorValue = 0xBF8000FF;
@@ -646,7 +728,7 @@ bool VkReadbackTest::Readback() {
     fprintf(stdout, "****** Test Failed! %d mismatches\n", mismatches);
   }
 
-  ctx_->device()->unmapMemory(device_memory);
+  ctx_->device()->unmapMemory(*device_memory_);
 
   return mismatches == 0;
 }
