@@ -61,10 +61,10 @@ pub mod route {
     };
     use net_types::{
         ip::{
-            AddrSubnetEither, AddrSubnetError, IpAddr, IpAddress as _, IpVersion, Ipv4Addr,
-            Ipv6Addr,
+            AddrSubnetEither, AddrSubnetError, Ip, IpAddr, IpAddress as _, IpVersion, Ipv4,
+            Ipv4Addr, Ipv6, Ipv6Addr,
         },
-        SpecifiedAddress as _,
+        SpecifiedAddress,
     };
 
     use crate::{
@@ -144,8 +144,8 @@ pub mod route {
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
     > {
         pub(crate) interfaces_request_sink: mpsc::Sender<interfaces::Request<S>>,
-        pub(crate) v4_routes_request_sink: mpsc::Sender<routes::Request<S>>,
-        pub(crate) v6_routes_request_sink: mpsc::Sender<routes::Request<S>>,
+        pub(crate) v4_routes_request_sink: mpsc::Sender<routes::Request<S, Ipv4>>,
+        pub(crate) v6_routes_request_sink: mpsc::Sender<routes::Request<S, Ipv6>>,
     }
 
     struct ExtractedAddressRequest {
@@ -542,17 +542,38 @@ pub mod route {
                         AF_UNSPEC => {
                             // V4 routes are requested prior to V6 routes to conform
                             // with `ip list` output.
-                            process_dump_for_routes_worker(v4_routes_request_sink, client, req_header).await;
-                            process_dump_for_routes_worker(v6_routes_request_sink, client, req_header).await;
+                            process_dump_for_routes_worker::<_, Ipv4>(
+                                v4_routes_request_sink,
+                                client,
+                                req_header
+                            ).await;
+                            process_dump_for_routes_worker::<_, Ipv6>(
+                                v6_routes_request_sink,
+                                client,
+                                req_header
+                            ).await;
                         },
                         AF_INET => {
-                            process_dump_for_routes_worker(v4_routes_request_sink, client, req_header).await;
+                            process_dump_for_routes_worker::<_, Ipv4>(
+                                v4_routes_request_sink,
+                                client,
+                                req_header
+                            ).await;
                         },
                         AF_INET6 => {
-                            process_dump_for_routes_worker(v6_routes_request_sink, client, req_header).await;
+                            process_dump_for_routes_worker::<_, Ipv6>(
+                                v6_routes_request_sink,
+                                client,
+                                req_header
+                            ).await;
                         },
                         family => {
-                            log_debug!("invalid address family ({}) in route dump request from {}: {:?}", family, client, req);
+                            log_debug!(
+                                "invalid address family ({}) in route dump request from {}: {:?}",
+                                family,
+                                client,
+                                req
+                            );
                             client.send_unicast(
                                 netlink_packet::new_error(Errno::EINVAL, req_header));
                             return;
@@ -647,8 +668,9 @@ pub mod route {
 
     async fn process_dump_for_routes_worker<
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+        I: Ip,
     >(
-        sink: &mut mpsc::Sender<routes::Request<S>>,
+        sink: &mut mpsc::Sender<routes::Request<S, I>>,
         client: &mut InternalClient<NetlinkRoute, S>,
         req_header: NetlinkHeader,
     ) {
@@ -788,7 +810,7 @@ mod test {
     use futures::{channel::mpsc, future::FutureExt as _, stream::StreamExt as _};
     use net_declare::net_addr_subnet;
     use net_types::{
-        ip::{AddrSubnetEither, IpVersion},
+        ip::{AddrSubnetEither, IpVersion, Ipv4, Ipv6},
         Witness as _,
     };
     use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP};
@@ -2060,7 +2082,7 @@ mod test {
     async fn test_route_request(
         family: u16,
         request: NetlinkMessage<RtnlMessage>,
-        expected_request: Option<routes::RequestArgs>,
+        expected_request: Option<routes::GetRouteArgs>,
     ) -> Vec<SentMessage<RtnlMessage>> {
         let (mut client_sink, mut client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_1,
@@ -2079,7 +2101,9 @@ mod test {
         let ((), ()) = futures::future::join(handler.handle_request(request, &mut client), async {
             if family == AF_UNSPEC || family == AF_INET {
                 let next = v4_routes_request_stream.next();
-                match expected_request {
+                match expected_request
+                    .map(|a| routes::RequestArgs::<Ipv4>::Route(routes::RouteRequestArgs::Get(a)))
+                {
                     Some(expected_request) => {
                         let routes::Request { args, sequence_number: _, client: _, completer } =
                             next.await.expect("handler should send request");
@@ -2091,7 +2115,9 @@ mod test {
             }
             if family == AF_UNSPEC || family == AF_INET6 {
                 let next = v6_routes_request_stream.next();
-                match expected_request {
+                match expected_request
+                    .map(|a| routes::RequestArgs::<Ipv6>::Route(routes::RouteRequestArgs::Get(a)))
+                {
                     Some(expected_request) => {
                         let routes::Request { args, sequence_number: _, client: _, completer } =
                             next.await.expect("handler should send request");
@@ -2210,7 +2236,6 @@ mod test {
                     NetlinkPayload::InnerMessage(RtnlMessage::GetRoute(route_message)),
                 ),
                 expected_request_args
-                    .map(|a| routes::RequestArgs::Route(routes::RouteRequestArgs::Get(a))),
             )
             .await,
             expected_response
