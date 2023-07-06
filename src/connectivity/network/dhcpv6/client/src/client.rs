@@ -43,7 +43,7 @@ use net_types::{
 use packet::ParsablePacket;
 use packet_formats_dhcp::v6;
 use rand::{rngs::StdRng, SeedableRng};
-use tracing::{error, warn};
+use tracing::{debug, error, warn};
 
 use dhcpv6_core;
 
@@ -587,6 +587,7 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
 
     /// Handles a FIDL request sent to this client.
     fn handle_client_request(&mut self, request: ClientRequest) -> Result<(), ClientError> {
+        debug!("handling client request: {:?}", request);
         match request {
             ClientRequest::WatchServers { responder } => match self.dns_responder {
                 Some(_) => {
@@ -648,7 +649,10 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
                         Ok(Some(()))
                     },
                     // The timer was aborted, do nothing.
-                    Err(Aborted) => Ok(Some(())),
+                    Err(Aborted) => {
+                        debug!("timer aborted");
+                        Ok(Some(()))
+                    }
                 }
             },
             recv_from_res = self.socket.recv_from(buf).fuse() => {
@@ -1303,7 +1307,13 @@ mod tests {
         {
             // No DNS configurations received yet.
             let mut test = Test::new(&mut client, &client_proxy);
-            assert_matches!(exec.run_until_stalled(&mut test.run()), Poll::Pending);
+
+            // Handle the WatchServers request.
+            exec.run_singlethreaded(test.handle_next_event());
+            assert!(
+                test.client.dns_responder.is_some(),
+                "WatchServers responder should be present"
+            );
 
             // Send an empty list to the client, should not update watcher.
             let () = exec
@@ -1318,7 +1328,7 @@ mod tests {
             // Wait for the client to handle the next event (processing the reply we just
             // sent). Note that it is not enough to simply drive the client future until it
             // is stalled as we do elsewhere in the test, because we have no guarantee that
-            // the the netstack has delivered the UDP packet to the client by the time the
+            // the netstack has delivered the UDP packet to the client by the time the
             // `send_to` call returned.
             exec.run_singlethreaded(test.handle_next_event());
             assert_matches!(exec.run_until_stalled(&mut test.run()), Poll::Pending);
@@ -1350,7 +1360,13 @@ mod tests {
         {
             // No new changes, should not update watcher.
             let mut test = Test::new(&mut client, &client_proxy);
-            assert_matches!(exec.run_until_stalled(&mut test.run()), Poll::Pending);
+
+            // Handle the WatchServers request.
+            exec.run_singlethreaded(test.handle_next_event());
+            assert!(
+                test.client.dns_responder.is_some(),
+                "WatchServers responder should be present"
+            );
 
             // Send the same list of DNS servers, should not update watcher.
             exec.run_singlethreaded(test.refresh_client());
@@ -1370,7 +1386,7 @@ mod tests {
             // Wait for the client to handle the next event (processing the reply we just
             // sent). Note that it is not enough to simply drive the client future until it
             // is stalled as we do elsewhere in the test, because we have no guarantee that
-            // the the netstack has delivered the UDP packet to the client by the time the
+            // the netstack has delivered the UDP packet to the client by the time the
             // `send_to` call returned.
             exec.run_singlethreaded(test.handle_next_event());
             assert_matches!(exec.run_until_stalled(&mut test.run()), Poll::Pending);
@@ -1412,6 +1428,7 @@ mod tests {
             // because this is different from what the watcher has seen
             // last time.
             let mut test = Test::new(&mut client, &client_proxy);
+
             exec.run_singlethreaded(test.refresh_client());
             let () = exec
                 .run_singlethreaded(send_msg_with_options(
@@ -1423,10 +1440,7 @@ mod tests {
                 ))
                 .expect("failed to send test reply");
             let want_servers = Vec::<fnet_name::DnsServer_>::new();
-            assert_matches!(
-                exec.run_until_stalled(&mut test.run()),
-                Poll::Ready(Ok(servers)) if servers == want_servers
-            );
+            assert_eq!(exec.run_singlethreaded(test.run()).expect("get servers"), want_servers);
         } // drop `test_fut` so `client_fut` is no longer mutably borrowed.
     }
 
@@ -1484,7 +1498,7 @@ mod tests {
         ];
         assert_matches!(
             join!(client.handle_next_event(&mut buf), client_proxy.watch_servers()),
-            (Ok(Some(())), Ok(servers)) if servers == want_servers
+            (Ok(Some(())), Ok(servers)) => assert_eq!(servers, want_servers)
         );
     }
 

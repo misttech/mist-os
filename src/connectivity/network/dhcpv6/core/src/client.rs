@@ -21,7 +21,7 @@ use std::{
     marker::PhantomData,
     time::Duration,
 };
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use zerocopy::ByteSlice;
 
 use crate::{Instant, InstantExt as _};
@@ -4963,6 +4963,7 @@ impl<I: Instant, R: Rng> ClientStateMachine<I, R> {
     pub fn handle_timeout(&mut self, timeout_type: ClientTimerType, now: I) -> Actions<I> {
         let ClientStateMachine { transaction_id, options_to_request, state, rng } = self;
         let old_state = state.take().expect("state should not be empty");
+        debug!("handling timeout {:?}", timeout_type);
         let Transition { state: new_state, actions, transaction_id: new_transaction_id } =
             match timeout_type {
                 ClientTimerType::Retransmission => old_state.retransmission_timer_expired(
@@ -5003,6 +5004,7 @@ impl<I: Instant, R: Rng> ClientStateMachine<I, R> {
         if msg.transaction_id() != transaction_id {
             Vec::new() // Ignore messages for other clients.
         } else {
+            debug!("handling received message of type: {:?}", msg.msg_type());
             match msg.msg_type() {
                 v6::MessageType::Reply => {
                     let Transition {
