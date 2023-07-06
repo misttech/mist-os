@@ -13,7 +13,7 @@ import("//sdk/config.gni")
 # generated archive will have host tools for both Linux/x64 and Linux/arm64.
 #
 # The generated archive will go into
-# $root_build_dir/sdk/archive/{output_name}.tgz
+# $root_build_dir/sdk/archive/{output_name}.tar.gz
 #
 # Arguments:
 #    target_cpus: (optional)
@@ -25,7 +25,7 @@ import("//sdk/config.gni")
 #      final archive. Each one will be built for several CPU architecture.
 #
 #    output_name: (optional)
-#      Name of the archive, without a .tgz suffix. Default is target_name
+#      Name of the archive, without a .tar.gz suffix. Default is target_name
 #
 #    testonly, visibility
 #      Usual GN meaning.
@@ -56,7 +56,7 @@ template("generate_final_idk") {
     if (defined(invoker.output_name)) {
       _output_name = invoker.output_name
     }
-    _output_archive = root_build_dir + "/sdk/archive/${_output_name}.tgz"
+    _output_archive = root_build_dir + "/sdk/archive/${_output_name}.tar.gz"
     _exported_dir = root_build_dir + "/sdk/exported/${_output_name}"
     _exported_dir_stamp = _exported_dir + ".stamp"
     _exported_dir_target = "${target_name}.exported"
