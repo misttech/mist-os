@@ -8,7 +8,12 @@
 
 #include <gtest/gtest.h>
 
+#ifdef __ANDROID__
+// Included in the NDK sysroot on android.
+#include <drm/drm_fourcc.h>
+#else
 #include "drm_fourcc.h"
+#endif
 
 // Copied from vulkan_core.h
 typedef enum VkImageUsageFlagBits {

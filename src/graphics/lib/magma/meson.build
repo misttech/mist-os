@@ -84,7 +84,6 @@ dep_magma = declare_dependency(
   include_directories : [inc_magma, inc_msd_intel_gen],
   link_with : libmagma_virt_hermetic)
 
-# Disabled because failing to build with android ndkl
-#if get_option('with_tests')
-#  subdir('tests')
-#endif
+if get_option('with_tests')
+  subdir('tests')
+endif

@@ -7,8 +7,14 @@
 #   -'googletest'
 #   -'libdrm-dev'
 dl_dep = meson.get_compiler('cpp').find_library('dl', required: false)
-gtest_dep = dependency('gtest', main: true)
-drm_dep = dependency('libdrm')
+gtest_main_dep = dependency('gtest_main', main: true)
+drm_dep = dependency('libdrm', required: not get_option('android_build'))
+
+if get_option('android_build')
+  extra_link_args = ['-static-libstdc++']
+else
+  extra_link_args = []
+endif
 
 foreach test : ['virtmagma_unit_tests', 'virtmagma_image_tests']
   files_unit_test = files(
@@ -20,10 +26,11 @@ foreach test : ['virtmagma_unit_tests', 'virtmagma_image_tests']
     test,
     sources: files_unit_test,
     include_directories : [inc_configuration, inc_top, inc_magma, inc_platform],
-    cpp_args: cpp_args,
+    cpp_args: cpp_args + ['-std=c++17'],
     link_with : [libmagma_virt],
-    dependencies : [gtest_dep, dl_dep, drm_dep],
+    dependencies : [gtest_main_dep, dl_dep, drm_dep],
     install : false,
+    link_args: extra_link_args
   )
 
   test(test, test_exe)
@@ -44,8 +51,9 @@ test_magma = executable(
     inc_platform],
   cpp_args: cpp_args + ['-DVIRTMAGMA=1'],
   link_with : [libmagma_virt],
-  dependencies : [gtest_dep],
+  dependencies : [gtest_main_dep],
   install : false,
+  link_args: extra_link_args,
 )
 
 test(test, test_magma)

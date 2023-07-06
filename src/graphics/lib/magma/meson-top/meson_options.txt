@@ -6,3 +6,9 @@ option('with_tests',
   value: false,
   description: 'build the magma_test target'
 )
+
+option('android_build',
+  type: 'boolean',
+  value: false,
+  description: 'build for android'
+)
