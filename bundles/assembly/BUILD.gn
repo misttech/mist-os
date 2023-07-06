@@ -105,6 +105,17 @@ assembly_input_bundle("bootstrap") {
   kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
 }
 
+# The most-common, most-basic, AIB that is included in all userdebug and eng
+# systems.
+#
+assembly_input_bundle("bootstrap_userdebug") {
+}
+
+# The most-common, most-basic, AIB that is included in all eng systems.
+#
+assembly_input_bundle("bootstrap_eng") {
+}
+
 # The virtcon AIB is included by all eng and userdebug products, and can be
 # optionally included by user products.
 #

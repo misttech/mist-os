@@ -16,21 +16,29 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "empty_live_usb",
     "emulator_support",
     "kernel_args_user",
-    "kernel_args_userdebug",
     "live_usb",
     "virtcon",
+]
+
+# These are the userdebug platform AIBs that are used by bootstrap
+# feature-set-level assemblies.  This is a subset of the overall platform AIBs
+# so that these systems (e.g. bringup) don't need to build the entire platform.
+BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
+    "bootstrap_userdebug",
+    "kernel_args_userdebug",
 ]
 
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap
 # feature-set-level assemblies.  This is a subset of the overall platform AIBs
 # so that these systems (e.g. bringup) don't need to build the entire platform.
 BOOTSTRAP_ENG_PLATFORM_AIB_NAMES = [
+    "bootstrap_eng",
     "kernel_args_eng",
 ]
 
 # This is the combined set of valid AIBs for "bringup" builds (which are the
 # ones that need to use the bootstrap feature-set-level
-BRINGUP_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + BOOTSTRAP_ENG_PLATFORM_AIB_NAMES
+BRINGUP_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + BOOTSTRAP_ENG_PLATFORM_AIB_NAMES
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
 USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
@@ -88,7 +96,7 @@ USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64 = [
 ]
 USER_PLATFORM_AIB_NAMES = USER_PLATFORM_AIB_NAMES_RISCV64 + USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64
 
-USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 = USER_PLATFORM_AIB_NAMES_RISCV64 + [
+USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + USER_PLATFORM_AIB_NAMES_RISCV64 + [
     "core_realm_development_access",
     "core_realm_development_access_rcs_no_usb",
     "core_realm_development_access_rcs_usb",

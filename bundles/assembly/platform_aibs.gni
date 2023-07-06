@@ -24,7 +24,6 @@ bootstrap_user_platform_aib_names = [
 
   # Kernel args
   "kernel_args_user",
-  "kernel_args_userdebug",
 
   # RCS live usb support
   "empty_live_usb",
@@ -34,10 +33,24 @@ bootstrap_user_platform_aib_names = [
   "emulator_support",
 ]
 
+# These are the userdebug platform AIBs that are used by bootstrap
+# feature-set-level assemblies.  This is a subset of the overall platform AIBs
+# so that these systems (e.g. bringup) don't need to build the entire platform.
+bootstrap_userdebug_platform_aib_names = [
+  # The bootstrap feature-set-level
+  "bootstrap_userdebug",
+
+  # Kernel args
+  "kernel_args_userdebug",
+]
+
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap
 # feature-set-level assemblies.  This is a subset of the overall platform AIBs
 # so that these systems (e.g. bringup) don't need to build the entire platform.
 bootstrap_eng_platform_aib_names = [
+  # The bootstrap feature-set-level
+  "bootstrap_eng",
+
   # Kernel args
   "kernel_args_eng",
 ]
@@ -140,14 +153,14 @@ if (current_cpu != "riscv64") {
 
 # The names of all userdebug-allowed platform Assembly Input Bundles
 #LINT.IfChange
-_userdebug_aib_names = [
-  # Needed by both eng and userdebug products, but contains things disallowed in
-  # user.
-  "core_realm_development_access",
-  "core_realm_development_access_rcs_no_usb",
-  "core_realm_development_access_rcs_usb",
-  "radar_proxy_with_injector",
-]
+_userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
+                         # Needed by both eng and userdebug products, but contains things disallowed in
+                         # user.
+                         "core_realm_development_access",
+                         "core_realm_development_access_rcs_no_usb",
+                         "core_realm_development_access_rcs_usb",
+                         "radar_proxy_with_injector",
+                       ]
 
 # LINT.ThenChange(platform_aib_names.bzl)
 userdebug_platform_aib_names = user_platform_aib_names + _userdebug_aib_names
@@ -185,8 +198,10 @@ eng_platform_aib_names =
 
 bringup_platform_aib_labels = []
 bringup_platform_aib_files = []
-foreach(name,
-        bootstrap_user_platform_aib_names + bootstrap_eng_platform_aib_names) {
+foreach(
+    name,
+    bootstrap_user_platform_aib_names + bootstrap_userdebug_platform_aib_names +
+        bootstrap_eng_platform_aib_names) {
   label = "//bundles/assembly:${name}"
   _target_out_dir = get_label_info(label, "target_out_dir")
 
