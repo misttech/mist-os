@@ -6,6 +6,7 @@
 #define SRC_STORAGE_LIB_PAVER_TEST_TEST_UTILS_H_
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/vmo-mapper.h>

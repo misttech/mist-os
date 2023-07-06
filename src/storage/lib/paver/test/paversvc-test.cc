@@ -1719,77 +1719,6 @@ TEST_F(PaverServiceSkipBlockTest, WriteVolumes) {
   // TODO(fxbug.dev/33793): Figure out a way to test this.
 }
 
-TEST_F(PaverServiceSkipBlockTest, WipeVolumeEmptyFvm) {
-  ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
-
-  ASSERT_NO_FATAL_FAILURE(FindDataSink());
-  auto result = data_sink_->WipeVolume();
-  ASSERT_OK(result.status());
-  ASSERT_TRUE(result->is_ok());
-  ASSERT_TRUE(result->value()->volume);
-}
-
-void CheckGuid(const fbl::unique_fd& device, const uint8_t type[GPT_GUID_LEN]) {
-  fdio_cpp::UnownedFdioCaller caller(device.get());
-  auto result = fidl::WireCall(caller.borrow_as<partition::Partition>())->GetTypeGuid();
-  ASSERT_OK(result.status());
-  ASSERT_OK(result.value().status);
-  auto* guid = result.value().guid.get();
-  EXPECT_BYTES_EQ(type, guid, GPT_GUID_LEN);
-}
-
-TEST_F(PaverServiceSkipBlockTest, WipeVolumeCreatesFvm) {
-  ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
-
-  constexpr size_t kBufferSize = 8192;
-  char buffer[kBufferSize];
-  memset(buffer, 'a', kBufferSize);
-  ASSERT_OK(block_client::SingleWriteBytes(fvm_client_, buffer, sizeof(buffer), 0));
-
-  ASSERT_NO_FATAL_FAILURE(FindDataSink());
-  auto result = data_sink_->WipeVolume();
-  ASSERT_OK(result.status());
-  ASSERT_TRUE(result->is_ok());
-  ASSERT_TRUE(result->value()->volume);
-  ASSERT_TRUE(result->value()->controller);
-
-  ASSERT_OK(block_client::SingleReadBytes(fvm_client_, buffer, sizeof(buffer), 0));
-  EXPECT_BYTES_EQ(fs_management::kFvmMagic, buffer, sizeof(fs_management::kFvmMagic));
-
-  fidl::ClientEnd<fuchsia_device::Controller> device_client(std::move(result->value()->controller));
-  std::string path = storage::GetTopologicalPath(device_client).value().substr(5);  // strip "/dev/"
-  ASSERT_FALSE(path.empty());
-
-  std::string blob_path = path + "/blobfs-p-1/block";
-  fbl::unique_fd blob_device;
-  ASSERT_OK(fdio_open_fd_at(device_->devfs_root().get(), blob_path.c_str(), 0,
-                            blob_device.reset_and_get_address()));
-  fdio_cpp::UnownedFdioCaller blob_device_caller(blob_device);
-
-  constexpr uint8_t kBlobType[GPT_GUID_LEN] = GUID_BLOB_VALUE;
-  ASSERT_NO_FAILURES(CheckGuid(blob_device, kBlobType));
-
-  uint8_t kEmptyData[kBufferSize];
-  memset(kEmptyData, 0xff, kBufferSize);
-
-  ASSERT_OK(block_client::SingleReadBytes(
-      blob_device_caller.borrow_as<fuchsia_hardware_block::Block>(), buffer, sizeof(buffer), 0));
-  EXPECT_BYTES_EQ(kEmptyData, buffer, kBufferSize);
-
-  std::string data_path = path + "/data-p-2/block";
-  fbl::unique_fd data_device;
-  ASSERT_OK(fdio_open_fd_at(device_->devfs_root().get(), data_path.c_str(), 0,
-                            data_device.reset_and_get_address()));
-  fdio_cpp::UnownedFdioCaller data_device_caller(data_device);
-
-  constexpr uint8_t kDataType[GPT_GUID_LEN] = GUID_DATA_VALUE;
-  ASSERT_NO_FAILURES(CheckGuid(data_device, kDataType));
-
-  ASSERT_OK(block_client::SingleReadBytes(
-      data_device_caller.borrow_as<fuchsia_hardware_block::Block>(), buffer, sizeof(buffer), 0));
-  EXPECT_BYTES_EQ(kEmptyData, buffer, kBufferSize);
-}
-
 void PaverServiceSkipBlockTest::TestSysconfigWriteBufferedClient(uint32_t offset_in_pages,
                                                                  uint32_t sysconfig_pages) {
   {
@@ -1991,25 +1920,6 @@ TEST_F(PaverServiceBlockTest, DISABLED_WipePartitionTables) {
   ASSERT_OK(wipe_result.value().status);
 }
 
-TEST_F(PaverServiceBlockTest, DISABLED_WipeVolume) {
-  std::unique_ptr<BlockDevice> gpt_dev;
-  // 32GiB disk.
-  constexpr uint64_t block_count = (32LU << 30) / kBlockSize;
-  ASSERT_NO_FATAL_FAILURE(
-      BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev));
-
-  zx::result connections = GetNewConnections(gpt_dev->block_controller_interface());
-  ASSERT_OK(connections);
-  ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(connections.value())));
-
-  auto result = data_sink_->InitializePartitionTables();
-  ASSERT_OK(result.status());
-  ASSERT_OK(result.value().status);
-
-  auto wipe_result = data_sink_->WipeVolume();
-  ASSERT_OK(wipe_result.status());
-  ASSERT_FALSE(wipe_result->is_error());
-}
 #endif
 
 class PaverServiceGptDeviceTest : public PaverServiceTest {

@@ -164,55 +164,6 @@ zx::result<> FvmPave(const fbl::unique_fd& devfs_root, const DevicePartitioner& 
   return zx::ok();
 }
 
-// Formats the FVM partition and returns a channel to the new volume.
-zx::result<VolumeManagerClient> FormatFvm(const fbl::unique_fd& devfs_root,
-                                          const DevicePartitioner& partitioner) {
-  auto status = GetFvmPartition(partitioner);
-  if (status.is_error()) {
-    return status.take_error();
-  }
-  std::unique_ptr<PartitionClient> partition = std::move(status.value());
-  zx::result block_or = partition->GetBlockDevice();
-  if (block_or.is_error()) {
-    return block_or.take_error();
-  }
-  BlockDeviceClient& block = block_or.value();
-
-  fvm::SparseImage header = {};
-  static_assert(PRODUCT_FVM_SLICE_SIZE > 0, "Invalid product FVM slice size.");
-  header.slice_size = PRODUCT_FVM_SLICE_SIZE;
-
-  zx::result fvm = FvmPartitionFormat(devfs_root, block.block_channel(), block.controller_channel(),
-                                      header, BindOption::Reformat);
-  if (fvm.is_error()) {
-    ERROR("Couldn't format FVM partition: %s\n", fvm.status_string());
-    return fvm.take_error();
-  }
-
-  zx::result volume_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
-  if (volume_endpoints.is_error()) {
-    return volume_endpoints.take_error();
-  }
-  auto& [volume, volume_server] = volume_endpoints.value();
-
-  if (fidl::OneWayError status =
-          fidl::WireCall(fvm.value())->ConnectToDeviceFidl(volume_server.TakeChannel());
-      !status.ok()) {
-    return zx::error(status.status());
-  }
-
-  if (zx::result status = AllocateEmptyPartitions(devfs_root, volume); status.is_error()) {
-    ERROR("Couldn't allocate empty partitions: %s\n", status.status_string());
-    return status.take_error();
-  }
-
-  return zx::ok(VolumeManagerClient{
-      .device = std::move(volume),
-      .controller = std::move(fvm.value()),
-  });
-}
-
 // Reads an image from disk into a vmo.
 zx::result<fuchsia_mem::wire::Buffer> PartitionRead(const DevicePartitioner& partitioner,
                                                     const PartitionSpec& spec) {
@@ -553,15 +504,6 @@ void DataSink::ReadFirmware(ReadFirmwareRequestView request,
   }
 }
 
-void DataSink::WipeVolume(WipeVolumeCompleter::Sync& completer) {
-  auto status = sink_.WipeVolume();
-  if (status.is_ok()) {
-    completer.ReplySuccess(std::move(status.value().device), std::move(status.value().controller));
-  } else {
-    completer.ReplyError(status.error_value());
-  }
-}
-
 zx::result<fuchsia_mem::wire::Buffer> DataSinkImpl::ReadAsset(Configuration configuration,
                                                               Asset asset) {
   // No assets support content types yet, use the PartitionSpec default.
@@ -672,49 +614,6 @@ zx::result<> DataSinkImpl::WriteVolumes(
   return FvmPave(devfs_root_, *partitioner_, std::move(status.value()));
 }
 
-zx::result<VolumeManagerClient> DataSinkImpl::WipeVolume() {
-  zx::result status = GetFvmPartition(*partitioner_);
-  if (status.is_error()) {
-    return status.take_error();
-  }
-  std::unique_ptr<PartitionClient> partition = std::move(status.value());
-  zx::result block_or = partition->GetBlockDevice();
-  if (block_or.is_error()) {
-    return block_or.take_error();
-  }
-  BlockDeviceClient& block = block_or.value();
-
-  // Bind the FVM driver to be in a well known state regarding races with block watcher.
-  // The block watcher will attempt to bind the FVM driver automatically based on
-  // the contents of the partition. However, that operation is not synchronized in
-  // any way with this service so the driver can be loaded at any time.
-  // WipeFvm basically writes underneath that driver, which means that we should
-  // eliminate the races at this point: assuming that the driver can load, either
-  // this call or the block watcher will succeed (and the other one will fail),
-  // but the driver will be loaded before moving on.
-  // TODO(https://fxbug.dev/130209): The error from this call has historically not
-  // been checked, and it fails in integration tests. Fix these and check this status.
-  (void)TryBindToFvmDriver(devfs_root_, block.controller_channel(), zx::sec(3));
-
-  {
-    auto status = partitioner_->WipeFvm();
-    if (status.is_error()) {
-      ERROR("Failure wiping partition: %s\n", status.status_string());
-      return status.take_error();
-    }
-  }
-
-  {
-    auto status = FormatFvm(devfs_root_, *partitioner_);
-    if (status.is_error()) {
-      ERROR("Failure formatting partition: %s\n", status.status_string());
-      return status.take_error();
-    }
-
-    return zx::ok(std::move(status.value()));
-  }
-}
-
 void DataSink::Bind(async_dispatcher_t* dispatcher, fbl::unique_fd devfs_root,
                     fidl::ClientEnd<fuchsia_io::Directory> svc_root,
                     fidl::ServerEnd<fuchsia_paver::DataSink> server,
@@ -779,15 +678,6 @@ void DynamicDataSink::ReadFirmware(ReadFirmwareRequestView request,
   auto status = sink_.ReadFirmware(request->configuration, request->type);
   if (status.is_ok()) {
     completer.ReplySuccess(std::move(status.value()));
-  } else {
-    completer.ReplyError(status.error_value());
-  }
-}
-
-void DynamicDataSink::WipeVolume(WipeVolumeCompleter::Sync& completer) {
-  auto status = sink_.WipeVolume();
-  if (status.is_ok()) {
-    completer.ReplySuccess(std::move(status.value().device), std::move(status.value().controller));
   } else {
     completer.ReplyError(status.error_value());
   }

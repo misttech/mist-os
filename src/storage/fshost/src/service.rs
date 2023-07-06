@@ -192,6 +192,11 @@ async fn wipe_storage(
             .await
             .context("waiting for FVM driver")?;
 
+    if blobfs_root.as_handle_ref().is_invalid() {
+        tracing::info!("Not provisioning blobfs");
+        return Ok(());
+    }
+
     tracing::info!("Allocating new partitions");
     // Volumes will be dynamically resized.
     const INITIAL_SLICE_COUNT: u64 = 1;

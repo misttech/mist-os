@@ -5,6 +5,7 @@
 #ifndef SRC_STORAGE_LIB_PAVER_PAVER_H_
 #define SRC_STORAGE_LIB_PAVER_PAVER_H_
 
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.paver/cpp/wire.h>
 #include <lib/async/dispatcher.h>
 #include <lib/zx/channel.h>
@@ -95,8 +96,6 @@ class DataSinkImpl {
 
   zx::result<> WriteVolumes(fidl::ClientEnd<fuchsia_paver::PayloadStream> payload_stream);
 
-  zx::result<VolumeManagerClient> WipeVolume();
-
   DevicePartitioner* partitioner() { return partitioner_.get(); }
 
  private:
@@ -150,8 +149,6 @@ class DataSink : public fidl::WireServer<fuchsia_paver::DataSink> {
     completer.Reply(sink_.WriteVolumes(std::move(request->payload)).status_value());
   }
 
-  void WipeVolume(WipeVolumeCompleter::Sync& completer) override;
-
   void Flush(FlushCompleter::Sync& completer) override {
     completer.Reply(sink_.partitioner()->Flush().status_value());
   }
@@ -202,8 +199,6 @@ class DynamicDataSink : public fidl::WireServer<fuchsia_paver::DynamicDataSink> 
                     WriteVolumesCompleter::Sync& completer) override {
     completer.Reply(sink_.WriteVolumes(std::move(request->payload)).status_value());
   }
-
-  void WipeVolume(WipeVolumeCompleter::Sync& completer) override;
 
   void Flush(FlushCompleter::Sync& completer) override {
     completer.Reply(sink_.partitioner()->Flush().status_value());

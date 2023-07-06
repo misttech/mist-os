@@ -4,6 +4,7 @@
 #ifndef SRC_STORAGE_LIB_PAVER_SYSCONFIG_FIDL_H_
 #define SRC_STORAGE_LIB_PAVER_SYSCONFIG_FIDL_H_
 
+#include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.paver/cpp/wire.h>
 #include <lib/zx/channel.h>
 

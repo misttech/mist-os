@@ -5,6 +5,7 @@
 #ifndef SRC_STORAGE_LIB_PAVER_DEVICE_PARTITIONER_H_
 #define SRC_STORAGE_LIB_PAVER_DEVICE_PARTITIONER_H_
 
+#include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.paver/cpp/wire.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/channel.h>

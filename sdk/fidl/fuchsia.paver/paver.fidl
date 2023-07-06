@@ -5,7 +5,6 @@ library fuchsia.paver;
 
 using fuchsia.hardware.block;
 using fuchsia.device;
-using fuchsia.hardware.block.volume;
 using fuchsia.mem;
 using zx;
 
@@ -220,23 +219,6 @@ closed protocol DataSink {
     strict WriteOpaqueVolume(resource struct {
         payload fuchsia.mem.Buffer;
     }) -> () error zx.Status;
-
-    /// Wipes the FVM partition from the device. Should not be confused with factory reset, which
-    /// is less intrusive. The result is that the default FVM volumes are re-created, but empty.
-    ///
-    /// Notable use cases include recovering from corrupted FVM as well as setting device to a
-    /// "clean" state for automation.
-    ///
-    /// If `block_device` is not provided, the paver will perform a search for the the FVM.
-    /// If multiple block devices have valid GPT, `block_device` can be provided to specify
-    /// which one to target. It assumed that channel backing `block_device` also implements
-    /// `fuchsia.io.Node` for now.
-    ///
-    /// On success, returns a channel to the initialized FVM volume.
-    strict WipeVolume() -> (resource struct {
-        volume client_end:fuchsia.hardware.block.volume.VolumeManager;
-        controller client_end:fuchsia.device.Controller;
-    }) error zx.Status;
 
     /// Flush all previously buffered writes to persistent storage.
     strict Flush() -> (struct {

@@ -56,18 +56,19 @@ void PrintUsage() {
   ERROR("  --force: Install partition even if inappropriate for the device\n");
   ERROR("  --path <path>: Install DATA file to path\n");
   ERROR(
-      "  --block-device <path>: Block device to operate on. Only applies to wipe, "
-      "init-partition-tables, and wipe-partition-tables\n");
+      "  --block-device <path>: Block device to operate on. Only applies to "
+      "init-partition-tables and wipe-partition-tables\n");
 }
 
-// Refer to //sdk/fidl/fuchsia.paver/paver.fidl for a list of what
-// these commands translate to.
+// Unless noted specifically, these all map to the equivalent command in fuchsia.paver.
 enum class Command {
+  // fuchsia.fshost.Admin.WipeStorage
   kWipe,
   kWipePartitionTables,
   kInitPartitionTables,
   kAsset,
   kBootloader,
+  // fuchsia.fshost.Admin.WriteDataFile
   kDataFile,
   kFvm,
 };
@@ -319,29 +320,7 @@ zx_status_t RealMain(Flags flags) {
       return ZX_OK;
     }
     case Command::kWipe: {
-      auto data_sink = fidl::CreateEndpoints<fuchsia_paver::DataSink>();
-      if (data_sink.is_error()) {
-        ERROR("Unable to create channels.\n");
-        return data_sink.status_value();
-      }
-      auto [data_sink_local, data_sink_remote] = std::move(*data_sink);
-
-      // Try to use |block_device| path if provided.
-      if (flags.block_device != nullptr) {
-        auto result = UseBlockDevice(paver_client, flags.block_device, std::move(data_sink_remote));
-        if (result.is_error()) {
-          // Fallback to |FindDataSink|.
-          data_sink_remote = std::move(result.error_value().unused_server);
-        }
-      }
-
-      // If we do not have a valid block device, use |FindDataSink|.
-      if (data_sink_remote) {
-        // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-        (void)paver_client->FindDataSink(std::move(data_sink_remote));
-      }
-
-      auto result = fidl::WireSyncClient(std::move(data_sink_local))->WipeVolume();
+      fidl::WireResult result = fshost_client->WipeStorage({});
       zx_status_t status;
       if (!result.ok()) {
         status = result.status();

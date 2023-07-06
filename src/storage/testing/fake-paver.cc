@@ -335,12 +335,6 @@ void FakePaver::WriteVolumes(WriteVolumesRequestView request,
   completer.Reply(status);
 }
 
-void FakePaver::WipeVolume(WipeVolumeCompleter::Sync& completer) {
-  fbl::AutoLock al(&lock_);
-  AppendCommand(Command::kWipeVolume);
-  completer.ReplySuccess({}, {});
-}
-
 void FakePaver::InitializePartitionTables(InitializePartitionTablesCompleter::Sync& completer) {
   fbl::AutoLock al(&lock_);
   AppendCommand(Command::kInitPartitionTables);

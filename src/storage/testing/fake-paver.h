@@ -41,7 +41,6 @@ enum class Command {
   kWriteVolumes,
   kWriteOpaqueVolume,
   kWriteDataFile,
-  kWipeVolume,
   kInitPartitionTables,
   kWipePartitionTables,
   kDataSinkFlush,
@@ -137,8 +136,6 @@ class FakePaver : public fidl::WireServer<fuchsia_paver::Paver>,
 
   void WriteVolumes(WriteVolumesRequestView request,
                     WriteVolumesCompleter::Sync& completer) override;
-
-  void WipeVolume(WipeVolumeCompleter::Sync& completer) override;
 
   void InitializePartitionTables(InitializePartitionTablesCompleter::Sync& completer) override;
 

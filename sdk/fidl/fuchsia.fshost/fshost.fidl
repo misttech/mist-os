@@ -72,7 +72,8 @@ closed protocol Admin {
     }) -> () error zx.Status;
 
     /// Reprovision the first non-ramdisk FVM volume, and format/mount the blob partition.
-    /// The formatted Blobfs instance can be accessed via the client end of `blobfs_root`.
+    /// The formatted Blobfs instance can be accessed via the client end of `blobfs_root`; if an
+    /// invalid handle is provided, then blobfs won't be formatted.
     ///
     /// This function will pause the fshost block watcher regardless of success or failure.
     /// Requires fshost to be started with the `ramdisk_image` config option set to true.
