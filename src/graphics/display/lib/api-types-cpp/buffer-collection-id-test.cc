@@ -5,7 +5,6 @@
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 
 #include <cstdint>
 
@@ -46,13 +45,7 @@ TEST(BufferCollectionIdTest, ToFidlBufferCollectionId) {
   EXPECT_EQ(kLargeIdValue, ToFidlBufferCollectionId(kLargeId).value);
 }
 
-TEST(BufferCollectionIdTest, ToFidlBufferCollectionIdValue) {
-  EXPECT_EQ(1u, ToFidlBufferCollectionIdValue(kOne));
-  EXPECT_EQ(2u, ToFidlBufferCollectionIdValue(kTwo));
-  EXPECT_EQ(kLargeIdValue, ToFidlBufferCollectionIdValue(kLargeId));
-}
-
-TEST(BufferCollectionIdTest, ToBufferCollectionIdWithFidl) {
+TEST(BufferCollectionIdTest, ToBufferCollectionIdWithFidlValue) {
   EXPECT_EQ(kOne,
             ToBufferCollectionId(fuchsia_hardware_display::wire::BufferCollectionId{.value = 1}));
   EXPECT_EQ(kTwo,
@@ -61,22 +54,10 @@ TEST(BufferCollectionIdTest, ToBufferCollectionIdWithFidl) {
                           .value = kLargeIdValue}));
 }
 
-TEST(BufferCollectionIdTest, ToBufferCollectionIdWithFidlValue) {
-  EXPECT_EQ(kOne, ToBufferCollectionId(1));
-  EXPECT_EQ(kTwo, ToBufferCollectionId(2));
-  EXPECT_EQ(kLargeId, ToBufferCollectionId(kLargeIdValue));
-}
-
 TEST(BufferCollectionIdTest, FidlBufferCollectionIdConversionRoundtrip) {
   EXPECT_EQ(kOne, ToBufferCollectionId(ToFidlBufferCollectionId(kOne)));
   EXPECT_EQ(kTwo, ToBufferCollectionId(ToFidlBufferCollectionId(kTwo)));
   EXPECT_EQ(kLargeId, ToBufferCollectionId(ToFidlBufferCollectionId(kLargeId)));
-}
-
-TEST(BufferCollectionIdTest, FidlBufferCollectionIdValueConversionRoundtrip) {
-  EXPECT_EQ(kOne, ToBufferCollectionId(ToFidlBufferCollectionIdValue(kOne)));
-  EXPECT_EQ(kTwo, ToBufferCollectionId(ToFidlBufferCollectionIdValue(kTwo)));
-  EXPECT_EQ(kLargeId, ToBufferCollectionId(ToFidlBufferCollectionIdValue(kLargeId)));
 }
 
 }  // namespace
