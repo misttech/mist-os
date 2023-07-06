@@ -13,6 +13,7 @@
     offer: [
         {
             protocol: [
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",

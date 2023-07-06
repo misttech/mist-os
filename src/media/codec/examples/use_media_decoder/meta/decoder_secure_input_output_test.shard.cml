@@ -70,5 +70,10 @@
             from: "parent",
             to: "#tee_manager",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#tee_manager" ],
+        },
     ],
 }

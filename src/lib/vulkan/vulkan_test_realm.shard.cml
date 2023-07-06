@@ -15,6 +15,7 @@
             // These hermetic protocols are offered to be used by tests.
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
             ],
