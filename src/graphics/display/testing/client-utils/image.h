@@ -12,6 +12,7 @@
 #include <zircon/types.h>
 
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/event-id.h"
 
 // Indicies into event and event_ids
 #define WAIT_EVENT 0
@@ -22,7 +23,7 @@ namespace display_test {
 typedef struct image_import {
   uint64_t id;
   zx::event events[2];
-  uint64_t event_ids[2];
+  display::EventId event_ids[2];
 } image_import_t;
 
 class Image {

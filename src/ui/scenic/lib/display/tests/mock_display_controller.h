@@ -36,7 +36,8 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
       std::function<void(fuchsia::hardware::display::DisplayId, std::array<float, 3>,
                          std::array<float, 9>, std::array<float, 3>)>;
   using SetMinimumRgbFn = std::function<void(uint8_t)>;
-  using ImportEventFn = std::function<void(zx::event event, uint64_t event_id)>;
+  using ImportEventFn =
+      std::function<void(zx::event event, fuchsia::hardware::display::EventId event_id)>;
   using AcknowledgeVsyncFn = std::function<void(uint64_t cookie)>;
   using SetDisplayLayersFn = std::function<void(fuchsia::hardware::display::DisplayId,
                                                 std::vector<fuchsia::hardware::display::LayerId>)>;
@@ -58,7 +59,7 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
 
   void set_import_event_fn(ImportEventFn fn) { import_event_fn_ = fn; }
 
-  void ImportEvent(zx::event event, uint64_t event_id) override {
+  void ImportEvent(zx::event event, fuchsia::hardware::display::EventId event_id) override {
     ++import_event_count_;
     if (import_event_fn_) {
       import_event_fn_(std::move(event), event_id);

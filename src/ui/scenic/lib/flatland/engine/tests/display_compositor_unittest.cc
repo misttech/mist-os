@@ -1620,8 +1620,10 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   std::vector<fuchsia::hardware::display::LayerId> active_layers = {{.value = 1}};
   zx::event imported_event;
   EXPECT_CALL(*mock_display_coordinator_, ImportEvent(_, _))
-      .WillOnce(testing::Invoke(
-          [&imported_event](zx::event event, uint64_t) { imported_event = std::move(event); }));
+      .WillOnce(
+          testing::Invoke([&imported_event](zx::event event, fuchsia::hardware::display::EventId) {
+            imported_event = std::move(event);
+          }));
   EXPECT_CALL(
       *mock_display_coordinator_,
       SetDisplayLayers(FidlEquals(kDisplayId), testing::ElementsAre(FidlEquals(active_layers[0]))))

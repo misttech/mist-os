@@ -13,7 +13,7 @@
 #include "src/ui/scenic/lib/allocation/id.h"
 
 namespace scenic_impl {
-using DisplayEventId = uint64_t;
+using DisplayEventId = fuchsia::hardware::display::EventId;
 
 // Imports a sysmem buffer collection token to a display controller, and sets the constraints.
 // A successful import will return true, otherwise it will return false.

@@ -21,7 +21,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
-use display_utils::{CollectionId, LayerId, PixelFormat, INVALID_LAYER_ID};
+use display_utils::{CollectionId, EventId, LayerId, PixelFormat, INVALID_LAYER_ID};
 use euclid::size2;
 use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy, ImageConfig};
 use fuchsia_async::{self as fasync, OnSignals};
@@ -36,7 +36,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-type WaitEvents = BTreeMap<ImageId, (Event, u64)>;
+type WaitEvents = BTreeMap<ImageId, (Event, EventId)>;
 
 #[derive(Default)]
 struct CollectionIdGenerator {}
@@ -86,12 +86,15 @@ fn next_image_id() -> u64 {
     ImageIdGenerator::default().next().expect("image_id")
 }
 
-async fn create_and_import_event(coordinator: &CoordinatorProxy) -> Result<(Event, u64), Error> {
+async fn create_and_import_event(
+    coordinator: &CoordinatorProxy,
+) -> Result<(Event, EventId), Error> {
     let event = Event::create();
 
     let their_event = event.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
-    let event_id = event.get_koid()?.raw_koid();
-    coordinator.import_event(Event::from_handle(their_event.into_handle()), event_id)?;
+    let event_id_value = event.get_koid()?.raw_koid();
+    let event_id = EventId(event_id_value);
+    coordinator.import_event(Event::from_handle(their_event.into_handle()), &event_id.into())?;
     Ok((event, event_id))
 }
 
@@ -546,8 +549,8 @@ impl ViewStrategy for DisplayDirectViewStrategy {
                 .set_layer_image(
                     &self.display.layer_id.into(),
                     prepared,
-                    wait_event_id,
-                    signal_event_id,
+                    &wait_event_id.into(),
+                    &signal_event_id.into(),
                 )
                 .expect("Frame::present() set_layer_image");
             self.display.coordinator.apply_config().expect("Frame::present() apply_config");

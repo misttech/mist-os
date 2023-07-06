@@ -808,7 +808,7 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
     return;
   }
 
-  capture_fence_id_ = request->signal_event_id;
+  capture_fence_id_ = ToEventId(request->signal_event_id);
   auto status = controller_->dc()->StartCapture(
       ToBanjoDriverCaptureImageId(image->driver_capture_image_id()));
   if (status == ZX_OK) {
@@ -1322,7 +1322,7 @@ void Client::OnFenceFired(FenceReference* fence) {
 }
 
 void Client::CaptureCompleted() {
-  auto signal_fence = fences_.GetFence(ToEventId(capture_fence_id_));
+  auto signal_fence = fences_.GetFence(capture_fence_id_);
   if (signal_fence != nullptr) {
     signal_fence->Signal();
   }

@@ -151,7 +151,8 @@ std::unique_ptr<DisplaySwapchain::FrameRecord> DisplaySwapchain::NewFrameRecord(
       scenic_impl::ImportEvent(*display_coordinator_.get(), frame_record->render_finished_event);
 
   if (!frame_record->render_finished_escher_semaphore ||
-      (frame_record->render_finished_event_id == fuchsia::hardware::display::INVALID_DISP_ID)) {
+      (frame_record->render_finished_event_id.value ==
+       fuchsia::hardware::display::INVALID_DISP_ID)) {
     FX_LOGS(ERROR) << "DisplaySwapchain::NewFrameRecord() failed to create semaphores";
     return std::unique_ptr<FrameRecord>();
   }
@@ -171,7 +172,7 @@ std::unique_ptr<DisplaySwapchain::FrameRecord> DisplaySwapchain::NewFrameRecord(
   // Import to display coordinator
   frame_record->retired_event_id =
       scenic_impl::ImportEvent(*display_coordinator_.get(), frame_record->retired_event);
-  if (frame_record->retired_event_id == fuchsia::hardware::display::INVALID_DISP_ID) {
+  if (frame_record->retired_event_id.value == fuchsia::hardware::display::INVALID_DISP_ID) {
     FX_LOGS(ERROR) << "DisplaySwapchain::NewFrameRecord() failed to import retired event";
     return std::unique_ptr<FrameRecord>();
   }
@@ -450,8 +451,8 @@ void DisplaySwapchain::OnVsync(zx::time timestamp,
 void DisplaySwapchain::Flip(fuchsia::hardware::display::LayerId layer_id,
                             FrameRecord* frame_record) {
   const uint64_t framebuffer_id = frame_record->buffer->id;
-  uint64_t wait_event_id = frame_record->render_finished_event_id;
-  uint64_t signal_event_id = frame_record->retired_event_id;
+  fuchsia::hardware::display::EventId wait_event_id = frame_record->render_finished_event_id;
+  fuchsia::hardware::display::EventId signal_event_id = frame_record->retired_event_id;
 
   zx_status_t status =
       (*display_coordinator_)

@@ -76,11 +76,11 @@ class DisplaySwapchain : public Swapchain {
 
     escher::SemaphorePtr render_finished_escher_semaphore;
     zx::event render_finished_event;
-    uint64_t render_finished_event_id;
+    fuchsia::hardware::display::EventId render_finished_event_id;
 
     // Event is signaled when the display is done using a frame.
     zx::event retired_event;
-    uint64_t retired_event_id;
+    fuchsia::hardware::display::EventId retired_event_id;
 
     std::unique_ptr<async::Wait> render_finished_wait;
 

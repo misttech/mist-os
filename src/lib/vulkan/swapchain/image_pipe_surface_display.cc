@@ -554,7 +554,8 @@ void ImagePipeSurfaceDisplay::PresentImage(
     return;
   }
 
-  uint64_t wait_event_id = fuchsia::hardware::display::INVALID_DISP_ID;
+  fuchsia::hardware::display::EventId wait_event_id = {
+      .value = fuchsia::hardware::display::INVALID_DISP_ID};
   if (acquire_fences.size()) {
     zx::event event = static_cast<FuchsiaEvent*>(acquire_fences[0].get())->Take();
 
@@ -565,7 +566,7 @@ void ImagePipeSurfaceDisplay::PresentImage(
       fprintf(stderr, "%s: failed to get event id: %d\n", kTag, status);
       return;
     }
-    wait_event_id = info.koid;
+    wait_event_id = {.value = info.koid};
     display_coordinator_->ImportEvent(std::move(event), wait_event_id);
     if (status != ZX_OK) {
       fprintf(stderr, "%s: fb_import_event failed: %d\n", kTag, status);
@@ -573,7 +574,8 @@ void ImagePipeSurfaceDisplay::PresentImage(
     }
   }
 
-  uint64_t signal_event_id = fuchsia::hardware::display::INVALID_DISP_ID;
+  fuchsia::hardware::display::EventId signal_event_id = {
+      .value = fuchsia::hardware::display::INVALID_DISP_ID};
   if (release_fences.size()) {
     zx::event event = static_cast<FuchsiaEvent*>(release_fences[0].get())->Take();
 
@@ -584,7 +586,7 @@ void ImagePipeSurfaceDisplay::PresentImage(
       fprintf(stderr, "%s: failed to get event id: %d\n", kTag, status);
       return;
     }
-    signal_event_id = info.koid;
+    signal_event_id = {.value = info.koid};
     display_coordinator_->ImportEvent(std::move(event), signal_event_id);
     if (status != ZX_OK) {
       fprintf(stderr, "%s: fb_import_event failed: %d\n", kTag, status);
@@ -596,11 +598,11 @@ void ImagePipeSurfaceDisplay::PresentImage(
   display_coordinator_->SetLayerImage(layer_id_, image_id, wait_event_id, signal_event_id);
   display_coordinator_->ApplyConfig();
 
-  if (wait_event_id != fuchsia::hardware::display::INVALID_DISP_ID) {
+  if (wait_event_id.value != fuchsia::hardware::display::INVALID_DISP_ID) {
     display_coordinator_->ReleaseEvent(wait_event_id);
   }
 
-  if (signal_event_id != fuchsia::hardware::display::INVALID_DISP_ID) {
+  if (signal_event_id.value != fuchsia::hardware::display::INVALID_DISP_ID) {
     display_coordinator_->ReleaseEvent(signal_event_id);
   }
 }

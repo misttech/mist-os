@@ -34,6 +34,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/testing/client-utils/display.h"
 #include "src/graphics/display/testing/client-utils/virtual-layer.h"
@@ -52,7 +53,7 @@ static zx_handle_t device_handle;
 static fidl::WireSyncClient<fhd::Coordinator> dc;
 static bool has_ownership;
 
-constexpr uint64_t kEventId = 13;
+constexpr display::EventId kEventId(13);
 constexpr display::BufferCollectionId kCollectionId(12);
 uint64_t capture_id = 0;
 zx::event client_event_;
@@ -326,7 +327,7 @@ zx_status_t capture_setup() {
     printf("Could not duplicate event %d\n", status);
     return status;
   }
-  auto event_status = dc->ImportEvent(std::move(e2), kEventId);
+  auto event_status = dc->ImportEvent(std::move(e2), display::ToFidlEventId(kEventId));
   if (event_status.status() != ZX_OK) {
     printf("Could not import event: %s\n", event_status.FormatDescription().c_str());
     return event_status.status();
@@ -467,7 +468,7 @@ zx_status_t capture_setup() {
 
 zx_status_t capture_start() {
   // start capture
-  auto capstart_resp = dc->StartCapture(kEventId, capture_id);
+  auto capstart_resp = dc->StartCapture(display::ToFidlEventId(kEventId), capture_id);
   if (capstart_resp.status() != ZX_OK) {
     printf("Could not start capture: %s\n", capstart_resp.FormatDescription().c_str());
     return capstart_resp.status();

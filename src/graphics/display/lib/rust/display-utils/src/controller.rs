@@ -23,6 +23,7 @@ use crate::{
     config::{DisplayConfig, LayerConfig},
     error::{ConfigError, Error, Result},
     types::{CollectionId, DisplayId, DisplayInfo, Event, EventId, ImageId, LayerId},
+    INVALID_EVENT_ID,
 };
 
 const DEV_DIR_PATH: &str = "/dev/class/display-coordinator";
@@ -200,7 +201,7 @@ impl Coordinator {
         let remote = event.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
         let id = self.inner.write().next_free_event_id()?;
 
-        self.inner.read().proxy.import_event(zx::Event::from(remote), id.0)?;
+        self.inner.read().proxy.import_event(zx::Event::from(remote), &id.into())?;
         Ok(Event::new(id, event))
     }
 
@@ -235,8 +236,8 @@ impl Coordinator {
                         proxy.set_layer_image(
                             &layer.id.into(),
                             image_id.0,
-                            unblock_event.map_or(0, |id| id.0),
-                            retirement_event.map_or(0, |id| id.0),
+                            &unblock_event.unwrap_or(INVALID_EVENT_ID).into(),
+                            &retirement_event.unwrap_or(INVALID_EVENT_ID).into(),
                         )?;
                     }
                     _ => (),

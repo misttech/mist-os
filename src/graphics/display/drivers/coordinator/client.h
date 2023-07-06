@@ -56,6 +56,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
+#include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 
 namespace display {
@@ -342,7 +343,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   DisplayControllerBindingState binding_state_;
 
   // Capture related book keeping
-  uint64_t capture_fence_id_ = INVALID_ID;
+  EventId capture_fence_id_ = kInvalidEventId;
 
   // Points to the image whose contents is modified by the current capture.
   //

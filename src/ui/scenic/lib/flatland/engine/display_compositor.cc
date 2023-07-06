@@ -485,7 +485,9 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
     const allocation::GlobalImageId image_id = data.images[i].identifier;
     if (image_id != allocation::kInvalidImageId) {
       if (buffer_collection_supports_display_[data.images[i].collection_id]) {
-        ApplyLayerImage(layers[i], data.rectangles[i], data.images[i], /*wait_id*/ 0,
+        static constexpr scenic_impl::DisplayEventId kInvalidEventId = {
+            .value = fuchsia::hardware::display::INVALID_DISP_ID};
+        ApplyLayerImage(layers[i], data.rectangles[i], data.images[i], /*wait_id*/ kInvalidEventId,
                         /*signal_id*/ image_event_map_[image_id].signal_id);
       } else {
         return false;
@@ -857,10 +859,10 @@ DisplayCompositor::FrameEventData DisplayCompositor::NewFrameEventData() {
   }
 
   result.wait_id = scenic_impl::ImportEvent(*display_coordinator_, result.wait_event);
-  FX_DCHECK(result.wait_id != fuchsia::hardware::display::INVALID_DISP_ID);
+  FX_DCHECK(result.wait_id.value != fuchsia::hardware::display::INVALID_DISP_ID);
   result.signal_event.signal(0, ZX_EVENT_SIGNALED);
   result.signal_id = scenic_impl::ImportEvent(*display_coordinator_, result.signal_event);
-  FX_DCHECK(result.signal_id != fuchsia::hardware::display::INVALID_DISP_ID);
+  FX_DCHECK(result.signal_id.value != fuchsia::hardware::display::INVALID_DISP_ID);
   return result;
 }
 
@@ -879,7 +881,7 @@ DisplayCompositor::ImageEventData DisplayCompositor::NewImageEventData() {
   }
 
   result.signal_id = scenic_impl::ImportEvent(*display_coordinator_, result.signal_event);
-  FX_DCHECK(result.signal_id != fuchsia::hardware::display::INVALID_DISP_ID);
+  FX_DCHECK(result.signal_id.value != fuchsia::hardware::display::INVALID_DISP_ID);
 
   return result;
 }

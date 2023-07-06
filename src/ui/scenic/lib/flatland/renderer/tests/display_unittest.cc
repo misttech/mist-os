@@ -268,19 +268,22 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   EXPECT_EQ(status, ZX_OK);
 
   // Import the above events to the display.
-  auto display_wait_event_id =
+  scenic_impl::DisplayEventId display_wait_event_id =
       scenic_impl::ImportEvent(*display_coordinator.get(), display_wait_fence);
-  auto display_signal_event_id =
+  scenic_impl::DisplayEventId display_signal_event_id =
       scenic_impl::ImportEvent(*display_coordinator.get(), display_signal_fence);
-  EXPECT_NE(display_wait_event_id, fuchsia::hardware::display::INVALID_DISP_ID);
-  EXPECT_NE(display_signal_event_id, fuchsia::hardware::display::INVALID_DISP_ID);
-  EXPECT_NE(display_wait_event_id, display_signal_event_id);
+  EXPECT_NE(display_wait_event_id.value, fuchsia::hardware::display::INVALID_DISP_ID);
+  EXPECT_NE(display_signal_event_id.value, fuchsia::hardware::display::INVALID_DISP_ID);
+  EXPECT_NE(display_wait_event_id.value, display_signal_event_id.value);
 
   // Set the layer image and apply the config.
   (*display_coordinator.get())->SetLayerPrimaryConfig(layer_id, image_config);
 
+  static constexpr scenic_impl::DisplayEventId kInvalidEventId = {
+      .value = fuchsia::hardware::display::INVALID_DISP_ID};
   status = (*display_coordinator.get())
-               ->SetLayerImage(layer_id, image_ids[0], 0, display_signal_event_id);
+               ->SetLayerImage(layer_id, image_ids[0], /*wait_event_id=*/kInvalidEventId,
+                               display_signal_event_id);
   EXPECT_EQ(status, ZX_OK);
 
   // Apply the config.
@@ -298,8 +301,9 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
 
   // Set the layer image again, to the second image, so that our first call to SetLayerImage()
   // above will signal.
-  status =
-      (*display_coordinator.get())->SetLayerImage(layer_id, image_ids[1], display_wait_event_id, 0);
+  status = (*display_coordinator.get())
+               ->SetLayerImage(layer_id, image_ids[1], display_wait_event_id,
+                               /*signal_event_id=*/kInvalidEventId);
   EXPECT_EQ(status, ZX_OK);
 
   // Apply the config to display the second image.

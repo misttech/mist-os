@@ -76,7 +76,7 @@ closed protocol Coordinator {
     /// before referencing the id again.
     strict ImportEvent(resource struct {
         event zx.Handle:EVENT;
-        id EventIdValue;
+        id EventId;
     });
 
     /// Releases the event imported with the given id.
@@ -86,7 +86,7 @@ closed protocol Coordinator {
     /// resources are released. It is an error to reuse an ID while the
     /// active config has references to it.
     strict ReleaseEvent(struct {
-        id EventIdValue;
+        id EventId;
     });
 
     // Creates a new layer.
@@ -284,8 +284,8 @@ closed protocol Coordinator {
     strict SetLayerImage(struct {
         layer_id LayerId;
         image_id uint64;
-        wait_event_id EventIdValue;
-        signal_event_id EventIdValue;
+        wait_event_id EventId;
+        signal_event_id EventId;
     });
 
     // Attempts to validate the current configuration.
@@ -489,7 +489,7 @@ closed protocol Coordinator {
     /// The client will get notified once capture is complete via signal_event_id.
     /// Returns ZX_ERR_NOT_SUPPORTED if coordinator does not support capture
     strict StartCapture(struct {
-        signal_event_id EventIdValue;
+        signal_event_id EventId;
         image_id uint64;
     }) -> () error zx.Status;
 

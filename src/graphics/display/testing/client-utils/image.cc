@@ -29,6 +29,7 @@
 #include <fbl/algorithm.h>
 
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/testing/client-utils/utils.h"
 
 static constexpr uint32_t kRenderPeriod = 120;
@@ -471,7 +472,7 @@ void Image::GetConfig(fhd::wire::ImageConfig* config_out) const {
 bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint64_t image_id,
                    image_import_t* info_out) const {
   for (int i = 0; i < 2; i++) {
-    static int event_id = fhd::wire::kInvalidDispId + 1;
+    static display::EventId next_event_id(fhd::wire::kInvalidDispId + 1);
     zx::event e1;
     if (zx_status_t status = zx::event::create(0, &e1); status != ZX_OK) {
       printf("Failed to create event: %s\n", zx_status_get_string(status));
@@ -483,9 +484,10 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint64_t im
       return false;
     }
 
+    const display::EventId event_id = next_event_id++;
     info_out->events[i] = std::move(e1);
     info_out->event_ids[i] = event_id;
-    const fidl::Status result = dc->ImportEvent(std::move(e2), event_id++);
+    const fidl::Status result = dc->ImportEvent(std::move(e2), display::ToFidlEventId(event_id));
     if (!result.ok()) {
       printf("Failed to import event: %s\n", result.FormatDescription().c_str());
       return false;

@@ -22,6 +22,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 
@@ -56,7 +57,7 @@ class TestFidlClient {
   bool Bind(async_dispatcher_t* dispatcher) TA_EXCL(mtx());
 
   struct EventInfo {
-    uint64_t id;
+    EventId id;
     zx::event event = {};
   };
 
@@ -72,7 +73,7 @@ class TestFidlClient {
   struct PresentLayerInfo {
     LayerId layer_id;
     uint64_t image_id;
-    std::optional<uint64_t> image_ready_wait_event_id;
+    std::optional<EventId> image_ready_wait_event_id;
   };
 
   std::vector<PresentLayerInfo> CreateDefaultPresentLayerInfo();

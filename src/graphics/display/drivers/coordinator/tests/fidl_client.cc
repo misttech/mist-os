@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 #include "src/lib/testing/predicates/status.h"
@@ -122,13 +123,14 @@ zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEventLocked() {
     return zx::error(status);
   }
 
-  auto import_result = dc_->ImportEvent(std::move(event), info.koid);
+  const EventId event_id(info.koid);
+  auto import_result = dc_->ImportEvent(std::move(event), ToFidlEventId(event_id));
   if (!import_result.ok()) {
     zxlogf(ERROR, "Failed to import event to display controller: %d", import_result.status());
   }
 
   return zx::ok(EventInfo{
-      .id = static_cast<uint64_t>(info.koid),
+      .id = event_id,
       .event = std::move(dup),
   });
 }
@@ -272,9 +274,10 @@ zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_
 
   for (const auto& info : present_layers) {
     const fhd::wire::LayerId fidl_layer_id = ToFidlLayerId(info.layer_id);
+    const EventId wait_event_id = info.image_ready_wait_event_id.value_or(kInvalidEventId);
     if (auto reply = dc_->SetLayerImage(fidl_layer_id, info.image_id,
-                                        info.image_ready_wait_event_id.value_or(0u),
-                                        /*signal_event_id*/ 0);
+                                        /*wait_event_id=*/ToFidlEventId(wait_event_id),
+                                        /*signal_event_id=*/ToFidlEventId(kInvalidEventId));
         !reply.ok()) {
       return reply.status();
     }

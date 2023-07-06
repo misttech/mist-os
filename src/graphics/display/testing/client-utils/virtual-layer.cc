@@ -16,6 +16,7 @@
 
 #include <fbl/algorithm.h>
 
+#include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/testing/client-utils/utils.h"
 
@@ -340,8 +341,12 @@ void VirtualLayer::SetLayerImages(const fidl::WireSyncClient<fhd::Coordinator>& 
   for (auto& layer : layers_) {
     const auto& image = layer.import_info[alt_image];
     const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
-    auto result = dc->SetLayerImage(fidl_layer_id, image.id, image.event_ids[WAIT_EVENT],
-                                    image.event_ids[SIGNAL_EVENT]);
+    const fhd::wire::EventId fidl_wait_event_id =
+        display::ToFidlEventId(image.event_ids[WAIT_EVENT]);
+    const fhd::wire::EventId fidl_signal_event_id =
+        display::ToFidlEventId(image.event_ids[SIGNAL_EVENT]);
+    auto result =
+        dc->SetLayerImage(fidl_layer_id, image.id, fidl_wait_event_id, fidl_signal_event_id);
 
     ZX_ASSERT(result.ok());
   }

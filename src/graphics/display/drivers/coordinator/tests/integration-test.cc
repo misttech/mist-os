@@ -28,6 +28,7 @@
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
@@ -136,7 +137,7 @@ TEST_F(IntegrationTest, DISABLED_ClientsCanBail) {
   }
 }
 
-TEST_F(IntegrationTest, MustUseUniqueEvenIDs) {
+TEST_F(IntegrationTest, MustUseUniqueEventIDs) {
   TestFidlClient client(sysmem_);
   ASSERT_TRUE(client.CreateChannel(display_fidl(), false));
   ASSERT_TRUE(client.Bind(dispatcher()));
@@ -146,9 +147,10 @@ TEST_F(IntegrationTest, MustUseUniqueEvenIDs) {
   ASSERT_OK(zx::event::create(0, &event_c));
   {
     fbl::AutoLock lock(client.mtx());
-    EXPECT_OK(client.dc_->ImportEvent(std::move(event_a), 123).status());
+    static constexpr EventId kEventId(123);
+    EXPECT_OK(client.dc_->ImportEvent(std::move(event_a), ToFidlEventId(kEventId)).status());
     // ImportEvent is one way. Expect the next call to fail.
-    EXPECT_OK(client.dc_->ImportEvent(std::move(event_b), 123).status());
+    EXPECT_OK(client.dc_->ImportEvent(std::move(event_b), ToFidlEventId(kEventId)).status());
     // This test passes if it closes without deadlocking.
   }
   // TODO: Use LLCPP epitaphs when available to detect ZX_ERR_PEER_CLOSED.

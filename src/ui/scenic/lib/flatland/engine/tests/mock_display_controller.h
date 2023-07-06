@@ -24,14 +24,15 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
                   dispatcher);
   }
 
-  MOCK_METHOD(void, ImportEvent, (zx::event, uint64_t));
+  MOCK_METHOD(void, ImportEvent, (zx::event, fuchsia::hardware::display::EventId));
 
   MOCK_METHOD(void, SetLayerColorConfig,
               (fuchsia::hardware::display::LayerId, fuchsia::images2::PixelFormat,
                std::vector<uint8_t>));
 
   MOCK_METHOD(void, SetLayerImage,
-              (fuchsia::hardware::display::LayerId, uint64_t, uint64_t, uint64_t));
+              (fuchsia::hardware::display::LayerId, uint64_t, fuchsia::hardware::display::EventId,
+               fuchsia::hardware::display::EventId));
 
   MOCK_METHOD(void, ApplyConfig, ());
 
