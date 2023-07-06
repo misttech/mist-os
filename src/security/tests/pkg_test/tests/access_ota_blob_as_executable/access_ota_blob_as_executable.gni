@@ -37,24 +37,24 @@ template("access_ota_blob_as_executable") {
     system_version_file =
         "//src/security/tests/pkg_test/assemblies/v0_version.txt"
 
-    # Calculated on local build from 2022-02-08:
+    # Calculated on local build from 2023-07-05:
     #
     #   v0 blobs:
     #     $ wc --bytes $(fx get-build-dir)/obj/src/security/tests/pkg_test/tests/core_access_ota_blob_as_executable_v0/blob.blk
-    #     3063808 [build-dir]/obj/src/security/tests/pkg_test/tests/core_access_ota_blob_as_executable_v0/blob.blk
+    #     3260416 [build-dir]/obj/src/security/tests/pkg_test/tests/core_access_ota_blob_as_executable_v0/blob.blk
     #
     #   v1 TUF repo assets:
     #     $ wc --bytes $(find $(fx get-build-dir)/gen/src/security/tests/pkg_test/tests/core_access_ota_blob_as_executable_v1_tuf_repo_resources.unzipped -type f | grep '/\(targets\|blobs\)/')
     #     [...]
-    #     46365598 total
+    #     104334214 total
     #
     #   minfs size: 8388608
     #
-    #   Total: round_up(3063808 + 46365598 + 8388608, 4096) = 57819136
+    #   Total: round_up(3260416 + 104334214 + 8388608, 4096) = 115986432
     if (fxfs_blob) {
-      assembly_fxfs_image_size_bytes = 57819136
+      assembly_fxfs_image_size_bytes = 115986432
     } else {
-      fvm_truncate_to_length = 57819136
+      fvm_truncate_to_length = 115986432
     }
   }
 
