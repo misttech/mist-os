@@ -399,7 +399,7 @@ zx_status_t FtdiI2c::I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_cou
 zx_status_t FtdiI2c::Create(zx_device_t* device,
                             const fuchsia_hardware_ftdi::wire::I2cBusLayout* layout,
                             const fuchsia_hardware_ftdi::wire::I2cDevice* i2c_dev) {
-  // TODO(dgilhooley): Support i2c on different sets of pins and then remove this check.
+  // Note: This driver has only been tested on one set of pins.
   if (layout->scl != 0 && layout->sda_out != 1 && layout->sda_in != 2) {
     return ZX_ERR_OUT_OF_RANGE;
   }
