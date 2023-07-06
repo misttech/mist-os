@@ -24,5 +24,10 @@
             from: "parent",
             to: "#fxfs-crypt",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#fxfs-crypt" ],
+        },
     ],
 }

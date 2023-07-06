@@ -18,6 +18,7 @@
         {
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
             ],
             from: "parent",

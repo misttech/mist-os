@@ -14,4 +14,11 @@
             from: "#decompressor-sandbox",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#decompressor-sandbox" ],
+        },
+    ],
 }

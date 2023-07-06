@@ -10,6 +10,7 @@
         "//src/storage/fs_test/meta/fxfs_crypt_test.shard.cml",
         "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
         "//src/sys/test_runners/gtest/default.shard.cml",
+        "inspect/offer.shard.cml",
     ],
     program: {
         binary: "test/fs-management-test",

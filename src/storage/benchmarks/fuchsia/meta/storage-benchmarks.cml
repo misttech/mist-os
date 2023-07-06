@@ -8,6 +8,7 @@
         "//sdk/lib/syslog/client.shard.cml",
         "//src/lib/storage/fs_management/client.shard.cml",
         "//src/storage/fs_test/meta/fxfs_crypt_test.shard.cml",
+        "inspect/offer.shard.cml",
     ],
     program: {
         binary: "bin/fuchsia_storage_benchmarks",

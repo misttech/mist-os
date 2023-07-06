@@ -26,5 +26,10 @@
             from: "parent",
             to: "#storage_driver_test_realm",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#storage_driver_test_realm" ],
+        },
     ],
 }

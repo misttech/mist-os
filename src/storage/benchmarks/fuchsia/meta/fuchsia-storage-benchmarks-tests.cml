@@ -12,6 +12,7 @@
         "//src/storage/testing/meta/storage_test.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
         "//src/sys/test_runners/tmp_storage.shard.cml",
+        "inspect/offer.shard.cml",
     ],
     program: {
         binary: "bin/fuchsia_storage_benchmarks_bin_test",
