@@ -39,9 +39,12 @@
             to: "#echo_client",
         },
 
-        // Route logging support to both children.
+        // Route diagnostics support to both children.
         {
-            protocol: "fuchsia.logger.LogSink",
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
             from: "parent",
             to: [
                 "#echo_client",

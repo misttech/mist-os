@@ -20,9 +20,12 @@
             to: "#client",
         },
 
-        // Route logging support to all children.
+        // Route diagnostics support to all children.
         {
-            protocol: "fuchsia.logger.LogSink",
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
             from: "parent",
             to: [
                 "#client",
