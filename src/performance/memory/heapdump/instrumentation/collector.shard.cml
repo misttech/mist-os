@@ -14,4 +14,11 @@
             from: "#heapdump-collector",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#heapdump-collector" ],
+        },
+    ],
 }
