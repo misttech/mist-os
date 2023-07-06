@@ -66,3 +66,4 @@ custom_signing_script_tools = [
 
 images_config_label = "//boards/images:imx8mmevk"
 zedboot_images_config_label = "//boards/images:zedboot_imx8mmevk"
+bringup_images_config_label = "//boards/images:bringup_imx8mmevk"

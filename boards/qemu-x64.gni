@@ -40,4 +40,5 @@ board_is_phys = false
 
 images_config_label = "//boards/images:qemu-x64"
 zedboot_images_config_label = "//boards/images:zedboot_qemu"
+bringup_images_config_label = "//boards/images:bringup_qemu"
 partitions_config_label = "//boards/partitions:qemu-x64"

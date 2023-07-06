@@ -112,6 +112,9 @@ declare_args() {
   # The images config information used for zedboot images.
   zedboot_images_config_label = false
 
+  # The images config information used for bringup images.
+  bringup_images_config_label = false
+
   # The images config information used for recovery images, including
   # recovery-fdr and recovery-ota.
   #

@@ -40,5 +40,6 @@ avb_key =
 
 images_config_label = "//boards/images:arm64"
 zedboot_images_config_label = "//boards/images:zedboot_default"
+bringup_images_config_label = "//boards/images:bringup_default"
 partitions_config_label = "//boards/partitions:arm64"
 partitions_config_contents += [ "$root_build_dir/fuchsia.esp.blk" ]
