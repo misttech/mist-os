@@ -406,9 +406,10 @@ pub enum ResolveActionError {
         #[source]
         err: fidl::Error,
     },
-    #[error("ABI compatibility check failed: {}", err)]
+    #[error("ABI compatibility check failed for {url}: {err}")]
     AbiCompatibilityError {
-        #[from]
+        url: String,
+        #[source]
         err: AbiRevisionError,
     },
 }

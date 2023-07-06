@@ -82,7 +82,9 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
         let component_info =
             Component::resolve_with_config(component_info, component.config_parent_overrides())?;
         let policy = component.context.abi_revision_policy();
-        policy.check_compatibility(&component.abs_moniker, component_info.abi_revision)?;
+        policy.check_compatibility(&component.abs_moniker, component_info.abi_revision).map_err(
+            |err| ResolveActionError::AbiCompatibilityError { url: component_url.clone(), err },
+        )?;
         if first_resolve {
             {
                 let mut state = component.lock_state().await;
