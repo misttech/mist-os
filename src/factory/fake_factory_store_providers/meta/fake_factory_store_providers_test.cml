@@ -6,6 +6,7 @@
         // Select the appropriate test runner shard here:
         // rust, gtest, go, etc.
         "//src/sys/test_runners/rust/default.shard.cml",
+        "inspect/offer.shard.cml",
 
         // Enable system logging
         "syslog/client.shard.cml",
