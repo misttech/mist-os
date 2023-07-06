@@ -82,17 +82,7 @@ def _path_or_default(path_or_none, default: Path) -> Path:
 def _write_lines_to_file(path: Path, lines: Iterable[str]):
     path.parent.mkdir(parents=True, exist_ok=True)
     contents = '\n'.join(lines) + '\n'
-    with open(path, 'w') as f:
-        f.write(contents)
-
-
-def _fill_string_to_size(text: str, size: int, pattern: str) -> str:
-    """Append string with a filler pattern to bring it up to a size."""
-    to_fill = size - len(text)
-    if to_fill <= 0:
-        return text
-    return text + pattern * (to_fill // len(pattern)) + pattern[:to_fill %
-                                                                len(pattern)]
+    path.write_text(contents)
 
 
 def _files_match(file1: Path, file2: Path) -> bool:
@@ -301,10 +291,8 @@ def rewrite_depfile(
         the original depfile.
     """
     output = output or dep_file
-    with open(dep_file) as f:
-        new_deps = depfile.transform_paths(f.read(), transform)
-    with open(output, 'w') as f:
-        f.write(new_deps)
+    new_deps = depfile.transform_paths(dep_file.read_text(), transform)
+    output.write_text(new_deps)
 
 
 def _matches_file_not_found(line: str) -> bool:
@@ -592,7 +580,7 @@ _RBE_DOWNLOAD_STUB_HELP = '# run //build/rbe/dlwrap.py on this file to download'
 _RBE_DOWNLOAD_STUB_SUFFIX = '.dl-stub'
 
 # Filesystem extended attribute for digests.
-# This should match the 'xattr_hash' value in build/rbe/fuchsia-reproxy.cfg.
+# This should match the 'xattr_digest' value in build/rbe/fuchsia-reproxy.cfg.
 _RBE_XATTR_NAME = 'user.fuchsia.rbe.digest.sha256'
 
 
@@ -653,17 +641,7 @@ class DownloadStubInfo(object):
             f'action_digest={self._action_digest}',
             f'build_id={self._build_id}',
         ]
-        # Want this:
-        #   _write_lines_to_file(output_abspath, lines)
-        # but we need a temporary ugly workaround:
-        sha256sum, slash, size = self.blob_digest.partition('/')
-        with open(output_abspath, 'w') as f:
-            f.write(
-                _fill_string_to_size(
-                    text='\n'.join(lines),
-                    size=int(size),
-                    pattern='\n# TODO(b/284380439): avoid resizing stub file',
-                ))
+        _write_lines_to_file(output_abspath, lines)
 
     def create(self, working_dir_abs: Path):
         """Create a download stub file.
@@ -681,14 +659,12 @@ class DownloadStubInfo(object):
         self._write(path)
 
         if _HAVE_XATTR:
-            sha256sum, slash, size = self.blob_digest.partition('/')
             # Signal to the next reproxy invocation that the object already
             # exists in the CAS and does not need to be uploaded.
             os.setxattr(
                 path,
                 _RBE_XATTR_NAME,
-                # TODO(b/284380439): use full self.blob_digest.encode()
-                sha256sum.encode(),
+                self.blob_digest.encode(),
             )
 
     @staticmethod
