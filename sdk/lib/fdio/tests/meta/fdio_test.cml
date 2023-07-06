@@ -6,6 +6,7 @@
         "//src/sys/test_runners/elf/ambient_exec.shard.cml",
         "driver_test_realm/meta/client.shard.cml",
         "driver_test_realm/simple/meta/client.shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
