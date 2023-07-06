@@ -35,7 +35,7 @@ async fn scan_legacy_privacy() {
 
     // Configure the scan event to return Beacon frames corresponding to each
     // BeaconInfo specified.
-    let scan_event = EventHandlerBuilder::new()
+    let mut scan_event = EventHandlerBuilder::new()
         .on_start_scan(start_scan_handler(
             &phy,
             Ok(vec![
@@ -73,7 +73,7 @@ async fn scan_legacy_privacy() {
         .run_until_complete_or_timeout(
             *SCAN_RESPONSE_TEST_TIMEOUT,
             "receive a scan response",
-            scan_event,
+            event::matched(|_, event| scan_event(event)),
             scan_result_list_fut,
         )
         .await;

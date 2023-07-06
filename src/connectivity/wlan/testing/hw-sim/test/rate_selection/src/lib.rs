@@ -22,7 +22,7 @@ use {
         mac,
     },
     wlan_hw_sim::{
-        connect_with_security_type, default_wlantap_config_client, init_syslog,
+        connect_with_security_type, default_wlantap_config_client, event, init_syslog,
         loop_until_iface_is_found, netdevice_helper, test_utils, ApAdvertisement, Beacon, AP_SSID,
         CLIENT_MAC_ADDR, ETH_DST_MAC,
     },
@@ -64,7 +64,7 @@ fn send_tx_status_report(
 }
 
 fn handle_rate_selection_event<F, G>(
-    event: WlantapPhyEvent,
+    event: &WlantapPhyEvent,
     phy: &WlantapPhyProxy,
     bssid: &Bssid,
     hm: &mut HashMap<u16, u64>,
@@ -76,7 +76,7 @@ fn handle_rate_selection_event<F, G>(
     G: FnMut(&HashMap<u16, u64>) -> bool,
 {
     match event {
-        WlantapPhyEvent::Tx { args } => {
+        WlantapPhyEvent::Tx { ref args } => {
             if let Some(mac::MacFrame::Data { .. }) =
                 mac::MacFrame::parse(&args.packet.data[..], false)
             {
@@ -239,7 +239,7 @@ async fn rate_selection() {
         .run_until_complete_or_timeout(
             30.seconds(),
             "verify rate selection converges to 130",
-            |event| {
+            event::matched(|_, event| {
                 handle_rate_selection_event(
                     event,
                     &phy,
@@ -249,7 +249,7 @@ async fn rate_selection() {
                     &mut is_converged,
                     sender.clone(),
                 );
-            },
+            }),
             eth_and_beacon_sender_fut,
         )
         .await

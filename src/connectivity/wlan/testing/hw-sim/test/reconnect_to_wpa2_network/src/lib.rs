@@ -113,7 +113,7 @@ fn handle_phy_event(
                             send_disassociate(
                                 &channel,
                                 bssid,
-                                fidl_ieee80211::ReasonCode::NoMoreStas.into(),
+                                fidl_ieee80211::ReasonCode::NoMoreStas,
                                 &phy,
                             )?;
                             authenticator.reset();
@@ -190,9 +190,9 @@ async fn reconnect_to_wpa2_network() {
         .run_until_complete_or_timeout(
             30.seconds(),
             format!("connecting to {} ({:02X?})", AP_SSID.to_string_not_redactable(), BSSID),
-            |event| {
+            event::matched(|_, event| {
                 handle_phy_event(
-                    &event,
+                    event,
                     &phy,
                     &AP_SSID,
                     &BSSID,
@@ -202,7 +202,7 @@ async fn reconnect_to_wpa2_network() {
                     &mut first_association_complete,
                     &mut second_association_confirm_sender_wrapper,
                 );
-            },
+            }),
             test_actions_fut,
         )
         .await;

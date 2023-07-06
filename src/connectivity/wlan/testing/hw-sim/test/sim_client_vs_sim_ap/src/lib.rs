@@ -11,10 +11,11 @@ use {
     tracing::{info, warn},
     wlan_common::{bss::Protection::Wpa2Personal, buffer_reader::BufferReader, mac},
     wlan_hw_sim::{
-        create_rx_info, default_wlantap_config_ap, default_wlantap_config_client, has_id_and_state,
-        init_syslog, loop_until_iface_is_found, netdevice_helper, send_scan_complete, test_utils,
-        wait_until_client_state, ApAdvertisement, Beacon, NetworkConfigBuilder, AP_MAC_ADDR,
-        AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC, WLANCFG_DEFAULT_AP_CHANNEL,
+        default_wlantap_config_ap, default_wlantap_config_client, event, has_id_and_state,
+        init_syslog, loop_until_iface_is_found, netdevice_helper, rx_info_with_default_ap,
+        send_scan_complete, test_utils, wait_until_client_state, ApAdvertisement, Beacon,
+        NetworkConfigBuilder, AP_MAC_ADDR, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC,
+        WLANCFG_DEFAULT_AP_CHANNEL,
     },
 };
 
@@ -27,11 +28,11 @@ const WAIT_FOR_ACK_INTERVAL: i64 = 500; // milliseconds
 fn packet_forwarder<'a>(
     peer_phy: &'a WlantapPhyProxy,
     context: &'a str,
-) -> impl Fn(WlantapPhyEvent) + 'a {
+) -> impl Fn(&WlantapPhyEvent) + 'a {
     move |event| {
-        if let WlantapPhyEvent::Tx { args } = event {
+        if let WlantapPhyEvent::Tx { ref args } = event {
             let frame = &args.packet.data;
-            peer_phy.rx(frame, &create_rx_info(&WLANCFG_DEFAULT_AP_CHANNEL, 0)).expect(context);
+            peer_phy.rx(frame, &rx_info_with_default_ap()).expect(context);
         }
     }
 }
@@ -88,8 +89,8 @@ async fn verify_client_connects_to_ap(
     let client_fut = client_helper.run_until_complete_or_timeout(
         10.seconds(),
         "connecting to AP",
-        |event| match event {
-            WlantapPhyEvent::StartScan { args } => {
+        event::matched(|_, event| match event {
+            WlantapPhyEvent::StartScan { ref args } => {
                 Beacon {
                     channel: WLANCFG_DEFAULT_AP_CHANNEL.clone(),
                     bssid: AP_MAC_ADDR,
@@ -102,8 +103,8 @@ async fn verify_client_connects_to_ap(
                 send_scan_complete(args.scan_id, 0, &client_proxy)
                     .expect("failed to send scan complete");
             }
-            evt => packet_forwarder(&ap_proxy, "frame client -> ap")(evt),
-        },
+            event => packet_forwarder(&ap_proxy, "frame client -> ap")(event),
+        }),
         connect_fut,
     );
 
@@ -112,7 +113,9 @@ async fn verify_client_connects_to_ap(
         .run_until_complete_or_timeout(
             10.seconds(),
             "serving as an AP",
-            packet_forwarder(&client_proxy, "frame ap ->  client"),
+            event::matched(|_, event| {
+                packet_forwarder(&client_proxy, "frame ap ->  client")(event)
+            }),
             connect_confirm_receiver,
         )
         .unwrap_or_else(|oneshot::Canceled| panic!("waiting for connect confirmation"));
@@ -309,7 +312,7 @@ async fn verify_ethernet_in_both_directions(
         // once Policy no longer mistakenly schedules unneeded scans.
         60.seconds(),
         "client trying to exchange data with a peer behind AP",
-        packet_forwarder(&ap_proxy, "frame client -> ap"),
+        event::matched(|_, event| packet_forwarder(&ap_proxy, "frame client -> ap")(event)),
         client_fut,
     );
     let peer_behind_ap_with_timeout = ap_helper.run_until_complete_or_timeout(
@@ -317,7 +320,7 @@ async fn verify_ethernet_in_both_directions(
         // once Policy no longer mistakenly schedules unneeded scans.
         60.seconds(),
         "AP forwarding data between client and its peer",
-        packet_forwarder(&client_proxy, "frame ap ->  client"),
+        event::matched(|_, event| packet_forwarder(&client_proxy, "frame ap ->  client")(event)),
         peer_behind_ap_fut,
     );
 

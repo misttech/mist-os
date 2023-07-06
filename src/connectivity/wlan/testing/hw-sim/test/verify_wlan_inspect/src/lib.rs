@@ -63,7 +63,7 @@ fn build_event_handler<'a>(
     ssid: &'a Ssid,
     bssid: Bssid,
     phy: &'a WlantapPhyProxy,
-) -> impl FnMut(wlantap::WlantapPhyEvent) + 'a {
+) -> impl FnMut(&wlantap::WlantapPhyEvent) + 'a {
     EventHandlerBuilder::new()
         .on_start_scan(start_scan_handler(
             &phy,
@@ -84,9 +84,10 @@ fn build_event_handler<'a>(
                             match mac::MgmtBody::parse({ mgmt_hdr.frame_ctrl }.mgmt_subtype(), body)
                             {
                                 Some(mac::MgmtBody::Authentication { .. }) => {
-                                    send_open_authentication_success(
+                                    send_open_authentication(
                                         &Channel::new(1, Cbw::Cbw20),
                                         &bssid,
+                                        fidl_ieee80211::StatusCode::Success,
                                         &phy,
                                     )
                                     .expect("Error sending fake authentication frame.");
@@ -95,7 +96,7 @@ fn build_event_handler<'a>(
                                     send_association_response(
                                         &Channel::new(1, Cbw::Cbw20),
                                         &bssid,
-                                        fidl_ieee80211::StatusCode::Success.into(),
+                                        fidl_ieee80211::StatusCode::Success,
                                         &phy,
                                     )
                                     .expect("Error sending fake association response frame");
@@ -142,11 +143,12 @@ async fn verify_wlan_inspect() {
         pin_mut!(connect_fut);
 
         let proxy = helper.proxy();
+        let mut handler = build_event_handler(&AP_SSID, BSSID, &proxy);
         let () = helper
             .run_until_complete_or_timeout(
                 240.seconds(),
                 format!("connecting to {} ({:02X?})", AP_SSID.to_string_not_redactable(), BSSID),
-                build_event_handler(&AP_SSID, BSSID, &proxy),
+                event::matched(|_, event| handler(event)),
                 connect_fut,
             )
             .await;

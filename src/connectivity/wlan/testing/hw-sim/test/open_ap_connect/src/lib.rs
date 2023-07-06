@@ -39,18 +39,14 @@ async fn open_ap_connect() {
 
     // (client->ap) send a mock auth req
     let proxy = helper.proxy();
-    proxy
-        .rx(&auth_req, &create_rx_info(&WLANCFG_DEFAULT_AP_CHANNEL, 0))
-        .expect("cannot send auth req frame");
+    proxy.rx(&auth_req, &rx_info_with_default_ap()).expect("cannot send auth req frame");
 
     // (ap->client) verify auth response frame was sent
     verify_auth_resp(&mut helper).await;
 
     // (client->ap) send a mock assoc req
     let proxy = helper.proxy();
-    proxy
-        .rx(&assoc_req, &create_rx_info(&WLANCFG_DEFAULT_AP_CHANNEL, 0))
-        .expect("cannot send assoc req frame");
+    proxy.rx(&assoc_req, &rx_info_with_default_ap()).expect("cannot send assoc req frame");
 
     // (ap->client) verify assoc response frame was sent
     verify_assoc_resp(&mut helper).await;
@@ -60,8 +56,8 @@ async fn open_ap_connect() {
 async fn verify_auth_resp(helper: &mut test_utils::TestHelper) {
     let (sender, receiver) = oneshot::channel::<()>();
     let mut sender = Some(sender);
-    let event_handler = move |event| match event {
-        WlantapPhyEvent::Tx { args } => {
+    let event_handler = event::matched(move |_, event| match event {
+        WlantapPhyEvent::Tx { ref args } => {
             if let Some(mac::MacFrame::Mgmt { mgmt_hdr, body, .. }) =
                 mac::MacFrame::parse(&args.packet.data[..], false)
             {
@@ -76,7 +72,7 @@ async fn verify_auth_resp(helper: &mut test_utils::TestHelper) {
             }
         }
         _ => {}
-    };
+    });
     helper
         .run_until_complete_or_timeout(
             5.seconds(),
@@ -91,39 +87,38 @@ async fn verify_auth_resp(helper: &mut test_utils::TestHelper) {
 async fn verify_assoc_resp(helper: &mut test_utils::TestHelper) {
     let (sender, receiver) = oneshot::channel::<()>();
     let mut sender = Some(sender);
-    let event_handler = move |event| match event {
-        WlantapPhyEvent::Tx { args } => {
-            if let Some(mac::MacFrame::Mgmt { mgmt_hdr, body, .. }) =
-                mac::MacFrame::parse(&args.packet.data[..], false)
-            {
-                match mac::MgmtBody::parse({ mgmt_hdr.frame_ctrl }.mgmt_subtype(), body) {
-                    Some(mac::MgmtBody::AssociationResp { assoc_resp_hdr, .. }) => {
-                        assert_eq!(
-                            { assoc_resp_hdr.status_code },
-                            fidl_ieee80211::StatusCode::Success.into()
-                        );
-                        sender.take().map(|s| s.send(()));
-                    }
-                    Some(mac::MgmtBody::Unsupported { subtype })
-                        if subtype == mac::MgmtSubtype::ACTION => {}
-                    other => {
-                        // We might still be servicing things from the channel after the initial
-                        // association frame but if the sender has not been taken, then we haven't
-                        // serviced an association frame at all.
-                        if sender.is_some() {
-                            panic!("expected association response frame, got {:?}", other);
-                        }
-                    }
-                }
-            }
-        }
-        _ => {}
-    };
     helper
         .run_until_complete_or_timeout(
             5.seconds(),
             "waiting for association response",
-            event_handler,
+            event::matched(move |_, event| match event {
+                WlantapPhyEvent::Tx { ref args } => {
+                    if let Some(mac::MacFrame::Mgmt { mgmt_hdr, body, .. }) =
+                        mac::MacFrame::parse(&args.packet.data[..], false)
+                    {
+                        match mac::MgmtBody::parse({ mgmt_hdr.frame_ctrl }.mgmt_subtype(), body) {
+                            Some(mac::MgmtBody::AssociationResp { assoc_resp_hdr, .. }) => {
+                                assert_eq!(
+                                    { assoc_resp_hdr.status_code },
+                                    fidl_ieee80211::StatusCode::Success.into()
+                                );
+                                sender.take().map(|s| s.send(()));
+                            }
+                            Some(mac::MgmtBody::Unsupported { subtype })
+                                if subtype == mac::MgmtSubtype::ACTION => {}
+                            other => {
+                                // We might still be servicing things from the channel after the initial
+                                // association frame but if the sender has not been taken, then we haven't
+                                // serviced an association frame at all.
+                                if sender.is_some() {
+                                    panic!("expected association response frame, got {:?}", other);
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }),
             receiver,
         )
         .await

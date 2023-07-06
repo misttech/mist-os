@@ -153,7 +153,7 @@ impl<'a> EventHandlerBuilder<'a> {
         self
     }
 
-    pub fn build(mut self) -> impl FnMut(wlantap::WlantapPhyEvent) + 'a {
+    pub fn build(mut self) -> impl FnMut(&wlantap::WlantapPhyEvent) + 'a {
         move |event| {
             match event {
                 wlantap::WlantapPhyEvent::SetChannel { ref args } => {
@@ -177,7 +177,7 @@ impl<'a> EventHandlerBuilder<'a> {
 
                 _ => {}
             }
-            (self.phy_event_handler)(&event)
+            (self.phy_event_handler)(event)
         }
     }
 }

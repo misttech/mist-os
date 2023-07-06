@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    crate::event::action,
     anyhow::Error,
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl::endpoints::{create_endpoints, create_proxy},
@@ -88,7 +89,11 @@ pub fn wlantap_config_ap(name: String, mac_addr: [u8; 6]) -> WlantapPhyConfig {
     config::create_wlantap_config(name, mac_addr, WlanMacRole::Ap)
 }
 
-pub fn create_rx_info(channel: &Channel, rssi_dbm: i8) -> WlanRxInfo {
+pub fn rx_info_with_default_ap() -> WlanRxInfo {
+    rx_info_with_valid_rssi(&WLANCFG_DEFAULT_AP_CHANNEL, 0)
+}
+
+fn rx_info_with_valid_rssi(channel: &Channel, rssi_dbm: i8) -> WlanRxInfo {
     WlanRxInfo {
         rx_flags: 0,
         valid_fields: if rssi_dbm == 0 { 0 } else { banjo_wlan_softmac::WlanRxInfoValid::RSSI.0 },
@@ -125,13 +130,14 @@ pub fn send_sae_authentication_frame(
         },
         body: &sae_frame.sae_fields[..],
     })?;
-    proxy.rx(&buf, &create_rx_info(channel, 0))?;
+    proxy.rx(&buf, &rx_info_with_valid_rssi(channel, 0))?;
     Ok(())
 }
 
-pub fn send_open_authentication_success(
+pub fn send_open_authentication(
     channel: &Channel,
     bssid: &Bssid,
+    status_code: impl Into<mac::StatusCode>,
     proxy: &WlantapPhyProxy,
 ) -> Result<(), anyhow::Error> {
     let (buf, _bytes_written) = write_frame_with_dynamic_buf!(vec![], {
@@ -147,45 +153,18 @@ pub fn send_open_authentication_success(
             mac::AuthHdr: &mac::AuthHdr {
                 auth_alg_num: mac::AuthAlgorithmNumber::OPEN,
                 auth_txn_seq_num: 2,
-                status_code: fidl_ieee80211::StatusCode::Success.into(),
+                status_code: status_code.into(),
             },
         },
     })?;
-    proxy.rx(&buf, &create_rx_info(channel, 0))?;
-    Ok(())
-}
-
-pub fn send_open_authentication(
-    channel: &Channel,
-    bssid: &Bssid,
-    status: impl Into<mac::StatusCode>,
-    phy: &WlantapPhyProxy,
-) -> Result<(), anyhow::Error> {
-    let (buf, _bytes_written) = write_frame_with_dynamic_buf!(vec![], {
-        headers: {
-            mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
-                mac::FrameControl(0)
-                    .with_frame_type(mac::FrameType::MGMT)
-                    .with_mgmt_subtype(mac::MgmtSubtype::AUTH),
-                CLIENT_MAC_ADDR,
-                *bssid,
-                mac::SequenceControl(0).with_seq_num(123),
-            ),
-            mac::AuthHdr: &mac::AuthHdr {
-                auth_alg_num: mac::AuthAlgorithmNumber::OPEN,
-                auth_txn_seq_num: 2,
-                status_code: status.into(),
-            },
-        },
-    })?;
-    phy.rx(&buf, &create_rx_info(channel, 0))?;
+    proxy.rx(&buf, &rx_info_with_valid_rssi(channel, 0))?;
     Ok(())
 }
 
 pub fn send_association_response(
     channel: &Channel,
     bssid: &Bssid,
-    status_code: mac::StatusCode,
+    status_code: impl Into<mac::StatusCode>,
     proxy: &WlantapPhyProxy,
 ) -> Result<(), anyhow::Error> {
     let (buf, _bytes_written) = write_frame_with_dynamic_buf!(vec![], {
@@ -200,7 +179,7 @@ pub fn send_association_response(
             ),
             mac::AssocRespHdr: &mac::AssocRespHdr {
                 capabilities: mac::CapabilityInfo(0).with_ess(true).with_short_preamble(true),
-                status_code,
+                status_code: status_code.into(),
                 aid: 2, // does not matter
             },
         },
@@ -213,14 +192,14 @@ pub fn send_association_response(
             extended_supported_rates:  &[48, 72, 128 + 96, 108],
         },
     })?;
-    proxy.rx(&buf, &create_rx_info(channel, 0))?;
+    proxy.rx(&buf, &rx_info_with_valid_rssi(channel, 0))?;
     Ok(())
 }
 
 pub fn send_disassociate(
     channel: &Channel,
     bssid: &Bssid,
-    reason_code: mac::ReasonCode,
+    reason_code: impl Into<mac::ReasonCode>,
     proxy: &WlantapPhyProxy,
 ) -> Result<(), anyhow::Error> {
     let (buf, _bytes_written) = write_frame_with_dynamic_buf!(vec![], {
@@ -234,11 +213,11 @@ pub fn send_disassociate(
                 mac::SequenceControl(0).with_seq_num(123),
             ),
             mac::DisassocHdr: &mac::DisassocHdr {
-                reason_code,
+                reason_code: reason_code.into(),
             },
         },
     })?;
-    proxy.rx(&buf, &create_rx_info(channel, 0))?;
+    proxy.rx(&buf, &rx_info_with_valid_rssi(channel, 0))?;
     Ok(())
 }
 
@@ -429,7 +408,7 @@ pub trait ApAdvertisement {
 
     fn send(&self, phy: &WlantapPhyProxy) -> Result<(), anyhow::Error> {
         let buf = self.generate_frame()?;
-        phy.rx(&buf, &create_rx_info(&self.channel(), self.rssi_dbm()))?;
+        phy.rx(&buf, &rx_info_with_valid_rssi(&self.channel(), self.rssi_dbm()))?;
         Ok(())
     }
 
@@ -616,9 +595,10 @@ pub fn handle_tx_event<F>(
                                 ..
                             })
                             | None => {
-                                send_open_authentication_success(
+                                send_open_authentication(
                                     &Channel::new(1, Cbw::Cbw20),
                                     bssid,
+                                    fidl_ieee80211::StatusCode::Success,
                                     &phy,
                                 )
                                 .expect("Error sending fake OPEN authentication frame.");
@@ -685,7 +665,7 @@ pub fn handle_tx_event<F>(
                     send_association_response(
                         &Channel::new(1, Cbw::Cbw20),
                         bssid,
-                        fidl_ieee80211::StatusCode::Success.into(),
+                        fidl_ieee80211::StatusCode::Success,
                         &phy,
                     )
                     .expect("Error sending fake association response frame.");
@@ -853,9 +833,9 @@ where
         .run_until_complete_or_timeout(
             timeout.unwrap_or(30).seconds(),
             format!("connecting to {} ({:02X?})", ap_ssid.to_string_not_redactable(), ap_bssid),
-            |event| {
+            event::matched(|_, event| {
                 handle_connect_events(
-                    &event,
+                    event,
                     &phy,
                     ap_ssid,
                     ap_bssid,
@@ -863,7 +843,7 @@ where
                     authenticator,
                     update_sink,
                 );
-            },
+            }),
             connect_fut,
         )
         .await
@@ -965,7 +945,7 @@ pub fn rx_wlan_data_frame(
     })?;
     buf.truncate(bytes_written);
 
-    phy.rx(&buf, &create_rx_info(channel, 0))?;
+    phy.rx(&buf, &rx_info_with_valid_rssi(channel, 0))?;
     Ok(())
 }
 
@@ -991,15 +971,14 @@ pub async fn loop_until_iface_is_found(helper: &mut test_utils::TestHelper) {
         pin_mut!(fut);
 
         let phy = helper.proxy();
-        let scan_event = EventHandlerBuilder::new()
-            .on_start_scan(start_scan_handler(&phy, Ok(Vec::<Beacon>::new())))
-            .build();
-
         match helper
             .run_until_complete_or_timeout(
                 *SCAN_RESPONSE_TEST_TIMEOUT,
                 "receive a scan response",
-                scan_event,
+                event::on_scan(action::send_advertisements_and_scan_completion(
+                    &phy,
+                    [] as [Beacon; 0],
+                )),
                 fut,
             )
             .await

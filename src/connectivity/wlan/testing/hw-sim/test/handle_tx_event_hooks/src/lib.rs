@@ -151,9 +151,9 @@ async fn handle_tx_event_hooks() {
         .run_until_complete_or_timeout(
             30.seconds(),
             format!("connecting to {} ({:02X?})", AP_SSID.to_string_not_redactable(), BSSID),
-            |event| {
+            event::matched(|_, event| {
                 handle_phy_event(
-                    &event,
+                    event,
                     &phy,
                     &AP_SSID,
                     &BSSID,
@@ -163,7 +163,7 @@ async fn handle_tx_event_hooks() {
                     &mut sec_assoc_update_trace,
                     &mut esssa_established_sender,
                 );
-            },
+            }),
             connect_to_network_fut,
         )
         .await;

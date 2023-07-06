@@ -29,7 +29,7 @@ async fn run_without_regulatory_manager() {
     // Issue a scan request to verify that the scan module can function in the absence of the
     // regulatory manager.
     let phy = helper.proxy();
-    let scan_event = EventHandlerBuilder::new()
+    let mut scan_event = EventHandlerBuilder::new()
         .on_start_scan(start_scan_handler(&phy, Ok(Vec::<Beacon>::new())))
         .build();
     let fut = async move {
@@ -49,7 +49,7 @@ async fn run_without_regulatory_manager() {
         .run_until_complete_or_timeout(
             *SCAN_RESPONSE_TEST_TIMEOUT,
             "receive a scan response",
-            scan_event,
+            event::matched(|_, event| scan_event(event)),
             fut,
         )
         .await;

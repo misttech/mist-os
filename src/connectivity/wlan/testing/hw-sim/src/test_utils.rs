@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::wlancfg_helper::{start_ap_and_wait_for_confirmation, NetworkConfigBuilder},
+    crate::{
+        event::{self, Handler},
+        wlancfg_helper::{start_ap_and_wait_for_confirmation, NetworkConfigBuilder},
+    },
     fidl::endpoints::create_proxy,
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_tap as wlantap,
@@ -11,6 +14,7 @@ use {
     fuchsia_zircon::{self as zx, prelude::*, sys::ZX_ERR_ALREADY_BOUND, zx_status_t},
     futures::{channel::oneshot, FutureExt, StreamExt},
     std::{
+        fmt::Display,
         future::Future,
         marker::Unpin,
         pin::Pin,
@@ -28,46 +32,46 @@ pub struct TestHelper {
     event_stream: Option<EventStream>,
     is_stopped: bool,
 }
-struct TestHelperFuture<F, H>
+struct TestHelperFuture<H, F>
 where
+    H: Handler<(), wlantap::WlantapPhyEvent>,
     F: Future + Unpin,
-    H: FnMut(wlantap::WlantapPhyEvent),
 {
     event_stream: Option<EventStream>,
-    event_handler: H,
-    main_future: F,
+    handler: H,
+    future: F,
 }
-impl<F, H> Unpin for TestHelperFuture<F, H>
+impl<H, F> Unpin for TestHelperFuture<H, F>
 where
+    H: Handler<(), wlantap::WlantapPhyEvent>,
     F: Future + Unpin,
-    H: FnMut(wlantap::WlantapPhyEvent),
 {
 }
-impl<F, H> Future for TestHelperFuture<F, H>
+impl<H, F> Future for TestHelperFuture<H, F>
 where
+    H: Handler<(), wlantap::WlantapPhyEvent>,
     F: Future + Unpin,
-    H: FnMut(wlantap::WlantapPhyEvent),
 {
     type Output = (F::Output, EventStream);
     /// Any events that accumulated in the |event_stream| since last poll will be passed to
     /// |event_handler| before the |main_future| is polled
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = &mut *self;
-        let stream = this.event_stream.as_mut().unwrap();
+        let helper = &mut *self;
+        let stream = helper.event_stream.as_mut().unwrap();
         while let Poll::Ready(optional_result) = stream.poll_next_unpin(cx) {
             let event = optional_result
                 .expect("Unexpected end of the WlantapPhy event stream")
                 .expect("WlantapPhy event stream returned an error");
-            (this.event_handler)(event);
+            helper.handler.call(&mut (), &event);
         }
-        match this.main_future.poll_unpin(cx) {
+        match helper.future.poll_unpin(cx) {
             Poll::Pending => {
-                debug!("Polled main_future. Still waiting for completion.");
+                debug!("Main future poll response is pending. Waiting for completion.");
                 Poll::Pending
             }
             Poll::Ready(x) => {
-                info!("main_future complete. No further events will be processed from the event stream.");
-                Poll::Ready((x, this.event_stream.take().unwrap()))
+                info!("Main future complete. Events will no longer be processed from the event stream.");
+                Poll::Ready((x, helper.event_stream.take().unwrap()))
             }
         }
     }
@@ -125,16 +129,10 @@ impl TestHelper {
     }
     async fn wait_for_wlan_softmac_start(&mut self) {
         let (sender, receiver) = oneshot::channel::<()>();
-        let mut sender = Some(sender);
         self.run_until_complete_or_timeout(
             120.seconds(),
             "receive a WlanSoftmacStart event",
-            move |event| match event {
-                wlantap::WlantapPhyEvent::WlanSoftmacStart { .. } => {
-                    sender.take().map(|s| s.send(()));
-                }
-                _ => {}
-            },
+            event::on_start_mac(event::once(|_, _| sender.send(()))),
             receiver,
         )
         .await
@@ -148,25 +146,24 @@ impl TestHelper {
     /// |event_handler| closure first before making progress on the main future.
     /// So if a test generates many events each of which requires significant computational time in
     /// the event handler, the main future may not be able to complete in time.
-    pub async fn run_until_complete_or_timeout<R, F, H, S>(
+    pub async fn run_until_complete_or_timeout<H, F>(
         &mut self,
         timeout: zx::Duration,
-        context: S,
-        event_handler: H,
-        main_future: F,
-    ) -> R
+        context: impl Display,
+        handler: H,
+        future: F,
+    ) -> F::Output
     where
-        H: FnMut(wlantap::WlantapPhyEvent),
-        F: Future<Output = R> + Unpin,
-        S: ToString,
+        H: Handler<(), wlantap::WlantapPhyEvent>,
+        F: Future + Unpin,
     {
-        info!("main_future started. Events will be handled by event_handler.");
+        info!("Running main future until completion or timeout with event handler.");
         let (item, stream) = TestHelperFuture {
             event_stream: Some(self.event_stream.take().unwrap()),
-            event_handler,
-            main_future,
+            handler,
+            future,
         }
-        .expect_within(timeout, format!("Did not complete in time: {}", context.to_string()))
+        .expect_within(timeout, format!("Main future timed out: {}", context))
         .await;
         self.event_stream = Some(stream);
         item

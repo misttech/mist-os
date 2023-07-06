@@ -407,13 +407,8 @@ where
             }
         }));
     let associate = event::extract(Stateful(|tap: &mut Tap<'_, H>, _: Buffered<AssocReqFrame>| {
-        crate::send_association_response(
-            channel,
-            bssid,
-            fidl_ieee80211::StatusCode::Success.into(),
-            phy,
-        )
-        .context("failed to send association response frame")?;
+        crate::send_association_response(channel, bssid, fidl_ieee80211::StatusCode::Success, phy)
+            .context("failed to send association response frame")?;
         match tap.control.authenticator.auth_cfg {
             auth::Config::ComputedPsk(_) => tap.control.authenticator.reset(),
             auth::Config::DriverSae { .. } => {

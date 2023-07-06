@@ -55,12 +55,12 @@ async fn set_country() {
         .run_until_complete_or_timeout(
             std::i64::MAX.nanos(), // Unlimited timeout since set_country must be called.
             "wlanstack_dev_svc set_country",
-            |event| {
-                if let WlantapPhyEvent::SetCountry { args } = event {
+            event::matched(|_, event| {
+                if let WlantapPhyEvent::SetCountry { ref args } = event {
                     assert_eq!(args.alpha2, *ALPHA2);
                     sender.take().map(|s| s.send(()));
                 }
-            },
+            }),
             set_country_fut,
         )
         .await;
