@@ -818,7 +818,6 @@ TEST(HidHelperTest, ParseEveTouchpadV2) {
     EXPECT_EQ(fields[ix].attr.phys_mm.min, 0);
     EXPECT_EQ(fields[ix].attr.phys_mm.max, 1030);
     EXPECT_EQ(fields[ix].attr.logc_mm.max, 13184);
-    // TODO(dgilhooley) Define Unit types in ulib/hid-parser.
     EXPECT_EQ(fields[ix].attr.unit.type, 0x11);
     EXPECT_EQ(fields[ix].attr.unit.exp, -2);
     EXPECT_EQ(fields[ix].attr.bit_sz, 16);
@@ -831,7 +830,6 @@ TEST(HidHelperTest, ParseEveTouchpadV2) {
     EXPECT_EQ(fields[ix].attr.phys_mm.min, 0);
     EXPECT_EQ(fields[ix].attr.phys_mm.max, 680);
     EXPECT_EQ(fields[ix].attr.logc_mm.max, 8704);
-    // TODO(dgilhooley) Define Unit types in ulib/hid-parser
     EXPECT_EQ(fields[ix].attr.unit.type, 0x11);
     EXPECT_EQ(fields[ix].attr.unit.exp, -2);
     EXPECT_EQ(fields[ix].attr.bit_sz, 16);
