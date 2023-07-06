@@ -18,7 +18,6 @@ group("tests_no_e2e") {
     "fidl:tests",
     "host_examples:tests",
     "integration:tests",
-    "integration_legacy:tests",
     "stress:tests",
   ]
 }
