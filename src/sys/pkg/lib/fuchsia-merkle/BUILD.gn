@@ -25,6 +25,7 @@ rustc_library("fuchsia-merkle") {
     "src/util.rs",
     "src/writer.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("fuchsia-merkle-tests") {

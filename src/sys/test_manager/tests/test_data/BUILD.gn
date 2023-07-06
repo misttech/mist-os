@@ -333,6 +333,7 @@ rustc_binary("logging-component-bin") {
   ]
 
   sources = [ "logging_component.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("logging-component") {

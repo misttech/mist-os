@@ -66,6 +66,7 @@ rustc_library("fuchsia-pkg") {
 
   deps = lib_deps
   sources = lib_sources
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 if (is_fuchsia) {

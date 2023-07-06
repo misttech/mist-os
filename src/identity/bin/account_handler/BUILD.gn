@@ -66,6 +66,7 @@ rustc_binary("bin") {
     "src/test_util.rs",
     "src/wrapped_key.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component_manifest("manifest") {

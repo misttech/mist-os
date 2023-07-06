@@ -4,7 +4,6 @@
 
 //! Extensions for types in the `fidl_fuchsia_net_dhcp` crate.
 #![deny(missing_docs)]
-#![warn(clippy::all)]
 
 use std::{collections::HashSet, fmt::Display, num::NonZeroU64};
 

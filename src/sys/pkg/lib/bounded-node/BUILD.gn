@@ -16,6 +16,7 @@ rustc_library("bounded-node") {
   ]
 
   sources = [ "src/lib.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 group("tests") {

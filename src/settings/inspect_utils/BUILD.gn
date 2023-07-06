@@ -38,6 +38,7 @@ rustc_library("settings_inspect_utils") {
   ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("settings_inspect_utils_tests") {

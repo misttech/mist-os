@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #![deny(missing_docs)]
-#![warn(clippy::all)]
 #![allow(clippy::let_unit_value)]
 
 //! This is a crate for broadcasting events to multiple clients and waiting for each client to

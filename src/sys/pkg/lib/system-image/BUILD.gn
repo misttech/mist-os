@@ -45,6 +45,7 @@ rustc_library("system-image") {
     "src/path_hash_mapping.rs",
     "src/system_image.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 group("tests") {

@@ -65,6 +65,7 @@ rustc_test("driver") {
     "src/writes_firmware.rs",
     "src/writes_images.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("system-updater-test") {

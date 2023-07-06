@@ -112,6 +112,7 @@ ffx_plugin("ffx_assembly") {
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:regex",
   ]
+  configs = [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 ffx_tool("ffx_assembly_tool") {

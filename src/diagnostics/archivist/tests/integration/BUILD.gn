@@ -80,6 +80,7 @@ rustc_test("integration_tests_bin") {
     "test_data/unified_reader_single_value_golden.json",
     "test_data/pipeline_reader_single_value_golden.json",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component_manifest("with-klog-manifest") {

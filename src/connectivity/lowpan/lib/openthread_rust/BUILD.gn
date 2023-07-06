@@ -101,6 +101,7 @@ rustc_library("openthread") {
   non_rust_deps = [ "//third_party/openthread:lib-ot-core" ]
 
   configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("openthread-rust-tests") {

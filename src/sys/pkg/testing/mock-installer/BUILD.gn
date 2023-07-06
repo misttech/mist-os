@@ -24,6 +24,7 @@ rustc_library("mock-installer") {
   test_deps = [ "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust" ]
 
   sources = [ "src/lib.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 group("tests") {

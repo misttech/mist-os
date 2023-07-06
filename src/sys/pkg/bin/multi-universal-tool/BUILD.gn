@@ -18,6 +18,7 @@ rustc_binary("multi-universal-tool") {
   ]
 
   sources = [ "src/main.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("multi-universal-tool-tests") {

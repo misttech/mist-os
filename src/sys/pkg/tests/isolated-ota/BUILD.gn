@@ -37,6 +37,7 @@ rustc_test("driver") {
   ]
 
   sources = [ "src/lib.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_test_component("isolated-ota-integration-test") {

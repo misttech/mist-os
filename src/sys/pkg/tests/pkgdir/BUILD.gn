@@ -32,6 +32,7 @@ ctf_rustc_test("driver") {
     "src/lib.rs",
     "src/node.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 ctf_test_component("default") {

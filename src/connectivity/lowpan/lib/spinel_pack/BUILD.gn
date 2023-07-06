@@ -22,6 +22,7 @@ rustc_library("spinel_pack") {
     "src/lib.rs",
     "src/primitives.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("spinel-pack-tests") {

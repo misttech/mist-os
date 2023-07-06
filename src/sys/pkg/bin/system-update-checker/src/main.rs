@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![warn(clippy::all)]
 #![allow(clippy::let_unit_value)]
 #![allow(clippy::type_complexity)]
 
@@ -29,7 +28,7 @@ use {
     fuchsia_inspect as finspect,
     futures::{prelude::*, stream::FuturesUnordered},
     std::sync::Arc,
-    tracing::{error, warn},
+    tracing::error,
 };
 
 const MAX_CONCURRENT_CONNECTIONS: usize = 100;

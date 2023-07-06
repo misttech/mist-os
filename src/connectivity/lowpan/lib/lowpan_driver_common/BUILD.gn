@@ -85,6 +85,7 @@ rustc_library("lowpan_driver_common") {
     "src/spinel/types/net_flags.rs",
     "src/tests.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("lowpan-driver-common-tests") {

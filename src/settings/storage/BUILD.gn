@@ -64,6 +64,7 @@ rustc_library("settings_storage") {
   ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("settings_storage_tests") {

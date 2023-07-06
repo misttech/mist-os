@@ -96,6 +96,7 @@ rustc_binary("bin") {
     "src/update/state.rs",
   ]
   inputs = [ base_epoch_file ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component_manifest("manifest") {

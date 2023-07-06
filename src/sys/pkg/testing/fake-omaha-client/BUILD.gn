@@ -21,6 +21,7 @@ rustc_binary("fake-omaha-client") {
   ]
 
   sources = [ "src/main.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 sdk_host_tool("bin_sdk") {

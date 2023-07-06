@@ -57,6 +57,7 @@ rustc_library("update-package") {
   if (!is_host) {
     deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
   }
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("test-component") {

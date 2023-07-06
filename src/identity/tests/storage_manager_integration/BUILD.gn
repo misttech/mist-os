@@ -40,6 +40,7 @@ rustc_test("test") {
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:rand",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 storage_driver_test_realm_v2_component("storage_manager_integration_test") {

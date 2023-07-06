@@ -4,7 +4,6 @@
 
 //! The Archivist collects and stores diagnostic data from components.
 
-#![warn(clippy::all)]
 #![warn(missing_docs)]
 
 use anyhow::{Context, Error};

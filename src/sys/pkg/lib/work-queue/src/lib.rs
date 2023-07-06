@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #![deny(missing_docs)]
-#![warn(clippy::all)]
 #![allow(clippy::type_complexity)]
 #![allow(clippy::let_unit_value)]
 

@@ -31,6 +31,7 @@ if (is_host) {
     ]
 
     sources = [ "src/lib.rs" ]
+    configs += [ "//build/config/rust/lints:clippy_warn_all" ]
   }
 
   rustc_binary("gen_eager_package_config") {
@@ -47,6 +48,7 @@ if (is_host) {
       "//third_party/rust_crates:tempfile",
     ]
     sources = [ "src/main.rs" ]
+    configs += [ "//build/config/rust/lints:clippy_warn_all" ]
   }
 }
 

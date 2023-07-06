@@ -5,8 +5,6 @@
 //! Triggers a forced fdr by comparing the configured
 //! index against the stored index
 
-#![warn(clippy::all)]
-
 use {
     anyhow::{format_err, Context as _, Error},
     fidl_fuchsia_recovery::{FactoryResetMarker, FactoryResetProxy},

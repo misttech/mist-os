@@ -26,6 +26,7 @@ rustc_library("assembly_manifest") {
     "src/lib.rs",
   ]
   test_deps = [ "//third_party/rust_crates:tempfile" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 group("host_tests") {

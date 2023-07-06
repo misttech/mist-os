@@ -58,6 +58,7 @@ rustc_test("driver") {
   sources = [ "src/lib.rs" ]
 
   inputs = [ "src/test_private_key.pem" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_test_component("omaha-client-test-root") {

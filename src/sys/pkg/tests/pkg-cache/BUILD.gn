@@ -62,6 +62,7 @@ rustc_test("driver") {
     "src/space.rs",
     "src/sync.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("pkg-cache-integration-test") {

@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![warn(clippy::all)]
-
 use crate::{constants, test_topology, utils};
 use component_events::events::*;
 use component_events::matcher::*;

@@ -4,7 +4,6 @@
 
 //! LoWPAN OpenThread Driver
 #![warn(rust_2018_idioms)]
-#![warn(clippy::all)]
 
 use anyhow::Error;
 use fidl_fuchsia_factory_lowpan::{FactoryRegisterMarker, FactoryRegisterProxyInterface};

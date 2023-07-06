@@ -55,6 +55,7 @@ rustc_library("isolated-swd") {
     "src/resolver.rs",
     "src/updater.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_test_component("isolated-swd-tests-component") {

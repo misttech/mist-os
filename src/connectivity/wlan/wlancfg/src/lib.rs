@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![deny(clippy::correctness)]
 #![warn(clippy::suspicious)]
 #![warn(clippy::complexity)]
 // The complexity of a separate struct doesn't seem universally better than having many arguments

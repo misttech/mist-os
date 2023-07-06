@@ -92,6 +92,7 @@ rustc_binary("bin") {
   non_rust_deps =
       [ "//src/connectivity/openthread/third_party/openthread/platform" ]
   configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("lowpan-ot-driver-cv2") {

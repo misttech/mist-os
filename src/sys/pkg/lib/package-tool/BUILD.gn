@@ -63,6 +63,7 @@ if (is_host) {
       "src/repo_create.rs",
       "src/repo_publish.rs",
     ]
+    configs += [ "//build/config/rust/lints:clippy_warn_all" ]
   }
 
   group("tests") {

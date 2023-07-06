@@ -52,6 +52,7 @@ rustc_library("lib") {
     ":*",
     "//src/sys/pkg/bin/multi-universal-tool:*",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 renamed_binary("update-binary") {

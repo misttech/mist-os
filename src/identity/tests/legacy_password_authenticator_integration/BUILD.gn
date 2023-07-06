@@ -41,6 +41,7 @@ rustc_test("driver") {
 
   # For fvm_init()
   non_rust_deps = [ "//src/lib/storage/fs_management/c" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("legacy-password-authenticator-integration-test") {

@@ -5,7 +5,6 @@
 //! This crate contains the rust OpenThread platform implementation for Fuchsia.
 
 #![warn(rust_2018_idioms)]
-#![warn(clippy::all)]
 
 mod backing;
 mod binding;

@@ -4,7 +4,6 @@
 
 //! Extension crate for `fuchsia.posix.socket` and `fuchsia.posix.socket.packet`.
 #![deny(missing_docs)]
-#![warn(clippy::all)]
 
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_packet as fpacket;

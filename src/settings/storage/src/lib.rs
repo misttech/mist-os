@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![warn(clippy::all)]
-
 /// Allows controllers to store state in persistent device level storage.
 pub mod device_storage;
 

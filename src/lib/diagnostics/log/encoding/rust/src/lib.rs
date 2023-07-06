@@ -4,7 +4,7 @@
 //! This crate provides an implementation of Fuchsia Diagnostic Streams, often referred to as
 //! "logs."
 
-#![warn(clippy::all, missing_docs)]
+#![warn(missing_docs)]
 
 use bitfield::bitfield;
 use std::{borrow::Cow, convert::TryFrom};

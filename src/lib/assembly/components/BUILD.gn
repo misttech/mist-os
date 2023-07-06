@@ -25,6 +25,7 @@ rustc_library("components") {
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 group("host_tests") {

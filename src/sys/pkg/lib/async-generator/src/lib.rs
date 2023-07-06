@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #![deny(missing_docs)]
-#![warn(clippy::all)]
 #![allow(clippy::let_unit_value)]
 
 //! Asynchronous generator-like functionality in stable Rust.

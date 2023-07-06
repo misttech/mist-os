@@ -189,8 +189,8 @@ fx lint # Same as --files but implicitly runs on locally changed files
 
 To see lints for your target you'll need to enable them in one of the following ways:
 
-- Put an attribute in your source root such as `#![warn(clippy::needless_return)]` or `#![warn(clippy::all)]`.
-- Locally enable all clippy lints as warnings with the gn arg: `fx set core.x64 --args clippy_warn_all=true`. This is useful for figuring out which lints are common before enabling them for your targets, or gathering statistics like lint frequency across the project.
+- Enable the default set of clippy lints on a specific target by adding a config: `configs += [ "//build/config/rust/lints:clippy_warn_all" ]`.
+- Locally enable clippy lints as warnings for every target with the gn arg: `fx set core.x64 --args clippy_warn_all=true`. This is useful for figuring out which lints are common before enabling them for your crate, or gathering statistics like lint frequency across the project.
 
 [Here is the list](https://rust-lang.github.io/rust-clippy/stable/) of all available clippy lints and their names.
 

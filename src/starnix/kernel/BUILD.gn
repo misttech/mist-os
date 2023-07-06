@@ -364,6 +364,8 @@ rustc_binary("starnix_kernel_bin") {
   if (starnix_disable_tracing) {
     features += [ "disable_tracing" ]
   }
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 # The starnix kernel manifest, used by all containers.

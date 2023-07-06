@@ -14,7 +14,10 @@ import("//build/rust/rustc_binary.gni")
 # Has the same properties as rustc_binary.
 template("archivist_optimized_binary") {
   rustc_binary(target_name) {
-    forward_variables_from(invoker, "*")
+    forward_variables_from(invoker, "*", [ "configs" ])
+    if (defined(invoker.configs)) {
+      configs += invoker.configs
+    }
     configs += [ "//build/config/rust:bootfs" ]
 
     # Can't dynamically link libstd and libtest for ZBI binaries

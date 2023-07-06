@@ -134,6 +134,7 @@ rustc_library("lib") {
     "src/testing.rs",
     "src/utils.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 archivist_optimized_binary("bin") {
@@ -167,6 +168,7 @@ archivist_optimized_binary("bin") {
   ]
 
   sources = [ "src/main.rs" ]
+  configs = [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component_manifest("root-manifest") {

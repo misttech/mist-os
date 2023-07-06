@@ -138,6 +138,7 @@ template("ffx_plugin") {
         forward_variables_from(invoker,
                                "*",
                                [
+                                 "configs",
                                  "name",
                                  "edition",
                                  "deps",
@@ -216,6 +217,7 @@ template("ffx_plugin") {
                              "*",
                              [
                                "name",
+                               "configs",
                                "config_data",
                                "deps",
                                "source_root",
@@ -288,6 +290,9 @@ template("ffx_plugin") {
 
         # for the #[ffx_plugin()] macro
         deps += [ "//third_party/rust_crates:anyhow" ]
+        if (defined(invoker.configs)) {
+          configs += invoker.configs
+        }
 
         non_rust_deps = [ "//third_party/boringssl" ]
         disable_rustdoc = true
@@ -295,6 +300,7 @@ template("ffx_plugin") {
                                "*",
                                [
                                  "name",
+                                 "configs",
                                  "config_data",
                                  "deps",
                                  "non_rust_deps",
@@ -324,6 +330,7 @@ template("ffx_plugin") {
                              "*",
                              [
                                "name",
+                               "configs",
                                "config_data",
                                "deps",
                                "edition",

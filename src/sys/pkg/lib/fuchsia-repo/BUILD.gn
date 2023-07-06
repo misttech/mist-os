@@ -86,6 +86,7 @@ if (is_host) {
       "src/test_utils.rs",
       "src/util.rs",
     ]
+    configs += [ "//build/config/rust/lints:clippy_warn_all" ]
   }
 
   group("tests") {

@@ -41,6 +41,7 @@ rustc_library("eager-package-config") {
     "src/omaha_client.rs",
     "src/pkg_resolver.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("eager-package-config-lib-tests") {

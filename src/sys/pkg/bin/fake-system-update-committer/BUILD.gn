@@ -21,6 +21,7 @@ rustc_binary("fake-system-update-committer-bin") {
   test_deps = [ "//src/lib/fidl/rust/fidl" ]
 
   sources = [ "src/main.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("fake-system-update-committer") {

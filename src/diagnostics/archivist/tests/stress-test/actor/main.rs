@@ -4,8 +4,6 @@
 
 // This actor has actions to write/read logs to/from Archivist.
 
-#![warn(clippy::all)]
-
 use {
     anyhow::{Context, Result},
     diagnostics_reader::{ArchiveReader, Data, Logs, Subscription},

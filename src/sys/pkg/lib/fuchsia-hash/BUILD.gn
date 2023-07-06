@@ -22,6 +22,7 @@ rustc_library("fuchsia-hash") {
     "src/iter.rs",
     "src/lib.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("fuchsia-hash-tests") {

@@ -91,6 +91,7 @@ rustc_library("lib") {
     ":*",
     "//src/sys/pkg/bin/grand-swd-binary:*",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 grand_swd_binary("bin") {

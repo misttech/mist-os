@@ -63,6 +63,7 @@ rustc_binary("bin") {
     "src/state.rs",
     "src/storage_unlock_mechanism.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component_manifest("manifest") {

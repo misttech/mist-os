@@ -22,6 +22,7 @@ rustc_library("work-queue") {
     "src/lib.rs",
     "src/state.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_component("test-component") {

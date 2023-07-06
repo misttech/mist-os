@@ -8,6 +8,12 @@ config("deny_unused_crate_dependencies") {
   rustflags = [ "-Wunused_crate_dependencies" ]
 }
 
+# This is preferred over adding `#![warn(clippy::all)]` in source because
+# it's easier to override
+config("clippy_warn_all") {
+  rustflags = [ "-Wclippy::all" ]
+}
+
 # TODO(https://fxbug.dev/104019): Delete this config when all unused
 # dependencies are removed.
 #

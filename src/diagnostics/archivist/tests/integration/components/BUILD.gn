@@ -21,6 +21,7 @@ rustc_binary("stub_inspect_component_bin") {
   ]
 
   sources = [ "src/stub_inspect_component.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_binary("hanging_inspect_component_bin") {
@@ -40,6 +41,7 @@ rustc_binary("hanging_inspect_component_bin") {
   ]
 
   sources = [ "src/hanging_inspect_component.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_binary("log_and_exit_component_bin") {
@@ -53,6 +55,7 @@ rustc_binary("log_and_exit_component_bin") {
   ]
 
   sources = [ "src/log_and_exit.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_binary("log_and_crash_component_bin") {
@@ -69,6 +72,7 @@ rustc_binary("log_and_crash_component_bin") {
   ]
 
   sources = [ "src/log_and_crash.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_binary("log_on_interest_bin") {
@@ -87,6 +91,7 @@ rustc_binary("log_on_interest_bin") {
   ]
 
   sources = [ "src/log_on_interest.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_binary("logging_component_bin") {
@@ -100,6 +105,7 @@ rustc_binary("logging_component_bin") {
   ]
 
   sources = [ "src/logging_component.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("logging_component") {
@@ -164,6 +170,7 @@ rustc_binary("socket_puppet_bin") {
   ]
 
   sources = [ "src/socket_puppet.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("socket-puppet") {
@@ -188,6 +195,7 @@ rustc_binary("stdio_puppet_bin") {
   ]
 
   sources = [ "src/stdio_puppet.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("stdio-puppet") {

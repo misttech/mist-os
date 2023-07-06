@@ -4,7 +4,6 @@
 
 //! Contains testing utilities.
 
-#![warn(clippy::all)]
 #![allow(clippy::expect_fun_call)]
 
 use async_trait::async_trait;

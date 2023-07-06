@@ -56,6 +56,7 @@ rustc_binary("bin") {
     "src/pinweaver.rs",
     "src/provision.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("component") {

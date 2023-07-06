@@ -69,6 +69,7 @@ rustc_binary("bin") {
     "src/update_monitor.rs",
     "src/update_service.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("component") {

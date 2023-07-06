@@ -46,6 +46,7 @@ rustc_library("platform_configuration") {
     "//third_party/rust_crates:serde_json",
   ]
   test_deps = [ "//src/lib/assembly/util" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 group("host_tests") {

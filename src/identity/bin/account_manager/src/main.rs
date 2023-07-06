@@ -9,7 +9,6 @@
 //! system and is intended only for use by the most trusted parts of the system.
 
 #![deny(missing_docs)]
-#![warn(clippy::all)]
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::let_unit_value)]
 #![allow(clippy::await_holding_refcell_ref)]

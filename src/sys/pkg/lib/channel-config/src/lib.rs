@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![warn(clippy::all)]
-
 use omaha_client::protocol::Cohort;
 use serde::{Deserialize, Serialize};
 use std::io;

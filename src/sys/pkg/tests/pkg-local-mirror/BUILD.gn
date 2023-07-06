@@ -31,6 +31,7 @@ rustc_test("driver") {
     "src/get_metadata.rs",
     "src/lib.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("driver-component") {

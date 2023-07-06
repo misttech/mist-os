@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #![deny(missing_docs)]
-#![warn(clippy::all)]
 
 //! Library for compiling and merging components from cml with the cm tool.
 mod components;

@@ -36,6 +36,8 @@ rustc_library("fidl-fuchsia-update-ext") {
       "//third_party/rust_crates:futures",
     ]
   }
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("fidl-fuchsia-update-ext-tests") {

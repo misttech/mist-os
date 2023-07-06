@@ -58,4 +58,5 @@ rustc_library("storage_manager") {
     "src/state.rs",
     "src/volume.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }

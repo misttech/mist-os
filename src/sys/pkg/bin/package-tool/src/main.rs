@@ -4,7 +4,6 @@
 
 // TODO(fxb/104019): Consider enabling globally.
 #![deny(unused_crate_dependencies)]
-#![warn(clippy::all)]
 
 use {
     anyhow::Result,

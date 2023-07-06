@@ -58,6 +58,7 @@ rustc_library("package-directory") {
     "src/non_meta_subdir.rs",
     "src/root_dir.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("test-component") {

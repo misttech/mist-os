@@ -78,6 +78,7 @@ rustc_library("fuchsia-pkg-testing") {
     "certs/test.fuchsia.com.certchain",
     "certs/wildcard.fuchsia-updates.googleusercontent.com.certchain",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("fuchsia-pkg-testing-tests") {

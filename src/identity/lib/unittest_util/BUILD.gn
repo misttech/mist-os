@@ -30,4 +30,5 @@ rustc_library("unittest_util") {
     "src/insecure_storage_manager.rs",
     "src/lib.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }

@@ -5,7 +5,6 @@
 //! `fuchsia_merkle` contains types and methods for building and working with merkle trees.
 
 #![deny(missing_docs)]
-#![warn(clippy::all)]
 
 use {
     futures::{AsyncRead, AsyncReadExt as _},

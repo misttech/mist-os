@@ -256,6 +256,7 @@ icu_rustc_library("lib") {
   # If building this massive crate runs into OOM issues on RBE, `disable_rbe = true`
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 metrics_registry("setui_metrics_registry") {
@@ -335,6 +336,7 @@ icu_rustc_binary("bin") {
   sources = [ "src/main.rs" ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 icu_fuchsia_component("setui_service_v2") {

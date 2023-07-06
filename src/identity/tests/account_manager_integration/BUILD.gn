@@ -42,6 +42,7 @@ rustc_test("test") {
     "tests/account.rs",
     "tests/lib.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_test_component("account_manager_integration_test_component") {

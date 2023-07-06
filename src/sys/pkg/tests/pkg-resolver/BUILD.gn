@@ -52,6 +52,7 @@ rustc_library("lib") {
     "src/lib.rs",
     "src/mock_filesystem.rs",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_test("dynamic_repositories_disabled") {

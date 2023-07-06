@@ -45,7 +45,6 @@
 //! assert_eq!(entries, ["a", "b", "dir/c"]);
 //! ```
 
-#![warn(clippy::all)]
 #![allow(clippy::let_unit_value)]
 // TODO(fxbug.dev/122028): Remove this allow once the lint is fixed.
 #![allow(unknown_lints, clippy::extra_unused_type_parameters)]
