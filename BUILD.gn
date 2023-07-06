@@ -636,13 +636,9 @@ build_api_module("sdk_archives") {
   deps = [
            # WARNING (fxbug.dev/116642): the driver SDK will soon be removed.
            "//sdk:driver_archive",
+           "//sdk:final_fuchsia_idk",
 
-           # https://fxbug.dev/126262: Add this massive archive when
-           # we know how to handle / upload it.
-           # "//sdk:fuchsia_idk",
-
-           # Until then, keep upload the single-target_cpu archive
-           # instead.
+           # WARNING (fxbug.dev/126262): This will be removed soon.
            "//sdk:merged",
          ] + sdk_archive_labels
 }
