@@ -3,15 +3,39 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_setui_intl_args::Intl;
+use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{IntlProxy, IntlSettings};
 use utils::handle_mixed_result;
 use utils::{self, Either, WatchOrSetResult};
 
-#[ffx_plugin("setui", IntlProxy = "core/setui_service:expose:fuchsia.settings.Intl")]
-pub async fn run_command(intl_proxy: IntlProxy, intl: Intl) -> Result<()> {
-    handle_mixed_result("Intl", command(intl_proxy, IntlSettings::from(intl)).await).await
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("setui"))]
+pub struct IntlTool {
+    #[command]
+    cmd: Intl,
+    #[with(moniker("/core/setui_service"))]
+    intl_proxy: IntlProxy,
+}
+
+fho::embedded_plugin!(IntlTool);
+
+#[async_trait(?Send)]
+impl FfxMain for IntlTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        run_command(self.intl_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
+}
+
+async fn run_command<W: std::io::Write>(
+    intl_proxy: IntlProxy,
+    intl: Intl,
+    writer: &mut W,
+) -> Result<()> {
+    handle_mixed_result("Intl", command(intl_proxy, IntlSettings::from(intl)).await, writer).await
 }
 
 async fn command(proxy: IntlProxy, settings: IntlSettings) -> WatchOrSetResult {
@@ -35,7 +59,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_command() {
-        let proxy = setup_fake_intl_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             IntlRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -51,7 +75,7 @@ mod test {
             hour_cycle: None,
             clear_locales: false,
         };
-        let response = run_command(proxy, intl).await;
+        let response = run_command(proxy, intl, &mut vec![]).await;
         assert!(response.is_ok());
     }
 
@@ -77,7 +101,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_intl_set_output(expected_intl: Intl) -> Result<()> {
-        let proxy = setup_fake_intl_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             IntlRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -114,7 +138,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_intl_watch_output(expected_intl: Intl) -> Result<()> {
         let expected_intl_clone = expected_intl.clone();
-        let proxy = setup_fake_intl_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             IntlRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

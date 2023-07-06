@@ -4,15 +4,39 @@
 
 use anyhow::format_err;
 use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_setui_keyboard_args::Keyboard;
+use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{KeyboardProxy, KeyboardSettings};
 use utils::handle_mixed_result;
 use utils::{self, Either, WatchOrSetResult};
 
-#[ffx_plugin("setui", KeyboardProxy = "core/setui_service:expose:fuchsia.settings.Keyboard")]
-pub async fn run_command(keyboard_proxy: KeyboardProxy, keyboard: Keyboard) -> Result<()> {
-    handle_mixed_result("Keyboard", command(keyboard_proxy, keyboard).await).await
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("setui"))]
+pub struct KeyboardTool {
+    #[command]
+    cmd: Keyboard,
+    #[with(moniker("/core/setui_service"))]
+    keyboard_proxy: KeyboardProxy,
+}
+
+fho::embedded_plugin!(KeyboardTool);
+
+#[async_trait(?Send)]
+impl FfxMain for KeyboardTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        run_command(self.keyboard_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
+}
+
+pub async fn run_command<W: std::io::Write>(
+    keyboard_proxy: KeyboardProxy,
+    keyboard: Keyboard,
+    writer: &mut W,
+) -> Result<()> {
+    handle_mixed_result("Keyboard", command(keyboard_proxy, keyboard).await, writer).await
 }
 
 async fn command(proxy: KeyboardProxy, keyboard: Keyboard) -> WatchOrSetResult {
@@ -42,7 +66,7 @@ mod test {
     async fn test_run_command() {
         const NUM: i64 = 7;
 
-        let proxy = setup_fake_keyboard_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             KeyboardRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -53,7 +77,7 @@ mod test {
 
         let keyboard =
             Keyboard { keymap: None, autorepeat_delay: Some(NUM), autorepeat_period: Some(NUM) };
-        let response = run_command(proxy, keyboard).await;
+        let response = run_command(proxy, keyboard, &mut vec![]).await;
         assert!(response.is_ok());
     }
 
@@ -66,7 +90,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_keyboard_failure(expected_keyboard: Keyboard) -> Result<()> {
-        let proxy = setup_fake_keyboard_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             KeyboardRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -102,7 +126,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_keyboard_set_output(expected_keyboard: Keyboard) -> Result<()> {
-        let proxy = setup_fake_keyboard_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             KeyboardRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -132,7 +156,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_keyboard_watch_output(expected_keyboard: Keyboard) -> Result<()> {
-        let proxy = setup_fake_keyboard_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             KeyboardRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

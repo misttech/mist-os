@@ -3,15 +3,39 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_setui_audio_args::Audio;
+use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{AudioProxy, AudioSettings};
 use utils::handle_mixed_result;
 use utils::{self, Either, WatchOrSetResult};
 
-#[ffx_plugin("setui", AudioProxy = "core/setui_service:expose:fuchsia.settings.Audio")]
-pub async fn run_command(audio_proxy: AudioProxy, audio: Audio) -> Result<()> {
-    handle_mixed_result("Audio", command(audio_proxy, audio).await).await
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("setui"))]
+pub struct AudioTool {
+    #[command]
+    cmd: Audio,
+    #[with(moniker("/core/setui_service"))]
+    audio_proxy: AudioProxy,
+}
+
+fho::embedded_plugin!(AudioTool);
+
+#[async_trait(?Send)]
+impl FfxMain for AudioTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        run_command(self.audio_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
+}
+
+pub async fn run_command<W: std::io::Write>(
+    audio_proxy: AudioProxy,
+    audio: Audio,
+    writer: &mut W,
+) -> Result<()> {
+    handle_mixed_result("Audio", command(audio_proxy, audio).await, writer).await
 }
 
 async fn command(proxy: AudioProxy, audio: Audio) -> WatchOrSetResult {
@@ -37,7 +61,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_command() {
-        let proxy = setup_fake_audio_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             AudioRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -52,7 +76,7 @@ mod test {
             level: Some(0.5),
             volume_muted: Some(false),
         };
-        let response = run_command(proxy, audio).await;
+        let response = run_command(proxy, audio, &mut vec![]).await;
         assert!(response.is_ok());
     }
 
@@ -76,7 +100,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_audio_set_output(expected_audio: Audio) -> Result<()> {
-        let proxy = setup_fake_audio_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             AudioRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -110,7 +134,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_audio_watch_output(expected_audio: Audio) -> Result<()> {
-        let proxy = setup_fake_audio_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             AudioRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

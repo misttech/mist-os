@@ -7,15 +7,39 @@
 
 use anyhow::format_err;
 use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_setui_input_args::Input;
+use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{DeviceType, InputProxy, InputState};
 use utils::handle_mixed_result;
 use utils::{self, Either, WatchOrSetResult};
 
-#[ffx_plugin("setui", InputProxy = "core/setui_service:expose:fuchsia.settings.Input")]
-pub async fn run_command(input_proxy: InputProxy, input: Input) -> Result<()> {
-    handle_mixed_result("Input", command(input_proxy, InputState::from(input)).await).await
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("setui"))]
+pub struct InputTool {
+    #[command]
+    cmd: Input,
+    #[with(moniker("/core/setui_service"))]
+    input_proxy: InputProxy,
+}
+
+fho::embedded_plugin!(InputTool);
+
+#[async_trait(?Send)]
+impl FfxMain for InputTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        run_command(self.input_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
+}
+
+async fn run_command<W: std::io::Write>(
+    input_proxy: InputProxy,
+    input: Input,
+    writer: &mut W,
+) -> Result<()> {
+    handle_mixed_result("Input", command(input_proxy, InputState::from(input)).await, writer).await
 }
 
 async fn command(proxy: InputProxy, mut input_state: InputState) -> WatchOrSetResult {
@@ -93,7 +117,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_command() {
-        let proxy = setup_fake_input_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             InputRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -110,7 +134,7 @@ mod test {
                 ..Default::default()
             }),
         };
-        let response = run_command(proxy, input).await;
+        let response = run_command(proxy, input, &mut vec![]).await;
         assert!(response.is_ok());
     }
 
@@ -138,7 +162,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_input_set_output(mut expected_input: Input) -> Result<()> {
-        let proxy = setup_fake_input_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             InputRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -168,7 +192,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_input_watch_output() -> Result<()> {
-        let proxy = setup_fake_input_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             InputRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

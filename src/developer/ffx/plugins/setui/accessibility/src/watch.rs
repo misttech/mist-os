@@ -7,8 +7,11 @@ use fidl_fuchsia_settings::AccessibilityProxy;
 use utils::handle_mixed_result;
 use utils::{self, Either, WatchOrSetResult};
 
-pub async fn watch(accessibility_proxy: AccessibilityProxy) -> Result<()> {
-    handle_mixed_result("AccessibilityWatch", command(accessibility_proxy).await).await
+pub async fn watch<W: std::io::Write>(
+    accessibility_proxy: AccessibilityProxy,
+    w: &mut W,
+) -> Result<()> {
+    handle_mixed_result("AccessibilityWatch", command(accessibility_proxy).await, w).await
 }
 
 async fn command(proxy: AccessibilityProxy) -> WatchOrSetResult {
@@ -18,12 +21,11 @@ async fn command(proxy: AccessibilityProxy) -> WatchOrSetResult {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::setup_fake_accessibility_proxy;
     use fidl_fuchsia_settings::{AccessibilityRequest, AccessibilitySettings};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_accessibility_watch() -> Result<()> {
-        let proxy = setup_fake_accessibility_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             AccessibilityRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

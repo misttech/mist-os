@@ -8,8 +8,8 @@ use fidl_fuchsia_settings::DisplayProxy;
 use utils::handle_mixed_result;
 use utils::{self, Either, WatchOrSetResult};
 
-pub async fn get(proxy: DisplayProxy, args: GetArgs) -> Result<()> {
-    handle_mixed_result("DisplayGet", command(proxy, args).await).await
+pub async fn get<W: std::io::Write>(proxy: DisplayProxy, args: GetArgs, w: &mut W) -> Result<()> {
+    handle_mixed_result("DisplayGet", command(proxy, args).await, w).await
 }
 
 async fn command(proxy: DisplayProxy, args: GetArgs) -> WatchOrSetResult {
@@ -37,7 +37,6 @@ async fn command(proxy: DisplayProxy, args: GetArgs) -> WatchOrSetResult {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::setup_fake_display_proxy;
     use ffx_setui_display_args::SetArgs;
     use fidl_fuchsia_settings::{DisplayRequest, DisplaySettings};
 
@@ -52,7 +51,7 @@ mod test {
             screen_enabled: None,
         };
 
-        let proxy = setup_fake_display_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             DisplayRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }
@@ -62,7 +61,7 @@ mod test {
         });
 
         let get_args = GetArgs { field: Some(Field::Auto) };
-        let response = get(proxy, get_args).await;
+        let response = get(proxy, get_args, &mut vec![]).await;
         assert!(response.is_ok());
     }
 
@@ -78,7 +77,7 @@ mod test {
             screen_enabled: None,
         };
 
-        let proxy = setup_fake_display_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             DisplayRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }
@@ -88,6 +87,6 @@ mod test {
         });
 
         let get_args = GetArgs { field: Some(Field::Auto) };
-        let _ = get(proxy, get_args).await;
+        let _ = get(proxy, get_args, &mut vec![]).await;
     }
 }

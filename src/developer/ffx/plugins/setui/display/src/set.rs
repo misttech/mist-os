@@ -7,8 +7,8 @@ use ffx_setui_display_args::SetArgs;
 use fidl_fuchsia_settings::{DisplayProxy, DisplaySettings};
 use utils::{self, handle_mixed_result, Either, WatchOrSetResult};
 
-pub async fn set(proxy: DisplayProxy, args: SetArgs) -> Result<()> {
-    handle_mixed_result("DisplaySet", command(proxy, DisplaySettings::from(args)).await).await
+pub async fn set<W: std::io::Write>(proxy: DisplayProxy, args: SetArgs, w: &mut W) -> Result<()> {
+    handle_mixed_result("DisplaySet", command(proxy, DisplaySettings::from(args)).await, w).await
 }
 
 async fn command(proxy: DisplayProxy, settings: DisplaySettings) -> WatchOrSetResult {
@@ -26,13 +26,12 @@ async fn command(proxy: DisplayProxy, settings: DisplaySettings) -> WatchOrSetRe
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::setup_fake_display_proxy;
     use fidl_fuchsia_settings::{DisplayRequest, LowLightMode, Theme, ThemeMode, ThemeType};
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_set() {
-        let proxy = setup_fake_display_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             DisplayRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -49,7 +48,7 @@ mod test {
             theme: None,
             screen_enabled: None,
         };
-        let response = set(proxy, display).await;
+        let response = set(proxy, display, &mut vec![]).await;
         assert!(response.is_ok());
     }
 
@@ -81,7 +80,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_display_set_output(expected_display: SetArgs) -> Result<()> {
-        let proxy = setup_fake_display_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             DisplayRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }

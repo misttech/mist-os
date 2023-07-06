@@ -10,8 +10,13 @@ use fidl_fuchsia_settings::{
 use utils::handle_mixed_result;
 use utils::{self, Either, WatchOrSetResult};
 
-pub async fn add_caption(accessibility_proxy: AccessibilityProxy, args: CaptionArgs) -> Result<()> {
-    handle_mixed_result("AccessibilityAddCaption", command(accessibility_proxy, args).await).await
+pub async fn add_caption<W: std::io::Write>(
+    accessibility_proxy: AccessibilityProxy,
+    args: CaptionArgs,
+    writer: &mut W,
+) -> Result<()> {
+    handle_mixed_result("AccessibilityAddCaption", command(accessibility_proxy, args).await, writer)
+        .await
 }
 
 async fn command(proxy: AccessibilityProxy, input: CaptionArgs) -> WatchOrSetResult {
@@ -52,7 +57,6 @@ async fn command(proxy: AccessibilityProxy, input: CaptionArgs) -> WatchOrSetRes
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::setup_fake_accessibility_proxy;
     use fidl_fuchsia_settings::{AccessibilityRequest, CaptionFontFamily, EdgeStyle};
     use fidl_fuchsia_ui_types::ColorRgba;
     use test_case::test_case;
@@ -62,7 +66,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_add_caption() {
         const TRUE: bool = true;
-        let proxy = setup_fake_accessibility_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             AccessibilityRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -81,7 +85,7 @@ mod test {
             relative_size: None,
             char_edge_style: None,
         };
-        let response = add_caption(proxy, args).await;
+        let response = add_caption(proxy, args, &mut vec![]).await;
         assert!(response.is_ok());
     }
 
@@ -114,7 +118,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_accessibility_add_caption(expected_add: CaptionArgs) -> Result<()> {
         let add_clone = expected_add.clone();
-        let proxy = setup_fake_accessibility_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             AccessibilityRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }

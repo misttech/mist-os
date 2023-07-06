@@ -3,21 +3,40 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_setui_do_not_disturb_args::DoNotDisturb;
+use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{DoNotDisturbProxy, DoNotDisturbSettings};
 use utils::handle_mixed_result;
 use utils::{self, Either, WatchOrSetResult};
 
-#[ffx_plugin(
-    "setui",
-    DoNotDisturbProxy = "core/setui_service:expose:fuchsia.settings.DoNotDisturb"
-)]
-pub async fn run_command(
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("setui"))]
+pub struct DoNotDisturbTool {
+    #[command]
+    cmd: DoNotDisturb,
+    #[with(moniker("/core/setui_service"))]
+    do_not_disturb_proxy: DoNotDisturbProxy,
+}
+
+fho::embedded_plugin!(DoNotDisturbTool);
+
+#[async_trait(?Send)]
+impl FfxMain for DoNotDisturbTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        run_command(self.do_not_disturb_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
+}
+
+async fn run_command<W: std::io::Write>(
     do_not_disturb_proxy: DoNotDisturbProxy,
     do_not_disturb: DoNotDisturb,
+    w: &mut W,
 ) -> Result<()> {
-    handle_mixed_result("DoNotDisturb", command(do_not_disturb_proxy, do_not_disturb).await).await
+    handle_mixed_result("DoNotDisturb", command(do_not_disturb_proxy, do_not_disturb).await, w)
+        .await
 }
 
 async fn command(proxy: DoNotDisturbProxy, do_not_disturb: DoNotDisturb) -> WatchOrSetResult {
@@ -45,7 +64,7 @@ mod test {
         const USER: bool = true;
         const NIGHT_MODE: bool = false;
 
-        let proxy = setup_fake_do_not_disturb_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             DoNotDisturbRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -55,7 +74,7 @@ mod test {
         });
 
         let dnd = DoNotDisturb { user_dnd: Some(USER), night_mode_dnd: Some(NIGHT_MODE) };
-        let response = run_command(proxy, dnd).await;
+        let response = run_command(proxy, dnd, &mut vec![]).await;
         assert!(response.is_ok());
     }
 
@@ -84,7 +103,7 @@ mod test {
     async fn validate_do_not_disturb_set_output(
         expected_do_not_disturb: DoNotDisturb,
     ) -> Result<()> {
-        let proxy = setup_fake_do_not_disturb_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             DoNotDisturbRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -119,7 +138,7 @@ mod test {
     async fn validate_do_not_disturb_watch_output(
         expected_do_not_disturb: DoNotDisturb,
     ) -> Result<()> {
-        let proxy = setup_fake_do_not_disturb_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             DoNotDisturbRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

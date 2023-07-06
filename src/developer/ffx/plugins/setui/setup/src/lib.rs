@@ -3,15 +3,40 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_setui_setup_args::Setup;
+use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{ConfigurationInterfaces, SetupProxy, SetupSettings};
 use utils::handle_mixed_result;
 use utils::{self, Either, WatchOrSetResult};
 
-#[ffx_plugin("setui", SetupProxy = "core/setui_service:expose:fuchsia.settings.Setup")]
-pub async fn run_command(setup_proxy: SetupProxy, setup: Setup) -> Result<()> {
-    handle_mixed_result("Setup", command(setup_proxy, setup.configuration_interfaces).await).await
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("setui"))]
+pub struct SetupTool {
+    #[command]
+    cmd: Setup,
+    #[with(moniker("/core/setui_service"))]
+    setup_proxy: SetupProxy,
+}
+
+fho::embedded_plugin!(SetupTool);
+
+#[async_trait(?Send)]
+impl FfxMain for SetupTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        run_command(self.setup_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
+}
+
+async fn run_command<W: std::io::Write>(
+    setup_proxy: SetupProxy,
+    setup: Setup,
+    writer: &mut W,
+) -> Result<()> {
+    handle_mixed_result("Setup", command(setup_proxy, setup.configuration_interfaces).await, writer)
+        .await
 }
 
 async fn command(
@@ -43,7 +68,7 @@ mod test {
     async fn test_run_command() {
         const INTERFACE: ConfigurationInterfaces = ConfigurationInterfaces::ETHERNET;
 
-        let proxy = setup_fake_setup_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             SetupRequest::Set { settings, responder, .. } => {
                 if let Some(val) = settings.enabled_configuration_interfaces {
                     assert_eq!(val, INTERFACE);
@@ -58,7 +83,7 @@ mod test {
         });
 
         let setup = Setup { configuration_interfaces: Some(INTERFACE) };
-        let response = run_command(proxy, setup).await;
+        let response = run_command(proxy, setup, &mut vec![]).await;
         assert!(response.is_ok());
     }
 
@@ -72,7 +97,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_setup_output(expected_interface: ConfigurationInterfaces) -> Result<()> {
-        let proxy = setup_fake_setup_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             SetupRequest::Set { settings, responder, .. } => {
                 if let Some(val) = settings.enabled_configuration_interfaces {
                     assert_eq!(val, expected_interface);
@@ -106,7 +131,7 @@ mod test {
     async fn validate_setup_watch_output(
         expected_interface: Option<ConfigurationInterfaces>,
     ) -> Result<()> {
-        let proxy = setup_fake_setup_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             SetupRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

@@ -3,16 +3,44 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_setui_privacy_args::Privacy;
+use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{PrivacyProxy, PrivacySettings};
 use utils::handle_mixed_result;
 use utils::{self, Either, WatchOrSetResult};
 
-#[ffx_plugin("setui", PrivacyProxy = "core/setui_service:expose:fuchsia.settings.Privacy")]
-pub async fn run_command(privacy_proxy: PrivacyProxy, privacy: Privacy) -> Result<()> {
-    handle_mixed_result("Privacy", command(privacy_proxy, privacy.user_data_sharing_consent).await)
-        .await
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("setui"))]
+pub struct PrivacyTool {
+    #[command]
+    cmd: Privacy,
+    #[with(moniker("/core/setui_service"))]
+    privacy_proxy: PrivacyProxy,
+}
+
+fho::embedded_plugin!(PrivacyTool);
+
+#[async_trait(?Send)]
+impl FfxMain for PrivacyTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        run_command(self.privacy_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
+}
+
+async fn run_command<W: std::io::Write>(
+    privacy_proxy: PrivacyProxy,
+    privacy: Privacy,
+    writer: &mut W,
+) -> Result<()> {
+    handle_mixed_result(
+        "Privacy",
+        command(privacy_proxy, privacy.user_data_sharing_consent).await,
+        writer,
+    )
+    .await
 }
 
 async fn command(proxy: PrivacyProxy, user_data_sharing_consent: Option<bool>) -> WatchOrSetResult {
@@ -40,7 +68,7 @@ mod test {
     async fn test_run_command() {
         const CONSENT: bool = true;
 
-        let proxy = setup_fake_privacy_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             PrivacyRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -50,7 +78,7 @@ mod test {
         });
 
         let privacy = Privacy { user_data_sharing_consent: Some(CONSENT) };
-        let response = run_command(proxy, privacy).await;
+        let response = run_command(proxy, privacy, &mut vec![]).await;
         assert!(response.is_ok());
     }
 
@@ -64,7 +92,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_privacy_set_output(expected_user_data_sharing_consent: bool) -> Result<()> {
-        let proxy = setup_fake_privacy_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             PrivacyRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -100,7 +128,7 @@ mod test {
     async fn validate_privacy_watch_output(
         expected_user_data_sharing_consent: Option<bool>,
     ) -> Result<()> {
-        let proxy = setup_fake_privacy_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             PrivacyRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

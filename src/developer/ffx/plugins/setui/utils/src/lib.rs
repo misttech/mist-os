@@ -63,13 +63,14 @@ where
 }
 
 /// A utility function to display every output that comes from a watch stream.
-pub async fn print_results<S>(label: &str, mut stream: S) -> Result<(), Error>
+pub async fn print_results<W, S>(label: &str, mut stream: S, writer: &mut W) -> Result<(), Error>
 where
+    W: std::io::Write,
     S: TryStream<Ok = String, Error = Error> + Unpin,
 {
-    println!("Watching `{}` in a loop. Press Ctrl+C to stop.", label);
+    writeln!(writer, "Watching `{label}` in a loop. Press Ctrl+C to stop.")?;
     while let Some(output) = stream.try_next().await? {
-        println!("{}", output);
+        writeln!(writer, "{output}")?;
     }
 
     Ok(())
@@ -77,10 +78,17 @@ where
 
 /// A utility function to manage outputting the results of either a watch or set
 /// call.
-pub async fn handle_mixed_result(label: &str, result: WatchOrSetResult) -> Result<(), Error> {
+pub async fn handle_mixed_result<W>(
+    label: &str,
+    result: WatchOrSetResult,
+    writer: &mut W,
+) -> Result<(), Error>
+where
+    W: std::io::Write,
+{
     Ok(match result? {
-        Either::Watch(stream) => print_results(label, stream).await?,
-        Either::Set(output) | Either::Get(output) => println!("{}: {}", label, output),
+        Either::Watch(stream) => print_results(label, stream, writer).await?,
+        Either::Set(output) | Either::Get(output) => writeln!(writer, "{label}: {output}")?,
     })
 }
 

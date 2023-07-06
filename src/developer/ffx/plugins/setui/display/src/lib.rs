@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_setui_display_args::{Display, SubCommandEnum};
+use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::DisplayProxy;
 
 pub use utils;
@@ -13,19 +14,41 @@ mod get;
 mod set;
 mod watch;
 
-#[ffx_plugin("setui", DisplayProxy = "core/setui_service:expose:fuchsia.settings.Display")]
-pub async fn run_command(display_proxy: DisplayProxy, display: Display) -> Result<()> {
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("setui"))]
+pub struct DisplayTool {
+    #[command]
+    cmd: Display,
+    #[with(moniker("/core/setui_service"))]
+    display_proxy: DisplayProxy,
+}
+
+fho::embedded_plugin!(DisplayTool);
+
+#[async_trait(?Send)]
+impl FfxMain for DisplayTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        run_command(self.display_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
+}
+
+async fn run_command<W: std::io::Write>(
+    display_proxy: DisplayProxy,
+    display: Display,
+    w: &mut W,
+) -> Result<()> {
     match display.subcommand {
-        SubCommandEnum::Set(args) => set::set(display_proxy, args).await,
-        SubCommandEnum::Get(args) => get::get(display_proxy, args).await,
-        SubCommandEnum::Watch(_) => watch::watch(display_proxy).await,
+        SubCommandEnum::Set(args) => set::set(display_proxy, args, w).await,
+        SubCommandEnum::Get(args) => get::get(display_proxy, args, w).await,
+        SubCommandEnum::Watch(_) => watch::watch(display_proxy, w).await,
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::setup_fake_display_proxy;
     use ffx_setui_display_args::{Field, GetArgs, SetArgs};
     use fidl_fuchsia_settings::{DisplayRequest, DisplaySettings};
 
@@ -40,7 +63,7 @@ mod test {
             screen_enabled: None,
         };
 
-        let proxy = setup_fake_display_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             DisplayRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }
@@ -51,7 +74,7 @@ mod test {
 
         let display =
             Display { subcommand: SubCommandEnum::Get(GetArgs { field: Some(Field::Auto) }) };
-        let response = run_command(proxy, display).await;
+        let response = run_command(proxy, display, &mut vec![]).await;
         assert!(response.is_ok());
     }
 }

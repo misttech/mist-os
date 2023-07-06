@@ -4,15 +4,39 @@
 
 use anyhow::format_err;
 use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_setui_light_args::LightGroup;
+use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{LightProxy, LightState};
 use utils::handle_mixed_result;
 use utils::{self, Either, WatchOrSetResult};
 
-#[ffx_plugin("setui", LightProxy = "core/setui_service:expose:fuchsia.settings.Light")]
-pub async fn run_command(light_proxy: LightProxy, light_group: LightGroup) -> Result<()> {
-    handle_mixed_result("Light", command(light_proxy, light_group).await).await
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("setui"))]
+pub struct LightTool {
+    #[command]
+    cmd: LightGroup,
+    #[with(moniker("/core/setui_service"))]
+    light_proxy: LightProxy,
+}
+
+fho::embedded_plugin!(LightTool);
+
+#[async_trait(?Send)]
+impl FfxMain for LightTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        run_command(self.light_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
+}
+
+pub async fn run_command<W: std::io::Write>(
+    light_proxy: LightProxy,
+    light_group: LightGroup,
+    writer: &mut W,
+) -> Result<()> {
+    handle_mixed_result("Light", command(light_proxy, light_group).await, writer).await
 }
 
 async fn command(proxy: LightProxy, light_group: LightGroup) -> WatchOrSetResult {
@@ -65,7 +89,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_command() {
-        let proxy = setup_fake_light_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             LightRequest::SetLightGroupValues { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -83,7 +107,7 @@ mod test {
             brightness: vec![LIGHT_VAL_1, LIGHT_VAL_2],
             rgb: vec![],
         };
-        let response = run_command(proxy, light).await;
+        let response = run_command(proxy, light, &mut vec![]).await;
         assert!(response.is_ok());
     }
 
@@ -107,7 +131,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_light_set_output(expected_light: LightGroup) -> Result<()> {
-        let proxy = setup_fake_light_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             LightRequest::SetLightGroupValues { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -165,7 +189,7 @@ mod test {
     ) -> Result<()> {
         let groups = [expected_light_settings];
         let groups_clone = groups.clone();
-        let proxy = setup_fake_light_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             LightRequest::SetLightGroupValues { .. } => {
                 panic!("Unexpected call to set");
             }
@@ -215,7 +239,7 @@ mod test {
         expected_light_settings: LightGroupSettings,
     ) -> Result<()> {
         let val_clone = expected_light_settings.clone();
-        let proxy = setup_fake_light_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             LightRequest::SetLightGroupValues { .. } => {
                 panic!("Unexpected call to set");
             }

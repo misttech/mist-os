@@ -3,23 +3,42 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_setui_factory_reset_args::FactoryReset;
+use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{FactoryResetProxy, FactoryResetSettings};
 use utils::handle_mixed_result;
 use utils::{self, Either, WatchOrSetResult};
 
-#[ffx_plugin(
-    "setui",
-    FactoryResetProxy = "core/setui_service:expose:fuchsia.settings.FactoryReset"
-)]
-pub async fn run_command(
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("setui"))]
+pub struct FactoryResetTool {
+    #[command]
+    cmd: FactoryReset,
+    #[with(moniker("/core/setui_service"))]
+    factory_reset_proxy: FactoryResetProxy,
+}
+
+fho::embedded_plugin!(FactoryResetTool);
+
+#[async_trait(?Send)]
+impl FfxMain for FactoryResetTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        run_command(self.factory_reset_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
+}
+
+async fn run_command<W: std::io::Write>(
     factory_reset_proxy: FactoryResetProxy,
     factory_reset: FactoryReset,
+    w: &mut W,
 ) -> Result<()> {
     handle_mixed_result(
         "FactoryReset",
         command(factory_reset_proxy, factory_reset.is_local_reset_allowed).await,
+        w,
     )
     .await
 }
@@ -52,7 +71,7 @@ mod test {
     async fn test_run_command() {
         const ALLOWED: bool = true;
 
-        let proxy = setup_fake_factory_reset_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             FactoryResetRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -62,7 +81,7 @@ mod test {
         });
 
         let factory_reset = FactoryReset { is_local_reset_allowed: Some(ALLOWED) };
-        let response = run_command(proxy, factory_reset).await;
+        let response = run_command(proxy, factory_reset, &mut vec![]).await;
         assert!(response.is_ok());
     }
 
@@ -78,7 +97,7 @@ mod test {
     async fn validate_factory_reset_set_output(
         expected_is_local_reset_allowed: bool,
     ) -> Result<()> {
-        let proxy = setup_fake_factory_reset_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             FactoryResetRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -117,7 +136,7 @@ mod test {
     async fn validate_factory_reset_watch_output(
         expected_is_local_reset_allowed: Option<bool>,
     ) -> Result<()> {
-        let proxy = setup_fake_factory_reset_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             FactoryResetRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

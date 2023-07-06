@@ -8,8 +8,12 @@ use fidl_fuchsia_settings::{AccessibilityProxy, AccessibilitySettings};
 use utils::handle_mixed_result;
 use utils::{self, Either, WatchOrSetResult};
 
-pub async fn set(accessibility_proxy: AccessibilityProxy, args: SetArgs) -> Result<()> {
-    handle_mixed_result("AccessibilitySet", command(accessibility_proxy, args).await).await
+pub async fn set<W: std::io::Write>(
+    accessibility_proxy: AccessibilityProxy,
+    args: SetArgs,
+    writer: &mut W,
+) -> Result<()> {
+    handle_mixed_result("AccessibilitySet", command(accessibility_proxy, args).await, writer).await
 }
 
 async fn command(proxy: AccessibilityProxy, options: SetArgs) -> WatchOrSetResult {
@@ -34,14 +38,13 @@ async fn command(proxy: AccessibilityProxy, options: SetArgs) -> WatchOrSetResul
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::setup_fake_accessibility_proxy;
     use fidl_fuchsia_settings::{AccessibilityRequest, ColorBlindnessType};
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_set() {
         const TRUE: bool = true;
-        let proxy = setup_fake_accessibility_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             AccessibilityRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -57,7 +60,7 @@ mod test {
             enable_magnification: None,
             color_correction: None,
         };
-        let response = set(proxy, args).await;
+        let response = set(proxy, args, &mut vec![]).await;
         assert!(response.is_ok());
     }
 
@@ -84,7 +87,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_accessibility_set(expected_set: SetArgs) -> Result<()> {
         let set_clone = expected_set.clone();
-        let proxy = setup_fake_accessibility_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             AccessibilityRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
