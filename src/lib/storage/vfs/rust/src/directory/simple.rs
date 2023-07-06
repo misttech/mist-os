@@ -9,13 +9,13 @@
 use crate::{
     common::{rights_to_posix_mode_bits, send_on_open_with_error},
     directory::{
-        connection::io1::DerivedConnection,
+        connection::DerivedConnection,
         dirents_sink,
         entry::{DirectoryEntry, EntryInfo},
         entry_container::{Directory, DirectoryWatcher},
         helper::DirectlyMutable,
-        immutable::connection::io1::ImmutableConnection,
-        mutable::{connection::io1::MutableConnection, entry_constructor::NewEntryType},
+        immutable::connection::ImmutableConnection,
+        mutable::{connection::MutableConnection, entry_constructor::NewEntryType},
         traversal_position::TraversalPosition,
         watchers::{
             event_producers::{SingleNameEventProducer, StaticVecEventProducer},

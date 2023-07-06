@@ -17,7 +17,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
 use vfs::directory::helper::DirectlyMutable;
-use vfs::directory::mutable::connection::io1::MutableConnection;
+use vfs::directory::mutable::connection::MutableConnection;
 use vfs::directory::simple::Simple;
 use vfs::file::vmo;
 
@@ -318,7 +318,7 @@ mod tests {
     use fuchsia_fs::file::read_to_string;
     use futures::StreamExt;
     use std::fmt;
-    use vfs::directory::immutable::connection::io1::ImmutableConnection;
+    use vfs::directory::immutable::connection::ImmutableConnection;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
     use vfs::path::Path;

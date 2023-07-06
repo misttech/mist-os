@@ -20,7 +20,7 @@ mod common;
 
 pub mod connection;
 
-pub use connection::io1::{FidlIoConnection, GetVmo, RawIoConnection, StreamIoConnection};
+pub use connection::{FidlIoConnection, GetVmo, RawIoConnection, StreamIoConnection};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct FileOptions {

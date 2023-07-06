@@ -13,7 +13,7 @@ use {
     thiserror::Error,
     tracing::info,
     vfs::{
-        directory::{entry::DirectoryEntry, immutable::connection::io1::ImmutableConnection},
+        directory::{entry::DirectoryEntry, immutable::connection::ImmutableConnection},
         execution_scope::ExecutionScope,
         file::vmo,
         tree_builder::{self, TreeBuilder},

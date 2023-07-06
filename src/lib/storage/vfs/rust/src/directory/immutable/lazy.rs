@@ -15,7 +15,7 @@ use crate::{
         dirents_sink,
         entry::{DirectoryEntry, EntryInfo},
         entry_container::{Directory, DirectoryWatcher},
-        immutable::connection::io1::ImmutableConnection,
+        immutable::connection::ImmutableConnection,
         traversal_position::TraversalPosition,
     },
     execution_scope::ExecutionScope,

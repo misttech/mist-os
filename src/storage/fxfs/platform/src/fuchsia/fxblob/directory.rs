@@ -49,7 +49,7 @@ use {
             dirents_sink::{self, Sink},
             entry::{DirectoryEntry, EntryInfo},
             entry_container::{DirectoryWatcher, MutableDirectory},
-            mutable::connection::io1::MutableConnection,
+            mutable::connection::MutableConnection,
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,

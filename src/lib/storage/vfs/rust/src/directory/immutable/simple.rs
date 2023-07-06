@@ -12,7 +12,7 @@ use crate::directory::{immutable::connection, simple};
 
 use {fidl_fuchsia_io as fio, std::sync::Arc};
 
-pub type Connection = connection::io1::ImmutableConnection;
+pub type Connection = connection::ImmutableConnection;
 pub type Simple = simple::Simple<Connection>;
 
 /// Creates an immutable empty "simple" directory.  This directory holds a "static" set of entries,

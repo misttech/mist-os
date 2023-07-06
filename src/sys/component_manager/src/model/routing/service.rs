@@ -43,7 +43,7 @@ use {
             dirents_sink,
             entry::{DirectoryEntry, EntryInfo},
             entry_container::{Directory, DirectoryWatcher},
-            immutable::connection::io1::ImmutableConnection,
+            immutable::connection::ImmutableConnection,
             immutable::simple::{simple as simple_immutable_dir, Simple as SimpleImmutableDir},
             traversal_position::TraversalPosition,
         },

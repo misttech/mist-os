@@ -22,7 +22,7 @@ use crate::{
 
 use {fidl_fuchsia_io as fio, fuchsia_zircon::Status, std::sync::Arc};
 
-pub type Connection = connection::io1::MutableConnection;
+pub type Connection = connection::MutableConnection;
 pub type Simple = simple::Simple<Connection>;
 
 /// Creates a mutable empty "simple" directory.  This directory holds a "static" set of entries,

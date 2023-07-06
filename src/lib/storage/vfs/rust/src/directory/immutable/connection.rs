@@ -7,7 +7,7 @@
 
 use crate::{
     directory::{
-        connection::io1::{BaseConnection, ConnectionState, DerivedConnection},
+        connection::{BaseConnection, ConnectionState, DerivedConnection},
         entry::DirectoryEntry,
         entry_container,
         mutable::entry_constructor::NewEntryType,

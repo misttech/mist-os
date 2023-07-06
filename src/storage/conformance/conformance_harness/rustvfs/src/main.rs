@@ -19,7 +19,7 @@ use {
         directory::{
             entry::DirectoryEntry,
             helper::DirectlyMutable,
-            mutable::{connection::io1::MutableConnection, simple},
+            mutable::{connection::MutableConnection, simple},
             simple::Simple,
         },
         execution_scope::ExecutionScope,

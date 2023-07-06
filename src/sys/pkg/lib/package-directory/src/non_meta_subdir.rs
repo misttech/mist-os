@@ -14,7 +14,7 @@ use {
         attributes,
         common::send_on_open_with_error,
         directory::{
-            entry::EntryInfo, immutable::connection::io1::ImmutableConnection,
+            entry::EntryInfo, immutable::connection::ImmutableConnection,
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,

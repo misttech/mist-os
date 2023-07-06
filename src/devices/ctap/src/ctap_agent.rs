@@ -215,7 +215,7 @@ mod tests {
         std::collections::VecDeque,
         vfs::{
             directory::entry::DirectoryEntry,
-            directory::immutable::connection::io1::ImmutableConnection, directory::simple::Simple,
+            directory::immutable::connection::ImmutableConnection, directory::simple::Simple,
             execution_scope::ExecutionScope, path::Path, pseudo_directory,
             service as pseudo_fs_service,
         },

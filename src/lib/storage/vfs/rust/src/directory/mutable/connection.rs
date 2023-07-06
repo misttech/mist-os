@@ -10,7 +10,7 @@ use crate::{
         extended_attributes_sender,
     },
     directory::{
-        connection::io1::{BaseConnection, ConnectionState, DerivedConnection},
+        connection::{BaseConnection, ConnectionState, DerivedConnection},
         entry::DirectoryEntry,
         entry_container::MutableDirectory,
         mutable::entry_constructor::NewEntryType,

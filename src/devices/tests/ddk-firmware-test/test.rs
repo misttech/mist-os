@@ -22,9 +22,8 @@ use {
     },
 };
 
-type Directory = Arc<
-    vfs::directory::simple::Simple<vfs::directory::immutable::connection::io1::ImmutableConnection>,
->;
+type Directory =
+    Arc<vfs::directory::simple::Simple<vfs::directory::immutable::connection::ImmutableConnection>>;
 
 struct FakePackageVariant {
     dir: Directory,

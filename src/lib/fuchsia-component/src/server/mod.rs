@@ -25,7 +25,7 @@ use {
         directory::{
             entry::DirectoryEntry,
             helper::DirectlyMutable,
-            immutable::{connection::io1::ImmutableConnection, simple::simple},
+            immutable::{connection::ImmutableConnection, simple::simple},
             simple::Simple,
         },
         execution_scope::ExecutionScope,

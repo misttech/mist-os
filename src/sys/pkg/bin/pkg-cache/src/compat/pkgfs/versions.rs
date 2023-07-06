@@ -21,7 +21,7 @@ use {
     vfs::{
         attributes,
         directory::{
-            entry::EntryInfo, immutable::connection::io1::ImmutableConnection,
+            entry::EntryInfo, immutable::connection::ImmutableConnection,
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,

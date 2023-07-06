@@ -40,7 +40,7 @@ use {
             dirents_sink::{self, AppendResult, Sink},
             entry::{DirectoryEntry, EntryInfo},
             entry_container::{DirectoryWatcher, MutableDirectory},
-            mutable::connection::io1::MutableConnection,
+            mutable::connection::MutableConnection,
             traversal_position::TraversalPosition,
             watchers::{event_producers::SingleNameEventProducer, Watchers},
         },

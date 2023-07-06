@@ -208,7 +208,7 @@ impl StarnixNodeConnection {
                             scope,
                             dir,
                             flags,
-                            directory::mutable::connection::io1::MutableConnection::create,
+                            directory::mutable::connection::MutableConnection::create,
                         )
                     });
                 return Ok(());
