@@ -9,12 +9,12 @@
 #include <vector>
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-trans.h"
-extern "C" {
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm/mvm.h"
-}  // extern "C"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test/sim-nvm.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test/sim.h"
 
+extern "C" {
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm/mvm.h"
+}
 namespace wlan::testing {
 
 class SimMvm {

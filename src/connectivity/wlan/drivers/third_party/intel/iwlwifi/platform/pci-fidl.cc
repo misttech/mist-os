@@ -87,6 +87,18 @@ zx_status_t iwl_pci_connect_fragment_protocol(struct zx_device* parent, const ch
   return ZX_OK;
 }
 
+zx_status_t iwl_pci_connect_fragment_protocol_with_client(
+    fidl::ClientEnd<fuchsia_hardware_pci::Device> client_end, struct iwl_pci_fidl** fidl) {
+  (*fidl) = new struct iwl_pci_fidl;
+  (*fidl)->pci = std::make_unique<ddk::Pci>(std::move(client_end));
+
+  if (!(*fidl)->pci->is_valid()) {
+    return ZX_ERR_INTERNAL;
+  }
+
+  return ZX_OK;
+}
+
 void iwl_pci_free(struct iwl_pci_fidl* fidl) {
   fidl->pci.reset();
   delete fidl;

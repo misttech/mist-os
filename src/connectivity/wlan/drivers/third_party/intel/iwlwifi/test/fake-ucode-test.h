@@ -12,7 +12,6 @@
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/file.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test/sim-trans.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace wlan::testing {
 
@@ -30,7 +29,6 @@ class FakeUcodeTest : public ::zxtest::Test {
   ~FakeUcodeTest() = default;
 
  protected:
-  std::shared_ptr<MockDevice> fake_parent_;
   SimTransport sim_trans_;
 };
 

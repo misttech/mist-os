@@ -35,8 +35,6 @@
  *****************************************************************************/
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-drv.h"
 
-#include <lib/ddk/debug.h>
-#include <lib/ddk/driver.h>
 #include <lib/sync/completion.h>
 #include <stdio.h>
 #include <threads.h>
@@ -53,7 +51,6 @@
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-op-mode.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-trans.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/align.h"
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/device.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/module.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/stats.h"
 #ifdef CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES
@@ -399,7 +396,7 @@ static zx_status_t iwl_alloc_fw_desc(struct iwl_drv* drv, struct fw_desc* desc,
   return 0;
 }
 
-static void iwl_req_fw_callback(struct firmware* ucode_raw, void* context);
+static zx_status_t iwl_req_fw_callback(struct firmware* ucode_raw, void* context);
 
 static zx_status_t iwl_load_firmware(struct iwl_drv* drv, bool first) {
   const struct iwl_cfg* cfg = drv->trans->cfg;
@@ -1451,7 +1448,7 @@ static void _iwl_op_mode_stop(struct iwl_drv* drv) {
  * If loaded successfully, copies the firmware into buffers
  * for the card to fetch (via DMA).
  */
-static void iwl_req_fw_callback(struct firmware* ucode_raw, void* context) {
+static zx_status_t iwl_req_fw_callback(struct firmware* ucode_raw, void* context) {
   struct iwl_drv* drv = context;
   struct iwl_fw* fw = &drv->fw;
   struct iwl_ucode_header* ucode;
@@ -1758,14 +1755,7 @@ try_again:
   if (iwl_load_firmware(drv, false)) {
     goto out_unbind;
   }
-  goto free;
 
-out_free_fw:
-  iwl_dealloc_ucode(drv);
-  iwl_firmware_release(ucode_raw);
-out_unbind:
-  sync_completion_signal(&drv->request_firmware_complete);
-  iwl_device_release(drv->trans->dev);
 free:
   if (pieces) {
     for (i = 0; i < ARRAY_SIZE(pieces->img); i++) {
@@ -1774,6 +1764,14 @@ free:
     kfree(pieces->dbg_mem_tlv);
     kfree(pieces);
   }
+  return ZX_OK;
+
+out_free_fw:
+  iwl_dealloc_ucode(drv);
+  iwl_firmware_release(ucode_raw);
+out_unbind:
+  sync_completion_signal(&drv->request_firmware_complete);
+  return ZX_ERR_INTERNAL;
 }
 
 zx_status_t iwl_drv_start(struct iwl_trans* trans, struct iwl_drv** out_drv) {
@@ -1819,7 +1817,7 @@ zx_status_t iwl_drv_start(struct iwl_trans* trans, struct iwl_drv** out_drv) {
 
   status = iwl_load_firmware(drv, true);
   if (status != ZX_OK) {
-    IWL_ERR(trans, "Couldn't request the fw\n");
+    IWL_ERR(trans, "Couldn't request the fw: %s\n", zx_status_get_string(status));
     goto err_fw;
   }
 

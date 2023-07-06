@@ -33,55 +33,75 @@ extern "C" {
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-config.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-drv.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-trans.h"
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm/mvm.h"
 }
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/mvm-mlme.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/rcu-manager.h"
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlanphy-impl-device.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
 
 using wlan::testing::IWL_TRANS_GET_SIM_TRANS;
 using wlan::testing::sim_trans_priv;
 using wlan::testing::SimMvm;
 
-namespace {
+namespace wlan::iwlwifi {
 
-// SimTransDevice to appropriately handle unbind and release.
-class SimTransDevice : public ::wlan::iwlwifi::WlanPhyImplDevice {
- public:
-  explicit SimTransDevice(zx_device_t* parent, iwl_trans* drvdata)
-      : WlanPhyImplDevice(parent), drvdata_(drvdata) {}
-  void DdkInit(::ddk::InitTxn txn) override { txn.Reply(ZX_OK); }
-  void DdkUnbind(::ddk::UnbindTxn txn) override {
-    // Saving the input UnbindTxn to the device, ::ddk::UnbindTxn::Reply() will be called with this
-    // UnbindTxn in the shutdown callback of the dispatcher, so that we can make sure DdkUnbind()
-    // won't end before the dispatcher shutdown.
-    unbind_txn_ = std::move(txn);
-    struct iwl_trans* trans = drvdata_;
-    if (trans->drv) {
-      iwl_drv_stop(trans->drv);
-    }
-    free(trans);
+SimTransIwlwifiDriver::SimTransIwlwifiDriver(iwl_trans* drvdata)
+    : WlanPhyImplDevice(), drvdata_(drvdata) {
+  // Get namespace entries.
+  std::vector<fuchsia_component_runner::ComponentNamespaceEntry> entries;
+  zx::result open_result = component::OpenServiceRoot();
+  ZX_ASSERT_MSG(open_result.is_ok(), "Failed to open service root: %d", open_result.status_value());
 
-    zx::result res =
-        outgoing_dir_.RemoveService<fuchsia_wlan_phyimpl::Service>(fdf::kDefaultInstance);
-    if (res.is_error()) {
-      zxlogf(ERROR, "Failed to remove WlanPhyImpl service from outgoing directory: %s\n",
-             res.status_string());
-    }
+  ::fidl::ClientEnd<::fuchsia_io::Directory> svc = std::move(*open_result);
+  entries.emplace_back(fuchsia_component_runner::ComponentNamespaceEntry{{
+      .path = "/svc",
+      .directory = std::move(svc),
+  }});
 
-    server_dispatcher_.ShutdownAsync();
+  // Create Namespace object from the entries.
+  auto ns = fdf::Namespace::Create(entries);
+  ZX_ASSERT_MSG(!ns.is_error(), "Create namespace failed: %d", ns.status_value());
+
+  // Create driver::Logger with dispatcher and namespace.
+  auto logger = fdf::Logger::Create(*ns, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                    "SimTransIwlwifiDriver loop", FUCHSIA_LOG_INFO, false);
+  ZX_ASSERT_MSG(!logger.is_error(), "Create logger failed: %d", logger.status_value());
+
+  // Initialize the log instance with driver::Logger.
+  wlan::drivers::log::Instance::Init(0, std::move(*logger));
+}
+
+SimTransIwlwifiDriver::~SimTransIwlwifiDriver() {
+  struct iwl_trans* trans = drvdata_;
+  if (trans->drv) {
+    iwl_drv_stop(trans->drv);
   }
+  free(trans);
+  wlan::drivers::log::Instance::Reset();
+}
 
-  iwl_trans* drvdata() override { return drvdata_; }
-  const iwl_trans* drvdata() const override { return drvdata_; }
+iwl_trans* SimTransIwlwifiDriver::drvdata() { return drvdata_; }
+const iwl_trans* SimTransIwlwifiDriver::drvdata() const { return drvdata_; }
 
- private:
-  iwl_trans* drvdata_ = nullptr;
-};
+zx_status_t SimTransIwlwifiDriver::AddWlansoftmacDevice(uint16_t iface_id,
+                                                        struct iwl_mvm_vif* mvmvif) {
+  softmac_device_count_++;
+  mvmvif_ptrs_[iface_id] = mvmvif;
+  return ZX_OK;
+}
 
-}  // namespace
+zx_status_t SimTransIwlwifiDriver::RemoveWlansoftmacDevice(uint16_t iface_id) {
+  softmac_device_count_--;
+  // Clean up this bit to enable subsequent iface manipulations.
+  iwl_trans_get_mvm(drvdata_)->if_delete_in_progress = false;
+  // In real case, this pointer is freed in mac_release() which is called from the destructor of
+  // WlanSoftmacDevice. This test doesn't spawn real WlanSoftmacDevice instances
+  free(mvmvif_ptrs_[iface_id]);
+  return ZX_OK;
+}
+
+size_t SimTransIwlwifiDriver::DeviceCount() { return softmac_device_count_; }
+
+}  // namespace wlan::iwlwifi
 
 // Send a fake packet from FW to unblock one wait in mvm->notif_wait.
 static void rx_fw_notification(struct iwl_trans* trans, uint8_t cmd, const void* data,
@@ -273,17 +293,19 @@ static struct iwl_trans* iwl_sim_trans_transport_alloc(struct device* dev,
   return iwl_trans;
 }
 
-// This function intends to be like this because we want to mimic the PcieDevice::DdkInit().
-// The goal is to allocate transportation layer resources and bind them together.
+// This function intends to be like this because we want to mimic the driver initialization process
+// in PcieIwlwifiDriver::Init(). The goal is to allocate transportation layer resources and bind
+// them together.
 //
-// We also determine the chip we want to simulate in this function. Currently we choose AX201.
+// We also determine the chip we want to simulate in this function. Currently we choose 7265 series
+// chips.
 //
 // A 'struct iwl_trans' instance will returned in 'out_trans'.
 //
-static zx_status_t sim_transport_bind(SimMvm* fw, struct device* dev,
-                                      struct iwl_trans** out_iwl_trans,
-                                      wlan::iwlwifi::WlanPhyImplDevice** out_device,
-                                      async_dispatcher_t* driver_dispatcher) {
+static zx_status_t sim_transport_bind(
+    SimMvm* fw, struct device* dev, struct iwl_trans** out_iwl_trans,
+    std::unique_ptr<wlan::iwlwifi::SimTransIwlwifiDriver>* out_device,
+    async_dispatcher_t* driver_dispatcher) {
   zx_status_t status = ZX_OK;
   const struct iwl_cfg* cfg = &iwl7265_2ac_cfg;
   const struct iwl_cfg_trans_params* trans_cfg = (const struct iwl_cfg_trans_params*)cfg;
@@ -297,59 +319,53 @@ static zx_status_t sim_transport_bind(SimMvm* fw, struct device* dev,
                          // iwl_pci_probe(). However, the unittest code doesn't have that code path.
   ZX_ASSERT(out_iwl_trans);
 
-  std::unique_ptr<SimTransDevice> device;
+  std::unique_ptr<wlan::iwlwifi::SimTransIwlwifiDriver> device;
   libsync::Completion create_device;
   async::PostTask(driver_dispatcher, [&]() {
-    device = std::make_unique<SimTransDevice>(dev->zxdev, iwl_trans);
+    device = std::make_unique<wlan::iwlwifi::SimTransIwlwifiDriver>(iwl_trans);
     create_device.Signal();
   });
   create_device.Wait();
 
-  status = device->DdkAdd("sim-iwlwifi-wlanphyimpl", DEVICE_ADD_NON_BINDABLE);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add wlanphyimpl device: %s", zx_status_get_string(status));
-    return status;
-  }
-  iwl_trans->zxdev = device->zxdev();
-
   status = iwl_drv_init();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to init driver: %s", zx_status_get_string(status));
-    goto remove_dev;
-  }
+  ZX_ASSERT_MSG(status == ZX_OK, "Failed to init driver: %s", zx_status_get_string(status));
 
   status = iwl_drv_start(iwl_trans, &iwl_trans->drv);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start driver: %s", zx_status_get_string(status));
-    goto remove_dev;
-  }
+  ZX_ASSERT_MSG(status == ZX_OK, "Failed to start driver: %s", zx_status_get_string(status));
 
   status = iwl_mvm_mac_start(IWL_OP_MODE_GET_MVM(iwl_trans->op_mode));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start mac: %s", zx_status_get_string(status));
-    goto remove_dev;
-  }
+  ZX_ASSERT_MSG(status == ZX_OK, "Failed to start mac: %s", zx_status_get_string(status));
 
   *out_iwl_trans = iwl_trans;
-  *out_device = device.release();
+  *out_device = std::move(device);
 
   return ZX_OK;
-
-remove_dev:
-  device.release()->DdkAsyncRemove();
-  return status;
 }
 
 namespace wlan::testing {
 
-SimTransport::SimTransport(zx_device_t* parent) : device_{}, iwl_trans_(nullptr) {
+zx_status_t sim_load_firmware_callback_entry(void* ctx, const char* name, zx_handle_t* vmo,
+                                             size_t* size) {
+  return static_cast<SimTransport*>(ctx)->LoadFirmware(name, vmo, size);
+}
+
+SimTransport::SimTransport() : device_{}, iwl_trans_(nullptr) {
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      {.value = FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS}, "iwlwifi-driver-dispatcher",
+      [&](fdf_dispatcher_t*) { completion_.Signal(); });
+  ZX_ASSERT(!dispatcher.is_error());
+
+  sim_driver_dispatcher_ = std::move(*dispatcher);
+
   task_loop_ = std::make_unique<::async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
   task_loop_->StartThread("iwlwifi-test-task-worker", nullptr);
   irq_loop_ = std::make_unique<::async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
   irq_loop_->StartThread("iwlwifi-test-irq-worker", nullptr);
-  rcu_manager_ = std::make_unique<::wlan::iwlwifi::RcuManager>(task_loop_->dispatcher());
+  rcu_manager_ =
+      std::make_unique<::wlan::iwlwifi::RcuManager>(sim_driver_dispatcher_.async_dispatcher());
 
-  device_.zxdev = parent;
+  device_.load_firmware_ctx = (void*)this;
+  device_.load_firmware_callback = &sim_load_firmware_callback_entry;
   device_.task_dispatcher = task_loop_->dispatcher();
   device_.irq_dispatcher = irq_loop_->dispatcher();
   device_.rcu_manager = static_cast<struct rcu_manager*>(rcu_manager_.get());
@@ -357,40 +373,57 @@ SimTransport::SimTransport(zx_device_t* parent) : device_{}, iwl_trans_(nullptr)
 }
 
 SimTransport::~SimTransport() {
-  if (sim_device_) {
-    sim_device_->DdkAsyncRemove();
-    mock_ddk::ReleaseFlaggedDevices(sim_device_->zxdev(), async_driver_dispatcher());
-  }
+  irq_loop_->Shutdown();
+  task_loop_->Shutdown();
+  zx_handle_close(device_.bti);
+  libsync::Completion destruct_driver;
+  async::PostTask(sim_driver_dispatcher_.async_dispatcher(), [&]() {
+    sim_driver_.reset();
+    destruct_driver.Signal();
+  });
+  destruct_driver.Wait();
   sim_driver_dispatcher_.ShutdownAsync();
   completion_.Wait();
-  zx_handle_close(device_.bti);
 }
 
 zx_status_t SimTransport::Init() {
-  auto dispatcher = fdf::SynchronizedDispatcher::Create(
-      {.value = FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS}, "iwlwifi-driver-dispatcher",
-      [&](fdf_dispatcher_t*) { completion_.Signal(); });
-  if (dispatcher.is_error()) {
-    zxlogf(ERROR, "Failed to create sim_driver_dispatcher: %s", dispatcher.status_string());
-    return dispatcher.error_value();
-  }
-  sim_driver_dispatcher_ = std::move(*dispatcher);
-  return sim_transport_bind(this, &device_, &iwl_trans_, &sim_device_,
+  return sim_transport_bind(this, &device_, &iwl_trans_, &sim_driver_,
                             sim_driver_dispatcher_.async_dispatcher());
+}
+
+void SimTransport::SetFirmware(std::string firmware) {
+  fake_firmware_ = std::vector<uint8_t>(firmware.begin(), firmware.end());
+}
+
+zx_status_t SimTransport::LoadFirmware(const char* name, zx_handle_t* fw, size_t* size) {
+  zx_status_t status = ZX_OK;
+  zx_handle_t vmo = ZX_HANDLE_INVALID;
+  if ((status = zx_vmo_create(fake_firmware_.size(), 0, &vmo)) != ZX_OK) {
+    return status;
+  }
+  if ((status = zx_vmo_write(vmo, fake_firmware_.data(), 0, fake_firmware_.size())) != ZX_OK) {
+    return status;
+  }
+
+  *fw = vmo;
+  *size = fake_firmware_.size();
+  return ZX_OK;
 }
 
 struct iwl_trans* SimTransport::iwl_trans() { return iwl_trans_; }
 
 const struct iwl_trans* SimTransport::iwl_trans() const { return iwl_trans_; }
 
-::wlan::iwlwifi::WlanPhyImplDevice* SimTransport::sim_device() { return sim_device_; }
+::wlan::iwlwifi::SimTransIwlwifiDriver* SimTransport::sim_driver() { return sim_driver_.get(); }
 
-const ::wlan::iwlwifi::WlanPhyImplDevice* SimTransport::sim_device() const { return sim_device_; }
-
-zx_device_t* SimTransport::fake_parent() { return device_.zxdev; }
+const ::wlan::iwlwifi::SimTransIwlwifiDriver* SimTransport::sim_driver() const {
+  return sim_driver_.get();
+}
 
 async_dispatcher_t* SimTransport::async_driver_dispatcher() {
   return sim_driver_dispatcher_.async_dispatcher();
 }
+
+fdf_dispatcher_t* SimTransport::fdf_driver_dispatcher() { return sim_driver_dispatcher_.get(); }
 
 }  // namespace wlan::testing

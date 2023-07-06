@@ -372,7 +372,6 @@ struct softmac_ifc {
  * @features: hw features active for this vif
  * @probe_resp_data: data from FW notification to store NOA and CSA related
  *  data to be inserted into probe response.
- * @zxdev: the placeholder for MAC device
  * @mac_role: the role of interface
  * @ifc: store callback functions of MLME
  * @ht_enabled: indicates if HT is enabled in this interface.
@@ -484,7 +483,6 @@ struct iwl_mvm_vif {
   struct ieee80211_key_conf* ap_wep_key;
 
   /* Zircon objects */
-  struct zx_device* zxdev;
   wlan_mac_role_t mac_role;
   zx_handle_t mlme_channel;  // Channel passed from devmgr. Will be passed to MLME at mac_start().
   struct softmac_ifc ifc;

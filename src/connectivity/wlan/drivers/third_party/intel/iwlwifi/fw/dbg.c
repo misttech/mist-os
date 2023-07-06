@@ -38,6 +38,7 @@
 #include <zircon/syscalls.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
+#include <stdarg.h>
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/debug.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/debugfs.h"

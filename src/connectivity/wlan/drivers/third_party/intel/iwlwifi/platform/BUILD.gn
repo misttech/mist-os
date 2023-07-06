@@ -2,7 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bind/bind.gni")
+import("//build/components.gni")
+import("//build/drivers.gni")
 
 visibility = [ "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/*" ]
 
@@ -13,8 +14,8 @@ source_set("platform") {
   sources = [
     "compiler.cc",
     "debug.cc",
-    "device.cc",
     "ieee80211.cc",
+    "io_buffer.cc",
     "irq.cc",
     "memory.cc",
     "module.cc",
@@ -29,8 +30,8 @@ source_set("platform") {
   public = [
     "compiler.h",
     "debug.h",
-    "device.h",
     "ieee80211.h",
+    "io_buffer.h",
     "irq.h",
     "kernel.h",
     "memory.h",
@@ -49,17 +50,16 @@ source_set("platform") {
     ":driver_inspector",
     ":rcu_manager",
     "//sdk/lib/stdcompat",
-    "//src/devices/pci/lib/device-protocol-pci",
     "//zircon/system/ulib/async:async-cpp",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp_wire",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_driver",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_wire",
-    "//src/connectivity/wlan/drivers/lib/log/c",
+    "//src/connectivity/wlan/drivers/lib/log/c:dfv2",
     "//src/connectivity/wlan/lib/common/cpp:common",
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
-    "//src/lib/ddk",
     "//zircon/system/public",
     "//zircon/system/ulib/async",
   ]
@@ -73,6 +73,7 @@ source_set("driver_inspector") {
   sources = [ "driver-inspector.cc" ]
   public = [ "driver-inspector.h" ]
   public_deps = [
+    "//sdk/lib/inspect/component/cpp:inspect_component_cpp",
     "//sdk/lib/stdcompat",
     "//zircon/system/public",
     "//zircon/system/ulib/inspect",
@@ -97,24 +98,24 @@ driver_bind_rules("fuchsia_bind") {
   deps = [ "//src/devices/bind/fuchsia.pci" ]
 }
 
-# Fuchsia DDK device bindings for the iwlwifi driver.
+# Fuchsia driver framework bindings for the iwlwifi driver.
 source_set("fuchsia_device") {
   sources = [
-    "bind.cc",
     "mvm-mlme.cc",
     "mvm-mlme.h",
     "mvm-sta.cc",
     "mvm-sta.h",
-    "pcie-device.cc",
-    "pcie-device.h",
+    "pcie-iwlwifi-driver.cc",
+    "pcie-iwlwifi-driver.h",
     "scoped_utils.h",
-    "wlan-softmac-device.cc",
-    "wlan-softmac-device.h",
-    "wlanphy-impl-device.cc",
-    "wlanphy-impl-device.h",
+    "wlanphyimpl-device.cc",
+    "wlanphyimpl-device.h",
+    "wlansoftmac-device.cc",
+    "wlansoftmac-device.h",
   ]
   deps = [
     ":driver_inspector",
+    ":fuchsia_bind",
     ":platform",
     ":rcu_manager",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_cpp_wire",
@@ -125,11 +126,7 @@ source_set("fuchsia_device") {
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/cfg",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/pcie",
-    "//src/connectivity/wlan/lib/common/cpp:common",
-    "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/public",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

@@ -1,0 +1,17 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+static_library("sim-driver-host") {
+  sources = [ "sim-driver-host.h" ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp_wire",
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp_wire",
+    "//sdk/lib/driver/compat/cpp:cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//zircon/system/ulib/sync:sync-cpp",
+  ]
+}

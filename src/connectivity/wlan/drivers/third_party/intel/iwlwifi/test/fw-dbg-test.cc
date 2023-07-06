@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/inspect/cpp/reader.h>
+#include <zircon/system/ulib/async-default/include/lib/async/default.h>
 
 #include <algorithm>
 #include <memory>
@@ -30,11 +31,14 @@ class FwDbgTest : public SingleApTest {
   std::unique_ptr<::wlan::iwlwifi::DriverInspector> inspector_;
   struct iwl_fw fw_ = {};
   struct iwl_fw_runtime fwrt_ = {};
+  async_dispatcher_t* dispatcher_;
+  component::OutgoingDirectory outgoing_;
 };
 
-FwDbgTest::FwDbgTest() {
+FwDbgTest::FwDbgTest()
+    : dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()), outgoing_(dispatcher_) {
   inspector_ = std::make_unique<::wlan::iwlwifi::DriverInspector>(
-      wlan::iwlwifi::DriverInspectorOptions{.root_name = "fw_dbg_test" });
+      dispatcher_, outgoing_, wlan::iwlwifi::DriverInspectorOptions{.root_name = "fw_dbg_test"});
   sim_trans_.iwl_trans()->dev->inspector = static_cast<struct driver_inspector*>(inspector_.get());
   iwl_fw_runtime_init(&fwrt_, sim_trans_.iwl_trans(), &fw_, nullptr, nullptr, nullptr);
 }

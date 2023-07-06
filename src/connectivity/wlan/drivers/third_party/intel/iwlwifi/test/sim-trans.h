@@ -13,12 +13,17 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_TEST_SIM_TRANS_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_TEST_SIM_TRANS_H_
 
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/cpp/completion.h>
 
 #include <memory>
 
+#include <wlan/drivers/log_instance.h>
+
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/kernel.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlanphyimpl-device.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test/sim-mvm.h"
 
 namespace async {
@@ -31,7 +36,29 @@ namespace wlan {
 namespace iwlwifi {
 
 class RcuManager;
-class WlanPhyImplDevice;
+
+// SimTransIwlwifiDriver to mimic PcieIwlwifiDriver.
+class SimTransIwlwifiDriver : public ::wlan::iwlwifi::WlanPhyImplDevice {
+ public:
+  explicit SimTransIwlwifiDriver(iwl_trans* drvdata);
+  ~SimTransIwlwifiDriver();
+
+  iwl_trans* drvdata() override;
+  const iwl_trans* drvdata() const override;
+
+  zx_status_t AddWlansoftmacDevice(uint16_t iface_id, struct iwl_mvm_vif* mvmvif) override;
+
+  zx_status_t RemoveWlansoftmacDevice(uint16_t iface_id) override;
+
+  size_t DeviceCount();
+
+ private:
+  // Store the addresses of allocated mvmvifs, in real world, these pointers are stored in
+  // corresponding WlanSoftmacDevice instances.
+  struct iwl_mvm_vif* mvmvif_ptrs_[MAX_NUM_MVMVIF];
+  size_t softmac_device_count_ = 0;
+  iwl_trans* drvdata_ = nullptr;
+};
 
 }  // namespace iwlwifi
 
@@ -52,19 +79,23 @@ static inline struct sim_trans_priv* IWL_TRANS_GET_SIM_TRANS(struct iwl_trans* t
 
 class SimTransport : public SimMvm {
  public:
-  explicit SimTransport(zx_device_t* parent);
+  explicit SimTransport();
   ~SimTransport();
 
   // This function must be called before starting using other functions.
   zx_status_t Init();
 
+  // Fake set/load firmware process like mock-ssk.
+  void SetFirmware(std::string firmware);
+  zx_status_t LoadFirmware(const char* name, zx_handle_t* vmo, size_t* size);
+
   // Member accessors.
   struct iwl_trans* iwl_trans();
   const struct iwl_trans* iwl_trans() const;
-  ::wlan::iwlwifi::WlanPhyImplDevice* sim_device();
-  const ::wlan::iwlwifi::WlanPhyImplDevice* sim_device() const;
-  zx_device_t* fake_parent();
+  ::wlan::iwlwifi::SimTransIwlwifiDriver* sim_driver();
+  const ::wlan::iwlwifi::SimTransIwlwifiDriver* sim_driver() const;
   async_dispatcher_t* async_driver_dispatcher();
+  fdf_dispatcher_t* fdf_driver_dispatcher();
 
  private:
   fdf::Dispatcher sim_driver_dispatcher_;
@@ -74,7 +105,8 @@ class SimTransport : public SimMvm {
   std::unique_ptr<::wlan::iwlwifi::RcuManager> rcu_manager_;
   struct device device_;
   struct iwl_trans* iwl_trans_;
-  wlan::iwlwifi::WlanPhyImplDevice* sim_device_;
+  std::unique_ptr<wlan::iwlwifi::SimTransIwlwifiDriver> sim_driver_;
+  std::vector<uint8_t> fake_firmware_;
 };
 
 }  // namespace testing

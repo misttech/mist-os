@@ -9,7 +9,6 @@
 
 #include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
-#include <lib/ddk/device.h>
 
 #include "banjo/common.h"
 #include "banjo/ieee80211.h"
@@ -43,7 +42,7 @@ zx_status_t phy_get_supported_mac_roles(
     uint8_t* out_supported_mac_roles_count);
 zx_status_t phy_create_iface(void* ctx, const wlan_phy_impl_create_iface_req_t* req,
                              uint16_t* out_iface_id);
-zx_status_t phy_start_iface(void* ctx, zx_device_t* zxdev, uint16_t idx);
+zx_status_t phy_start_iface(void* ctx, uint16_t idx);
 zx_status_t phy_destroy_iface(void* ctx, uint16_t id);
 zx_status_t phy_set_country(void* ctx, const wlan_phy_country_t* country);
 zx_status_t phy_get_country(void* ctx, wlan_phy_country_t* out_country);
@@ -77,13 +76,12 @@ zx_status_t mac_start_passive_scan(
 zx_status_t mac_start_active_scan(
     void* ctx, const wlan_softmac_wire::WlanSoftmacStartActiveScanRequest* active_scan_args,
     uint64_t* out_scan_id);
-zx_status_t mac_init(void* ctx, struct iwl_trans* drvdata, zx_device_t* zxdev, uint16_t idx);
+zx_status_t mac_init(void* ctx, struct iwl_trans* drvdata, uint16_t idx);
 
 // Mid-layer C functions for WlanSoftmacIfc protocol to enter C++ definitions in iwlwifi/platform/
 void mac_ifc_recv(void* ctx, const wlan_rx_packet_t* rx_packet);
 void mac_ifc_scan_complete(void* ctx, const zx_status_t status, const uint64_t scan_id);
 
-void mac_unbind(void* ctx);
 void mac_release(void* ctx);
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_MVM_MLME_H_

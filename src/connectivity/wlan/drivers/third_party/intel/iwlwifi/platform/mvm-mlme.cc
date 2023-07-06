@@ -49,9 +49,6 @@
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/mvm-mlme.h"
 
 #include <fidl/fuchsia.wlan.ieee80211/cpp/driver/wire.h>
-#include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
 #include <stdio.h>
 #include <string.h>
 #include <zircon/status.h>
@@ -76,7 +73,7 @@ extern "C" {
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/ieee80211.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/rcu.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/scoped_utils.h"
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlan-softmac-device.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlansoftmac-device.h"
 
 // Interface create waiting for delete to complete.
 #define IWLWIFI_IF_DELETE_TIMEOUT (ZX_MSEC(100))
@@ -693,24 +690,13 @@ zx_status_t mac_start_active_scan(
   return ret;
 }
 
-zx_status_t mac_init(void* ctx, struct iwl_trans* drvdata, zx_device_t* zxdev, uint16_t idx) {
-  zx_status_t status = phy_start_iface(drvdata, zxdev, idx);
+zx_status_t mac_init(void* ctx, struct iwl_trans* drvdata, uint16_t idx) {
+  zx_status_t status = phy_start_iface(drvdata, idx);
   if (status != ZX_OK) {
     // Freeing of resources allocated in phy_create_iface() will happen in mac_release().
     IWL_ERR(this, "failed phy start: %s", zx_status_get_string(status));
   }
   return status;
-}
-
-void mac_unbind(void* ctx) {
-  const auto mvmvif = reinterpret_cast<struct iwl_mvm_vif*>(ctx);
-
-  if (!mvmvif->zxdev) {
-    IWL_ERR(nullptr, "mac_unbind(): no zxdev\n");
-    return;
-  }
-
-  mvmvif->zxdev = nullptr;
 }
 
 void mac_release(void* ctx) {
@@ -840,7 +826,7 @@ void phy_create_iface_undo(struct iwl_trans* iwl_trans, uint16_t idx) {
   free(mvmvif);
 }
 
-zx_status_t phy_start_iface(void* ctx, zx_device_t* zxdev, uint16_t idx) {
+zx_status_t phy_start_iface(void* ctx, uint16_t idx) {
   const auto iwl_trans = reinterpret_cast<struct iwl_trans*>(ctx);
   struct iwl_mvm* mvm = iwl_trans_get_mvm(iwl_trans);
   zx_status_t ret = ZX_OK;
@@ -852,7 +838,6 @@ zx_status_t phy_start_iface(void* ctx, zx_device_t* zxdev, uint16_t idx) {
 
   auto lock = std::lock_guard(mvm->mutex);
   struct iwl_mvm_vif* mvmvif = mvm->mvmvif[idx];
-  mvmvif->zxdev = zxdev;
 
   // Only start FW MVM for the first device. The 'vif_count' will be increased in
   // iwl_mvm_mac_add_interface().
@@ -921,8 +906,7 @@ zx_status_t phy_destroy_iface(void* ctx, uint16_t id) {
     // this flag is cleared before proceeeding. This flag is cleared in mac_stop().
     mvm->if_delete_in_progress = true;
 
-    // Unlink the 'mvmvif' from the 'mvm'. The zxdev will be removed in mac_unbind(),
-    // and the memory of 'mvmvif' will be freed in mac_release().
+    // Unlink the 'mvmvif' from the 'mvm'. The memory of 'mvmvif' will be freed in mac_release().
     iwl_mvm_unbind_mvmvif(mvm, id);
 
     // the last MAC interface. stop the MVM to save power. 'vif_count' had been decreased in
@@ -932,7 +916,6 @@ zx_status_t phy_destroy_iface(void* ctx, uint16_t id) {
     }
   }
 
-  device_async_remove(mvmvif->zxdev);
   return ZX_OK;
 }
 

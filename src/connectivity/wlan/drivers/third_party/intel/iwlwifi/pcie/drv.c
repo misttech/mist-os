@@ -42,6 +42,7 @@
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-trans.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/pcie/internal.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/kernel.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/pci-fidl.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/pci.h"
 
 #if 0  // NEEDS_PORTING
@@ -1735,13 +1736,17 @@ out_free_trans:
 }
 
 void iwl_pci_remove(struct iwl_pci_dev* pdev) {
+  // Moved here from iwl_trans_pcie_free(), pdev->fidl could be allocated without iwl_trans.
+  if(pdev->fidl){
+	iwl_pci_free(pdev->fidl);
+  }
+
   struct iwl_trans* trans = iwl_pci_get_drvdata(pdev);
   if (!trans) {
     return;
   }
 
   iwl_drv_stop(trans->drv);
-
   iwl_trans_pcie_free(trans);
   iwl_pci_set_drvdata(pdev, NULL);
 }

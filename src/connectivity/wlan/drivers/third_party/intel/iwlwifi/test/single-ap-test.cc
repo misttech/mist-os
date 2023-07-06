@@ -14,10 +14,7 @@ extern "C" {
 
 namespace wlan::testing {
 
-// TODO(fxb/124464): Migrate tests to use dispatcher integration.
-SingleApTest::SingleApTest()
-    : fake_parent_(MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()),
-      sim_trans_(fake_parent_.get()) {
+SingleApTest::SingleApTest() : sim_trans_() {
   // Add a default MVM firmware to the fake DDK.
   TlvFwBuilder fw_builder;
 
@@ -33,7 +30,7 @@ SingleApTest::SingleApTest()
                   (6 << FW_PHY_CFG_RX_CHAIN_POS));  // Rx antenna 2 and 1.
   fw_builder.AddValue(IWL_UCODE_TLV_PHY_SKU, &ucode_phy_sku, sizeof(ucode_phy_sku));
 
-  fake_parent_->SetFirmware(fw_builder.GetBinary());
+  sim_trans_.SetFirmware(fw_builder.GetBinary());
 
   zx_status_t status = sim_trans_.Init();
   ZX_ASSERT_MSG(ZX_OK == status, "Transportation initialization failed: %s",

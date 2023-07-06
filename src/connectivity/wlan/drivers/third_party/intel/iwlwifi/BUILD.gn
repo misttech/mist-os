@@ -50,7 +50,6 @@ source_set("core") {
   ]
   deps = [
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw:api",
-    "//src/lib/ddk",
     "//zircon/system/public",
     "//zircon/system/ulib/sync",
   ]
@@ -71,13 +70,13 @@ fuchsia_driver("iwlwifi_driver-driver") {
 fuchsia_driver_component("iwlwifi_driver") {
   info = "iwlwifi_driver-info.json"
   component_name = "iwlwifi"
+  manifest = "platform/meta/iwlwifi.cml"
   deps = [
     ":iwlwifi_driver-driver",
     "platform:fuchsia_bind",
   ]
   visibility = []
   visibility = [ "*" ]
-  manifest = "platform/meta/iwlwifi.cml"
 }
 
 all_fw_files = [

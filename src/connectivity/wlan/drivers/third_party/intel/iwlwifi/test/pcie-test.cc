@@ -14,6 +14,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
@@ -30,23 +31,25 @@
 #include <thread>
 #include <vector>
 
+#include <wlan/drivers/log_instance.h>
 #include <zxtest/zxtest.h>
 
+#include "src/connectivity/wlan/drivers/testing/lib/DFv2/sim-driver-host.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-fh.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/compiler.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
 
 extern "C" {
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/commands.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-csr.h"
 }
+
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/pcie/internal.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/align.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/ieee80211.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/irq.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/kernel.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/memory.h"
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/pcie-device.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/pcie-iwlwifi-driver.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/stats.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test/wlan-pkt-builder.h"
 #include "src/devices/pci/testing/pci_protocol_fake.h"
@@ -61,68 +64,126 @@ constexpr int kTestSubsysDeviceId = 0x9e10;
 // TODO(fxbug.dev/119415): come back to review this after uprev.
 #define TX_RESERVED_SPACE 3
 
-
 class MockDdkTesterPci : public zxtest::Test, public loop_fixture::RealLoop {};
+// Note: which dispatcher will this run on?
+// Implement all the WireServer handlers of fuchsia_hardware_pci::Device as protocol as required by
+// FIDL.
+class FakePciParent : public fidl::WireServer<fuchsia_hardware_pci::Device> {
+ public:
+  void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override {
+    fuchsia_hardware_pci::wire::DeviceInfo info;
+    info.device_id = kTestDeviceId;
+    completer.Reply(info);
+  }
+  void GetBar(GetBarRequestView request, GetBarCompleter::Sync& completer) override {
+    fuchsia_hardware_pci::wire::Bar bar;
+    completer.ReplySuccess(std::move(bar));
+  }
 
-TEST_F(MockDdkTesterPci, DeviceLifeCycle) {
-  // TODO(fxb/124464): Migrate test to use dispatcher integration.
-  auto parent = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
+  void SetBusMastering(SetBusMasteringRequestView request,
+                       SetBusMasteringCompleter::Sync& completer) override {
+    completer.ReplySuccess();
+  }
 
-  // Set up a fake pci:
-  pci::FakePciProtocol fake_pci;
-  // Set up the first BAR.
-  fake_pci.CreateBar(/*bar_id=*/0, /*size=*/4096, /*is_mmio=*/true);
+  void ResetDevice(ResetDeviceCompleter::Sync& completer) override { completer.ReplySuccess(); }
 
-  // Identify as the correct device.
-  fake_pci.SetDeviceInfo({.device_id = kTestDeviceId});
-  zx::unowned_vmo config = fake_pci.GetConfigVmo();
-  config->write(&kTestSubsysDeviceId,
-                fidl::ToUnderlying(fuchsia_hardware_pci::Config::kSubsystemId),
-                sizeof(kTestSubsysDeviceId));
+  void AckInterrupt(AckInterruptCompleter::Sync& completer) override { completer.ReplySuccess(); }
 
-  // Need an IRQ of some kind. Since Intel drivers are very specific in their
-  // MSI-X handling we'll keep it simple and use a legacy interrupt.
-  fake_pci.AddLegacyInterrupt();
+  void MapInterrupt(MapInterruptRequestView request,
+                    MapInterruptCompleter::Sync& completer) override {
+    zx::interrupt interrupt;
+    completer.ReplySuccess(std::move(interrupt));
+  }
 
-  // Now add the protocol to the parent.
-  // PCI is the only protocol of interest here.
-  component::OutgoingDirectory outgoing(dispatcher());
+  void GetInterruptModes(GetInterruptModesCompleter::Sync& completer) override {
+    fuchsia_hardware_pci::wire::InterruptModes modes;
+    completer.Reply(modes);
+  }
 
-  auto service_result = outgoing.AddService<fuchsia_hardware_pci::Service>(
-      fuchsia_hardware_pci::Service::InstanceHandler(
-          {.device = fake_pci.bind_handler(dispatcher())}));
-  ZX_ASSERT(service_result.is_ok());
+  void SetInterruptMode(SetInterruptModeRequestView request,
+                        SetInterruptModeCompleter::Sync& completer) override {
+    completer.ReplySuccess();
+  }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ZX_ASSERT(endpoints.is_ok());
-  ZX_ASSERT(outgoing.Serve(std::move(endpoints->server)).is_ok());
+  void ReadConfig8(ReadConfig8RequestView request, ReadConfig8Completer::Sync& completer) override {
+    completer.ReplySuccess(0);
+  }
 
-  parent->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints->client), "pci");
+  void ReadConfig16(ReadConfig16RequestView request,
+                    ReadConfig16Completer::Sync& completer) override {
+    // Always return the fake sub-system device id to pass the initialization.
+    completer.ReplySuccess(kTestSubsysDeviceId);
+  }
 
-  // Create() allocates and binds the device.
-  ASSERT_OK(wlan::iwlwifi::PcieDevice::Create(parent.get()), "Bind failed");
+  void ReadConfig32(ReadConfig32RequestView request,
+                    ReadConfig32Completer::Sync& completer) override {
+    completer.ReplySuccess(0);
+  }
 
-  auto& pcie_device = parent->children().front();
-  // Set up a fake firmware of non-zero size for the PcieDevice:
-  // TODO(fxbug.dev/76744) since device initialization will fail (as there is no hardware backing
-  // this PcieDevice), we are free to use a fake firmware here that does not pass driver validation
-  // anyways.
-  pcie_device->SetFirmware(std::string(4, '\0'));
+  void WriteConfig8(WriteConfig8RequestView request,
+                    WriteConfig8Completer::Sync& completer) override {
+    completer.ReplySuccess();
+  }
 
-  PerformBlockingWork([&] {
-    // TODO(fxbug.dev/76744) the Create() call will succeed, but since there is no hardware backing
-    // this PcieDevice, initialization will ultimately fail and the PcieDevice instance will be
-    // automatically removed without explicitly reporting an error.
-    pcie_device->InitOp();  // Calls DdkInit for ddktl devices.
-  });
+  void WriteConfig16(WriteConfig16RequestView request,
+                     WriteConfig16Completer::Sync& completer) override {
+    completer.ReplySuccess();
+  }
 
-  // If another thread is spawned during the init call, wait until InitReply is called:
-  pcie_device->WaitUntilInitReplyCalled();
-  EXPECT_EQ(1, parent->child_count());
+  void WriteConfig32(WriteConfig32RequestView request,
+                     WriteConfig32Completer::Sync& completer) override {
+    completer.ReplySuccess();
+  }
 
-  device_async_remove(pcie_device.get());
+  void GetCapabilities(GetCapabilitiesRequestView request,
+                       GetCapabilitiesCompleter::Sync& completer) override {
+    std::vector<uint8_t> dummy_vec;
+    auto dummy_vec_view = fidl::VectorView<uint8_t>::FromExternal(dummy_vec);
+    completer.Reply(dummy_vec_view);
+  }
 
-  mock_ddk::ReleaseFlaggedDevices(pcie_device.get());
+  void GetExtendedCapabilities(GetExtendedCapabilitiesRequestView request,
+                               GetExtendedCapabilitiesCompleter::Sync& completer) override {
+    std::vector<uint16_t> dummy_vec;
+    auto dummy_vec_view = fidl::VectorView<uint16_t>::FromExternal(dummy_vec);
+    completer.Reply(dummy_vec_view);
+  }
+
+  void GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer) override {
+    zx_handle_t fake_handle;
+    fake_bti_create(&fake_handle);
+    zx::bti bti(fake_handle);
+    completer.ReplySuccess(std::move(bti));
+  }
+};
+
+// clang-format off
+class DriverLifeCycleTest : public zxtest::Test {
+ public:
+  DriverLifeCycleTest() {
+    fake_pci_parent_ = std::make_unique<FakePciParent>();
+    sim_driver_host_.StartDriver(std::move(fake_pci_parent_));
+  }
+  ~DriverLifeCycleTest() = default;
+
+  wlan::simulation::SimDriverHost<wlan::iwlwifi::PcieIwlwifiDriver, fuchsia_hardware_pci::Service,
+                                  fuchsia_hardware_pci::Device> sim_driver_host_;
+  std::unique_ptr<FakePciParent> fake_pci_parent_;
+};
+// clang-format on
+
+TEST_F(DriverLifeCycleTest, DeviceLifeCycle) {
+  // Start PcieIwlwifiDriver will trigger AddNode for wlanphy virtual device.
+  EXPECT_EQ(sim_driver_host_.ChildNodeCount(), 1);
+
+  sim_driver_host_.PrepareStopDriver();
+  sim_driver_host_.StopDriver();
+  sim_driver_host_.WaitForNextNodeRemoval();
+
+  EXPECT_EQ(sim_driver_host_.ChildNodeCount(), 0);
+
+  // TODO(b/281685553): Add more operations here like AddWlansoftmacDevice() and
+  // RemoveWlansoftmacDevice().
 }
 
 class PcieTest;
@@ -182,6 +243,29 @@ class PcieTest : public zxtest::Test {
   PcieTest() {
     task_loop_ = std::make_unique<::async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
     ASSERT_OK(task_loop_->StartThread("iwlwifi-test-task-worker", nullptr));
+
+    std::vector<fuchsia_component_runner::ComponentNamespaceEntry> entries;
+    zx::result open_result = component::OpenServiceRoot();
+    ZX_ASSERT_MSG(open_result.is_ok(), "Failed to open service root: %d",
+                  open_result.status_value());
+
+    ::fidl::ClientEnd<::fuchsia_io::Directory> svc = std::move(*open_result);
+    entries.emplace_back(fuchsia_component_runner::ComponentNamespaceEntry{{
+        .path = "/svc",
+        .directory = std::move(svc),
+    }});
+
+    // Create Namespace object from the entries.
+    auto ns = fdf::Namespace::Create(entries);
+    ZX_ASSERT_MSG(!ns.is_error(), "Create namespace failed: %d", ns.status_value());
+
+    // Create driver::Logger with dispatcher and namespace.
+    auto logger = fdf::Logger::Create(*ns, task_loop_->dispatcher(), "SimTransIwlwifiDriver loop");
+    ZX_ASSERT_MSG(!logger.is_error(), "Create logger failed: %d", logger.status_value());
+
+    // Initialize the log instance with driver::Logger.
+    wlan::drivers::log::Instance::Init(0, std::move(*logger));
+
     irq_loop_ = std::make_unique<::async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
     ASSERT_OK(irq_loop_->StartThread("iwlwifi-test-irq-worker", nullptr));
     pci_dev_.dev.task_dispatcher = task_loop_->dispatcher();
@@ -224,6 +308,7 @@ class PcieTest : public zxtest::Test {
   ~PcieTest() override {
     iwl_trans_free(trans_);
     zx_handle_close(pci_dev_.dev.bti);
+    wlan::drivers::log::Instance::Reset();
   }
 
   mock_function::MockFunction<void, uint32_t, uint8_t> mock_write8_;

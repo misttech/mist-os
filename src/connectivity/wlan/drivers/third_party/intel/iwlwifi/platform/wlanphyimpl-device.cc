@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlanphy-impl-device.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlanphyimpl-device.h"
 
 #include <lib/sync/cpp/completion.h>
 #include <zircon/status.h>
@@ -14,56 +14,15 @@ extern "C" {
 }  // extern "C"
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/mvm-mlme.h"
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlan-softmac-device.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlansoftmac-device.h"
 
 namespace wlan::iwlwifi {
 
 namespace phyimpl_fidl = fuchsia_wlan_phyimpl::wire;
 
-WlanPhyImplDevice::WlanPhyImplDevice(zx_device_t* parent)
-    : ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable, ::ddk::Unbindable>(parent),
-      outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {
-  auto dispatcher =
-      fdf::SynchronizedDispatcher::Create({}, "wlanphy-impl-server", [&](fdf_dispatcher_t*) {
-        if (unbind_txn_)
-          unbind_txn_->Reply();
-      });
-  if (dispatcher.is_error()) {
-    IWL_ERR(this, "Failed to create dispatcher: %s\n", dispatcher.status_string());
-  }
-  server_dispatcher_ = std::move(*dispatcher);
-  driver_async_dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-}
+WlanPhyImplDevice::WlanPhyImplDevice() = default;
 
 WlanPhyImplDevice::~WlanPhyImplDevice() = default;
-
-void WlanPhyImplDevice::DdkRelease() { delete this; }
-
-zx_status_t WlanPhyImplDevice::ServeWlanPhyImplProtocol(
-    fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  auto protocol = [this](fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end) mutable {
-    if (unbind_txn_) {
-      IWL_WARN(this, "Unbind has started, skip the FIDL server binding.");
-      return;
-    }
-    fdf::BindServer(server_dispatcher_.get(), std::move(server_end), this);
-  };
-  fuchsia_wlan_phyimpl::Service::InstanceHandler handler({.wlan_phy_impl = std::move(protocol)});
-  auto status = outgoing_dir_.AddService<fuchsia_wlan_phyimpl::Service>(std::move(handler));
-  if (status.is_error()) {
-    IWL_ERR(this, "%s(): Failed to add service to outgoing directory: %s\n", __func__,
-            status.status_string());
-    return status.error_value();
-  }
-  auto result = outgoing_dir_.Serve(std::move(server_end));
-  if (result.is_error()) {
-    IWL_ERR(this, "%s(): Failed to serve outgoing directory: %s\n", __func__,
-            result.status_string());
-    return result.error_value();
-  }
-
-  return ZX_OK;
-}
 
 void WlanPhyImplDevice::GetSupportedMacRoles(fdf::Arena& arena,
                                              GetSupportedMacRolesCompleter::Sync& completer) {
@@ -101,7 +60,6 @@ void WlanPhyImplDevice::GetSupportedMacRoles(fdf::Arena& arena,
 void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
                                     CreateIfaceCompleter::Sync& completer) {
   zx_status_t status = ZX_OK;
-
   if (!request->has_role() || !request->has_mlme_channel()) {
     IWL_ERR(this, "missing info in request role(%u), channel(%u)", request->has_role(),
             request->has_mlme_channel());
@@ -139,46 +97,13 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
   struct iwl_mvm* mvm = iwl_trans_get_mvm(drvdata());
   struct iwl_mvm_vif* mvmvif = mvm->mvmvif[out_iface_id];
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    IWL_ERR(this, "failed to create endpoints: %s\n", endpoints.status_string());
-    completer.buffer(arena).ReplyError(endpoints.status_value());
-    return;
-  }
-  std::unique_ptr<WlanSoftmacDevice> wlan_softmac_device;
-
-  libsync::Completion served;
-  async::PostTask(driver_async_dispatcher_, [&]() {
-    wlan_softmac_device =
-        std::make_unique<WlanSoftmacDevice>(parent(), drvdata(), out_iface_id, mvmvif);
-    zx_status_t status =
-        wlan_softmac_device->ServeWlanSoftmacProtocol(std::move(endpoints->server));
-    if (status != ZX_OK) {
-      IWL_ERR(this, "failed to serve wlan softmac service: %s\n", zx_status_get_string(status));
-      completer.buffer(arena).ReplyError(status);
-      return;
-    }
-    served.Signal();
-  });
-  served.Wait();
-  std::array<const char*, 1> offers{
-      fuchsia_wlan_softmac::Service::Name,
-  };
-  // The outgoing directory will only be accessible by the driver that binds to
-  // the newly created device.
-  status = wlan_softmac_device->DdkAdd(::ddk::DeviceAddArgs("iwlwifi-wlan-softmac")
-                                           .set_proto_id(ZX_PROTOCOL_WLAN_SOFTMAC)
-                                           .set_runtime_service_offers(offers)
-                                           .set_outgoing_dir(endpoints->client.TakeChannel()));
-  if (status != ZX_OK) {
-    IWL_ERR(this, "failed mac device add: %s", zx_status_get_string(status));
+  if ((status = AddWlansoftmacDevice(out_iface_id, mvmvif)) != ZX_OK) {
+    IWL_ERR(this, "%s() failed mac device add: %s\n", __func__, zx_status_get_string(status));
     phy_create_iface_undo(drvdata(), out_iface_id);
     completer.buffer(arena).ReplyError(status);
     return;
   }
-  wlan_softmac_device.release();
-
-  IWL_INFO(this, "created iface %u", out_iface_id);
+  IWL_INFO(this, "%s() created iface %u\n", __func__, out_iface_id);
 
   fidl::Arena fidl_arena;
   auto builder = phyimpl_fidl::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
@@ -193,15 +118,18 @@ void WlanPhyImplDevice::DestroyIface(DestroyIfaceRequestView request, fdf::Arena
     completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
-
   IWL_INFO(this, "destroying iface %u", request->iface_id());
   zx_status_t status = phy_destroy_iface(drvdata(), request->iface_id());
   if (status != ZX_OK) {
-    completer.buffer(arena).ReplyError(status);
     IWL_ERR(this, "failed destroy iface: %s", zx_status_get_string(status));
+    completer.buffer(arena).ReplyError(status);
     return;
   }
-
+  if ((status = RemoveWlansoftmacDevice(request->iface_id())) != ZX_OK) {
+    IWL_ERR(this, "%s() failed mac device remove: %s\n", __func__, zx_status_get_string(status));
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
   completer.buffer(arena).ReplySuccess();
 }
 
@@ -259,6 +187,11 @@ void WlanPhyImplDevice::GetPowerSaveMode(fdf::Arena& arena,
                                          GetPowerSaveModeCompleter::Sync& completer) {
   IWL_ERR(this, "%s() not implemented ...\n", __func__);
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void WlanPhyImplDevice::ServiceConnectHandler(
+    fdf_dispatcher_t* dispatcher, fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end) {
+  fdf::BindServer(dispatcher, std::move(server_end), this);
 }
 
 }  // namespace wlan::iwlwifi

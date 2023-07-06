@@ -267,7 +267,6 @@ Device::Device(zx_device_t* device)
   ldebug(0, NULL, "Entering.");
   linfo("Creating a new WLAN device.");
   state_ = fbl::AdoptRef(new DeviceState);
-
   // Create a dispatcher to wait on the runtime channel.
   auto dispatcher =
       fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
@@ -309,8 +308,8 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
   linfo("Binding our new WLAN softmac device.");
 
   zx_status_t status;
-  zx::result<fdf::ClientEnd<fuchsia_wlan_softmac::WlanSoftmac>> client_end =
-      DdkConnectRuntimeProtocol<fuchsia_wlan_softmac::Service::WlanSoftmac>();
+
+  auto client_end = DdkConnectRuntimeProtocol<fuchsia_wlan_softmac::Service::WlanSoftmac>();
   if (client_end.is_error()) {
     lerror("DDdkConnectRuntimeProtocol failed: %s", client_end.status_string());
     return client_end.status_value();

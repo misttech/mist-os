@@ -4,7 +4,6 @@
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/module.h"
 
-#include <lib/ddk/driver.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <zircon/process.h>
@@ -13,8 +12,6 @@
 #include <zircon/types.h>
 
 #include <string>
-
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/device.h"
 
 static const size_t kModuleNameMax = 256;
 
@@ -45,7 +42,8 @@ zx_status_t iwl_firmware_request(struct device* dev, const char* name, struct fi
   zx_status_t status = ZX_OK;
   zx_handle_t vmo = ZX_HANDLE_INVALID;
   size_t size = 0;
-  if ((status = load_firmware(dev->zxdev, name, &vmo, &size)) != ZX_OK) {
+  if ((status = (*dev->load_firmware_callback)(dev->load_firmware_ctx, name, &vmo, &size)) !=
+      ZX_OK) {
     return status;
   }
 
@@ -63,18 +61,21 @@ zx_status_t iwl_firmware_request(struct device* dev, const char* name, struct fi
 }
 
 zx_status_t iwl_firmware_request_nowait(struct device* dev, const char* name,
-                                        void (*cont)(struct firmware* firmware, void* context),
+                                        zx_status_t (*cont)(struct firmware* firmware,
+                                                            void* context),
                                         void* context) {
   // Fuchsia does support asynchronous firmware loading, but it makes for a rather complicated
-  // threading model when the reply to ddk::Bind (where firmware typically loading occurs) can also
+  // threading model when the reply to Start()(where firmware typically loading occurs) can also
   // be threaded.  To simplify things then we'll just do this synchronously, and rely on threading
-  // the entire ddk::Bind call if asynchronous loading is desired.
+  // the entire Start() call if asynchronous loading is desired.
   zx_status_t status = ZX_OK;
   struct firmware fw = {};
   if ((status = iwl_firmware_request(dev, name, &fw)) != ZX_OK) {
     return status;
   }
-  (*cont)(&fw, context);
+  if ((status = (*cont)(&fw, context)) != ZX_OK) {
+    return status;
+  }
   return ZX_OK;
 }
 

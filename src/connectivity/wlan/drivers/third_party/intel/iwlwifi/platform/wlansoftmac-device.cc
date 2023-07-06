@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlan-softmac-device.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlansoftmac-device.h"
 
 #include <zircon/assert.h>
 #include <zircon/status.h>
@@ -39,17 +39,13 @@ extern "C" {
 
 namespace wlan::iwlwifi {
 
-WlanSoftmacDevice::WlanSoftmacDevice(zx_device* parent, iwl_trans* drvdata, uint16_t iface_id,
+WlanSoftmacDevice::WlanSoftmacDevice(iwl_trans* drvdata, uint16_t iface_id,
                                      struct iwl_mvm_vif* mvmvif)
-    : ddk::Device<WlanSoftmacDevice, ddk::Initializable, ddk::Unbindable>(parent),
-      mvmvif_(mvmvif),
-      drvdata_(drvdata),
-      iface_id_(iface_id),
-      mac_started(false),
-      outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())),
-      serving_wlan_softmac_instance_(false) {}
+    : mvmvif_(mvmvif), drvdata_(drvdata) {
+  mac_init(mvmvif_, drvdata_, iface_id);
+}
 
-WlanSoftmacDevice::~WlanSoftmacDevice() {}
+WlanSoftmacDevice::~WlanSoftmacDevice() { mac_release(mvmvif_); }
 
 // Max size of WlanSoftmacQueryResponse.
 constexpr size_t kWlanSoftmacQueryResponseBufferSize =
@@ -119,16 +115,13 @@ void WlanSoftmacDevice::Start(StartRequestView request, fdf::Arena& arena,
     return;
   }
 
-  mac_started = true;
   completer.buffer(arena).ReplySuccess(std::move(out_mlme_channel));
 }
 
 void WlanSoftmacDevice::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
   // Remove the stop logic from destructor if higher layer calls this function correctly.
-  if (mac_started) {
-    ap_mvm_sta_.reset();
-    mac_stop(mvmvif_);
-  }
+  ap_mvm_sta_.reset();
+  mac_stop(mvmvif_);
   completer.buffer(arena).Reply();
 }
 
@@ -455,30 +448,9 @@ void WlanSoftmacDevice::UpdateWmmParameters(UpdateWmmParametersRequestView reque
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-void WlanSoftmacDevice::DdkInit(ddk::InitTxn txn) {
-  txn.Reply(mac_init(mvmvif_, drvdata_, zxdev(), iface_id_));
-}
-
-void WlanSoftmacDevice::DdkRelease() {
-  IWL_DEBUG_INFO(this, "Releasing iwlwifi mac-device\n");
-  if (mac_started) {
-    ap_mvm_sta_.reset();
-    mac_stop(mvmvif_);
-  }
-  mac_release(mvmvif_);
-  delete this;
-}
-
-void WlanSoftmacDevice::DdkUnbind(ddk::UnbindTxn txn) {
-  IWL_DEBUG_INFO(this, "Unbinding iwlwifi mac-device\n");
-  zx::result res =
-      outgoing_dir_.RemoveService<fuchsia_wlan_softmac::Service>(fdf::kDefaultInstance);
-  if (res.is_error()) {
-    IWL_ERR(this, "Failed to remove WlanSoftmac service from outgoing directory: %s\n",
-            res.status_string());
-  }
-  mac_unbind(mvmvif_);
-  txn.Reply();
+void WlanSoftmacDevice::ServiceConnectHandler(
+    fdf_dispatcher_t* dispatcher, fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmac> server_end) {
+  fdf::BindServer(dispatcher, std::move(server_end), this);
 }
 
 void WlanSoftmacDevice::Recv(fuchsia_wlan_softmac::wire::WlanRxPacket* rx_packet) {
@@ -518,32 +490,6 @@ void WlanSoftmacDevice::NotifyScanComplete(const zx_status_t status, const uint6
         "result.status: %d, scan_id=%zu, status=%s\n",
         result.status(), scan_id, zx_status_get_string(status));
   }
-}
-
-zx_status_t WlanSoftmacDevice::ServeWlanSoftmacProtocol(
-    fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  auto protocol = [this](fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmac> server_end) mutable {
-    if (serving_wlan_softmac_instance_) {
-      zxlogf(ERROR, "Cannot bind WlanSoftmac server: Already serving WlanSoftmac");
-      return;
-    }
-
-    serving_wlan_softmac_instance_ = true;
-    fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), this);
-  };
-  fuchsia_wlan_softmac::Service::InstanceHandler handler({.wlan_softmac = std::move(protocol)});
-  auto status = outgoing_dir_.AddService<fuchsia_wlan_softmac::Service>(std::move(handler));
-  if (status.is_error()) {
-    IWL_ERR(this, "Failed to add service to outgoing directory: %s", status.status_string());
-    return status.error_value();
-  }
-  auto result = outgoing_dir_.Serve(std::move(server_end));
-  if (result.is_error()) {
-    IWL_ERR(this, "Failed to serve outgoing directory: %s", result.status_string());
-    return result.error_value();
-  }
-
-  return ZX_OK;
 }
 
 }  // namespace wlan::iwlwifi

@@ -5,6 +5,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_DRIVER_INSPECTOR_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_DRIVER_INSPECTOR_H_
 
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/inspect/cpp/vmo/types.h>
 #include <lib/stdcompat/span.h>
@@ -34,7 +35,8 @@ struct DriverInspectorOptions final {
 // Thread-safety: this class is thread-safe.
 class DriverInspector {
  public:
-  explicit DriverInspector(DriverInspectorOptions options = {});
+  explicit DriverInspector(async_dispatcher* dispatcher, component::OutgoingDirectory& out,
+                           DriverInspectorOptions options = {});
   ~DriverInspector();
 
   // Publish a core dump under `core_dump_name`.  Old core dumps may be removed to make room.
@@ -47,6 +49,8 @@ class DriverInspector {
   // Get a read-only copy of this Inspect tree's backing VMO.
   ::zx::vmo DuplicateVmo() const;
 
+  inspect::Inspector* inspector() { return inspector_.get(); }
+
  private:
   struct CoreDumpEntry {
     ::inspect::ByteVectorProperty dump_ = {};
@@ -54,6 +58,8 @@ class DriverInspector {
   };
 
   std::unique_ptr<::inspect::Inspector> inspector_;
+  // Another wrapper of ::inspect::Inspector, alternative of set_inspect_vmo().
+  std::unique_ptr<inspect::ComponentInspector> component_inspector_;
   ::inspect::Node root_node_;
 
   std::mutex core_dump_mutex_;

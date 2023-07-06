@@ -70,8 +70,9 @@ struct rcu_manager;
 // This struct is analogous to the Linux device struct, and contains all the Fuchsia-specific data
 // fields relevant to generic device functionality.
 struct device {
-  // The zx_device of the base iwlwifi Device.
-  struct zx_device* zxdev;
+  void* load_firmware_ctx;
+  zx_status_t (*load_firmware_callback)(void* ctx, const char* name, zx_handle_t* vmo,
+                                        size_t* size);
 
   // The BTI handle used to map IO buffers for this device.
   zx_handle_t bti;
@@ -241,24 +242,17 @@ static inline unsigned int jiffies_to_msecs(zx_duration_t duration) {
   return (unsigned int)zx_nsec_from_duration(duration) / 1000 / 1000;
 }
 
-static inline void udelay(int usec) {
-  zx_nanosleep(zx_deadline_after(ZX_USEC(usec)));
-}
+static inline void udelay(int usec) { zx_nanosleep(zx_deadline_after(ZX_USEC(usec))); }
 
-static inline void mdelay(int msec) {
-  zx_nanosleep(zx_deadline_after(ZX_MSEC(msec)));
-}
+static inline void mdelay(int msec) { zx_nanosleep(zx_deadline_after(ZX_MSEC(msec))); }
 
-static inline void msleep(int msec) {
-  zx_nanosleep(zx_deadline_after(ZX_MSEC(msec)));
-}
+static inline void msleep(int msec) { zx_nanosleep(zx_deadline_after(ZX_MSEC(msec))); }
 
 // We may redefine this struct to use `list_node_t` in the future.
 // TODO(fxbug.dev/119415): clean-up after uprev.
 struct list_head {
   char dummy;
 };
-
 
 // Returns the size of the given struct 'str' and its tailing variant-length array 'member' (which
 // the element count is 'count').
@@ -268,28 +262,24 @@ struct list_head {
 //
 #define struct_size(str, member, count) (sizeof(*str) + sizeof(*((str)->member)) * count)
 
-
 // Fuchsia dones't support spin lock. We use the mutex lock as the workaround.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wthread-safety-analysis"
-static inline void spin_lock(mtx_t* lock) {
-  mtx_lock(lock);
-}
+static inline void spin_lock(mtx_t* lock) { mtx_lock(lock); }
 
-static inline void spin_unlock(mtx_t* lock) {
-  mtx_unlock(lock);
-}
+static inline void spin_unlock(mtx_t* lock) { mtx_unlock(lock); }
 
 // flags is not needed in Fuchsia. Discard it.
-#define spin_lock_irqsave(lock, flags) do {  \
-  mtx_lock(lock);                            \
-} while (0)
+#define spin_lock_irqsave(lock, flags) \
+  do {                                 \
+    mtx_lock(lock);                    \
+  } while (0)
 
-#define spin_unlock_irqrestore(lock, flags) do {  \
-  mtx_unlock(lock);                               \
-} while (0)
+#define spin_unlock_irqrestore(lock, flags) \
+  do {                                      \
+    mtx_unlock(lock);                       \
+  } while (0)
 #pragma GCC diagnostic pop
-
 
 #if defined(__cplusplus)
 }  // extern "C"

@@ -39,6 +39,8 @@ source_set("sim_library") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/connectivity/wlan/drivers/lib/log/c:dfv2",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw:api",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
@@ -50,11 +52,10 @@ source_set("sim_library") {
     "//zircon/system/ulib/sync:sync-cpp",
   ]
   public_deps = [
-    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform",
     "//src/connectivity/wlan/lib/common/cpp:common",
     "//src/devices/pci/testing:pci-protocol-fake",
-    "//src/devices/testing/mock-ddk",
     "//zircon/system/public",
     "//zircon/system/ulib/zxtest",
   ]
@@ -76,7 +77,11 @@ executable("driver_inspector_test") {
   testonly = true
   sources = [ "driver-inspector-test.cc" ]
   deps = [
+    "//sdk/lib/driver/component/cpp:cpp",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform:driver_inspector",
+    "//src/devices/testing/driver-runtime-main:zxtest",
+    "//zircon/system/ulib/async",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zxtest",
   ]
@@ -127,8 +132,10 @@ executable("iwl_phy_db_test") {
   sources = [ "iwl-phy-db-test.cc" ]
   deps = [
     ":stub_mvm",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/connectivity/wlan/drivers/lib/log/c:dfv2",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
-    "//src/devices/testing/no_ddk",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -180,7 +187,6 @@ executable("notif_wait_test") {
   deps = [
     ":stub_mvm",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw",
-    "//src/devices/testing/no_ddk",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -207,6 +213,7 @@ executable("pcie_test") {
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//src/connectivity/wlan/drivers/testing/lib/DFv2:sim-driver-host",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw:api",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/pcie",
@@ -214,7 +221,6 @@ executable("pcie_test") {
     "//src/devices/pci/testing:pci-protocol-fake",
     "//src/devices/testing/driver-runtime-main:zxtest",
     "//src/devices/testing/fake-bti",
-    "//src/devices/testing/mock-ddk",
     "//zircon/system/public",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -244,7 +250,6 @@ executable("platform_test") {
   deps = [
     ":stub_mvm",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform",
-    "//src/devices/testing/no_ddk",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -281,7 +286,6 @@ executable("task_test") {
   deps = [
     ":stub_mvm",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform",
-    "//src/devices/testing/no_ddk",
     "//zircon/system/public",
     "//zircon/system/ulib/async-testing",
     "//zircon/system/ulib/zxtest",
@@ -294,7 +298,6 @@ executable("utils_test") {
   sources = [ "utils-test.cc" ]
   deps = [
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
-    "//src/devices/testing/no_ddk",
     "//zircon/system/ulib/zxtest",
   ]
 }

@@ -3,15 +3,15 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
-        compat: "driver/iwlwifi.so",
+        binary: "driver/iwlwifi.so",
+        colocate: "true",
         bind: "meta/bind/iwlwifi.bindbc",
-        colocate: "false",
+        default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     capabilities: [
         { service: "fuchsia.wlan.softmac.Service" },
@@ -19,6 +19,9 @@
     ],
     use: [
         { service: "fuchsia.hardware.pci.Service" },
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+        },
     ],
     expose: [
         {

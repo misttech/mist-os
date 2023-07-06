@@ -11,7 +11,8 @@
 
 namespace wlan::iwlwifi {
 
-DriverInspector::DriverInspector(DriverInspectorOptions options)
+DriverInspector::DriverInspector(async_dispatcher* dispatcher, component::OutgoingDirectory& out,
+                                 DriverInspectorOptions options)
     : inspector_(std::make_unique<::inspect::Inspector>(
           ::inspect::InspectSettings{.maximum_size = options.vmo_size})),
       core_dump_capacity_(options.core_dump_capacity) {
@@ -19,6 +20,9 @@ DriverInspector::DriverInspector(DriverInspectorOptions options)
   if (inspector_root) {
     root_node_ = inspector_root.CreateChild(options.root_name);
   }
+
+  component_inspector_ =
+      std::make_unique<inspect::ComponentInspector>(out, dispatcher, *inspector_);
 }
 
 DriverInspector::~DriverInspector() = default;

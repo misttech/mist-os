@@ -18,8 +18,7 @@ namespace wlan::testing {
 // TODO(fxb/124464): Migrate test to use dispatcher integration.
 FakeUcodeTest::FakeUcodeTest(const std::vector<enum iwl_ucode_tlv_capa>& capas,
                              const std::vector<enum iwl_ucode_tlv_api>& apis)
-    : fake_parent_(MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()),
-      sim_trans_(fake_parent_.get()) {
+    : sim_trans_() {
   // Add a default MVM firmware to the fake DDK.
   TlvFwBuilder fw_builder;
 
@@ -61,7 +60,7 @@ FakeUcodeTest::FakeUcodeTest(const std::vector<enum iwl_ucode_tlv_capa>& capas,
                   (6 << FW_PHY_CFG_RX_CHAIN_POS));  // Rx antenna 2 and 1.
   fw_builder.AddValue(IWL_UCODE_TLV_PHY_SKU, &ucode_phy_sku, sizeof(ucode_phy_sku));
 
-  fake_parent_->SetFirmware(fw_builder.GetBinary());
+  sim_trans_.SetFirmware(fw_builder.GetBinary());
 
   zx_status_t status = sim_trans_.Init();
   ZX_ASSERT_MSG(ZX_OK == status, "Transportation initialization failed: %s",

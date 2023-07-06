@@ -25,7 +25,8 @@ zx_status_t iwl_firmware_request(struct device* dev, const char* name, struct fi
 
 // Request loading of a firmware binary, asynchronously.
 zx_status_t iwl_firmware_request_nowait(struct device* dev, const char* name,
-                                        void (*cont)(struct firmware* firmware, void* context),
+                                        zx_status_t (*cont)(struct firmware* firmware,
+                                                            void* context),
                                         void* context);
 
 // Free a loaded firmware binary.

@@ -44,6 +44,10 @@ void iwl_pci_free(struct iwl_pci_fidl* fidl);
 
 #if defined(__cplusplus)
 }  // extern "C"
+
+zx_status_t iwl_pci_connect_fragment_protocol_with_client(
+    fidl::ClientEnd<fuchsia_hardware_pci::Device> client_end, struct iwl_pci_fidl** fidl);
+
 #endif  // defined(__cplusplus)
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_PCI_FIDL_H_

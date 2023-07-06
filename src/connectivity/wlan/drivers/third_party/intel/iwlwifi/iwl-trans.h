@@ -921,7 +921,6 @@ struct iwl_trans {
   enum iwl_trans_state state;
   unsigned long status;
 
-  zx_device_t* zxdev;
   struct device* dev;
 	u32 max_skb_frags;
 	u32 hw_rev;

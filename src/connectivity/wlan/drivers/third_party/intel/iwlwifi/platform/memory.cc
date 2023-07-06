@@ -4,7 +4,9 @@
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/memory.h"
 
-#include <lib/ddk/io-buffer.h>
+#include <zircon/compiler.h>
+#include <zircon/process.h>
+#include <zircon/syscalls.h>
 
 #include <memory>
 
@@ -12,6 +14,7 @@ struct iwl_iobuf {
   io_buffer_t io_buffer = {};
 };
 
+// iwlwifi buffer operations
 zx_status_t iwl_iobuf_allocate_contiguous(struct device* dev, size_t size,
                                           struct iwl_iobuf** out_iobuf) {
   zx_status_t status = ZX_OK;

@@ -16,6 +16,10 @@
 extern "C" {
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-phy-db.h"
 }
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/driver/logging/cpp/logger.h>
+
+#include <wlan/drivers/log_instance.h>
 
 namespace wlan {
 namespace testing {
@@ -23,12 +27,32 @@ namespace {
 
 class IwlPhyDbTest : public ::zxtest::Test {
  public:
-  IwlPhyDbTest() {}
-  ~IwlPhyDbTest() {}
+  IwlPhyDbTest() {
+    std::vector<fuchsia_component_runner::ComponentNamespaceEntry> entries;
+    zx::result open_result = component::OpenServiceRoot();
+    ZX_ASSERT_MSG(open_result.is_ok(), "Failed to open service root: %d",
+                  open_result.status_value());
 
-  struct iwl_phy_db* phy_db() {
-    return phy_db_;
+    ::fidl::ClientEnd<::fuchsia_io::Directory> svc = std::move(*open_result);
+    entries.emplace_back(fuchsia_component_runner::ComponentNamespaceEntry{{
+        .path = "/svc",
+        .directory = std::move(svc),
+    }});
+
+    // Create Namespace object from the entries.
+    auto ns = fdf::Namespace::Create(entries);
+    ZX_ASSERT_MSG(!ns.is_error(), "Create namespace failed: %d", ns.status_value());
+
+    // Create driver::Logger with dispatcher and namespace.
+    auto logger = fdf::Logger::Create(*ns, loop_.dispatcher(), "SimTransIwlwifiDriver loop");
+    ZX_ASSERT_MSG(!logger.is_error(), "Create logger failed: %d", logger.status_value());
+
+    // Initialize the log instance with driver::Logger.
+    wlan::drivers::log::Instance::Init(0, std::move(*logger));
   }
+  ~IwlPhyDbTest() { wlan::drivers::log::Instance::Reset(); }
+
+  struct iwl_phy_db* phy_db() { return phy_db_; }
 
   void SetUp() override { phy_db_ = iwl_phy_db_init(nullptr); }
 
@@ -36,6 +60,7 @@ class IwlPhyDbTest : public ::zxtest::Test {
 
  private:
   struct iwl_phy_db* phy_db_;
+  async::Loop loop_ = async::Loop(&kAsyncLoopConfigNeverAttachToThread);
 };
 
 // Expect the iwl_phy_db_send_all_channel_groups() returns ZX_OK right after init before there is

@@ -20,7 +20,6 @@ source_set("pcie") {
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/queue:queue",
     "//src/devices/pci/lib/device-protocol-pci",
-    "//src/lib/ddk",
     "//src/lib/debug:backtrace-request",
     "//zircon/system/ulib/sync",
   ]

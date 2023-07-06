@@ -4,8 +4,11 @@
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/driver-inspector.h"
 
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/reader.h>
+#include <zircon/system/ulib/async-default/include/lib/async/default.h>
 
 #include <cstring>
 #include <vector>
@@ -15,28 +18,48 @@
 namespace wlan::testing {
 namespace {
 
+class DriverInspectorTest : public ::zxtest::Test {
+ public:
+  DriverInspectorTest()
+      : dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()), outgoing_(dispatcher_) {}
+
+  async_dispatcher_t* dispatcher_;
+  component::OutgoingDirectory outgoing_;
+};
+
 // Test DriverInspector creation with different parameters.
-TEST(DriverInspectorTest, CreationOptions) {
-  auto d1 = wlan::iwlwifi::DriverInspector();
-  EXPECT_TRUE(d1.GetRoot());
+TEST_F(DriverInspectorTest, CreationOptionsDefault) {
+  auto inspector = wlan::iwlwifi::DriverInspector(dispatcher_, outgoing_);
+  EXPECT_TRUE(inspector.GetRoot());
+}
 
-  auto d2 = wlan::iwlwifi::DriverInspector(
+TEST_F(DriverInspectorTest, CreationOptionsSizeAndCapacity) {
+  auto inspector = wlan::iwlwifi::DriverInspector(
+      dispatcher_, outgoing_,
       wlan::iwlwifi::DriverInspectorOptions{.vmo_size = 4 * 1024, .core_dump_capacity = 4 * 1024});
-  EXPECT_TRUE(d2.GetRoot());
+  EXPECT_TRUE(inspector.GetRoot());
+}
 
-  auto d3 = wlan::iwlwifi::DriverInspector(
+TEST_F(DriverInspectorTest, CreationOptionsSize) {
+  auto inspector = wlan::iwlwifi::DriverInspector(
+      dispatcher_, outgoing_,
       wlan::iwlwifi::DriverInspectorOptions{.vmo_size = 4 * 1024, .core_dump_capacity = 0});
-  EXPECT_TRUE(d3.GetRoot());
+  EXPECT_TRUE(inspector.GetRoot());
+}
 
-  auto d4 = wlan::iwlwifi::DriverInspector(
+TEST_F(DriverInspectorTest, CreationOptionsNone) {
+  auto inspector = wlan::iwlwifi::DriverInspector(
+      dispatcher_, outgoing_,
       wlan::iwlwifi::DriverInspectorOptions{.vmo_size = 0, .core_dump_capacity = 0});
-  EXPECT_FALSE(d4.GetRoot());
+  EXPECT_FALSE(inspector.GetRoot());
 }
 
 // Test DriverInspector core dump functionality.
-TEST(DriverInspectorTest, PublishCoreDump) {
-  auto inspector = wlan::iwlwifi::DriverInspector(wlan::iwlwifi::DriverInspectorOptions{
-      .root_name = "test_inspector", .vmo_size = 8 * 1024, .core_dump_capacity = 2 * 1024});
+TEST_F(DriverInspectorTest, PublishCoreDump) {
+  auto inspector = wlan::iwlwifi::DriverInspector(
+      dispatcher_, outgoing_,
+      wlan::iwlwifi::DriverInspectorOptions{
+          .root_name = "test_inspector", .vmo_size = 8 * 1024, .core_dump_capacity = 2 * 1024});
   ASSERT_TRUE(inspector.GetRoot());
 
   auto large_buffer = std::vector<char>(2 * 1024 + 1);

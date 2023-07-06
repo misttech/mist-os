@@ -113,7 +113,7 @@ zx_status_t iwl_mvm_init(void) {
 
   ret = iwl_opmode_register("iwlmvm", &iwl_mvm_ops);
   if (ret) {
-    zxlogf(ERROR, "Unable to register MVM op_mode: %d", ret);
+    IWL_ERR(nullptr, "Unable to register MVM op_mode: %d", ret);
   }
 
   return ret;
@@ -832,9 +832,9 @@ static struct iwl_op_mode* iwl_op_mode_mvm_start(struct iwl_trans* trans, const 
       trans_cfg.rx_buf_size = IWL_AMSDU_12K;
       break;
     default:
-      zxlogf(ERROR, "%s: Unsupported amsdu_size: %d", KBUILD_MODNAME,
-             iwlwifi_mod_params.amsdu_size);
-		trans_cfg.rx_buf_size = IWL_AMSDU_4K;
+      IWL_ERR(nullptr, "%s: Unsupported amsdu_size: %d", KBUILD_MODNAME,
+              iwlwifi_mod_params.amsdu_size);
+      trans_cfg.rx_buf_size = IWL_AMSDU_4K;
   }
 
   trans->wide_cmd_header = true;

@@ -33,9 +33,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *****************************************************************************/
-#include <lib/ddk/io-buffer.h>
 #include <lib/sync/condition.h>
 #include <zircon/assert.h>
+#include <zircon/syscalls.h>
 #include <zircon/time.h>
 
 #if 0  // NEEDS_PORTING

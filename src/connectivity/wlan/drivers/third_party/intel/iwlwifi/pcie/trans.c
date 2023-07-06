@@ -1998,8 +1998,6 @@ void iwl_trans_pcie_free(struct iwl_trans* trans) {
 	mutex_destroy(&trans_pcie->mutex);
 #endif  // NEEDS_PORTING
 
-  iwl_pci_free(trans_pcie->pci);
-
   iwl_trans_free(trans);
 }
 

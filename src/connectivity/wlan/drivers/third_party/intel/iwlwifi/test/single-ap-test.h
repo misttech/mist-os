@@ -12,7 +12,6 @@
 #include <zxtest/zxtest.h>
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test/sim-trans.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace wlan::testing {
 
@@ -31,7 +30,6 @@ class SingleApTest : public ::zxtest::Test {
   static constexpr cssid_t kSsid = {.len = 6 /* strlen("MySSID") */, .data = "MySSID"};
   static constexpr wlan_channel_t kChannel = {.primary = 11, .cbw = CHANNEL_BANDWIDTH_CBW20};
 
-  std::shared_ptr<MockDevice> fake_parent_;
   SimTransport sim_trans_;
 };
 

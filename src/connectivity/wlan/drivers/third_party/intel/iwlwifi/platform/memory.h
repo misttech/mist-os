@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <zircon/types.h>
 
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/io_buffer.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/kernel.h"
 
 #if defined(__cplusplus)

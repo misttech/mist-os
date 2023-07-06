@@ -19,9 +19,8 @@
 
 #define IWL_STATS_INTERVAL ZX_SEC(20)
 
-static const char* descs[] = {"ints", "fw_cmd",    "be",       "bc",      "mc",
-                              "uni",  "from_mlme", "data->fw", "cmd->fw", "txq_drop",
-                              "buf",  "drop", "to"};
+static const char* descs[] = {"ints",     "fw_cmd",  "be",       "bc",  "mc",   "uni", "from_mlme",
+                              "data->fw", "cmd->fw", "txq_drop", "buf", "drop", "to"};
 
 struct iwl_stats_data {
   async_dispatcher_t* dispatcher;
@@ -49,25 +48,25 @@ void iwl_stats_report_wk(async_dispatcher_t* dispatcher, async_task_t* task, zx_
   const std::lock_guard<std::mutex> lock(mutex_lock);
 
   // TODO(fxb/101542): better debug info for bug triage.
-  // clang-format off
-  zxlogf(INFO,
-         "rssi:%d rate:%u [%s:%zu %s:%zu (%s:%zu,%s:%zu,%s:%zu,%s:%zu)] "
-         "[%s:%zu %s:%zu %s:%zu] [%s:%zu] reorder:[%s:%zu %s:%zu %s:%zu]",
-      stats_data.last_rssi_dbm, stats_data.last_data_rate,
-      descs[IWL_STATS_CNT_INTS_FROM_FW], stats_data.counters[IWL_STATS_CNT_INTS_FROM_FW],
-      descs[IWL_STATS_CNT_CMD_FROM_FW], stats_data.counters[IWL_STATS_CNT_CMD_FROM_FW],
-      descs[IWL_STATS_CNT_BCAST_TO_MLME], stats_data.counters[IWL_STATS_CNT_BCAST_TO_MLME],
-      descs[IWL_STATS_CNT_MCAST_TO_MLME], stats_data.counters[IWL_STATS_CNT_MCAST_TO_MLME],
-      descs[IWL_STATS_CNT_UNICAST_TO_MLME], stats_data.counters[IWL_STATS_CNT_UNICAST_TO_MLME],
-      descs[IWL_STATS_CNT_BEACON_TO_MLME], stats_data.counters[IWL_STATS_CNT_BEACON_TO_MLME],
-      descs[IWL_STATS_CNT_DATA_FROM_MLME], stats_data.counters[IWL_STATS_CNT_DATA_FROM_MLME],
-      descs[IWL_STATS_CNT_DATA_TO_FW], stats_data.counters[IWL_STATS_CNT_DATA_TO_FW],
-      descs[IWL_STATS_CNT_CMD_TO_FW], stats_data.counters[IWL_STATS_CNT_CMD_TO_FW],
-      descs[IWL_STATS_CNT_TXQ_DROP], stats_data.counters[IWL_STATS_CNT_TXQ_DROP],
-      descs[IWL_STATS_CNT_FRAMES_BUFFERED], stats_data.counters[IWL_STATS_CNT_FRAMES_BUFFERED],
-      descs[IWL_STATS_CNT_REORDER_DROP], stats_data.counters[IWL_STATS_CNT_REORDER_DROP],
-      descs[IWL_STATS_CNT_REORDER_TIMEOUT], stats_data.counters[IWL_STATS_CNT_REORDER_TIMEOUT]);
-  // clang-format on
+  //clang-format off
+  IWL_LOG(linfo,
+          "rssi:%d rate:%u [%s:%zu %s:%zu (%s:%zu,%s:%zu,%s:%zu,%s:%zu)] "
+          "[%s:%zu %s:%zu %s:%zu] [%s:%zu] reorder:[%s:%zu %s:%zu %s:%zu]",
+          stats_data.last_rssi_dbm, stats_data.last_data_rate, descs[IWL_STATS_CNT_INTS_FROM_FW],
+          stats_data.counters[IWL_STATS_CNT_INTS_FROM_FW], descs[IWL_STATS_CNT_CMD_FROM_FW],
+          stats_data.counters[IWL_STATS_CNT_CMD_FROM_FW], descs[IWL_STATS_CNT_BCAST_TO_MLME],
+          stats_data.counters[IWL_STATS_CNT_BCAST_TO_MLME], descs[IWL_STATS_CNT_MCAST_TO_MLME],
+          stats_data.counters[IWL_STATS_CNT_MCAST_TO_MLME], descs[IWL_STATS_CNT_UNICAST_TO_MLME],
+          stats_data.counters[IWL_STATS_CNT_UNICAST_TO_MLME], descs[IWL_STATS_CNT_BEACON_TO_MLME],
+          stats_data.counters[IWL_STATS_CNT_BEACON_TO_MLME], descs[IWL_STATS_CNT_DATA_FROM_MLME],
+          stats_data.counters[IWL_STATS_CNT_DATA_FROM_MLME], descs[IWL_STATS_CNT_DATA_TO_FW],
+          stats_data.counters[IWL_STATS_CNT_DATA_TO_FW], descs[IWL_STATS_CNT_CMD_TO_FW],
+          stats_data.counters[IWL_STATS_CNT_CMD_TO_FW], descs[IWL_STATS_CNT_TXQ_DROP],
+          stats_data.counters[IWL_STATS_CNT_TXQ_DROP], descs[IWL_STATS_CNT_FRAMES_BUFFERED],
+          stats_data.counters[IWL_STATS_CNT_FRAMES_BUFFERED], descs[IWL_STATS_CNT_REORDER_DROP],
+          stats_data.counters[IWL_STATS_CNT_REORDER_DROP], descs[IWL_STATS_CNT_REORDER_TIMEOUT],
+          stats_data.counters[IWL_STATS_CNT_REORDER_TIMEOUT]);
+  // clang - format on
 
   uint64_t avg_isr_duration = 0;
   if (stats_data.counters[IWL_STATS_CNT_INTS_FROM_FW]) {
@@ -75,8 +74,7 @@ void iwl_stats_report_wk(async_dispatcher_t* dispatcher, async_task_t* task, zx_
         stats_data.total_isr_duration / stats_data.counters[IWL_STATS_CNT_INTS_FROM_FW];
   }
 
-  zxlogf(INFO, "rx isr: avg:%zuns, max:%zuns", avg_isr_duration, stats_data.max_isr_duration);
-
+  IWL_LOG(linfo, "rx isr: avg:%zuns, max:%zuns", avg_isr_duration, stats_data.max_isr_duration);
   iwl_stats_schedule_next(IWL_STATS_INTERVAL);
 }
 

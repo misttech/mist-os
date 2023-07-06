@@ -33,11 +33,6 @@ class Device
   Device(zx_device_t* device, fdf::ClientEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> client);
   ~Device();
 
-  // Creates and binds wlanphy device instance. On success hands device off to device lifecycle
-  // management.
-  static zx_status_t Create(zx_device_t* parent_device,
-                            fdf::ClientEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> client);
-
   // Overriding DDK functions.
   void DdkRelease();
   void DdkUnbind(::ddk::UnbindTxn txn);

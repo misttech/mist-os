@@ -48,10 +48,8 @@ source_set("api") {
     "file.h",
     "img.h",
   ]
-  public_deps = [
-    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform",
-    "//src/lib/ddk",
-  ]
+  public_deps =
+      [ "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform" ]
 }
 
 source_set("fw") {

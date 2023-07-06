@@ -7,7 +7,6 @@
 
 // This file contains Fuchsia-specific debug compilation support.
 
-#include <lib/ddk/debug.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <zircon/assert.h>
@@ -25,17 +24,16 @@ struct device;
 #define WARN(cond, y, z...) (!!(cond))
 #define BUILD_BUG_ON(x) ZX_ASSERT(!(x))
 
-#define __WARN_ON(x, count_down) (  \
-  {  \
-    static size_t count = 1;  \
-    count -= count_down;  \
-    if (count && !!(x)) {  \
-      char str[] = #x;  \
-      lwarn("WARN_ON(%s) is asserted in %s:%d", str, __FILE__, __LINE__);  \
-    }  \
-    !!(x);  \
-  }  \
-)
+#define __WARN_ON(x, count_down)                                          \
+  ({                                                                      \
+    static size_t count = 1;                                              \
+    count -= count_down;                                                  \
+    if (count && !!(x)) {                                                 \
+      char str[] = #x;                                                    \
+      lwarn("WARN_ON(%s) is asserted in %s:%d", str, __FILE__, __LINE__); \
+    }                                                                     \
+    !!(x);                                                                \
+  })
 
 #define WARN_ON(x) __WARN_ON(x, 0)
 #define WARN_ON_ONCE(x) __WARN_ON(x, 1)

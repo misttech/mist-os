@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlan-softmac-device.h"
-
 #include <fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/directory.h>
@@ -28,6 +26,7 @@
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/banjo/common.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/banjo/ieee80211.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/banjo/softmac.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlansoftmac-device.h"
 
 extern "C" {
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-nvm-parse.h"
@@ -65,76 +64,39 @@ class WlanSoftmacDeviceTest : public SingleApTest,
     mvmvif_->mlme_channel = kDummyMlmeChannel;
     mvmvif_->mac_role = WLAN_MAC_ROLE_CLIENT;
     mvmvif_->bss_conf = {.beacon_int = kListenInterval};
+    mvmvif_->mvm->mvmvif[0] = mvmvif_;
 
-    auto driver_dispatcher = fdf::SynchronizedDispatcher::Create(
-        {}, "wlansoftmac-test-driver-dispatcher",
+    // mac_init() is called inside the constructor.
+    device_ =
+        std::make_unique<::wlan::iwlwifi::WlanSoftmacDevice>(sim_trans_.iwl_trans(), 0, mvmvif_);
+
+    auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmac>();
+    ASSERT_FALSE(endpoints.is_error());
+
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        {}, "wlan-softmac-device-test-driver-dispatcher",
         [&](fdf_dispatcher_t*) { driver_completion_.Signal(); });
-    ASSERT_FALSE(driver_dispatcher.is_error());
-    driver_dispatcher_ = *std::move(driver_dispatcher);
-
-    // The WlanSoftmacDevice must be constructed in an fdf dispatcher because it
-    // creates a `driver::OutgoingDirectory` instance which must be constructed
-    // on an fdf dispatcher.
-    libsync::Completion created;
-    async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
-      device_ = new ::wlan::iwlwifi::WlanSoftmacDevice(sim_trans_.fake_parent(),
-                                                       sim_trans_.iwl_trans(), 0, mvmvif_);
-      created.Signal();
-    });
-    created.Wait();
-
-    device_->DdkAdd("sim-iwlwifi-wlansoftmac", DEVICE_ADD_NON_BINDABLE);
-    device_->DdkAsyncRemove();
-
-    auto outgoing_dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_FALSE(outgoing_dir_endpoints.is_error());
+    ASSERT_FALSE(dispatcher.is_error());
+    driver_dispatcher_ = *std::move(dispatcher);
 
     // `ServeWlanSoftmacProtocol` must be called in a driver dispatcher because
     // it manipulates a `driver::OutgoingDirectory` which can only be accessed
     // on the same fdf dispatcher that created it.
-    libsync::Completion served;
+    libsync::Completion connected;
     async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
-      ASSERT_EQ(ZX_OK,
-                device_->ServeWlanSoftmacProtocol(std::move(outgoing_dir_endpoints->server)));
-      served.Signal();
+      device_->ServiceConnectHandler(driver_dispatcher_.get(), std::move(endpoints->server));
+      connected.Signal();
     });
-    served.Wait();
-
-    // Connect to the WlanSoftmac protocol found in the device's outgoing
-    // directory.
-    // TODO(fxb/116815): Simplify process for connecting to WlanSoftmac
-    // protocol.
-    {
-      auto endpoints =
-          fdf::CreateEndpoints<fuchsia_wlan_softmac::Service::WlanSoftmac::ProtocolType>();
-      ASSERT_FALSE(endpoints.is_error());
-      zx::channel client_token, server_token;
-      ASSERT_EQ(ZX_OK, zx::channel::create(0, &client_token, &server_token));
-      ASSERT_EQ(ZX_OK,
-                fdf::ProtocolConnect(std::move(client_token),
-                                     fdf::Channel(endpoints->server.TakeChannel().release())));
-      fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
-      path.AppendPrintf("svc/%s/default/%s",
-                        fuchsia_wlan_softmac::Service::WlanSoftmac::ServiceName,
-                        fuchsia_wlan_softmac::Service::WlanSoftmac::Name);
-      // Serve the WlanSoftmac protocol on `server_token` found at `path` within
-      // the outgoing directory.
-      ASSERT_EQ(ZX_OK, fdio_service_connect_at(outgoing_dir_endpoints->client.channel().get(),
-                                               path.c_str(), server_token.release()));
-      client_ =
-          fdf::WireSyncClient<fuchsia_wlan_softmac::WlanSoftmac>(std::move(endpoints->client));
-    }
+    connected.Wait();
 
     // Create a dispatcher for the server end of WlansoftmacIfc protocol to wait on the runtime
     // channel.
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+    dispatcher = fdf::SynchronizedDispatcher::Create(
         {}, "wlansoftmacifc_server_test", [&](fdf_dispatcher_t*) { server_completion_.Signal(); });
     ASSERT_FALSE(dispatcher.is_error());
     server_dispatcher_ = *std::move(dispatcher);
 
-    // TODO(fxbug.dev/106669): Increase test fidelity. Call mac_init() here as what DdkInit() in
-    // real case does, instead of manually initialize mvmvif above to meet the minimal requirements
-    // of the test cases. Note: device_->zxdev()->InitOp() will invoke DdkInit().
+    client_ = fdf::WireSyncClient<fuchsia_wlan_softmac::WlanSoftmac>(std::move(endpoints->client));
 
     // Create test arena.
     auto arena = fdf::Arena::Create(0, 0);
@@ -144,10 +106,6 @@ class WlanSoftmacDeviceTest : public SingleApTest,
   }
 
   ~WlanSoftmacDeviceTest() {
-    if (!release_called_) {
-      mock_ddk::ReleaseFlaggedDevices(device_->zxdev(), driver_dispatcher_.async_dispatcher());
-    }
-
     driver_dispatcher_.ShutdownAsync();
     server_dispatcher_.ShutdownAsync();
 
@@ -172,17 +130,19 @@ class WlanSoftmacDeviceTest : public SingleApTest,
 
  protected:
   struct iwl_mvm_vif* mvmvif_;
-  ::wlan::iwlwifi::WlanSoftmacDevice* device_;
+  std::unique_ptr<::wlan::iwlwifi::WlanSoftmacDevice> device_;
 
   fdf::WireSyncClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
+  // In DFv2 world, WlanSoftmacDevice doesn't maintain its own server end dispatcher for
+  // fuchsia_wlan_softmac::WlanSoftmac protocol. The dispatcher is created by driver framework in
+  // the real case, this one is the subsititution in test.
   fdf::Dispatcher driver_dispatcher_;
   fdf::Dispatcher server_dispatcher_;
+
   fdf::Arena test_arena_;
   libsync::Completion driver_completion_;
   libsync::Completion server_completion_;
-  // mock_ddk::ReleaseFlaggedDevices() cannot be called twice, but it's required to be called in
-  // come test cases.
-  bool release_called_ = false;
+
   // The marks of WlanSoftmacIfc function calls.
   bool recv_called_ = false;
 };
@@ -447,10 +407,9 @@ TEST_F(WlanSoftmacDeviceTest, Release) {
   ASSERT_EQ(zx_channel_create(0 /* option */, &case_end, &mvmvif_->mlme_channel), ZX_OK);
   ASSERT_EQ(zx_channel_write(case_end, 0 /* option */, dummy, sizeof(dummy), nullptr, 0), ZX_OK);
 
-  // Call release and the sme channel should be closed so that we will get a peer-close error while
-  // trying to write any data to it.
-  mock_ddk::ReleaseFlaggedDevices(device_->zxdev(), driver_dispatcher_.async_dispatcher());
-  release_called_ = true;
+  // Destroy the device and the sme channel should be closed so that we will get a peer-close error
+  // while trying to write any data to it.
+  device_.reset();
   ASSERT_EQ(zx_channel_write(case_end, 0 /* option */, dummy, sizeof(dummy), nullptr, 0),
             ZX_ERR_PEER_CLOSED);
 }
