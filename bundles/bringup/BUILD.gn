@@ -11,16 +11,8 @@ group("tests") {
   deps = [ "//bundles/buildbot/bringup" ]
 }
 
+# TODO(fxbug.dev/122864) Remove transitional labels
 group("manual_testing") {
-  testonly = true
-
-  deps = [
-    "//src/devices/bundles:manual_testing",
-    "//src/graphics/display/bin/display-test",
-    "//src/security/bin/syscall-check",
-    "//src/zircon/testing/mutex_pi_exerciser",
-    "//src/zircon/tests/evil",
-  ]
 }
 
 # This provides metadata in the //:boot_tests schema.

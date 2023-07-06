@@ -2,7 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
+
 executable("blktest") {
+  visibility = [
+    ":*",
+    "//src/devices/block/drivers/ftl/tests:ftl-integration",
+    "//src/devices/block/drivers/usb-mass-storage:ums-integration",
+  ]
   testonly = true
   sources = [
     "blktest.cc",
@@ -21,4 +28,9 @@ executable("blktest") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  testonly = true
+  deps = [ ":blktest" ]
 }

@@ -137,6 +137,25 @@ assembly_input_bundle("bootstrap_userdebug") {
 # The most-common, most-basic, AIB that is included in all eng systems.
 #
 assembly_input_bundle("bootstrap_eng") {
+  testonly = true
+  bootfs_files_labels = [
+    "//src/devices/bin/tee-test:bootfs",
+    "//src/devices/block/bin/biotime:bootfs",
+    "//src/devices/block/bin/blktest:bootfs",
+    "//src/devices/block/bin/iochk:bootfs",
+    "//src/devices/block/bin/iotime:bootfs",
+    "//src/devices/gpio/drivers/gpio-test:bootfs",
+    "//src/devices/misc/drivers/test:bootfs",
+    "//src/devices/tests/sysdev:bootfs",
+    "//src/devices/usb/drivers/usb-peripheral-test:bootfs",
+    "//src/graphics/display/bin/display-test:bootfs",
+    "//src/security/bin/syscall-check:bootfs",
+    "//src/zircon/tests/evil:bootfs",
+  ]
+
+  # Do not automatically include these tools, but build them to keep them from
+  # bit-rotting.
+  deps = [ "//src/zircon/testing/mutex_pi_exerciser:bootfs" ]
 }
 
 # The virtcon AIB is included by all eng and userdebug products, and can be

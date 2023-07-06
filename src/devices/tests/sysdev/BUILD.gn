@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
@@ -24,8 +25,13 @@ fuchsia_driver("sysdev-driver") {
 }
 
 fuchsia_driver_component("sysdev") {
+  visibility = [ ":*" ]
   component_name = "sysdev"
   deps = [ ":sysdev-driver" ]
   info = "sysdev-info.json"
   manifest = "meta/sysdev.cml"
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":sysdev" ]
 }

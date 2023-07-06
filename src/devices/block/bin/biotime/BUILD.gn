@@ -2,11 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/test.gni")
 import("//src/storage/testing/driver_test_realm.gni")
 
 executable("biotime") {
+  visibility = [ ":*" ]
   testonly = true
   sources = [ "biotime.cc" ]
   deps = [
@@ -17,6 +19,11 @@ executable("biotime") {
     "//zircon/system/ulib/perftest",
     "//zircon/system/ulib/zircon-internal",
   ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  testonly = true
+  deps = [ ":biotime" ]
 }
 
 test("biotime-test") {

@@ -18,8 +18,5 @@ group("bringup") {
 
     # Add the testrunner.
     "//src/testing/runtests",
-
-    # Add various drivers and binaries used in manual testing.
-    "//bundles/bringup:manual_testing",
   ]
 }

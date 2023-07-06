@@ -13,7 +13,6 @@ group("bin") {
     "driver_runtime",
     "lsdev",
     "register-util",
-    "tee-test",
   ]
 }
 

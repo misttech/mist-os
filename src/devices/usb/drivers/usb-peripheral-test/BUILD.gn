@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
@@ -40,10 +41,15 @@ if (is_fuchsia) {
   }
 
   fuchsia_driver_component("usb-peripheral-test") {
+    visibility = [ ":*" ]
     info = "usb-peripheral-test-info.json"
     component_name = "usb-peripheral-test"
     deps = [ ":usb-peripheral-test-driver" ]
     manifest = "meta/usb-peripheral-test.cml"
+  }
+
+  bootfs_files_for_assembly("bootfs") {
+    deps = [ ":usb-peripheral-test" ]
   }
 
   group("tests") {

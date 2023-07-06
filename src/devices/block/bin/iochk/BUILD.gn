@@ -2,7 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
+
 executable("iochk") {
+  visibility = [
+    ":*",
+    "//src/devices/block/drivers/ftl/tests:ftl-integration",
+  ]
   sources = [ "iochk.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
@@ -16,4 +22,8 @@ executable("iochk") {
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":iochk" ]
 }

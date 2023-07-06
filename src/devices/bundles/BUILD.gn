@@ -123,22 +123,6 @@ group("utils") {
   ]
 }
 
-group("manual_testing") {
-  testonly = true
-
-  deps = [
-    "//src/devices/bin/tee-test",
-    "//src/devices/block/bin/biotime",
-    "//src/devices/block/bin/blktest",
-    "//src/devices/block/bin/iochk",
-    "//src/devices/block/bin/iotime",
-    "//src/devices/gpio/drivers/gpio-test",
-    "//src/devices/misc/drivers/test",
-    "//src/devices/tests/sysdev",
-    "//src/devices/usb/drivers/usb-peripheral-test",
-  ]
-}
-
 # This is a group of tools that drivers and driver authors use.
 # It is included in //bundles/tools.
 group("tools") {
