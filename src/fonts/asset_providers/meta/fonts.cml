@@ -5,6 +5,7 @@
 // Top level component for a hermetic font server. The manifest and the component
 // are named after the old fonts.cml which was based on config-data.
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "asset-provider",
