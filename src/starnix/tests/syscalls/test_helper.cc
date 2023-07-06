@@ -26,7 +26,7 @@ namespace test_helper {
 
 ::testing::AssertionResult ForkHelper::WaitForChildrenInternal(int death_signum) {
   ::testing::AssertionResult result = ::testing::AssertionSuccess();
-  while (!only_wait_for_child_pids_ || !child_pids_.empty()) {
+  while (wait_for_all_children_ || !child_pids_.empty()) {
     int wstatus;
     pid_t pid;
     if ((pid = wait(&wstatus)) == -1) {
@@ -41,16 +41,12 @@ namespace test_helper {
       result = ::testing::AssertionFailure()
                << "wait error: " << strerror(errno) << "(" << errno << ")";
     }
-    bool check_result = !only_wait_for_child_pids_;
+    bool check_result = wait_for_all_children_;
     if (!check_result) {
-      auto it = child_pids_.begin();
-      while (it != child_pids_.end()) {
-        if (*it == pid) {
-          check_result = true;
-          it = child_pids_.erase(it);
-        } else {
-          ++it;
-        }
+      auto it = std::find(child_pids_.begin(), child_pids_.end(), pid);
+      if (it != child_pids_.end()) {
+        child_pids_.erase(it);
+        check_result = true;
       }
     }
 
@@ -75,7 +71,7 @@ namespace test_helper {
   return result;
 }
 
-ForkHelper::ForkHelper() : only_wait_for_child_pids_(false), death_signum_(0) {
+ForkHelper::ForkHelper() : wait_for_all_children_(true), death_signum_(0) {
   // Ensure that all children will ends up being parented to the process that
   // created the helper.
   prctl(PR_SET_CHILD_SUBREAPER, 1);
@@ -86,7 +82,7 @@ ForkHelper::~ForkHelper() {
   EXPECT_TRUE(WaitForChildrenInternal(death_signum_)) << ": at least a child had a failure";
 }
 
-void ForkHelper::OnlyWaitForForkedChildren() { only_wait_for_child_pids_ = true; }
+void ForkHelper::OnlyWaitForForkedChildren() { wait_for_all_children_ = false; }
 
 void ForkHelper::ExpectSignal(int signum) { death_signum_ = signum; }
 

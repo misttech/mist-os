@@ -68,7 +68,7 @@ class ForkHelper {
 
  private:
   std::vector<pid_t> child_pids_;
-  bool only_wait_for_child_pids_;
+  bool wait_for_all_children_;
   int death_signum_;
 
   ::testing::AssertionResult WaitForChildrenInternal(int death_signum);
