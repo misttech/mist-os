@@ -237,6 +237,7 @@ template("assemble_security_pkg_test_system") {
     generate_fxfs = fxfs_blob
     testonly = true
     product_assembly_config_label = "//build/assembly:default_product_config"
+    use_bringup_platform_bundles_only = true
     board_name = invoker.board_name
     bootfs_labels = []
     base_packages = packages_for_assembly

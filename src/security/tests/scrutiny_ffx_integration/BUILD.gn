@@ -28,6 +28,7 @@ if (is_fuchsia) {
     testonly = true
     generate_fvm = true
     product_assembly_config_label = "//build/assembly:default_product_config"
+    use_bringup_platform_bundles_only = true
     bootfs_labels = []
     base_packages = [
       ":empty-pkg",
@@ -42,6 +43,7 @@ if (is_fuchsia) {
     testonly = true
     generate_fvm = true
     product_assembly_config_label = "//build/assembly:default_product_config"
+    use_bringup_platform_bundles_only = true
     bootfs_labels = []
     ramdisk_in_zbi = true
     base_packages = [

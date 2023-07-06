@@ -49,6 +49,7 @@ if (current_toolchain == default_toolchain) {
     testonly = true
     generate_fvm = false
     product_assembly_config_label = "//build/assembly:default_product_config"
+    use_bringup_platform_bundles_only = true
     bootfs_labels = []
     bootfs_package_labels = [ "//src/security/tests/pkg_test/assemblies/hello_world_v1:hello_world-package" ]
     base_packages = [

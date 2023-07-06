@@ -80,7 +80,6 @@ if (is_fuchsia) {
     generate_fvm = true
 
     product_assembly_config_label = ":product_assembly_config"
-    allow_eng_platform_bundle_use = true
 
     # Needed for scrutiny to find root.cm and other component config.
     bootfs_labels = [ "//build/input:bootfs" ]

@@ -19,6 +19,7 @@ assembled_system("overnet") {
   testonly = true
   assembly_images_config_label = images_config_label
   product_assembly_config_label = "//build/assembly:default_product_config"
+  use_bringup_platform_bundles_only = true
 
   base_packages = [
     "//src/connectivity/overnet/overnetstack",
