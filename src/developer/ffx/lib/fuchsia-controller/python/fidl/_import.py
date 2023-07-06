@@ -17,8 +17,8 @@ class FIDLImportFinder(importlib.abc.MetaPathFinder):
         """Override from abc.MetaPathFinder."""
         if fullname.startswith("fidl.") and not fullname.startswith("fidl._"):
             return self
-        else:
-            return None
+        elif fullname.startswith("fidl._"):
+            return __loader__
 
     def load_module(self, fullname: str):
         """Override from abc.MetaPathFinder."""

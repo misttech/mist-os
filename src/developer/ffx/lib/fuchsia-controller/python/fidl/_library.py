@@ -16,8 +16,7 @@ import types
 
 from typing import Dict, List, Optional, Mapping, ForwardRef, Set, Union, Sequence, Tuple, Callable, Iterable, Any
 from fidl_codec import add_ir_path
-from ._ipc import send_one_way_fidl_request
-from ._ipc import send_two_way_fidl_request
+from ._client import FidlClient
 
 LIB_MAP: Dict[str, str] = {}
 MAP_INIT = False
@@ -168,6 +167,7 @@ def fidl_ir_prefix_path() -> str:
             return ""
     return ""
 
+
 def get_fidl_ir_map() -> Mapping[str, str]:
     """Returns a singleton mapping of library names to FIDL files."""
     # This operates under the assumption that the topmost element in the FIDL IR file is the name
@@ -188,7 +188,8 @@ def get_fidl_ir_map() -> Mapping[str, str]:
     # again that is only available in tree). This hinders users who are out-of-tree and who wish to
     # simply "play around" with fuchsia controller in an interactive way.
     prefix = fidl_ir_prefix_path()
-    with open(os.path.join(prefix, "all_fidl_json.txt"), "r", encoding="UTF-8") as f:
+    with open(os.path.join(prefix, "all_fidl_json.txt"), "r",
+              encoding="UTF-8") as f:
         while lib := f.readline().strip():
             full_path = os.path.join(prefix, lib)
             try:
@@ -517,16 +518,11 @@ def protocol_type(ir, root_ir, recurse_guard=None) -> type:
     )
 
 
-def init_with_handle(self, hdl):
-    self.handle = hdl
-
-
 def protocol_client_type(ir: IR, root_ir) -> type:
     name = fidl_ident_to_py_library_member(ir.name())
     properties = {
         "__doc__": docstring(ir),
         "__fidl__kind__": "client",
-        "__init__": init_with_handle,
     }
     for method in ir.methods():
         if not method.has_request():
@@ -535,7 +531,7 @@ def protocol_client_type(ir: IR, root_ir) -> type:
         method_snake_case = re.sub(r"(?<!^)(?=[A-Z])", "_",
                                    method.name()).lower()
         properties[method_snake_case] = protocol_client_method(method, root_ir)
-    return type(name, (object,), properties)
+    return type(name, (FidlClient,), properties)
 
 
 def get_fidl_request_lambda(ir: Method, root_ir, msg) -> Callable:
@@ -551,16 +547,15 @@ def get_fidl_request_lambda(ir: Method, root_ir, msg) -> Callable:
             else:
                 response_ident = response_kind
         if msg:
-            return lambda self, **args: send_two_way_fidl_request(
-                self.handle, ir["ordinal"], root_ir.name(), msg(**args),
-                response_ident)
-        return lambda self: send_two_way_fidl_request(
-            self.handle, ir["ordinal"], root_ir.name(), msg, response_ident)
+            return lambda self, **args: self._send_two_way_fidl_request(
+                ir["ordinal"], root_ir.name(), msg(**args), response_ident)
+        return lambda self: self._send_two_way_fidl_request(
+            ir["ordinal"], root_ir.name(), msg, response_ident)
     if msg:
-        return lambda self, **args: send_one_way_fidl_request(
-            self.handle, ir["ordinal"], root_ir.name(), msg(**args))
-    return lambda self: send_one_way_fidl_request(
-        self.handle, ir["ordinal"], root_ir.name(), msg)
+        return lambda self, **args: self._send_one_way_fidl_request(
+            0, ir["ordinal"], root_ir.name(), msg(**args))
+    return lambda self: self._send_one_way_fidl_request(
+        0, ir["ordinal"], root_ir.name(), msg)
 
 
 def protocol_client_method(
