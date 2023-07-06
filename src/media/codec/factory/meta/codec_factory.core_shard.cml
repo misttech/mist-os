@@ -53,7 +53,10 @@
         {
             protocol: [ "fuchsia.mediacodec.CodecFactory" ],
             from: "#codec_factory",
-            to: [ "#test_manager" ],
+            to: [
+                "#test_manager",
+                "#testing",
+            ],
         },
     ],
 }

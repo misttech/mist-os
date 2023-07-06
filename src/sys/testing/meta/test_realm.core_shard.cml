@@ -437,5 +437,27 @@
             from: "parent",
             to: "#testing",
         },
+
+        // Needed by system-validation-tests
+        {
+            // TODO(fxbug.dev/107526): After removing "weak" from the block
+            // below, merge them together
+            protocol: [ "fuchsia.accessibility.semantics.SemanticsManager" ],
+            from: "#ui",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.buildinfo.Provider",
+            from: "#build-info",
+            to: "#testing",
+        },
+
+        // TODO(fxbug.dev/83038): Remove once e2e is better supported.
+        {
+            protocol: [ "fuchsia.net.interfaces.State" ],
+            from: "#network",
+            to: "#testing",
+        },
     ],
 }

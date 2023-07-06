@@ -22,6 +22,7 @@
         "//src/sys/testing/meta/starnix-tests.shard.cml",
         "//src/sys/testing/meta/system-tests.shard.cml",
         "//src/sys/testing/meta/test-arch-tests.shard.cml",
+        "//src/testing/system-validation/meta/system_validation_test_realm.shard.cml",
 
         // Required: Include other required shards.
         "sys/component/realm_builder.shard.cml",

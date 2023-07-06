@@ -848,6 +848,7 @@
                     "/core/testing/devices-tests:**",
                     "/core/testing/drm-tests:**",
                     "/core/testing/system-tests:**",
+                    "/core/testing/system-validation-tests:**",
                     "/core/trace_manager/cpuperf_provider",
                 ],
             },

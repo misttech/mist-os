@@ -5,7 +5,6 @@
 // This is the shared manifest to creating a system validation test component.
 {
     include: [
-        "//src/testing/system-validation/meta/system_validation_test_facet.cml",
         "//src/testing/system-validation/meta/use_custom_artifact.cml",
         "sys/testing/elf_test_runner.shard.cml",
         "syslog/client.shard.cml",

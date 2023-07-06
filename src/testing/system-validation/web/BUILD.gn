@@ -4,12 +4,13 @@
 import("//build/components.gni")
 import("//build/testing/run_target_test_and_host_script.gni")
 
-fuchsia_component("web_view_system_validation_component") {
+fuchsia_test_component("web_view_system_validation_component") {
   restricted_features = [ "allow_non_hermetic_packages" ]
-  testonly = true
   component_name = "web_view_system_validation"
   manifest = "tests/meta/web_view_system_validation.cml"
   deps = [ "//src/testing/system-validation/ui:bin" ]
+
+  test_type = "system_validation"
 }
 
 # To run tests:

@@ -113,11 +113,17 @@
         {
             storage: [
                 "cache",
-                "data",
                 "tmp",
             ],
             from: "self",
             to: "#system-validation-tests",
+        },
+        {
+            storage: "fxfs_tests_data",
+            from: "self",
+            as: "data",
+            to: [ "#system-validation-tests" ],
+            rights: [ "rw*" ],
         },
     ],
 }

@@ -631,6 +631,7 @@ Possible values of `test_type`:
 | `device` | [Device tests] |
 | `drm` | [DRM tests] |
 | `starnix` | [Starnix tests] |
+| `system_validation` | [System Validation Tests] |
 | `system` | [Legacy non hermetic realm][system-test-realm] with access to some system capabilities. |
 | `test_arch` | [Test Architecture Tests] |
 | `vfs-compliance` | [VFS compliance tests] |
@@ -684,7 +685,6 @@ Possible values of `fuchsia.test.type`:
 | `chromium-system` | Chromium system test realm |
 | `cts` | [CTF test realm] |
 | `google` | Google test realm |
-| `system-validation` | system validation apps test realm |
 
 ## Restricted logs
 
@@ -847,6 +847,7 @@ offer: [
 [Starnix tests]: /src/sys/testing/meta/starnix-tests.shard.cml
 [subpackages]: /docs/concepts/components/v2/subpackaging.md
 [sys-migration-guide]: /docs/development/components/v2/migration/tests.md
+[System Validation Tests]: /src/testing/system-validation/meta/system_validation_test_realm.shard.cml
 [system-test-realm]: /src/sys/testing/meta/system-tests.shard.cml
 [Test Architecture Tests]: /src/sys/testing/meta/test-arch-tests.shard.cml
 [test-manager-as-a-service]: /docs/contribute/governance/rfcs/0202_test_manager_as_a_service.md

@@ -26,25 +26,25 @@ rustc_binary("bin") {
   ]
 }
 
-fuchsia_component("flatland_view_provider_system_validation_component") {
-  testonly = true
+fuchsia_test_component("flatland_view_provider_system_validation_component") {
   component_name = "flatland_view_provider_system_validation"
   manifest = "tests/meta/flatland_view_provider_system_validation.cml"
   deps = [ ":bin" ]
+  test_type = "system_validation"
 }
 
-fuchsia_component("simplest_sysmem_system_validation_component") {
-  testonly = true
+fuchsia_test_component("simplest_sysmem_system_validation_component") {
   component_name = "simplest_sysmem_system_validation"
   manifest = "tests/meta/simplest_sysmem_system_validation.cml"
   deps = [ ":bin" ]
+  test_type = "system_validation"
 }
 
-fuchsia_component("spinning_square_system_validation_component") {
-  testonly = true
+fuchsia_test_component("spinning_square_system_validation_component") {
   component_name = "spinning_square_system_validation"
   manifest = "tests/meta/spinning_square_system_validation.cml"
   deps = [ ":bin" ]
+  test_type = "system_validation"
 }
 
 # To run tests:
