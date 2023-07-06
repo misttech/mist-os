@@ -114,6 +114,9 @@ class AssemblyInputBundle(ImageAssemblyConfig):
                 <package name>
             system/
                 <package name>
+            bootfs_packages/
+                name_of_aib.bootfs_files_package
+                <package name>
         blobs/
             <merkle>
         subpackages/
@@ -157,6 +160,7 @@ class AssemblyInputBundle(ImageAssemblyConfig):
             "base_drivers": [ "packageD1", ... ],
             "system": [ "packageS1", ... ],
             "bootfs_packages": [ "packageB1", ... ],
+            "bootfs_files_package": "packages/bootfs_packages/packageB2",
             "bootfs_files": [
                 { "destination": "path/in/bootfs", source: "path/in/layout" },
                 ...
@@ -221,6 +225,7 @@ class AssemblyInputBundle(ImageAssemblyConfig):
     packages_to_compile: List[Union[CompiledPackageMainDefinition,
                                     CompiledPackageAdditionalShards]] = field(
                                         default_factory=list)
+    bootfs_files_package: Optional[FilePath] = None
 
     def __repr__(self) -> str:
         """Serialize to a JSON string"""
@@ -264,6 +269,8 @@ class AssemblyInputBundle(ImageAssemblyConfig):
         file_paths.extend(self.system)
         file_paths.extend(self.bootfs_packages)
         file_paths.extend([entry.source for entry in self.bootfs_files])
+        if self.bootfs_files_package:
+            file_paths.append(self.bootfs_files_package)
         if self.kernel.path is not None:
             file_paths.append(self.kernel.path)
         if self.qemu_kernel is not None:
@@ -365,6 +372,7 @@ class AIBCreator:
 
         # Bootfs info
         self.bootfs_files: Set[FileEntry] = set()
+        self.bootfs_files_package: Optional[FilePath] = None
         self.bootfs_packages: Set[FilePath] = set()
 
         # The config_data entries
@@ -464,6 +472,14 @@ class AIBCreator:
          bootfs_pkg_deps) = self._copy_packages("bootfs_packages")
         deps.update(bootfs_pkg_deps)
         result.bootfs_packages.update(bootfs_pkgs)
+
+        if self.bootfs_files_package:
+            (bootfs_files_pkg, bootfs_files_pkg_blobs,
+             bootfs_files_pkg_deps) = self._copy_package_from_path(
+                 self.bootfs_files_package, "bootfs_packages")
+            deps.update(bootfs_files_pkg_deps)
+            result.bootfs_files_package = bootfs_files_pkg
+            bootfs_pkg_blobs.extend(bootfs_files_pkg_blobs)
 
         # Add shell_commands field to assembly_config.json field in AIBCreator
         result.shell_commands = self.shell_commands
@@ -669,19 +685,6 @@ class AIBCreator:
         that need to be copied as well (so that they blob copying can be done in a
         single, deduplicated step).
         """
-
-        def validate_unique_packages(package_url, package_path):
-            invalid = False
-            if package_url in self.package_urls:
-                invalid = True
-                message = f"There is a duplicate declaration of {package_url} in {set_name}"
-            if os.path.exists(package_path):
-                invalid = True
-                message = f"The package path {package_path} already exists, and can't be replaced."
-            if invalid:
-                raise DuplicatePackageException(message)
-            self.package_urls.add(package_url)
-
         package_manifests = getattr(self, set_name)
 
         # Resultant paths to package manifests
@@ -698,51 +701,88 @@ class AIBCreator:
         if len(package_manifests) == 0:
             return (packages, blobs, deps)
 
-        # Create the directory for the packages, now that we know it will exist
-        packages_dir = os.path.join("packages", set_name)
-        os.makedirs(os.path.join(self.outdir, packages_dir))
-
         # Open each manifest, record the blobs, and then copy it to its destination,
         # sorted by path to the package manifest.
         for package_manifest_path in sorted(package_manifests):
-            with open(package_manifest_path, 'r') as file:
-                try:
-                    manifest = json_load(PackageManifest, file)
-                except Exception as exc:
-                    raise PackageManifestParsingException(
-                        f"loading PackageManifest from {package_manifest_path}"
-                    ) from exc
-
-                package_name = manifest.package.name
-                # Track in deps, since it was opened.
-                deps.add(package_manifest_path)
-
-            # Path to which we will write the new manifest within the input bundle.
-            rebased_destination = os.path.join(packages_dir, package_name)
-
-            # Bail if we are trying to add a duplicate package
-            validate_unique_packages(
-                AIBCreator.package_url_template.format(
-                    repository=manifest.repository,
-                    package_name=manifest.package.name), rebased_destination)
-
-            # But skip config-data, if we find it.
-            if "config-data" == package_name:
-                continue
-
-            try:
-                self._copy_package(
-                    manifest, os.path.dirname(package_manifest_path),
-                    rebased_destination, blobs, deps)
-            except Exception as e:
-                raise AssemblyInputBundleCreationException(
-                    f"Copying '{set_name}' package '{package_name}' with manifest: {package_manifest_path}"
-                ) from e
-
-            # Track the package manifest in our set of packages
-            packages.append(rebased_destination)
+            (manifest, blob_list, dep_set) = self._copy_package_from_path(
+                package_manifest_path, set_name)
+            if manifest:
+                # Track the package manifest in our set of packages
+                packages.append(manifest)
+                blobs.extend(blob_list)
+                deps.update(dep_set)
 
         return (packages, blobs, deps)
+
+    def _copy_package_from_path(
+        self,
+        package_manifest_path: FilePath,
+        set_name: str,
+    ) -> Tuple[Optional[FilePath], BlobList, DepSet]:
+        """Copy a package manifest by its path to the assembly bundle outdir,
+        adding its blobs to the set of blobs that need to be copied as well.
+        If the package has subpackages, recursively copy those as well, skipping
+        any subpackages that have already been copied.
+        """
+
+        def validate_unique_packages(package_url, package_path):
+            invalid = False
+            if package_url in self.package_urls:
+                invalid = True
+                message = f"There is a duplicate declaration of {package_url} in {set_name}"
+            if os.path.exists(package_path):
+                invalid = True
+                message = f"The package path {package_path} already exists, and can't be replaced."
+            if invalid:
+                raise DuplicatePackageException(message)
+            self.package_urls.add(package_url)
+
+        # All of the blobs to copy, deduplicated by merkle, and validated for
+        # conflicting sources.
+        blobs: BlobList = []
+
+        # The deps touched by this function.
+        deps: DepSet = set()
+
+        with open(package_manifest_path, 'r') as file:
+            try:
+                manifest = json_load(PackageManifest, file)
+            except Exception as exc:
+                raise PackageManifestParsingException(
+                    f"loading PackageManifest from {package_manifest_path}"
+                ) from exc
+
+            package_name = manifest.package.name
+            # Track in deps, since it was opened.
+            deps.add(package_manifest_path)
+
+        # Create the directory for the packages, now that we know it will exist
+        packages_dir = os.path.join("packages", set_name)
+        os.makedirs(os.path.join(self.outdir, packages_dir), exist_ok=True)
+
+        # Path to which we will write the new manifest within the input bundle.
+        rebased_destination = os.path.join(packages_dir, package_name)
+
+        # Bail if we are trying to add a duplicate package
+        validate_unique_packages(
+            AIBCreator.package_url_template.format(
+                repository=manifest.repository,
+                package_name=manifest.package.name), rebased_destination)
+
+        # But skip config-data, if we find it.
+        if "config-data" == package_name:
+            return (None, [], [])
+
+        try:
+            self._copy_package(
+                manifest, os.path.dirname(package_manifest_path),
+                rebased_destination, blobs, deps)
+        except Exception as e:
+            raise AssemblyInputBundleCreationException(
+                f"Copying '{set_name}' package '{package_name}' with manifest: {package_manifest_path}"
+            ) from e
+
+        return (rebased_destination, blobs, deps)
 
     def _copy_package(
         self,

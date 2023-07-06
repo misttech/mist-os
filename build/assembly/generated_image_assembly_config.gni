@@ -26,10 +26,6 @@ import("//build/zbi/kernel_cmdline.gni")
 #   cache_packages (optional)
 #     [list of labels] The packages to cache in the images.
 #
-#   bootfs_labels (optional)
-#     [list of labels] The objects installed on the bootfs partition of the
-#     generated ZBI.
-#
 #   bootfs_package_labels (optional)
 #     [list of labels] The packages installed on the bootfs partition of the
 #     generated ZBI as meta.fars and content-id'd blobs.
@@ -73,11 +69,6 @@ template("generated_image_assembly_config") {
     cache_packages += invoker.cache_packages
   }
 
-  bootfs_labels = []
-  if (defined(invoker.bootfs_labels)) {
-    bootfs_labels += invoker.bootfs_labels
-  }
-
   bootfs_package_labels = []
   if (defined(invoker.bootfs_package_labels)) {
     bootfs_package_labels += invoker.bootfs_package_labels
@@ -110,7 +101,6 @@ template("generated_image_assembly_config") {
         "${target_name}_package_manifest_list.extra_base_deps"
     kernel_image_metadata = "${target_name}_kernel_image_metadata"
     kernel_cmdline_args = "${target_name}_kernel_cmdline_args"
-    bootfs_entries_metadata = "${target_name}_bootfs_entries_metadata"
     boot_args = "${target_name}_boot_args"
     config_data = "${target_name}.config-data"
   }
@@ -127,38 +117,7 @@ template("generated_image_assembly_config") {
         "$target_out_dir/${target_name}_kernel_image.gn_meta.json"
     kernel_cmdline_args =
         "$target_out_dir/${target_name}_kernel_cmdline_args.json"
-    bootfs_entries_metadata =
-        "$target_out_dir/${target_name}_bootfs_entries.gn_meta.json"
     boot_args = "$target_out_dir/${target_name}_boot_args"
-  }
-
-  component_id_index_dep = []
-  component_id_index_config_data_dep = []
-  include_component_index = defined(invoker.include_component_id_index) &&
-                            invoker.include_component_id_index
-
-  if (include_component_index) {
-    # For details, see //docs/development/components/component_id_index.md#system-assembly
-    component_id_index_config("${target_name}.component_id_index_config") {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-
-      # collect and merge component ID indices from the base set.
-      deps = base_packages
-
-      metadata = {
-        package_barrier = []
-      }
-    }
-
-    component_id_index_dep = [ ":${target_name}.component_id_index_config" ]
-    component_id_index_config_data_dep =
-        [ ":${target_name}.component_id_index_config-config-data" ]
-  } else {
-    not_needed([ "component_id_index_config_data_dep" ])
   }
 
   include_config_data = true
@@ -173,11 +132,9 @@ template("generated_image_assembly_config") {
                                "visibility",
                              ])
       package_name = "config-data"
-      deps = config_data_packages + component_id_index_config_data_dep
+      deps = config_data_packages
     }
   }
-
-  bootfs_labels += component_id_index_dep
 
   # Construct a list of Base packages to add to the image assembly config.
   package_manifests_list(labels.base_package_list) {
@@ -287,18 +244,6 @@ template("generated_image_assembly_config") {
     deps = cmdline_deps
   }
 
-  # Find all the files to add to BootFS.
-  distribution_manifest(labels.bootfs_entries_metadata) {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
-
-    outputs = [ files.bootfs_entries_metadata ]
-    deps = bootfs_labels
-  }
-
   # Construct a list of bootfs packages to add to the image assembly config.
   # Ignores any fuchsia_driver_packages and fuchsia_shell_packages
   package_manifests_list(labels.bootfs_package_list) {
@@ -329,14 +274,12 @@ template("generated_image_assembly_config") {
       files.kernel_image_metadata,
       files.kernel_cmdline_args,
       files.boot_args,
-      files.bootfs_entries_metadata,
       files.bootfs_package_list,
     ]
 
     deps = [
       ":${labels.base_package_list}",
       ":${labels.boot_args}",
-      ":${labels.bootfs_entries_metadata}",
       ":${labels.bootfs_package_list}",
       ":${labels.cache_package_list}",
       ":${labels.extra_base_deps_list}",
@@ -365,8 +308,6 @@ template("generated_image_assembly_config") {
       rebase_path(build_info_files.minimum_utc_stamp, root_build_dir),
       "--boot-args",
       rebase_path(files.boot_args, root_build_dir),
-      "--bootfs-entries",
-      rebase_path(files.bootfs_entries_metadata, root_build_dir),
       "--bootfs-packages-list",
       rebase_path(files.bootfs_package_list, root_build_dir),
       "--output",

@@ -5,6 +5,7 @@
 import("//build/assembly/assembly_input_bundle_archive.gni")
 import("//build/assembly/assembly_input_bundle_package.gni")
 import("//build/bazel/bazel_inputs.gni")
+import("//build/components/fuchsia_package.gni")
 import("//build/dist/distribution_manifest.gni")
 import("//build/group_with_inputs.gni")
 import("//build/python/python_action.gni")
@@ -214,6 +215,7 @@ template("assembly_input_bundle") {
 
     bazel_inputs = "${target_name}_bazel_inputs"
 
+    bootfs_files_package = "${target_name}.bootfs_files_package"
     config_data = "${target_name}.config_data_list"
     config_data_with_verification = "${target_name}.group_with.config_data"
     kernel_cmdline = "${target_name}.kernel_cmdline"
@@ -225,6 +227,9 @@ template("assembly_input_bundle") {
   files = {
     # The directory where all the bundle contents are written to
     assembly_input_bundle_dir = "${bundles_dir}/${bundle_name}"
+
+    # The unpackaged bootfs files that we throw into a package to add to the AIB.
+    bootfs_files_package = "$target_out_dir/$target_name.bootfs_files_package/package_manifest.json"
 
     # The "official" outputs file that we create in that directory
     assembly_input_bundle_config =
@@ -286,6 +291,20 @@ template("assembly_input_bundle") {
     creation_deps += invoker.deps
   }
 
+  fuchsia_package(labels.bootfs_files_package) {
+    forward_variables_from(invoker, [ "testonly" ])
+    if (defined(invoker.bootfs_files_labels)) {
+      deps = invoker.bootfs_files_labels
+    }
+  }
+
+  # Pass the bootfs files package to the assembly tool.
+  creation_args += [
+    "--bootfs-files-package",
+    rebase_path(files.bootfs_files_package, root_build_dir),
+  ]
+  creation_deps += [ ":${labels.bootfs_files_package}" ]
+
   # Convert the list of config_data_labels into a set of config_data_entry.json
   # files that are inputs that define config data entry scopes.
   if (defined(invoker.config_data_labels)) {
@@ -307,29 +326,6 @@ template("assembly_input_bundle") {
 
     creation_deps += invoker.config_data_labels
     creation_inputs += _config_data_entries
-  }
-
-  # Convert the list of bootfs_files_labels into a set of bootfs_files.json
-  # files that are inputs that define bootfs file entry scopes.
-  if (defined(invoker.bootfs_files_labels)) {
-    _bootfs_files = []
-
-    foreach(entry_label, invoker.bootfs_files_labels) {
-      # Assume this is a GN-label to a bootfs_files_for_assembly()
-      # instantiation, which is similar to packages.
-      _entry_out_dir = get_label_info(entry_label, "target_out_dir")
-      _entry_name = get_label_info(entry_label, "name")
-      _entry_file = "${_entry_out_dir}/${_entry_name}/bootfs_files.json"
-      _bootfs_files += [ _entry_file ]
-
-      creation_args += [
-        "--bootfs-files-list",
-        rebase_path(_entry_file, root_build_dir),
-      ]
-    }
-
-    creation_deps += invoker.bootfs_files_labels
-    creation_inputs += _bootfs_files
   }
 
   # Splits config_data inputs from the invoker into:

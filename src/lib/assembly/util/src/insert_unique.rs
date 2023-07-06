@@ -193,7 +193,9 @@ impl<'a, K: Ord, V> InsertAllUniqueExt<MapEntry<K, V>> for &'a mut BTreeMap<K, V
 /// new value that was attempted to be inserted.
 #[derive(Debug)]
 pub struct BTreeMapDuplicateKeyError<'a, K: Ord, V> {
+    /// The entry already in the map.
     pub existing_entry: btree_map::OccupiedEntry<'a, K, V>,
+    /// The entry attempting to be added to the map.
     pub new_value: V,
 }
 

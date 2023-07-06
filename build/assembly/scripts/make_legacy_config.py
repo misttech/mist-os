@@ -14,7 +14,7 @@ import json
 import os
 import sys
 import logging
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Set, Tuple, Optional
 
 from assembly import AssemblyInputBundle, AIBCreator, FileEntry, FilePath, ImageAssemblyConfig, PackageManifest
 from assembly.assembly_input_bundle import CompiledPackageAdditionalShards, DuplicatePackageException, PackageManifestParsingException, CompiledPackageMainDefinition
@@ -33,11 +33,16 @@ DepSet = Set[FilePath]
 
 
 def copy_to_assembly_input_bundle(
-    legacy: ImageAssemblyConfig, config_data_entries: FileEntryList,
-    outdir: FilePath, base_driver_packages_list: List[str],
+    legacy: ImageAssemblyConfig,
+    config_data_entries: FileEntryList,
+    outdir: FilePath,
+    base_driver_packages_list: List[str],
     base_driver_components_files_list: List[dict],
-    shell_commands: Dict[str, List], core_realm_shards: List[FilePath],
-    core_realm_includes: FileEntryList, core_package_contents: FileEntryList
+    shell_commands: Dict[str, List],
+    core_realm_shards: List[FilePath],
+    core_realm_includes: FileEntryList,
+    core_package_contents: FileEntryList,
+    bootfs_files_package: Optional[FilePath],
 ) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
     """
     Copy all the artifacts from the ImageAssemblyConfig into an AssemblyInputBundle that is in
@@ -53,12 +58,14 @@ def copy_to_assembly_input_bundle(
     aib_creator.base = legacy.base
     aib_creator.cache = legacy.cache
     aib_creator.system = legacy.system
-    aib_creator.bootfs_files = legacy.bootfs_files
     aib_creator.bootfs_packages = legacy.bootfs_packages
     aib_creator.kernel = legacy.kernel
     aib_creator.boot_args = legacy.boot_args
 
     aib_creator.base_drivers = set(base_driver_packages_list)
+
+    if bootfs_files_package:
+        aib_creator.bootfs_files_package = bootfs_files_package
 
     # Strip any base_driver and base pkgs from the cache set
     aib_creator.cache = aib_creator.cache.difference(
@@ -125,6 +132,7 @@ def main():
     parser.add_argument(
         "--core-package-contents-list", type=argparse.FileType('r'))
     parser.add_argument("--core-package-name", default="core")
+    parser.add_argument("--bootfs-files-package", required=True)
     args = parser.parse_args()
 
     # Read in the legacy config and the others to subtract from it
@@ -193,7 +201,8 @@ def main():
          base_driver_components_files_list, {
              package: sorted(list(components))
              for (package, components) in shell_commands.items()
-         }, core_realm_shards, core_realm_includes, core_package_contents)
+         }, core_realm_shards, core_realm_includes, core_package_contents,
+         args.bootfs_files_package)
 
     deps.update(shell_deps)
     # Write out a fini manifest of the files that have been copied, to create a

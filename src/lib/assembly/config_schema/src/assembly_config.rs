@@ -58,6 +58,10 @@ pub struct AssemblyInputBundle {
     /// Packages to create dynamically as part of the Assembly process.
     #[serde(default)]
     pub packages_to_compile: Vec<CompiledPackageDefinition>,
+
+    /// A package that includes files to include in bootfs.
+    #[serde(default)]
+    pub bootfs_files_package: Option<Utf8PathBuf>,
 }
 
 /// Contents of a compiled package. The contents provided by all

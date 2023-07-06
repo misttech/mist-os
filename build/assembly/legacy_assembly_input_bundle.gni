@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembly_input_bundle.gni")
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/assembly/generated_image_assembly_config.gni")
 import("//build/assembly/package_manifests_list.gni")
 import("//build/dist/distribution_manifest.gni")
@@ -150,6 +151,8 @@ template("legacy_assembly_input_bundle") {
 
   labels = {
     image_assembly_config = "${target_name}.generated_image_assembly_config"
+    bootfs_files = "${target_name}.bootfs_files"
+    bootfs_files_package = "${target_name}.bootfs_files_package"
 
     # Compute the assembly config and config_data labels that are generated within
     # generated_image_assembly_config()
@@ -177,6 +180,8 @@ template("legacy_assembly_input_bundle") {
   files = {
     image_assembly_config =
         "$target_out_dir/${labels.image_assembly_config}.json"
+    bootfs_files_package =
+        "$target_out_dir/${labels.bootfs_files_package}/package_manifest.json"
     assemble_system_config_data_entries = "$target_out_dir/${labels.image_assembly_config}.config-data_config_package_entries"
 
     # Outputs
@@ -350,6 +355,34 @@ template("legacy_assembly_input_bundle") {
     }
   }
 
+  component_id_index_dep = []
+  component_id_index_config_data_dep = []
+  include_component_index = defined(invoker.include_component_id_index) &&
+                            invoker.include_component_id_index
+  if (include_component_index) {
+    # For details, see //docs/development/components/component_id_index.md#system-assembly
+    component_id_index_config("${target_name}.component_id_index_config") {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+
+      # collect and merge component ID indices from the base set.
+      deps = invoker.base_packages
+
+      metadata = {
+        package_barrier = []
+      }
+    }
+
+    component_id_index_dep = [ ":${target_name}.component_id_index_config" ]
+    component_id_index_config_data_dep =
+        [ ":${target_name}.component_id_index_config-config-data" ]
+  } else {
+    not_needed([ "component_id_index_config_data_dep" ])
+  }
+
   create_package_archive =
       defined(invoker.create_package_archive) && invoker.create_package_archive
   create_package = create_package_archive ||
@@ -360,7 +393,6 @@ template("legacy_assembly_input_bundle") {
                            [
                              "testonly",
                              "visibility",
-                             "include_component_id_index",
                            ])
 
     kernel_image = kernel_zbi
@@ -376,8 +408,9 @@ template("legacy_assembly_input_bundle") {
     }
 
     include_config_data = _include_config_data
-    config_data_packages = invoker.base_packages + invoker.universe_packages +
-                           invoker.cache_packages
+    config_data_packages =
+        invoker.base_packages + invoker.universe_packages +
+        invoker.cache_packages + component_id_index_config_data_dep
 
     boot_args = invoker.additional_boot_args
 
@@ -385,19 +418,6 @@ template("legacy_assembly_input_bundle") {
     bootfs_package_labels = []
     if (defined(invoker.bootfs_package_labels)) {
       bootfs_package_labels += invoker.bootfs_package_labels
-    }
-
-    # Search for BootFS files in these targets.
-    bootfs_labels = invoker.bootfs_labels
-
-    bootfs_labels += [ kernel_image ]
-    if (defined(invoker.non_assembly_fshost_label)) {
-      bootfs_labels += [ invoker.non_assembly_fshost_label ]
-    }
-
-    # Only builds which support blobs need base-resolver.
-    if (invoker.supports_blobs) {
-      bootfs_labels += [ "//src/sys/base-resolver:bootfs" ]
     }
 
     extra_base_deps = system_image_deps
@@ -410,6 +430,33 @@ template("legacy_assembly_input_bundle") {
     if (defined(invoker.cmdline)) {
       cmdline = invoker.cmdline
     }
+  }
+
+  # Search for BootFS files in these targets.
+  bootfs_files_for_assembly(labels.bootfs_files) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    deps = invoker.bootfs_labels + component_id_index_dep + [ kernel_zbi ]
+    if (defined(invoker.non_assembly_fshost_label)) {
+      deps += [ invoker.non_assembly_fshost_label ]
+    }
+
+    # Only builds which support blobs need base-resolver.
+    if (invoker.supports_blobs) {
+      deps += [ "//src/sys/base-resolver:bootfs" ]
+    }
+  }
+
+  fuchsia_package(labels.bootfs_files_package) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    deps = [ ":${labels.bootfs_files}" ]
   }
 
   # Run the script that creates the out-of-tree-usable Assembly Input Bundle from
@@ -454,6 +501,8 @@ template("legacy_assembly_input_bundle") {
       rebase_path(files.base_driver_package_list, root_build_dir),
       "--base-driver-components-files-list",
       rebase_path(files.driver_package_component_files, root_build_dir),
+      "--bootfs-files-package",
+      rebase_path(files.bootfs_files_package, root_build_dir),
     ]
 
     # If packaging or archiving the AIB, write out the fini manifest needed to
@@ -470,10 +519,12 @@ template("legacy_assembly_input_bundle") {
       files.base_driver_package_list,
       files.driver_package_component_files,
       files.image_assembly_config,
+      files.bootfs_files_package,
     ]
 
     deps = [
       ":${labels.base_driver_package_list}",
+      ":${labels.bootfs_files_package}",
       ":${labels.driver_package_component_files}",
       ":${labels.image_assembly_config}",
     ]

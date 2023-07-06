@@ -3,8 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Context, Result};
+use assembly_bootfs_file_map::BootfsFileMap;
 use assembly_components::ComponentBuilder;
-use assembly_config_schema::assembly_config::{CompiledPackageDefinition, MainPackageDefinition};
+use assembly_config_schema::{
+    assembly_config::{CompiledPackageDefinition, MainPackageDefinition},
+    FileEntry,
+};
 use assembly_tool::Tool;
 use assembly_util::{DuplicateKeyError, InsertUniqueExt, MapEntry};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -154,7 +158,7 @@ impl CompiledPackageBuilder {
     fn build_bootfs(
         &self,
         cmc_tool: &dyn Tool,
-        bootfs_files: &mut BTreeMap<String, Utf8PathBuf>,
+        bootfs_files: &mut BootfsFileMap,
         main_definition: &MainPackageDefinition,
         outdir: impl AsRef<Utf8Path>,
     ) -> Result<()> {
@@ -171,7 +175,10 @@ impl CompiledPackageBuilder {
             let component_manifest_file_name =
                 component_manifest_path.file_name().context("component file name")?;
             let component_path = format!("meta/{component_manifest_file_name}");
-            bootfs_files.insert(component_path, component_manifest_path.to_owned());
+            bootfs_files.add_entry(FileEntry {
+                source: component_manifest_path.to_owned(),
+                destination: component_path,
+            })?;
         }
 
         Ok(())
@@ -222,7 +229,7 @@ impl CompiledPackageBuilder {
     pub fn build(
         self,
         cmc_tool: &dyn Tool,
-        bootfs_files: &mut BTreeMap<String, Utf8PathBuf>,
+        bootfs_files: &mut BootfsFileMap,
         outdir: impl AsRef<Utf8Path>,
     ) -> Result<Option<Utf8PathBuf>> {
         let main_definition = &self.main_definition.as_ref().context("no main definition")?;
@@ -318,7 +325,7 @@ mod tests {
         let tools = FakeToolProvider::default();
         let outdir_tmp = TempDir::new().unwrap();
         let outdir = Utf8Path::from_path(outdir_tmp.path()).unwrap();
-        let mut bootfs_files = BTreeMap::new();
+        let mut bootfs_files = BootfsFileMap::new();
         make_test_package_and_components(outdir);
 
         compiled_package_builder

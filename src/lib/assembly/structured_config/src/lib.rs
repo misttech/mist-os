@@ -5,6 +5,8 @@
 //! Utilities for working with structured configuration during the product assembly process.
 
 use anyhow::{ensure, format_err, Context};
+use assembly_bootfs_file_map::BootfsFileMap;
+use assembly_config_schema::FileEntry;
 use assembly_validate_util::PkgNamespace;
 use camino::{Utf8Path, Utf8PathBuf};
 use cm_rust::{FidlIntoNative, NativeIntoFidl};
@@ -42,11 +44,8 @@ impl Repackager<PackageBuilder> {
     }
 }
 
-impl<'f> Repackager<&'f mut BTreeMap<String, Utf8PathBuf>> {
-    pub fn for_bootfs(
-        files: &'f mut BTreeMap<String, Utf8PathBuf>,
-        outdir: impl Into<Utf8PathBuf>,
-    ) -> Self {
+impl<'f> Repackager<&'f mut BootfsFileMap> {
+    pub fn for_bootfs(files: &'f mut BootfsFileMap, outdir: impl Into<Utf8PathBuf>) -> Self {
         Self { builder: files, outdir: outdir.into() }
     }
 }
@@ -117,10 +116,10 @@ impl PkgNamespaceBuilder for PackageBuilder {
     }
 }
 
-impl PkgNamespaceBuilder for &mut BTreeMap<String, Utf8PathBuf> {
+impl PkgNamespaceBuilder for &mut BootfsFileMap {
     fn read_contents(&self, path: &str) -> anyhow::Result<Vec<u8>> {
-        let src_path = self.get(path).ok_or_else(|| format_err!("missing {path}"))?;
-        Ok(std::fs::read(&src_path).with_context(|| format!("reading {}", src_path))?)
+        let src_path = &self.get(path).ok_or_else(|| format_err!("missing {path}"))?.source;
+        Ok(std::fs::read(src_path).with_context(|| format!("reading {}", src_path))?)
     }
 
     fn add_contents(
@@ -132,7 +131,7 @@ impl PkgNamespaceBuilder for &mut BTreeMap<String, Utf8PathBuf> {
         let out_path = outdir.as_ref().join("bootfs/repackaging/components").join(path);
         std::fs::create_dir_all(out_path.parent().unwrap()).context("creating outdir")?;
         std::fs::write(&out_path, contents).with_context(|| format!("writing {}", out_path))?;
-        self.insert(path.to_owned(), out_path);
+        self.add_entry(FileEntry { source: out_path, destination: path.to_owned() })?;
         Ok(())
     }
 }

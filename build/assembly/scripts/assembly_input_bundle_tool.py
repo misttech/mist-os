@@ -60,6 +60,9 @@ def create_bundle(args: argparse.Namespace) -> None:
             if 'source' in entry:
                 excluded_files.add(entry['source'])
 
+    if args.bootfs_files_package:
+        aib_creator.bootfs_files_package = args.bootfs_files_package
+
     if args.bootfs_files_list:
         for bootfs_files_entry_file in args.bootfs_files_list:
             with open(bootfs_files_entry_file) as bootfs_files_entry:
@@ -467,6 +470,10 @@ def main():
         help=
         "Path to a json file of config-data entries, may be specified multiple times"
     )
+    bundle_creation_parser.add_argument(
+        "--bootfs-files-package",
+        help=
+        "Path to a package manifest that points to files to include in bootfs")
     bundle_creation_parser.add_argument(
         "--bootfs-files-list",
         action="append",

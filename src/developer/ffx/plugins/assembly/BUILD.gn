@@ -57,6 +57,7 @@ ffx_plugin("ffx_assembly") {
     "//src/lib/assembly/assembly_manifest",
     "//src/lib/assembly/base_package",
     "//src/lib/assembly/blobfs",
+    "//src/lib/assembly/bootfs_file_map",
     "//src/lib/assembly/components",
     "//src/lib/assembly/config_data",
     "//src/lib/assembly/config_schema",

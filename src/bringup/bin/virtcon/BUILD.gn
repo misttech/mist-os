@@ -37,7 +37,7 @@ bootfs_files_for_assembly("boot_animation") {
 resource("boot_animation_resource") {
   sources = [ virtcon_boot_animation_path ]
   outputs = [ "data/boot-animation.riv" ]
-  visibility = [ ":boot_animation" ]
+  visibility = [ ":*" ]
 }
 
 group("tests") {

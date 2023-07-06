@@ -25,8 +25,6 @@ def main():
         '--kernel-image-metadata', type=argparse.FileType('r'), required=True)
     parser.add_argument('--kernel-image-name', required=True)
     parser.add_argument('--boot-args', type=argparse.FileType('r'))
-    parser.add_argument(
-        '--bootfs-entries', type=argparse.FileType('r'), required=True)
     parser.add_argument('--bootfs-packages-list', type=argparse.FileType('r'))
     parser.add_argument('--output', type=argparse.FileType('w'), required=True)
     args = parser.parse_args()
@@ -80,13 +78,6 @@ def main():
 
     if args.boot_args is not None:
         config["boot_args"] = sorted(json.load(args.boot_args))
-
-    config["bootfs_files"] = [
-        {
-            "source": entry["source"],
-            "destination": entry["destination"],
-        } for entry in json.load(args.bootfs_entries)
-    ]
 
     if args.bootfs_packages_list is not None:
         bootfs_packages_list = json.load(args.bootfs_packages_list)

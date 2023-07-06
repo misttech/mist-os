@@ -63,7 +63,7 @@ def make_package_path(package_name):
 
 TestSetupArgs = namedtuple(
     "TestSetupArgs",
-    "shell_commands_file, image_assembly, driver_manifest_path, driver_component_file"
+    "shell_commands_file, image_assembly, driver_manifest_path, driver_component_file, bootfs"
 )
 SOURCE_DIR = "source"
 OUTDIR = "outdir"
@@ -93,6 +93,13 @@ def setup_temp_dir(*args, **kwargs):
 
                 # Add to the ImageAssembly in the correct package set.
                 getattr(image_assembly, package_set).add(manifest_path)
+
+        # Write out the bootfs files package.
+        bootfs = make_package_manifest(
+            "bootfs_files_package", [
+                "some/file",
+                "another/file",
+            ], SOURCE_DIR)
 
         # Write out a driver package
         package_name = "base_driver"
@@ -137,7 +144,7 @@ def setup_temp_dir(*args, **kwargs):
 
         yield TestSetupArgs(
             shell_commands_file, image_assembly, driver_manifest_path,
-            driver_component_file)
+            driver_component_file, bootfs)
     finally:
         temp_dir.cleanup()
 
@@ -153,7 +160,7 @@ class MakeLegacyConfig(unittest.TestCase):
         with setup_temp_dir() as setup_args:
             (
                 shell_commands_file, image_assembly, driver_manifest_path,
-                driver_component_file) = setup_args
+                driver_component_file, bootfs) = setup_args
             # Create the outdir path, and perform the "copying" into the
             # AssemblyInputBundle.
             aib, _, deps = make_legacy_config.copy_to_assembly_input_bundle(
@@ -177,7 +184,8 @@ class MakeLegacyConfig(unittest.TestCase):
                     FileEntry(
                         os.path.join(SOURCE_DIR, "some/core/package/file"),
                         "core/package/file/destination")
-                ])
+                ],
+                bootfs_files_package=bootfs)
             file_paths = aib.all_file_paths()
 
             # Validate the contents of the AssemblyInputBundle itself
@@ -194,15 +202,9 @@ class MakeLegacyConfig(unittest.TestCase):
             self.assertEqual(aib.kernel.args, set(["arg1", "arg2"]))
             self.assertEqual(aib.kernel.clock_backstop, 123456)
             self.assertEqual(
-                aib.bootfs_files,
-                set(
-                    [
-                        FileEntry(
-                            source="bootfs/some/file", destination="some/file"),
-                        FileEntry(
-                            source="bootfs/another/file",
-                            destination="another/file"),
-                    ]))
+                aib.bootfs_files_package,
+                "packages/bootfs_packages/bootfs_files_package")
+            self.assertEqual(aib.bootfs_files, set())
 
             self.assertEqual(
                 aib.base_drivers, [
@@ -323,9 +325,10 @@ class MakeLegacyConfig(unittest.TestCase):
                         'source/system_b/internal/path/file_b_1',
                         'source/system_b/internal/path/file_b_2',
                         'source/system_b/internal/path/file_b_3',
-                        'source/kernel.bin', 'source/some/file',
-                        'source/another/file', 'source/core/core.cml',
-                        'source/core/realm/shard1.cml',
+                        'source/kernel.bin', 'source/bootfs_files_package.json',
+                        'source/bootfs_files_package/some/file',
+                        'source/bootfs_files_package/another/file',
+                        'source/core/core.cml', 'source/core/realm/shard1.cml',
                         'source/core/realm/shard2.cml',
                         'source/src/include.cml',
                         'source/some/core/package/file'
@@ -462,11 +465,15 @@ class MakeLegacyConfig(unittest.TestCase):
                             source='source/kernel.bin',
                             destination='outdir/kernel/kernel.bin'),
                         FileEntry(
-                            source='source/some/file',
-                            destination='outdir/bootfs/some/file'),
+                            source='source/bootfs_files_package/another/file',
+                            destination=
+                            'outdir/blobs/809aae59e2ca524e21f93c4e5747fc718b6f61aefe9eabc46f981d5856b88de3'
+                        ),
                         FileEntry(
-                            source='source/another/file',
-                            destination='outdir/bootfs/another/file'),
+                            source='source/bootfs_files_package/some/file',
+                            destination=
+                            'outdir/blobs/1be711a4235aefc04302d3a20eefafcf0ac26b573881bc7967479aff6e1e8dd7'
+                        ),
                     ]))
 
             # Validate that the output manifest will have the right file paths
@@ -475,9 +482,11 @@ class MakeLegacyConfig(unittest.TestCase):
                     'blobs/0cdbf3e4f1246ce7522e78c21bcf1c3aef2d41ac2b4de3f0ee98fc6273f62eb9',
                     'blobs/0f32059964674afd810001c76c2a5d783a2ce012c41303685ec1adfdb83290fd',
                     'blobs/1834109a42a5ff6501fbe05216475b2b0acc44e0d9c94924469a485d6f45dc86',
+                    'blobs/1be711a4235aefc04302d3a20eefafcf0ac26b573881bc7967479aff6e1e8dd7',
                     'blobs/301e8584305e63f0b764daf52dcf312eecb6378b201663fcc77d7ad68aab1f23',
                     'blobs/38b7b79ef8e827ea8d283d4e01d61563a8feeecf95650f224c047502ea1edb4b',
                     'blobs/6468d9d6761c8afcc97744dfd9e066f29bb697a9a0c8248b5e6eec989134a048',
+                    'blobs/809aae59e2ca524e21f93c4e5747fc718b6f61aefe9eabc46f981d5856b88de3',
                     'blobs/8135016519df51d386efaea9b02f50cb454b6c7afe69c77895c1d4d844c3584d',
                     'blobs/8ca898b1389c58b6cd9a6a777e320f2756ab3437b402c61d774dd2758ad9cf06',
                     'blobs/a2e574ccd55c815f0a87c4f27e7a3115fe8e46d41a2e0caf2a91096a41421f78',
@@ -491,8 +500,6 @@ class MakeLegacyConfig(unittest.TestCase):
                     'blobs/efac096092f7cf879c72ac51d23d9f142e97405dec7dd9c69aeee81de083f794',
                     'blobs/f0601d51be1ec8c11d825b756841937706eb2805ce9b924b67b4b0dc14caba29',
                     'blobs/fd0891d15ce65d7682f7437e441e917b8ed4bde4db07a11dc100104f25056051',
-                    'bootfs/another/file',
-                    'bootfs/some/file',
                     'compiled_packages/core/core/core.cml',
                     'compiled_packages/core/core/shard1.cml',
                     'compiled_packages/core/core/shard2.cml',
@@ -501,6 +508,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     'kernel/kernel.bin',
                     'packages/base/base_a',
                     'packages/base/base_b',
+                    'packages/bootfs_packages/bootfs_files_package',
                     'packages/cache/cache_a',
                     'packages/cache/cache_b',
                     'packages/system/system_a',
@@ -516,7 +524,7 @@ class MakeLegacyConfig(unittest.TestCase):
         with setup_temp_dir() as setup_args:
             # Patch in a mock for the fast_copy() fn
             mock_fast_copy_in(assembly.assembly_input_bundle)
-            _, image_assembly, _, _ = setup_args
+            _, image_assembly, _, _, _ = setup_args
             duplicate_package = "cache_a"
             manifest_path = make_package_manifest(
                 duplicate_package, [], SOURCE_DIR)
@@ -533,7 +541,7 @@ class MakeLegacyConfig(unittest.TestCase):
 
             # Copies legacy config into AIB
             aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
-                image_assembly, [], OUTDIR, [], [], dict(), set(), [], [])
+                image_assembly, [], OUTDIR, [], [], dict(), set(), [], [], None)
 
             # Asserts that the duplicate package is present in the base package set after
             # being copied to the AIB
@@ -552,7 +560,7 @@ class MakeLegacyConfig(unittest.TestCase):
         with setup_temp_dir() as setup_args:
             # Patch in a mock for the fast_copy() fn
             mock_fast_copy_in(assembly.assembly_input_bundle)
-            _, image_assembly, _, _ = setup_args
+            _, image_assembly, _, _, _ = setup_args
             duplicate_package = "base_driver_package"
             manifest_path = make_package_manifest(
                 duplicate_package, [], SOURCE_DIR)
@@ -574,7 +582,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     {make_package_path(duplicate_package)}, list())
                 aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
                     image_assembly, [], OUTDIR, [manifest_path], [], dict(),
-                    set(), [], [])
+                    set(), [], [], None)
 
             self.assertNotIn(make_package_path(duplicate_package), aib.base)
             self.assertIn(
@@ -588,7 +596,7 @@ class MakeLegacyConfig(unittest.TestCase):
         with setup_temp_dir() as setup_args:
             # Patch in a mock for the fast_copy() fn
             mock_fast_copy_in(assembly.assembly_input_bundle)
-            _, image_assembly, _, _ = setup_args
+            _, image_assembly, _, _, _ = setup_args
             duplicate_package = "package_a"
             manifest_path = make_package_manifest(
                 duplicate_package, [], SOURCE_DIR)
@@ -622,4 +630,5 @@ class MakeLegacyConfig(unittest.TestCase):
                 DuplicatePackageException,
                 partial(
                     make_legacy_config.copy_to_assembly_input_bundle,
-                    image_assembly, [], OUTDIR, [], [], dict(), set(), [], []))
+                    image_assembly, [], OUTDIR, [], [], dict(), set(), [], [],
+                    None))

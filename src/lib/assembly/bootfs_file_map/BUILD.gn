@@ -1,0 +1,34 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/host.gni")
+import("//build/rust/rustc_library.gni")
+
+assert(is_host, "Assembly libraries are host-only")
+
+rustc_library("bootfs_file_map") {
+  edition = "2021"
+  name = "assembly_bootfs_file_map"
+  version = "0.1.0"
+  with_unit_tests = true
+
+  deps = [
+    "//src/lib/assembly/config_schema",
+    "//src/lib/assembly/util",
+    "//src/sys/pkg/lib/fuchsia-merkle",
+    "//src/sys/pkg/lib/fuchsia-pkg",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:serde",
+  ]
+  sources = [
+    "src/bootfs_file_map.rs",
+    "src/lib.rs",
+  ]
+}
+
+group("host_tests") {
+  testonly = true
+  deps = [ ":bootfs_file_map_test" ]
+}
