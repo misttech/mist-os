@@ -366,9 +366,11 @@ struct ActiveTransaction {
 /// state is dropped, decrementing temporary strong references to binder objects.
 #[derive(Debug, Default)]
 struct TransactionState {
-    // The process whose handle table `handles` belong to.
+    /// The process whose handle table `handles` belong to.
     proc: Weak<BinderProcess>,
-    // The handles to decrement their strong reference count.
+    /// The objects to strongly owned for the duration of the transaction.
+    objects: Vec<Arc<BinderObject>>,
+    /// The handles to decrement their strong reference count.
     handles: Vec<Handle>,
 }
 
@@ -377,15 +379,14 @@ impl Drop for TransactionState {
         log_trace!("Dropping binder TransactionState");
         let Some(proc) = self.proc.upgrade() else { return; };
         let mut drop_actions = vec![];
-        let mut proc = proc.lock();
-        for handle in &self.handles {
-            // Ignore the error because there is little we can do about it.
-            // Panicking would be wrong, in case the client issued an extra strong decrement.
-            match proc.handles.dec_strong(handle.object_index()) {
+        let mut add_drop_actions = |actions: Result<Vec<RefCountAction>, Errno>| {
+            match actions {
+                // Ignore the error because there is little we can do about it.
+                // Panicking would be wrong, in case the client issued an extra strong decrement.
                 Err(error) => {
                     log_warn!(
                         "Error when dropping transaction state for process {}: {:?}",
-                        proc.base.pid,
+                        proc.pid,
                         error
                     );
                 }
@@ -393,12 +394,29 @@ impl Drop for TransactionState {
                     drop_actions.extend(actions);
                 }
             }
+        };
+        for object in &self.objects {
+            add_drop_actions(object.dec_strong());
+        }
+        let mut proc = proc.lock();
+        for handle in &self.handles {
+            add_drop_actions(proc.handles.dec_strong(handle.object_index()));
         }
         drop(proc);
         // Executing action must be done without holding BinderProcess lock.
         for action in drop_actions {
             action.execute();
         }
+    }
+}
+
+impl TransactionState {
+    fn add_object(&mut self, object: Arc<BinderObject>) -> Result<(), Errno> {
+        for action in object.inc_strong()? {
+            action.execute();
+        }
+        self.objects.push(object);
+        Ok(())
     }
 }
 
@@ -430,9 +448,13 @@ impl<'a> TransientTransactionState<'a> {
     /// `target_proc` for FDs and binder handles respectively.
     fn new(accessor: &'a dyn ResourceAccessor, target_proc: &Arc<BinderProcess>) -> Self {
         TransientTransactionState {
-            state: TransactionState { proc: Arc::downgrade(target_proc), handles: Vec::new() },
+            state: TransactionState {
+                proc: Arc::downgrade(target_proc),
+                objects: vec![],
+                handles: vec![],
+            },
             accessor,
-            transient_fds: Vec::new(),
+            transient_fds: vec![],
         }
     }
 
@@ -474,7 +496,7 @@ enum RequestType {
     Oneway {
         /// The recipient of the transaction. Oneway transactions are ordered for a given binder
         /// object.
-        object: Weak<BinderObject>,
+        object: Arc<BinderObject>,
     },
     /// A request/response type.
     RequestResponse,
@@ -590,23 +612,21 @@ impl BinderProcess {
         if let Some(ActiveTransaction { request_type: RequestType::Oneway { object }, .. }) =
             active_transaction
         {
-            if let Some(object) = object.upgrade() {
-                let mut object_state = object.lock();
-                assert!(
-                    object_state.handling_oneway_transaction,
-                    "freeing a oneway buffer implies that a oneway transaction was being handled"
-                );
-                if let Some(transaction) = object_state.oneway_transactions.pop_front() {
-                    // Drop the lock, as we've completed all mutations and don't want to hold this
-                    // lock while acquiring any others.
-                    drop(object_state);
+            let mut object_state = object.lock();
+            assert!(
+                object_state.handling_oneway_transaction,
+                "freeing a oneway buffer implies that a oneway transaction was being handled"
+            );
+            if let Some(transaction) = object_state.oneway_transactions.pop_front() {
+                // Drop the lock, as we've completed all mutations and don't want to hold this
+                // lock while acquiring any others.
+                drop(object_state);
 
-                    // Schedule the transaction
-                    self.enqueue_command(Command::OnewayTransaction(transaction));
-                } else {
-                    // No more oneway transactions queued, mark the queue handling as done.
-                    object_state.handling_oneway_transaction = false;
-                }
+                // Schedule the transaction
+                self.enqueue_command(Command::OnewayTransaction(transaction));
+            } else {
+                // No more oneway transactions queued, mark the queue handling as done.
+                object_state.handling_oneway_transaction = false;
             }
         }
 
@@ -2915,7 +2935,7 @@ impl BinderDriver {
         };
 
         // Copy the transaction data to the target process.
-        let (buffers, transaction_state) = self.copy_transaction_buffers(
+        let (buffers, mut transaction_state) = self.copy_transaction_buffers(
             binder_proc.get_resource_accessor(current_task),
             binder_proc,
             binder_thread,
@@ -2944,6 +2964,10 @@ impl BinderDriver {
             buffers: buffers.clone(),
         };
 
+        if !handle.is_handle_0() {
+            transaction_state.state.add_object(object.clone())?;
+        }
+
         let (target_thread, command) =
             if data.transaction_data.flags & transaction_flags_TF_ONE_WAY != 0 {
                 // The caller is not expecting a reply.
@@ -2953,7 +2977,7 @@ impl BinderDriver {
                 target_proc.lock().active_transactions.insert(
                     buffers.data.address,
                     ActiveTransaction {
-                        request_type: RequestType::Oneway { object: Arc::downgrade(&object) },
+                        request_type: RequestType::Oneway { object: object.clone() },
                         _state: transaction_state.into(),
                     },
                 );
@@ -3547,7 +3571,7 @@ fn find_parent_buffer<'a>(
 
     // Calculate the start and end of the buffer payload in the scatter gather buffer.
     // The buffer payload will have been copied to the scatter gather buffer, so recover the
-    // offset from its userspace address.
+    // offset from its userspace address.
     if buffer_payload_addr < sg_buffer.user_buffer().address {
         // This should never happen unless userspace is messing with us, since we wrote this address
         // during translation.
@@ -4761,7 +4785,7 @@ pub mod tests {
             cookie: 99,
             __bindgen_anon_1.handle: 2,
         });
-        let mut unaligned_input = Vec::new();
+        let mut unaligned_input = vec![];
         unaligned_input.push(0u8);
         unaligned_input.extend(input);
         SerializedBinderObject::from_bytes(&unaligned_input[1..]).expect("read unaligned object");
@@ -4782,7 +4806,7 @@ pub mod tests {
 
         // Write transaction data in process 1.
         const BINDER_DATA: &[u8; 8] = b"binder!!";
-        let mut transaction_data = Vec::new();
+        let mut transaction_data = vec![];
         transaction_data.extend(BINDER_DATA);
         transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
             hdr: binder_object_header { type_: BINDER_TYPE_HANDLE },
@@ -4883,7 +4907,7 @@ pub mod tests {
 
         const DATA_PREAMBLE: &[u8; 5] = b"stuff";
 
-        let mut transaction_data = Vec::new();
+        let mut transaction_data = vec![];
         transaction_data.extend(DATA_PREAMBLE);
         let offsets = [transaction_data.len() as binder_uintptr_t];
         transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
@@ -4914,7 +4938,7 @@ pub mod tests {
         assert_eq!(transaction_state.state.handles[0], EXPECTED_HANDLE);
 
         // Verify that the transaction data was mutated.
-        let mut expected_transaction_data = Vec::new();
+        let mut expected_transaction_data = vec![];
         expected_transaction_data.extend(DATA_PREAMBLE);
         expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
             hdr.type_: BINDER_TYPE_HANDLE,
@@ -4968,7 +4992,7 @@ pub mod tests {
 
         const DATA_PREAMBLE: &[u8; 5] = b"stuff";
 
-        let mut transaction_data = Vec::new();
+        let mut transaction_data = vec![];
         transaction_data.extend(DATA_PREAMBLE);
         let offsets = [transaction_data.len() as binder_uintptr_t];
         transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
@@ -4992,7 +5016,7 @@ pub mod tests {
             .expect("failed to translate handles");
 
         // Verify that the transaction data was mutated.
-        let mut expected_transaction_data = Vec::new();
+        let mut expected_transaction_data = vec![];
         expected_transaction_data.extend(DATA_PREAMBLE);
         expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
             hdr.type_: BINDER_TYPE_BINDER,
@@ -5037,7 +5061,7 @@ pub mod tests {
 
         const DATA_PREAMBLE: &[u8; 5] = b"stuff";
 
-        let mut transaction_data = Vec::new();
+        let mut transaction_data = vec![];
         transaction_data.extend(DATA_PREAMBLE);
         let offsets = [transaction_data.len() as binder_uintptr_t];
         transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
@@ -5066,7 +5090,7 @@ pub mod tests {
         assert_eq!(transaction_state.state.handles[0], RECEIVING_HANDLE);
 
         // Verify that the transaction data was mutated.
-        let mut expected_transaction_data = Vec::new();
+        let mut expected_transaction_data = vec![];
         expected_transaction_data.extend(DATA_PREAMBLE);
         expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
             hdr.type_: BINDER_TYPE_HANDLE,
@@ -5162,7 +5186,7 @@ pub mod tests {
         assert_eq!(transaction_state.state.handles[1], RECEIVING_HANDLE_OTHER);
 
         // Verify that the transaction data was mutated.
-        let mut expected_transaction_data = Vec::new();
+        let mut expected_transaction_data = vec![];
         expected_transaction_data.extend(DATA_PREAMBLE);
         expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
             hdr.type_: BINDER_TYPE_HANDLE,
@@ -5334,7 +5358,7 @@ pub mod tests {
                 hdr: binder_object_header { type_: BINDER_TYPE_PTR },
                 buffer: writer
                     .write(&{
-                        let mut data = Vec::new();
+                        let mut data = vec![];
                         data.resize(*size, 0u8);
                         data
                     })
@@ -5647,7 +5671,7 @@ pub mod tests {
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
-        let mut transaction_data = Vec::new();
+        let mut transaction_data = vec![];
         transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
             hdr.type_: BINDER_TYPE_HANDLE,
             flags: 0,
@@ -5679,7 +5703,7 @@ pub mod tests {
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
-        let mut transaction_data = Vec::new();
+        let mut transaction_data = vec![];
         transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
             hdr.type_: BINDER_TYPE_WEAK_HANDLE,
             flags: 0,
@@ -5716,7 +5740,7 @@ pub mod tests {
             strong_ref_addr: UserAddress::from(0x0000000000000100),
         };
 
-        let mut transaction_data = Vec::new();
+        let mut transaction_data = vec![];
         transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
             hdr.type_: BINDER_TYPE_BINDER,
             flags: 0,
@@ -6183,7 +6207,7 @@ pub mod tests {
 
         const DATA_PREAMBLE: &[u8; 5] = b"stuff";
 
-        let mut transaction_data = Vec::new();
+        let mut transaction_data = vec![];
         transaction_data.extend(DATA_PREAMBLE);
         let offsets = [transaction_data.len() as binder_uintptr_t];
         transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
