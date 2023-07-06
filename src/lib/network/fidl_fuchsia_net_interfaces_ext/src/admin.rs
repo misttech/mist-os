@@ -169,7 +169,7 @@ pub struct Control {
 }
 
 impl Control {
-    /// Calls AddAddress on the proxy.
+    /// Calls `AddAddress` on the proxy.
     pub fn add_address(
         &self,
         address: &mut fidl_fuchsia_net::Subnet,
@@ -185,14 +185,14 @@ impl Control {
         ))
     }
 
-    /// Calls GetId on the proxy.
+    /// Calls `GetId` on the proxy.
     pub async fn get_id(
         &self,
     ) -> Result<u64, TerminalError<fnet_interfaces_admin::InterfaceRemovedReason>> {
         self.or_terminal_event(self.proxy.get_id()).await
     }
 
-    /// Calls RemoveAddress on the proxy.
+    /// Calls `RemoveAddress` on the proxy.
     pub async fn remove_address(
         &self,
         address: &mut fidl_fuchsia_net::Subnet,
@@ -203,7 +203,7 @@ impl Control {
         self.or_terminal_event(self.proxy.remove_address(address)).await
     }
 
-    /// Calls SetConfiguration on the proxy.
+    /// Calls `SetConfiguration` on the proxy.
     pub async fn set_configuration(
         &self,
         config: fnet_interfaces_admin::Configuration,
@@ -214,7 +214,7 @@ impl Control {
         self.or_terminal_event(self.proxy.set_configuration(&config)).await
     }
 
-    /// Calls GetConfiguration on the proxy.
+    /// Calls `GetConfiguration` on the proxy.
     pub async fn get_configuration(
         &self,
     ) -> Result<
@@ -224,7 +224,17 @@ impl Control {
         self.or_terminal_event(self.proxy.get_configuration()).await
     }
 
-    /// Calls Enable on the proxy.
+    /// Calls `GetAuthorizationForInterface` on the proxy.
+    pub async fn get_authorization_for_interface(
+        &self,
+    ) -> Result<
+        fnet_interfaces_admin::GrantForInterfaceAuthorization,
+        TerminalError<fnet_interfaces_admin::InterfaceRemovedReason>,
+    > {
+        self.or_terminal_event(self.proxy.get_authorization_for_interface()).await
+    }
+
+    /// Calls `Enable` on the proxy.
     pub async fn enable(
         &self,
     ) -> Result<
@@ -234,7 +244,7 @@ impl Control {
         self.or_terminal_event(self.proxy.enable()).await
     }
 
-    /// Calls Remove on the proxy.
+    /// Calls `Remove` on the proxy.
     pub async fn remove(
         &self,
     ) -> Result<
@@ -244,7 +254,7 @@ impl Control {
         self.or_terminal_event(self.proxy.remove()).await
     }
 
-    /// Calls Disable on the proxy.
+    /// Calls `Disable` on the proxy.
     pub async fn disable(
         &self,
     ) -> Result<
@@ -254,7 +264,7 @@ impl Control {
         self.or_terminal_event(self.proxy.disable()).await
     }
 
-    /// Calls Detach on the proxy.
+    /// Calls `Detach` on the proxy.
     pub fn detach(
         &self,
     ) -> Result<(), TerminalError<fnet_interfaces_admin::InterfaceRemovedReason>> {
