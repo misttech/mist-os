@@ -4,17 +4,32 @@
 
 use {
     anyhow::{format_err, Context, Result},
-    ffx_core::ffx_plugin,
+    async_trait::async_trait,
     ffx_session_add_args::SessionAddCommand,
+    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_element::{ControllerMarker, ManagerProxy, Spec},
     futures::{channel::oneshot, FutureExt},
     signal_hook::{consts::signal::*, iterator::Signals},
     std::future::Future,
 };
 
-#[ffx_plugin(ManagerProxy = "core/session-manager:expose:fuchsia.element.Manager")]
-pub async fn add(manager_proxy: ManagerProxy, cmd: SessionAddCommand) -> Result<()> {
-    add_impl(manager_proxy, cmd, spawn_ctrl_c_listener(), &mut std::io::stdout()).await
+#[derive(FfxTool)]
+pub struct AddTool {
+    #[command]
+    cmd: SessionAddCommand,
+    #[with(moniker("/core/session-manager"))]
+    manager_proxy: ManagerProxy,
+}
+
+fho::embedded_plugin!(AddTool);
+
+#[async_trait(?Send)]
+impl FfxMain for AddTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        add_impl(self.manager_proxy, self.cmd, spawn_ctrl_c_listener(), &mut writer).await?;
+        Ok(())
+    }
 }
 
 pub async fn add_impl<W: std::io::Write>(
@@ -68,7 +83,7 @@ mod test {
     async fn test_add_element() {
         const TEST_ELEMENT_URL: &str = "Test Element Url";
 
-        let proxy = setup_fake_manager_proxy(|req| match req {
+        let proxy = fho::testing::fake_proxy(|req| match req {
             ManagerRequest::ProposeElement { spec, responder, .. } => {
                 assert_eq!(spec.component_url.unwrap(), TEST_ELEMENT_URL.to_string());
                 let _ = responder.send(Ok(()));
@@ -76,7 +91,8 @@ mod test {
         });
 
         let add_cmd = SessionAddCommand { url: TEST_ELEMENT_URL.to_string(), interactive: false };
-        let response = add(proxy, add_cmd).await;
+        let response =
+            add_impl(proxy, add_cmd, spawn_ctrl_c_listener(), &mut std::io::stdout()).await;
         assert!(response.is_ok());
     }
 
@@ -84,14 +100,15 @@ mod test {
     async fn test_add_element_args() {
         const TEST_ELEMENT_URL: &str = "Test Element Url";
 
-        let proxy = setup_fake_manager_proxy(|req| match req {
+        let proxy = fho::testing::fake_proxy(|req| match req {
             ManagerRequest::ProposeElement { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
         });
 
         let add_cmd = SessionAddCommand { url: TEST_ELEMENT_URL.to_string(), interactive: false };
-        let response = add(proxy, add_cmd).await;
+        let response =
+            add_impl(proxy, add_cmd, spawn_ctrl_c_listener(), &mut std::io::stdout()).await;
         assert!(response.is_ok());
     }
 
@@ -99,7 +116,7 @@ mod test {
     async fn test_add_interactive_element_stop_with_ctrl_c() {
         const TEST_ELEMENT_URL: &str = "Test Element Url";
 
-        let proxy = setup_fake_manager_proxy(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             ManagerRequest::ProposeElement { responder, .. } => {
                 responder.send(Ok(())).unwrap();
             }

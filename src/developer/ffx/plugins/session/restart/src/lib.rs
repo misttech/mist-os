@@ -4,14 +4,29 @@
 
 use {
     anyhow::{format_err, Result},
-    ffx_core::ffx_plugin,
+    async_trait::async_trait,
     ffx_session_restart_args::SessionRestartCommand,
+    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_session::RestarterProxy,
 };
 
-#[ffx_plugin(RestarterProxy = "core/session-manager:expose:fuchsia.session.Restarter")]
-pub async fn restart(restarter_proxy: RestarterProxy, cmd: SessionRestartCommand) -> Result<()> {
-    restart_impl(restarter_proxy, cmd, &mut std::io::stdout()).await
+#[derive(FfxTool)]
+pub struct RestartTool {
+    #[command]
+    cmd: SessionRestartCommand,
+    #[with(moniker("/core/session-manager"))]
+    restarter_proxy: RestarterProxy,
+}
+
+fho::embedded_plugin!(RestartTool);
+
+#[async_trait(?Send)]
+impl FfxMain for RestartTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        restart_impl(self.restarter_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
 }
 
 pub async fn restart_impl<W: std::io::Write>(
@@ -29,7 +44,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_restart_session() {
-        let proxy = setup_fake_restarter_proxy(|req| match req {
+        let proxy = fho::testing::fake_proxy(|req| match req {
             RestarterRequest::Restart { responder } => {
                 let _ = responder.send(Ok(()));
             }

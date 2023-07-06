@@ -4,16 +4,31 @@
 
 use {
     anyhow::{format_err, Result},
-    ffx_core::ffx_plugin,
+    async_trait::async_trait,
     ffx_session_stop_args::SessionStopCommand,
+    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_session::LifecycleProxy,
 };
 
 const STOPPING_SESSION: &str = "Stopping the session\n";
 
-#[ffx_plugin(LifecycleProxy = "core/session-manager:expose:fuchsia.session.Lifecycle")]
-pub async fn stop(lifecycle_proxy: LifecycleProxy, cmd: SessionStopCommand) -> Result<()> {
-    stop_impl(lifecycle_proxy, cmd, &mut std::io::stdout()).await
+#[derive(FfxTool)]
+pub struct StopTool {
+    #[command]
+    cmd: SessionStopCommand,
+    #[with(moniker("/core/session-manager"))]
+    lifecycle_proxy: LifecycleProxy,
+}
+
+fho::embedded_plugin!(StopTool);
+
+#[async_trait(?Send)]
+impl FfxMain for StopTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        stop_impl(self.lifecycle_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
 }
 
 pub async fn stop_impl<W: std::io::Write>(
@@ -31,7 +46,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_stop_session() -> Result<()> {
-        let proxy = setup_fake_lifecycle_proxy(|req| match req {
+        let proxy = fho::testing::fake_proxy(|req| match req {
             LifecycleRequest::Stop { responder } => {
                 let _ = responder.send(Ok(()));
             }

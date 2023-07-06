@@ -4,16 +4,31 @@
 
 use {
     anyhow::{format_err, Result},
-    ffx_core::ffx_plugin,
+    async_trait::async_trait,
     ffx_session_start_args::SessionStartCommand,
+    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_session::{LifecycleProxy, LifecycleStartRequest},
 };
 
 const STARTING_SESSION: &str = "Starting the default session\n";
 
-#[ffx_plugin(LifecycleProxy = "core/session-manager:expose:fuchsia.session.Lifecycle")]
-pub async fn start(lifecycle_proxy: LifecycleProxy, cmd: SessionStartCommand) -> Result<()> {
-    start_impl(lifecycle_proxy, cmd, &mut std::io::stdout()).await
+#[derive(FfxTool)]
+pub struct StartTool {
+    #[command]
+    cmd: SessionStartCommand,
+    #[with(moniker("/core/session-manager"))]
+    lifecycle_proxy: LifecycleProxy,
+}
+
+fho::embedded_plugin!(StartTool);
+
+#[async_trait(?Send)]
+impl FfxMain for StartTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        start_impl(self.lifecycle_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
 }
 
 pub async fn start_impl<W: std::io::Write>(
@@ -34,7 +49,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_start_session() -> Result<()> {
-        let proxy = setup_fake_lifecycle_proxy(|req| match req {
+        let proxy = fho::testing::fake_proxy(|req| match req {
             LifecycleRequest::Start { payload, responder, .. } => {
                 assert_eq!(payload.session_url, None);
                 let _ = responder.send(Ok(()));

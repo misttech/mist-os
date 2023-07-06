@@ -4,9 +4,10 @@
 
 use {
     anyhow::{Context, Result},
+    async_trait::async_trait,
     component_debug::cli::show_cmd_print,
-    ffx_core::ffx_plugin,
     ffx_session_show_args::SessionShowCommand,
+    fho::{FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_sys2 as fsys,
     fuchsia_zircon_status::Status,
 };
@@ -15,8 +16,29 @@ const DETAILS_FAILURE: &str = "Could not get session information from the target
 because there are no running sessions, or because the target is using a product configuration
 that does not support the session framework.";
 
-#[ffx_plugin()]
-async fn show(rcs_proxy: rc::RemoteControlProxy, _cmd: SessionShowCommand) -> Result<()> {
+#[derive(FfxTool)]
+pub struct ShowTool {
+    #[command]
+    cmd: SessionShowCommand,
+    rcs: rc::RemoteControlProxy,
+}
+
+fho::embedded_plugin!(ShowTool);
+
+#[async_trait(?Send)]
+impl FfxMain for ShowTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        show_impl(self.rcs, self.cmd, &mut writer).await?;
+        Ok(())
+    }
+}
+
+async fn show_impl<W: std::io::Write>(
+    rcs_proxy: rc::RemoteControlProxy,
+    _cmd: SessionShowCommand,
+    writer: &mut W,
+) -> Result<()> {
     let (query_proxy, query_server) = fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>()
         .context("creating query proxy")?;
     rcs_proxy
@@ -25,7 +47,7 @@ async fn show(rcs_proxy: rc::RemoteControlProxy, _cmd: SessionShowCommand) -> Re
         .map_err(|i| Status::ok(i).unwrap_err())
         .context("opening realm query")?;
 
-    show_cmd_print("session:session".to_string(), query_proxy, std::io::stdout())
+    show_cmd_print("session:session".to_string(), query_proxy, writer)
         .await
         .context(DETAILS_FAILURE)?;
 

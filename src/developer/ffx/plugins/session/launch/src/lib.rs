@@ -4,14 +4,29 @@
 
 use {
     anyhow::{format_err, Result},
-    ffx_core::ffx_plugin,
+    async_trait::async_trait,
     ffx_session_launch_args::SessionLaunchCommand,
+    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_session::{LaunchConfiguration, LauncherProxy},
 };
 
-#[ffx_plugin(LauncherProxy = "core/session-manager:expose:fuchsia.session.Launcher")]
-pub async fn launch(launcher_proxy: LauncherProxy, cmd: SessionLaunchCommand) -> Result<()> {
-    launch_impl(launcher_proxy, cmd, &mut std::io::stdout()).await
+#[derive(FfxTool)]
+pub struct LaunchTool {
+    #[command]
+    cmd: SessionLaunchCommand,
+    #[with(moniker("/core/session-manager"))]
+    launcher_proxy: LauncherProxy,
+}
+
+fho::embedded_plugin!(LaunchTool);
+
+#[async_trait(?Send)]
+impl FfxMain for LaunchTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        launch_impl(self.launcher_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
 }
 
 pub async fn launch_impl<W: std::io::Write>(
@@ -32,7 +47,7 @@ mod test {
     async fn test_launch_session() {
         const SESSION_URL: &str = "Session URL";
 
-        let proxy = setup_fake_launcher_proxy(|req| match req {
+        let proxy = fho::testing::fake_proxy(|req| match req {
             LauncherRequest::Launch { configuration, responder } => {
                 assert!(configuration.session_url.is_some());
                 let session_url = configuration.session_url.unwrap();
@@ -42,7 +57,7 @@ mod test {
         });
 
         let launch_cmd = SessionLaunchCommand { url: SESSION_URL.to_string() };
-        let result = launch(proxy, launch_cmd).await;
+        let result = launch_impl(proxy, launch_cmd, &mut std::io::stdout()).await;
         assert!(result.is_ok());
     }
 }
