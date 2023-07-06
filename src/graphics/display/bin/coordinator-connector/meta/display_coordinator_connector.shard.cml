@@ -31,12 +31,15 @@
     include: [ "syslog/client.shard.cml" ],
     offer: [
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: [ "fuchsia.logger.LogSink" ],
             from: "parent",
             to: [ "#display-coordinator-connector" ],
+        },
+        {
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            from: "parent",
+            to: [ "#display-coordinator-connector" ],
+            availability: "optional",
         },
         {
             directory: "dev-display-coordinator",
