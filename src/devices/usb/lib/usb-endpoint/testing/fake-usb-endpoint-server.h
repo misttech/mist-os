@@ -11,6 +11,7 @@
 
 #include <queue>
 
+#include <fbl/auto_lock.h>
 #include <zxtest/zxtest.h>
 
 #include "zircon/system/ulib/async-default/include/lib/async/default.h"
@@ -35,21 +36,14 @@ class FakeEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint
   // RequestComplete: responds to the next request. If there are any requests in the request queue,
   // respond to that. If not, save this response and respond with the next incoming request.
   void RequestComplete(zx_status_t status, size_t actual) {
-    if (requests_.empty()) {
-      // Save completion for next incoming request.
-      completions_.emplace(status, actual);
-      return;
+    fbl::AutoLock _(&lock_);
+    auto completion = RequestCompleteLocked(status, actual);
+    if (completion.has_value()) {
+      ASSERT_TRUE(binding_ref_);
+      std::vector<fuchsia_hardware_usb_endpoint::Completion> completions;
+      completions.emplace_back(std::move(completion.value()));
+      EXPECT_TRUE(fidl::SendEvent(*binding_ref_)->OnCompletion(std::move(completions)).is_ok());
     }
-
-    // Respond to the next request in the queue.
-    std::vector<fuchsia_hardware_usb_endpoint::Completion> completions;
-    completions.emplace_back(std::move(fuchsia_hardware_usb_endpoint::Completion()
-                                           .request(std::move(requests_.front()))
-                                           .status(status)
-                                           .transfer_size(actual)));
-    ASSERT_TRUE(binding_ref_);
-    EXPECT_TRUE(fidl::SendEvent(*binding_ref_)->OnCompletion(std::move(completions)).is_ok());
-    requests_.erase(requests_.begin());
   }
 
   // GetInfo: responds according to previous calls of ExpectGetInfo() and returns
@@ -72,15 +66,27 @@ class FakeEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint
   // called or if there is already a completion saved from before.
   void QueueRequests(QueueRequestsRequest& request,
                      QueueRequestsCompleter::Sync& completer) override {
+    fbl::AutoLock _(&lock_);
     // Add request to queue.
     requests_.insert(requests_.end(), std::make_move_iterator(request.req().begin()),
                      std::make_move_iterator(request.req().end()));
 
     // Reply if there is a completion saved for it already.
+    std::vector<fuchsia_hardware_usb_endpoint::Completion> completions;
     while (!completions_.empty()) {
-      RequestComplete(completions_.front().first, completions_.front().second);
+      auto completion =
+          RequestCompleteLocked(completions_.front().first, completions_.front().second);
+      if (!completion.has_value()) {
+        break;
+      }
       completions_.pop();
+      completions.emplace_back(std::move(completion.value()));
     }
+    if (completions.empty()) {
+      return;
+    }
+    ASSERT_TRUE(binding_ref_);
+    EXPECT_TRUE(fidl::SendEvent(*binding_ref_)->OnCompletion(std::move(completions)).is_ok());
   }
   // CancelAll: succeeds without checking anything.
   void CancelAll(CancelAllCompleter::Sync& completer) override { completer.Reply(fit::ok()); }
@@ -112,12 +118,31 @@ class FakeEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint
   }
 
  private:
+  std::optional<fuchsia_hardware_usb_endpoint::Completion> RequestCompleteLocked(zx_status_t status,
+                                                                                 size_t actual)
+      __TA_REQUIRES(lock_) {
+    if (requests_.empty()) {
+      // Save completion for next incoming request.
+      completions_.emplace(status, actual);
+      return std::nullopt;
+    }
+
+    // Respond to the next request in the queue.
+    auto completion = std::move(fuchsia_hardware_usb_endpoint::Completion()
+                                    .request(std::move(requests_.front()))
+                                    .status(status)
+                                    .transfer_size(actual));
+    requests_.erase(requests_.begin());
+    return std::move(completion);
+  }
+
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_usb_endpoint::Endpoint>> binding_ref_;
 
+  fbl::Mutex lock_;
   std::queue<std::pair<zx_status_t, fuchsia_hardware_usb_endpoint::EndpointInfo>>
       expected_get_info_;
-  std::vector<fuchsia_hardware_usb_request::Request> requests_;
-  std::queue<std::pair<zx_status_t, size_t>> completions_;
+  std::vector<fuchsia_hardware_usb_request::Request> requests_ __TA_GUARDED(lock_);
+  std::queue<std::pair<zx_status_t, size_t>> completions_ __TA_GUARDED(lock_);
 };
 
 // FakeUsbFidlProvider is, as its name suggests, a fake USB FIDL server for testing.
