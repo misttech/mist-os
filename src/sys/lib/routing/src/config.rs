@@ -311,7 +311,7 @@ symmetrical_enums!(
 
 impl Default for AbiRevisionPolicy {
     fn default() -> Self {
-        AbiRevisionPolicy::AllowAll
+        AbiRevisionPolicy::EnforcePresenceAndCompatibility
     }
 }
 
