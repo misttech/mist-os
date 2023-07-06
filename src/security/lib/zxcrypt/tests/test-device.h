@@ -11,6 +11,7 @@
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/driver-integration-test/fixture.h>
 #include <lib/fdio/cpp/caller.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -84,28 +85,52 @@ class TestDevice final {
   // Returns the size of the zxcrypt volume.
   size_t size() const { return block_count_ * block_size_; }
 
-  const fbl::unique_fd& parent() const { return parent_; }
-
   const fbl::unique_fd& devfs_root() const { return devmgr_.devfs_root(); }
 
   const fbl::unique_fd& zxcrypt() const { return zxcrypt_; }
 
   // Returns a connection to the parent device.
   fidl::UnownedClientEnd<fuchsia_device::Controller> parent_controller() const {
-    fdio_cpp::UnownedFdioCaller caller(parent_);
-    return caller.borrow_as<fuchsia_device::Controller>();
+    return fvm_controller_;
   }
 
-  // Returns a connection to the parent device.
-  fidl::UnownedClientEnd<fuchsia_hardware_block::Block> parent_block() const {
-    fdio_cpp::UnownedFdioCaller caller(parent_);
-    return caller.borrow_as<fuchsia_hardware_block::Block>();
+  fidl::ClientEnd<fuchsia_device::Controller> new_parent_controller() const {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+    if (!endpoints.is_ok()) {
+      FX_PLOGS(ERROR, endpoints.error_value()) << "Failed to create endpoints";
+      return {};
+    }
+    auto& [client, server] = endpoints.value();
+
+    fidl::OneWayStatus status =
+        fidl::WireCall(fvm_controller_)->ConnectToController(std::move(server));
+    if (!status.ok()) {
+      FX_LOGS(ERROR) << "Failed to create endpoints: " << status.FormatDescription();
+      return {};
+    }
+    return std::move(client);
+  }
+
+  fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> new_parent() const {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
+    if (!endpoints.is_ok()) {
+      FX_PLOGS(ERROR, endpoints.error_value()) << "Failed to create endpoints";
+      return {};
+    }
+    auto& [client, server] = endpoints.value();
+
+    fidl::OneWayStatus status =
+        fidl::WireCall(fvm_controller_)->ConnectToDeviceFidl(server.TakeChannel());
+    if (!status.ok()) {
+      FX_LOGS(ERROR) << "Failed to create endpoints: " << status.FormatDescription();
+      return {};
+    }
+    return std::move(client);
   }
 
   // Returns a connection to the parent device.
   fidl::UnownedClientEnd<fuchsia_hardware_block_volume::Volume> parent_volume() const {
-    fdio_cpp::UnownedFdioCaller caller(parent_);
-    return caller.borrow_as<fuchsia_hardware_block_volume::Volume>();
+    return fvm_.borrow();
   }
 
   // Returns a connection to the zxcrypt device.
@@ -128,26 +153,18 @@ class TestDevice final {
 
   // Returns space reserved for metadata
   zx::result<size_t> reserved_blocks() const {
-    zx::result channel = component::Clone(parent_volume(), component::AssumeProtocolComposesNode);
-    if (channel.is_error()) {
-      return channel.take_error();
-    }
-    zx::result volume = FdioVolume::Unlock(std::move(channel.value()), key_, 0);
+    zx::result volume = FdioVolume::Unlock(new_parent(), key_, 0);
     if (volume.is_error()) {
       return volume.take_error();
     }
-    return zx::ok(volume->reserved_blocks());
+    return zx::ok(volume.value()->reserved_blocks());
   }
   zx::result<size_t> reserved_slices() const {
-    zx::result channel = component::Clone(parent_volume(), component::AssumeProtocolComposesNode);
-    if (channel.is_error()) {
-      return channel.take_error();
-    }
-    zx::result volume = FdioVolume::Unlock(std::move(channel.value()), key_, 0);
+    zx::result volume = FdioVolume::Unlock(new_parent(), key_, 0);
     if (volume.is_error()) {
       return volume.take_error();
     }
-    return zx::ok(volume->reserved_slices());
+    return zx::ok(volume.value()->reserved_slices());
   }
 
   // Returns a reference to the root key generated for this device.
@@ -268,12 +285,15 @@ class TestDevice final {
 
   // The pathname of the FVM partition.
   char fvm_part_path_[PATH_MAX];
-  // File descriptor for the (optional) underlying FVM partition.
-  fbl::unique_fd parent_;
+  // The underlying FVM partition's controller.
+  fidl::ClientEnd<fuchsia_device::Controller> fvm_controller_;
+  //  The underlying FVM partition.
+  fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> fvm_;
+
   // File descriptor for the zxcrypt volume.
   fbl::unique_fd zxcrypt_;
   // The zxcrypt volume
-  std::unique_ptr<zxcrypt::VolumeManager> volume_manager_;
+  std::optional<zxcrypt::VolumeManager> volume_manager_;
   // The cached block count.
   size_t block_count_ = 0;
   // The cached block size.

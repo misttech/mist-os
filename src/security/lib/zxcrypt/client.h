@@ -5,9 +5,8 @@
 #ifndef SRC_SECURITY_LIB_ZXCRYPT_CLIENT_H_
 #define SRC_SECURITY_LIB_ZXCRYPT_CLIENT_H_
 
+#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.encrypted/cpp/wire.h>
-#include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/fdio.h>
 #include <lib/fit/function.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
@@ -116,7 +115,7 @@ class __EXPORT EncryptedVolumeClient {
   zx_status_t Shred();
 
  private:
-  // The underlying zxcrypt device, accessed over FDIO
+  // The underlying zxcrypt device.
   fidl::ClientEnd<fuchsia_hardware_block_encrypted::DeviceManager> client_end_;
 };
 
@@ -131,27 +130,27 @@ class __EXPORT EncryptedVolumeClient {
 // are currently the only way to obtain a handle to a newly-bound child.
 class __EXPORT VolumeManager {
  public:
-  explicit VolumeManager(fbl::unique_fd&& block_dev_fd, fbl::unique_fd&& devfs_root_fd);
+  explicit VolumeManager(fidl::ClientEnd<fuchsia_device::Controller> block_controller,
+                         fbl::unique_fd devfs_root_fd);
 
   // Unbinds the zxcrypt driver.  Invalidates channels previously returned from `OpenClient` and FDs
   // returned from `OpenInnerBlockDevice`.
   zx_status_t Unbind();
 
   // Attempts to open the zxcrypt driver device associated with the underlying
-  // block device described by |fd|, binding the driver if necessary,
-  // and returning a channel to the zxcrypt device node.
+  // block device, binding the driver if necessary, and returning a channel to the zxcrypt device
+  // node.
   zx_status_t OpenClient(const zx::duration& timeout, zx::channel& out);
 
   // Attempts to open the block device representing the inner, unsealed block
-  // device, at a device path of |/zxcrypt/unsealed/block| below the block device
-  // represented by |block_dev_fd_|.  This will only work once you have called
-  // |OpenClient| and used that handle to call |EncryptedVolumeClient::Unseal|
-  // or |EncryptedVolumeClient::UnsealWithImplicitKey|.
+  // device, at a device path of |/zxcrypt/unsealed/block| below the block device.  This will only
+  // work once you have called |OpenClient| and used that handle to call
+  // |EncryptedVolumeClient::Unseal| or |EncryptedVolumeClient::UnsealWithImplicitKey|.
   zx_status_t OpenInnerBlockDevice(const zx::duration& timeout, fbl::unique_fd* out);
 
  private:
-  // The underlying block device, accessed over FDIO
-  fbl::unique_fd block_dev_fd_;
+  // The underlying block device.
+  fidl::ClientEnd<fuchsia_device::Controller> block_controller_;
 
   // The root of the device tree, needed to openat() related devices via
   // constructing relative topological paths.

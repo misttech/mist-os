@@ -346,7 +346,15 @@ zx::result<zxcrypt::VolumeManager> ZxcryptCreate(PartitionInfo* part) {
     return zx::error(status);
   }
 
-  zxcrypt::VolumeManager zxcrypt_manager(std::move(part->new_part), std::move(devfs_root));
+  fdio_cpp::FdioCaller part_caller(std::move(part->new_part));
+  zx::result part_channel = part_caller.take_channel();
+  if (part_channel.is_error()) {
+    return part_channel.take_error();
+  }
+
+  zxcrypt::VolumeManager zxcrypt_manager(
+      fidl::ClientEnd<fuchsia_device::Controller>(std::move(part_channel.value())),
+      std::move(devfs_root));
   zx::channel client_chan;
   if (zx_status_t status = zxcrypt_manager.OpenClient(zx::sec(3), client_chan); status != ZX_OK) {
     ERROR("Could not open zxcrypt volume manager\n");

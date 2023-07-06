@@ -108,12 +108,13 @@ class FactoryResetTest : public gtest::RealLoopFixture {
   }
 
   void CreateZxcrypt() {
-    fbl::unique_fd fd;
-    zx::result channel = WaitForDevice(fvm_block_path_);
+    std::string controller_path = fvm_block_path_ + "/device_controller";
+    zx::result channel = WaitForDevice(controller_path);
     ASSERT_EQ(channel.status_value(), ZX_OK);
-    ASSERT_EQ(fdio_fd_create(channel.value().release(), fd.reset_and_get_address()), ZX_OK);
 
-    zxcrypt::VolumeManager zxcrypt_volume(std::move(fd), devfs_root_fd().duplicate());
+    zxcrypt::VolumeManager zxcrypt_volume(
+        fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value())),
+        devfs_root_fd().duplicate());
     zx::channel zxc_manager_chan;
     ASSERT_EQ(zxcrypt_volume.OpenClient(zx::duration::infinite(), zxc_manager_chan), ZX_OK);
 

@@ -114,7 +114,7 @@ void TestDevice::Create(size_t device_size, size_t block_size, bool fvm, Volume:
 void TestDevice::Bind(Volume::Version version, bool fvm) {
   ASSERT_NO_FATAL_FAILURE(Create(kDeviceSize, kBlockSize, fvm, version));
 
-  zxcrypt::VolumeManager volume_manager(parent().duplicate(), devfs_root().duplicate());
+  zxcrypt::VolumeManager volume_manager(new_parent_controller(), devfs_root().duplicate());
   zx::channel zxc_client_chan;
   ASSERT_OK(volume_manager.OpenClient(kTimeout, zxc_client_chan));
   EncryptedVolumeClient volume_client(std::move(zxc_client_chan));
@@ -142,16 +142,14 @@ void TestDevice::Rebind() {
 
   Disconnect();
   zxcrypt_.reset();
-  parent_.reset();
+  fvm_.reset();
 
   if (strlen(fvm_part_path_) != 0) {
+    const fidl::UnownedClientEnd<fuchsia_device::Controller> channel(
+        ramdisk_get_block_controller_interface(ramdisk_));
     // We need to explicitly rebind FVM here, since now that we're not
     // relying on the system-wide block-watcher, the driver won't rebind by
     // itself.
-    //
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-    const fidl::UnownedClientEnd<fuchsia_device::Controller> channel(
-        ramdisk_get_block_interface(ramdisk_));
     const fidl::WireResult result =
         fidl::WireCall(channel)->Rebind(fidl::StringView::FromExternal(kFvmDriver));
     ASSERT_OK(result.status());
@@ -159,17 +157,26 @@ void TestDevice::Rebind() {
     ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
 
     zx::result owned = device_watcher::RecursiveWaitForFile(devfs_root().get(), fvm_part_path_);
-    ASSERT_OK(owned.status_value());
-    ASSERT_OK(fdio_fd_create(owned.value().release(), parent_.reset_and_get_address()));
+    ASSERT_OK(owned);
+    fvm_ = fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(std::move(owned.value()));
+
+    std::string controller_path = std::string(fvm_part_path_) + "/device_controller";
+    zx::result controller =
+        device_watcher::RecursiveWaitForFile(devfs_root().get(), controller_path.c_str());
+    ASSERT_OK(controller);
+    fvm_controller_ = fidl::ClientEnd<fuchsia_device::Controller>(std::move(controller.value()));
   } else {
     ASSERT_OK(ramdisk_rebind(ramdisk_));
+    const fidl::UnownedClientEnd<fuchsia_device::Controller> channel(
+        ramdisk_get_block_controller_interface(ramdisk_));
+    zx::result server = fidl::CreateEndpoints(&fvm_controller_);
+    ASSERT_OK(server);
+    ASSERT_OK(fidl::WireCall(channel)->ConnectToController(std::move(server.value())).status());
 
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-    fidl::UnownedClientEnd<fuchsia_io::Node> client(ramdisk_get_block_interface(ramdisk_));
-    zx::result owned = component::Clone(client);
-    ASSERT_OK(owned.status_value());
+    zx::result fvm = fidl::CreateEndpoints(&fvm_);
+    ASSERT_OK(fvm);
     ASSERT_OK(
-        fdio_fd_create(owned.value().TakeChannel().release(), parent_.reset_and_get_address()));
+        fidl::WireCall(fvm_controller_)->ConnectToDeviceFidl(fvm.value().TakeChannel()).status());
   }
   ASSERT_NO_FATAL_FAILURE(Connect());
 }
@@ -250,12 +257,14 @@ void TestDevice::WriteVmo(zx_off_t off, size_t len) {
 void TestDevice::Corrupt(uint64_t blkno, key_slot_t slot) {
   uint8_t block[block_size_];
 
-  ASSERT_OK(block_client::SingleReadBytes(parent_block(), block, block_size_, blkno * block_size_));
+  // TODO(https://fxbug.dev/129956): Update this API to take a volume channel instead.
+  ASSERT_OK(block_client::SingleReadBytes(
+      fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(parent_volume().channel()), block,
+      block_size_, blkno * block_size_));
 
-  zx::result channel = component::Clone(parent_volume(), component::AssumeProtocolComposesNode);
-  ASSERT_OK(channel);
+  fidl::ClientEnd channel = new_parent();
 
-  zx::result volume = FdioVolume::Unlock(std::move(channel.value()), key_, 0);
+  zx::result volume = FdioVolume::Unlock(std::move(channel), key_, 0);
   ASSERT_OK(volume);
 
   zx_off_t off;
@@ -263,8 +272,10 @@ void TestDevice::Corrupt(uint64_t blkno, key_slot_t slot) {
   int flip = 1U << (rand() % 8);
   block[off] ^= static_cast<uint8_t>(flip);
 
-  ASSERT_OK(
-      block_client::SingleWriteBytes(parent_block(), block, block_size_, blkno * block_size_));
+  // TODO(https://fxbug.dev/129956): Update this API to take a volume channel instead.
+  ASSERT_OK(block_client::SingleWriteBytes(
+      fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(parent_volume().channel()), block,
+      block_size_, blkno * block_size_));
 }
 
 // Private methods
@@ -286,8 +297,14 @@ void TestDevice::CreateRamdisk(size_t device_size, size_t block_size) {
 
   zx::result owned =
       device_watcher::RecursiveWaitForFile(devfs_root().get(), ramdisk_get_path(ramdisk_));
-  ASSERT_OK(owned.status_value());
-  ASSERT_OK(fdio_fd_create(owned.value().release(), parent_.reset_and_get_address()));
+  ASSERT_OK(owned);
+  fvm_ = fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(std::move(owned.value()));
+
+  std::string controller_path = std::string(ramdisk_get_path(ramdisk_)) + "/device_controller";
+  zx::result controller =
+      device_watcher::RecursiveWaitForFile(devfs_root().get(), controller_path.c_str());
+  ASSERT_OK(controller);
+  fvm_controller_ = fidl::ClientEnd<fuchsia_device::Controller>(std::move(controller.value()));
 
   block_size_ = block_size;
   block_count_ = count;
@@ -335,9 +352,16 @@ void TestDevice::CreateFvmPart(size_t device_size, size_t block_size) {
       *devfs, fvm_manager, request_slice_count, uuid::Uuid(zxcrypt_magic), uuid::Uuid::Generate(),
       "data", 0);
   ASSERT_EQ(fvm_part.status_value(), ZX_OK);
-  fbl::unique_fd partition;
-  ASSERT_OK(fdio_fd_create(fvm_part->TakeChannel().release(), partition.reset_and_get_address()));
-  parent_ = std::move(partition);
+  fvm_controller_ = std::move(fvm_part.value());
+
+  {
+    zx::result server = fidl::CreateEndpoints(&fvm_);
+    ASSERT_OK(server);
+
+    ASSERT_OK(fidl::WireCall(fvm_controller_)
+                  ->ConnectToDeviceFidl(server.value().TakeChannel())
+                  .status());
+  }
 
   // Save the topological path for rebinding.  The topological path will be
   // consistent after rebinding the ramdisk, whereas the
@@ -360,8 +384,7 @@ void TestDevice::CreateFvmPart(size_t device_size, size_t block_size) {
 void TestDevice::Connect() {
   ZX_DEBUG_ASSERT(!zxcrypt_);
 
-  volume_manager_ =
-      std::make_unique<zxcrypt::VolumeManager>(parent().duplicate(), devfs_root().duplicate());
+  volume_manager_ = zxcrypt::VolumeManager(new_parent_controller(), devfs_root().duplicate());
   zx::channel zxc_client_chan;
   ASSERT_OK(volume_manager_->OpenClient(kTimeout, zxc_client_chan));
 

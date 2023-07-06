@@ -5,6 +5,7 @@
 #include "src/storage/testing/zxcrypt.h"
 
 #include <fcntl.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -16,9 +17,10 @@
 namespace storage {
 
 zx::result<std::string> CreateZxcryptVolume(const std::string& device_path) {
-  fbl::unique_fd fd(open(device_path.c_str(), O_RDONLY));
-  if (!fd) {
-    FX_LOGS(ERROR) << "Could not open test block device";
+  std::string controller_path = device_path + "/device_controller";
+  zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
+  if (controller.is_error()) {
+    FX_PLOGS(ERROR, controller.error_value()) << "Could not open test block device";
     return zx::error(ZX_ERR_BAD_STATE);
   }
   fbl::unique_fd dev_fd(open("/dev", O_RDONLY));
@@ -27,7 +29,7 @@ zx::result<std::string> CreateZxcryptVolume(const std::string& device_path) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  zxcrypt::VolumeManager volume_manager(std::move(fd), std::move(dev_fd));
+  zxcrypt::VolumeManager volume_manager(std::move(controller.value()), std::move(dev_fd));
   zx::channel driver_chan;
   auto status = zx::make_result(volume_manager.OpenClient(zx::sec(2), driver_chan));
   if (status.is_error()) {

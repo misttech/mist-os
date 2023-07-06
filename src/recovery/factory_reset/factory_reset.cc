@@ -27,8 +27,9 @@ namespace factory_reset {
 
 const char* kBlockPath = "class/block";
 
-zx_status_t ShredZxcryptDevice(fbl::unique_fd fd, fbl::unique_fd devfs_root_fd) {
-  zxcrypt::VolumeManager volume(std::move(fd), std::move(devfs_root_fd));
+zx_status_t ShredZxcryptDevice(fidl::ClientEnd<fuchsia_device::Controller> device,
+                               fbl::unique_fd devfs_root_fd) {
+  zxcrypt::VolumeManager volume(std::move(device), std::move(devfs_root_fd));
 
   // Note: the access to /dev/sys/platform from the manifest is load-bearing
   // here, because we can only find the related zxcrypt device for a particular
@@ -141,16 +142,17 @@ void FactoryReset::Shred(fit::callback<void(zx_status_t)> callback) const {
           FX_PLOGS(ERROR, block.status_value()) << "Error opening " << de->d_name;
           continue;
         }
+
+        std::string controller_path = std::string(de->d_name) + "/device_controller";
+        zx::result block_controller =
+            component::ConnectAt<fuchsia_device::Controller>(caller.directory(), controller_path);
+        if (block_controller.is_error()) {
+          FX_PLOGS(ERROR, block_controller.status_value()) << "Error opening " << controller_path;
+          continue;
+        }
         zx_status_t status;
         switch (fs_management::DetectDiskFormat(block.value())) {
           case fs_management::kDiskFormatZxcrypt: {
-            fbl::unique_fd block_fd;
-            if (zx_status_t status = fdio_fd_create(block.value().TakeChannel().release(),
-                                                    block_fd.reset_and_get_address());
-                status != ZX_OK) {
-              FX_PLOGS(ERROR, status) << "Error creating file descriptor from " << de->d_name;
-              continue;
-            }
             fbl::unique_fd dev_fd;
             {
               zx::result dev = component::Clone(dev_);
@@ -166,7 +168,7 @@ void FactoryReset::Shred(fit::callback<void(zx_status_t)> callback) const {
               }
             }
 
-            status = ShredZxcryptDevice(std::move(block_fd), std::move(dev_fd));
+            status = ShredZxcryptDevice(std::move(block_controller.value()), std::move(dev_fd));
             break;
           }
           case fs_management::kDiskFormatFxfs: {

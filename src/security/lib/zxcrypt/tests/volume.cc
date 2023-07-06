@@ -32,20 +32,18 @@ namespace {
 
 // fxbug.dev/31814: Dump extra information if encountering an unexpected error during volume
 // creation.
-void VolumeCreate(const fbl::unique_fd& fd, const fbl::unique_fd& devfs_root,
-                  const crypto::Secret& key, bool fvm, zx_status_t expected) {
-  char err[128];
-  fdio_cpp::UnownedFdioCaller caller(fd);
-  const fidl::WireResult result =
-      fidl::WireCall(caller.borrow_as<fuchsia_hardware_block::Block>())->GetInfo();
+void VolumeCreate(fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device,
+                  const fbl::unique_fd& devfs_root, const crypto::Secret& key, bool fvm,
+                  zx_status_t expected) {
+  const fidl::WireResult result = fidl::WireCall(device)->GetInfo();
   ASSERT_OK(result.status());
   const fit::result response = result.value();
   ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
   const fuchsia_hardware_block::wire::BlockInfo& block_info = response.value()->info;
 
+  char err[128];
   if (fvm) {
-    const fidl::WireResult result =
-        fidl::WireCall(caller.borrow_as<fuchsia_hardware_block_volume::Volume>())->GetVolumeInfo();
+    const fidl::WireResult result = fidl::WireCall(device)->GetVolumeInfo();
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
     ASSERT_OK(response.status);
@@ -61,11 +59,7 @@ void VolumeCreate(const fbl::unique_fd& fd, const fbl::unique_fd& devfs_root,
              block_info.block_size, block_info.block_count);
   }
 
-  zx::result channel = component::Clone(caller.borrow_as<fuchsia_hardware_block_volume::Volume>(),
-                                        component::AssumeProtocolComposesNode);
-  ASSERT_OK(channel);
-  EXPECT_STATUS(FdioVolume::Create(std::move(channel.value()), key).status_value(), expected, "%s",
-                err);
+  EXPECT_STATUS(FdioVolume::Create(std::move(device), key), expected, "%s", err);
 }
 
 void TestInit(Volume::Version version, bool fvm) {
@@ -77,13 +71,10 @@ void TestInit(Volume::Version version, bool fvm) {
   EXPECT_STATUS(FdioVolume::Init({}).status_value(), ZX_ERR_INVALID_ARGS);
 
   // Valid
-  zx::result channel =
-      component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-  ASSERT_OK(channel);
-  zx::result volume = FdioVolume::Init(std::move(channel.value()));
+  zx::result volume = FdioVolume::Init(device.new_parent());
   ASSERT_OK(volume);
-  EXPECT_EQ(volume->reserved_blocks(), fvm ? (fvm::kBlockSize / kBlockSize) : 2u);
-  EXPECT_EQ(volume->reserved_slices(), fvm ? 1u : 0u);
+  EXPECT_EQ(volume.value()->reserved_blocks(), fvm ? (fvm::kBlockSize / kBlockSize) : 2u);
+  EXPECT_EQ(volume.value()->reserved_slices(), fvm ? 1u : 0u);
 }
 DEFINE_EACH_DEVICE(VolumeTest, TestInit)
 
@@ -98,10 +89,10 @@ void TestCreate(Volume::Version version, bool fvm) {
   // Weak key
   crypto::Secret short_key;
   ASSERT_OK(short_key.Generate(device.key().len() - 1));
-  VolumeCreate(device.parent(), device.devfs_root(), short_key, fvm, ZX_ERR_INVALID_ARGS);
+  VolumeCreate(device.new_parent(), device.devfs_root(), short_key, fvm, ZX_ERR_INVALID_ARGS);
 
   // Valid
-  VolumeCreate(device.parent(), device.devfs_root(), device.key(), fvm, ZX_OK);
+  VolumeCreate(device.new_parent(), device.devfs_root(), device.key(), fvm, ZX_OK);
 }
 DEFINE_EACH_DEVICE(VolumeTest, TestCreate)
 
@@ -112,10 +103,7 @@ void TestUnlock(Volume::Version version, bool fvm) {
 
   // Invalid device
   {
-    zx::result channel =
-        component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-    ASSERT_OK(channel);
-    EXPECT_STATUS(FdioVolume::Unlock(std::move(channel.value()), device.key(), 0).status_value(),
+    EXPECT_STATUS(FdioVolume::Unlock(device.new_parent(), device.key(), 0).status_value(),
                   ZX_ERR_ACCESS_DENIED);
   }
 
@@ -124,70 +112,59 @@ void TestUnlock(Volume::Version version, bool fvm) {
 
   // Bad key
   ASSERT_NO_FATAL_FAILURE(
-      VolumeCreate(device.parent(), device.devfs_root(), device.key(), fvm, ZX_OK));
+      VolumeCreate(device.new_parent(), device.devfs_root(), device.key(), fvm, ZX_OK));
 
   crypto::Secret bad_key;
   ASSERT_OK(bad_key.Generate(device.key().len()));
   {
-    zx::result channel =
-        component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-    ASSERT_OK(channel);
-    EXPECT_STATUS(FdioVolume::Unlock(std::move(channel.value()), bad_key, 0).status_value(),
+    EXPECT_STATUS(FdioVolume::Unlock(device.new_parent(), bad_key, 0).status_value(),
                   ZX_ERR_ACCESS_DENIED);
   }
 
   // Bad slot
   {
-    zx::result channel =
-        component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-    ASSERT_OK(channel);
-    EXPECT_STATUS(FdioVolume::Unlock(std::move(channel.value()), device.key(), -1).status_value(),
+    EXPECT_STATUS(FdioVolume::Unlock(device.new_parent(), device.key(), -1).status_value(),
                   ZX_ERR_ACCESS_DENIED);
   }
   {
-    zx::result channel =
-        component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-    ASSERT_OK(channel);
-    EXPECT_STATUS(FdioVolume::Unlock(std::move(channel.value()), device.key(), 1).status_value(),
+    EXPECT_STATUS(FdioVolume::Unlock(device.new_parent(), device.key(), 1).status_value(),
                   ZX_ERR_ACCESS_DENIED);
   }
 
   // Valid
-  zx::result channel =
-      component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-  ASSERT_OK(channel);
-  zx::result volume = FdioVolume::Unlock(std::move(channel.value()), device.key(), 0);
+  zx::result volume = FdioVolume::Unlock(device.new_parent(), device.key(), 0);
   ASSERT_OK(volume);
 
   // Corrupt the key in each block.
   off_t off = 0;
   uint8_t before[kBlockSize];
   uint8_t after[sizeof(before)];
-  const size_t num_blocks = volume->reserved_blocks();
+  const size_t num_blocks = volume.value()->reserved_blocks();
+
+  // TODO(https://fxbug.dev/130150): This code is broken as devices no longer support fds.
+  // Please either fix this code or delete it.
+  int bad_fd = -1;
 
   for (size_t i = 0; i < num_blocks; ++i) {
     // On FVM, the trailing reserved blocks may just be to pad to a slice, and not have any
     // metdata.  Start from the end and iterate backward to ensure the last block corrupted has
     // metadata.
     ASSERT_NO_FATAL_FAILURE(device.Corrupt(num_blocks - 1 - i, 0));
-    lseek(device.parent().get(), off, SEEK_SET);
-    read(device.parent().get(), before, sizeof(before));
+    ASSERT_EQ(lseek(bad_fd, off, SEEK_SET), -1);
+    ASSERT_EQ(read(bad_fd, before, sizeof(before)), -1);
 
-    zx::result channel =
-        component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-    ASSERT_OK(channel);
     if (i < num_blocks - 1) {
       // Volume should still be unlockable as long as one copy of the key exists
-      volume = FdioVolume::Unlock(std::move(channel.value()), device.key(), 0);
+      volume = FdioVolume::Unlock(device.new_parent(), device.key(), 0);
       ASSERT_OK(volume);
     } else {
       // Key should fail when last copy is corrupted.
-      EXPECT_STATUS(FdioVolume::Unlock(std::move(channel.value()), device.key(), 0).status_value(),
+      EXPECT_STATUS(FdioVolume::Unlock(device.new_parent(), device.key(), 0).status_value(),
                     ZX_ERR_ACCESS_DENIED);
     }
 
-    lseek(device.parent().get(), off, SEEK_SET);
-    read(device.parent().get(), after, sizeof(after));
+    ASSERT_EQ(lseek(bad_fd, off, SEEK_SET), -1);
+    ASSERT_EQ(read(bad_fd, after, sizeof(after)), -1);
 
     // Unlock should not modify the parent
     EXPECT_EQ(memcmp(before, after, sizeof(before)), 0);
@@ -200,36 +177,27 @@ void TestEnroll(Volume::Version version, bool fvm) {
   ASSERT_NO_FATAL_FAILURE(device.SetupDevmgr());
   ASSERT_NO_FATAL_FAILURE(device.Bind(version, fvm));
 
-  zx::result channel =
-      component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-  ASSERT_OK(channel);
-  zx::result volume = FdioVolume::Unlock(std::move(channel.value()), device.key(), 0);
+  zx::result volume = FdioVolume::Unlock(device.new_parent(), device.key(), 0);
   ASSERT_OK(volume);
 
   // Bad key
   crypto::Secret bad_key;
-  EXPECT_STATUS(volume->Enroll(bad_key, 1), ZX_ERR_INVALID_ARGS);
+  EXPECT_STATUS(volume.value()->Enroll(bad_key, 1), ZX_ERR_INVALID_ARGS);
 
   // Bad slot
-  EXPECT_STATUS(volume->Enroll(device.key(), volume->num_slots()), ZX_ERR_INVALID_ARGS);
+  EXPECT_STATUS(volume.value()->Enroll(device.key(), volume->num_slots()), ZX_ERR_INVALID_ARGS);
 
   // Valid; new slot
-  EXPECT_OK(volume->Enroll(device.key(), 1));
+  EXPECT_OK(volume.value()->Enroll(device.key(), 1));
   {
-    zx::result channel =
-        component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-    ASSERT_OK(channel);
-    volume = FdioVolume::Unlock(std::move(channel.value()), device.key(), 1);
+    volume = FdioVolume::Unlock(device.new_parent(), device.key(), 1);
     ASSERT_OK(volume);
   }
 
   // Valid; existing slot
-  EXPECT_OK(volume->Enroll(device.key(), 0));
+  EXPECT_OK(volume.value()->Enroll(device.key(), 0));
   {
-    zx::result channel =
-        component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-    ASSERT_OK(channel);
-    volume = FdioVolume::Unlock(std::move(channel.value()), device.key(), 0);
+    volume = FdioVolume::Unlock(device.new_parent(), device.key(), 0);
     ASSERT_OK(volume);
   }
 }
@@ -240,10 +208,7 @@ void TestRevoke(Volume::Version version, bool fvm) {
   ASSERT_NO_FATAL_FAILURE(device.SetupDevmgr());
   ASSERT_NO_FATAL_FAILURE(device.Bind(version, fvm));
 
-  zx::result channel =
-      component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-  ASSERT_OK(channel);
-  zx::result volume = FdioVolume::Unlock(std::move(channel.value()), device.key(), 0);
+  zx::result volume = FdioVolume::Unlock(device.new_parent(), device.key(), 0);
   ASSERT_OK(volume);
 
   // Bad slot
@@ -254,9 +219,7 @@ void TestRevoke(Volume::Version version, bool fvm) {
 
   // Valid, even if last slot
   EXPECT_OK(volume->Revoke(0));
-  channel = component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-  ASSERT_OK(channel);
-  EXPECT_STATUS(FdioVolume::Unlock(std::move(channel.value()), device.key(), 0).status_value(),
+  EXPECT_STATUS(FdioVolume::Unlock(device.new_parent(), device.key(), 0).status_value(),
                 ZX_ERR_ACCESS_DENIED);
 }
 DEFINE_EACH_DEVICE(VolumeTest, TestRevoke)
@@ -266,10 +229,7 @@ void TestShred(Volume::Version version, bool fvm) {
   ASSERT_NO_FATAL_FAILURE(device.SetupDevmgr());
   ASSERT_NO_FATAL_FAILURE(device.Bind(version, fvm));
 
-  zx::result channel =
-      component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-  ASSERT_OK(channel);
-  zx::result volume = FdioVolume::Unlock(std::move(channel.value()), device.key(), 0);
+  zx::result volume = FdioVolume::Unlock(device.new_parent(), device.key(), 0);
   ASSERT_OK(volume);
 
   // Valid
@@ -278,9 +238,7 @@ void TestShred(Volume::Version version, bool fvm) {
   // No further methods work
   EXPECT_STATUS(volume->Enroll(device.key(), 0), ZX_ERR_BAD_STATE);
   EXPECT_STATUS(volume->Revoke(0), ZX_ERR_BAD_STATE);
-  channel = component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-  ASSERT_OK(channel);
-  EXPECT_STATUS(FdioVolume::Unlock(std::move(channel.value()), device.key(), 0).status_value(),
+  EXPECT_STATUS(FdioVolume::Unlock(device.new_parent(), device.key(), 0).status_value(),
                 ZX_ERR_ACCESS_DENIED);
 }
 DEFINE_EACH_DEVICE(VolumeTest, TestShred)
@@ -290,7 +248,7 @@ void TestFormatThroughDriver(Volume::Version version, bool fvm) {
   ASSERT_NO_FATAL_FAILURE(device.SetupDevmgr());
   ASSERT_NO_FATAL_FAILURE(device.Create(kDeviceSize, kBlockSize, fvm, version));
 
-  zxcrypt::VolumeManager manager(device.parent().duplicate(), device.devfs_root().duplicate());
+  zxcrypt::VolumeManager manager(device.new_parent_controller(), device.devfs_root().duplicate());
   zx::channel chan;
   ASSERT_OK(manager.OpenClient(zx::duration::infinite(), chan));
 
@@ -314,7 +272,7 @@ void TestShredThroughDriver(Volume::Version version, bool fvm) {
   ASSERT_NO_FATAL_FAILURE(device.SetupDevmgr());
   ASSERT_NO_FATAL_FAILURE(device.Bind(version, fvm));
 
-  zxcrypt::VolumeManager manager(device.parent().duplicate(), device.devfs_root().duplicate());
+  zxcrypt::VolumeManager manager(device.new_parent_controller(), device.devfs_root().duplicate());
   zx::channel chan;
   ASSERT_OK(manager.OpenClient(zx::duration::infinite(), chan));
   zxcrypt::EncryptedVolumeClient zxc_client(std::move(chan));
@@ -323,10 +281,7 @@ void TestShredThroughDriver(Volume::Version version, bool fvm) {
   EXPECT_OK(zxc_client.Seal());
 
   // Key should no longer work
-  zx::result channel =
-      component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-  ASSERT_OK(channel);
-  EXPECT_STATUS(FdioVolume::Unlock(std::move(channel.value()), device.key(), 0).status_value(),
+  EXPECT_STATUS(FdioVolume::Unlock(device.new_parent(), device.key(), 0).status_value(),
                 ZX_ERR_ACCESS_DENIED);
 }
 DEFINE_EACH_DEVICE(VolumeTest, TestShredThroughDriver)
@@ -336,17 +291,14 @@ void TestShredThroughDriverLocked(Volume::Version version, bool fvm) {
   ASSERT_NO_FATAL_FAILURE(device.SetupDevmgr());
   ASSERT_NO_FATAL_FAILURE(device.Bind(version, fvm));
 
-  zxcrypt::VolumeManager manager(device.parent().duplicate(), device.devfs_root().duplicate());
+  zxcrypt::VolumeManager manager(device.new_parent_controller(), device.devfs_root().duplicate());
   zx::channel chan;
   ASSERT_OK(manager.OpenClient(zx::duration::infinite(), chan));
   zxcrypt::EncryptedVolumeClient zxc_client(std::move(chan));
   EXPECT_OK(zxc_client.Shred());
 
   // Key should no longer work
-  zx::result channel =
-      component::Clone(device.parent_volume(), component::AssumeProtocolComposesNode);
-  ASSERT_OK(channel);
-  EXPECT_STATUS(FdioVolume::Unlock(std::move(channel.value()), device.key(), 0).status_value(),
+  EXPECT_STATUS(FdioVolume::Unlock(device.new_parent(), device.key(), 0).status_value(),
                 ZX_ERR_ACCESS_DENIED);
 }
 DEFINE_EACH_DEVICE(VolumeTest, TestShredThroughDriverLocked)
@@ -356,7 +308,7 @@ void TestFormatAfterShredThroughDriverWhileSealed(Volume::Version version, bool 
   ASSERT_NO_FATAL_FAILURE(device.SetupDevmgr());
   ASSERT_NO_FATAL_FAILURE(device.Create(kDeviceSize, kBlockSize, fvm, version));
 
-  zxcrypt::VolumeManager manager(device.parent().duplicate(), device.devfs_root().duplicate());
+  zxcrypt::VolumeManager manager(device.new_parent_controller(), device.devfs_root().duplicate());
   zx::channel chan;
   ASSERT_OK(manager.OpenClient(zx::duration::infinite(), chan));
 
@@ -387,7 +339,7 @@ void TestFormatAfterShredThroughDriverWhileUnsealed(Volume::Version version, boo
   ASSERT_NO_FATAL_FAILURE(device.SetupDevmgr());
   ASSERT_NO_FATAL_FAILURE(device.Create(kDeviceSize, kBlockSize, fvm, version));
 
-  zxcrypt::VolumeManager manager(device.parent().duplicate(), device.devfs_root().duplicate());
+  zxcrypt::VolumeManager manager(device.new_parent_controller(), device.devfs_root().duplicate());
   zx::channel chan;
   ASSERT_OK(manager.OpenClient(zx::duration::infinite(), chan));
 
@@ -423,7 +375,7 @@ void TestDriverStateTransitions(Volume::Version version, bool fvm) {
   ASSERT_NO_FATAL_FAILURE(device.SetupDevmgr());
   ASSERT_NO_FATAL_FAILURE(device.Create(kDeviceSize, kBlockSize, fvm, version));
 
-  zxcrypt::VolumeManager manager(device.parent().duplicate(), device.devfs_root().duplicate());
+  zxcrypt::VolumeManager manager(device.new_parent_controller(), device.devfs_root().duplicate());
   zx::channel chan;
   ASSERT_OK(manager.OpenClient(zx::duration::infinite(), chan));
 

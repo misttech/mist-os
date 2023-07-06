@@ -43,7 +43,7 @@ void TestBlockGetInfo(Volume::Version version, bool fvm) {
   ASSERT_NO_FATAL_FAILURE(device.SetupDevmgr());
   ASSERT_NO_FATAL_FAILURE(device.Bind(version, fvm));
 
-  const fidl::WireResult parent_result = fidl::WireCall(device.parent_block())->GetInfo();
+  const fidl::WireResult parent_result = fidl::WireCall(device.parent_volume())->GetInfo();
   ASSERT_OK(parent_result.status());
   const fit::result parent_response = parent_result.value();
   ASSERT_TRUE(parent_response.is_ok(), "%s", zx_status_get_string(parent_response.error_value()));

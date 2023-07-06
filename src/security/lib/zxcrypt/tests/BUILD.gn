@@ -19,6 +19,7 @@ test("zxcrypt") {
     "//sdk/fidl/fuchsia.hardware.ramdisk:fuchsia.hardware.ramdisk_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/syslog/cpp",
     "//src/devices/testing/driver-integration-test-shim",
     "//src/lib/ddk",
     "//src/lib/digest",

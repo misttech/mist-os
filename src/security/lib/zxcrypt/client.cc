@@ -287,26 +287,16 @@ zx_status_t EncryptedVolumeClient::Shred() {
   return response.status;
 }
 
-VolumeManager::VolumeManager(fbl::unique_fd&& block_dev_fd, fbl::unique_fd&& devfs_root_fd)
-    : block_dev_fd_(std::move(block_dev_fd)), devfs_root_fd_(std::move(devfs_root_fd)) {}
+VolumeManager::VolumeManager(fidl::ClientEnd<fuchsia_device::Controller> block_controller,
+                             fbl::unique_fd devfs_root_fd)
+    : block_controller_(std::move(block_controller)), devfs_root_fd_(std::move(devfs_root_fd)) {}
 
 zx_status_t VolumeManager::Unbind() {
-  fdio_cpp::UnownedFdioCaller caller(block_dev_fd_.get());
-  if (!caller) {
-    xprintf("could not convert fd to io\n");
-    return ZX_ERR_BAD_STATE;
-  }
-  return fidl::WireCall(caller.borrow_as<fuchsia_device::Controller>())->UnbindChildren().status();
+  return fidl::WireCall(block_controller_)->UnbindChildren().status();
 }
 
 zx_status_t VolumeManager::OpenInnerBlockDevice(const zx::duration& timeout, fbl::unique_fd* out) {
-  fdio_cpp::UnownedFdioCaller caller(block_dev_fd_.get());
-  if (!caller) {
-    xprintf("could not convert fd to io\n");
-    return ZX_ERR_BAD_STATE;
-  }
-
-  zx::result path_base = RelativeTopologicalPath(caller.borrow_as<fuchsia_device::Controller>());
+  zx::result path_base = RelativeTopologicalPath(block_controller_);
   if (path_base.is_error()) {
     xprintf("could not get topological path: %s\n", path_base.status_string());
     return path_base.error_value();
@@ -331,13 +321,7 @@ zx_status_t VolumeManager::OpenInnerBlockDevice(const zx::duration& timeout, fbl
 }
 
 zx_status_t VolumeManager::OpenClient(const zx::duration& timeout, zx::channel& out) {
-  fdio_cpp::UnownedFdioCaller caller(block_dev_fd_.get());
-  if (!caller) {
-    xprintf("could not convert fd to io\n");
-    return ZX_ERR_BAD_STATE;
-  }
-
-  zx::result path_base = RelativeTopologicalPath(caller.borrow_as<fuchsia_device::Controller>());
+  zx::result path_base = RelativeTopologicalPath(block_controller_);
   if (path_base.is_error()) {
     xprintf("could not get topological path: %s\n", path_base.status_string());
     return path_base.error_value();
@@ -366,8 +350,8 @@ zx_status_t VolumeManager::OpenClient(const zx::duration& timeout, zx::channel& 
 
   // No manager device in the /dev tree yet.  Try binding the zxcrypt
   // driver and waiting for it to appear.
-  auto resp = fidl::WireCall(caller.borrow_as<fuchsia_device::Controller>())
-                  ->Bind(::fidl::StringView::FromExternal(kDriverLib));
+  fidl::WireResult resp =
+      fidl::WireCall(block_controller_)->Bind(::fidl::StringView::FromExternal(kDriverLib));
   zx_status_t status = resp.status();
   if (status == ZX_OK) {
     if (resp.value().is_error()) {

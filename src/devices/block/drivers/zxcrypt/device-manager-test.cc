@@ -75,21 +75,20 @@ TEST(ZxcryptInspect, ExportsGuid) {
   zx::result channel =
       device_watcher::RecursiveWaitForFile(devfs_root_fd.get(), ramdisk_get_path(ramdisk));
   ASSERT_OK(channel.status_value());
-  fbl::unique_fd ramdisk_fd;
+  fidl::ClientEnd<fuchsia_device::Controller> ramdisk_controller;
   {
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-    fidl::UnownedClientEnd<fuchsia_io::Node> client(ramdisk_get_block_interface(ramdisk));
-    zx::result owned = component::Clone(client);
-    ASSERT_OK(owned.status_value());
+    fidl::UnownedClientEnd<fuchsia_device::Controller> client(
+        ramdisk_get_block_controller_interface(ramdisk));
+    zx::result controller_server = fidl::CreateEndpoints(&ramdisk_controller);
+    ASSERT_OK(controller_server);
     ASSERT_OK(
-        fdio_fd_create(owned.value().TakeChannel().release(), ramdisk_fd.reset_and_get_address()));
+        fidl::WireCall(client)->ConnectToController(std::move(controller_server.value())).status());
   }
 
   // Create a new zxcrypt volume manager using the ramdisk.
-  auto vol_mgr =
-      std::make_unique<zxcrypt::VolumeManager>(std::move(ramdisk_fd), std::move(devfs_root_fd));
+  zxcrypt::VolumeManager vol_mgr(std::move(ramdisk_controller), std::move(devfs_root_fd));
   zx::channel zxc_client_chan;
-  ASSERT_OK(vol_mgr->OpenClient(kTimeout, zxc_client_chan));
+  ASSERT_OK(vol_mgr.OpenClient(kTimeout, zxc_client_chan));
 
   // Create a new crypto key.
   crypto::Secret key;
