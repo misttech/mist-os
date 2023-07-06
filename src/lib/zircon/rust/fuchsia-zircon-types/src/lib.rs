@@ -112,6 +112,8 @@ multiconst!(zx_rights_t, [
     ZX_RIGHT_MANAGE_SOCKET  = 1 << 20;
     ZX_RIGHT_OP_CHILDREN    = 1 << 21;
     ZX_RIGHT_RESIZE         = 1 << 22;
+    ZX_RIGHT_ATTACH_VMO     = 1 << 23;
+    ZX_RIGHT_MANAGE_VMO     = 1 << 24;
     ZX_RIGHT_SAME_RIGHTS    = 1 << 31;
 ]);
 

@@ -82,7 +82,7 @@ If *pager* is closed, then no more packets will be delivered to *port* (includin
 
 ## Rights
 
-*pager* must be of type **ZX_OBJ_TYPE_PAGER**.
+*pager* must be of type **ZX_OBJ_TYPE_PAGER** and have **ZX_RIGHT_ATTACH_VMO**.
 
 *port* must be of type **ZX_OBJ_TYPE_PORT** and have **ZX_RIGHT_WRITE**.
 
@@ -97,7 +97,8 @@ If *pager* is closed, then no more packets will be delivered to *port* (includin
 
 **ZX_ERR_BAD_HANDLE** *pager* or *port* is not a valid handle.
 
-**ZX_ERR_ACCESS_DENIED** *port* does not have **ZX_RIGHT_WRITE**.
+**ZX_ERR_ACCESS_DENIED** *pager* does not have **ZX_RIGHT_ATTACH_VMO** or *port* does not have
+**ZX_RIGHT_WRITE**.
 
 **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle or *port* is not a port handle.
 

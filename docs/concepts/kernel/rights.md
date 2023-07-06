@@ -38,6 +38,8 @@ default rights for each object type, which can be reduced via
 | **ZX_RIGHT_MANAGE_SOCKET**  | Allows changing socket disposition via [`zx_socket_set_disposition()`] |
 | **ZX_RIGHT_OP_CHILDREN**    | Allows for operations on a parent object to also modify children |
 | **ZX_RIGHT_RESIZE**         | Allows resizing a VM object if **ZX_RIGHT_WRITE** is also present |
+| **ZX_RIGHT_ATTACH_VMO**     | Allows attaching and detaching VM objects to a pager |
+| **ZX_RIGHT_MANAGE_VMO**     | Allows managing the contents and metadata of a pager-owned VM object |
 
 ## ZX_RIGHTS_BASIC
 

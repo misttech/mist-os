@@ -32,6 +32,14 @@ with the pager will fail as if [`zx_pager_detach_vmo()`] had been called. Furthe
 will make an effort to ensure that the faults happen as quickly as possible (e.g. by evicting
 present pages), but the precise behavior is implementation dependent.
 
+The returned handle will have the following rights:
+ - **ZX_RIGHT_TRANSFER** - The handle may be transferred to another process.
+ - **ZX_RIGHT_INSPECT** - May be inspected with [`zx_object_get_info()`].
+ - **ZX_RIGHT_ATTACH_VMO** - May attach VMOs with [`zx_pager_create_vmo()`] and detach VMOs with
+   [`zx_pager_detach_vmo()`].
+ - **ZX_RIGHT_MANAGE_VMO** - May alter the contents or pager-related metadata of an owned VMO, e.g.
+   with [`zx_pager_supply_pages()`] or [`zx_pager_op_range()`].
+
 ## Rights
 
 Caller job policy must allow **ZX_POL_NEW_PAGER**.
@@ -51,8 +59,10 @@ any value other than 0.
 
  - [`zx_pager_create_vmo()`]
  - [`zx_pager_detach_vmo()`]
+ - [`zx_pager_op_range()`]
  - [`zx_pager_supply_pages()`]
 
 [`zx_pager_create_vmo()`]: pager_create_vmo.md
 [`zx_pager_detach_vmo()`]: pager_detach_vmo.md
+[`zx_pager_op_range()`]: pager_op_range.md
 [`zx_pager_supply_pages()`]: pager_supply_pages.md

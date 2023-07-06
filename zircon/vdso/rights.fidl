@@ -30,6 +30,8 @@ type Rights = strict bits : uint32 {
     MANAGE_SOCKET = 0x00100000;
     OP_CHILDREN = 0x00200000;
     RESIZE = 0x00400000;
+    ATTACH_VMO = 0x00800000;
+    MANAGE_VMO = 0x01000000;
     SAME_RIGHTS = 0x80000000;
 };
 

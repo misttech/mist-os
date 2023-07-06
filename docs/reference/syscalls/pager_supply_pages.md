@@ -40,7 +40,7 @@ decommitted.
 
 ## Rights
 
-*pager* must be of type **ZX_OBJ_TYPE_PAGER**.
+*pager* must be of type **ZX_OBJ_TYPE_PAGER** and have **ZX_RIGHT_MANAGE_VMO**.
 
 *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
 
@@ -63,8 +63,8 @@ populated.
 **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*, or *offset*, *size*,
 or *aux_offset* is not page aligned.
 
-**ZX_ERR_ACCESS_DENIED** *aux_vmo* is does not have **ZX_RIGHT_WRITE**,
-or *pager_vmo* does not have **ZX_RIGHT_WRITE**.
+**ZX_ERR_ACCESS_DENIED** *pager* does not have **ZX_RIGHT_MANAGE_VMO**, or *aux_vmo* does not have
+**ZX_RIGHT_WRITE**, or *pager_vmo* does not have **ZX_RIGHT_WRITE**.
 
 **ZX_ERR_BAD_STATE** *aux_vmo* is not in a state where it can supply the required pages.
 

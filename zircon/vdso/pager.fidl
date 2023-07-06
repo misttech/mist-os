@@ -26,6 +26,14 @@ closed protocol Pager {
     /// will make an effort to ensure that the faults happen as quickly as possible (e.g. by evicting
     /// present pages), but the precise behavior is implementation dependent.
     ///
+    /// The returned handle will have the following rights:
+    ///  - **ZX_RIGHT_TRANSFER** - The handle may be transferred to another process.
+    ///  - **ZX_RIGHT_INSPECT** - May be inspected with [`zx_object_get_info()`].
+    ///  - **ZX_RIGHT_ATTACH_VMO** - May attach VMOs with [`zx_pager_create_vmo()`] and detach VMOs with
+    ///    [`zx_pager_detach_vmo()`].
+    ///  - **ZX_RIGHT_MANAGE_VMO** - May alter the contents or pager-related metadata of an owned VMO, e.g.
+    ///    with [`zx_pager_supply_pages()`] or [`zx_pager_op_range()`].
+    ///
     /// ## Rights
     ///
     /// Caller job policy must allow **ZX_POL_NEW_PAGER**.
@@ -45,10 +53,12 @@ closed protocol Pager {
     ///
     ///  - [`zx_pager_create_vmo()`]
     ///  - [`zx_pager_detach_vmo()`]
+    ///  - [`zx_pager_op_range()`]
     ///  - [`zx_pager_supply_pages()`]
     ///
     /// [`zx_pager_create_vmo()`]: pager_create_vmo.md
     /// [`zx_pager_detach_vmo()`]: pager_detach_vmo.md
+    /// [`zx_pager_op_range()`]: pager_op_range.md
     /// [`zx_pager_supply_pages()`]: pager_supply_pages.md
     strict Create(struct {
         options uint32;
@@ -127,7 +137,7 @@ closed protocol Pager {
     ///
     /// ## Rights
     ///
-    /// *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
+    /// *pager* must be of type **ZX_OBJ_TYPE_PAGER** and have **ZX_RIGHT_ATTACH_VMO**.
     ///
     /// *port* must be of type **ZX_OBJ_TYPE_PORT** and have **ZX_RIGHT_WRITE**.
     ///
@@ -142,7 +152,8 @@ closed protocol Pager {
     ///
     /// **ZX_ERR_BAD_HANDLE** *pager* or *port* is not a valid handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED** *port* does not have **ZX_RIGHT_WRITE**.
+    /// **ZX_ERR_ACCESS_DENIED** *pager* does not have **ZX_RIGHT_ATTACH_VMO** or *port* does not have
+    /// **ZX_RIGHT_WRITE**.
     ///
     /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle or *port* is not a port handle.
     ///
@@ -202,7 +213,8 @@ closed protocol Pager {
     ///
     /// ## Rights
     ///
-    /// *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
+    /// *pager* must be of type **ZX_OBJ_TYPE_PAGER** and have **ZX_RIGHT_ATTACH_VMO** and
+    /// **ZX_RIGHT_MANAGE_VMO**.
     ///
     /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
     ///
@@ -216,7 +228,8 @@ closed protocol Pager {
     ///
     /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle or *pager_vmo* is not a VMO handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_WRITE**.
+    /// **ZX_ERR_ACCESS_DENIED** *pager* does not have **ZX_RIGHT_ATTACH_VMO** or **ZX_RIGHT_MANAGE_VMO**,
+    /// or *pager_vmo* does not have **ZX_RIGHT_WRITE**.
     ///
     /// **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*.
     ///
@@ -263,7 +276,7 @@ closed protocol Pager {
     ///
     /// ## Rights
     ///
-    /// *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
+    /// *pager* must be of type **ZX_OBJ_TYPE_PAGER** and have **ZX_RIGHT_MANAGE_VMO**.
     ///
     /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
     ///
@@ -286,8 +299,8 @@ closed protocol Pager {
     /// **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*, or *offset*, *size*,
     /// or *aux_offset* is not page aligned.
     ///
-    /// **ZX_ERR_ACCESS_DENIED** *aux_vmo* is does not have **ZX_RIGHT_WRITE**,
-    /// or *pager_vmo* does not have **ZX_RIGHT_WRITE**.
+    /// **ZX_ERR_ACCESS_DENIED** *pager* does not have **ZX_RIGHT_MANAGE_VMO**, or *aux_vmo* does not have
+    /// **ZX_RIGHT_WRITE**, or *pager_vmo* does not have **ZX_RIGHT_WRITE**.
     ///
     /// **ZX_ERR_BAD_STATE** *aux_vmo* is not in a state where it can supply the required pages.
     ///
@@ -397,7 +410,7 @@ closed protocol Pager {
     ///
     /// ## Rights
     ///
-    /// *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
+    /// *pager* must be of type **ZX_OBJ_TYPE_PAGER** and have **ZX_RIGHT_MANAGE_VMO**.
     ///
     /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
     ///
@@ -411,7 +424,8 @@ closed protocol Pager {
     ///
     /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a VMO handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_WRITE**.
+    /// **ZX_ERR_ACCESS_DENIED** *pager* does not have **ZX_RIGHT_MANAGE_VMO** or *pager_vmo* does not have
+    /// **ZX_RIGHT_WRITE**.
     ///
     /// **ZX_ERR_INVALID_ARGS** under any of these conditions:
     /// - *pager_vmo* is not a VMO created from *pager*.
@@ -538,7 +552,7 @@ closed protocol Pager {
     ///
     /// ## Rights
     ///
-    /// *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
+    /// *pager* must be of type **ZX_OBJ_TYPE_PAGER** and have **ZX_RIGHT_MANAGE_VMO**.
     ///
     /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_READ**.
     ///
@@ -553,7 +567,8 @@ closed protocol Pager {
     ///
     /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a VMO handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_READ**.
+    /// **ZX_ERR_ACCESS_DENIED** *pager* does not have **ZX_RIGHT_MANAGE_VMO** or *pager_vmo* does not have
+    /// **ZX_RIGHT_READ**.
     ///
     /// **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*, or *buffer* is an invalid
     /// pointer.
@@ -631,7 +646,7 @@ closed protocol Pager {
     ///
     /// ## Rights
     ///
-    /// *pager* must be of type **ZX_OBJ_TYPE_PAGER**.
+    /// *pager* must be of type **ZX_OBJ_TYPE_PAGER** and have **ZX_RIGHT_MANAGE_VMO**.
     ///
     /// <!-- TODO(fxbug.dev/129527): ZX_PAGER_RESET_VMO_STATS does more than a pure query. -->
     /// *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_READ**.
@@ -647,7 +662,8 @@ closed protocol Pager {
     ///
     /// **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a VMO handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_READ**.
+    /// **ZX_ERR_ACCESS_DENIED** *pager* does not have **ZX_RIGHT_MANAGE_VMO** or *pager_vmo* does not have
+    /// **ZX_RIGHT_READ**.
     ///
     /// **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*, or *options* is neither 0 or
     /// **ZX_PAGER_RESET_VMO_STATS**, or *buffer* is an invalid pointer.

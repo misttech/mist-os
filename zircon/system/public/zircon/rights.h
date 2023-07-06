@@ -32,6 +32,8 @@ typedef uint32_t zx_rights_t;
 #define ZX_RIGHT_MANAGE_SOCKET ((zx_rights_t)1u << 20)
 #define ZX_RIGHT_OP_CHILDREN ((zx_rights_t)1u << 21)
 #define ZX_RIGHT_RESIZE ((zx_rights_t)1u << 22)
+#define ZX_RIGHT_ATTACH_VMO ((zx_rights_t)1u << 23)
+#define ZX_RIGHT_MANAGE_VMO ((zx_rights_t)1u << 24)
 #define ZX_RIGHT_SAME_RIGHTS ((zx_rights_t)1u << 31)
 
 // Convenient names for commonly grouped rights.
@@ -116,7 +118,7 @@ typedef uint32_t zx_rights_t;
 #define ZX_DEFAULT_SUSPEND_TOKEN_RIGHTS (ZX_RIGHT_TRANSFER | ZX_RIGHT_INSPECT)
 
 #define ZX_DEFAULT_PAGER_RIGHTS \
-  (ZX_RIGHT_INSPECT | ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_SET_PROPERTY | ZX_RIGHT_TRANSFER)
+  (ZX_RIGHT_INSPECT | ZX_RIGHT_TRANSFER | ZX_RIGHT_ATTACH_VMO | ZX_RIGHT_MANAGE_VMO)
 
 #define ZX_DEFAULT_EXCEPTION_RIGHTS (ZX_RIGHT_TRANSFER | ZX_RIGHTS_PROPERTY | ZX_RIGHT_INSPECT)
 

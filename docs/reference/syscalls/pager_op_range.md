@@ -92,7 +92,7 @@ this.
 
 ## Rights
 
-*pager* must be of type **ZX_OBJ_TYPE_PAGER**.
+*pager* must be of type **ZX_OBJ_TYPE_PAGER** and have **ZX_RIGHT_MANAGE_VMO**.
 
 *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
 
@@ -106,7 +106,8 @@ this.
 
 **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a VMO handle.
 
-**ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_WRITE**.
+**ZX_ERR_ACCESS_DENIED** *pager* does not have **ZX_RIGHT_MANAGE_VMO** or *pager_vmo* does not have
+**ZX_RIGHT_WRITE**.
 
 **ZX_ERR_INVALID_ARGS** under any of these conditions:
 - *pager_vmo* is not a VMO created from *pager*.

@@ -56,7 +56,7 @@ queryable state if the **ZX_PAGER_RESET_VMO_STATS** option is specified. For exa
 
 ## Rights
 
-*pager* must be of type **ZX_OBJ_TYPE_PAGER**.
+*pager* must be of type **ZX_OBJ_TYPE_PAGER** and have **ZX_RIGHT_MANAGE_VMO**.
 
 <!-- TODO(fxbug.dev/129527): ZX_PAGER_RESET_VMO_STATS does more than a pure query. -->
 *pager_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_READ**.
@@ -72,7 +72,8 @@ value is returned.
 
 **ZX_ERR_WRONG_TYPE** *pager* is not a pager handle, or *pager_vmo* is not a VMO handle.
 
-**ZX_ERR_ACCESS_DENIED** *pager_vmo* does not have **ZX_RIGHT_READ**.
+**ZX_ERR_ACCESS_DENIED** *pager* does not have **ZX_RIGHT_MANAGE_VMO** or *pager_vmo* does not have
+**ZX_RIGHT_READ**.
 
 **ZX_ERR_INVALID_ARGS**  *pager_vmo* is not a VMO created from *pager*, or *options* is neither 0 or
 **ZX_PAGER_RESET_VMO_STATS**, or *buffer* is an invalid pointer.

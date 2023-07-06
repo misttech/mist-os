@@ -1876,6 +1876,14 @@
               "type": "VariableDeclarationImpl",
               "varType": "int"
             },
+            "RIGHT_ATTACH_VMO": {
+              "isConst": true,
+              "isFinal": false,
+              "isLate": false,
+              "name": "RIGHT_ATTACH_VMO",
+              "type": "VariableDeclarationImpl",
+              "varType": "int"
+            },
             "RIGHT_DESTROY": {
               "isConst": true,
               "isFinal": false,
@@ -1961,6 +1969,14 @@
               "isFinal": false,
               "isLate": false,
               "name": "RIGHT_MANAGE_THREAD",
+              "type": "VariableDeclarationImpl",
+              "varType": "int"
+            },
+            "RIGHT_MANAGE_VMO": {
+              "isConst": true,
+              "isFinal": false,
+              "isLate": false,
+              "name": "RIGHT_MANAGE_VMO",
               "type": "VariableDeclarationImpl",
               "varType": "int"
             },
