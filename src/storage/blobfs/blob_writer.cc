@@ -340,6 +340,11 @@ zx::result<std::optional<Blob::WrittenBlob>> Blob::Writer::WriteInternal(Blob& b
         }
         return status.take_error();
       }
+      // Special case: If the archive is empty (i.e. this is the null blob), skip the write phase.
+      if (seek_table_.DecompressedSize() == 0) {
+        *actual = bytes_written;
+        return WriteNullBlob(blob);
+      }
     }
   }
 
@@ -737,10 +742,6 @@ zx::result<> Blob::Writer::InitializeDecompressor() {
   if (status != chunked_compression::kStatusOk) {
     return zx::error(chunked_compression::ToZxStatus(status));
   }
-  if (seek_table_.Entries().empty()) {
-    FX_LOGS(ERROR) << "Decoded seek table has no entries!";
-    return zx::error(ZX_ERR_OUT_OF_RANGE);
-  }
 
   // The chunked compression library is responsible for ensuring that the seek table is
   // consistent (i.e. chunks don't overlap, the last chunk matches decompressed size, etc...).
@@ -751,7 +752,9 @@ zx::result<> Blob::Writer::InitializeDecompressor() {
                    << ")!";
     return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
   }
-  ZX_DEBUG_ASSERT(seek_table_.CompressedSize() == metadata_.payload_length);
+  if (seek_table_.Entries().empty()) {
+    return zx::ok();  // Archive is empty, no decompresison is required.
+  }
 
   // The StreamingChunkedDecompressor decommits chunks as they are decompressed, so we just need to
   // ensure the maximum decompressed chunk size does not exceed our set upper bound.

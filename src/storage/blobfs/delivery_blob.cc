@@ -37,9 +37,6 @@ constexpr bool IsValidDeliveryType(blobfs::DeliveryBlobType delivery_type) {
 
 zx::result<fbl::Array<uint8_t>> CompressData(cpp20::span<const uint8_t> data,
                                              const chunked_compression::CompressionParams& params) {
-  if (data.empty()) {
-    return zx::ok(fbl::Array<uint8_t>());
-  }
   const size_t num_chunks = fbl::round_up(data.size_bytes(), params.chunk_size) / params.chunk_size;
   // If `data` spans multiple chunks, we compress each chunk in parallel.
   if (num_chunks > 1) {
@@ -167,7 +164,7 @@ zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint
 
   fbl::Array<uint8_t> delivery_blob;
 
-  if (compress.value_or(true) && !data.empty()) {
+  if (compress.value_or(true)) {
     // WARNING: If we use different compression parameters here, the `compressed_file_size` in the
     // blob info JSON file will be incorrect.
     const chunked_compression::CompressionParams params =
@@ -191,7 +188,7 @@ zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint
   std::memcpy(delivery_blob.data(), &MetadataType1::kHeader, sizeof MetadataType1::kHeader);
   const MetadataType1 metadata =
       MetadataType1::Create(MetadataType1::kHeader, delivery_blob.size() - kPayloadOffset,
-                            /*is_compressed=*/compress.value_or(use_compressed_result));
+                            /*is_compressed=*/use_compressed_result);
   std::memcpy(delivery_blob.data() + sizeof MetadataType1::kHeader, &metadata, sizeof metadata);
   // Copy uncompressed data into payload if we aren't using compression or we aborted compression.
   if (!use_compressed_result && !data.empty()) {
