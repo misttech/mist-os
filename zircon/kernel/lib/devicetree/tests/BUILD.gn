@@ -20,9 +20,9 @@ group("tests") {
 
 test("devicetree-tests") {
   sources = [
-    "devicetree_tests.cc",
-    "matcher_tests.cc",
-    "path_tests.cc",
+    "devicetree-tests.cc",
+    "matcher-tests.cc",
+    "node-path-tests.cc",
   ]
   deps = [
     "//zircon/kernel/lib/devicetree",

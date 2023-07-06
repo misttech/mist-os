@@ -9,8 +9,8 @@ import("//build/zircon/migrated_targets.gni")
 zx_library("devicetree") {
   sources = [
     "alias-matcher.cc",
+    "devicetree-node-path.cc",
     "devicetree.cc",
-    "path.cc",
   ]
   deps = [ "//zircon/system/ulib/fbl" ]
 
