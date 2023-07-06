@@ -6,8 +6,8 @@
 #define ZIRCON_KERNEL_TARGET_ARM64_BOARD_IMX8MMEVK_BOOT_SHIM_CONFIG_H_
 
 #include <lib/zbi-format/board.h>
+#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
-#include <lib/zbi-format/internal/cpu.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
 
@@ -75,7 +75,7 @@ static void add_cpu_topology(zbi_header_t* zbi) {
 
                         .architecture_info =
                             {
-                                .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
+                                .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
                                 .arm64 =
                                     {
                                         .cpu_id = index,
