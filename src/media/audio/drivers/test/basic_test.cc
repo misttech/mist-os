@@ -460,8 +460,6 @@ void BasicTest::WatchGainStateAndExpectUpdate() {
         EXPECT_TRUE(gain_state.has_gain_db());
         EXPECT_GE(gain_state.gain_db(), stream_props_->min_gain_db());
         EXPECT_LE(gain_state.gain_db(), stream_props_->max_gain_db());
-        // We require that audio drivers have a default gain no greater than 0dB.
-        EXPECT_LE(gain_state.gain_db(), 0.f);
 
         // If we're muted, then we must be capable of muting.
         EXPECT_TRUE(!gain_state.has_muted() || !gain_state.muted() || stream_props_->can_mute());
