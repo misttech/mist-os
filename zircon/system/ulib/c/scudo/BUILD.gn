@@ -37,26 +37,13 @@ libc_source_set("scudo") {
     "fuchsia.cpp",
     "linux.cpp",
     "mem_map.cpp",
+    "mem_map_fuchsia.cpp",
     "release.cpp",
     "report.cpp",
     "rss_limit_checker.cpp",
     "string_utils.cpp",
     "timing.cpp",
   ]
-
-  scudo_git_dir =
-      exec_script("/usr/bin/env",
-                  [
-                    "git",
-                    "--git-dir=" + rebase_path("${scudo_common_vars.dir}/.git"),
-                    "rev-parse",
-                    "--git-dir",
-                  ],
-                  "trim string")
-  scudo_git_revision = read_file("${scudo_git_dir}/HEAD", "list lines")
-  if (scudo_git_revision != [ "0dd410a7e8c2c46e352e9aecaa8c1af9d6e38a70" ]) {
-    sources += [ "mem_map_fuchsia.cpp" ]
-  }
 
   # The code needs to be compiled separately for production and test use for
   # two reasons.

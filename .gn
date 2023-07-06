@@ -34,7 +34,6 @@ exec_script_whitelist = [
   "//build/toolchain/zircon/zircon_toolchain.gni",
   "//build/icu/config.gni",
   "//zircon/kernel/arch/x86/phys/BUILD.gn",
-  "//zircon/system/ulib/c/scudo/BUILD.gn",
 ]
 
 check_system_includes = true
