@@ -4,6 +4,7 @@
 {
     include: [
         "//sdk/lib/sys/component/realm_builder.shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     children: [
