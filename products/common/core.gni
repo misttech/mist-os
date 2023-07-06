@@ -6,13 +6,8 @@ import("//products/common/minimal.gni")
 
 product_system_image_deps = []
 
-product_bootfs_labels += [
-  "//products/kernel_cmdline:kernel.oom.behavior--reboot",
-
-  # bin/sh is currently expected on all products.
-  # Consider removing this on non-user builds.
-  "//zircon/third_party/uapp/dash:dash",
-]
+product_bootfs_labels +=
+    [ "//products/kernel_cmdline:kernel.oom.behavior--reboot" ]
 
 core_realm_shards += [
   "//src/connectivity/bluetooth/tools/bt-snoop:bt-snoop-core-shard",

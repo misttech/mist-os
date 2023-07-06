@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
@@ -42,6 +43,13 @@ fuchsia_driver_component("nand-broker") {
   component_name = "nand-broker"
   deps = [ ":nand-broker-driver" ]
   manifest = "meta/nand-broker.cml"
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [
+    ":nand-broker",
+    ":nand-broker-bind",
+  ]
 }
 
 group("tests") {

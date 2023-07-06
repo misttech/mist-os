@@ -2,9 +2,23 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/suspend/config.gni")
 
 executable("dash") {
+  visibility = [
+    ":*",
+    "//build/images/zedboot:*",
+
+    # Several unittests use dash.
+    "//src/bringup/bin/netsvc:*",
+    "//src/lib/process:*",
+    "//src/lib/pty:*",
+    "//src/sys/tools/debug-dash-launcher:*",
+    "//src/sys/tools/debug-dash-launcher/integration_test:*",
+    "//src/ui/bin/terminal:*",
+    "//zircon/system/utest/dash:*",
+  ]
   output_name = "sh"
   sources = [
     "src/alias.c",
@@ -123,6 +137,10 @@ executable("dash") {
   configs += [ "//build/config:Wno-unused-function" ]
   configs += [ "//build/config:Wno-unused-but-set-variable" ]
   configs += [ "//build/config:Wno-unused-but-set-parameter" ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":dash" ]
 }
 
 config("undefined_behavior_pointer_overflow") {

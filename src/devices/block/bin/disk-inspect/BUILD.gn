@@ -2,7 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
+
 executable("disk-inspect") {
+  visibility = [ ":*" ]
   sources = [ "main.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp_wire",
@@ -13,4 +16,8 @@ executable("disk-inspect") {
     "//src/storage/minfs",
     "//zircon/system/ulib/cmdline",
   ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":disk-inspect" ]
 }

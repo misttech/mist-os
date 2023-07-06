@@ -2,11 +2,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
+
 executable("fvm-check") {
+  visibility = [ ":*" ]
   sources = [ "main.cc" ]
   deps = [
     "//src/storage/fvm",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
   ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":fvm-check" ]
 }

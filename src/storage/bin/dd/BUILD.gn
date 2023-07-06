@@ -2,7 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
+
 executable("dd") {
+  visibility = [
+    ":*",
+    "//build/images/zedboot:*",
+  ]
   sources = [ "main.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
@@ -17,4 +23,8 @@ executable("dd") {
     "//zircon/system/ulib/zx",
     "//zircon/third_party/ulib/safemath",
   ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":dd" ]
 }

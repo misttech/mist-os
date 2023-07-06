@@ -47,7 +47,6 @@ if (is_fuchsia) {
 
     bootfs_labels = [
       "//build/input:recovery_bootfs",
-      "//bundles:debugging",
       "//bundles/bringup:manual_testing",
       "//bundles/drivers:bootstrap",
       "//bundles/drivers:usb-host-stack",
@@ -299,7 +298,6 @@ if (is_fuchsia) {
       "//bundles/drivers:usb-host-stack",
       "//bundles/drivers:usb-peripheral-stack",
       "//src/sys/component_manager:component_manager_bootfs_config",
-      "//src/devices/bundles:debugging",
     ]
 
     if (recovery_is_recovery_fastboot) {

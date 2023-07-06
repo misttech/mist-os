@@ -109,6 +109,29 @@ assembly_input_bundle("bootstrap") {
 # systems.
 #
 assembly_input_bundle("bootstrap_userdebug") {
+  bootfs_files_labels = [
+    "//src/connectivity/network/bin/ping:bootfs",
+    "//src/developer/forensics/crasher/cpp:bootfs",
+    "//src/devices/block/bin/disk-inspect:bootfs",
+    "//src/devices/block/bin/fvm-check:bootfs",
+    "//src/devices/nand/bin/nand-loader:bootfs",
+    "//src/devices/nand/bin/nand-util:bootfs",
+    "//src/devices/nand/drivers/broker:bootfs",
+    "//src/storage/bin/dd:bootfs",
+    "//src/storage/bin/df:bootfs",
+    "//src/storage/bin/storage-metrics:bootfs",
+    "//src/sys/bin/psutils:bootfs",
+    "//src/sys/tools/component:bootfs",
+    "//src/zircon/bin/kcounter:bootfs",
+    "//src/zircon/bin/kstress:bootfs",
+    "//src/zircon/bin/ktrace:bootfs",
+    "//src/zircon/bin/loadgen:bootfs",
+    "//zircon/third_party/uapp/dash:bootfs",
+  ]
+
+  # Do not automatically include pistress, but build it to keep it from
+  # bit-rotting.
+  deps = [ "//src/zircon/bin/pistress:bootfs" ]
 }
 
 # The most-common, most-basic, AIB that is included in all eng systems.

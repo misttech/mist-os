@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/config/zircon/standard.gni")
 import("//build/cpp/verify_public_symbols.gni")
@@ -318,6 +319,10 @@ group("libc") {
   public_deps = [ libc_impl_label ]
 
   deps = [ ":verify_abi" ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ libc_impl_label ]
 }
 
 verify_public_symbols("verify_abi") {

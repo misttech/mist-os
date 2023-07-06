@@ -59,18 +59,10 @@ assembled_system("zedboot_assembly") {
 
   # For debugging.
   bootfs_labels += [
-    "//src/connectivity/network/bin/ping",
-    "//src/devices/nand/bin/nand-util",
     "//src/devices/nand/drivers/broker:nand-broker",
     "//src/security/bin/syscall-check",
-    "//src/storage/bin/dd",
     "//src/storage/bin/umount",
     "//src/storage/tools/logs/run-with-logs",
-    "//src/sys/bin/psutils:killall",
-    "//src/sys/bin/psutils:ps",
-    "//src/sys/bin/psutils:threads",
-    "//src/zircon/bin/ktrace",
-    "//zircon/third_party/uapp/dash",
   ]
 
   # zbi arguments

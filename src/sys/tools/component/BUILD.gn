@@ -2,9 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/rust/rustc_binary.gni")
 
 rustc_binary("component") {
+  visibility = [ ":*" ]
   edition = "2021"
 
   deps = [
@@ -31,4 +33,8 @@ rustc_binary("component") {
     "src/args.rs",
     "src/main.rs",
   ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":component" ]
 }

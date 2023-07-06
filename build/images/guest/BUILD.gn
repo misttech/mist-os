@@ -95,7 +95,6 @@ if (labels.images == "//build/images/bringup") {
       "//src/power/power-manager:base_config",
       "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
       "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice",
-      "//src/connectivity/network/bin/ping",
       "//src/connectivity/network/drivers/network-device",
       "//src/devices/bin/lsdev",
       "//src/devices/block/drivers/virtio:virtio_block",
@@ -109,17 +108,13 @@ if (labels.images == "//build/images/bringup") {
       "//src/graphics/display/drivers/coordinator",
       "//src/graphics/display/drivers/virtio-guest:virtio_gpu",
       "//src/storage/bin/minfs",
-      "//src/storage/bin/dd",
-      "//src/storage/bin/df",
       "//src/storage/bin/mount",
       "//src/storage/bin/umount",
       "//src/storage/fvm/driver",
-      "//src/sys/bin/psutils",
       "//src/sys/component_manager:component_manager_bootfs_config",
       "//src/ui/input/drivers/hid",
       "//src/ui/input/drivers/hid-input-report",
       "//src/ui/input/drivers/virtio:virtio_input",
-      "//zircon/third_party/uapp/dash",
     ]
 
     fshost_config = {

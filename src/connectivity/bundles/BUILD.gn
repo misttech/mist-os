@@ -14,7 +14,3 @@ group("drivers") {
     "//src/connectivity/wlan:drivers",
   ]
 }
-
-group("debugging") {
-  deps = [ "//src/connectivity/network/bin/ping" ]
-}

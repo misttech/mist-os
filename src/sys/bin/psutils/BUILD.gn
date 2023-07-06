@@ -2,7 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("psutils") {
+import("//build/assembly/bootfs_files_for_assembly.gni")
+
+bootfs_files_for_assembly("bootfs") {
   deps = [
     ":handles",
     ":kill",
@@ -40,6 +42,10 @@ source_set("handles_internal") {
 }
 
 executable("ps") {
+  visibility = [
+    ":*",
+    "//build/images/zedboot:*",
+  ]
   output_dir = "$root_out_dir/zircon-migrated"
   sources = [ "ps.c" ]
   deps = [
@@ -51,6 +57,7 @@ executable("ps") {
 }
 
 executable("top") {
+  visibility = [ ":*" ]
   sources = [ "top.c" ]
   deps = [
     "//sdk/lib/fdio",
@@ -61,6 +68,7 @@ executable("top") {
 }
 
 executable("kill") {
+  visibility = [ ":*" ]
   sources = [ "kill.c" ]
   deps = [
     "//sdk/lib/fdio",
@@ -69,6 +77,10 @@ executable("kill") {
 }
 
 executable("killall") {
+  visibility = [
+    ":*",
+    "//build/images/zedboot:*",
+  ]
   sources = [ "killall.c" ]
   deps = [
     "//sdk/lib/fdio",
@@ -77,6 +89,7 @@ executable("killall") {
 }
 
 executable("vmaps") {
+  visibility = [ ":*" ]
   sources = [ "vmaps.c" ]
   deps = [
     "//sdk/lib/fdio",
@@ -86,6 +99,7 @@ executable("vmaps") {
 }
 
 executable("vmos") {
+  visibility = [ ":*" ]
   sources = [
     "vmo-utils.c",
     "vmos.cc",
@@ -111,6 +125,7 @@ source_set("resources") {
 }
 
 executable("memgraph") {
+  visibility = [ ":*" ]
   sources = [
     "memgraph.cc",
     "object-utils.cc",
@@ -135,6 +150,7 @@ action("gen-memgraph-schema") {
 }
 
 executable("kstats") {
+  visibility = [ ":*" ]
   sources = [ "kstats.c" ]
   deps = [
     ":resources",
@@ -144,6 +160,10 @@ executable("kstats") {
 }
 
 executable("threads") {
+  visibility = [
+    ":*",
+    "//build/images/zedboot:*",
+  ]
   sources = [ "threads.cc" ]
   deps = [
     "//sdk/lib/fdio",
@@ -158,6 +178,7 @@ executable("threads") {
 }
 
 executable("signal") {
+  visibility = [ ":*" ]
   sources = [ "signal.c" ]
   deps = [
     "//sdk/lib/fdio",
@@ -166,6 +187,7 @@ executable("signal") {
 }
 
 executable("handles") {
+  visibility = [ ":*" ]
   output_dir = "$root_out_dir/zircon-migrated"
   sources = [ "handles.cc" ]
   deps = [

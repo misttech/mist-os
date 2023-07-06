@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/zircon/zx_library.gni")
 
 group("tests") {
@@ -35,6 +36,10 @@ zx_library("inspector") {
     configs -= [ "//build/config:default_frame_pointers" ]
     configs += [ "//build/config:frame_pointers" ]
   }
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":inspector" ]
 }
 
 # GWP-ASan crash handling utility that wraps //zircon/system/ulib/c/scudo:gwp-asan-common.

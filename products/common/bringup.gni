@@ -7,7 +7,6 @@ use_bringup_assembly = true
 bootfs_only = true
 
 product_bootfs_labels = [
-  "//bundles:debugging",
   "//bundles/bringup:manual_testing",
   "//bundles/drivers:bootstrap",
   "//bundles/drivers:bootstrap-eng",
