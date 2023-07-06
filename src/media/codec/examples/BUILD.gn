@@ -78,6 +78,7 @@ fuchsia_test_component("use_h264_decoder_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_h264_decoder_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("use_h264_decoder_tests") {
@@ -103,6 +104,7 @@ fuchsia_test_component("use_h264_decoder_tiled_output_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_h264_decoder_tiled_output_test",
   ]
+  test_type = "system"
 }
 
 # Test x86 H264 decoder on target x86 hardware (excluding emulator)
@@ -127,6 +129,7 @@ fuchsia_unittest_component("use_h264_decoder_frame_num_gaps_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_h264_decoder_frame_num_gaps_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("use_h264_decoder_frame_num_gaps_tests") {
@@ -153,6 +156,7 @@ fuchsia_test_component("use_h264_sw_decoder_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_h264_sw_decoder_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("use_h264_sw_decoder_tests") {
@@ -195,6 +199,7 @@ fuchsia_unittest_component("use_h264_decoder_stream_switching_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_h264_decoder_stream_switching_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("use_h264_decoder_stream_switching_tests") {
@@ -240,6 +245,7 @@ fuchsia_test_component(
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_h264_decoder_concurrent_stream_switching_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("use_h264_decoder_concurrent_stream_switching_tests") {
@@ -269,6 +275,7 @@ fuchsia_test_component("use_h264_and_vp9_decoders_and_pcmm_stress_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_h264_and_vp9_decoders_and_pcmm_stress_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("use_h264_and_vp9_decoders_and_pcmm_stress_test") {
@@ -292,6 +299,7 @@ fuchsia_unittest_component("use_h264_decoder_secure_output_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_h264_decoder_secure_output_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("use_h264_decoder_secure_output_tests") {
@@ -333,12 +341,14 @@ fuchsia_unittest_component("h264_decoder_fuzzer_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:h264_decoder_fuzzer_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_unittest_component("h264_decoder_malformed_stream_test_comp") {
   restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/h264_decoder_malformed_stream_test.cml"
   deps = [ "//src/media/codec/examples/use_media_decoder:h264_decoder_malformed_stream_test" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("h264_decoder_fuzzer_tests") {
@@ -367,6 +377,7 @@ fuchsia_unittest_component("codec_description_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:codec_description_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("codec_description_tests") {
@@ -390,6 +401,7 @@ fuchsia_unittest_component("vp9_decoder_fuzzer_test_comp") {
     ":bear_vp9",
     "//src/media/codec/examples/use_media_decoder:vp9_decoder_fuzzer_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("vp9_decoder_fuzzer_tests") {
@@ -411,6 +423,7 @@ fuchsia_unittest_component("use_vp9_decoder_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_vp9_decoder_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_unittest_component("use_vp9_decoder_tiled_output_test_comp") {
@@ -421,6 +434,7 @@ fuchsia_unittest_component("use_vp9_decoder_tiled_output_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_vp9_decoder_tiled_output_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_unittest_component("use_vp9_decoder_1280x546_test_comp") {
@@ -430,6 +444,7 @@ fuchsia_unittest_component("use_vp9_decoder_1280x546_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_vp9_decoder_1280x546_test",
   ]
+  test_type = "system"
 }
 
 # Test amlogic-video vp9 decode.
@@ -477,6 +492,7 @@ fuchsia_unittest_component("use_vp9_decoder_stream_switching_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_vp9_decoder_stream_switching_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("use_vp9_decoder_stream_switching_tests") {
@@ -500,6 +516,7 @@ fuchsia_unittest_component("use_vp9_decoder_skip_first_frame_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_vp9_decoder_skip_first_frame_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("use_vp9_decoder_skip_first_frame_tests") {
@@ -526,6 +543,7 @@ fuchsia_test_component("use_vp9_decoder_24_output_frames_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_vp9_decoder_24_output_frames_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("use_vp9_decoder_24_output_frames_tests") {
@@ -547,6 +565,7 @@ fuchsia_test_component("use_vp9_decoder_secure_output_test_comp") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_vp9_decoder_secure_output_test",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("use_vp9_decoder_secure_output_tests") {
@@ -585,6 +604,7 @@ fuchsia_unittest_component("use_mjpeg_decoder_test_component") {
     "//src/media/codec:codec_factory",
     "//src/media/codec/examples/use_media_decoder:use_mjpeg_decoder_test",
   ]
+  test_type = "system"
 }
 
 # Test x86 mjpeg decoder on target x86 hardware (excluding emulator)

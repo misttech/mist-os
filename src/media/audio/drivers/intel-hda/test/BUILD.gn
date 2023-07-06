@@ -47,6 +47,7 @@ fuchsia_unittest_package("pixelbook-eve-test-package") {
   manifest = "pixelbook-eve-test.cml"
   package_name = "pixelbook-eve-test"
   deps = [ ":pixelbook-eve-test-bin" ]
+  test_type = "system"
 }
 
 fuchsia_unittest_package("intel-hda-test-package") {

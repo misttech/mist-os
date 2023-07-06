@@ -63,5 +63,8 @@ template("vp9_file_decoder_conformance_test") {
       ":${md5_resource_name}",
       "//src/media/codec/examples/use_media_decoder:vp9_decoder_conformance_test",
     ]
+
+    # The manifest above uses non-hermetic capabilities.
+    test_type = "system"
   }
 }

@@ -12,6 +12,7 @@ fuchsia_unittest_package("audio_core_hardware_tests") {
     # By definition this validates software that requires real audio input hardware.
     environments = built_in_input_hardware_envs
   }
+  test_type = "system"
 }
 
 executable("audio_core_hardware_tests_bin") {
