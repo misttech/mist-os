@@ -42,7 +42,7 @@ using zx;
 ///   and `fuchsia.ui.SessionListener`.
 ///
 ///  TODO(fxbug.dev/24402): Migrate all implementations of `ViewProvider` to use `View`.
-@discoverable
+@available(deprecated=13, removed=14, legacy=true)
 closed protocol View {
     /// Updates the View's configuration.
     ///

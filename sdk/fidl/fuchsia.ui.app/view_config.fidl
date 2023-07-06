@@ -8,6 +8,7 @@ using fuchsia.intl;
 /// Collection of properties that provide affect the rendering of a view's
 /// contents. This might include internationalization settings, font scaling,
 /// night mode, high contrast mode, etc.
+@available(deprecated=13, removed=14, legacy=true)
 type ViewConfig = struct {
     intl_profile fuchsia.intl.Profile;
     // Add others as needed.

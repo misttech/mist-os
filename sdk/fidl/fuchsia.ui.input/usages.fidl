@@ -4,17 +4,27 @@
 library fuchsia.ui.input;
 
 /// Common mouse buttons report constants
+@available(deprecated=13, removed=14, legacy=true)
 const kMouseButtonPrimary uint32 = 1;
+@available(deprecated=13, removed=14, legacy=true)
 const kMouseButtonSecondary uint32 = 2;
+@available(deprecated=13, removed=14, legacy=true)
 const kMouseButtonTertiary uint32 = 4;
 
 /// Common stylus buttons report constants
+@available(deprecated=13, removed=14, legacy=true)
 const kStylusBarrel uint32 = 1;
 
 /// Used as mask bits (2^N) against ButtonDescriptor.buttons.
+@available(deprecated=13, removed=14, legacy=true)
 const kVolumeUp uint32 = 1;
+@available(deprecated=13, removed=14, legacy=true)
 const kVolumeDown uint32 = 2;
+@available(deprecated=13, removed=14, legacy=true)
 const kMicMute uint32 = 4;
+@available(deprecated=13, removed=14, legacy=true)
 const kReset uint32 = 8;
+@available(deprecated=13, removed=14, legacy=true)
 const kPause uint32 = 16;
+@available(deprecated=13, removed=14, legacy=true)
 const kCameraDisable uint32 = 32;

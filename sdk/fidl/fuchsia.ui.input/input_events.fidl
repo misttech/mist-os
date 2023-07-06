@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.ui.input;
 
+@available(deprecated=13)
 type KeyboardEventPhase = flexible enum {
     /// When key is pressed down.
     PRESSED = 0;
@@ -28,6 +29,7 @@ type KeyboardEventPhase = flexible enum {
 /// available.
 ///
 /// DEPRECATED: Will be removed in favor of `fuchsia.ui.input.KeyEvent`.
+@available(deprecated=13)
 type KeyboardEvent = struct {
     /// Time the event was delivered. The time is in nanoseconds and corresponds
     /// to the monotonic time as determined by the zx_clock_get_monotonic syscall.
@@ -167,6 +169,7 @@ type MediaButtonsEvent = table {
 type InputEvent = strict union {
     @available(deprecated=10, note="Instead, use fuchsia.ui.pointer")
     1: pointer PointerEvent;
+    @available(deprecated=13)
     2: keyboard KeyboardEvent;
     @available(deprecated=10, note="Instead, use fuchsia.ui.views.ViewRefFocused")
     3: focus FocusEvent;

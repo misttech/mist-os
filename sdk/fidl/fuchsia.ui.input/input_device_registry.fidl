@@ -16,6 +16,7 @@ closed protocol InputDeviceRegistry {
     });
 };
 
+@available(deprecated=13)
 closed protocol InputDevice {
     /// Dispatch an `InputReport` from the device `token`
     strict DispatchReport(struct {
