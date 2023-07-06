@@ -142,6 +142,7 @@ fuchsia_test_component("hwstress_v2_test_pkg") {
     ":hwstress_v2_test",
     "//src/storage/testing:storage_driver_test_realm",
   ]
+  test_type = "system"
 }
 
 fuchsia_test_package("hwstress_test_pkg") {

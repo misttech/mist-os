@@ -54,6 +54,7 @@ fuchsia_unittest_package("devicetree-test-package") {
     # which is true in the case of the arm64 qemu-boot-shim.
     environments = [ emu_env ]
   }
+  test_type = "system"
 }
 
 executable("devicetree-extract") {

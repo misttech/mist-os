@@ -21,6 +21,7 @@ test("pty") {
 fuchsia_unittest_package("pty-test") {
   manifest = "meta/pty-test.cml"
   deps = [ ":pty" ]
+  test_type = "system"
 }
 
 group("tests") {

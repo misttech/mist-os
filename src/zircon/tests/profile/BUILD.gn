@@ -25,6 +25,7 @@ test("profile") {
 fuchsia_unittest_package("profile-test-pkg") {
   manifest = "meta/profile-test.cml"
   deps = [ ":profile" ]
+  test_type = "system"
 }
 
 test("profile-config") {
