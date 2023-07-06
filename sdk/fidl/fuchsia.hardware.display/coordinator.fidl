@@ -47,7 +47,7 @@ closed protocol Coordinator {
     @selector("ImportImage2")
     strict ImportImage(struct {
         image_config ImageConfig;
-        collection_id BufferCollectionIdValue;
+        collection_id BufferCollectionId;
         image_id uint64;
         index uint32;
     }) -> (struct {
@@ -440,7 +440,7 @@ closed protocol Coordinator {
     // Import a sysmem buffer collection token. `collection_id` must not
     // already be in use.
     strict ImportBufferCollection(resource struct {
-        collection_id BufferCollectionIdValue;
+        collection_id BufferCollectionId;
         collection_token client_end:fuchsia.sysmem.BufferCollectionToken;
     }) -> (struct {
         res zx.Status;
@@ -448,7 +448,7 @@ closed protocol Coordinator {
 
     // Release an imported buffer collection.
     strict ReleaseBufferCollection(struct {
-        collection_id BufferCollectionIdValue;
+        collection_id BufferCollectionId;
     });
 
     // Takes an imported buffer collection and sets the constraints
@@ -458,7 +458,7 @@ closed protocol Coordinator {
     // TODO(fxbug.dev/85320): Update this API to better support
     // optional fields.
     strict SetBufferCollectionConstraints(struct {
-        collection_id BufferCollectionIdValue;
+        collection_id BufferCollectionId;
         config ImageConfig;
     }) -> (struct {
         res zx.Status;
@@ -477,7 +477,7 @@ closed protocol Coordinator {
     /// Returns ZX_ERR_NOT_SUPPORTED if coordinator does not support capture
     strict ImportImageForCapture(struct {
         image_config ImageConfig;
-        collection_id BufferCollectionIdValue;
+        collection_id BufferCollectionId;
         index uint32;
     }) -> (struct {
         image_id uint64;

@@ -15,6 +15,7 @@ source_set("allocation") {
   ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/lib/fxl",
   ]

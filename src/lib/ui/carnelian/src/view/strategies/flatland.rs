@@ -23,6 +23,7 @@ use crate::{
 use anyhow::{bail, ensure, Context, Error, Result};
 use async_trait::async_trait;
 use async_utils::hanging_get::client::HangingGetStream;
+use display_utils::CollectionId as DisplayCollectionId;
 use euclid::size2;
 use fidl::endpoints::{create_endpoints, create_proxy, create_request_stream};
 use fidl_fuchsia_ui_composition as flatland;
@@ -172,7 +173,7 @@ impl Plumber {
             context.get_image(index as u32);
         }
 
-        let frame_set = FrameSet::new(collection_id as u64, image_ids);
+        let frame_set = FrameSet::new(DisplayCollectionId(collection_id as u64), image_ids);
         Ok(Plumber { size, collection_id, frame_set, image_indexes, context })
     }
 

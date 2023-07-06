@@ -180,8 +180,10 @@ bool BufferPool::CreateBuffers(size_t count, BufferPool::Environment* environmen
 
   // Set display buffer constraints.
   tokens[1]->SetDebugClientInfo("gfx::BufferPool duplicated", 0u);
-  auto display_collection_id = allocation::GenerateUniqueBufferCollectionId();
-  auto result = scenic_impl::ImportBufferCollection(display_collection_id,
+  auto global_collection_id = allocation::GenerateUniqueBufferCollectionId();
+  const fuchsia::hardware::display::BufferCollectionId display_collection_id =
+      allocation::ToDisplayBufferCollectionId(global_collection_id);
+  auto result = scenic_impl::ImportBufferCollection(global_collection_id,
                                                     *environment->display_coordinator.get(),
                                                     std::move(tokens[1]), image_config_);
   if (!result) {

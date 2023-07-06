@@ -9,6 +9,7 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/join_strings.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
+#include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/display/tests/mock_display_controller.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/flatland/engine/tests/common.h"
@@ -193,18 +194,23 @@ TEST_F(DisplayCompositorTest, ImportAndReleaseBufferCollectionTest) {
   // ReleaseBufferCollection(), CheckConfig(), and one for deletion.
   const auto server = CreateServerWaitingForMessages(*mock_display_coordinator_, 5);
 
-  const allocation::GlobalBufferCollectionId kGlobalBufferCollectionId = 15;
+  constexpr allocation::GlobalBufferCollectionId kGlobalBufferCollectionId = 15;
+  constexpr fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
+      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
 
-  EXPECT_CALL(*mock_display_coordinator_, ImportBufferCollection(kGlobalBufferCollectionId, _, _))
-      .WillOnce(testing::Invoke(
-          [](uint64_t, fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
-             MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))
+      .WillOnce(
+          testing::Invoke([](fuchsia::hardware::display::BufferCollectionId,
+                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
+                             MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
             callback(ZX_OK);
           }));
   EXPECT_CALL(*mock_display_coordinator_,
-              SetBufferCollectionConstraints(kGlobalBufferCollectionId, _, _))
+              SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
       .WillOnce(testing::Invoke(
-          [](uint64_t collection_id, fuchsia::hardware::display::ImageConfig config,
+          [](fuchsia::hardware::display::BufferCollectionId collection_id,
+             fuchsia::hardware::display::ImageConfig config,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             callback(ZX_OK);
           }));
@@ -221,7 +227,8 @@ TEST_F(DisplayCompositorTest, ImportAndReleaseBufferCollectionTest) {
                                               CreateToken(), BufferCollectionUsage::kClientImage,
                                               std::nullopt);
 
-  EXPECT_CALL(*mock_display_coordinator_, ReleaseBufferCollection(kGlobalBufferCollectionId))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ReleaseBufferCollection(FidlEquals(kDisplayBufferCollectionId)))
       .WillOnce(Return());
   EXPECT_CALL(*renderer_, ReleaseBufferCollection(kGlobalBufferCollectionId, _)).WillOnce(Return());
   display_compositor_->ReleaseBufferCollection(kGlobalBufferCollectionId,
@@ -282,11 +289,14 @@ TEST_F(DisplayCompositorTest,
             ZX_OK);
 
   const auto kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
+  const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
+      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
 
   fuchsia::sysmem::BufferCollectionTokenSyncPtr display_token;
-  EXPECT_CALL(*mock_display_coordinator_, ImportBufferCollection(kGlobalBufferCollectionId, _, _))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))
       .WillOnce(testing::Invoke(
-          [&display_token](uint64_t,
+          [&display_token](fuchsia::hardware::display::BufferCollectionId,
                            fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
                            MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
             display_token = token.BindSync();
@@ -295,10 +305,11 @@ TEST_F(DisplayCompositorTest,
 
   // Set display constraints.
   EXPECT_CALL(*mock_display_coordinator_,
-              SetBufferCollectionConstraints(kGlobalBufferCollectionId, _, _))
+              SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
       .WillOnce(testing::Invoke(
           [&display_token](
-              uint64_t collection_id, fuchsia::hardware::display::ImageConfig config,
+              fuchsia::hardware::display::BufferCollectionId collection_id,
+              fuchsia::hardware::display::ImageConfig config,
               MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             auto sysmem_allocator = utils::CreateSysmemAllocatorSyncPtr("MockDisplayCoordinator");
             SetConstraintsAndClose(sysmem_allocator, std::move(display_token),
@@ -309,9 +320,11 @@ TEST_F(DisplayCompositorTest,
                                    });
             callback(ZX_OK);
           }));
-  EXPECT_CALL(*mock_display_coordinator_, ImportImage(_, kGlobalBufferCollectionId, _, 0, _))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportImage(_, FidlEquals(kDisplayBufferCollectionId), _, 0, _))
       .WillOnce(testing::Invoke(
-          [](fuchsia::hardware::display::ImageConfig, uint64_t, uint64_t, uint32_t,
+          [](fuchsia::hardware::display::ImageConfig,
+             fuchsia::hardware::display::BufferCollectionId, uint64_t, uint32_t,
              MockDisplayCoordinator::ImportImageCallback callback) { callback(ZX_OK); }));
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
@@ -405,11 +418,14 @@ TEST_F(DisplayCompositorTest,
             ZX_OK);
 
   const auto kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
+  const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
+      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
 
   fuchsia::sysmem::BufferCollectionTokenSyncPtr display_token;
-  EXPECT_CALL(*mock_display_coordinator_, ImportBufferCollection(kGlobalBufferCollectionId, _, _))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))
       .WillOnce(testing::Invoke(
-          [&display_token](uint64_t,
+          [&display_token](fuchsia::hardware::display::BufferCollectionId,
                            fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
                            MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
             display_token = token.BindSync();
@@ -419,10 +435,11 @@ TEST_F(DisplayCompositorTest,
   // Set display constraints.
   fuchsia::sysmem::BufferCollectionSyncPtr display_collection;
   EXPECT_CALL(*mock_display_coordinator_,
-              SetBufferCollectionConstraints(kGlobalBufferCollectionId, _, _))
+              SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
       .WillOnce(testing::Invoke(
           [&display_token](
-              uint64_t collection_id, fuchsia::hardware::display::ImageConfig config,
+              fuchsia::hardware::display::BufferCollectionId collection_id,
+              fuchsia::hardware::display::ImageConfig config,
               MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             auto sysmem_allocator = utils::CreateSysmemAllocatorSyncPtr("MockDisplayCoordinator");
             SetConstraintsAndClose(sysmem_allocator, std::move(display_token),
@@ -516,6 +533,8 @@ TEST_F(DisplayCompositorTest, SysmemNegotiationTest_InRendererOnlyMode_DisplaySh
             ZX_OK);
 
   const auto kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
+  const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
+      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
@@ -570,6 +589,9 @@ TEST_F(DisplayCompositorTest, ClientDropSysmemToken) {
   const auto server = CreateServerWaitingForMessages(*mock_display_coordinator_, 1);
 
   const auto kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
+  const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
+      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+
   fuchsia::sysmem::BufferCollectionTokenSyncPtr dup_token;
   // Let client drop token.
   {
@@ -609,18 +631,23 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
   const auto server = CreateServerWaitingForMessages(*mock_display_coordinator_, 5);
 
   const auto kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
+  const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
+      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
 
   // Import buffer collection.
-  EXPECT_CALL(*mock_display_coordinator_, ImportBufferCollection(kGlobalBufferCollectionId, _, _))
-      .WillOnce(testing::Invoke(
-          [](uint64_t, fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
-             MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))
+      .WillOnce(
+          testing::Invoke([](fuchsia::hardware::display::BufferCollectionId,
+                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
+                             MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
             callback(ZX_OK);
           }));
   EXPECT_CALL(*mock_display_coordinator_,
-              SetBufferCollectionConstraints(kGlobalBufferCollectionId, _, _))
+              SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
       .WillOnce(testing::Invoke(
-          [](uint64_t collection_id, fuchsia::hardware::display::ImageConfig config,
+          [](fuchsia::hardware::display::BufferCollectionId collection_id,
+             fuchsia::hardware::display::ImageConfig config,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             callback(ZX_OK);
           }));
@@ -647,16 +674,19 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
       .height = 256,
       .blend_mode = fuchsia::ui::composition::BlendMode::SRC,
   };
-  EXPECT_CALL(*mock_display_coordinator_, ImportImage(_, kGlobalBufferCollectionId, _, 0, _))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportImage(_, FidlEquals(kDisplayBufferCollectionId), _, 0, _))
       .WillOnce(testing::Invoke(
-          [](fuchsia::hardware::display::ImageConfig, uint64_t, uint64_t, uint32_t,
+          [](fuchsia::hardware::display::ImageConfig,
+             fuchsia::hardware::display::BufferCollectionId, uint64_t, uint32_t,
              MockDisplayCoordinator::ImportImageCallback callback) { callback(ZX_OK); }));
   EXPECT_CALL(*renderer_, ImportBufferImage(image_metadata, _)).WillOnce(Return(true));
   display_compositor_->ImportBufferImage(image_metadata, BufferCollectionUsage::kClientImage);
 
   // Release buffer collection. Make sure that does not release Image.
   EXPECT_CALL(*mock_display_coordinator_, ReleaseImage(image_metadata.identifier)).Times(0);
-  EXPECT_CALL(*mock_display_coordinator_, ReleaseBufferCollection(kGlobalBufferCollectionId))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ReleaseBufferCollection(FidlEquals(kDisplayBufferCollectionId)))
       .WillOnce(Return());
   EXPECT_CALL(*renderer_, ReleaseBufferCollection(kGlobalBufferCollectionId, _)).WillOnce(Return());
   display_compositor_->ReleaseBufferCollection(kGlobalBufferCollectionId,
@@ -676,6 +706,9 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
 TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
   const allocation::GlobalBufferCollectionId kGlobalBufferCollectionId =
       allocation::GenerateUniqueBufferCollectionId();
+  const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
+      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+
   const allocation::GlobalImageId kImageId = allocation::GenerateUniqueImageId();
   const uint32_t kVmoCount = 2;
   const uint32_t kVmoIdx = 1;
@@ -683,17 +716,20 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
   const uint32_t kMaxHeight = 200;
   uint32_t num_times_import_image_called = 0;
 
-  EXPECT_CALL(*mock_display_coordinator_, ImportBufferCollection(kGlobalBufferCollectionId, _, _))
-      .WillOnce(testing::Invoke(
-          [](uint64_t, fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
-             MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))
+      .WillOnce(
+          testing::Invoke([](fuchsia::hardware::display::BufferCollectionId,
+                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
+                             MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
             callback(ZX_OK);
           }));
 
   EXPECT_CALL(*mock_display_coordinator_,
-              SetBufferCollectionConstraints(kGlobalBufferCollectionId, _, _))
+              SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
       .WillOnce(testing::Invoke(
-          [](uint64_t collection_id, fuchsia::hardware::display::ImageConfig config,
+          [](fuchsia::hardware::display::BufferCollectionId collection_id,
+             fuchsia::hardware::display::ImageConfig config,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             callback(ZX_OK);
           }));
@@ -732,10 +768,11 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
 
   // Make sure that the engine returns true if the display coordinator returns true.
   EXPECT_CALL(*mock_display_coordinator_,
-              ImportImage(_, kGlobalBufferCollectionId, kImageId, kVmoIdx, _))
+              ImportImage(_, FidlEquals(kDisplayBufferCollectionId), kImageId, kVmoIdx, _))
       .WillOnce(testing::Invoke(
-          [](fuchsia::hardware::display::ImageConfig image_config, uint64_t collection_id,
-             uint64_t image_id, uint32_t index,
+          [](fuchsia::hardware::display::ImageConfig image_config,
+             fuchsia::hardware::display::BufferCollectionId collection_id, uint64_t image_id,
+             uint32_t index,
              MockDisplayCoordinator::ImportImageCallback callback) { callback(ZX_OK); }));
 
   EXPECT_CALL(*renderer_, ImportBufferImage(metadata, _)).WillOnce(Return(true));
@@ -751,9 +788,11 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
   display_compositor_->ReleaseBufferImage(metadata.identifier);
 
   // Make sure that the engine returns false if the display coordinator returns an error
-  EXPECT_CALL(*mock_display_coordinator_, ImportImage(_, kGlobalBufferCollectionId, _, kVmoIdx, _))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportImage(_, FidlEquals(kDisplayBufferCollectionId), _, kVmoIdx, _))
       .WillOnce(testing::Invoke([](fuchsia::hardware::display::ImageConfig image_config,
-                                   uint64_t collection_id, uint64_t image_id, uint32_t index,
+                                   fuchsia::hardware::display::BufferCollectionId collection_id,
+                                   uint64_t image_id, uint32_t index,
                                    MockDisplayCoordinator::ImportImageCallback callback) {
         callback(ZX_ERR_INVALID_ARGS);
       }));
@@ -765,7 +804,8 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
   EXPECT_FALSE(result);
 
   // Collection ID can't be invalid. This shouldn't reach the display coordinator.
-  EXPECT_CALL(*mock_display_coordinator_, ImportImage(_, kGlobalBufferCollectionId, _, kVmoIdx, _))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportImage(_, FidlEquals(kDisplayBufferCollectionId), _, kVmoIdx, _))
       .Times(0);
   auto copy_metadata = metadata;
   copy_metadata.collection_id = allocation::kInvalidId;
@@ -774,7 +814,8 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
   EXPECT_FALSE(result);
 
   // Image Id can't be 0. This shouldn't reach the display coordinator.
-  EXPECT_CALL(*mock_display_coordinator_, ImportImage(_, kGlobalBufferCollectionId, _, kVmoIdx, _))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportImage(_, FidlEquals(kDisplayBufferCollectionId), _, kVmoIdx, _))
       .Times(0);
   copy_metadata = metadata;
   copy_metadata.identifier = allocation::kInvalidImageId;
@@ -783,7 +824,8 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
   EXPECT_FALSE(result);
 
   // Width can't be 0. This shouldn't reach the display coordinator.
-  EXPECT_CALL(*mock_display_coordinator_, ImportImage(_, kGlobalBufferCollectionId, _, kVmoIdx, _))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportImage(_, FidlEquals(kDisplayBufferCollectionId), _, kVmoIdx, _))
       .Times(0);
   copy_metadata = metadata;
   copy_metadata.width = 0;
@@ -877,6 +919,8 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
 // should be added to its own layer on the display.
 TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   const uint64_t kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
+  const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
+      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
 
   // Create a parent and child session.
   auto parent_session = CreateSession();
@@ -974,16 +1018,19 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   // - 2 calls to destroy layer.
   const auto server = CreateServerWaitingForMessages(*mock_display_coordinator_, 25);
 
-  EXPECT_CALL(*mock_display_coordinator_, ImportBufferCollection(kGlobalBufferCollectionId, _, _))
-      .WillOnce(testing::Invoke(
-          [](uint64_t, fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
-             MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))
+      .WillOnce(
+          testing::Invoke([](fuchsia::hardware::display::BufferCollectionId,
+                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
+                             MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
             callback(ZX_OK);
           }));
   EXPECT_CALL(*mock_display_coordinator_,
-              SetBufferCollectionConstraints(kGlobalBufferCollectionId, _, _))
+              SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
       .WillOnce(testing::Invoke(
-          [](uint64_t collection_id, fuchsia::hardware::display::ImageConfig config,
+          [](fuchsia::hardware::display::BufferCollectionId collection_id,
+             fuchsia::hardware::display::ImageConfig config,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             callback(ZX_OK);
           }));
@@ -1001,10 +1048,11 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
                                               std::nullopt);
   SetDisplaySupported(kGlobalBufferCollectionId, true);
 
-  EXPECT_CALL(*mock_display_coordinator_,
-              ImportImage(_, kGlobalBufferCollectionId, parent_image_metadata.identifier, 0, _))
+  EXPECT_CALL(*mock_display_coordinator_, ImportImage(_, FidlEquals(kDisplayBufferCollectionId),
+                                                      parent_image_metadata.identifier, 0, _))
       .WillOnce(testing::Invoke(
-          [](fuchsia::hardware::display::ImageConfig, uint64_t, uint64_t, uint32_t,
+          [](fuchsia::hardware::display::ImageConfig,
+             fuchsia::hardware::display::BufferCollectionId, uint64_t, uint32_t,
              MockDisplayCoordinator::ImportImageCallback callback) { callback(ZX_OK); }));
 
   EXPECT_CALL(*renderer_, ImportBufferImage(parent_image_metadata, _)).WillOnce(Return(true));
@@ -1012,10 +1060,11 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   display_compositor_->ImportBufferImage(parent_image_metadata,
                                          BufferCollectionUsage::kClientImage);
 
-  EXPECT_CALL(*mock_display_coordinator_,
-              ImportImage(_, kGlobalBufferCollectionId, child_image_metadata.identifier, 1, _))
+  EXPECT_CALL(*mock_display_coordinator_, ImportImage(_, FidlEquals(kDisplayBufferCollectionId),
+                                                      child_image_metadata.identifier, 1, _))
       .WillOnce(testing::Invoke(
-          [](fuchsia::hardware::display::ImageConfig, uint64_t, uint64_t, uint32_t,
+          [](fuchsia::hardware::display::ImageConfig,
+             fuchsia::hardware::display::BufferCollectionId, uint64_t, uint32_t,
              MockDisplayCoordinator::ImportImageCallback callback) { callback(ZX_OK); }));
 
   EXPECT_CALL(*renderer_, ImportBufferImage(child_image_metadata, _)).WillOnce(Return(true));
@@ -1109,6 +1158,8 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
     glm::mat3 transform_matrix, ImageFlip image_flip,
     fuchsia::hardware::display::Frame expected_dst, fhd_Transform expected_transform) {
   const uint64_t kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
+  const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
+      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
 
   // Create a parent session.
   auto parent_session = CreateSession();
@@ -1169,16 +1220,19 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   // - 1 calls to destroy layer.
   const auto server = CreateServerWaitingForMessages(*mock_display_coordinator_, 18);
 
-  EXPECT_CALL(*mock_display_coordinator_, ImportBufferCollection(kGlobalBufferCollectionId, _, _))
-      .WillOnce(testing::Invoke(
-          [](uint64_t, fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
-             MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))
+      .WillOnce(
+          testing::Invoke([](fuchsia::hardware::display::BufferCollectionId,
+                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
+                             MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
             callback(ZX_OK);
           }));
   EXPECT_CALL(*mock_display_coordinator_,
-              SetBufferCollectionConstraints(kGlobalBufferCollectionId, _, _))
+              SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
       .WillOnce(testing::Invoke(
-          [](uint64_t collection_id, fuchsia::hardware::display::ImageConfig config,
+          [](fuchsia::hardware::display::BufferCollectionId collection_id,
+             fuchsia::hardware::display::ImageConfig config,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             callback(ZX_OK);
           }));
@@ -1196,10 +1250,11 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
                                               std::nullopt);
   SetDisplaySupported(kGlobalBufferCollectionId, true);
 
-  EXPECT_CALL(*mock_display_coordinator_,
-              ImportImage(_, kGlobalBufferCollectionId, parent_image_metadata.identifier, 0, _))
+  EXPECT_CALL(*mock_display_coordinator_, ImportImage(_, FidlEquals(kDisplayBufferCollectionId),
+                                                      parent_image_metadata.identifier, 0, _))
       .WillOnce(testing::Invoke(
-          [](fuchsia::hardware::display::ImageConfig, uint64_t, uint64_t, uint32_t,
+          [](fuchsia::hardware::display::ImageConfig,
+             fuchsia::hardware::display::BufferCollectionId, uint64_t, uint32_t,
              MockDisplayCoordinator::ImportImageCallback callback) { callback(ZX_OK); }));
 
   EXPECT_CALL(*renderer_, ImportBufferImage(parent_image_metadata, _)).WillOnce(Return(true));
@@ -1441,6 +1496,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlip270DegreeRot
 
 TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   const uint64_t kGlobalBufferCollectionId = 1;
+  const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
+      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+
   auto session = CreateSession();
 
   // Create the root handle and a handle that will have an image attached.
@@ -1489,16 +1547,19 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   const auto server = CreateServerWaitingForMessages(*mock_display_coordinator_, 21);
 
   // Import buffer collection.
-  EXPECT_CALL(*mock_display_coordinator_, ImportBufferCollection(kGlobalBufferCollectionId, _, _))
-      .WillOnce(testing::Invoke(
-          [](uint64_t, fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
-             MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))
+      .WillOnce(
+          testing::Invoke([](fuchsia::hardware::display::BufferCollectionId,
+                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
+                             MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
             callback(ZX_OK);
           }));
   EXPECT_CALL(*mock_display_coordinator_,
-              SetBufferCollectionConstraints(kGlobalBufferCollectionId, _, _))
+              SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
       .WillOnce(testing::Invoke(
-          [](uint64_t collection_id, fuchsia::hardware::display::ImageConfig config,
+          [](fuchsia::hardware::display::BufferCollectionId collection_id,
+             fuchsia::hardware::display::ImageConfig config,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             callback(ZX_OK);
           }));
@@ -1517,9 +1578,11 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   SetDisplaySupported(kGlobalBufferCollectionId, true);
 
   // Import image.
-  EXPECT_CALL(*mock_display_coordinator_, ImportImage(_, kGlobalBufferCollectionId, _, 0, _))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportImage(_, FidlEquals(kDisplayBufferCollectionId), _, 0, _))
       .WillOnce(testing::Invoke(
-          [](fuchsia::hardware::display::ImageConfig, uint64_t, uint64_t, uint32_t,
+          [](fuchsia::hardware::display::ImageConfig,
+             fuchsia::hardware::display::BufferCollectionId, uint64_t, uint32_t,
              MockDisplayCoordinator::ImportImageCallback callback) { callback(ZX_OK); }));
 
   EXPECT_CALL(*renderer_, ImportBufferImage(image_metadata, _)).WillOnce(Return(true));
@@ -1611,8 +1674,11 @@ TEST_F(DisplayCompositorTest, RendererOnly_ImportAndReleaseBufferCollectionTest)
   const auto server = CreateServerWaitingForMessages(*mock_display_coordinator_, 2);
 
   const allocation::GlobalBufferCollectionId kGlobalBufferCollectionId = 15;
+  const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
+      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
 
-  EXPECT_CALL(*mock_display_coordinator_, ImportBufferCollection(kGlobalBufferCollectionId, _, _))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))
       .Times(0);
   // Save token to avoid early token failure.
   fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
@@ -1627,7 +1693,8 @@ TEST_F(DisplayCompositorTest, RendererOnly_ImportAndReleaseBufferCollectionTest)
                                               CreateToken(), BufferCollectionUsage::kClientImage,
                                               std::nullopt);
 
-  EXPECT_CALL(*mock_display_coordinator_, ReleaseBufferCollection(kGlobalBufferCollectionId))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ReleaseBufferCollection(FidlEquals(kDisplayBufferCollectionId)))
       .WillOnce(Return());
   EXPECT_CALL(*renderer_, ReleaseBufferCollection(kGlobalBufferCollectionId, _)).WillOnce(Return());
   display_compositor_->ReleaseBufferCollection(kGlobalBufferCollectionId,

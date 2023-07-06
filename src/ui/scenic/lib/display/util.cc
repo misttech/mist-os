@@ -4,9 +4,12 @@
 
 #include "src/ui/scenic/lib/display/util.h"
 
+#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/event.h>
+
+#include "src/ui/scenic/lib/allocation/id.h"
 
 namespace scenic_impl {
 
@@ -17,19 +20,21 @@ bool ImportBufferCollection(
     const fuchsia::hardware::display::ImageConfig& image_config) {
   zx_status_t status;
 
-  if (display_coordinator->ImportBufferCollection(buffer_collection_id, std::move(token),
+  const fuchsia::hardware::display::BufferCollectionId display_buffer_collection_id =
+      allocation::ToDisplayBufferCollectionId(buffer_collection_id);
+  if (display_coordinator->ImportBufferCollection(display_buffer_collection_id, std::move(token),
                                                   &status) != ZX_OK ||
       status != ZX_OK) {
     FX_LOGS(ERROR) << "ImportBufferCollection failed - status: " << status;
     return false;
   }
 
-  if (display_coordinator->SetBufferCollectionConstraints(buffer_collection_id, image_config,
-                                                          &status) != ZX_OK ||
+  if (display_coordinator->SetBufferCollectionConstraints(display_buffer_collection_id,
+                                                          image_config, &status) != ZX_OK ||
       status != ZX_OK) {
     FX_LOGS(ERROR) << "SetBufferCollectionConstraints failed.";
 
-    if (display_coordinator->ReleaseBufferCollection(buffer_collection_id) != ZX_OK) {
+    if (display_coordinator->ReleaseBufferCollection(display_buffer_collection_id) != ZX_OK) {
       FX_LOGS(ERROR) << "ReleaseBufferCollection failed.";
     }
     return false;
@@ -95,9 +100,11 @@ uint64_t ImportImageForCapture(
     return 0;
   }
 
+  const fuchsia::hardware::display::BufferCollectionId display_buffer_collection_id =
+      allocation::ToDisplayBufferCollectionId(buffer_collection_id);
   fuchsia::hardware::display::Coordinator_ImportImageForCapture_Result import_result;
-  auto status = display_coordinator->ImportImageForCapture(image_config, buffer_collection_id,
-                                                           vmo_idx, &import_result);
+  auto status = display_coordinator->ImportImageForCapture(
+      image_config, display_buffer_collection_id, vmo_idx, &import_result);
 
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "FIDL transport error, status: " << status;

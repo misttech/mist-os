@@ -18,6 +18,7 @@
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/lib/escher/vk/vulkan_device_queues.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
+#include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/display/display_manager.h"
 #include "src/ui/scenic/lib/display/util.h"
 #include "src/ui/scenic/lib/flatland/renderer/null_renderer.h"
@@ -121,7 +122,9 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   FX_DCHECK(status == ZX_OK);
 
   // Register the collection with the renderer, which sets the vk constraints.
-  auto collection_id = allocation::GenerateUniqueBufferCollectionId();
+  const auto collection_id = allocation::GenerateUniqueBufferCollectionId();
+  const fuchsia::hardware::display::BufferCollectionId display_collection_id =
+      allocation::ToDisplayBufferCollectionId(collection_id);
   auto image_id = allocation::GenerateUniqueImageId();
   auto result = renderer.ImportBufferCollection(
       collection_id, sysmem_allocator_.get(), std::move(tokens.dup_token),
@@ -145,10 +148,10 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
                                                  std::move(display_token), display_constraints);
   ASSERT_TRUE(res);
   auto release_buffer_collection =
-      fit::defer([display_coordinator = display_coordinator.get(), collection_id] {
+      fit::defer([display_coordinator = display_coordinator.get(), display_collection_id] {
         // Release the buffer collection.
         zx_status_t release_buffer_collection_status =
-            (*display_coordinator)->ReleaseBufferCollection(collection_id);
+            (*display_coordinator)->ReleaseBufferCollection(display_collection_id);
         EXPECT_EQ(release_buffer_collection_status, ZX_OK);
       });
 
@@ -193,7 +196,7 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   uint64_t display_image_id = allocation::GenerateUniqueImageId();
   zx_status_t import_image_status = ZX_OK;
   (*display_coordinator.get())
-      ->ImportImage(image_config, collection_id, display_image_id, /*vmo_index*/ 0,
+      ->ImportImage(image_config, display_collection_id, display_image_id, /*vmo_index*/ 0,
                     &import_image_status);
   EXPECT_EQ(import_image_status, ZX_OK);
 }
@@ -230,10 +233,12 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       .width = kWidth,
       .height = kHeight,
   };
-  auto display_collection_id = allocation::GenerateUniqueBufferCollectionId();
-  ASSERT_NE(display_collection_id, 0U);
+  auto global_collection_id = allocation::GenerateUniqueBufferCollectionId();
+  ASSERT_NE(global_collection_id, ZX_KOID_INVALID);
+  const fuchsia::hardware::display::BufferCollectionId display_collection_id =
+      allocation::ToDisplayBufferCollectionId(global_collection_id);
 
-  bool res = scenic_impl::ImportBufferCollection(display_collection_id, *display_coordinator.get(),
+  bool res = scenic_impl::ImportBufferCollection(global_collection_id, *display_coordinator.get(),
                                                  std::move(tokens.dup_token), image_config);
   ASSERT_TRUE(res);
 

@@ -40,17 +40,19 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   MOCK_METHOD(void, CheckConfig, (bool, CheckConfigCallback));
 
   MOCK_METHOD(void, ImportBufferCollection,
-              (uint64_t, fidl::InterfaceHandle<class ::fuchsia::sysmem::BufferCollectionToken>,
+              (fuchsia::hardware::display::BufferCollectionId,
+               fidl::InterfaceHandle<class ::fuchsia::sysmem::BufferCollectionToken>,
                ImportBufferCollectionCallback));
 
   MOCK_METHOD(void, SetBufferCollectionConstraints,
-              (uint64_t, fuchsia::hardware::display::ImageConfig,
-               SetBufferCollectionConstraintsCallback));
+              (fuchsia::hardware::display::BufferCollectionId,
+               fuchsia::hardware::display::ImageConfig, SetBufferCollectionConstraintsCallback));
 
-  MOCK_METHOD(void, ReleaseBufferCollection, (uint64_t));
+  MOCK_METHOD(void, ReleaseBufferCollection, (fuchsia::hardware::display::BufferCollectionId));
 
   MOCK_METHOD(void, ImportImage,
-              (fuchsia::hardware::display::ImageConfig, uint64_t, uint64_t, uint32_t,
+              (fuchsia::hardware::display::ImageConfig,
+               fuchsia::hardware::display::BufferCollectionId, uint64_t, uint32_t,
                ImportImageCallback));
 
   MOCK_METHOD(void, ReleaseImage, (uint64_t));

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use display_utils::CollectionId;
 use std::collections::BTreeSet;
 
 pub mod sysmem;
@@ -11,7 +12,6 @@ use std::ops::Range;
 
 // TODO(fxbug.dev/130035): Use display_utils structs instead.
 pub type ImageId = u64;
-pub type CollectionId = u64;
 
 #[derive(Debug)]
 pub struct FrameSet {
@@ -41,7 +41,7 @@ impl FrameSet {
         for image_id in r {
             available.insert(image_id);
         }
-        Self::new(0, available)
+        Self::new(CollectionId(0), available)
     }
 
     pub fn mark_presented(&mut self, image_id: ImageId) {

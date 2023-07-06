@@ -21,7 +21,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
-use display_utils::{LayerId, PixelFormat, INVALID_LAYER_ID};
+use display_utils::{CollectionId, LayerId, PixelFormat, INVALID_LAYER_ID};
 use euclid::size2;
 use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy, ImageConfig};
 use fuchsia_async::{self as fasync, OnSignals};
@@ -42,23 +42,23 @@ type WaitEvents = BTreeMap<ImageId, (Event, u64)>;
 struct CollectionIdGenerator {}
 
 impl Iterator for CollectionIdGenerator {
-    type Item = u64;
+    type Item = CollectionId;
 
-    fn next(&mut self) -> Option<u64> {
-        static NEXT_ID: AtomicU64 = AtomicU64::new(100);
-        // NEXT_ID only increments so it only requires atomicity, and we can
-        // use Relaxed order.
-        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    fn next(&mut self) -> Option<CollectionId> {
+        static NEXT_ID_VALUE: AtomicU64 = AtomicU64::new(100);
+        // NEXT_ID_VALUE only increments so it only requires atomicity, and we
+        // can use Relaxed order.
+        let value = NEXT_ID_VALUE.fetch_add(1, Ordering::Relaxed);
         // fetch_add wraps on overflow, which we'll use as a signal
         // that this generator is out of ids.
-        if id == 0 {
+        if value == 0 {
             None
         } else {
-            Some(id)
+            Some(CollectionId(value))
         }
     }
 }
-fn next_collection_id() -> u64 {
+fn next_collection_id() -> CollectionId {
     CollectionIdGenerator::default().next().expect("collection_id")
 }
 
@@ -165,7 +165,7 @@ pub(crate) struct DisplayDirectViewStrategy {
     vsync_phase: Time,
     vsync_interval: Duration,
     mouse_cursor_position: Option<IntPoint>,
-    pub collection_id: u64,
+    pub collection_id: CollectionId,
     render_frame_count: usize,
     presented: Option<u64>,
 }
@@ -278,7 +278,7 @@ impl DisplayDirectViewStrategy {
     }
 
     async fn allocate_display_resources(
-        collection_id: u64,
+        collection_id: CollectionId,
         size: IntSize,
         pixel_format: display_utils::PixelFormat,
         render_frame_count: usize,
@@ -315,8 +315,14 @@ impl DisplayDirectViewStrategy {
         let mut image_config = ImageConfig { width: unsize.width, height: unsize.height, type_: 0 };
 
         let coordinator_token = buffer_allocator.duplicate_token().await?;
-        display.coordinator.import_buffer_collection(collection_id, coordinator_token).await?;
-        display.coordinator.set_buffer_collection_constraints(collection_id, &image_config).await?;
+        display
+            .coordinator
+            .import_buffer_collection(&collection_id.into(), coordinator_token)
+            .await?;
+        display
+            .coordinator
+            .set_buffer_collection_constraints(&collection_id.into(), &image_config)
+            .await?;
 
         let buffers = buffer_allocator
             .allocate_buffers(true)
@@ -351,7 +357,7 @@ impl DisplayDirectViewStrategy {
             let image_id = next_image_id();
             let status = display
                 .coordinator
-                .import_image(&image_config, collection_id, image_id, uindex)
+                .import_image(&image_config, &collection_id.into(), image_id, uindex)
                 .await
                 .context("coordinator import_image")?;
             ensure!(status == 0, "import_image error {} ({})", Status::from_raw(status), status);
@@ -365,7 +371,7 @@ impl DisplayDirectViewStrategy {
             signal_events.insert(image_id as ImageId, (event, event_id));
         }
 
-        let frame_set = FrameSet::new(collection_id as u64, image_ids);
+        let frame_set = FrameSet::new(collection_id, image_ids);
 
         display.coordinator.set_layer_primary_config(&display.layer_id.into(), &image_config)?;
 
@@ -554,7 +560,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
                     .unbounded_send(MessageInternal::ImageFreed(
                         view_key,
                         image_id,
-                        collection_id as u32,
+                        collection_id.0 as u32,
                     ))
                     .expect("unbounded_send");
             })
@@ -597,7 +603,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
     }
 
     fn image_freed(&mut self, image_id: u64, collection_id: u32) {
-        if collection_id as u64 == self.collection_id {
+        if CollectionId(collection_id as u64) == self.collection_id {
             instant!(
                 "gfx",
                 "DisplayDirectViewStrategy::image_freed",
@@ -670,7 +676,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
     fn close(&mut self) {
         self.display
             .coordinator
-            .release_buffer_collection(self.collection_id)
+            .release_buffer_collection(&self.collection_id.into())
             .expect("release_buffer_collection");
     }
 }

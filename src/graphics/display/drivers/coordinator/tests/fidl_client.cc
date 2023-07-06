@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/coordinator/tests/fidl_client.h"
 
+#include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/debug.h>
 #include <zircon/assert.h>
@@ -11,6 +12,7 @@
 #include <fbl/auto_lock.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 #include "src/lib/testing/predicates/status.h"
@@ -348,26 +350,29 @@ zx::result<uint64_t> TestFidlClient::ImportImageWithSysmemLocked(
   }
 
   // Set display buffer constraints.
-  static uint64_t display_collection_id = 0;
-  display_collection_id++;
+  static BufferCollectionId next_display_collection_id(0);
+  const BufferCollectionId display_collection_id = ++next_display_collection_id;
   if (auto result = local_token->Sync(); !result.ok()) {
     zxlogf(ERROR, "Failed to sync token %d %s", result.status(),
            result.FormatDescription().c_str());
     return zx::error(result.status());
   }
-  if (auto result = dc_->ImportBufferCollection(display_collection_id, std::move(client));
+
+  const fuchsia_hardware_display::wire::BufferCollectionId fidl_display_collection_id =
+      ToFidlBufferCollectionId(display_collection_id);
+  if (auto result = dc_->ImportBufferCollection(fidl_display_collection_id, std::move(client));
       !result.ok() || result.value().res != ZX_OK) {
-    zxlogf(ERROR, "Failed to import buffer collection %lu (fidl=%d, res=%d)", display_collection_id,
-           result.status(), result.value().res);
+    zxlogf(ERROR, "Failed to import buffer collection %lu (fidl=%d, res=%d)",
+           display_collection_id.value(), result.status(), result.value().res);
     return zx::error(result.ok() ? result.value().res : result.status());
   }
 
   auto set_constraints_result =
-      dc_->SetBufferCollectionConstraints(display_collection_id, image_config);
+      dc_->SetBufferCollectionConstraints(fidl_display_collection_id, image_config);
   if (!set_constraints_result.ok() || set_constraints_result.value().res != ZX_OK) {
     zxlogf(ERROR, "Setting buffer (%dx%d) collection constraints failed: %s", image_config.width,
            image_config.height, set_constraints_result.FormatDescription().c_str());
-    (void)dc_->ReleaseBufferCollection(display_collection_id);
+    (void)dc_->ReleaseBufferCollection(fidl_display_collection_id);
     return zx::error(set_constraints_result.ok() ? set_constraints_result.value().res
                                                  : set_constraints_result.status());
   }
@@ -421,7 +426,7 @@ zx::result<uint64_t> TestFidlClient::ImportImageWithSysmemLocked(
   }
 
   auto image_id = next_image_id_++;
-  auto import_result = dc_->ImportImage(image_config, display_collection_id, image_id, 0);
+  auto import_result = dc_->ImportImage(image_config, fidl_display_collection_id, image_id, 0);
   if (!import_result.ok() || import_result.value().res != ZX_OK) {
     zxlogf(ERROR, "Importing image failed (fidl=%d, res=%d)", import_result.status(),
            import_result.value().res);

@@ -238,7 +238,7 @@ void Client::SetBufferCollectionConstraints(
   if (status != ZX_OK) {
     zxlogf(WARNING,
            "Cannot set BufferCollection constraints using imported buffer collection (id=%lu) %s.",
-           request->collection_id, zx_status_get_string(status));
+           buffer_collection_id.value(), zx_status_get_string(status));
     completer.Reply(ZX_ERR_INTERNAL);
   }
   completer.Reply(status);

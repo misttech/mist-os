@@ -323,7 +323,9 @@ void DisplayCompositor::ReleaseBufferCollection(
 
   std::scoped_lock lock(lock_);
   FX_DCHECK(display_coordinator_);
-  (*display_coordinator_)->ReleaseBufferCollection(collection_id);
+  const fuchsia::hardware::display::BufferCollectionId display_collection_id =
+      allocation::ToDisplayBufferCollectionId(collection_id);
+  (*display_coordinator_)->ReleaseBufferCollection(display_collection_id);
   display_buffer_collection_ptrs_.erase(collection_id);
   buffer_collection_supports_display_.erase(collection_id);
 }
@@ -365,6 +367,8 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   FX_DCHECK(display_coordinator_);
 
   const allocation::GlobalBufferCollectionId collection_id = metadata.collection_id;
+  const fuchsia::hardware::display::BufferCollectionId display_collection_id =
+      allocation::ToDisplayBufferCollectionId(collection_id);
   const bool display_support_already_set =
       buffer_collection_supports_display_.find(collection_id) !=
       buffer_collection_supports_display_.end();
@@ -396,7 +400,7 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   zx_status_t import_image_status = ZX_OK;
   {
     const auto status = (*display_coordinator_)
-                            ->ImportImage(image_config, collection_id, metadata.identifier,
+                            ->ImportImage(image_config, display_collection_id, metadata.identifier,
                                           metadata.vmo_index, &import_image_status);
     FX_DCHECK(status == ZX_OK);
   }

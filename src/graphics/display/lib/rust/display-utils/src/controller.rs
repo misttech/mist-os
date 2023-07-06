@@ -270,7 +270,7 @@ impl Coordinator {
         let proxy = self.proxy();
 
         // First import the token.
-        let _ = zx::Status::ok(proxy.import_buffer_collection(id.0, token).await?)?;
+        let _ = zx::Status::ok(proxy.import_buffer_collection(&id.into(), token).await?)?;
 
         // Tell the driver to assign any device-specific constraints.
         // TODO(fxbug.dev/85320): These fields are effectively unused except for `type` in the case
@@ -278,7 +278,7 @@ impl Coordinator {
         let _ = zx::Status::ok(
             proxy
                 .set_buffer_collection_constraints(
-                    id.0,
+                    &id.into(),
                     &display::ImageConfig { width: 0, height: 0, type_: 0 },
                 )
                 .await?,
@@ -288,7 +288,7 @@ impl Coordinator {
 
     /// Notify the display driver to release its handle on a previously imported buffer collection.
     pub(crate) fn release_buffer_collection(&self, id: CollectionId) -> Result<()> {
-        self.inner.read().proxy.release_buffer_collection(id.0).map_err(Error::from)
+        self.inner.read().proxy.release_buffer_collection(&id.into()).map_err(Error::from)
     }
 
     /// Register a sysmem buffer collection backed image to the display driver.
@@ -298,7 +298,8 @@ impl Coordinator {
         image_id: ImageId,
         config: display::ImageConfig,
     ) -> Result<()> {
-        let result = self.proxy().import_image(&config, collection_id.0, image_id.0, 0).await?;
+        let result =
+            self.proxy().import_image(&config, &collection_id.into(), image_id.0, 0).await?;
         zx::Status::ok(result)?;
         Ok(())
     }

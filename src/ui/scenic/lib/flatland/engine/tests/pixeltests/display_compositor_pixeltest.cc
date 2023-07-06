@@ -515,9 +515,11 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   }
 
   void ReleaseCaptureBufferCollection(allocation::GlobalBufferCollectionId collection_id) {
+    const fuchsia::hardware::display::BufferCollectionId display_collection_id =
+        allocation::ToDisplayBufferCollectionId(collection_id);
     auto display = display_manager_->default_display();
     auto display_coordinator = display_manager_->default_display_coordinator();
-    (*display_coordinator)->ReleaseBufferCollection(collection_id);
+    (*display_coordinator)->ReleaseBufferCollection(display_collection_id);
   }
 
   static void ReleaseClientTextureBufferCollection(

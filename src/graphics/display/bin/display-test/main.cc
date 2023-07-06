@@ -32,6 +32,7 @@
 #include <fbl/string_buffer.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/testing/client-utils/display.h"
@@ -52,7 +53,7 @@ static fidl::WireSyncClient<fhd::Coordinator> dc;
 static bool has_ownership;
 
 constexpr uint64_t kEventId = 13;
-constexpr uint32_t kCollectionId = 12;
+constexpr display::BufferCollectionId kCollectionId(12);
 uint64_t capture_id = 0;
 zx::event client_event_;
 fidl::WireSyncClient<sysmem::BufferCollection> collection_;
@@ -370,7 +371,8 @@ zx_status_t capture_setup() {
   }
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)token->Sync();
-  auto import_resp = dc->ImportBufferCollection(kCollectionId, display_token.TakeClientEnd());
+  auto import_resp = dc->ImportBufferCollection(display::ToFidlBufferCollectionId(kCollectionId),
+                                                display_token.TakeClientEnd());
   if (import_resp.status() != ZX_OK) {
     printf("Could not import token: %s\n", import_resp.FormatDescription().c_str());
     return import_resp.status();
@@ -379,7 +381,8 @@ zx_status_t capture_setup() {
   // set buffer constraints
   fhd::wire::ImageConfig image_config = {};
   image_config.type = fhd::wire::kTypeCapture;
-  auto constraints_resp = dc->SetBufferCollectionConstraints(kCollectionId, image_config);
+  auto constraints_resp = dc->SetBufferCollectionConstraints(
+      display::ToFidlBufferCollectionId(kCollectionId), image_config);
   if (constraints_resp.status() != ZX_OK) {
     printf("Could not set capture constraints %s\n", constraints_resp.FormatDescription().c_str());
     return constraints_resp.status();
@@ -448,7 +451,8 @@ zx_status_t capture_setup() {
   capture_vmo = std::move(wait_resp.value().buffer_collection_info.buffers[0].vmo);
   // import image for capture
   fhd::wire::ImageConfig capture_cfg = {};  // will contain a handle
-  auto importcap_resp = dc->ImportImageForCapture(capture_cfg, kCollectionId, 0);
+  auto importcap_resp =
+      dc->ImportImageForCapture(capture_cfg, display::ToFidlBufferCollectionId(kCollectionId), 0);
   if (importcap_resp.status() != ZX_OK) {
     printf("Failed to start capture: %s\n", importcap_resp.FormatDescription().c_str());
     return importcap_resp.status();
@@ -577,7 +581,7 @@ void capture_release() {
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)dc->ReleaseCapture(capture_id);
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)dc->ReleaseBufferCollection(kCollectionId);
+  (void)dc->ReleaseBufferCollection(display::ToFidlBufferCollectionId(kCollectionId));
 }
 
 void usage(void) {

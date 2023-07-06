@@ -11,6 +11,8 @@
 #include <lib/zx/event.h>
 #include <zircon/types.h>
 
+#include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
+
 // Indicies into event and event_ids
 #define WAIT_EVENT 0
 #define SIGNAL_EVENT 1
@@ -49,8 +51,8 @@ class Image {
 
  private:
   Image(uint32_t width, uint32_t height, int32_t stride, fuchsia_images2::wire::PixelFormat format,
-        uint32_t collection_id, void* buf, Pattern pattern, uint32_t fg_color, uint32_t bg_color,
-        uint64_t modifier);
+        display::BufferCollectionId collection_id, void* buf, Pattern pattern, uint32_t fg_color,
+        uint32_t bg_color, uint64_t modifier);
 
   void RenderNv12(int32_t prev_step, int32_t step_num);
 
@@ -65,7 +67,7 @@ class Image {
   uint32_t stride_;
   fuchsia_images2::wire::PixelFormat format_;
 
-  uint32_t collection_id_;
+  display::BufferCollectionId collection_id_;
   void* buf_;
 
   const Pattern pattern_;

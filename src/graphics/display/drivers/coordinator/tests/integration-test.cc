@@ -25,6 +25,7 @@
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
 #include "src/graphics/display/drivers/coordinator/tests/fidl_client.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
+#include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
@@ -574,10 +575,11 @@ TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
   ASSERT_TRUE(client.Bind(dispatcher()));
 
   fbl::AutoLock lock(client.mtx());
-  const uint64_t image_id = fuchsia_hardware_display::wire::kInvalidDispId;
-  const uint64_t buffer_collection_id = 0xffeeeedd;
+  constexpr uint64_t image_id = fuchsia_hardware_display::wire::kInvalidDispId;
+  constexpr BufferCollectionId buffer_collection_id(0xffeeeedd);
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
-      client.dc_->ImportImage(client.displays_[0].image_config_, buffer_collection_id, image_id,
+      client.dc_->ImportImage(client.displays_[0].image_config_,
+                              ToFidlBufferCollectionId(buffer_collection_id), image_id,
                               /*index=*/0);
   ASSERT_OK(import_image_reply.status());
   EXPECT_NE(ZX_OK, import_image_reply.value().res);
@@ -589,10 +591,11 @@ TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
   ASSERT_TRUE(client.Bind(dispatcher()));
 
   fbl::AutoLock lock(client.mtx());
-  const uint64_t image_id = 1;
-  const uint64_t buffer_collection_id = 0xffeeeedd;
+  constexpr BufferCollectionId kNonExistentCollectionId(0xffeeeedd);
+  constexpr uint64_t image_id = 1;
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
-      client.dc_->ImportImage(client.displays_[0].image_config_, buffer_collection_id, image_id,
+      client.dc_->ImportImage(client.displays_[0].image_config_,
+                              ToFidlBufferCollectionId(kNonExistentCollectionId), image_id,
                               /*index=*/0);
   ASSERT_OK(import_image_reply.status());
   EXPECT_NE(ZX_OK, import_image_reply.value().res);

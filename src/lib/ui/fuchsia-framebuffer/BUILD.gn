@@ -13,6 +13,7 @@ rustc_library("fuchsia-framebuffer") {
   with_unit_tests = true
   deps = [
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
+    "//src/graphics/display/lib/rust/display-utils",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",

@@ -259,7 +259,7 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
     return false;
   }
 
-  constexpr uint32_t kBufferCollectionId = 1;
+  constexpr fuchsia::hardware::display::BufferCollectionId kBufferCollectionId = {.value = 1};
 
   display_coordinator_->ImportBufferCollection(kBufferCollectionId, std::move(display_token),
                                                [this, &status](zx_status_t import_status) {
