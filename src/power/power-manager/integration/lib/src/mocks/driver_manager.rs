@@ -10,10 +10,13 @@ use {
     futures::StreamExt as _,
     std::sync::Arc,
     tracing::*,
-    vfs::directory::{
-        entry::DirectoryEntry as _,
-        helper::DirectlyMutable as _,
-        immutable::simple::{simple as simple_mutable_dir, Simple as SimpleMutableDir},
+    vfs::{
+        directory::{
+            entry::DirectoryEntry as _,
+            helper::DirectlyMutable as _,
+            immutable::simple::{simple as simple_mutable_dir, Simple as SimpleMutableDir},
+        },
+        name::Name,
     },
 };
 
@@ -45,8 +48,8 @@ impl MockDriverManager {
         };
 
         for component in parent_path.components() {
-            let component =
-                component.as_os_str().to_str().expect("invalid path component").to_string();
+            let component = component.as_os_str().to_str().expect("invalid path component");
+            let component = Name::from(component).expect("invalid path component");
             root = root
                 .get_or_insert(component, vfs::directory::immutable::simple::simple)
                 .into_any()

@@ -30,6 +30,7 @@ use {
         },
         execution_scope::ExecutionScope,
         file::vmo::VmoFile,
+        name::Name,
         path::Path,
         remote::{remote_dir, remote_node},
         service::endpoint,
@@ -433,7 +434,8 @@ macro_rules! add_functions {
 
         /// Adds an entry to the directory at the given path.
         ///
-        /// The path must be a single component containing no `/` characters.
+        /// The path must be a single component.
+        /// The path must be a valid `fuchsia.io` [`Name`].
         ///
         /// Panics if any node has already been added at the given path.
         pub fn add_entry_at(
@@ -441,49 +443,54 @@ macro_rules! add_functions {
             path: impl Into<String>,
             entry: Arc<dyn DirectoryEntry>,
         ) -> &mut Self {
-            // This will fail if the name has '/' characters or already exists.
-            self.dir.add_entry_impl(path.into(), entry, false).expect("Unable to add entry");
+            let path: String = path.into();
+            let name: Name = path.try_into().expect("Invalid path");
+            // This will fail if the name is invalid or already exists.
+            self.dir.add_entry_impl(name, entry, false).expect("Unable to add entry");
             self
         }
 
         /// Returns a reference to the subdirectory at the given path,
         /// creating one if none exists.
         ///
-        /// The path must be a single component containing no `/` characters.
+        /// The path must be a single component.
+        /// The path must be a valid `fuchsia.io` [`Name`].
         ///
         /// Panics if a service has already been added at the given path.
         pub fn dir(&mut self, path: impl Into<String>) -> ServiceFsDir<'_, ServiceObjTy> {
-            let dir = Arc::downcast(self.dir.get_or_insert(path.into(), simple).into_any())
+            let path: String = path.into();
+            let name: Name = path.try_into().expect("Invalid path");
+            let dir = Arc::downcast(self.dir.get_or_insert(name, simple).into_any())
                 .unwrap_or_else(|_| panic!("Not a directory"));
             ServiceFsDir { fs: self.fs(), dir }
         }
 
         /// Adds a new remote directory served over the given DirectoryProxy.
         ///
-        /// The name must not contain any '/' characters.
+        /// The name must be a valid `fuchsia.io` [`Name`].
         pub fn add_remote(
             &mut self,
             name: impl Into<String>,
             proxy: fio::DirectoryProxy,
         ) -> &mut Self {
-            self.dir
-                .add_entry_impl(name.into(), remote_dir(proxy), false)
-                .expect("Unable to add entry");
+            let name: String = name.into();
+            let name: Name = name.try_into().expect("Invalid path");
+            self.dir.add_entry_impl(name, remote_dir(proxy), false).expect("Unable to add entry");
             self
         }
 
         /// Adds a new remote served over the given NodeProxy.  If the remote is a directory,
         /// add_remote should be used instead.
         ///
-        /// The name must not contain any '/' characters.
+        /// The name must be a valid `fuchsia.io` [`Name`].
         pub fn add_remote_node(
             &mut self,
             name: impl Into<String>,
             proxy: fio::NodeProxy,
         ) -> &mut Self {
-            self.dir
-                .add_entry_impl(name.into(), remote_node(proxy), false)
-                .expect("Unable to add entry");
+            let name: String = name.into();
+            let name: Name = name.try_into().expect("Invalid path");
+            self.dir.add_entry_impl(name, remote_node(proxy), false).expect("Unable to add entry");
             self
         }
     };

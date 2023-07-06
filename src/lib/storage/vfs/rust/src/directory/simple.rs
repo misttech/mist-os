@@ -13,7 +13,7 @@ use crate::{
         dirents_sink,
         entry::{DirectoryEntry, EntryInfo},
         entry_container::{Directory, DirectoryWatcher},
-        helper::DirectlyMutable,
+        helper::{AlreadyExists, DirectlyMutable, NotDirectory},
         immutable::connection::ImmutableConnection,
         mutable::{connection::MutableConnection, entry_constructor::NewEntryType},
         traversal_position::TraversalPosition,
@@ -23,6 +23,7 @@ use crate::{
         },
     },
     execution_scope::ExecutionScope,
+    name::Name,
     node::Node,
     path::Path,
     ToObjectRequest,
@@ -33,7 +34,6 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::Status,
-    static_assertions::assert_eq_size,
     std::{
         boxed::Box,
         clone::Clone,
@@ -67,7 +67,7 @@ pub struct Simple<Connection> {
 }
 
 struct Inner {
-    entries: BTreeMap<String, Arc<dyn DirectoryEntry>>,
+    entries: BTreeMap<Name, Arc<dyn DirectoryEntry>>,
 
     watchers: Watchers,
 }
@@ -113,7 +113,8 @@ where
                     path,
                 )?;
 
-                let _ = this.entries.insert(name.to_string(), entry.clone());
+                let name: Name = name.to_string().try_into()?;
+                let _ = this.entries.insert(name, entry.clone());
                 Ok(entry)
             }
         }
@@ -130,10 +131,7 @@ where
 
     /// Returns the entry identified by `name`.
     pub fn get_entry(&self, name: &str) -> Result<Arc<dyn DirectoryEntry>, Status> {
-        assert_eq_size!(u64, usize);
-        if name.len() as u64 > fio::MAX_FILENAME {
-            return Err(Status::INVALID_ARGS);
-        }
+        crate::name::validate_name(name)?;
 
         let this = self.inner.lock().unwrap();
         match this.entries.get(name) {
@@ -145,7 +143,7 @@ where
     /// Gets or inserts an entry (as supplied by the callback `f`).
     pub fn get_or_insert<T: DirectoryEntry>(
         &self,
-        name: String,
+        name: Name,
         f: impl FnOnce() -> Arc<T>,
     ) -> Arc<dyn DirectoryEntry> {
         self.inner
@@ -320,12 +318,12 @@ where
                         //
                         // pointing to "range".  Same for two the other "range()" invocations
                         // below.
-                        (sink, this.entries.range::<String, _>(..))
+                        (sink, this.entries.range::<Name, _>(..))
                     }
                     AppendResult::Sealed(sealed) => {
                         let new_pos = match this.entries.keys().next() {
                             None => TraversalPosition::End,
-                            Some(first_name) => TraversalPosition::Name(first_name.clone()),
+                            Some(first_name) => TraversalPosition::Name(first_name.clone().into()),
                         };
                         return Ok((new_pos, sealed.into()));
                     }
@@ -333,7 +331,9 @@ where
             }
 
             TraversalPosition::Name(next_name) => {
-                (sink, this.entries.range::<String, _>(next_name.to_owned()..))
+                // TODO(fxbug.dev/130228): TraversalPosition::Name should take Name not String.
+                let next: Name = next_name.to_owned().try_into()?;
+                (sink, this.entries.range::<Name, _>(next..))
             }
 
             TraversalPosition::Index(_) => unreachable!(),
@@ -345,7 +345,7 @@ where
             match sink.append(&entry.entry_info(), &name) {
                 AppendResult::Ok(new_sink) => sink = new_sink,
                 AppendResult::Sealed(sealed) => {
-                    return Ok((TraversalPosition::Name(name.clone()), sealed.into()));
+                    return Ok((TraversalPosition::Name(name.clone().into()), sealed.into()));
                 }
             }
         }
@@ -363,7 +363,7 @@ where
 
         let mut names = StaticVecEventProducer::existing({
             let entry_names = this.entries.keys();
-            iter::once(&".".to_string()).chain(entry_names).cloned().collect()
+            iter::once(".".to_string()).chain(entry_names.map(|x| x.to_owned().into())).collect()
         });
 
         let controller = this.watchers.add(scope, self.clone(), mask, watcher);
@@ -385,22 +385,14 @@ where
 {
     fn add_entry_impl(
         &self,
-        name: String,
+        name: Name,
         entry: Arc<dyn DirectoryEntry>,
         overwrite: bool,
-    ) -> Result<(), Status> {
-        assert_eq_size!(u64, usize);
-        if name.len() as u64 > fio::MAX_FILENAME {
-            return Err(Status::INVALID_ARGS);
-        }
-        if name.contains('/') {
-            return Err(Status::INVALID_ARGS);
-        }
-
+    ) -> Result<(), AlreadyExists> {
         let mut this = self.inner.lock().unwrap();
 
         if !overwrite && this.entries.contains_key(&name) {
-            return Err(Status::ALREADY_EXISTS);
+            return Err(AlreadyExists);
         }
 
         this.watchers.send_event(&mut SingleNameEventProducer::added(&name));
@@ -411,14 +403,9 @@ where
 
     fn remove_entry_impl(
         &self,
-        name: String,
+        name: Name,
         must_be_directory: bool,
-    ) -> Result<Option<Arc<dyn DirectoryEntry>>, Status> {
-        assert_eq_size!(u64, usize);
-        if name.len() as u64 >= fio::MAX_FILENAME {
-            return Err(Status::INVALID_ARGS);
-        }
-
+    ) -> Result<Option<Arc<dyn DirectoryEntry>>, NotDirectory> {
         let mut this = self.inner.lock().unwrap();
 
         match this.entries.entry(name) {
@@ -427,7 +414,7 @@ where
                 if must_be_directory
                     && occupied.get().entry_info().type_() != fio::DirentType::Directory
                 {
-                    Err(Status::NOT_DIR)
+                    Err(NotDirectory)
                 } else {
                     let (key, value) = occupied.remove_entry();
                     this.watchers.send_event(&mut SingleNameEventProducer::removed(&key));
@@ -442,9 +429,7 @@ where
         src: String,
         to: Box<dyn FnOnce(Arc<dyn DirectoryEntry>) -> Result<(), Status>>,
     ) -> Result<(), Status> {
-        if src.len() as u64 >= fio::MAX_FILENAME {
-            return Err(Status::INVALID_ARGS);
-        }
+        let src: Name = src.try_into()?;
 
         let mut this = self.inner.lock().unwrap();
 
@@ -468,9 +453,7 @@ where
         dst: String,
         from: Box<dyn FnOnce() -> Result<Arc<dyn DirectoryEntry>, Status>>,
     ) -> Result<(), Status> {
-        if dst.len() as u64 >= fio::MAX_FILENAME {
-            return Err(Status::INVALID_ARGS);
-        }
+        let dst: Name = dst.try_into()?;
 
         let mut this = self.inner.lock().unwrap();
 
@@ -483,9 +466,8 @@ where
     }
 
     fn rename_within(&self, src: String, dst: String) -> Result<(), Status> {
-        if src.len() as u64 >= fio::MAX_FILENAME || dst.len() as u64 >= fio::MAX_FILENAME {
-            return Err(Status::INVALID_ARGS);
-        }
+        let src: Name = src.try_into()?;
+        let dst: Name = dst.try_into()?;
 
         let mut this = self.inner.lock().unwrap();
 
@@ -534,16 +516,30 @@ mod tests {
     use crate::file::vmo::read_only;
 
     #[test]
-    fn name_with_path_separator() {
+    fn add_entry_success() {
         let dir = crate::directory::mutable::simple();
-        let status = dir
-            .add_entry("path/with/separators", read_only(b"test"))
-            .expect_err("add entry with path separator should fail");
-        assert_eq!(status, Status::INVALID_ARGS);
         assert_eq!(
             dir.add_entry("path_without_separators", read_only(b"test")),
             Ok(()),
             "add entry with valid filename should succeed"
         );
+    }
+
+    #[test]
+    fn add_entry_error_name_with_path_separator() {
+        let dir = crate::directory::mutable::simple();
+        let status = dir
+            .add_entry("path/with/separators", read_only(b"test"))
+            .expect_err("add entry with path separator should fail");
+        assert_eq!(status, Status::INVALID_ARGS);
+    }
+
+    #[test]
+    fn add_entry_error_name_too_long() {
+        let dir = crate::directory::mutable::simple();
+        let status = dir
+            .add_entry("a".repeat(10000), read_only(b"test"))
+            .expect_err("add entry whose name is too long should fail");
+        assert_eq!(status, Status::BAD_PATH);
     }
 }

@@ -62,12 +62,7 @@ impl Path {
                 // Disallow empty components, ".", and ".."s.  Path is expected to be
                 // canonicalized.  See fxbug.dev/28436 for discussion of empty components.
                 for c in check {
-                    if c.is_empty() || c == ".." || c == "." {
-                        return Err(Status::INVALID_ARGS);
-                    }
-                    if c.len() as u64 > fio::MAX_FILENAME {
-                        return Err(Status::BAD_PATH);
-                    }
+                    crate::name::validate_name(c)?;
                 }
 
                 Ok(Path { is_dir, inner: path, next })
@@ -75,7 +70,7 @@ impl Path {
         }
     }
 
-    /// Returns `true` when there are no more compoenents left in this `Path`.
+    /// Returns `true` when there are no more components left in this `Path`.
     pub fn is_empty(&self) -> bool {
         self.next >= self.inner.len()
     }

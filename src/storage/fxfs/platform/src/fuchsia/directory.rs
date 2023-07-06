@@ -812,7 +812,7 @@ impl vfs::directory::entry_container::Directory for FxDirectory {
                     // Note that entries inserted between the previous entry and this entry before
                     // the next call to read_dirents would not be included in the results (but
                     // there's no requirement to include them anyways).
-                    return Ok((TraversalPosition::Name(name.to_owned()), sealed));
+                    return Ok((TraversalPosition::Name(name.to_string()), sealed));
                 }
             }
             iter.advance().await.map_err(map_to_status)?;

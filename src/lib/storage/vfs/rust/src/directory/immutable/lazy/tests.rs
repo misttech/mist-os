@@ -64,7 +64,7 @@ impl Entries {
                 let pos = if name == "." {
                     TraversalPosition::Start
                 } else {
-                    TraversalPosition::Name(name.to_string())
+                    TraversalPosition::Name(name.to_string().try_into().unwrap())
                 };
                 (pos, EntryInfo::new(fio::INO_UNKNOWN, dirent_type))
             })

@@ -75,7 +75,10 @@ mod tests {
         fuchsia_async as fasync, fuchsia_zircon as zx,
         lazy_static::lazy_static,
         test_util::Counter,
-        vfs::directory::{entry::DirectoryEntry, immutable::simple as pfs},
+        vfs::{
+            directory::{entry::DirectoryEntry, immutable::simple as pfs},
+            name::Name,
+        },
     };
 
     #[fuchsia::test]
@@ -97,7 +100,7 @@ mod tests {
         );
         let remote = open.into_remote();
         let dir = pfs::simple();
-        dir.get_or_insert("foo".to_string(), || remote);
+        dir.get_or_insert(Name::from("foo").unwrap(), || remote);
 
         let scope = ExecutionScope::new();
         let (dir_client_end, dir_server_end) = create_endpoints::<fio::DirectoryMarker>();

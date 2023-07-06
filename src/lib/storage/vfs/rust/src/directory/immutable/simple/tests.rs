@@ -1013,10 +1013,10 @@ fn add_entry_too_long_error() {
             "`add_entry()` succeeded for a name of {} bytes, when MAX_FILENAME is {}",
             name_len, max_filename
         ),
-        Err(Status::INVALID_ARGS) => (),
+        Err(Status::BAD_PATH) => (),
         Err(status) => panic!(
             "`add_entry()` failed for a name of {} bytes, with status {}.  Expected status is \
-             INVALID_ARGS.  MAX_FILENAME is {}.",
+             BAD_PATH.  MAX_FILENAME is {}.",
             name_len, status, max_filename
         ),
     }

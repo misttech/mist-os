@@ -15,6 +15,7 @@ pub mod test_utils;
 pub mod common;
 
 pub mod execution_scope;
+pub mod name;
 pub mod path;
 
 pub mod directory;

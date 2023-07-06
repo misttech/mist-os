@@ -65,8 +65,8 @@ impl State {
         {
             info!("Stopping fatfs runtime; remaining connections will be forcibly closed");
 
-            if let Ok(Some(entry)) = outgoing_dir
-                .remove_entry_impl("root".to_string(), /* must_be_directory: */ false)
+            if let Ok(Some(entry)) =
+                outgoing_dir.remove_entry("root", /* must_be_directory: */ false)
             {
                 let _ = entry.into_any().downcast::<FatDirectory>().unwrap().close();
             }

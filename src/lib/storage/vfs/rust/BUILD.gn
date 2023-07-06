@@ -67,6 +67,7 @@ rustc_library("vfs") {
     "src/file/vmo.rs",
     "src/file/vmo/tests.rs",
     "src/lib.rs",
+    "src/name.rs",
     "src/node.rs",
     "src/object_request.rs",
     "src/path.rs",

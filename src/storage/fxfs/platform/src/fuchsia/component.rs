@@ -146,8 +146,7 @@ impl State {
             std::mem::replace(self, State::ComponentStarted)
         {
             info!("Stopping Fxfs runtime; remaining connections will be forcibly closed");
-            let _ = outgoing_dir
-                .remove_entry_impl("volumes".into(), /* must_be_directory: */ false);
+            let _ = outgoing_dir.remove_entry("volumes", /* must_be_directory: */ false);
             volumes.terminate().await;
             let _ = fs.deref().close().await;
         }
@@ -317,8 +316,8 @@ impl Component {
         let volumes =
             VolumesDirectory::new(root_volume, Arc::downgrade(&inspect_tree), mem_monitor).await?;
 
-        self.outgoing_dir.add_entry_impl(
-            "volumes".to_string(),
+        self.outgoing_dir.add_entry_may_overwrite(
+            "volumes",
             volumes.directory_node().clone(),
             /* overwrite: */ true,
         )?;
