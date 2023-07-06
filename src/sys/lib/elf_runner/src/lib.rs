@@ -7,7 +7,6 @@ mod config;
 mod crash_handler;
 pub mod crash_info;
 mod error;
-mod launcher;
 pub mod process_launcher;
 mod runtime_dir;
 mod stdout;
@@ -18,7 +17,6 @@ use {
         component::ElfComponent,
         config::ElfProgramConfig,
         error::{ConfigDataError, JobError, StartComponentError, StartInfoError},
-        launcher::ProcessLauncherConnector,
         runtime_dir::RuntimeDirBuilder,
         stdout::bind_streams_to_syslog,
     },
@@ -26,7 +24,7 @@ use {
         crash_info::CrashRecords,
         vdso_vmo::{get_direct_vdso_vmo, get_next_vdso_vmo},
     },
-    ::routing::{config::RuntimeConfig, policy::ScopedPolicyChecker},
+    ::routing::policy::ScopedPolicyChecker,
     async_trait::async_trait,
     chrono::{DateTime, NaiveDateTime, Utc},
     cm_runner::Runner,
@@ -39,9 +37,7 @@ use {
     fidl_fuchsia_process_lifecycle::LifecycleMarker,
     fuchsia_async::{self as fasync, TimeoutExt},
     fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType},
-    fuchsia_zircon::{
-        self as zx, AsHandleRef, Duration, HandleBased, ProcessInfo, Signals, Status, Time,
-    },
+    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
     futures::channel::oneshot,
     moniker::AbsoluteMoniker,
     runner::component::ChannelEpitaph,
@@ -53,7 +49,7 @@ use {
 // Maximum time that the runner will wait for break_on_start eventpair to signal.
 // This is set to prevent debuggers from blocking us for too long, either intentionally
 // or unintentionally.
-const MAX_WAIT_BREAK_ON_START: Duration = Duration::from_millis(300);
+const MAX_WAIT_BREAK_ON_START: zx::Duration = zx::Duration::from_millis(300);
 
 // Minimum timer slack amount and default mode. The amount should be large enough to allow for some
 // coalescing of timers, but small enough to ensure applications don't miss deadlines.
@@ -76,7 +72,7 @@ const DUPLICATE_CLOCK_RIGHTS: zx::Rights = zx::Rights::from_bits_truncate(
 // Builds and serves the runtime directory
 /// Runs components with ELF binaries.
 pub struct ElfRunner {
-    launcher_connector: ProcessLauncherConnector,
+    launcher_connector: process_launcher::Connector,
 
     /// If `utc_clock` is populated then that Clock's handle will
     /// be passed into the newly created process. Otherwise, the UTC
@@ -90,15 +86,11 @@ pub struct ElfRunner {
 
 impl ElfRunner {
     pub fn new(
-        config: &RuntimeConfig,
+        launcher_connector: process_launcher::Connector,
         utc_clock: Option<Arc<zx::Clock>>,
         crash_records: CrashRecords,
     ) -> ElfRunner {
-        ElfRunner {
-            launcher_connector: ProcessLauncherConnector::new(config),
-            utc_clock,
-            crash_records,
-        }
+        ElfRunner { launcher_connector, utc_clock, crash_records }
     }
 
     /// Returns a UTC clock handle.
@@ -318,10 +310,27 @@ impl ElfRunner {
             (None, None)
         };
 
-        let utc_clock = self
-            .duplicate_utc_clock()
-            .await
-            .map_err(StartComponentError::UtcClockDuplicateFailed)?;
+        // Take the UTC clock handle out of `start_info.numbered_handles`, if available.
+        let utc_handle = start_info
+            .numbered_handles
+            .as_mut()
+            .map(|handles| {
+                handles
+                    .iter()
+                    .position(|handles| {
+                        handles.id == HandleInfo::new(HandleType::ClockUtc, 0).as_raw()
+                    })
+                    .map(|position| handles.swap_remove(position).handle)
+            })
+            .flatten();
+
+        let utc_clock = if let Some(handle) = utc_handle {
+            zx::Clock::from(handle)
+        } else {
+            self.duplicate_utc_clock()
+                .await
+                .map_err(StartComponentError::UtcClockDuplicateFailed)?
+        };
 
         // Duplicate the clock handle again, used later to wait for the clock to start, while
         // the original handle is passed to the process.
@@ -394,8 +403,8 @@ impl ElfRunner {
 
         // Wait on break_on_start with a timeout and don't fail.
         if let Some(break_on_start) = start_info.break_on_start {
-            fasync::OnSignals::new(&break_on_start, Signals::OBJECT_PEER_CLOSED)
-                .on_timeout(MAX_WAIT_BREAK_ON_START, || Err(Status::TIMED_OUT))
+            fasync::OnSignals::new(&break_on_start, zx::Signals::OBJECT_PEER_CLOSED)
+                .on_timeout(MAX_WAIT_BREAK_ON_START, || Err(zx::Status::TIMED_OUT))
                 .await
                 .err()
                 .map(|error| warn!(%moniker, %error, "Failed to wait break_on_start"));
@@ -426,8 +435,8 @@ impl ElfRunner {
         runtime_dir.add_process_start_time(process_start_time);
 
         // Add UTC estimate of the process start time to the runtime dir.
-        let utc_clock_started = fasync::OnSignals::new(&utc_clock_dup, Signals::CLOCK_STARTED)
-            .on_timeout(Time::after(Duration::default()), || Err(Status::TIMED_OUT))
+        let utc_clock_started = fasync::OnSignals::new(&utc_clock_dup, zx::Signals::CLOCK_STARTED)
+            .on_timeout(zx::Time::after(zx::Duration::default()), || Err(zx::Status::TIMED_OUT))
             .await
             .is_ok();
         let clock_transformation = utc_clock_started
@@ -435,7 +444,7 @@ impl ElfRunner {
             .flatten();
         if let Some(clock_transformation) = clock_transformation {
             let utc_timestamp =
-                clock_transformation.apply(Time::from_nanos(process_start_time)).into_nanos();
+                clock_transformation.apply(zx::Time::from_nanos(process_start_time)).into_nanos();
             let seconds = (utc_timestamp / 1_000_000_000) as i64;
             let nanos = (utc_timestamp % 1_000_000_000) as u32;
             let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(seconds, nanos), Utc);
@@ -544,7 +553,7 @@ impl Runner for ScopedElfRunner {
             // intentional, non-zero exit, use that for all non-0 exit
             // codes.
             let exit_status: ChannelEpitaph = match proc_copy.info() {
-                Ok(ProcessInfo { return_code: 0, .. }) => zx::Status::OK.try_into().unwrap(),
+                Ok(zx::ProcessInfo { return_code: 0, .. }) => zx::Status::OK.try_into().unwrap(),
                 Ok(_) => fcomp::Error::InstanceDied.into(),
                 Err(error) => {
                     warn!(%error, "Unable to query process info");
@@ -594,8 +603,10 @@ mod tests {
         anyhow::{Context, Error},
         assert_matches::assert_matches,
         fidl::endpoints::{
-            create_endpoints, create_proxy, ClientEnd, DiscoverableProtocolMarker, Proxy, ServerEnd,
+            create_endpoints, create_proxy, spawn_stream_handler, ClientEnd,
+            DiscoverableProtocolMarker, Proxy, ServerEnd,
         },
+        fidl_connector::Connect,
         fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
         fidl_fuchsia_data as fdata,
         fidl_fuchsia_diagnostics_types::{
@@ -603,22 +614,16 @@ mod tests {
         },
         fidl_fuchsia_io as fio,
         fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream},
-        fidl_fuchsia_process_lifecycle::LifecycleMarker,
-        fidl_fuchsia_process_lifecycle::LifecycleProxy,
+        fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy},
         fuchsia_async as fasync,
         fuchsia_component::server::{ServiceFs, ServiceObjLocal},
         fuchsia_fs,
-        fuchsia_zircon::{self as zx, Task},
-        fuchsia_zircon::{AsHandleRef, Job, Process},
-        futures::{join, StreamExt, TryStreamExt},
+        fuchsia_zircon::{self as zx, AsHandleRef, Task},
+        futures::{channel::mpsc, join, lock::Mutex, StreamExt, TryStreamExt},
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
         runner::component::Controllable,
         scoped_task,
-        std::{
-            convert::TryFrom,
-            sync::{Arc, Mutex},
-            task::Poll,
-        },
+        std::{convert::TryFrom, sync::Arc, task::Poll},
     };
 
     pub enum MockServiceRequest {
@@ -644,8 +649,12 @@ mod tests {
         Ok((dir, entries))
     }
 
-    fn new_elf_runner_for_test(config: &RuntimeConfig) -> Arc<ElfRunner> {
-        Arc::new(ElfRunner::new(&config, None, CrashRecords::new()))
+    fn new_elf_runner_for_test() -> Arc<ElfRunner> {
+        Arc::new(ElfRunner::new(
+            Box::new(process_launcher::BuiltInConnector {}),
+            None,
+            CrashRecords::new(),
+        ))
     }
 
     fn hello_world_startinfo(
@@ -671,7 +680,7 @@ mod tests {
 
         fcrunner::ComponentStartInfo {
             resolved_url: Some(
-                "fuchsia-pkg://fuchsia.com/elf_runner_tests#meta/hello_world.cm".to_string(),
+                "fuchsia-pkg://fuchsia.com/elf_runner_tests#meta/hello-world-rust.cm".to_string(),
             ),
             program: Some(fdata::Dictionary {
                 entries: Some(vec![
@@ -685,10 +694,52 @@ mod tests {
                     fdata::DictionaryEntry {
                         key: "binary".to_string(),
                         value: Some(Box::new(fdata::DictionaryValue::Str(
-                            "bin/hello_world".to_string(),
+                            "bin/hello_world_rust".to_string(),
                         ))),
                     },
                 ]),
+                ..Default::default()
+            }),
+            ns: Some(ns),
+            outgoing_dir: None,
+            runtime_dir: Some(runtime_dir),
+            ..Default::default()
+        }
+    }
+
+    /// ComponentStartInfo that points to a non-existent binary.
+    fn invalid_binary_startinfo(
+        runtime_dir: ServerEnd<fio::DirectoryMarker>,
+    ) -> fcrunner::ComponentStartInfo {
+        // Get a handle to /pkg
+        let pkg_path = "/pkg".to_string();
+        let pkg_chan = fuchsia_fs::directory::open_in_namespace(
+            "/pkg",
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        )
+        .unwrap()
+        .into_channel()
+        .unwrap()
+        .into_zx_channel();
+        let pkg_handle = ClientEnd::new(pkg_chan);
+
+        let ns = vec![fcrunner::ComponentNamespaceEntry {
+            path: Some(pkg_path),
+            directory: Some(pkg_handle),
+            ..Default::default()
+        }];
+
+        fcrunner::ComponentStartInfo {
+            resolved_url: Some(
+                "fuchsia-pkg://fuchsia.com/elf_runner_tests#meta/does-not-exist.cm".to_string(),
+            ),
+            program: Some(fdata::Dictionary {
+                entries: Some(vec![fdata::DictionaryEntry {
+                    key: "binary".to_string(),
+                    value: Some(Box::new(fdata::DictionaryValue::Str(
+                        "bin/does_not_exist".to_string(),
+                    ))),
+                }]),
                 ..Default::default()
             }),
             ns: Some(ns),
@@ -755,9 +806,9 @@ mod tests {
         }
     }
 
-    fn create_dummy_process(job: &scoped_task::Scoped<Job>, name_for_builtin: &str) -> Process {
+    fn create_child_process(job: &zx::Job, name: &str) -> zx::Process {
         let (process, _vmar) = job
-            .create_child_process(zx::ProcessOptions::empty(), name_for_builtin.as_bytes())
+            .create_child_process(zx::ProcessOptions::empty(), name.as_bytes())
             .expect("could not create process");
         process
     }
@@ -765,24 +816,21 @@ mod tests {
     fn make_default_elf_component(
         lifecycle_client: Option<LifecycleProxy>,
         critical: bool,
-    ) -> (Job, ElfComponent) {
+    ) -> (scoped_task::Scoped<zx::Job>, ElfComponent) {
         let job = scoped_task::create_child_job().expect("failed to make child job");
-        let dummy_process = create_dummy_process(&job, "dummy");
-        let job_copy = Job::from(
-            job.as_handle_ref()
-                .duplicate(zx::Rights::SAME_RIGHTS)
-                .expect("job handle duplication failed"),
-        );
+        let process = create_child_process(&job, "test_process");
+        let job_copy =
+            job.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("job handle duplication failed");
         let component = ElfComponent::new(
             RuntimeDirectory::empty(),
             job_copy,
-            dummy_process,
+            process,
             lifecycle_client,
             critical,
             Vec::new(),
             "".to_string(),
         );
-        (job.into_inner(), component)
+        (job, component)
     }
 
     // TODO(fxbug.dev/122225): A variation of this is used in a couple of places. We should consider
@@ -803,10 +851,9 @@ mod tests {
         let (runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>()?;
         let start_info = lifecycle_startinfo(runtime_dir_server);
 
-        let config = RuntimeConfig { use_builtin_process_launcher: true, ..Default::default() };
-        let runner = new_elf_runner_for_test(&config);
+        let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-            Arc::downgrade(&Arc::new(config)),
+            Arc::downgrade(&Arc::new(RuntimeConfig::default())),
             AbsoluteMoniker::root(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
@@ -1040,35 +1087,31 @@ mod tests {
         Ok(())
     }
 
-    /// Modify the standard test StartInfo to request ambient_mark_vmo_exec job policy
-    fn lifecycle_startinfo_mark_vmo_exec(
-        runtime_dir: ServerEnd<fio::DirectoryMarker>,
+    fn with_mark_vmo_exec(
+        mut start_info: fcrunner::ComponentStartInfo,
     ) -> fcrunner::ComponentStartInfo {
-        let mut start_info = lifecycle_startinfo(runtime_dir);
         start_info.program.as_mut().map(|dict| {
-            dict.entries.as_mut().map(|ent| {
-                ent.push(fdata::DictionaryEntry {
+            dict.entries.as_mut().map(|entry| {
+                entry.push(fdata::DictionaryEntry {
                     key: "job_policy_ambient_mark_vmo_exec".to_string(),
                     value: Some(Box::new(fdata::DictionaryValue::Str("true".to_string()))),
                 });
-                ent
+                entry
             })
         });
         start_info
     }
 
-    // Modify the standard test StartInfo to add a main_process_critical request
-    fn hello_world_startinfo_main_process_critical(
-        runtime_dir: ServerEnd<fio::DirectoryMarker>,
+    fn with_main_process_critical(
+        mut start_info: fcrunner::ComponentStartInfo,
     ) -> fcrunner::ComponentStartInfo {
-        let mut start_info = hello_world_startinfo(runtime_dir);
         start_info.program.as_mut().map(|dict| {
-            dict.entries.as_mut().map(|ent| {
-                ent.push(fdata::DictionaryEntry {
+            dict.entries.as_mut().map(|entry| {
+                entry.push(fdata::DictionaryEntry {
                     key: "main_process_critical".to_string(),
                     value: Some(Box::new(fdata::DictionaryValue::Str("true".to_string()))),
                 });
-                ent
+                entry
             })
         });
         start_info
@@ -1077,13 +1120,12 @@ mod tests {
     #[fuchsia::test]
     async fn vmex_security_policy_denied() -> Result<(), Error> {
         let (_runtime_dir, runtime_dir_server) = create_endpoints::<fio::DirectoryMarker>();
-        let start_info = lifecycle_startinfo_mark_vmo_exec(runtime_dir_server);
+        let start_info = with_mark_vmo_exec(lifecycle_startinfo(runtime_dir_server));
 
         // Config does not allowlist any monikers to have access to the job policy.
-        let config = RuntimeConfig { use_builtin_process_launcher: true, ..Default::default() };
-        let runner = new_elf_runner_for_test(&config);
+        let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-            Arc::downgrade(&Arc::new(config)),
+            Arc::downgrade(&Arc::new(RuntimeConfig::default())),
             AbsoluteMoniker::root(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
@@ -1103,7 +1145,7 @@ mod tests {
     #[fuchsia::test]
     async fn vmex_security_policy_allowed() -> Result<(), Error> {
         let (runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>()?;
-        let start_info = lifecycle_startinfo_mark_vmo_exec(runtime_dir_server);
+        let start_info = with_mark_vmo_exec(lifecycle_startinfo(runtime_dir_server));
 
         let config = Arc::new(RuntimeConfig {
             security_policy: SecurityPolicy {
@@ -1113,10 +1155,9 @@ mod tests {
                 },
                 ..Default::default()
             },
-            use_builtin_process_launcher: true,
             ..Default::default()
         });
-        let runner = new_elf_runner_for_test(&config);
+        let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::downgrade(&config),
             AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
@@ -1149,13 +1190,12 @@ mod tests {
     #[fuchsia::test]
     async fn critical_security_policy_denied() -> Result<(), Error> {
         let (_runtime_dir, runtime_dir_server) = create_endpoints::<fio::DirectoryMarker>();
-        let start_info = hello_world_startinfo_main_process_critical(runtime_dir_server);
+        let start_info = with_main_process_critical(hello_world_startinfo(runtime_dir_server));
 
         // Config does not allowlist any monikers to be marked as critical
-        let config = RuntimeConfig { use_builtin_process_launcher: true, ..Default::default() };
-        let runner = new_elf_runner_for_test(&config);
+        let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-            Arc::downgrade(&Arc::new(config)),
+            Arc::downgrade(&Arc::new(RuntimeConfig::default())),
             AbsoluteMoniker::root(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
@@ -1176,12 +1216,14 @@ mod tests {
     #[should_panic]
     async fn fail_to_launch_critical_component() {
         let (_runtime_dir, runtime_dir_server) = create_endpoints::<fio::DirectoryMarker>();
-        let start_info = hello_world_startinfo_main_process_critical(runtime_dir_server);
+
+        // ElfRunner should fail to start the component because this start_info points
+        // to a binary that does not exist in the test package.
+        let start_info = with_main_process_critical(invalid_binary_startinfo(runtime_dir_server));
 
         // Config does not allowlist any monikers to be marked as critical without being
         // allowlisted, so make sure we permit this one.
         let config = Arc::new(RuntimeConfig {
-            use_builtin_process_launcher: true,
             security_policy: SecurityPolicy {
                 job_policy: JobPolicyAllowlists {
                     main_process_critical: vec![AllowlistEntryBuilder::new().build()],
@@ -1191,7 +1233,7 @@ mod tests {
             },
             ..Default::default()
         });
-        let runner = new_elf_runner_for_test(&config);
+        let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::downgrade(&config),
             AbsoluteMoniker::root(),
@@ -1201,8 +1243,6 @@ mod tests {
 
         runner.start(start_info, server_controller).await;
 
-        // The hello_world binary starts and its process exits right away. Since the component is
-        // marked `main_process_critical`, this causes the runner to panic.
         controller
             .take_event_stream()
             .try_next()
@@ -1273,11 +1313,9 @@ mod tests {
             let (_runtime_dir, runtime_dir_server) = create_endpoints::<fio::DirectoryMarker>();
             let start_info = hello_world_startinfo_forward_stdout_to_log(runtime_dir_server, ns);
 
-            let config = RuntimeConfig { use_builtin_process_launcher: true, ..Default::default() };
-
-            let runner = new_elf_runner_for_test(&config);
+            let runner = new_elf_runner_for_test();
             let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-                Arc::downgrade(&Arc::new(config)),
+                Arc::downgrade(&Arc::new(RuntimeConfig::default())),
                 AbsoluteMoniker::root(),
             ));
             let (client_controller, server_controller) =
@@ -1306,7 +1344,7 @@ mod tests {
                                     panic!("Unexpected call to `Connect`");
                                 }
                                 LogSinkRequest::ConnectStructured { .. } => {
-                                    let mut count = req_count.lock().expect("locking failed");
+                                    let mut count = req_count.lock().await;
                                     *count += 1;
                                 }
                                 LogSinkRequest::WaitForInterestChange { .. } => {
@@ -1323,7 +1361,7 @@ mod tests {
 
         join!(run_component_fut, service_fs_listener_fut);
 
-        assert_eq!(*request_count.lock().expect("lock failed"), connection_count);
+        assert_eq!(*request_count.lock().await, connection_count);
         Ok(())
     }
 
@@ -1332,10 +1370,9 @@ mod tests {
         let (runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>()?;
         let start_info = lifecycle_startinfo(runtime_dir_server);
 
-        let config = RuntimeConfig { use_builtin_process_launcher: true, ..Default::default() };
-        let runner = new_elf_runner_for_test(&config);
+        let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-            Arc::downgrade(&Arc::new(config)),
+            Arc::downgrade(&Arc::new(RuntimeConfig::default())),
             AbsoluteMoniker::root(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
@@ -1396,5 +1433,107 @@ mod tests {
             }
             other => panic!("Expected channel closed error, got {:?}", other),
         }
+    }
+
+    /// An implementation of launcher that sends a complete launch request payload back to
+    /// a test through an mpsc channel.
+    struct LauncherConnectorForTest {
+        sender: mpsc::UnboundedSender<LaunchPayload>,
+    }
+
+    /// Contains all the information passed to fuchsia.process.Launcher before and up to calling
+    /// Launch/CreateWithoutStarting.
+    #[derive(Default)]
+    struct LaunchPayload {
+        launch_info: Option<fproc::LaunchInfo>,
+        args: Vec<Vec<u8>>,
+        environ: Vec<Vec<u8>>,
+        name_info: Vec<fproc::NameInfo>,
+        handles: Vec<fproc::HandleInfo>,
+        options: u32,
+    }
+
+    impl Connect for LauncherConnectorForTest {
+        type Proxy = fproc::LauncherProxy;
+
+        fn connect(&self) -> Result<Self::Proxy, anyhow::Error> {
+            let sender = self.sender.clone();
+            let payload = Arc::new(Mutex::new(LaunchPayload::default()));
+
+            spawn_stream_handler(move |launcher_request| {
+                let sender = sender.clone();
+                let payload = payload.clone();
+                async move {
+                    let mut payload = payload.lock().await;
+                    match launcher_request {
+                        fproc::LauncherRequest::Launch { info, responder } => {
+                            let process = create_child_process(&info.job, "test_process");
+                            responder.send(zx::Status::OK.into_raw(), Some(process)).unwrap();
+
+                            let mut payload =
+                                std::mem::replace(&mut *payload, LaunchPayload::default());
+                            payload.launch_info = Some(info);
+                            sender.unbounded_send(payload).unwrap();
+                        }
+                        fproc::LauncherRequest::CreateWithoutStarting { info: _, responder: _ } => {
+                            unimplemented!()
+                        }
+                        fproc::LauncherRequest::AddArgs { mut args, control_handle: _ } => {
+                            payload.args.append(&mut args);
+                        }
+                        fproc::LauncherRequest::AddEnvirons { mut environ, control_handle: _ } => {
+                            payload.environ.append(&mut environ);
+                        }
+                        fproc::LauncherRequest::AddNames { mut names, control_handle: _ } => {
+                            payload.name_info.append(&mut names);
+                        }
+                        fproc::LauncherRequest::AddHandles { mut handles, control_handle: _ } => {
+                            payload.handles.append(&mut handles);
+                        }
+                        fproc::LauncherRequest::SetOptions { options, .. } => {
+                            payload.options = options;
+                        }
+                    }
+                }
+            })
+            .map_err(anyhow::Error::new)
+        }
+    }
+
+    #[fuchsia::test]
+    async fn process_created_with_utc_clock_from_numbered_handles() -> Result<(), Error> {
+        let (payload_tx, mut payload_rx) = mpsc::unbounded();
+
+        let connector = LauncherConnectorForTest { sender: payload_tx };
+        let runner = ElfRunner::new(Box::new(connector), None, CrashRecords::new());
+        let policy_checker = ScopedPolicyChecker::new(
+            Arc::downgrade(&Arc::new(RuntimeConfig::default())),
+            AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
+        );
+
+        // Create a clock and pass it to the component as the UTC clock through numbered_handles.
+        let clock = zx::Clock::create(zx::ClockOpts::AUTO_START | zx::ClockOpts::MONOTONIC, None)?;
+        let clock_koid = clock.get_koid().unwrap();
+
+        let (_runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>()?;
+        let mut start_info = hello_world_startinfo(runtime_dir_server);
+        start_info.numbered_handles = Some(vec![fproc::HandleInfo {
+            handle: clock.into_handle(),
+            id: HandleInfo::new(HandleType::ClockUtc, 0).as_raw(),
+        }]);
+
+        // Start the component.
+        let _ = runner
+            .start_component(start_info, &policy_checker)
+            .await
+            .context("failed to start component")?;
+
+        let payload = payload_rx.next().await.unwrap();
+        assert!(payload
+            .handles
+            .iter()
+            .any(|handle_info| handle_info.handle.get_koid().unwrap() == clock_koid));
+
+        Ok(())
     }
 }

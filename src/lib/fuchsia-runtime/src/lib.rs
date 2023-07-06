@@ -226,17 +226,19 @@ impl HandleInfo {
     }
 
     /// Returns the handle type for this handle info struct.
+    #[inline(always)]
     pub fn handle_type(&self) -> HandleType {
         self.htype
     }
 
     /// Returns the argument for this handle info struct.
+    #[inline(always)]
     pub fn arg(&self) -> u16 {
         self.arg
     }
 
     /// Convert the handle info into a raw u32 value for FFI purposes.
-    pub fn as_raw(&self) -> u32 {
+    pub const fn as_raw(&self) -> u32 {
         ((self.htype as u32) & 0xFF) | (self.arg as u32) << 16
     }
 }

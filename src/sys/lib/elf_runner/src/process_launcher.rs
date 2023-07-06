@@ -4,7 +4,9 @@
 
 use {
     crate::vdso_vmo::get_stable_vdso_vmo,
-    fidl_fuchsia_process as fproc,
+    anyhow::Context,
+    fidl_connector::Connect,
+    fidl_fuchsia_process as fproc, fuchsia_async as fasync,
     fuchsia_runtime::{HandleInfo, HandleInfoError},
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::prelude::*,
@@ -288,5 +290,40 @@ impl ProcessLauncher {
 
     fn new_startup_handle(info: fproc::HandleInfo) -> Result<StartupHandle, LauncherError> {
         Ok(StartupHandle { handle: info.handle, info: HandleInfo::try_from(info.id)? })
+    }
+}
+
+pub type Connector = Box<dyn Connect<Proxy = fproc::LauncherProxy> + Send + Sync>;
+
+/// A protocol connector for `fuchsia.process.Launcher` that serves the protocol with the
+/// `ProcessLauncher` implementation.
+pub struct BuiltInConnector {}
+
+impl Connect for BuiltInConnector {
+    type Proxy = fproc::LauncherProxy;
+
+    fn connect(&self) -> Result<Self::Proxy, anyhow::Error> {
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fproc::LauncherMarker>()?;
+        fasync::Task::spawn(async move {
+            let result = ProcessLauncher::serve(stream).await;
+            if let Err(error) = result {
+                warn!(%error, "ProcessLauncher.serve failed");
+            }
+        })
+        .detach();
+        Ok(proxy)
+    }
+}
+
+/// A protocol connector for `fuchsia.process.Launcher` that connects to the protocol from the
+/// process namespace.
+pub struct NamespaceConnector {}
+
+impl Connect for NamespaceConnector {
+    type Proxy = fproc::LauncherProxy;
+
+    fn connect(&self) -> Result<Self::Proxy, anyhow::Error> {
+        fuchsia_component::client::connect_to_protocol::<fproc::LauncherMarker>()
+            .context("failed to connect to external launcher service")
     }
 }
