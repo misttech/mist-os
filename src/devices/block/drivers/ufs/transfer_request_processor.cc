@@ -214,9 +214,10 @@ zx::result<ResponseUpiu> TransferRequestProcessor::SendScsiUpiu(std::unique_ptr<
   if (zx::result<> result = SendCommand(slot, request->GetDataDirection(), response_offset,
                                         response_length, prdt_offset, prdt_length, sync);
       result.is_error()) {
-    ScsiSenseData *sense_data = reinterpret_cast<ScsiSenseData *>(response->GetSenseData());
+    auto *sense_data =
+        reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(response->GetSenseData());
     zxlogf(ERROR, "Failed to send scsi command upiu, response code 0x%x, sense key 0x%x",
-           sense_data->resp_code, sense_data->sense_key);
+           sense_data->response_code(), sense_data->sense_key());
     return result.take_error();
   }
 
@@ -372,13 +373,14 @@ zx::result<> TransferRequestProcessor::GetResponseStatus(TransferRequestDescript
   // TODO(fxbug.dev/124835): Needs refactoring.
   if (transaction_type == UpiuTransactionCodes::kCommand &&
       (descriptor->overall_command_status() != OverallCommandStatus::kSuccess ||
-       status != ScsiCommandSetStatus::kGood ||
+       status != static_cast<uint8_t>(scsi::StatusCode::GOOD) ||
        header_response != UpiuHeaderResponse::kTargetSuccess)) {
     zxlogf(ERROR, "SCSI failure: ocs=0x%x, status=0x%x, header_response=0x%x",
            descriptor->overall_command_status(), status, header_response);
-    ScsiSenseData *sense_data = reinterpret_cast<ScsiSenseData *>(response->GetSenseData());
-    zxlogf(ERROR, "SCSI sense data:sense_key=0x%x, asc=0x%x, ascq=0x%x", sense_data->sense_key,
-           sense_data->asc, sense_data->ascq);
+    auto *sense_data =
+        reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(response->GetSenseData());
+    zxlogf(ERROR, "SCSI sense data:sense_key=0x%x, asc=0x%x, ascq=0x%x", sense_data->sense_key(),
+           sense_data->additional_sense_code, sense_data->additional_sense_code_qualifier);
   } else if (transaction_type == UpiuTransactionCodes::kQueryRequest &&
              (descriptor->overall_command_status() != OverallCommandStatus::kSuccess ||
               header_response != UpiuHeaderResponse::kTargetSuccess)) {

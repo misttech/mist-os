@@ -111,10 +111,10 @@ TEST_F(ScsiCommandTest, RequestSense) {
   auto result = ufs_->QueueScsiCommand(std::move(upiu), kTestLun, paddrs.value(), nullptr);
   ASSERT_EQ(result.status_value(), ZX_OK);
 
-  ScsiSenseData *sense_data = reinterpret_cast<ScsiSenseData *>(mapper.start());
-  ASSERT_EQ(sense_data->resp_code, 0x70);
-  ASSERT_EQ(sense_data->valid, 0);
-  ASSERT_EQ(sense_data->sense_key, 0);
+  auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(mapper.start());
+  ASSERT_EQ(sense_data->response_code(), 0x70);
+  ASSERT_EQ(sense_data->valid(), 0);
+  ASSERT_EQ(sense_data->sense_key(), 0);
 
   pmt.unpin();
 }

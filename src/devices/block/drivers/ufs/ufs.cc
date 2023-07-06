@@ -659,7 +659,7 @@ zx::result<> Ufs::ScanLogicalUnits() {
     zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
     return zx::error(status);
   }
-  auto* sense_data = reinterpret_cast<ScsiSenseData*>(mapper.start());
+  auto* sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader*>(mapper.start());
   std::array<zx_paddr_t, 2> sense_data_paddr = {0};
   if (zx_status_t status =
           bti_.pin(ZX_BTI_PERM_WRITE, *unowned_vmo, 0, kPageSize, sense_data_paddr.data(), 1, &pmt);
@@ -708,7 +708,7 @@ zx::result<> Ufs::ScanLogicalUnits() {
     auto unit_ready_upiu = std::make_unique<ScsiTestUnitReadyUpiu>();
     if (auto result = QueueScsiCommand(std::move(unit_ready_upiu), i, sense_data_paddr, nullptr);
         result.is_error()) {
-      if (sense_data->sense_key == ScsiCommandSenseKey::kUnitAttention) {
+      if (sense_data->sense_key() == static_cast<uint8_t>(scsi::SenseKey::UNIT_ATTENTION)) {
         zxlogf(DEBUG, "Expected Unit Attention error: %s", result.status_string());
       } else {
         zxlogf(ERROR, "Failed to send SCSI command: %s", result.status_string());

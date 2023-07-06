@@ -49,6 +49,7 @@ source_set("shared") {
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+    "//src/devices/block/lib/scsi",
     "//src/devices/lib/dev-operation",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",

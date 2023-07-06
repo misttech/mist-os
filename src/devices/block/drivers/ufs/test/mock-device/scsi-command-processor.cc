@@ -88,19 +88,19 @@ zx_status_t CopyPhysicalRegionToBuffer(
 }  // namespace
 
 void ScsiCommandProcessor::BuildSenseData(ResponseUpiu::Data &response_upiu, uint8_t sense_key) {
-  response_upiu.header.data_segment_length = htobe16(sizeof(ScsiSenseData));
-  response_upiu.sense_data_len = htobe16(sizeof(ScsiSenseData));
-  ScsiSenseData *sense_data = reinterpret_cast<ScsiSenseData *>(response_upiu.sense_data);
-  sense_data->resp_code = 0x70;
-  sense_data->valid = 0;
-  sense_data->sense_key = sense_key;
+  response_upiu.header.data_segment_length = htobe16(sizeof(scsi::FixedFormatSenseDataHeader));
+  response_upiu.sense_data_len = htobe16(sizeof(scsi::FixedFormatSenseDataHeader));
+  auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(response_upiu.sense_data);
+  sense_data->set_response_code(0x70);
+  sense_data->set_valid(0);
+  sense_data->set_sense_key(sense_key);
 }
 
 zx_status_t ScsiCommandProcessor::HandleScsiCommand(
     CommandUpiu::Data &command_upiu, ResponseUpiu::Data &response_upiu,
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
   constexpr uint8_t kIllegalRequest = 0x05;
-  ScsiOpcode opcode = static_cast<ScsiOpcode>(command_upiu.cdb[0]);
+  scsi::Opcode opcode = static_cast<scsi::Opcode>(command_upiu.cdb[0]);
   std::vector<uint8_t> data;
   if (auto it = handlers_.find(opcode); it != handlers_.end()) {
     if (auto result = (it->second)(mock_device_, command_upiu, response_upiu, prdt_upius);
@@ -111,8 +111,8 @@ zx_status_t ScsiCommandProcessor::HandleScsiCommand(
       data = std::move(*result);
     }
   } else {
-    zxlogf(ERROR, "UFS MOCK: scsi command opcode: 0x%x is not supported",
-           static_cast<unsigned int>(opcode));
+    zxlogf(ERROR, "UFS MOCK: scsi command opcode: 0x%hhx is not supported",
+           static_cast<uint8_t>(opcode));
     BuildSenseData(response_upiu, kIllegalRequest);
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -130,10 +130,10 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultRequestSenseHandle
 
   std::vector<uint8_t> data_buffer(request_sense_command->allocation_length());
 
-  ScsiSenseData *sense_data = reinterpret_cast<ScsiSenseData *>(data_buffer.data());
-  sense_data->resp_code = 0x70;
-  sense_data->valid = 0;
-  sense_data->sense_key = 0;
+  auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(data_buffer.data());
+  sense_data->set_response_code(0x70);
+  sense_data->set_valid(0);
+  sense_data->set_sense_key(0);
 
   if (auto status = CopyBufferToPhysicalRegion(mock_device, prdt_upius, data_buffer);
       status != ZX_OK) {
@@ -172,6 +172,7 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultWrite10Handler(
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
   uint8_t lun = command_upiu.header.lun;
   auto write10_command = ScsiCommandUpiu::CopyFrom<ScsiWrite10Upiu>(&command_upiu);
+
   std::vector<uint8_t> data_buffer(write10_command->GetTransferBytes());
 
   if (auto status = CopyPhysicalRegionToBuffer(mock_device, data_buffer, prdt_upius);

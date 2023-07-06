@@ -32,14 +32,48 @@ enum class Opcode : uint8_t {
   READ_10 = 0x28,
   WRITE_10 = 0x2A,
   SYNCHRONIZE_CACHE_10 = 0x35,
+  WRITE_BUFFER = 0x3B,
+  UNMAP = 0x42,
   MODE_SELECT_10 = 0x55,
   MODE_SENSE_10 = 0x5A,
   READ_16 = 0x88,
   WRITE_16 = 0x8A,
   READ_CAPACITY_16 = 0x9E,
   REPORT_LUNS = 0xA0,
+  SECURITY_PROTOCOL_IN = 0xA2,
   READ_12 = 0xA8,
   WRITE_12 = 0xAA,
+  SECURITY_PROTOCOL_OUT = 0xB5,
+};
+
+enum class StatusCode : uint8_t {
+  GOOD = 0x00,
+  CHECK_CONDITION = 0x02,
+  CONDITION_MET = 0x04,
+  BUSY = 0x08,
+  RESERVATION_CONFILCT = 0x18,
+  TASK_SET_FULL = 0x28,
+  ACA_ACTIVE = 0x30,
+  TASK_ABORTED = 0x40,
+};
+
+enum class SenseKey : uint8_t {
+  NO_SENSE = 0x00,
+  RECOVERED_ERROR = 0x01,
+  NOT_READY = 0x02,
+  MEDIUM_ERROR = 0x03,
+  HARDWARE_ERROR = 0x04,
+  ILLEGAL_REQUEST = 0x05,
+  UNIT_ATTENTION = 0x06,
+  DATA_PROTECT = 0x07,
+  BLANK_CHECK = 0x08,
+  VENDOR_SPECIFIC = 0x09,
+  COPY_ABORTED = 0x0A,
+  ABORTED_COMMAND = 0x0B,
+  RESERVED_1 = 0x0C,
+  VOLUME_OVERFLOW = 0x0D,
+  MISCOMPARE = 0x0E,
+  RESERVED_2 = 0x0F,
 };
 
 // SCSI command structures (CDBs)
@@ -135,6 +169,38 @@ struct SenseDataHeader {
 } __PACKED;
 
 static_assert(sizeof(SenseDataHeader) == 8, "Sense data header must be 8 bytes");
+
+struct FixedFormatSenseDataHeader {
+  // valid_resp_code (7) is 'valid'
+  // valid_resp_code (6 downto 0) is 'response code'
+  uint8_t valid_resp_code;
+  uint8_t obsolete;
+  // mark_sense_key (7) is 'filemark'
+  // mark_sense_key (6) is 'EOM (End-of-Medium)'
+  // mark_sense_key (5) is 'ILI (Incorrect length indicator)'
+  // mark_sense_key (3 downto 0) is 'sense key'
+  uint8_t mark_sense_key;
+  uint32_t information;
+  uint8_t additional_sense_length;
+  uint32_t command_specific_information;
+  uint8_t additional_sense_code;
+  uint8_t additional_sense_code_qualifier;
+  uint8_t field_replaceable_unit_code;
+  // sense_key_specific[0] (7) is 'SKSV (Sense-key Specific Valid)'
+  uint8_t sense_key_specific[3];
+
+  DEF_SUBBIT(valid_resp_code, 7, valid);
+  DEF_SUBFIELD(valid_resp_code, 6, 0, response_code);
+  DEF_SUBBIT(mark_sense_key, 7, filemark);
+  DEF_SUBBIT(mark_sense_key, 6, eom);
+  DEF_SUBBIT(mark_sense_key, 5, ili);
+  DEF_SUBFIELD(mark_sense_key, 3, 0, sense_key);
+  DEF_SUBBIT(sense_key_specific[0], 7, sksv);
+  // Additional sense byte follow after 18 bytes.
+} __PACKED;
+
+static_assert(sizeof(FixedFormatSenseDataHeader) == 18,
+              "Fixed format Sense data header must be 18 bytes");
 
 struct ModeSense6CDB {
   static constexpr uint8_t kCachingPageCode = 0x08;
@@ -253,17 +319,23 @@ static_assert(sizeof(ReportLunsParameterDataHeader) == 16, "Report LUNs Header m
 
 struct Read10CDB {
   Opcode opcode;
+  // dpo_fua(7 downto 5) - Read protect
   // dpo_fua(4) - DPO - Disable Page Out
   // dpo_fua(3) - FUA - Force Unit Access
+  // dpo_fua(1) - FUA_NV - If NV_SUP is 1, prefer read from nonvolatile cache.
   uint8_t dpo_fua;
   // Network byte order
   uint32_t logical_block_address;
-  uint8_t group_number;
+  // group_num (4 downto 0) is 'group_number'
+  uint8_t group_num;
   uint16_t transfer_length;
   uint8_t control;
 
+  DEF_SUBFIELD(dpo_fua, 7, 5, rd_protect);
   DEF_SUBBIT(dpo_fua, 4, disable_page_out);
   DEF_SUBBIT(dpo_fua, 3, force_unit_access);
+  DEF_SUBBIT(dpo_fua, 1, force_unit_access_nv_cache);
+  DEF_SUBFIELD(group_num, 4, 0, group_number);
 } __PACKED;
 
 static_assert(sizeof(Read10CDB) == 10, "Read 10 CDB must be 10 bytes");
@@ -272,15 +344,19 @@ struct Read12CDB {
   Opcode opcode;
   // dpo_fua(4) - DPO - Disable Page Out
   // dpo_fua(3) - FUA - Force Unit Access
+  // dpo_fua(1) - FUA_NV - If NV_SUP is 1, prefer read from nonvolatile cache.
   uint8_t dpo_fua;
   // Network byte order
   uint32_t logical_block_address;
   uint32_t transfer_length;
-  uint8_t group_number;
+  // group_num (4 downto 0) is 'group_number'
+  uint8_t group_num;
   uint8_t control;
 
   DEF_SUBBIT(dpo_fua, 4, disable_page_out);
   DEF_SUBBIT(dpo_fua, 3, force_unit_access);
+  DEF_SUBBIT(dpo_fua, 1, force_unit_access_nv_cache);
+  DEF_SUBFIELD(group_num, 4, 0, group_number);
 } __PACKED;
 
 static_assert(sizeof(Read12CDB) == 12, "Read 12 CDB must be 12 bytes");
@@ -289,33 +365,42 @@ struct Read16CDB {
   Opcode opcode;
   // dpo_fua(4) - DPO - Disable Page Out
   // dpo_fua(3) - FUA - Force Unit Access
+  // dpo_fua(1) - FUA_NV - If NV_SUP is 1, prefer read from nonvolatile cache.
   uint8_t dpo_fua;
   // Network byte order
   uint64_t logical_block_address;
   uint32_t transfer_length;
-  uint8_t group_number;
+  // group_num (4 downto 0) is 'group_number'
+  uint8_t group_num;
   uint8_t control;
 
   DEF_SUBBIT(dpo_fua, 4, disable_page_out);
   DEF_SUBBIT(dpo_fua, 3, force_unit_access);
+  DEF_SUBBIT(dpo_fua, 1, force_unit_access_nv_cache);
+  DEF_SUBFIELD(group_num, 4, 0, group_number);
 } __PACKED;
 
 static_assert(sizeof(Read16CDB) == 16, "Read 16 CDB must be 16 bytes");
 
 struct Write10CDB {
   Opcode opcode;
+  // dpo_fua(7 downto 5) - Write protect
   // dpo_fua(4) - DPO - Disable Page Out
   // dpo_fua(3) - FUA - Write to medium
   // dpo_fua(1) - FUA_NV - If NV_SUP is 1, prefer write to nonvolatile cache.
   uint8_t dpo_fua;
   // Network byte order
   uint32_t logical_block_address;
-  uint8_t group_number;
+  // group_num (4 downto 0) is 'group_number'
+  uint8_t group_num;
   uint16_t transfer_length;
   uint8_t control;
 
+  DEF_SUBFIELD(dpo_fua, 7, 5, wr_protect);
   DEF_SUBBIT(dpo_fua, 4, disable_page_out);
   DEF_SUBBIT(dpo_fua, 3, force_unit_access);
+  DEF_SUBBIT(dpo_fua, 1, force_unit_access_nv_cache);
+  DEF_SUBFIELD(group_num, 4, 0, group_number);
 } __PACKED;
 
 static_assert(sizeof(Write10CDB) == 10, "Write 10 CDB must be 10 bytes");
@@ -329,11 +414,14 @@ struct Write12CDB {
   // Network byte order
   uint32_t logical_block_address;
   uint32_t transfer_length;
-  uint8_t group_number;
+  // group_num (4 downto 0) is 'group_number'
+  uint8_t group_num;
   uint8_t control;
 
   DEF_SUBBIT(dpo_fua, 4, disable_page_out);
   DEF_SUBBIT(dpo_fua, 3, force_unit_access);
+  DEF_SUBBIT(dpo_fua, 1, force_unit_access_nv_cache);
+  DEF_SUBFIELD(group_num, 4, 0, group_number);
 } __PACKED;
 
 static_assert(sizeof(Write12CDB) == 12, "Write 12 CDB must be 12 bytes");
@@ -347,11 +435,14 @@ struct Write16CDB {
   // Network byte order
   uint64_t logical_block_address;
   uint32_t transfer_length;
-  uint8_t group_number;
+  // group_num (4 downto 0) is 'group_number'
+  uint8_t group_num;
   uint8_t control;
 
   DEF_SUBBIT(dpo_fua, 4, disable_page_out);
   DEF_SUBBIT(dpo_fua, 3, force_unit_access);
+  DEF_SUBBIT(dpo_fua, 1, force_unit_access_nv_cache);
+  DEF_SUBFIELD(group_num, 4, 0, group_number);
 } __PACKED;
 
 static_assert(sizeof(Write16CDB) == 16, "Write 16 CDB must be 16 bytes");
@@ -363,12 +454,120 @@ struct SynchronizeCache10CDB {
   //                           validated.
   uint8_t syncnv_immed;
   uint32_t logical_block_address;
-  uint8_t group_number;
+  // group_num(4 downto 0) is 'group number'
+  uint8_t group_num;
   uint16_t num_blocks;
   uint8_t control;
+
+  DEF_SUBBIT(syncnv_immed, 2, sync_nv);
+  DEF_SUBBIT(syncnv_immed, 1, immed);
+  DEF_SUBFIELD(group_num, 4, 0, group_number);
 } __PACKED;
 
 static_assert(sizeof(SynchronizeCache10CDB) == 10, "Synchronize Cache 10 CDB must be 10 bytes");
+
+struct StartStopCDB {
+  Opcode opcode;
+  // imm(0) is IMMED
+  uint8_t imm;
+  uint8_t reserved;
+  // power_cond_modifier(3 downto 0) is 'power condition modifier'
+  uint8_t power_cond_modifier;
+  // power_cond(7 downto 4) is 'power conditions'
+  // power_cond(2) is 'no flush'
+  // power_cond(1) is 'loej (load eject)'
+  // power_cond(0) is 'start'
+  uint8_t power_cond;
+  uint8_t control;
+
+  DEF_SUBBIT(imm, 0, immed);
+  DEF_SUBFIELD(power_cond_modifier, 3, 0, power_condition_modifier);
+  DEF_SUBFIELD(power_cond, 7, 4, power_conditions);
+  DEF_SUBBIT(power_cond, 2, no_flush);
+  DEF_SUBBIT(power_cond, 1, loej);
+  DEF_SUBBIT(power_cond, 0, start);
+} __PACKED;
+
+static_assert(sizeof(StartStopCDB) == 6, "Start Stop CDB must be 6 bytes");
+
+struct SecurityProtocolInCDB {
+  Opcode opcode;
+  uint8_t security_protocol;
+  uint16_t security_protocol_specific;
+  // inc (7) is 'inc 512'
+  uint8_t inc;
+  uint8_t reserved;
+  uint32_t allocation_length;
+  uint8_t reserved2;
+  uint8_t control;
+
+  DEF_SUBBIT(inc, 7, inc_512);
+} __PACKED;
+
+static_assert(sizeof(SecurityProtocolInCDB) == 12, "Security Protocol In CDB must be 12 bytes");
+
+struct SecurityProtocolOutCDB {
+  Opcode opcode;
+  uint8_t security_protocol;
+  uint16_t security_protocol_specific;
+  // inc (7) is 'inc 512'
+  uint8_t inc;
+  uint8_t reserved;
+  uint32_t transfer_length;
+  uint8_t reserved2;
+  uint8_t control;
+
+  DEF_SUBBIT(inc, 7, inc_512);
+} __PACKED;
+
+static_assert(sizeof(SecurityProtocolOutCDB) == 12, "Security Protocol Out CDB must be 12 bytes");
+
+struct UnmapCDB {
+  Opcode opcode;
+  // anch (0) is 'anchor'
+  uint8_t anch;
+  uint32_t reserved;
+  // group_num (4 downto 0) is 'group_number'
+  uint8_t group_num;
+  uint16_t parameter_list_length;
+  uint8_t control;
+
+  DEF_SUBBIT(anch, 0, anchor);
+  DEF_SUBFIELD(group_num, 4, 0, group_number);
+} __PACKED;
+
+static_assert(sizeof(UnmapCDB) == 10, "Unmap CDB must be 10 bytes");
+
+struct UnmapParameterListHeader {
+  uint16_t data_length;
+  uint16_t block_descriptor_data_length;
+  uint8_t reserved[4];
+  // Unmap block descriptors follow after 8 bytes.
+} __PACKED;
+
+static_assert(sizeof(UnmapParameterListHeader) == 8, "Unmap parameter list header must be 8 bytes");
+
+struct UnmapBlockDescriptor {
+  uint64_t logical_block_address;
+  uint32_t blocks;
+  uint8_t reserved[4];
+} __PACKED;
+
+static_assert(sizeof(UnmapBlockDescriptor) == 16, "Unmap block decriptor must be 16 bytes");
+
+struct WriteBufferCDB {
+  Opcode opcode;
+  // mod (4 downto 0) is 'mode'
+  uint8_t mod;
+  uint8_t buffer_id;
+  uint8_t buffer_offset[3];
+  uint8_t parameter_list_length[3];
+  uint8_t control;
+
+  DEF_SUBFIELD(mod, 4, 0, mode);
+} __PACKED;
+
+static_assert(sizeof(WriteBufferCDB) == 10, "Write Buffer CDB must be 10 bytes");
 
 struct DiskOp;
 

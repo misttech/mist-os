@@ -348,7 +348,7 @@ TEST_F(RequestProcessorTest, SendScsiUpiu) {
 
   // Check response
   ASSERT_EQ(response->GetHeader().trans_code(), UpiuTransactionCodes::kResponse);
-  ASSERT_EQ(response->GetHeader().status, ScsiCommandSetStatus::kGood);
+  ASSERT_EQ(response->GetHeader().status, static_cast<uint8_t>(scsi::StatusCode::GOOD));
   ASSERT_EQ(response->GetHeader().response, UpiuHeaderResponse::kTargetSuccess);
 }
 
