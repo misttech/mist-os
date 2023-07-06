@@ -38,24 +38,27 @@ zx_status_t SdmmcRootDevice::Bind(void* ctx, zx_device_t* parent) {
 }
 
 // TODO(hanbinyoon): Simplify further using templated lambda come C++20.
+// Returns true if device was successfully added. Returns false if the probe failed (i.e., no
+// eligible device present).
 template <class DeviceType>
-static zx_status_t MaybeAddDevice(const std::string& name, zx_device_t* zxdev, SdmmcDevice& sdmmc) {
+static zx::result<bool> MaybeAddDevice(const std::string& name, zx_device_t* zxdev,
+                                       SdmmcDevice& sdmmc) {
   std::unique_ptr<DeviceType> device;
   if (zx_status_t st = DeviceType::Create(zxdev, sdmmc, &device) != ZX_OK) {
     zxlogf(ERROR, "Failed to create %s device, retcode = %d", name.c_str(), st);
-    return st;
+    return zx::error(st);
   }
 
   if (zx_status_t st = device->Probe(); st != ZX_OK) {
-    return ZX_ERR_WRONG_TYPE;  // Use this to mean probe failure.
+    return zx::ok(false);
   }
 
   if (zx_status_t st = device->AddDevice(); st != ZX_OK) {
-    return st;
+    return zx::error(st);
   }
 
   [[maybe_unused]] auto* placeholder = device.release();
-  return ZX_OK;
+  return zx::ok(true);
 }
 
 void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
@@ -81,15 +84,21 @@ void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
   }
 
   // Probe for SDIO first, then SD/MMC.
-  if ((st = MaybeAddDevice<SdioControllerDevice>("sdio", zxdev(), sdmmc)) != ZX_ERR_WRONG_TYPE) {
-    return txn.Reply(st);
+  zx::result<bool> result = MaybeAddDevice<SdioControllerDevice>("sdio", zxdev(), sdmmc);
+  if (result.is_error()) {
+    return txn.Reply(result.status_value());
+  } else if (*result) {
+    return txn.Reply(ZX_OK);
   }
-  if ((st = MaybeAddDevice<SdmmcBlockDevice>("block", zxdev(), sdmmc)) == ZX_OK) {
+  result = MaybeAddDevice<SdmmcBlockDevice>("block", zxdev(), sdmmc);
+  if (result.is_error()) {
+    return txn.Reply(result.status_value());
+  } else if (*result) {
     return txn.Reply(ZX_OK);
   }
 
-  zxlogf(ERROR, "failed to probe");
-  return txn.Reply(st);
+  zxlogf(INFO, "failed to probe (no eligible device present)");
+  return txn.Reply(ZX_OK);
 }
 
 void SdmmcRootDevice::DdkRelease() { delete this; }
