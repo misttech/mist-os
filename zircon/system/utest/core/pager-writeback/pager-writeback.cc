@@ -7503,6 +7503,12 @@ TEST(PagerWriteback, InvalidPagerOpRange) {
   // ZX_PAGER_OP_WRITEBACK_END: invalid data
   ASSERT_EQ(ZX_ERR_INVALID_ARGS,
             zx_pager_op_range(pager.get(), ZX_PAGER_OP_WRITEBACK_END, vmo.get(), 0, 0, 100));
+
+  // missing pager rights
+  ASSERT_OK(pager.replace(ZX_DEFAULT_PAGER_RIGHTS & ~ZX_RIGHT_MANAGE_VMO, &pager));
+  for (uint32_t i = 0; i < kNumValidOpCodes; i++) {
+    ASSERT_EQ(ZX_ERR_ACCESS_DENIED, zx_pager_op_range(pager.get(), opcodes[i], vmo.get(), 0, 0, 0));
+  }
 }
 
 // Tests API violations for zx_pager_query_vmo_stats and zx_pager_query_dirty_ranges.
@@ -7581,6 +7587,12 @@ TEST(PagerWriteback, InvalidQuery) {
                                         nullptr, sizeof(zx_vmo_dirty_range_t), nullptr, nullptr));
   ASSERT_EQ(ZX_ERR_INVALID_ARGS,
             zx_pager_query_vmo_stats(pager.get(), vmo.get(), 0, nullptr, sizeof(stats)));
+
+  // missing pager rights
+  ASSERT_OK(pager.replace(ZX_DEFAULT_PAGER_RIGHTS & ~ZX_RIGHT_MANAGE_VMO, &pager));
+  ASSERT_EQ(ZX_ERR_ACCESS_DENIED, zx_pager_query_dirty_ranges(pager.get(), vmo.get(), 0, 0, nullptr,
+                                                              0, nullptr, nullptr));
+  ASSERT_EQ(ZX_ERR_ACCESS_DENIED, zx_pager_query_vmo_stats(pager.get(), vmo.get(), 0, nullptr, 0));
 }
 
 }  // namespace pager_tests

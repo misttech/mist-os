@@ -1598,6 +1598,11 @@ TEST(Pager, InvalidPagerCreateVmo) {
   const uint64_t kBadSize = fbl::round_down(UINT64_MAX, zx_system_get_page_size()) + 1;
   ASSERT_EQ(zx_pager_create_vmo(pager.get(), 0, port.get(), 0, kBadSize, &vmo),
             ZX_ERR_OUT_OF_RANGE);
+
+  // missing pager rights
+  ASSERT_OK(pager.replace(ZX_DEFAULT_PAGER_RIGHTS & ~ZX_RIGHT_ATTACH_VMO, &pager));
+  ASSERT_EQ(zx_pager_create_vmo(pager.get(), 0, port.get(), 0, zx_system_get_page_size(), &vmo),
+            ZX_ERR_ACCESS_DENIED);
 }
 
 // Tests API violations for pager_detach_vmo.
@@ -1635,6 +1640,15 @@ TEST(Pager, InvalidPagerDetachVmo) {
   zx::pager pager2;
   ASSERT_EQ(zx::pager::create(0, &pager2), ZX_OK);
   ASSERT_EQ(zx_pager_detach_vmo(pager2.get(), vmo.get()), ZX_ERR_INVALID_ARGS);
+
+  // missing pager rights
+  ASSERT_OK(pager.replace(ZX_DEFAULT_PAGER_RIGHTS & ~ZX_RIGHT_ATTACH_VMO, &pager));
+  ASSERT_EQ(zx_pager_detach_vmo(pager.get(), vmo.get()), ZX_ERR_ACCESS_DENIED);
+
+  ASSERT_OK(zx_pager_create_vmo(pager2.get(), 0, port.get(), 0, zx_system_get_page_size(),
+                                vmo.reset_and_get_address()));
+  ASSERT_OK(pager2.replace(ZX_DEFAULT_PAGER_RIGHTS & ~ZX_RIGHT_MANAGE_VMO, &pager2));
+  ASSERT_EQ(zx_pager_detach_vmo(pager2.get(), vmo.get()), ZX_ERR_ACCESS_DENIED);
 }
 
 // Tests API violations for supply_pages.
@@ -1792,6 +1806,12 @@ TEST(Pager, InvalidPagerSupplyPages) {
   ASSERT_EQ(zx_pager_supply_pages(pager.get(), vmo.get(), 0, zx_system_get_page_size(),
                                   aux_vmo.get(), zx_system_get_page_size()),
             ZX_ERR_OUT_OF_RANGE);
+
+  // missing pager rights
+  ASSERT_OK(pager.replace(ZX_DEFAULT_PAGER_RIGHTS & ~ZX_RIGHT_MANAGE_VMO, &pager));
+  ASSERT_EQ(
+      zx_pager_supply_pages(pager.get(), vmo.get(), 0, zx_system_get_page_size(), aux_vmo.get(), 0),
+      ZX_ERR_ACCESS_DENIED);
 }
 
 // Tests that supply_pages works when the source is mapped.
