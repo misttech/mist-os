@@ -30,7 +30,10 @@
             to: "#reverser",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
             from: "parent",
             to: [
                 "#fizzbuzz",

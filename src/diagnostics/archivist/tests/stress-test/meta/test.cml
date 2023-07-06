@@ -16,6 +16,7 @@
 {
     include: [
         "//src/sys/test_runners/stress_test/default.shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/use.shard.cml",
     ],
     program: {
