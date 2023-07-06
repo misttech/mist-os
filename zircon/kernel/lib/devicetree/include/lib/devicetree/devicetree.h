@@ -13,6 +13,7 @@
 #include <zircon/types.h>
 
 #include <cstdint>
+#include <iterator>
 #include <optional>
 #include <string_view>
 #include <type_traits>
@@ -143,13 +144,90 @@ struct Node : public std::string_view,
   }
 };
 
+// Forward-declared; defined below.
+struct ResolvedPath;
+
 // Represents a rooted path of nodes in a devicetree.
 // This can be used interchangeably with `const std::list<std::string_view>`
 // to iterate over the elements in a path with implied `/` separators.
-using NodePath = fbl::DoublyLinkedList<Node*, fbl::DefaultObjectTag, fbl::SizeOrder::Constant>;
+struct NodePath
+    : public fbl::DoublyLinkedList<Node*, fbl::DefaultObjectTag, fbl::SizeOrder::Constant> {
+  // The result of a path comparison between this NodePath and another type
+  // encoding a node path.
+  enum class Comparison {
+    // This node is equal to another.
+    kEqual,
+
+    // This node is the parent of another.
+    kParent,
+
+    // This node is the indirect ancestor of another.
+    kIndirectAncestor,
+
+    // This node is the child of another.
+    kChild,
+
+    // This node is the indirect descendent of another.
+    kIndirectDescendent,
+
+    // This node does not share a lineage with another node.
+    kMismatch,
+  };
+
+  //
+  // Comparisons with a `std::string_view`-encoded node path.
+  //
+
+  bool operator==(std::string_view path) const { return CompareWith(path) == Comparison::kEqual; }
+
+  bool IsParentOf(std::string_view path) const { return CompareWith(path) == Comparison::kParent; }
+
+  bool IsAncestorOf(std::string_view path) const {
+    Comparison result = CompareWith(path);
+    return result == Comparison::kParent || result == Comparison::kIndirectAncestor;
+  }
+
+  bool IsChildOf(std::string_view path) const { return CompareWith(path) == Comparison::kChild; }
+
+  bool IsDescendentOf(std::string_view path) const {
+    Comparison result = CompareWith(path);
+    return result == Comparison::kChild || result == Comparison::kIndirectDescendent;
+  }
+
+  Comparison CompareWith(std::string_view path) const;
+
+  //
+  // Comparisons with a `ResolvedPath`-encoded node path.
+  //
+
+  bool operator==(const ResolvedPath& path) const {
+    return CompareWith(path) == Comparison::kEqual;
+  }
+
+  bool IsParentOf(const ResolvedPath& path) const {
+    return CompareWith(path) == Comparison::kParent;
+  }
+
+  bool IsAncestorOf(const ResolvedPath& path) const {
+    Comparison result = CompareWith(path);
+    return result == Comparison::kParent || result == Comparison::kIndirectAncestor;
+  }
+
+  bool IsChildOf(const ResolvedPath& path) const { return CompareWith(path) == Comparison::kChild; }
+
+  bool IsDescendentOf(const ResolvedPath& path) const {
+    Comparison result = CompareWith(path);
+    return result == Comparison::kChild || result == Comparison::kIndirectDescendent;
+  }
+
+  Comparison CompareWith(const ResolvedPath& path) const;
+};
 
 // Some property values encode a list of NUL-terminated strings.
 // This is also useful for separating path strings at '/' characters.
+//
+// By convention, if the last character in a string is a separator, then there
+// is no element regarded as following it.
 template <char Separator = '\0'>
 class StringList {
  public:
@@ -165,12 +243,9 @@ class StringList {
     constexpr bool operator!=(const iterator& other) const { return !(*this == other); }
 
     constexpr iterator& operator++() {  // prefix
-      if (len_ == std::string_view::npos) {
-        // This was the last word.
-        rest_ = {};
-      } else if (rest_.empty()) {
-        // This was the last word and it was empty.
-        len_ = std::string_view::npos;
+      if (len_ == std::string_view::npos || len_ == rest_.size() - 1) {
+        // We're at the end.
+        *this = {};
       } else {
         // Move to the next word.  If it's empty, record len_ = 0.
         // Otherwise len_ = npos if it's the last word and not empty.

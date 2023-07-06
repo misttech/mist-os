@@ -8,7 +8,6 @@
 #include <lib/boot-shim/item-base.h>
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
-#include <lib/devicetree/path.h>
 #include <lib/devicetree/testing/loaded-dtb.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/span.h>
@@ -43,11 +42,12 @@ class FakeMatcher : public boot_shim::DevicetreeItemBase<FakeMatcher, 2> {
                  ? devicetree::ScanState::kDoneWithSubtree
                  : devicetree::ScanState::kNeedsPathResolution;
     }
-    switch (devicetree::ComparePath(path, *resolved_path)) {
-      case devicetree::CompareResult::kIsAncestor:
+    switch (path.CompareWith(*resolved_path)) {
+      case devicetree::NodePath::Comparison::kParent:
+      case devicetree::NodePath::Comparison::kIndirectAncestor:
         return devicetree::ScanState::kActive;
 
-      case devicetree::CompareResult::kIsMatch: {
+      case devicetree::NodePath::Comparison::kEqual: {
         count_++;
         if (count_ == max_count_) {
           value_ = cmdline_name_ + std::to_string(count_);
@@ -58,8 +58,9 @@ class FakeMatcher : public boot_shim::DevicetreeItemBase<FakeMatcher, 2> {
         return devicetree::ScanState::kDoneWithSubtree;
       }
 
-      case devicetree::CompareResult::kIsDescendant:
-      case devicetree::CompareResult::kIsMismatch:
+      case devicetree::NodePath::Comparison::kChild:
+      case devicetree::NodePath::Comparison::kIndirectDescendent:
+      case devicetree::NodePath::Comparison::kMismatch:
         return devicetree::ScanState::kDoneWithSubtree;
     }
   }

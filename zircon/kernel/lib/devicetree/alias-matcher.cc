@@ -6,7 +6,6 @@
 
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
-#include <lib/devicetree/path.h>
 #include <stdio.h>
 #include <zircon/compiler.h>
 
@@ -20,13 +19,15 @@ constexpr std::string_view kAliasNode = "/aliases";
 }
 
 ScanState AliasMatcher::OnNode(const NodePath& path, const PropertyDecoder& decoder) {
-  switch (ComparePath(path, kAliasNode)) {
-    case CompareResult::kIsAncestor:
+  switch (path.CompareWith(kAliasNode)) {
+    case NodePath::Comparison::kParent:
+    case NodePath::Comparison::kIndirectAncestor:
       return ScanState::kActive;
-    case CompareResult::kIsMatch:
+    case NodePath::Comparison::kEqual:
       return ScanState::kDone;
-    case CompareResult::kIsMismatch:
-    case CompareResult::kIsDescendant:
+    case NodePath::Comparison::kMismatch:
+    case NodePath::Comparison::kChild:
+    case NodePath::Comparison::kIndirectDescendent:
       return ScanState::kDoneWithSubtree;
   }
   __UNREACHABLE;

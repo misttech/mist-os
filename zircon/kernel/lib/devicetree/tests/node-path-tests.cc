@@ -5,7 +5,6 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/devicetree/devicetree.h>
-#include <lib/devicetree/path.h>
 #include <lib/stdcompat/span.h>
 
 #include <array>
@@ -16,6 +15,8 @@
 #include <zxtest/zxtest.h>
 
 namespace {
+
+using Comparison = devicetree::NodePath::Comparison;
 
 auto as_bytes = [](auto& val) {
   using byte_type = std::conditional_t<std::is_const_v<std::remove_reference_t<decltype(val)>>,
@@ -70,8 +71,9 @@ struct AliasContext {
 };
 
 std::vector<std::string_view> ConvertPath(std::string_view path) {
-  std::vector<std::string_view> components;
+  ZX_ASSERT(!path.empty());
 
+  std::vector<std::string_view> components;
   while (!path.empty()) {
     size_t component_end = path.find('/');
     components.push_back(path.substr(0, component_end));
@@ -82,73 +84,6 @@ std::vector<std::string_view> ConvertPath(std::string_view path) {
     }
   }
   return components;
-}
-
-TEST(CompareRangesOfNodesInternalTest, PerfectMatch) {
-  auto path_a = ConvertPath("/this/is/my/path");
-  auto path_b = ConvertPath("/this/is/my/path");
-
-  auto [it_1, it_2] = devicetree::internal::CompareRangesOfNodes(path_a.begin(), path_a.end(),
-                                                                 path_b.begin(), path_b.end());
-  EXPECT_EQ(it_1, path_a.end());
-  EXPECT_EQ(it_2, path_b.end());
-}
-
-TEST(CompareRangesOfNodesInternalTest, PathBIsContainedInPathA) {
-  auto path_a = ConvertPath("/this/is/my/path/way/longer/than/b");
-  auto path_b = ConvertPath("/this/is/my/path");
-
-  auto [it_1, it_2] = devicetree::internal::CompareRangesOfNodes(path_a.begin(), path_a.end(),
-                                                                 path_b.begin(), path_b.end());
-  ASSERT_NE(it_1, path_a.end());
-  EXPECT_EQ(*it_1, "way");
-  EXPECT_EQ(it_2, path_b.end());
-}
-
-TEST(CompareRangesOfNodesInternalTest, PathAIsContainedInPathB) {
-  auto path_a = ConvertPath("/this/is/my/path");
-  auto path_b = ConvertPath("/this/is/my/path/way/longer/than/b");
-
-  auto [it_1, it_2] = devicetree::internal::CompareRangesOfNodes(path_a.begin(), path_a.end(),
-                                                                 path_b.begin(), path_b.end());
-  EXPECT_EQ(it_1, path_a.end());
-  ASSERT_NE(it_2, path_b.end());
-  EXPECT_EQ(*it_2, "way");
-}
-
-TEST(CompareRangesOfNodesInternalTest, PathAandBDoNotMatch) {
-  auto path = ConvertPath("/this/is/my/path");
-  auto path_2 = ConvertPath("/this/is/my/other/path");
-
-  auto [it_1, it_2] = devicetree::internal::CompareRangesOfNodes(path.begin(), path.end(),
-                                                                 path_2.begin(), path_2.end());
-  ASSERT_NE(it_1, path.end());
-  ASSERT_NE(it_2, path_2.end());
-
-  EXPECT_EQ(*it_1, "path");
-  EXPECT_EQ(*it_2, "other");
-}
-
-TEST(CompareRangesOfNodesInternalTest, WithAddressAndNoWildcardMatch) {
-  auto path = ConvertPath("/this/is/my@10/path");
-  auto path_2 = ConvertPath("/this/is/my@10/path");
-
-  auto [it_1, it_2] = devicetree::internal::CompareRangesOfNodes(path.begin(), path.end(),
-                                                                 path_2.begin(), path_2.end());
-  ASSERT_EQ(it_1, path.end());
-  ASSERT_EQ(it_2, path_2.end());
-}
-
-TEST(CompareRangesOfNodesInternalTest, WithAddressAndNoWildcardDoesntMatch) {
-  auto path = ConvertPath("/this/is/my@11/path");
-  auto path_2 = ConvertPath("/this/is/my@10/path");
-
-  auto [it_1, it_2] = devicetree::internal::CompareRangesOfNodes(path.begin(), path.end(),
-                                                                 path_2.begin(), path_2.end());
-  ASSERT_NE(it_1, path.end());
-  ASSERT_NE(it_2, path_2.end());
-  EXPECT_EQ(*it_1, "my@11");
-  EXPECT_EQ(*it_2, "my@10");
 }
 
 struct NodePathHelper {
@@ -185,64 +120,135 @@ auto ToResolvedPath(std::string_view path,
   return resolved.value();
 }
 
-TEST(ComparePathTest, AbsolutePathMismatchSameLength) {
+TEST(NodePathTest, AbsolutePathMismatchSameLength) {
   {
     auto [nodes, node_path] = ConvertToNodePath("/A/B/C/D");
-    auto target_path = ToResolvedPath("/A/B/E/D");
+    std::string_view target_path = "/A/B/E/D";
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsMismatch);
-    EXPECT_EQ(ComparePath(node_path, "/A/B/E/D"), devicetree::CompareResult::kIsMismatch);
+    EXPECT_NE(target_path, node_path);
+    EXPECT_FALSE(node_path.IsAncestorOf(target_path));
+    EXPECT_FALSE(node_path.IsDescendentOf(target_path));
+    EXPECT_EQ(Comparison::kMismatch, node_path.CompareWith(target_path));
   }
   {
     auto [nodes, node_path] = ConvertToNodePath("/A/B");
-    auto target_path = ToResolvedPath("/A/C/E/D");
+    std::string_view target_path = "/A/C/E/D";
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsMismatch);
-    EXPECT_EQ(ComparePath(node_path, "/A/C/E/D"), devicetree::CompareResult::kIsMismatch);
+    EXPECT_NE(target_path, node_path);
+    EXPECT_FALSE(node_path.IsAncestorOf(target_path));
+    EXPECT_FALSE(node_path.IsDescendentOf(target_path));
+    EXPECT_EQ(Comparison::kMismatch, node_path.CompareWith(target_path));
   }
   {
     auto [nodes, node_path] = ConvertToNodePath("/A/C/E/D");
-    auto target_path = ToResolvedPath("/A/B");
+    std::string_view target_path = "/A/B";
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsMismatch);
-    EXPECT_EQ(ComparePath(node_path, "/A/B"), devicetree::CompareResult::kIsMismatch);
+    EXPECT_NE(target_path, node_path);
+    EXPECT_FALSE(node_path.IsAncestorOf(target_path));
+    EXPECT_FALSE(node_path.IsDescendentOf(target_path));
+    EXPECT_EQ(Comparison::kMismatch, node_path.CompareWith(target_path));
   }
 }
 
-TEST(ComparePathTest, AbsolutePathMatch) {
+TEST(NodePathTest, AbsolutePathMatch) {
   auto [nodes, node_path] = ConvertToNodePath("/A/B/C/D");
-  auto target_path = ToResolvedPath("/A/B/C/D");
+  std::string_view target_path = "/A/B/C/D";
 
-  EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsMatch);
+  EXPECT_EQ(target_path, node_path);
+  EXPECT_FALSE(node_path.IsAncestorOf(target_path));
+  EXPECT_FALSE(node_path.IsDescendentOf(target_path));
+  EXPECT_EQ(Comparison::kEqual, node_path.CompareWith(target_path));
 }
 
-TEST(ComparePathTest, AbsolutePathAncestor) {
+TEST(NodePathTest, AbsolutePathAncestor) {
+  {
+    auto [nodes, node_path] = ConvertToNodePath("/");
+    std::string_view target_path = "/A/B/C/D";
+
+    EXPECT_TRUE(node_path.IsAncestorOf(target_path));
+    EXPECT_FALSE(node_path.IsParentOf(target_path));
+    EXPECT_EQ(Comparison::kIndirectAncestor, node_path.CompareWith(target_path));
+
+    EXPECT_NE(target_path, node_path);
+    EXPECT_FALSE(node_path.IsDescendentOf(target_path));
+  }
   {
     auto [nodes, node_path] = ConvertToNodePath("/A/B");
-    auto target_path = ToResolvedPath("/A/B/C/D");
+    std::string_view target_path = "/A/B/C/D";
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsAncestor);
-    EXPECT_EQ(ComparePath(node_path, "/A/B/C/D"), devicetree::CompareResult::kIsAncestor);
+    EXPECT_TRUE(node_path.IsAncestorOf(target_path));
+    EXPECT_FALSE(node_path.IsParentOf(target_path));
+    EXPECT_EQ(Comparison::kIndirectAncestor, node_path.CompareWith(target_path));
+
+    EXPECT_NE(target_path, node_path);
+    EXPECT_FALSE(node_path.IsDescendentOf(target_path));
   }
   {
-    auto [nodes, node_path] = ConvertToNodePath("");
-    auto target_path = ToResolvedPath("/A/B/C/D");
+    auto [nodes, node_path] = ConvertToNodePath("/A/B/C");
+    std::string_view target_path = "/A/B/C/D";
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsAncestor);
-    EXPECT_EQ(ComparePath(node_path, "/A/B/C/D"), devicetree::CompareResult::kIsAncestor);
+    EXPECT_TRUE(node_path.IsAncestorOf(target_path));
+    EXPECT_TRUE(node_path.IsParentOf(target_path));
+    EXPECT_EQ(Comparison::kParent, node_path.CompareWith(target_path));
+
+    EXPECT_NE(target_path, node_path);
+    EXPECT_FALSE(node_path.IsDescendentOf(target_path));
+  }
+  {
+    // A path is never an ancestor of itself.
+    auto [nodes, node_path] = ConvertToNodePath("/A/B/C");
+    std::string_view target_path = "/A/B/C";
+
+    EXPECT_FALSE(node_path.IsAncestorOf(target_path));
+    EXPECT_FALSE(node_path.IsParentOf(target_path));
   }
 }
 
-TEST(ComparePathTest, AbsolutePathDescendant) {
-  auto [nodes, node_path] = ConvertToNodePath("/A/B/C/D");
-  // Empty string is the root node, so its parent of everything.
-  auto target_path = ToResolvedPath("");
+TEST(NodePathTest, AbsolutePathDescendent) {
+  {
+    auto [nodes, node_path] = ConvertToNodePath("/A/B/C/D");
+    std::string_view target_path = "/";
 
-  EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsDescendant);
-  EXPECT_EQ(ComparePath(node_path, ""), devicetree::CompareResult::kIsDescendant);
+    EXPECT_TRUE(node_path.IsDescendentOf(target_path));
+    EXPECT_FALSE(node_path.IsChildOf(target_path));
+    EXPECT_EQ(Comparison::kIndirectDescendent, node_path.CompareWith(target_path));
+
+    EXPECT_NE(target_path, node_path);
+    EXPECT_FALSE(node_path.IsAncestorOf(target_path));
+  }
+  {
+    auto [nodes, node_path] = ConvertToNodePath("/A/B/C/D");
+    std::string_view target_path = "/A/B";
+
+    EXPECT_TRUE(node_path.IsDescendentOf(target_path));
+    EXPECT_FALSE(node_path.IsChildOf(target_path));
+    EXPECT_EQ(Comparison::kIndirectDescendent, node_path.CompareWith(target_path));
+
+    EXPECT_NE(target_path, node_path);
+    EXPECT_FALSE(node_path.IsAncestorOf(target_path));
+  }
+  {
+    auto [nodes, node_path] = ConvertToNodePath("/A/B/C/D");
+    std::string_view target_path = "/A/B/C";
+
+    EXPECT_TRUE(node_path.IsDescendentOf(target_path));
+    EXPECT_TRUE(node_path.IsChildOf(target_path));
+    EXPECT_EQ(Comparison::kChild, node_path.CompareWith(target_path));
+
+    EXPECT_NE(target_path, node_path);
+    EXPECT_FALSE(node_path.IsAncestorOf(target_path));
+  }
+  {
+    // A path is never a descendent of itself.
+    auto [nodes, node_path] = ConvertToNodePath("/A/B/C");
+    std::string_view target_path = "/A/B/C";
+
+    EXPECT_FALSE(node_path.IsDescendentOf(target_path));
+    EXPECT_FALSE(node_path.IsChildOf(target_path));
+  }
 }
 
-TEST(ComparePathTest, AliasedPathMismatch) {
+TEST(NodePathTest, AliasedPathMismatch) {
   AliasContext aliases;
   aliases.Add("alias", "/A/B/D");
 
@@ -250,56 +256,73 @@ TEST(ComparePathTest, AliasedPathMismatch) {
     auto [nodes, node_path] = ConvertToNodePath("/A/B/C/D");
     auto target_path = ToResolvedPath("alias/D", aliases.properties());
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsMismatch);
+    EXPECT_NE(target_path, node_path);
+    EXPECT_FALSE(node_path.IsAncestorOf(target_path));
+    EXPECT_FALSE(node_path.IsDescendentOf(target_path));
+    EXPECT_EQ(Comparison::kMismatch, node_path.CompareWith(target_path));
   }
   {  // Stem mismatch with empty leaf
     auto [nodes, node_path] = ConvertToNodePath("/A/B/C/D");
     auto target_path = ToResolvedPath("alias", aliases.properties());
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsMismatch);
+    EXPECT_NE(target_path, node_path);
+    EXPECT_FALSE(node_path.IsAncestorOf(target_path));
+    EXPECT_FALSE(node_path.IsDescendentOf(target_path));
+    EXPECT_EQ(Comparison::kMismatch, node_path.CompareWith(target_path));
   }
   {  // Stem match left mismatch.
     auto [nodes, node_path] = ConvertToNodePath("/A/B/D/D");
     auto target_path = ToResolvedPath("alias/C", aliases.properties());
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsMismatch);
+    EXPECT_NE(target_path, node_path);
+    EXPECT_FALSE(node_path.IsAncestorOf(target_path));
+    EXPECT_FALSE(node_path.IsDescendentOf(target_path));
+    EXPECT_EQ(Comparison::kMismatch, node_path.CompareWith(target_path));
   }
 }
 
-TEST(ComparePathTest, AliasedPathAncestor) {
+TEST(NodePathTest, AliasedPathAncestor) {
   AliasContext aliases;
   aliases.Add("alias", "/A/B/D");
 
   {  // Root is ancestor of every node.
-    auto [nodes, node_path] = ConvertToNodePath("");
+    auto [nodes, node_path] = ConvertToNodePath("/");
     auto target_path = ToResolvedPath("alias", aliases.properties());
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsAncestor);
+    EXPECT_TRUE(node_path.IsAncestorOf(target_path));
+    EXPECT_FALSE(node_path.IsParentOf(target_path));
+    EXPECT_EQ(Comparison::kIndirectAncestor, node_path.CompareWith(target_path));
   }
 
   {  // Ancestor of stem Empty leaf
     auto [nodes, node_path] = ConvertToNodePath("/A/B");
     auto target_path = ToResolvedPath("alias", aliases.properties());
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsAncestor);
+    EXPECT_TRUE(node_path.IsAncestorOf(target_path));
+    EXPECT_TRUE(node_path.IsParentOf(target_path));
+    EXPECT_EQ(Comparison::kParent, node_path.CompareWith(target_path));
   }
 
   {  // Ancestor of stem non empty leaf
     auto [nodes, node_path] = ConvertToNodePath("/A/B");
     auto target_path = ToResolvedPath("alias/C", aliases.properties());
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsAncestor);
+    EXPECT_TRUE(node_path.IsAncestorOf(target_path));
+    EXPECT_FALSE(node_path.IsParentOf(target_path));
+    EXPECT_EQ(Comparison::kIndirectAncestor, node_path.CompareWith(target_path));
   }
 
   {  // Ancestor of leaf (stem matches)
     auto [nodes, node_path] = ConvertToNodePath("/A/B/D");
     auto target_path = ToResolvedPath("alias/C", aliases.properties());
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsAncestor);
+    EXPECT_TRUE(node_path.IsAncestorOf(target_path));
+    EXPECT_TRUE(node_path.IsParentOf(target_path));
+    EXPECT_EQ(Comparison::kParent, node_path.CompareWith(target_path));
   }
 }
 
-TEST(ComparePathTest, AliasedPathDescendant) {
+TEST(NodePathTest, AliasedPathDescendent) {
   AliasContext aliases;
   aliases.Add("alias", "/A");
 
@@ -307,18 +330,22 @@ TEST(ComparePathTest, AliasedPathDescendant) {
     auto [nodes, node_path] = ConvertToNodePath("/A/B/C");
     auto target_path = ToResolvedPath("alias", aliases.properties());
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsDescendant);
+    EXPECT_TRUE(node_path.IsDescendentOf(target_path));
+    EXPECT_FALSE(node_path.IsChildOf(target_path));
+    EXPECT_EQ(Comparison::kIndirectDescendent, node_path.CompareWith(target_path));
   }
 
   {  // Current Node is descendant of the alias with the leaf.
     auto [nodes, node_path] = ConvertToNodePath("/A/B/C");
     auto target_path = ToResolvedPath("alias/B", aliases.properties());
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsDescendant);
+    EXPECT_TRUE(node_path.IsDescendentOf(target_path));
+    EXPECT_TRUE(node_path.IsChildOf(target_path));
+    EXPECT_EQ(Comparison::kChild, node_path.CompareWith(target_path));
   }
 }
 
-TEST(ComparePathTest, AliasedPathMatches) {
+TEST(NodePathTest, AliasedPathMatches) {
   AliasContext aliases;
   aliases.Add("alias", "/A");
 
@@ -326,14 +353,16 @@ TEST(ComparePathTest, AliasedPathMatches) {
     auto [nodes, node_path] = ConvertToNodePath("/A");
     auto target_path = ToResolvedPath("alias", aliases.properties());
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsMatch);
+    EXPECT_EQ(target_path, node_path);
+    EXPECT_EQ(Comparison::kEqual, node_path.CompareWith(target_path));
   }
 
   {  // Stem and leaf match
     auto [nodes, node_path] = ConvertToNodePath("/A/B/C");
     auto target_path = ToResolvedPath("alias/B/C", aliases.properties());
 
-    EXPECT_EQ(ComparePath(node_path, target_path), devicetree::CompareResult::kIsMatch);
+    EXPECT_EQ(target_path, node_path);
+    EXPECT_EQ(Comparison::kEqual, node_path.CompareWith(target_path));
   }
 }
 

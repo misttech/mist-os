@@ -6,7 +6,6 @@
 
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
-#include <lib/devicetree/path.h>
 #include <lib/devicetree/testing/loaded-dtb.h>
 #include <lib/fit/function.h>
 
@@ -86,16 +85,17 @@ struct SingleNodeMatcher {
                  ? devicetree::ScanState::kNeedsPathResolution
                  : devicetree::ScanState::kDoneWithSubtree;
     }
-    switch (devicetree::ComparePath(path, *resolved_path)) {
-      case devicetree::CompareResult::kIsMatch:
+    switch (path.CompareWith(*resolved_path)) {
+      case devicetree::NodePath::Comparison::kEqual:
         found = true;
         node(path.back(), decoder);
         return node_match_result;
-      case devicetree::CompareResult::kIsAncestor:
+      case devicetree::NodePath::Comparison::kParent:
+      case devicetree::NodePath::Comparison::kIndirectAncestor:
         return devicetree::ScanState::kActive;
-      case devicetree::CompareResult::kIsMismatch:
-        return devicetree::ScanState::kDoneWithSubtree;
-      case devicetree::CompareResult::kIsDescendant:
+      case devicetree::NodePath::Comparison::kMismatch:
+      case devicetree::NodePath::Comparison::kChild:
+      case devicetree::NodePath::Comparison::kIndirectDescendent:
         return devicetree::ScanState::kDoneWithSubtree;
     };
   }
@@ -400,7 +400,7 @@ TEST_F(MatchTest, OnSubtreeCalledWhenActive) {
       },
       []() {},
       [&](const devicetree::NodePath& path) {
-        if (devicetree::ComparePath(path, "/A") == devicetree::CompareResult::kIsMatch) {
+        if (path == "/A") {
           root_after++;
           return devicetree::ScanState::kDone;
         }
@@ -430,7 +430,7 @@ TEST_F(MatchTest, OnSubtreeDoneWithSubtreeIsNoOp) {
       },
       []() {},
       [&](const devicetree::NodePath& path) {
-        if (devicetree::ComparePath(path, "/A") == devicetree::CompareResult::kIsMatch) {
+        if (path == "/A") {
           root_after++;
           return devicetree::ScanState::kDone;
         }

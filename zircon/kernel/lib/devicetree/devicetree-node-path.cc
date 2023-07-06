@@ -4,51 +4,88 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include "lib/devicetree/path.h"
-
-#include <lib/devicetree/devicetree.h>
 #include <zircon/assert.h>
 
 #include <string_view>
 
+#include "lib/devicetree/devicetree.h"
+
 namespace devicetree {
+namespace {
 
-CompareResult ComparePath(const NodePath& path_a, const ResolvedPath& path_b) {
-  // Compare stem.
-  auto [prefix_a_it, prefix_b_it] = internal::CompareRangesOfNodes(
-      path_a.begin(), path_a.end(), path_b.Prefix().begin(), path_b.Prefix().end());
-
-  // They both point to the mismatching element.
-  if (prefix_a_it != path_a.end() && prefix_b_it != path_b.Prefix().end()) {
-    return CompareResult::kIsMismatch;
+// Gives an incrementing, pairwise comparison of two ranges of string_view
+// iterators, returning the first pair of iterators that point to differing
+// values.
+template <typename IterA, typename IterB>
+std::pair<IterA, IterB> CompareStringRanges(IterA start_a, IterA end_a, IterB start_b,
+                                            IterB end_b) {
+  while (start_a != end_a && start_b != end_b) {
+    if (*start_a != *start_b) {
+      break;
+    }
+    ++start_a;
+    ++start_b;
   }
-
-  if (prefix_b_it != path_b.Prefix().end()) {
-    return CompareResult::kIsAncestor;
-  }
-
-  auto [suffix_a_it, suffix_b_it] = internal::CompareRangesOfNodes(
-      prefix_a_it, path_a.end(), path_b.Suffix().begin(), path_b.Suffix().end());
-
-  // Exhausted the node path components but the stem still has more elements.
-  if (suffix_a_it != path_a.end() && suffix_b_it != path_b.Suffix().end()) {
-    return CompareResult::kIsMismatch;
-  }
-
-  if (suffix_a_it == path_a.end() && suffix_b_it != path_b.Suffix().end()) {
-    return CompareResult::kIsAncestor;
-  }
-
-  if (suffix_a_it != path_a.end() && suffix_b_it == path_b.Suffix().end()) {
-    return CompareResult::kIsDescendant;
-  }
-
-  return CompareResult::kIsMatch;
+  return {start_a, start_b};
 }
 
-CompareResult ComparePath(const NodePath& path_a, std::string_view absolute_path_b) {
-  ZX_ASSERT(absolute_path_b.empty() || absolute_path_b[0] == '/');
-  return ComparePath(path_a, {.prefix = absolute_path_b});
+}  // namespace
+
+NodePath::Comparison NodePath::CompareWith(const ResolvedPath& path) const {
+  // The use of `std::next()` below would require a bunch of obscure member type
+  // definitions in `StringList<'/'>::iterator`.
+  auto next = [](auto it) { return ++it; };
+
+  StringList<'/'> path_prefix = path.Prefix();
+  auto path_prefix_begin = path_prefix.begin();
+  auto path_prefix_end = path_prefix.end();
+
+  auto [this_prefix_it, path_prefix_it] =
+      CompareStringRanges(begin(), end(), path_prefix_begin, path_prefix_end);
+
+  // We found a mismatch in the prefix.
+  if (this_prefix_it != end() && path_prefix_it != path_prefix_end) {
+    return Comparison::kMismatch;
+  }
+
+  // If we iterated through each node in this path and there are still tokens
+  // left in the other path, then this is an ancestor of the other
+  if (this_prefix_it == end() && path_prefix_it != path_prefix_end) {
+    return next(path_prefix_it) == path_prefix_end && path.suffix.empty()
+               ? Comparison::kParent
+               : Comparison::kIndirectAncestor;
+  }
+
+  StringList<'/'> path_suffix = path.Suffix();
+  auto path_suffix_begin = path_suffix.begin();
+  auto path_suffix_end = path_suffix.end();
+  auto [this_suffix_it, path_suffix_it] =
+      CompareStringRanges(this_prefix_it, end(), path_suffix_begin, path_suffix_end);
+
+  // We found a mismatch in the suffix.
+  if (this_suffix_it != end() && path_suffix_it != path_suffix_end) {
+    return Comparison::kMismatch;
+  }
+
+  // As above, if we iterated through each node in this path and there are still
+  // tokens left in the other, then this is an ancestor.
+  if (this_suffix_it == end() && path_suffix_it != path_suffix_end) {
+    return next(path_prefix_it) == path_prefix_end ? Comparison::kParent
+                                                   : Comparison::kIndirectAncestor;
+  }
+
+  // Similarly, if we iterated through each token in the other path and there
+  // are still nodes left to compare in this one, then this is a descendent.
+  if (this_suffix_it != end() && path_suffix_it == path_suffix_end) {
+    return next(this_suffix_it) == end() ? Comparison::kChild : Comparison::kIndirectDescendent;
+  }
+
+  return Comparison::kEqual;
+}
+
+NodePath::Comparison NodePath::CompareWith(std::string_view path) const {
+  ZX_ASSERT(path.empty() || path[0] == '/');
+  return CompareWith(ResolvedPath{.prefix = path});
 }
 
 }  // namespace devicetree

@@ -8,7 +8,6 @@
 
 #include <inttypes.h>
 #include <lib/devicetree/internal/devicetree.h>
-#include <lib/devicetree/path.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/result.h>
 #include <lib/zircon-internal/align.h>
@@ -391,7 +390,7 @@ ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, PropertyDecod
     // Re-initialize the property decoder with this node's properties.
     new (&decoder) PropertyDecoder(parent, Properties(props_block, string_block_), aliases_);
     constexpr std::string_view kAliasNodePath = "/aliases";
-    if (!aliases_ && ComparePath(*path, kAliasNodePath) == CompareResult::kIsMatch) {
+    if (!aliases_ && *path == kAliasNodePath) {
       aliases_.emplace(decoder.properties());
     }
     visit = call(pre_order_visitor);

@@ -415,6 +415,7 @@ TEST(DevicetreeTest, StringList) {
   }
   EXPECT_EQ(i, 3);
 
+  // By convention, there is no element following a terminal separator.
   i = 0;
   for (auto str : devicetree::StringList("one\0\0two\0"sv)) {
     switch (i++) {
@@ -428,7 +429,7 @@ TEST(DevicetreeTest, StringList) {
         EXPECT_EQ(0, str.size());
     }
   }
-  EXPECT_EQ(i, 4);
+  EXPECT_EQ(i, 3);
 
   i = 0;
   for (auto str : devicetree::StringList<'/'>("foo/bar/baz"sv)) {

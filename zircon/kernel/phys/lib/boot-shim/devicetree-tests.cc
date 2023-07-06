@@ -7,7 +7,6 @@
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/devicetree.h>
 #include <lib/devicetree/devicetree.h>
-#include <lib/devicetree/path.h>
 #include <lib/devicetree/testing/loaded-dtb.h>
 #include <lib/fit/defer.h>
 #include <lib/memalloc/range.h>
@@ -277,8 +276,7 @@ void CheckChosenItem(const ChosenItemType& item, const ExpectedChosen& expected)
   EXPECT_EQ(ramdisk.size(), expected.ramdisk_end - expected.ramdisk_start);
 
   ASSERT_TRUE(item.stdout_path());
-  EXPECT_EQ(devicetree::ComparePath(expected_uart_path, *item.stdout_path()),
-            devicetree::CompareResult::kIsMatch);
+  EXPECT_EQ(*item.stdout_path(), expected_uart_path);
 
   // Uart.
   std::optional<AllUartDrivers> uart = item.uart();

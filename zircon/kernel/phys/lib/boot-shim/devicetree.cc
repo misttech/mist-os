@@ -9,7 +9,6 @@
 #include <lib/boot-shim/debugdata.h>
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
-#include <lib/devicetree/path.h>
 #include <lib/fit/result.h>
 #include <lib/memalloc/range.h>
 #include <lib/stdcompat/array.h>
@@ -310,10 +309,11 @@ devicetree::ScanState DevicetreeBootstrapChosenNodeItemBase::HandleBootstrapStdo
   // for hand off.
   resolved_stdout_ = *resolved_path;
 
-  switch (devicetree::ComparePath(path, *resolved_path)) {
-    case devicetree::CompareResult::kIsMatch:
+  switch (path.CompareWith(*resolved_path)) {
+    case devicetree::NodePath::Comparison::kEqual:
       break;
-    case devicetree::CompareResult::kIsAncestor:
+    case devicetree::NodePath::Comparison::kParent:
+    case devicetree::NodePath::Comparison::kIndirectAncestor:
       return devicetree::ScanState::kActive;
     default:
       return devicetree::ScanState::kDoneWithSubtree;
@@ -367,13 +367,15 @@ devicetree::ScanState DevicetreeBootstrapChosenNodeItemBase::OnNode(
     return devicetree::ScanState::kDone;
   }
 
-  switch (devicetree::ComparePath(path, "/chosen")) {
-    case devicetree::CompareResult::kIsAncestor:
+  switch (path.CompareWith("/chosen")) {
+    case devicetree::NodePath::Comparison::kParent:
+    case devicetree::NodePath::Comparison::kIndirectAncestor:
       return devicetree::ScanState::kActive;
-    case devicetree::CompareResult::kIsMismatch:
-    case devicetree::CompareResult::kIsDescendant:
+    case devicetree::NodePath::Comparison::kMismatch:
+    case devicetree::NodePath::Comparison::kChild:
+    case devicetree::NodePath::Comparison::kIndirectDescendent:
       return devicetree::ScanState::kDoneWithSubtree;
-    case devicetree::CompareResult::kIsMatch:
+    case devicetree::NodePath::Comparison::kEqual:
       found_chosen_ = true;
       break;
   };
@@ -416,12 +418,12 @@ devicetree::ScanState DevicetreeMemoryItem::OnNode(const devicetree::NodePath& p
     return devicetree::ScanState::kActive;
   }
 
-  if (path.size() == 1) {
+  if (path == "/") {
     return devicetree::ScanState::kActive;
   }
 
   // Only look for direct children of the root node.
-  if (path.size() == 2) {
+  if (path.IsChildOf("/")) {
     auto name = path.back().name();
     if (name == "memory") {
       return HandleMemoryNode(path, decoder);
@@ -566,11 +568,11 @@ bool DevicetreeMemoryItem::AppendRangesFromReg(
 
 devicetree::ScanState RiscvDevicetreeTimerItem::OnNode(const devicetree::NodePath& path,
                                                        const devicetree::PropertyDecoder& decoder) {
-  if (path.size() == 1) {
+  if (path == "/") {
     return devicetree::ScanState::kActive;
   }
 
-  if (path.size() == 2 && path.back().name() == "cpus") {
+  if (path == "/cpus") {
     auto freq = decoder.FindProperty("timebase-frequency");
     if (freq) {
       if (auto freq_val = freq->AsUint32()) {
