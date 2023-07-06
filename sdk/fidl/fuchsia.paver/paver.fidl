@@ -235,6 +235,7 @@ closed protocol DataSink {
     /// On success, returns a channel to the initialized FVM volume.
     strict WipeVolume() -> (resource struct {
         volume client_end:fuchsia.hardware.block.volume.VolumeManager;
+        controller client_end:fuchsia.device.Controller;
     }) error zx.Status;
 
     /// Flush all previously buffered writes to persistent storage.

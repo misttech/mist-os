@@ -72,49 +72,43 @@ class FvmTest : public zxtest::Test {
 
 TEST_F(FvmTest, FormatFvmEmpty) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  fbl::unique_fd fvm_part = FvmPartitionFormat(
-      devfs_root(), device_->block_interface(), device_->block_controller_interface(),
-      SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
-  ASSERT_TRUE(fvm_part.is_valid());
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
+                               device_->block_controller_interface(),
+                               SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat));
 }
 
 TEST_F(FvmTest, TryBindEmpty) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  fbl::unique_fd fvm_part = FvmPartitionFormat(
-      devfs_root(), device_->block_interface(), device_->block_controller_interface(),
-      SparseHeaderForSliceSize(kSliceSize), paver::BindOption::TryBind);
-  ASSERT_TRUE(fvm_part.is_valid());
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
+                               device_->block_controller_interface(),
+                               SparseHeaderForSliceSize(kSliceSize), paver::BindOption::TryBind));
 }
 
 TEST_F(FvmTest, TryBindAlreadyFormatted) {
   ASSERT_NO_FAILURES(CreateRamdisk());
   ASSERT_OK(fs_management::FvmInit(block_interface(), kSliceSize));
-  fbl::unique_fd fvm_part = FvmPartitionFormat(
-      devfs_root(), device_->block_interface(), device_->block_controller_interface(),
-      SparseHeaderForSliceSize(kSliceSize), paver::BindOption::TryBind);
-  ASSERT_TRUE(fvm_part.is_valid());
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
+                               device_->block_controller_interface(),
+                               SparseHeaderForSliceSize(kSliceSize), paver::BindOption::TryBind));
 }
 
 TEST_F(FvmTest, TryBindAlreadyBound) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  fbl::unique_fd fvm_part = FvmPartitionFormat(
-      devfs_root(), device_->block_interface(), device_->block_controller_interface(),
-      SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
-  ASSERT_TRUE(fvm_part.is_valid());
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
+                               device_->block_controller_interface(),
+                               SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat));
 
-  fvm_part = FvmPartitionFormat(devfs_root(), device_->block_interface(),
-                                device_->block_controller_interface(),
-                                SparseHeaderForSliceSize(kSliceSize), paver::BindOption::TryBind);
-  ASSERT_TRUE(fvm_part.is_valid());
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
+                               device_->block_controller_interface(),
+                               SparseHeaderForSliceSize(kSliceSize), paver::BindOption::TryBind));
 }
 
 TEST_F(FvmTest, TryBindAlreadyFormattedWrongSliceSize) {
   ASSERT_NO_FAILURES(CreateRamdisk());
   ASSERT_OK(fs_management::FvmInit(block_interface(), kSliceSize * 2));
-  fbl::unique_fd fvm_part = FvmPartitionFormat(
-      devfs_root(), device_->block_interface(), device_->block_controller_interface(),
-      SparseHeaderForSliceSize(kSliceSize), paver::BindOption::TryBind);
-  ASSERT_TRUE(fvm_part.is_valid());
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
+                               device_->block_controller_interface(),
+                               SparseHeaderForSliceSize(kSliceSize), paver::BindOption::TryBind));
 }
 
 TEST_F(FvmTest, TryBindAlreadyFormattedWithSmallerSize) {
@@ -128,10 +122,9 @@ TEST_F(FvmTest, TryBindAlreadyFormattedWithSmallerSize) {
   fvm::SparseImage header =
       SparseHeaderForSliceSizeAndMaxDiskSize(kSliceSize, 2 * kBlockDeviceInitialSize);
   paver::FormatResult result;
-  fbl::unique_fd fvm_part = FvmPartitionFormat(devfs_root(), device_->block_interface(),
-                                               device_->block_controller_interface(), header,
-                                               paver::BindOption::TryBind, &result);
-  ASSERT_TRUE(fvm_part.is_valid());
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
+                               device_->block_controller_interface(), header,
+                               paver::BindOption::TryBind, &result));
   ASSERT_EQ(paver::FormatResult::kPreserved, result);
 }
 
@@ -145,10 +138,9 @@ TEST_F(FvmTest, TryBindAlreadyFormattedWithBiggerSize) {
   // preallocated can have.
   fvm::SparseImage header = SparseHeaderForSliceSizeAndMaxDiskSize(kSliceSize, kBlockDeviceMaxSize);
   paver::FormatResult result;
-  fbl::unique_fd fvm_part = FvmPartitionFormat(devfs_root(), device_->block_interface(),
-                                               device_->block_controller_interface(), header,
-                                               paver::BindOption::TryBind, &result);
-  ASSERT_TRUE(fvm_part.is_valid());
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
+                               device_->block_controller_interface(), header,
+                               paver::BindOption::TryBind, &result));
   ASSERT_EQ(paver::FormatResult::kReformatted, result);
 }
 
@@ -163,14 +155,17 @@ constexpr char kRamdisk1DataPath[] =
 
 TEST_F(FvmTest, AllocateEmptyPartitions) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  fbl::unique_fd fvm_part = FvmPartitionFormat(
+  zx::result fvm = FvmPartitionFormat(
       devfs_root(), device_->block_interface(), device_->block_controller_interface(),
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
-  ASSERT_TRUE(fvm_part.is_valid());
+  ASSERT_OK(fvm);
 
-  fdio_cpp::FdioCaller fvm_caller(std::move(fvm_part));
-  ASSERT_OK(paver::AllocateEmptyPartitions(
-      devfs_root(), fvm_caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>()));
+  zx::result volume_endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
+  ASSERT_OK(volume_endpoints);
+  auto& [volume, volume_server] = volume_endpoints.value();
+  ASSERT_OK(fidl::WireCall(fvm.value())->ConnectToDeviceFidl(volume_server.TakeChannel()).status());
+  ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), volume));
 
   fbl::unique_fd blob;
   ASSERT_OK(
@@ -183,14 +178,18 @@ TEST_F(FvmTest, AllocateEmptyPartitions) {
 
 TEST_F(FvmTest, WipeWithMultipleFvm) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  fbl::unique_fd fvm_part1 = FvmPartitionFormat(
+  zx::result fvm1 = FvmPartitionFormat(
       devfs_root(), device_->block_interface(), device_->block_controller_interface(),
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
-  ASSERT_TRUE(fvm_part1.is_valid());
+  ASSERT_OK(fvm1);
 
-  fdio_cpp::FdioCaller fvm_caller1(std::move(fvm_part1));
-  ASSERT_OK(paver::AllocateEmptyPartitions(
-      devfs_root(), fvm_caller1.borrow_as<fuchsia_hardware_block_volume::VolumeManager>()));
+  zx::result volume_endpoints1 =
+      fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
+  ASSERT_OK(volume_endpoints1);
+  auto& [volume1, volume_server1] = volume_endpoints1.value();
+  ASSERT_OK(
+      fidl::WireCall(fvm1.value())->ConnectToDeviceFidl(volume_server1.TakeChannel()).status());
+  ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), volume1));
 
   {
     fbl::unique_fd blob;
@@ -206,15 +205,18 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
   std::unique_ptr<BlockDevice> first_device = std::move(device_);
 
   ASSERT_NO_FAILURES(CreateRamdisk());
-  fbl::unique_fd fvm_part2 = FvmPartitionFormat(
+  zx::result fvm2 = FvmPartitionFormat(
       devfs_root(), device_->block_interface(), device_->block_controller_interface(),
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
-  ASSERT_TRUE(fvm_part2.is_valid());
+  ASSERT_OK(fvm2);
 
-  // TODO(http://fxbug.dev/112484): Remove this as it relies on multiplexing.
-  fdio_cpp::FdioCaller fvm_caller2(std::move(fvm_part2));
-  ASSERT_OK(paver::AllocateEmptyPartitions(
-      devfs_root(), fvm_caller2.borrow_as<fuchsia_hardware_block_volume::VolumeManager>()));
+  zx::result volume_endpoints2 =
+      fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
+  ASSERT_OK(volume_endpoints2);
+  auto& [volume2, volume_server2] = volume_endpoints2.value();
+  ASSERT_OK(
+      fidl::WireCall(fvm2.value())->ConnectToDeviceFidl(volume_server2.TakeChannel()).status());
+  ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), volume2));
 
   {
     fbl::unique_fd blob;
@@ -227,8 +229,7 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
   }
 
   std::array<uint8_t, fvm::kGuidSize> blobfs_guid = GUID_BLOB_VALUE;
-  ASSERT_OK(paver::WipeAllFvmPartitionsWithGuid(fvm_caller2.borrow_as<fuchsia_device::Controller>(),
-                                                blobfs_guid.data()));
+  ASSERT_OK(paver::WipeAllFvmPartitionsWithGuid(fvm2.value(), blobfs_guid.data()));
 
   // Check we can still open the first ramdisk's blobfs:
   {
@@ -247,14 +248,17 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
 
 TEST_F(FvmTest, Unbind) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  fbl::unique_fd fvm_part = FvmPartitionFormat(
+  zx::result fvm = FvmPartitionFormat(
       devfs_root(), device_->block_interface(), device_->block_controller_interface(),
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
-  ASSERT_TRUE(fvm_part.is_valid());
+  ASSERT_OK(fvm);
 
-  fdio_cpp::FdioCaller caller(std::move(fvm_part));
-  ASSERT_OK(paver::AllocateEmptyPartitions(
-      devfs_root(), caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>()));
+  zx::result volume_endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
+  ASSERT_OK(volume_endpoints);
+  auto& [volume, volume_server] = volume_endpoints.value();
+  ASSERT_OK(fidl::WireCall(fvm.value())->ConnectToDeviceFidl(volume_server.TakeChannel()).status());
+  ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), volume));
 
   fbl::unique_fd blob;
   ASSERT_OK(
@@ -269,14 +273,18 @@ TEST_F(FvmTest, Unbind) {
 
 TEST_F(FvmTest, UnbindInvalidPath) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  fbl::unique_fd fvm_part = FvmPartitionFormat(
+  zx::result fvm = FvmPartitionFormat(
       devfs_root(), device_->block_interface(), device_->block_controller_interface(),
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
-  ASSERT_TRUE(fvm_part.is_valid());
+  ASSERT_OK(fvm);
 
-  fdio_cpp::FdioCaller caller(std::move(fvm_part));
-  ASSERT_OK(paver::AllocateEmptyPartitions(
-      devfs_root(), caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>()));
+  zx::result volume_endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
+  ASSERT_OK(volume_endpoints);
+  auto& [volume, volume_server] = volume_endpoints.value();
+  ASSERT_OK(fidl::WireCall(fvm.value())->ConnectToDeviceFidl(volume_server.TakeChannel()).status());
+
+  ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), volume));
 
   fbl::unique_fd blob;
   ASSERT_OK(

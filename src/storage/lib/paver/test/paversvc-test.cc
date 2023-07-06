@@ -1751,18 +1751,12 @@ TEST_F(PaverServiceSkipBlockTest, WipeVolumeCreatesFvm) {
   ASSERT_OK(result.status());
   ASSERT_TRUE(result->is_ok());
   ASSERT_TRUE(result->value()->volume);
+  ASSERT_TRUE(result->value()->controller);
 
   ASSERT_OK(block_client::SingleReadBytes(fvm_client_, buffer, sizeof(buffer), 0));
   EXPECT_BYTES_EQ(fs_management::kFvmMagic, buffer, sizeof(fs_management::kFvmMagic));
 
-  fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager> volume_client =
-      std::move(result->value()->volume);
-  // This force-casts the protocol type from
-  // |fuchsia.hardware.block.volume/VolumeManager| into
-  // |fuchsia.device/Controller|. It only works because protocols hosted
-  // on devfs are automatically multiplexed with both the
-  // |fuchsia.device/Controller| and the |fuchsia.io/File| protocol.
-  fidl::ClientEnd<fuchsia_device::Controller> device_client(std::move(volume_client.channel()));
+  fidl::ClientEnd<fuchsia_device::Controller> device_client(std::move(result->value()->controller));
   std::string path = storage::GetTopologicalPath(device_client).value().substr(5);  // strip "/dev/"
   ASSERT_FALSE(path.empty());
 
@@ -2155,13 +2149,17 @@ TEST_F(PaverServiceLuisTest, FindGPTDevicesIgnoreFvmPartitions) {
   // Initialize the primary block solely as FVM and allocate sub-partitions.
   fvm::SparseImage header = {};
   header.slice_size = 1 << 20;
-  fbl::unique_fd fvm_fd(FvmPartitionFormat(devmgr_.devfs_root(), gpt_dev_->block_interface(),
-                                           gpt_dev_->block_controller_interface(), header,
-                                           paver::BindOption::Reformat));
-  ASSERT_TRUE(fvm_fd);
-  fdio_cpp::FdioCaller caller(std::move(fvm_fd));
-  zx::result status = paver::AllocateEmptyPartitions(
-      devmgr_.devfs_root(), caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>());
+  zx::result fvm = FvmPartitionFormat(devmgr_.devfs_root(), gpt_dev_->block_interface(),
+                                      gpt_dev_->block_controller_interface(), header,
+                                      paver::BindOption::Reformat);
+  ASSERT_OK(fvm);
+
+  zx::result volume_endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
+  ASSERT_OK(volume_endpoints);
+  auto& [volume, volume_server] = volume_endpoints.value();
+  ASSERT_OK(fidl::WireCall(fvm.value())->ConnectToDeviceFidl(volume_server.TakeChannel()).status());
+  zx::result status = paver::AllocateEmptyPartitions(devmgr_.devfs_root(), volume);
   ASSERT_OK(status);
 
   // Check that FVM created sub-partitions are not considered as candidates.

@@ -61,6 +61,11 @@ class Paver : public fidl::WireServer<fuchsia_paver::Paver> {
   std::shared_ptr<Context> context_;
 };
 
+struct VolumeManagerClient {
+  fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager> device;
+  fidl::ClientEnd<fuchsia_device::Controller> controller;
+};
+
 // Common shared implementation for DataSink and DynamicDataSink. Necessary to work around lack of
 // "is-a" relationship in llcpp bindings.
 class DataSinkImpl {
@@ -90,7 +95,7 @@ class DataSinkImpl {
 
   zx::result<> WriteVolumes(fidl::ClientEnd<fuchsia_paver::PayloadStream> payload_stream);
 
-  zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager>> WipeVolume();
+  zx::result<VolumeManagerClient> WipeVolume();
 
   DevicePartitioner* partitioner() { return partitioner_.get(); }
 

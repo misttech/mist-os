@@ -30,15 +30,14 @@ enum class FormatResult {
   kReformatted,
 };
 
-// Attempts to bind an FVM driver to a partition fd. Returns a file descriptor
-// for the FVM's device.
-fbl::unique_fd TryBindToFvmDriver(const fbl::unique_fd& devfs_root,
-                                  fidl::UnownedClientEnd<fuchsia_device::Controller> partition,
-                                  zx::duration timeout);
+// Attempts to bind an FVM driver to a partition device. Returns a connection for the FVM's device.
+zx::result<fidl::ClientEnd<fuchsia_device::Controller>> TryBindToFvmDriver(
+    const fbl::unique_fd& devfs_root, fidl::UnownedClientEnd<fuchsia_device::Controller> partition,
+    zx::duration timeout);
 
 // Formats the FVM within the provided partition if it is not already formatted.
-// Returns a file descriptor for the FVM's device.
-fbl::unique_fd FvmPartitionFormat(
+// Returns a connection to the FVM's device.
+zx::result<fidl::ClientEnd<fuchsia_device::Controller>> FvmPartitionFormat(
     const fbl::unique_fd& devfs_root,
     fidl::UnownedClientEnd<fuchsia_hardware_block::Block> partition,
     fidl::UnownedClientEnd<fuchsia_device::Controller> partition_controller,
