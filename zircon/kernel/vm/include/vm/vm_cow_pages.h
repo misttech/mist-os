@@ -865,6 +865,15 @@ class VmCowPages final : public VmHierarchyBase,
                                        uint64_t owner_offset, LazyPageRequest* page_request)
       TA_REQ(lock());
 
+  // Helper function for CreateCloneLocked. Performs bidirectional clone operation where this VMO
+  // transitions into being a hidden node and two children are created. This VMO is cloned into the
+  // left child and the right child becomes the snapshot.
+  zx_status_t CloneBidirectionalLocked(uint64_t offset, uint64_t size,
+                                       fbl::RefPtr<AttributionObject> attribution_object,
+                                       fbl::RefPtr<VmCowPages>* cow_child,
+                                       uint64_t new_root_parent_offset, uint64_t child_parent_limit)
+      TA_REQ(lock());
+
   // Returns true if |page| (located at |offset| in this vmo) is only accessible by one
   // child, where 'accessible' is defined by ::CloneCowPageLocked.
   bool IsUniAccessibleLocked(vm_page_t* page, uint64_t offset) const TA_REQ(lock());

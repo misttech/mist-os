@@ -673,6 +673,64 @@ void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages>& child) {
   paged_ref_ = nullptr;
 }
 
+zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
+                                                 fbl::RefPtr<AttributionObject> attribution_object,
+                                                 fbl::RefPtr<VmCowPages>* cow_child,
+                                                 uint64_t new_root_parent_offset,
+                                                 uint64_t child_parent_limit) {
+  // We need two new VmCowPages for our two children. To avoid destructor of the first being
+  // invoked if the second fails we separately perform allocations and construction.  It's fine
+  // for the destructor of VmCowPagesContainer to run since the optional VmCowPages isn't
+  // emplaced yet so the VmCowPages destructor doesn't run if the second fails allocation.
+  fbl::AllocChecker ac;
+  ktl::unique_ptr<VmCowPagesContainer> left_child_placeholder =
+      ktl::make_unique<VmCowPagesContainer>(&ac);
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+  ktl::unique_ptr<VmCowPagesContainer> right_child_placeholder =
+      ktl::make_unique<VmCowPagesContainer>(&ac);
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  // At this point cow_pages must *not* be destructed in this function, as doing so would cause
+  // a deadlock. That means from this point on we *must* succeed and any future error checking
+  // needs to be added prior to creation. Note: The left child inherits the attribution object
+  // of the original cow pages.
+  fbl::RefPtr<AttributionObject> left_attribution_object;
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+  left_attribution_object = attribution_object_;
+#endif
+  fbl::RefPtr<VmCowPages> left_child = NewVmCowPages(
+      ktl::move(left_child_placeholder), hierarchy_state_ptr_, VmCowPagesOptions::kNone,
+      pmm_alloc_flags_, size_, nullptr, nullptr, ktl::move(left_attribution_object));
+  fbl::RefPtr<VmCowPages> right_child = NewVmCowPages(
+      ktl::move(right_child_placeholder), hierarchy_state_ptr_, VmCowPagesOptions::kNone,
+      pmm_alloc_flags_, size, nullptr, nullptr, ktl::move(attribution_object));
+
+  AssertHeld(left_child->lock_ref());
+  AssertHeld(right_child->lock_ref());
+
+  // The left child becomes a full clone of us, inheriting our children, paged backref etc.
+  CloneParentIntoChildLocked(left_child);
+
+  // The right child is the, potential, subset view into the parent so has a variable offset. If
+  // this view would extend beyond us then we need to clip the parent_limit to our size_, which
+  // will ensure any pages in that range just get initialized from zeroes.
+  AddChildLocked(right_child.get(), offset, new_root_parent_offset, child_parent_limit);
+
+  // Transition into being the hidden node.
+  options_ |= VmCowPagesOptions::kHidden;
+  DEBUG_ASSERT(children_list_len_ == 2);
+
+  *cow_child = ktl::move(right_child);
+
+  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
+  return ZX_OK;
+}
+
 zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint64_t size,
                                           fbl::RefPtr<AttributionObject> attribution_object,
                                           fbl::RefPtr<VmCowPages>* cow_child) {
@@ -729,57 +787,8 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
 
   switch (type) {
     case CloneType::Snapshot: {
-      // We need two new VmCowPages for our two children. To avoid destructor of the first being
-      // invoked if the second fails we separately perform allocations and construction.  It's fine
-      // for the destructor of VmCowPagesContainer to run since the optional VmCowPages isn't
-      // emplaced yet so the VmCowPages destructor doesn't run if the second fails allocation.
-      fbl::AllocChecker ac;
-      ktl::unique_ptr<VmCowPagesContainer> left_child_placeholder =
-          ktl::make_unique<VmCowPagesContainer>(&ac);
-      if (!ac.check()) {
-        return ZX_ERR_NO_MEMORY;
-      }
-      ktl::unique_ptr<VmCowPagesContainer> right_child_placeholder =
-          ktl::make_unique<VmCowPagesContainer>(&ac);
-      if (!ac.check()) {
-        return ZX_ERR_NO_MEMORY;
-      }
-
-      // At this point cow_pages must *not* be destructed in this function, as doing so would cause
-      // a deadlock. That means from this point on we *must* succeed and any future error checking
-      // needs to be added prior to creation. Note: The left child inherits the attribution object
-      // of the original cow pages.
-      fbl::RefPtr<AttributionObject> left_attribution_object;
-#if KERNEL_BASED_MEMORY_ATTRIBUTION
-      left_attribution_object = attribution_object_;
-#endif
-      fbl::RefPtr<VmCowPages> left_child = NewVmCowPages(
-          ktl::move(left_child_placeholder), hierarchy_state_ptr_, VmCowPagesOptions::kNone,
-          pmm_alloc_flags_, size_, nullptr, nullptr, ktl::move(left_attribution_object));
-      fbl::RefPtr<VmCowPages> right_child = NewVmCowPages(
-          ktl::move(right_child_placeholder), hierarchy_state_ptr_, VmCowPagesOptions::kNone,
-          pmm_alloc_flags_, size, nullptr, nullptr, ktl::move(attribution_object));
-
-      AssertHeld(left_child->lock_ref());
-      AssertHeld(right_child->lock_ref());
-
-      // The left child becomes a full clone of us, inheriting our children, paged backref etc.
-      CloneParentIntoChildLocked(left_child);
-
-      // The right child is the, potential, subset view into the parent so has a variable offset. If
-      // this view would extend beyond us then we need to clip the parent_limit to our size_, which
-      // will ensure any pages in that range just get initialized from zeroes.
-      AddChildLocked(right_child.get(), offset, new_root_parent_offset, child_parent_limit);
-
-      // Transition into being the hidden node.
-      options_ |= VmCowPagesOptions::kHidden;
-      DEBUG_ASSERT(children_list_len_ == 2);
-
-      *cow_child = ktl::move(right_child);
-
-      VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
-      VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-      return ZX_OK;
+      return CloneBidirectionalLocked(offset, size, attribution_object, cow_child,
+                                      new_root_parent_offset, child_parent_limit);
     }
     case CloneType::SnapshotAtLeastOnWrite: {
       fbl::AllocChecker ac;
