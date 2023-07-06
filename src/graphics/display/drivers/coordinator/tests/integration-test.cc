@@ -39,13 +39,14 @@ namespace display {
 
 class IntegrationTest : public TestBase, public testing::WithParamInterface<bool> {
  public:
-  fbl::RefPtr<display::DisplayInfo> display_info(DisplayId id) __TA_REQUIRES(controller()->mtx()) {
-    auto iter = controller()->displays_.find(id);
-    if (iter.IsValid()) {
-      return iter.CopyPointer();
-    } else {
-      return nullptr;
+  // Returns -1 if no display exists with the given ID.
+  int64_t DisplayLayerCount(DisplayId id) {
+    fbl::AutoLock lock(controller()->mtx());
+    auto displays_it = controller()->displays_.find(id);
+    if (!displays_it.IsValid()) {
+      return -1;
     }
+    return int64_t{displays_it->layer_count};
   }
 
   bool primary_client_connected() {
@@ -177,12 +178,7 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
   // Present an image
   EXPECT_OK(primary_client->PresentLayers());
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
-      [&]() {
-        fbl::AutoLock lock(controller()->mtx());
-        auto info = display_info(primary_client->display_id());
-        return info->layer_count == 1;
-      },
-      zx::sec(1)));
+      [&]() { return DisplayLayerCount(primary_client->display_id()) == 1; }, zx::sec(1)));
   uint64_t count = primary_client->vsync_count();
   SendDisplayVsync();
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil([&]() { return primary_client->vsync_count() > count; },
@@ -199,12 +195,7 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
   ConfigStamp empty_config_stamp = controller()->TEST_controller_stamp();
   // Wait for it to apply
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
-      [&]() {
-        fbl::AutoLock lock(controller()->mtx());
-        auto info = display_info(primary_client->display_id());
-        return info->layer_count == 0;
-      },
-      zx::sec(1)));
+      [&]() { return DisplayLayerCount(primary_client->display_id()) == 0; }, zx::sec(1)));
 
   // The old client disconnects
   primary_client.reset();
@@ -218,12 +209,7 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
   // ... and presents before the previous client's empty vsync
   EXPECT_EQ(ZX_OK, primary_client->PresentLayers());
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
-      [&]() {
-        fbl::AutoLock lock(controller()->mtx());
-        auto info = display_info(primary_client->display_id());
-        return info->layer_count == 1;
-      },
-      zx::sec(1)));
+      [&]() { return DisplayLayerCount(primary_client->display_id()) == 1; }, zx::sec(1)));
 
   // Empty vsync for last client. Nothing should be sent to the new client.
   const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(empty_config_stamp);
@@ -259,12 +245,7 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   EXPECT_OK(primary_client->PresentLayers());
   SendDisplayVsync();
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
-      [&]() {
-        fbl::AutoLock lock(controller()->mtx());
-        auto info = display_info(primary_client->display_id());
-        return info->layer_count == 1;
-      },
-      zx::sec(1)));
+      [&]() { return DisplayLayerCount(primary_client->display_id()) == 1; }, zx::sec(1)));
 
   EXPECT_TRUE(
       RunLoopWithTimeoutOrUntil([&]() { return primary_client->vsync_count() == 1; }, zx::sec(1)));
@@ -692,12 +673,7 @@ TEST_F(IntegrationTest, EmptyConfigIsNotApplied) {
   // Present an image from the primary client.
   EXPECT_OK(primary_client->PresentLayers());
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
-      [&]() {
-        fbl::AutoLock lock(controller()->mtx());
-        auto info = display_info(primary_client->display_id());
-        return info->layer_count == 1;
-      },
-      zx::sec(1)));
+      [&]() { return DisplayLayerCount(primary_client->display_id()) == 1; }, zx::sec(1)));
 
   // Primary client should have become active after a config was set.
   const uint64_t primary_vsync_count = primary_client->vsync_count();
@@ -782,10 +758,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
         [&]() { return primary_client->vsync_count() > primary_vsync_count; }, zx::sec(2)));
   }
-  {
-    fbl::AutoLock lock(controller()->mtx());
-    EXPECT_EQ(1u, display_info(primary_client->display_id())->layer_count);
-  }
+  EXPECT_EQ(1, DisplayLayerCount(primary_client->display_id()));
 
   auto present_config_stamp_1 = primary_client->recent_presented_config_stamp();
   EXPECT_EQ(apply_config_stamp_1, present_config_stamp_1);
@@ -806,10 +779,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
         [&]() { return primary_client->vsync_count() > primary_vsync_count; }, zx::sec(2)));
   }
-  {
-    fbl::AutoLock lock(controller()->mtx());
-    EXPECT_EQ(1u, display_info(primary_client->display_id())->layer_count);
-  }
+  EXPECT_EQ(1, DisplayLayerCount(primary_client->display_id()));
 
   auto present_config_stamp_2 = primary_client->recent_presented_config_stamp();
   EXPECT_EQ(apply_config_stamp_2, present_config_stamp_2);
@@ -835,10 +805,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
         [&]() { return primary_client->vsync_count() > primary_vsync_count; }, zx::sec(2)));
   }
-  {
-    fbl::AutoLock lock(controller()->mtx());
-    EXPECT_EQ(0u, display_info(primary_client->display_id())->layer_count);
-  }
+  EXPECT_EQ(0, DisplayLayerCount(primary_client->display_id()));
 
   auto present_config_stamp_3 = primary_client->recent_presented_config_stamp();
   EXPECT_EQ(apply_config_stamp_3, present_config_stamp_3);
@@ -925,10 +892,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
         [&]() { return primary_client->vsync_count() > primary_vsync_count; }, zx::sec(2)));
   }
-  {
-    fbl::AutoLock lock(controller()->mtx());
-    EXPECT_EQ(1u, display_info(primary_client->display_id())->layer_count);
-  }
+  EXPECT_EQ(1, DisplayLayerCount(primary_client->display_id()));
 
   auto present_config_stamp_1 = primary_client->recent_presented_config_stamp();
   EXPECT_EQ(apply_config_stamp_1, present_config_stamp_1);
@@ -951,10 +915,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
         [&]() { return primary_client->vsync_count() > primary_vsync_count; }, zx::sec(2)));
   }
-  {
-    fbl::AutoLock lock(controller()->mtx());
-    EXPECT_EQ(1u, display_info(primary_client->display_id())->layer_count);
-  }
+  EXPECT_EQ(1, DisplayLayerCount(primary_client->display_id()));
 
   auto present_config_stamp_2 = primary_client->recent_presented_config_stamp();
   EXPECT_EQ(present_config_stamp_2, present_config_stamp_1);
@@ -976,10 +937,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
         [&]() { return primary_client->vsync_count() > primary_vsync_count; }, zx::sec(2)));
   }
-  {
-    fbl::AutoLock lock(controller()->mtx());
-    EXPECT_EQ(1u, display_info(primary_client->display_id())->layer_count);
-  }
+  EXPECT_EQ(1, DisplayLayerCount(primary_client->display_id()));
 
   auto present_config_stamp_3 = primary_client->recent_presented_config_stamp();
   EXPECT_EQ(present_config_stamp_3, apply_config_stamp_2);
@@ -1067,10 +1025,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
         [&]() { return primary_client->vsync_count() > primary_vsync_count; }, zx::sec(2)));
   }
-  {
-    fbl::AutoLock lock(controller()->mtx());
-    EXPECT_EQ(1u, display_info(primary_client->display_id())->layer_count);
-  }
+  EXPECT_EQ(1, DisplayLayerCount(primary_client->display_id()));
 
   auto present_config_stamp_1 = primary_client->recent_presented_config_stamp();
   EXPECT_EQ(apply_config_stamp_1, present_config_stamp_1);
@@ -1093,10 +1048,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
         [&]() { return primary_client->vsync_count() > primary_vsync_count; }, zx::sec(2)));
   }
-  {
-    fbl::AutoLock lock(controller()->mtx());
-    EXPECT_EQ(1u, display_info(primary_client->display_id())->layer_count);
-  }
+  EXPECT_EQ(1, DisplayLayerCount(primary_client->display_id()));
 
   auto present_config_stamp_2 = primary_client->recent_presented_config_stamp();
   EXPECT_EQ(present_config_stamp_2, present_config_stamp_1);
@@ -1126,10 +1078,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
         [&]() { return primary_client->vsync_count() > primary_vsync_count; }, zx::sec(2)));
   }
-  {
-    fbl::AutoLock lock(controller()->mtx());
-    EXPECT_EQ(0u, display_info(primary_client->display_id())->layer_count);
-  }
+  EXPECT_EQ(0, DisplayLayerCount(primary_client->display_id()));
 
   auto present_config_stamp_3 = primary_client->recent_presented_config_stamp();
   EXPECT_EQ(present_config_stamp_3, apply_config_stamp_3);
@@ -1206,10 +1155,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
         [&]() { return primary_client->vsync_count() > primary_vsync_count; }, zx::sec(2)));
   }
-  {
-    fbl::AutoLock lock(controller()->mtx());
-    EXPECT_EQ(1u, display_info(primary_client->display_id())->layer_count);
-  }
+  EXPECT_EQ(1, DisplayLayerCount(primary_client->display_id()));
 
   auto present_config_stamp_0 = primary_client->recent_presented_config_stamp();
   EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
@@ -1273,10 +1219,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
         [&]() { return primary_client->vsync_count() > primary_vsync_count; }, zx::sec(2)));
   }
-  {
-    fbl::AutoLock lock(controller()->mtx());
-    EXPECT_EQ(1u, display_info(primary_client->display_id())->layer_count);
-  }
+  EXPECT_EQ(1, DisplayLayerCount(primary_client->display_id()));
 
   auto present_config_stamp_3 = primary_client->recent_presented_config_stamp();
   EXPECT_EQ(present_config_stamp_3, apply_config_stamp_2);
@@ -1294,10 +1237,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
         [&]() { return primary_client->vsync_count() > primary_vsync_count; }, zx::sec(2)));
   }
-  {
-    fbl::AutoLock lock(controller()->mtx());
-    EXPECT_EQ(1u, display_info(primary_client->display_id())->layer_count);
-  }
+  EXPECT_EQ(1, DisplayLayerCount(primary_client->display_id()));
 
   auto present_config_stamp_4 = primary_client->recent_presented_config_stamp();
   EXPECT_EQ(present_config_stamp_4, apply_config_stamp_2);
