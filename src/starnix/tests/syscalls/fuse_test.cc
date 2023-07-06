@@ -11,6 +11,7 @@
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/xattr.h>
 #include <unistd.h>
@@ -102,7 +103,7 @@ class FuseTest : public ::testing::Test {
     pid_t child_pid = fork_helper_.RunInForkedProcess([&] {
       std::string configuration =
           "lowerdir=" + lowerdir + ",upperdir=" + upperdir + ",workdir=" + workdir;
-      execl(GetOverlayFsPath().c_str(), GetOverlayFsPath().c_str(), "-f", "-d", "-o",
+      execl(GetOverlayFsPath().c_str(), GetOverlayFsPath().c_str(), "-f", "-o",
             configuration.c_str(), mergedir.c_str(), NULL);
     });
     if (child_pid <= 0) {
@@ -325,6 +326,15 @@ TEST_F(FuseTest, Readdir) {
   ASSERT_EQ(files.size(), 2u);
   ASSERT_NE(files.find("."), files.end());
   ASSERT_NE(files.find(".."), files.end());
+}
+
+TEST_F(FuseTest, Getdents) {
+  ASSERT_TRUE(Mount());
+  std::string root = GetMountDir();
+  test_helper::ScopedFD fd(open(root.c_str(), O_RDONLY));
+  ASSERT_TRUE(fd.is_valid());
+  char buffer[4096];
+  ASSERT_GT(syscall(SYS_getdents64, fd.get(), buffer, 4096), 0);
 }
 
 TEST_F(FuseTest, XAttr) {

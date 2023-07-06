@@ -259,10 +259,11 @@ impl FileOps for FuseFileObject {
         };
         // TODO(https://fxbug.dev/128843): This should receives a CurrentTask instead of relying on
         // the system task.
+        let mode = file.node().info().mode;
         if let Err(e) = self.connection.execute_operation(
             self.kernel.kthreads.system_task(),
             node,
-            FuseOperation::Release(file.flags(), self.open_out),
+            FuseOperation::Release(file.flags(), mode, self.open_out),
         ) {
             log_error!("Error when relasing fh: {e:?}");
         }
@@ -498,14 +499,18 @@ impl FileOps for FuseFileObject {
 impl FsNodeOps for Arc<FuseNode> {
     fn create_file_ops(
         &self,
-        _node: &FsNode,
+        node: &FsNode,
         current_task: &CurrentTask,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         // The node already exists. The creation has been handled before calling this method.
         let flags = flags & !(OpenFlags::CREAT | OpenFlags::EXCL);
-        let response =
-            self.connection.execute_operation(current_task, self, FuseOperation::Open(flags))?;
+        let mode = node.info().mode;
+        let response = self.connection.execute_operation(
+            current_task,
+            self,
+            FuseOperation::Open(flags, mode),
+        )?;
         let open_out = if let FuseResponse::Open(open_out) = response {
             open_out
         } else {
@@ -1209,12 +1214,12 @@ enum FuseOperation {
     Mkdir(uapi::fuse_mkdir_in, FsString),
     Mknod(uapi::fuse_mknod_in, FsString),
     Link(uapi::fuse_link_in, FsString),
-    Open(OpenFlags),
+    Open(OpenFlags, FileMode),
     Poll(uapi::fuse_poll_in),
     Read(uapi::fuse_read_in),
     Readdir(uapi::fuse_read_in),
     Readlink,
-    Release(OpenFlags, uapi::fuse_open_out),
+    Release(OpenFlags, FileMode, uapi::fuse_open_out),
     RemoveXAttr(
         // Name of the attribute
         FsString,
@@ -1298,7 +1303,7 @@ impl FuseOperation {
             }
             Self::ListXAttr(getxattr_in) => data.write_all(getxattr_in.as_bytes()),
             Self::Lookup(name) => Self::write_null_terminated(data, name),
-            Self::Open(open_flags) => {
+            Self::Open(open_flags, _) => {
                 let message = uapi::fuse_open_in { flags: open_flags.bits(), open_flags: 0 };
                 data.write_all(message.as_bytes())
             }
@@ -1319,7 +1324,7 @@ impl FuseOperation {
                 Ok(len)
             }
             Self::Read(read_in) | Self::Readdir(read_in) => data.write_all(read_in.as_bytes()),
-            Self::Release(_, open_in) => {
+            Self::Release(_, _, open_in) => {
                 let message = uapi::fuse_release_in {
                     fh: open_in.fh,
                     flags: 0,
@@ -1377,8 +1382,8 @@ impl FuseOperation {
             Self::Mkdir(_, _) => uapi::fuse_opcode_FUSE_MKDIR,
             Self::Mknod(_, _) => uapi::fuse_opcode_FUSE_MKNOD,
             Self::Link(_, _) => uapi::fuse_opcode_FUSE_LINK,
-            Self::Open(flags) => {
-                if flags.contains(OpenFlags::DIRECTORY) {
+            Self::Open(flags, mode) => {
+                if mode.is_dir() || flags.contains(OpenFlags::DIRECTORY) {
                     uapi::fuse_opcode_FUSE_OPENDIR
                 } else {
                     uapi::fuse_opcode_FUSE_OPEN
@@ -1388,8 +1393,8 @@ impl FuseOperation {
             Self::Read(_) => uapi::fuse_opcode_FUSE_READ,
             Self::Readdir(_) => uapi::fuse_opcode_FUSE_READDIR,
             Self::Readlink => uapi::fuse_opcode_FUSE_READLINK,
-            Self::Release(flags, _) => {
-                if flags.contains(OpenFlags::DIRECTORY) {
+            Self::Release(flags, mode, _) => {
+                if mode.is_dir() || flags.contains(OpenFlags::DIRECTORY) {
                     uapi::fuse_opcode_FUSE_RELEASEDIR
                 } else {
                     uapi::fuse_opcode_FUSE_RELEASE
@@ -1477,7 +1482,7 @@ impl FuseOperation {
             | Self::Symlink(_, _) => {
                 Ok(FuseResponse::Entry(Self::to_response::<uapi::fuse_entry_out>(&buffer)))
             }
-            Self::Open(_) => {
+            Self::Open(_, _) => {
                 Ok(FuseResponse::Open(Self::to_response::<uapi::fuse_open_out>(&buffer)))
             }
             Self::Poll(_) => {
@@ -1508,7 +1513,7 @@ impl FuseOperation {
                 Ok(FuseResponse::Readdir(result))
             }
             Self::Flush(_)
-            | Self::Release(_, _)
+            | Self::Release(_, _, _)
             | Self::RemoveXAttr(_)
             | Self::SetXAttr(_, _, _)
             | Self::Unlink(_) => Ok(FuseResponse::None),
