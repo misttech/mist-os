@@ -12,6 +12,23 @@
 
 #include "assert.h"
 
+// This file contains various test cases that measure the cost of copying to/from a VMO, effectively
+// measuring the cost of a memcpy() for different cases. These include:
+//  * Vmo/Read, Vmo/Write: cost of copying from/to a VMO with zx_vmo_read()/zx_vmo_write(). The
+//    operated-on VMO is already mapped, with page table entries populated.
+//    * Subcase: Vmo/Write/ZeroPage: cost of zx_vmo_write() when the memory being read from is the
+//      shared zero page (as implemented by the kernel).
+//  * VmoMap/Read, VmoMap/Write: cost of mapping a VMO and then copying it. The operated-on VMO
+//    already has its pages committed.
+//    * Subcase: "/Kernel" variants use zx_vmo_read()/zx_vmo_write() to copy to/from the VMO; other
+//      variants use memcpy() in userland.
+//    * Subcase: VmoMapRange: uses ZX_VM_MAP_RANGE so that the map operation pre-populates the page
+//      table entries for the mappings.
+//  * Vmo/Memcpy: cost of creating a VMO, mapping it, then copying it using memcpy().
+//    * Subcase: "/WithPrecommit" variants use ZX_VMAR_OP_COMMIT to map and commit the VMO prior to
+//      issuing a memcpy.
+//    * Subcase: "/WithoutPrecommit" variants perform a memcpy into the VMO without committing it.
+
 namespace {
 
 // Measure the time taken to write or read a chunk of data to/from a VMO using the zx_vmo_write() or
@@ -125,6 +142,46 @@ bool VmoReadOrWriteMapTest(perftest::RepeatState* state, uint32_t copy_size, boo
 bool VmoReadOrWriteMapRangeTest(perftest::RepeatState* state, uint32_t copy_size, bool do_write,
                                 bool user_memcpy) {
   return VmoReadOrWriteMapTestImpl(state, copy_size, do_write, ZX_VM_MAP_RANGE, user_memcpy);
+}
+
+// Measure the time taken to create a VMO, map it into the root VMAR, optionally commit and
+// map the pages, memcpy data into the VMO, then unmap and destroy the VMO. This is used as
+// an indirect way to measure the overhead induced by page faulting during a memcpy.
+bool VmoMemcpyPrecommitTest(perftest::RepeatState* state, uint32_t size, bool precommit) {
+  state->DeclareStep("create_and_map_vmo");
+  if (precommit) {
+    state->DeclareStep("precommit");
+  }
+  state->DeclareStep("memcpy");
+  state->DeclareStep("unmap_and_destroy_vmo");
+
+  // Set up a source buffer and initialize it.
+  std::unique_ptr<char[]> src(new char[size]);
+  memset(src.get(), 0xff, size);
+
+  while (state->KeepRunning()) {
+    // Create and map the destination VMO.
+    zx::vmo dst_vmo;
+    ASSERT_OK(zx::vmo::create(size, 0, &dst_vmo));
+    zx_vaddr_t dst;
+    ASSERT_OK(
+        zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, dst_vmo, 0, size, &dst));
+    state->NextStep();
+
+    // Commit the destination VMO if we're running the precommit case.
+    if (precommit) {
+      ASSERT_OK(zx::vmar::root_self()->op_range(ZX_VMAR_OP_COMMIT, dst, size, 0, 0));
+      state->NextStep();
+    }
+
+    // Memcpy from source into dst.
+    memcpy(reinterpret_cast<void*>(dst), src.get(), size);
+    state->NextStep();
+
+    // Unmap the destination VMO.
+    ASSERT_OK(zx::vmar::root_self()->unmap(dst, size));
+  }
+  return true;
 }
 
 // Measure the time taken to clone a vmo and destroy it. If map_size is non zero, then this function
@@ -303,7 +360,7 @@ bool VmoCreateWriteReadCloseTest(perftest::RepeatState* state, uint32_t copy_siz
 
 template <typename Func, typename... Args>
 void RegisterVmoTest(const char* name, Func fn, Args... args) {
-  for (unsigned size_in_kbytes : {128, 512, 2048}) {
+  for (unsigned size_in_kbytes : {4, 32, 128, 512, 2048}) {
     auto full_name = fbl::StringPrintf("%s/%ukbytes", name, size_in_kbytes);
     perftest::RegisterTest(full_name.c_str(), fn, size_in_kbytes * 1024, args...);
   }
@@ -336,6 +393,12 @@ void RegisterTests() {
       rw_name = fbl::StringPrintf("VmoMapRange/%s%s", rw, user_kernel);
       RegisterVmoTest(rw_name.c_str(), VmoReadOrWriteMapRangeTest, do_write, user_memcpy);
     }
+  }
+
+  for (bool precommit : {false, true}) {
+    const char* pc = precommit ? "WithPrecommit" : "WithoutPrecommit";
+    auto precommit_name = fbl::StringPrintf("Vmo/Memcpy/%s", pc);
+    RegisterVmoTest(precommit_name.c_str(), VmoMemcpyPrecommitTest, precommit);
   }
 
   for (bool map : {false, true}) {
