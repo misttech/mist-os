@@ -84,9 +84,9 @@ class VmObjectPaged final : public VmObject {
     Guard<CriticalMutex> guard{lock()};
     return cow_pages_locked()->is_root_source_user_pager_backed_locked();
   }
-  bool is_private_pager_copy_supported() const override {
+  bool is_snapshot_at_least_on_write_supported() const override {
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->is_private_pager_copy_supported();
+    return cow_pages_locked()->is_snapshot_at_least_on_write_supported();
   }
   bool is_dirty_tracked_locked() const override TA_REQ(lock()) {
     return cow_pages_locked()->is_dirty_tracked_locked();

@@ -1513,8 +1513,8 @@ static bool vmo_move_pages_on_access_test() {
 
   // Touching pages in a child should also move the page to the front of the queues.
   fbl::RefPtr<VmObject> child;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::PrivatePagerCopy, 0, PAGE_SIZE,
-                            true, AttributionObject::GetKernelAttribution(), &child);
+  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
+                            PAGE_SIZE, true, AttributionObject::GetKernelAttribution(), &child);
   ASSERT_EQ(ZX_OK, status);
 
   status = child->GetPageBlocking(0, VMM_PF_FLAG_SW_FAULT, nullptr, nullptr, nullptr);
@@ -1698,7 +1698,7 @@ static bool vmo_eviction_hints_clone_test() {
 
   // Create a clone.
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::PrivatePagerCopy, 0,
+  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
                             2 * PAGE_SIZE, true, AttributionObject::GetKernelAttribution(), &clone);
   ASSERT_EQ(ZX_OK, status);
 
@@ -1728,8 +1728,8 @@ static bool vmo_eviction_hints_clone_test() {
   // Hinting should also work via a clone of a clone.
   fbl::RefPtr<VmObject> clone2;
   status =
-      clone->CreateClone(Resizability::NonResizable, CloneType::PrivatePagerCopy, 0, 2 * PAGE_SIZE,
-                         true, AttributionObject::GetKernelAttribution(), &clone2);
+      clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
+                         2 * PAGE_SIZE, true, AttributionObject::GetKernelAttribution(), &clone2);
   ASSERT_EQ(ZX_OK, status);
 
   // Hint that the page is not needed.
@@ -1795,8 +1795,8 @@ static bool vmo_eviction_hints_clone_test() {
   // Hinting through this clone should have no effect, since it will see the forked page.
   fbl::RefPtr<VmObject> clone3;
   status =
-      clone->CreateClone(Resizability::NonResizable, CloneType::PrivatePagerCopy, 0, 2 * PAGE_SIZE,
-                         true, AttributionObject::GetKernelAttribution(), &clone3);
+      clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
+                         2 * PAGE_SIZE, true, AttributionObject::GetKernelAttribution(), &clone3);
   ASSERT_EQ(ZX_OK, status);
 
   // Move the page back to the DontNeed queue first.
@@ -2362,8 +2362,8 @@ static bool vmo_attribution_pager_test() {
 
   // Create a COW clone that sees the first page.
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::PrivatePagerCopy, 0, PAGE_SIZE,
-                            true, AttributionObject::GetKernelAttribution(), &clone);
+  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
+                            PAGE_SIZE, true, AttributionObject::GetKernelAttribution(), &clone);
   ASSERT_EQ(ZX_OK, status);
   clone->set_user_id(0xfc);
 

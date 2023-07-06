@@ -702,8 +702,8 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
       }
       break;
     }
-    case CloneType::PrivatePagerCopy:
-      if (!is_private_pager_copy_supported()) {
+    case CloneType::SnapshotAtLeastOnWrite:
+      if (!is_snapshot_at_least_on_write_supported()) {
         return ZX_ERR_NOT_SUPPORTED;
       }
       break;

@@ -1029,8 +1029,8 @@ static bool vmaspace_priority_pager_test() {
 
   // Create a clone of the VMO.
   fbl::RefPtr<VmObject> vmo_child;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::PrivatePagerCopy, 0, PAGE_SIZE,
-                            true, AttributionObject::GetKernelAttribution(), &vmo_child);
+  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
+                            PAGE_SIZE, true, AttributionObject::GetKernelAttribution(), &vmo_child);
   ASSERT_OK(status);
   VmObjectPaged* childp = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
 
@@ -1046,8 +1046,8 @@ static bool vmaspace_priority_pager_test() {
 
   // Create a second child of the root.
   fbl::RefPtr<VmObject> vmo_child2;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::PrivatePagerCopy, 0, PAGE_SIZE,
-                            true, AttributionObject::GetKernelAttribution(), &vmo_child);
+  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
+                            PAGE_SIZE, true, AttributionObject::GetKernelAttribution(), &vmo_child);
   ASSERT_OK(status);
   VmObjectPaged* childp2 = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
 

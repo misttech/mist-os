@@ -109,7 +109,7 @@ class VmCowPages final : public VmHierarchyBase,
     return root->page_source_ && root->page_source_->properties().is_user_pager;
   }
 
-  bool is_private_pager_copy_supported() const TA_REQ(lock()) {
+  bool is_snapshot_at_least_on_write_supported() const TA_REQ(lock()) {
     canary_.Assert();
     auto root = GetRootLocked();
     // The root will never be null. It will either point to a valid parent, or |this| if there's no

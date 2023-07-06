@@ -433,8 +433,8 @@ zx_status_t VmObjectDispatcher::CreateChild(
     type = CloneType::Snapshot;
   } else if (options & ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE) {
     options &= ~ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE;
-    if (vmo_->is_private_pager_copy_supported()) {
-      type = CloneType::PrivatePagerCopy;
+    if (vmo_->is_snapshot_at_least_on_write_supported()) {
+      type = CloneType::SnapshotAtLeastOnWrite;
     } else {
       type = CloneType::Snapshot;
     }
