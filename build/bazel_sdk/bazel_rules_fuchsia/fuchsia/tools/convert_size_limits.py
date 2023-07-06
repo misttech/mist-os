@@ -33,6 +33,7 @@ import argparse
 import json
 import sys
 import collections
+import re
 import os
 
 
@@ -59,7 +60,8 @@ def convert_budget_format(platform_aib_paths, component, all_manifests):
         # These location are used in bazel based workflows
         "external/legacy_ninja_build_outputs/obj/build/images/fuchsia/fuchsia/fuchsia.bazel_legacy_aib",
         "bazel-out/aarch64-fastbuild/bin",
-        "bazel-out/aarch64-opt/bin",  # Release Bazel builds will have this prefix.
+        # Release Bazel builds will have this prefix.
+        "bazel-out/aarch64-opt/bin",
     ]
     # And these are the assembly bundle locations that packages can be from
     for bundle_path in platform_aib_paths:
@@ -69,9 +71,13 @@ def convert_budget_format(platform_aib_paths, component, all_manifests):
         os.path.join(prefix, src)
         for prefix in prefixes_for_prefixes
         for src in component["src"])
-    # Finds all package manifest files located bellow the directories
+    # Finds all package manifest files located below the directories
     # listed by the component `src` field.
-    packages = sorted(m for m in all_manifests if m.startswith(prefixes))
+    packages = sorted(
+        list(
+            set(
+                m for m in all_manifests for prefix in prefixes
+                if m.startswith(prefixes) or re.match(prefix, m))))
     return dict(
         name=component["component"],
         budget_bytes=component["limit"],
