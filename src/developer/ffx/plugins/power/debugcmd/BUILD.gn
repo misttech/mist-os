@@ -4,7 +4,7 @@
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
-ffx_plugin("ffx_power_manager") {
+ffx_plugin("ffx_power_debugcmd") {
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
@@ -13,6 +13,8 @@ ffx_plugin("ffx_power_manager") {
   deps = [
     "//sdk/fidl/fuchsia.power.manager.debug:fuchsia.power.manager.debug_rust",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:async-trait",
   ]
 
   test_deps = [ "//src/lib/fuchsia-async" ]

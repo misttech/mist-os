@@ -8,7 +8,7 @@ import("//src/developer/ffx/build/ffx_tool.gni")
 ffx_plugin("ffx_power") {
   version = "0.1.0"
   edition = "2021"
-  plugin_deps = [ "power_manager:ffx_power_manager" ]
+  plugin_deps = [ "debugcmd:ffx_power_debugcmd" ]
 
   args_sources = [ "src/args.rs" ]
 }
