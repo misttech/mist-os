@@ -12,7 +12,7 @@ use {
     diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect},
     fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _},
     fidl::persist,
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
     fidl_fuchsia_metrics::{self as fmetrics, MetricEvent, MetricEventPayload},
     fidl_fuchsia_pkg::{
         self as fpkg, CupMarker, CupProxy, GetInfoError, PackageCacheMarker, PackageResolverMarker,
@@ -65,11 +65,15 @@ pub mod mock_filesystem;
 
 pub trait Blobfs {
     fn root_dir_handle(&self) -> ClientEnd<fio::DirectoryMarker>;
+    fn svc_dir(&self) -> fio::DirectoryProxy;
 }
 
 impl Blobfs for BlobfsRamdisk {
     fn root_dir_handle(&self) -> ClientEnd<fio::DirectoryMarker> {
         self.root_dir_handle().unwrap()
+    }
+    fn svc_dir(&self) -> fio::DirectoryProxy {
+        self.svc_dir().unwrap().unwrap()
     }
 }
 
@@ -307,7 +311,7 @@ pub fn clone_directory_proxy(
 }
 
 pub struct TestEnvBuilder<BlobfsAndSystemImageFut, MountsFn> {
-    blobfs_and_system_image: BlobfsAndSystemImageFut,
+    blobfs_and_system_image: Box<dyn FnOnce(BlobImplementation) -> BlobfsAndSystemImageFut>,
     mounts: MountsFn,
     local_mirror_repo: Option<(Arc<Repository>, RepositoryUrl)>,
     fetch_delivery_blob: Option<bool>,
@@ -317,20 +321,37 @@ pub struct TestEnvBuilder<BlobfsAndSystemImageFut, MountsFn> {
     blob_network_header_timeout_seconds: Option<u32>,
     blob_network_body_timeout_seconds: Option<u32>,
     blob_download_resumption_attempts_limit: Option<u32>,
+    blob_implementation: Option<BlobImplementation>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
+enum BlobImplementation {
+    #[default]
+    Blobfs,
+    FxBlob,
 }
 
 impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, fn() -> Mounts> {
     #![allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
-            blobfs_and_system_image: async {
-                let system_image_package =
-                    fuchsia_pkg_testing::SystemImageBuilder::new().build().await;
-                let blobfs = BlobfsRamdisk::start().await.unwrap();
-                let () = system_image_package.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
-                (blobfs, Some(*system_image_package.meta_far_merkle_root()))
-            }
-            .boxed(),
+            blobfs_and_system_image: Box::new(|blob_impl| {
+                async move {
+                    let system_image_package =
+                        fuchsia_pkg_testing::SystemImageBuilder::new().build().await;
+                    let blobfs = BlobfsRamdisk::builder();
+                    let blobfs = match blob_impl {
+                        BlobImplementation::Blobfs => blobfs.blobfs(),
+                        BlobImplementation::FxBlob => blobfs.fxblob(),
+                    }
+                    .start()
+                    .await
+                    .unwrap();
+                    let () = system_image_package.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
+                    (blobfs, Some(*system_image_package.meta_far_merkle_root()))
+                }
+                .boxed()
+            }),
             // If it's not overridden, the default state of the mounts allows for dynamic
             // configuration. We do this because in the majority of tests, we'll want to use
             // dynamic repos and rewrite rules.
@@ -352,6 +373,7 @@ impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, f
             blob_network_header_timeout_seconds: None,
             blob_network_body_timeout_seconds: None,
             blob_download_resumption_attempts_limit: None,
+            blob_implementation: None,
         }
     }
 }
@@ -369,10 +391,10 @@ where
         system_image: Option<Hash>,
     ) -> TestEnvBuilder<future::Ready<(OtherBlobfs, Option<Hash>)>, MountsFn>
     where
-        OtherBlobfs: Blobfs,
+        OtherBlobfs: Blobfs + 'static,
     {
         TestEnvBuilder::<_, MountsFn> {
-            blobfs_and_system_image: future::ready((blobfs, system_image)),
+            blobfs_and_system_image: Box::new(move |_| future::ready((blobfs, system_image))),
             mounts: self.mounts,
             local_mirror_repo: self.local_mirror_repo,
             fetch_delivery_blob: self.fetch_delivery_blob,
@@ -382,28 +404,31 @@ where
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
             blob_download_resumption_attempts_limit: self.blob_download_resumption_attempts_limit,
+            blob_implementation: self.blob_implementation,
         }
     }
 
     /// Creates a BlobfsRamdisk loaded with the supplied packages and configures the system to use
     /// the supplied `system_image` package.
+    /// Sets the blob implementation to Blobfs.
     pub async fn system_image_and_extra_packages(
         self,
         system_image: &Package,
         extra_packages: &[&Package],
     ) -> TestEnvBuilder<future::Ready<(BlobfsRamdisk, Option<Hash>)>, MountsFn> {
+        assert_eq!(self.blob_implementation, None);
         let blobfs = BlobfsRamdisk::start().await.unwrap();
         let root_dir = blobfs.root_dir().unwrap();
         let () = system_image.write_to_blobfs_dir(&root_dir);
         for pkg in extra_packages {
             let () = pkg.write_to_blobfs_dir(&root_dir);
         }
+        let system_image_hash = *system_image.meta_far_merkle_root();
 
         TestEnvBuilder::<_, MountsFn> {
-            blobfs_and_system_image: future::ready((
-                blobfs,
-                Some(*system_image.meta_far_merkle_root()),
-            )),
+            blobfs_and_system_image: Box::new(move |_| {
+                future::ready((blobfs, Some(system_image_hash)))
+            }),
             mounts: self.mounts,
             local_mirror_repo: self.local_mirror_repo,
             fetch_delivery_blob: self.fetch_delivery_blob,
@@ -413,6 +438,7 @@ where
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
             blob_download_resumption_attempts_limit: self.blob_download_resumption_attempts_limit,
+            blob_implementation: Some(BlobImplementation::Blobfs),
         }
     }
 
@@ -431,6 +457,7 @@ where
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
             blob_download_resumption_attempts_limit: self.blob_download_resumption_attempts_limit,
+            blob_implementation: self.blob_implementation,
         }
     }
 
@@ -481,8 +508,14 @@ where
         self
     }
 
+    pub fn use_fxblob(self) -> Self {
+        assert_eq!(self.blob_implementation, None);
+        Self { blob_implementation: Some(BlobImplementation::FxBlob), ..self }
+    }
+
     pub async fn build(self) -> TestEnv<ConcreteBlobfs> {
-        let (blobfs, system_image) = self.blobfs_and_system_image.await;
+        let blob_implementation = self.blob_implementation.unwrap_or_default();
+        let (blobfs, system_image) = (self.blobfs_and_system_image)(blob_implementation).await;
         let mounts = (self.mounts)();
 
         let local_child_svc_dir = vfs::pseudo_directory! {};
@@ -532,6 +565,11 @@ where
             },
             "svc" => local_child_svc_dir,
         };
+        if blob_implementation == BlobImplementation::FxBlob {
+            local_child_out_dir
+                .add_entry("blob-svc", vfs::remote::remote_dir(blobfs.svc_dir()))
+                .unwrap();
+        }
 
         let local_mirror_dir = tempfile::tempdir().unwrap();
         if let Some((repo, url)) = self.local_mirror_repo {
@@ -687,10 +725,18 @@ where
             }
         }
 
-        if system_image.is_none() {
+        if system_image.is_none() || blob_implementation == BlobImplementation::FxBlob {
             let () = builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
-            let () =
-                builder.set_config_value_bool(&pkg_cache, "use_system_image", false).await.unwrap();
+            if system_image.is_none() {
+                let () = builder
+                    .set_config_value_bool(&pkg_cache, "use_system_image", false)
+                    .await
+                    .unwrap();
+            }
+            if blob_implementation == BlobImplementation::FxBlob {
+                let () =
+                    builder.set_config_value_bool(&pkg_cache, "use_fxblob", true).await.unwrap();
+            }
         }
 
         builder
@@ -789,6 +835,22 @@ where
             )
             .await
             .unwrap();
+        if blob_implementation == BlobImplementation::FxBlob {
+            builder
+                .add_route(
+                    Route::new()
+                        .capability(
+                            Capability::protocol::<ffxfs::BlobCreatorMarker>().path(format!(
+                                "/blob-svc/{}",
+                                ffxfs::BlobCreatorMarker::PROTOCOL_NAME
+                            )),
+                        )
+                        .from(&service_reflector)
+                        .to(&pkg_cache),
+                )
+                .await
+                .unwrap();
+        }
 
         builder
             .add_route(

@@ -1028,3 +1028,28 @@ async fn fetch_delivery_blob_fallback() {
 
     env.stop().await;
 }
+
+#[fuchsia::test]
+async fn fxblob() {
+    let env = TestEnvBuilder::new().use_fxblob().fetch_delivery_blob(true).build().await;
+    let pkg = make_pkg_with_extra_blobs("using-fx-blob", 1).await;
+    let repo = Arc::new(
+        RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
+            .add_package(&pkg)
+            .delivery_blob_type(1)
+            .build()
+            .await
+            .unwrap(),
+    );
+    let served_repository = Arc::clone(&repo).server().start().unwrap();
+    let repo_url = "fuchsia-pkg://test".parse().unwrap();
+    let repo_config = served_repository.make_repo_config(repo_url);
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
+
+    let (resolved_pkg, _resolved_context) =
+        env.resolve_package("fuchsia-pkg://test/using-fx-blob").await.unwrap();
+
+    pkg.verify_contents(&resolved_pkg).await.unwrap();
+
+    env.stop().await;
+}

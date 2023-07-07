@@ -4,7 +4,8 @@
 
 use {
     super::{OpenBlobError, TruncateBlobError, WriteBlobError},
-    fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
+    anyhow::Context as _,
+    fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
     fuchsia_zircon_status::Status,
 };
 
@@ -17,8 +18,11 @@ pub(super) fn into_blob_writer_and_closer(
             let proxy = file.into_proxy()?;
             Ok((Box::new(Clone::clone(&proxy)), Box::new(proxy)))
         }
-        // TODO(fxbug.dev/129271) Support fxblob write API.
-        Writer(_writer) => Err(OpenBlobError::Internal),
+        Writer(writer) => {
+            let proxy = writer.into_proxy()?;
+            // TODO(fxbug.dev/129995) Add cancellation support to fuchsia.fxfs/BlobWriter
+            Ok((Box::new(FxBlob::new(proxy)), Box::new(())))
+        }
     }
 }
 
@@ -43,8 +47,16 @@ impl Closer for fio::FileProxy {
     }
 }
 
+// TODO(fxbug.dev/129995) Add cancellation support to fuchsia.fxfs/BlobWriter.
 #[async_trait::async_trait]
-pub(super) trait Writer: Send + Sync + std::fmt::Debug {
+impl Closer for () {
+    async fn close(&mut self) {}
+
+    fn best_effort_close(&mut self) {}
+}
+
+#[async_trait::async_trait]
+pub(super) trait Writer: Send + std::fmt::Debug {
     /// Set the size of the blob.
     /// If the blob is size zero, the returned Future should not complete until the blob
     /// is readable.
@@ -97,6 +109,62 @@ impl Writer for fio::FileProxy {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+enum FxBlob {
+    NeedsTruncate(ffxfs::BlobWriterProxy),
+    NeedsBytes(blob_writer::BlobWriter),
+    Invalid,
+}
+
+impl FxBlob {
+    fn new(proxy: ffxfs::BlobWriterProxy) -> Self {
+        Self::NeedsTruncate(proxy)
+    }
+
+    fn state_str(&self) -> &'static str {
+        match self {
+            Self::NeedsTruncate(_) => "needs truncate",
+            Self::NeedsBytes(_) => "needs bytes",
+            Self::Invalid => "invalid",
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl Writer for FxBlob {
+    async fn truncate(&mut self, size: u64) -> Result<(), TruncateBlobError> {
+        *self = match std::mem::replace(self, Self::Invalid) {
+            Self::NeedsTruncate(proxy) => Self::NeedsBytes(
+                blob_writer::BlobWriter::create(proxy, size)
+                    .await
+                    .context("creating a BlobWriter")
+                    .map_err(TruncateBlobError::Other)?,
+            ),
+            Self::NeedsBytes(_) => {
+                return Err(TruncateBlobError::AlreadyTruncated(self.state_str()))
+            }
+            Self::Invalid => return Err(TruncateBlobError::BadState),
+        };
+        Ok(())
+    }
+
+    async fn write(
+        &mut self,
+        bytes: &[u8],
+        after_write: &(dyn Fn(u64) + Send + Sync),
+        after_write_ack: &(dyn Fn() + Send + Sync),
+    ) -> Result<(), WriteBlobError> {
+        let Self::NeedsBytes(writer) = self else {
+            return Err(WriteBlobError::BytesNotNeeded(self.state_str()));
+        };
+        let fut = writer.write(bytes);
+        let () = after_write(bytes.len() as u64);
+        let res = fut.await;
+        let () = after_write_ack();
+        res.context("calling write on BlobWriter").map_err(WriteBlobError::Other)
     }
 }
 
@@ -164,5 +232,34 @@ mod tests {
         };
 
         let ((), ()) = futures::future::join(write_fut, server_fut).await;
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn fxblob_writer() {
+        let blobfs = blobfs_ramdisk::BlobfsRamdisk::builder().fxblob().start().await.unwrap();
+        assert_eq!(blobfs.list_blobs().unwrap(), std::collections::BTreeSet::new());
+        let contents = [0u8; 7];
+        let hash = fuchsia_merkle::MerkleTree::from_reader(&contents[..]).unwrap().root();
+        let compressed = delivery_blob::Type1Blob::generate(
+            &contents[..],
+            delivery_blob::CompressionMode::Attempt,
+        );
+        let writer = blobfs
+            .blob_creator_proxy()
+            .unwrap()
+            .unwrap()
+            .create(&hash.into(), false)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let (mut writer, _closer) =
+            into_blob_writer_and_closer(fpkg::BlobWriter::Writer(writer)).unwrap();
+        let () = writer.truncate(compressed.len().try_into().unwrap()).await.unwrap();
+        let () = writer.write(&compressed, &|_| (), &|| ()).await.unwrap();
+
+        assert_eq!(blobfs.list_blobs().unwrap(), std::collections::BTreeSet::from([hash]));
+
+        let () = blobfs.stop().await.unwrap();
     }
 }

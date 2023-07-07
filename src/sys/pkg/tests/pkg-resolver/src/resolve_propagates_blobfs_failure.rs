@@ -63,6 +63,9 @@ impl lib::Blobfs for BlobFsWithFileCreateOverride {
         DirectoryWithFileCreateOverride { inner, target: self.target.clone() }.spawn(server);
         client
     }
+    fn svc_dir(&self) -> fio::DirectoryProxy {
+        panic!("BlobFsWithFileCreateOverride does not have a service dir")
+    }
 }
 
 #[derive(Clone)]

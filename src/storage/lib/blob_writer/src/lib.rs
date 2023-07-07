@@ -16,6 +16,7 @@ mod errors;
 
 /// BlobWriter is a wrapper around the fuchsia.fxfs.BlobWriter fidl protocol. Clients will use this
 /// library to write blobs to disk.
+#[derive(Debug)]
 pub struct BlobWriter {
     blob_writer_proxy: BlobWriterProxy,
     vmo: zx::Vmo,

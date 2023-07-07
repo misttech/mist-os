@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![cfg(target_os = "fuchsia")]
 #![deny(missing_docs)]
 
 //! Wrapper types for [`fidl_fuchsia_pkg::PackageCacheProxy`] and its related protocols.
@@ -579,6 +580,16 @@ pub enum TruncateBlobError {
 
     #[error("transport error")]
     Fidl(#[from] fidl::Error),
+
+    #[error("already truncated, currently in state {0}")]
+    AlreadyTruncated(&'static str),
+
+    // TODO(fxbug.dev/130001) Add error variants to BlobWriter.
+    #[error("unspecified error")]
+    Other(#[source] anyhow::Error),
+
+    #[error("blob is in an invalid state")]
+    BadState,
 }
 
 /// An error encountered while writing a blob.
@@ -599,6 +610,13 @@ pub enum WriteBlobError {
 
     #[error("transport error")]
     Fidl(#[from] fidl::Error),
+
+    #[error("bytes were written but not needed in state {0}")]
+    BytesNotNeeded(&'static str),
+
+    // TODO(fxbug.dev/130001) Add error variants to BlobWriter.
+    #[error("unspecified error")]
+    Other(#[source] anyhow::Error),
 }
 
 /// An error encountered while sending the BlobWritten message.

@@ -320,10 +320,12 @@ impl ToResolveError for pkg::cache::ListMissingBlobsError {
 
 impl ToResolveError for pkg::cache::TruncateBlobError {
     fn to_resolve_error(&self) -> pkg::ResolveError {
+        use pkg::cache::TruncateBlobError::*;
         match self {
-            pkg::cache::TruncateBlobError::NoSpace => pkg::ResolveError::NoSpace,
-            pkg::cache::TruncateBlobError::UnexpectedResponse(_) => pkg::ResolveError::Io,
-            pkg::cache::TruncateBlobError::Fidl(_) => pkg::ResolveError::Io,
+            NoSpace => pkg::ResolveError::NoSpace,
+            UnexpectedResponse(_) => pkg::ResolveError::Io,
+            Fidl(_) => pkg::ResolveError::Io,
+            AlreadyTruncated(_) | Other(_) | BadState => pkg::ResolveError::Internal,
         }
     }
 }
@@ -334,6 +336,7 @@ impl ToResolveError for pkg::cache::WriteBlobError {
         match self {
             Overwrite | Corrupt | UnexpectedResponse(_) | Fidl(_) => pkg::ResolveError::Io,
             NoSpace => pkg::ResolveError::NoSpace,
+            BytesNotNeeded(_) | Other(_) => pkg::ResolveError::Internal,
         }
     }
 }
