@@ -66,7 +66,8 @@ or *aux_offset* is not page aligned.
 **ZX_ERR_ACCESS_DENIED** *pager* does not have **ZX_RIGHT_MANAGE_VMO**, or *aux_vmo* does not have
 **ZX_RIGHT_WRITE**, or *pager_vmo* does not have **ZX_RIGHT_WRITE**.
 
-**ZX_ERR_BAD_STATE** *aux_vmo* is not in a state where it can supply the required pages.
+**ZX_ERR_BAD_STATE** *aux_vmo* is not in a state where it can supply the required pages, or
+*pager_vmo* has been detached from the *pager*.
 
 **ZX_ERR_NOT_SUPPORTED** *aux_vmo* is a physical VMO or a contiguous VMO.
 

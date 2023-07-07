@@ -33,6 +33,14 @@ but some requests may still be in flight. The pager service is free to ignore th
 kernel will resume and fault the threads that generated these requests. The final request the pager
 service will receive is a **ZX_PAGER_VMO_COMPLETE** request.
 
+The following pager syscalls will fail on a detached VMO:
+ - [`zx_pager_supply_pages()`]
+ - [`zx_pager_op_range()`] with **ZX_PAGER_OP_DIRTY** and **ZX_PAGER_OP_FAIL**
+And the following will continue working as before the detach:
+ - [`zx_pager_query_dirty_ranges()`]
+ - [`zx_pager_query_vmo_stats()`]
+ - [`zx_pager_op_range()`] with **ZX_PAGER_OP_WRITEBACK_BEGIN** and **ZX_PAGER_OP_WRITEBACK_END**
+
 The kernel is free to evict clean pages from detached VMOs, but will retain any dirty pages. Upon
 receiving the **ZX_PAGER_VMO_COMPLETE** request, the pager service is expected to query these ranges
 with [`zx_pager_query_dirty_ranges()`] and write them back with [`zx_pager_op_range()`]

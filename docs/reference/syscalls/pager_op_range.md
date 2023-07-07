@@ -123,6 +123,9 @@ this.
 **ZX_ERR_NOT_FOUND** *op* is **ZX_PAGER_OP_DIRTY** and the range denoted by *offset* and
 *length* contains unsupplied regions.
 
+**ZX_ERR_BAD_STATE** *op* is **ZX_PAGER_OP_DIRTY** or **ZX_PAGER_OP_FAIL** and *pager_vmo* has been
+detached from the *pager*.
+
 ## See also
 
  - [`zx_pager_create_vmo()`]
