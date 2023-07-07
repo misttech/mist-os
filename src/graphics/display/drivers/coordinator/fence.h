@@ -128,12 +128,21 @@ class FenceReference : public fbl::RefCounted<FenceReference>,
 // FenceCollection controls the access and lifecycles for several display::Fences.
 class FenceCollection : private FenceCallback {
  public:
-  FenceCollection() = delete;
+  // Creates an empty collection.
+  //
+  // `dispatcher` must outlive the newly created instance. `on_fence_fired` must
+  // be callable while the newly created instance is alive.
+  //
+  // `on_fence_fired` will be called when one of the fences fires. The call
+  // will be done from an async task processed using `dispatcher`.
+  FenceCollection(async_dispatcher_t* dispatcher,
+                  fit::function<void(FenceReference*)> on_fence_fired);
+
   FenceCollection(const FenceCollection&) = delete;
   FenceCollection(FenceCollection&&) = delete;
+  FenceCollection& operator=(const FenceCollection&) = delete;
+  FenceCollection& operator=(FenceCollection&&) = delete;
 
-  // fired_cb will be called whenever a fence fires, from dispatcher's threads.
-  FenceCollection(async_dispatcher_t* dispatcher, fit::function<void(FenceReference*)>&& fired_cb);
   virtual ~FenceCollection() = default;
 
   // Explicit destruction step. Use this to control when fences are destroyed.
@@ -152,8 +161,8 @@ class FenceCollection : private FenceCallback {
 
   mtx_t mtx_ = MTX_INIT;
   Fence::Map fences_ __TA_GUARDED(mtx_);
-  async_dispatcher_t* dispatcher_;
-  fit::function<void(FenceReference*)> fired_cb_;
+  async_dispatcher_t* const dispatcher_;
+  fit::function<void(FenceReference*)> on_fence_fired_;
 };
 
 }  // namespace display

@@ -134,8 +134,11 @@ FenceReference::~FenceReference() {
 }
 
 FenceCollection::FenceCollection(async_dispatcher_t* dispatcher,
-                                 fit::function<void(FenceReference*)>&& fired_cb)
-    : dispatcher_(dispatcher), fired_cb_(std::move(fired_cb)) {}
+                                 fit::function<void(FenceReference*)> on_fence_fired)
+    : dispatcher_(dispatcher), on_fence_fired_(std::move(on_fence_fired)) {
+  ZX_DEBUG_ASSERT(dispatcher != nullptr);
+  ZX_DEBUG_ASSERT(on_fence_fired_);
+}
 
 void FenceCollection::Clear() {
   // Use a temporary list to prevent double locking when resetting.
@@ -197,7 +200,7 @@ fbl::RefPtr<FenceReference> FenceCollection::GetFence(EventId id) {
   return fence.IsValid() ? fence->GetReference() : nullptr;
 }
 
-void FenceCollection::OnFenceFired(FenceReference* fence) { fired_cb_(fence); }
+void FenceCollection::OnFenceFired(FenceReference* fence) { on_fence_fired_(fence); }
 
 void FenceCollection::OnRefForFenceDead(Fence* fence) {
   fbl::AutoLock lock(&mtx_);
