@@ -5,8 +5,7 @@
 use {
     crate::bucket::Bucket, crate::digest, crate::plugin_output::ProcessesMemoryUsage,
     crate::write_human_readable_output::filter_and_order_vmo_groups_names_for_printing,
-    crate::ProfileMemoryOutput, anyhow::Result, digest::processed, ffx_writer::Writer,
-    std::io::Write,
+    crate::ProfileMemoryOutput, anyhow::Result, digest::processed, std::io::Write,
 };
 
 /// Transforms nanoseconds into seconds, because tools that use the CSV output expect seconds.
@@ -16,7 +15,10 @@ fn nanoseconds_to_seconds(time: u64) -> u64 {
 
 /// Write to `w` a detailed csv representation of `processes`:
 /// for every process, write the memory usage of every non-empty vmo group.
-fn write_detailed_processes_digest(w: &mut Writer, processes: &ProcessesMemoryUsage) -> Result<()> {
+fn write_detailed_processes_digest<W: Write>(
+    w: &mut W,
+    processes: &ProcessesMemoryUsage,
+) -> Result<()> {
     for process in &processes.process_data {
         let vmo_names = filter_and_order_vmo_groups_names_for_printing(&process.name_to_vmo_memory);
         for vmo_name in vmo_names {
@@ -39,7 +41,10 @@ fn write_detailed_processes_digest(w: &mut Writer, processes: &ProcessesMemoryUs
 
 /// Write to `w` a superficial csv presentation of `processes`:
 /// for every process, write how much memory they uses.
-fn write_short_processes_digest(w: &mut Writer, processes: &ProcessesMemoryUsage) -> Result<()> {
+fn write_short_processes_digest<W: Write>(
+    w: &mut W,
+    processes: &ProcessesMemoryUsage,
+) -> Result<()> {
     for process in &processes.process_data {
         writeln!(
             w,
@@ -56,7 +61,11 @@ fn write_short_processes_digest(w: &mut Writer, processes: &ProcessesMemoryUsage
 }
 
 /// Write to `w` a csv presentation of the buckets
-pub fn write_csv_buckets(w: &mut Writer, buckets: &Vec<Bucket>, capture_time: u64) -> Result<()> {
+pub fn write_csv_buckets<W: Write>(
+    w: &mut W,
+    buckets: &Vec<Bucket>,
+    capture_time: u64,
+) -> Result<()> {
     for bucket in buckets {
         writeln!(w, "{},{},{}", nanoseconds_to_seconds(capture_time), bucket.name, bucket.size,)?;
     }
@@ -67,7 +76,11 @@ pub fn write_csv_buckets(w: &mut Writer, buckets: &Vec<Bucket>, capture_time: u6
 /// If `bucketize` is true, output only the bucket data. Otherwise, output only the process data.
 /// Outputting more than just the process data (e.g. `total_committed_bytes_in_vmos`)
 /// is out of the scope of the CSV output.
-fn write_complete_digest(w: &mut Writer, digest: processed::Digest, bucketize: bool) -> Result<()> {
+fn write_complete_digest<W: Write>(
+    w: &mut W,
+    digest: processed::Digest,
+    bucketize: bool,
+) -> Result<()> {
     if bucketize {
         write_csv_buckets(w, &digest.buckets, digest.time)
     } else {
@@ -79,8 +92,8 @@ fn write_complete_digest(w: &mut Writer, digest: processed::Digest, bucketize: b
 }
 
 /// Write to `w` a csv presentation of `output`.
-pub fn write_csv_output<'a>(
-    w: &mut Writer,
+pub fn write_csv_output<'a, W: Write>(
+    w: &mut W,
     internal_output: ProfileMemoryOutput,
     bucketize: bool,
 ) -> Result<()> {
@@ -148,12 +161,12 @@ mod tests {
 
     #[test]
     fn write_csv_output_detailed_processes_test() {
-        let mut writer = Writer::new_test(None);
+        let mut writer = Vec::new();
         let _ = write_csv_output(&mut writer, process_digest_for_test(), false);
-        let actual_output = writer.test_output().unwrap();
+        let actual_output = std::str::from_utf8(&writer).unwrap();
         let expected_output =
             "123,4,vmoA,444,5555,66666\n123,4,vmoB,44,555,6666\n123,4,vmoC,4,55,666\n";
-        pretty_assertions::assert_eq!(actual_output, *expected_output);
+        pretty_assertions::assert_eq!(actual_output, expected_output);
     }
 
     fn complete_digest_for_test() -> crate::ProfileMemoryOutput {
@@ -175,11 +188,11 @@ mod tests {
 
     #[test]
     fn write_csv_output_short_processes_test() {
-        let mut writer = Writer::new_test(None);
+        let mut writer = Vec::new();
         let _ = write_csv_output(&mut writer, complete_digest_for_test(), false);
-        let actual_output = writer.test_output().unwrap();
+        let actual_output = std::str::from_utf8(&writer).unwrap();
         let expected_output = "123,4,P,11,22,33\n";
-        pretty_assertions::assert_eq!(actual_output, *expected_output);
+        pretty_assertions::assert_eq!(actual_output, expected_output);
     }
 
     fn bucket_data_for_test() -> crate::ProfileMemoryOutput {
@@ -198,10 +211,10 @@ mod tests {
 
     #[test]
     fn write_csv_output_buckets_test() {
-        let mut writer = Writer::new_test(None);
+        let mut writer = Vec::new();
         let _ = write_csv_output(&mut writer, bucket_data_for_test(), true);
-        let actual_output = writer.test_output().unwrap();
+        let actual_output = std::str::from_utf8(&writer).unwrap();
         let expected_output = "567,Bucket0,42\n567,Bucket1,43\n";
-        pretty_assertions::assert_eq!(actual_output, *expected_output);
+        pretty_assertions::assert_eq!(actual_output, expected_output);
     }
 }

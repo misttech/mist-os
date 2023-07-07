@@ -9,7 +9,6 @@ use {
     crate::ProfileMemoryOutput,
     anyhow::Result,
     digest::processed,
-    ffx_writer::Writer,
     humansize::{file_size_opts::BINARY, FileSize},
     processed::RetainedMemory,
     std::cmp::Reverse,
@@ -37,8 +36,8 @@ pub fn filter_and_order_vmo_groups_names_for_printing(
 }
 
 /// Print to `w` a human-readable presentation of `processes`.
-fn print_processes_digest(
-    w: &mut Writer,
+fn print_processes_digest<W: Write>(
+    w: &mut W,
     processes: Vec<processed::Process>,
     size_formatter: fn(u64) -> String,
 ) -> Result<()> {
@@ -99,8 +98,8 @@ fn print_processes_digest(
 }
 
 /// Print to `w` a human-readable presentation of `digest`.
-fn print_complete_digest(
-    w: &mut Writer,
+fn print_complete_digest<W: Write>(
+    w: &mut W,
     digest: processed::Digest,
     size_formatter: fn(u64) -> String,
 ) -> Result<()> {
@@ -138,8 +137,8 @@ fn print_complete_digest(
 }
 
 /// Print to `w` a human-readable presentation of `output`.
-pub fn write_human_readable_output<'a>(
-    w: &mut Writer,
+pub fn write_human_readable_output<'a, W: Write>(
+    w: &mut W,
     output: ProfileMemoryOutput,
     exact_sizes: bool,
 ) -> Result<()> {
@@ -243,9 +242,9 @@ mod tests {
 
     #[test]
     fn write_human_readable_output_exact_sizes_test() {
-        let mut writer = Writer::new_test(None);
+        let mut writer = Vec::new();
         let _ = write_human_readable_output(&mut writer, data_for_test(), true);
-        let actual_output = writer.test_output().unwrap();
+        let actual_output = std::str::from_utf8(&writer).unwrap();
         let expected_output = r#"Process name: P
 Process koid: 4
 Private:      11 B
@@ -257,14 +256,14 @@ Total:        33 B (Private + Shared unscaled)
     vmoC       4444 B      55555 B     666666 B     (shared)
 
 "#;
-        pretty_assertions::assert_eq!(actual_output, *expected_output);
+        pretty_assertions::assert_eq!(actual_output, expected_output);
     }
 
     #[test]
     fn write_human_readable_output_human_friendly_sizes_test() {
-        let mut writer = Writer::new_test(None);
+        let mut writer = Vec::new();
         let _ = write_human_readable_output(&mut writer, data_for_test(), false);
-        let actual_output = writer.test_output().unwrap();
+        let actual_output = std::str::from_utf8(&writer).unwrap();
         let expected_output = r#"Process name: P
 Process koid: 4
 Private:      11 B
@@ -276,6 +275,6 @@ Total:        33 B (Private + Shared unscaled)
     vmoC     4.34 KiB    54.25 KiB   651.04 KiB     (shared)
 
 "#;
-        pretty_assertions::assert_eq!(actual_output, *expected_output);
+        pretty_assertions::assert_eq!(actual_output, expected_output);
     }
 }

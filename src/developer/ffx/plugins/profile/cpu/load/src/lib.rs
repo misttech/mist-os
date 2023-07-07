@@ -4,41 +4,55 @@
 
 use {
     anyhow::{bail, Result},
-    errors::ffx_bail,
-    ffx_core::ffx_plugin,
-    ffx_cpu_load_args as args_mod, fidl_fuchsia_developer_remotecontrol as rc,
-    fidl_fuchsia_kernel as fstats,
+    async_trait::async_trait,
+    errors::{ffx_bail, ffx_error},
+    ffx_cpu_load_args as args_mod,
+    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
+    fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_kernel as fstats,
     fidl_fuchsia_metricslogger_test::{self as fmetrics, CpuLoad, Metric},
     fuchsia_zircon_status::Status,
 };
 
-#[ffx_plugin(
-    fmetrics::MetricsLoggerProxy = "core/metrics-logger:expose:fuchsia.metricslogger.test.\
-    MetricsLogger"
-)]
-pub async fn load(
-    rcs_proxy: rc::RemoteControlProxy,
-    cpu_logger: fmetrics::MetricsLoggerProxy,
+#[derive(FfxTool)]
+pub struct CpuLoadTool {
+    #[command]
     cmd: args_mod::CpuLoadCommand,
-) -> Result<()> {
-    match (cmd.subcommand, cmd.duration) {
-        (Some(subcommand), None) => match subcommand {
-            args_mod::SubCommand::Start(start_cmd) => start(cpu_logger, start_cmd).await,
-            args_mod::SubCommand::Stop(_) => stop(cpu_logger).await,
-        },
-        (None, Some(duration)) => {
-            let (stats_proxy, stats_server_end) = fidl::endpoints::create_proxy().unwrap();
-            if let Err(i) = rcs_proxy.kernel_stats(stats_server_end).await? {
-                bail!("Could not open fuchsia.kernel.Stats: {}", Status::from_raw(i));
-            }
+    rcs_proxy: rc::RemoteControlProxy,
+    #[with(moniker("/core/metrics-logger"))]
+    cpu_logger: fmetrics::MetricsLoggerProxy,
+}
 
-            measure(stats_proxy, duration, &mut std::io::stdout()).await
-        }
-        _ => bail!(
-            "Please specify a duration for immediate load display, or alternatively, utilize \
+fho::embedded_plugin!(CpuLoadTool);
+
+#[async_trait(?Send)]
+impl FfxMain for CpuLoadTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        let CpuLoadTool { cmd, rcs_proxy, cpu_logger } = self;
+        match (cmd.subcommand, cmd.duration) {
+            (Some(subcommand), None) => match subcommand {
+                args_mod::SubCommand::Start(start_cmd) => start(cpu_logger, start_cmd).await?,
+                args_mod::SubCommand::Stop(_) => stop(cpu_logger).await?,
+            },
+            (None, Some(duration)) => {
+                let (stats_proxy, stats_server_end) = fidl::endpoints::create_proxy().unwrap();
+                if let Err(i) = rcs_proxy
+                    .kernel_stats(stats_server_end)
+                    .await
+                    .map_err(|err| ffx_error!("FIDL error: {err}"))?
+                {
+                    ffx_bail!("Could not open fuchsia.kernel.Stats: {}", Status::from_raw(i));
+                }
+
+                measure(stats_proxy, duration, &mut writer).await?;
+            }
+            _ => ffx_bail!(
+                "Please specify a duration for immediate load display, or alternatively, utilize \
             the start/stop subcommand to instruct the metrics-logger component to record the \
             CPU usage data on the target."
-        ),
+            ),
+        }
+        Ok(())
     }
 }
 
@@ -143,7 +157,7 @@ mod tests {
     // Stop), and returns a specific error
     macro_rules! make_proxy {
         ($request_type:tt, $error_type:tt) => {
-            setup_fake_cpu_logger(move |req| match req {
+            fho::testing::fake_proxy(move |req| match req {
                 fmetrics::MetricsLoggerRequest::$request_type { responder, .. } => {
                     responder.send(Err(fmetrics::MetricsLoggerError::$error_type)).unwrap();
                 }
@@ -234,7 +248,7 @@ Total: 3.76%
             output_to_syslog: false,
         };
         let (mut sender, mut receiver) = mpsc::channel(1);
-        let proxy = setup_fake_cpu_logger(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             fmetrics::MetricsLoggerRequest::StartLogging {
                 client_id,
                 metrics,
@@ -265,7 +279,7 @@ Total: 3.76%
         let args =
             args_mod::StartCommand { interval: ONE_SEC, duration: None, output_to_syslog: false };
         let (mut sender, mut receiver) = mpsc::channel(1);
-        let proxy = setup_fake_cpu_logger(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             fmetrics::MetricsLoggerRequest::StartLoggingForever {
                 client_id,
                 metrics,
@@ -293,7 +307,7 @@ Total: 3.76%
     async fn test_request_dispatch_stop_logging() {
         // Stop logging
         let (mut sender, mut receiver) = mpsc::channel(1);
-        let proxy = setup_fake_cpu_logger(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             fmetrics::MetricsLoggerRequest::StopLogging { client_id, responder } => {
                 assert_eq!(String::from("ffx_cpu"), client_id);
                 responder.send(true).unwrap();
@@ -307,7 +321,7 @@ Total: 3.76%
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stop_logging_error() {
-        let proxy = setup_fake_cpu_logger(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             fmetrics::MetricsLoggerRequest::StopLogging { responder, .. } => {
                 responder.send(false).unwrap();
             }

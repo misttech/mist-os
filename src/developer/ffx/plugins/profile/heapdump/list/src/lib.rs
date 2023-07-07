@@ -4,12 +4,14 @@
 
 use {
     anyhow::{Context, Result},
-    ffx_core::ffx_plugin,
+    async_trait::async_trait,
+    errors::ffx_error,
     ffx_profile_heapdump_common::{
         build_process_selector, check_collector_error, connect_to_collector,
     },
     ffx_profile_heapdump_list_args::ListCommand,
-    ffx_writer::Writer,
+    ffx_writer::ToolIO,
+    fho::{AvailabilityFlag, FfxMain, FfxTool, MachineWriter},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
     fidl_fuchsia_memory_heapdump_client as fheapdump_client,
@@ -51,42 +53,59 @@ async fn receive_list_of_stored_snapshots(
     return Ok(result);
 }
 
-#[ffx_plugin("ffx_profile_heapdump")]
-pub async fn list(
-    remote_control: RemoteControlProxy,
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("ffx_profile_heapdump"))]
+pub struct ListTool {
+    #[command]
     cmd: ListCommand,
-    #[ffx(machine = Vec<StoredSnapshot>)] mut writer: Writer,
-) -> Result<()> {
-    let (iterator_proxy, iterator_server) = create_proxy()?;
-    let request = fheapdump_client::CollectorListStoredSnapshotsRequest {
-        iterator: Some(iterator_server),
-        process_selector: match (cmd.by_name, cmd.by_koid) {
-            (None, None) => None,
-            (by_name, by_koid) => Some(build_process_selector(by_name, by_koid)?),
-        },
-        ..Default::default()
-    };
+    remote_control: RemoteControlProxy,
+}
 
-    let collector = connect_to_collector(&remote_control, cmd.collector).await?;
-    check_collector_error(collector.list_stored_snapshots(request).await?)?;
+fho::embedded_plugin!(ListTool);
 
-    let stored_snapshots = receive_list_of_stored_snapshots(iterator_proxy).await?;
-    if writer.is_machine() {
-        writer.machine(&stored_snapshots)?;
-    } else {
-        let mut table = Table::new();
-        table.set_titles(row!["ID", "NAME", "PROCESS"]);
+#[async_trait(?Send)]
+impl FfxMain for ListTool {
+    type Writer = MachineWriter<Vec<StoredSnapshot>>;
 
-        for elem in stored_snapshots {
-            table.add_row(row![
-                format!("{}", elem.snapshot_id),
-                elem.snapshot_name,
-                format!("{}[{}]", elem.process_name, elem.process_koid),
-            ]);
+    /// Forwards the specified memory pressure level to the fuchsia.memory.Debugger FIDL interface.
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        let ListTool { cmd, remote_control } = self;
+        let (iterator_proxy, iterator_server) = create_proxy().unwrap();
+        let request = fheapdump_client::CollectorListStoredSnapshotsRequest {
+            iterator: Some(iterator_server),
+            process_selector: match (cmd.by_name, cmd.by_koid) {
+                (None, None) => None,
+                (by_name, by_koid) => Some(build_process_selector(by_name, by_koid)?),
+            },
+            ..Default::default()
+        };
+
+        let collector = connect_to_collector(&remote_control, cmd.collector).await?;
+        check_collector_error(
+            collector
+                .list_stored_snapshots(request)
+                .await
+                .map_err(|err| ffx_error!("Failed to list stored snapshots: {err}"))?,
+        )?;
+
+        let stored_snapshots = receive_list_of_stored_snapshots(iterator_proxy).await?;
+        if writer.is_machine() {
+            writer.machine(&stored_snapshots)?;
+        } else {
+            let mut table = Table::new();
+            table.set_titles(row!["ID", "NAME", "PROCESS"]);
+
+            for elem in stored_snapshots {
+                table.add_row(row![
+                    format!("{}", elem.snapshot_id),
+                    elem.snapshot_name,
+                    format!("{}[{}]", elem.process_name, elem.process_koid),
+                ]);
+            }
+
+            table.print(&mut writer).map_err(|err| ffx_error!("Failed to print table: {err}"))?;
         }
 
-        table.print(&mut writer)?;
+        Ok(())
     }
-
-    Ok(())
 }

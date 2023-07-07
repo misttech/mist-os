@@ -4,23 +4,34 @@
 
 use {
     anyhow::Result,
+    async_trait::async_trait,
     errors::ffx_bail,
-    ffx_core::ffx_plugin,
     ffx_temperature_logger_args as args_mod,
+    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_metricslogger_test::{self as fmetrics, Metric, StatisticsArgs, Temperature},
 };
 
-#[ffx_plugin(
-    fmetrics::MetricsLoggerProxy = "core/metrics-logger:expose:fuchsia.metricslogger.test.\
-    MetricsLogger"
-)]
-pub async fn logger(
-    temperature_logger: fmetrics::MetricsLoggerProxy,
+#[derive(FfxTool)]
+pub struct TemperatureLoggerTool {
+    #[command]
     cmd: args_mod::Command,
-) -> Result<()> {
-    match cmd.subcommand {
-        args_mod::SubCommand::Start(start_cmd) => start(temperature_logger, start_cmd).await,
-        args_mod::SubCommand::Stop(_) => stop(temperature_logger).await,
+    #[with(moniker("/core/metrics-logger"))]
+    temperature_logger: fmetrics::MetricsLoggerProxy,
+}
+
+fho::embedded_plugin!(TemperatureLoggerTool);
+
+#[async_trait(?Send)]
+impl FfxMain for TemperatureLoggerTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        match self.cmd.subcommand {
+            args_mod::SubCommand::Start(start_cmd) => {
+                start(self.temperature_logger, start_cmd).await?
+            }
+            args_mod::SubCommand::Stop(_) => stop(self.temperature_logger).await?,
+        };
+        Ok(())
     }
 }
 
@@ -106,7 +117,7 @@ mod tests {
     // Stop), and returns a specific error
     macro_rules! make_logger {
         ($request_type:tt, $error_type:tt) => {
-            setup_fake_temperature_logger(move |req| match req {
+            fho::testing::fake_proxy(move |req| match req {
                 fmetrics::MetricsLoggerRequest::$request_type { responder, .. } => {
                     responder.send(Err(fmetrics::MetricsLoggerError::$error_type)).unwrap();
                 }
@@ -133,7 +144,7 @@ mod tests {
             output_stats_to_syslog: false,
         };
         let (mut sender, mut receiver) = mpsc::channel(1);
-        let logger = setup_fake_temperature_logger(move |req| match req {
+        let logger = fho::testing::fake_proxy(move |req| match req {
             fmetrics::MetricsLoggerRequest::StartLogging {
                 client_id,
                 metrics,
@@ -177,7 +188,7 @@ mod tests {
             output_stats_to_syslog: false,
         };
         let (mut sender, mut receiver) = mpsc::channel(1);
-        let logger = setup_fake_temperature_logger(move |req| match req {
+        let logger = fho::testing::fake_proxy(move |req| match req {
             fmetrics::MetricsLoggerRequest::StartLoggingForever {
                 client_id,
                 metrics,
@@ -213,7 +224,7 @@ mod tests {
     async fn test_request_dispatch_stop_logging() {
         // Stop logging
         let (mut sender, mut receiver) = mpsc::channel(1);
-        let logger = setup_fake_temperature_logger(move |req| match req {
+        let logger = fho::testing::fake_proxy(move |req| match req {
             fmetrics::MetricsLoggerRequest::StopLogging { client_id, responder } => {
                 assert_eq!(String::from("ffx_temperature"), client_id);
                 responder.send(true).unwrap();
@@ -227,7 +238,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stop_logging_error() {
-        let logger = setup_fake_temperature_logger(move |req| match req {
+        let logger = fho::testing::fake_proxy(move |req| match req {
             fmetrics::MetricsLoggerRequest::StopLogging { responder, .. } => {
                 responder.send(false).unwrap();
             }

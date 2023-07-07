@@ -3,26 +3,49 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Result,
-    ffx_core::ffx_plugin,
+    async_trait::async_trait,
+    errors::ffx_error,
     ffx_profile_heapdump_common::{check_collector_error, connect_to_collector, export_to_pprof},
     ffx_profile_heapdump_download_args::DownloadCommand,
-    ffx_writer::Writer,
+    fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
 };
 
-#[ffx_plugin("ffx_profile_heapdump")]
-pub async fn download(
-    remote_control: RemoteControlProxy,
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("ffx_profile_heapdump"))]
+pub struct DownloadTool {
+    #[command]
     cmd: DownloadCommand,
-    _writer: Writer,
-) -> Result<()> {
-    let collector = connect_to_collector(&remote_control, cmd.collector).await?;
-    let result = collector.download_stored_snapshot(cmd.snapshot_id).await?;
-    let receiver_stream = check_collector_error(result)?.into_stream()?;
+    remote_control: RemoteControlProxy,
+}
 
-    let snapshot = heapdump_snapshot::Snapshot::receive_from(receiver_stream).await?;
-    export_to_pprof(&snapshot, &mut std::fs::File::create(cmd.output_file)?)?;
+fho::embedded_plugin!(DownloadTool);
 
-    Ok(())
+#[async_trait(?Send)]
+impl FfxMain for DownloadTool {
+    type Writer = SimpleWriter;
+
+    /// Forwards the specified memory pressure level to the fuchsia.memory.Debugger FIDL interface.
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        let DownloadTool { cmd, remote_control } = self;
+        let collector = connect_to_collector(&remote_control, cmd.collector)
+            .await
+            .map_err(|err| ffx_error!("Failed to connect to collector: {err}"))?;
+        let result = collector
+            .download_stored_snapshot(cmd.snapshot_id)
+            .await
+            .map_err(|err| ffx_error!("Failed to download stored snapshot: {err}"))?;
+        let receiver_stream = check_collector_error(result)?.into_stream().unwrap();
+
+        let snapshot = heapdump_snapshot::Snapshot::receive_from(receiver_stream)
+            .await
+            .map_err(|err| ffx_error!("Failed to receive snapshot: {err}"))?;
+        export_to_pprof(
+            &snapshot,
+            &mut std::fs::File::create(cmd.output_file)
+                .map_err(|err| ffx_error!("Failed to create file: {err}"))?,
+        )?;
+
+        Ok(())
+    }
 }

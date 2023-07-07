@@ -4,24 +4,40 @@
 
 use {
     anyhow::Result,
+    async_trait::async_trait,
     errors::ffx_bail,
-    ffx_core::ffx_plugin,
     ffx_profile_heapdump_common::{
         build_process_selector, check_collector_error, connect_to_collector, export_to_pprof,
     },
     ffx_profile_heapdump_snapshot_args::SnapshotCommand,
-    ffx_writer::Writer,
+    fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
     fidl_fuchsia_memory_heapdump_client as fheapdump_client,
     std::io::Write,
 };
 
-#[ffx_plugin("ffx_profile_heapdump")]
-pub async fn snapshot(
-    remote_control: RemoteControlProxy,
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("ffx_profile_heapdump"))]
+pub struct SnapshotTool {
+    #[command]
     cmd: SnapshotCommand,
-    _writer: Writer,
-) -> Result<()> {
+    remote_control: RemoteControlProxy,
+}
+
+fho::embedded_plugin!(SnapshotTool);
+
+#[async_trait(?Send)]
+impl FfxMain for SnapshotTool {
+    type Writer = SimpleWriter;
+
+    /// Forwards the specified memory pressure level to the fuchsia.memory.Debugger FIDL interface.
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        snapshot(self.remote_control, self.cmd).await?;
+        Ok(())
+    }
+}
+
+pub async fn snapshot(remote_control: RemoteControlProxy, cmd: SnapshotCommand) -> Result<()> {
     let process_selector = build_process_selector(cmd.by_name, cmd.by_koid)?;
     let contents_dir = cmd.output_contents_dir.as_ref().map(std::path::Path::new);
     let request = fheapdump_client::CollectorTakeLiveSnapshotRequest {

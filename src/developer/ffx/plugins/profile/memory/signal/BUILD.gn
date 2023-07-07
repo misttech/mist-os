@@ -9,7 +9,12 @@ ffx_plugin("ffx_profile_memory_signal") {
   edition = "2021"
 
   sources = [ "src/lib.rs" ]
-  deps = [ "//sdk/fidl/fuchsia.memory:fuchsia.memory_rust" ]
+  deps = [
+    "//sdk/fidl/fuchsia.memory:fuchsia.memory_rust",
+    "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:async-trait",
+  ]
 
   args_sources = [ "src/args.rs" ]
   args_deps =

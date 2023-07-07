@@ -16,10 +16,11 @@ use {
     crate::write_human_readable_output::write_human_readable_output,
     anyhow::Context,
     anyhow::Result,
+    async_trait::async_trait,
     digest::{processed, raw},
-    ffx_core::ffx_plugin,
     ffx_profile_memory_args::MemoryCommand,
-    ffx_writer::Writer,
+    ffx_writer::ToolIO,
+    fho::{FfxMain, FfxTool, MachineWriter},
     fidl::endpoints::DiscoverableProtocolMarker,
     fidl::Socket,
     fidl_fuchsia_developer_remotecontrol as rc,
@@ -31,6 +32,25 @@ use {
     std::io::Write,
     std::time::Duration,
 };
+
+#[derive(FfxTool)]
+pub struct MemoryTool {
+    #[command]
+    cmd: MemoryCommand,
+    remote_control: rc::RemoteControlProxy,
+}
+
+fho::embedded_plugin!(MemoryTool);
+
+#[async_trait(?Send)]
+impl FfxMain for MemoryTool {
+    type Writer = MachineWriter<ProfileMemoryOutput>;
+    /// Forwards the specified memory pressure level to the fuchsia.memory.Debugger FIDL interface.
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        plugin_entrypoint(self.remote_control, self.cmd, writer).await?;
+        Ok(())
+    }
+}
 
 /// Abstracts a JSON collector.
 pub trait JsonCollector {
@@ -83,12 +103,11 @@ async fn remotecontrol_connect<S: DiscoverableProtocolMarker>(
     Ok(proxy)
 }
 
-#[ffx_plugin()]
 /// Prints a memory digest to stdout.
 pub async fn plugin_entrypoint(
     remote_control: rc::RemoteControlProxy,
     cmd: MemoryCommand,
-    #[ffx(machine = ProfileMemoryOutput)] mut writer: Writer,
+    mut writer: MachineWriter<ProfileMemoryOutput>,
 ) -> Result<()> {
     let collector: Box<dyn JsonCollector> = {
         // Attempt to connect to memory monitor's fuchsia.memory.inspection.Collector.
@@ -131,7 +150,7 @@ pub async fn plugin_entrypoint(
 pub async fn print_output(
     collector: &dyn JsonCollector,
     cmd: &MemoryCommand,
-    writer: &mut Writer,
+    writer: &mut MachineWriter<ProfileMemoryOutput>,
 ) -> Result<()> {
     if cmd.debug_json {
         let raw_data = get_raw_data(collector).await?;
@@ -150,7 +169,8 @@ pub async fn print_output(
             write_csv_output(writer, output, cmd.buckets)
         } else {
             if writer.is_machine() {
-                writer.machine(&output)
+                writer.machine(&output)?;
+                Ok(())
             } else {
                 write_human_readable_output(writer, output, cmd.exact_sizes)
             }

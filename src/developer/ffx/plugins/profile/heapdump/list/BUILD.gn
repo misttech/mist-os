@@ -11,10 +11,13 @@ ffx_plugin("ffx_profile_heapdump_list") {
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.memory.heapdump.client:fuchsia.memory.heapdump.client_rust",
+    "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/profile/heapdump/common:ffx_profile_heapdump_common",
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:prettytable-rs",
     "//third_party/rust_crates:serde",
   ]

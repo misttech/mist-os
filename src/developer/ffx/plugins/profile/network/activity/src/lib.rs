@@ -4,23 +4,32 @@
 
 use {
     anyhow::Result,
+    async_trait::async_trait,
     errors::ffx_bail,
-    ffx_core::ffx_plugin,
     ffx_network_activity_args as args_mod,
+    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_metricslogger_test::{self as fmetrics, Metric, NetworkActivity},
 };
 
-#[ffx_plugin(
-    fmetrics::MetricsLoggerProxy = "core/metrics-logger:expose:fuchsia.metricslogger.test.\
-    MetricsLogger"
-)]
-pub async fn activity(
-    network_logger: fmetrics::MetricsLoggerProxy,
+#[derive(FfxTool)]
+pub struct NetworkActivityTool {
+    #[command]
     cmd: args_mod::Command,
-) -> Result<()> {
-    match cmd.subcommand {
-        args_mod::SubCommand::Start(start_cmd) => start(network_logger, start_cmd).await,
-        args_mod::SubCommand::Stop(_) => stop(network_logger).await,
+    #[with(moniker("/core/metrics-logger"))]
+    network_logger: fmetrics::MetricsLoggerProxy,
+}
+
+fho::embedded_plugin!(NetworkActivityTool);
+
+#[async_trait(?Send)]
+impl FfxMain for NetworkActivityTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        match self.cmd.subcommand {
+            args_mod::SubCommand::Start(start_cmd) => start(self.network_logger, start_cmd).await?,
+            args_mod::SubCommand::Stop(_) => stop(self.network_logger).await?,
+        }
+        Ok(())
     }
 }
 
@@ -99,7 +108,7 @@ mod tests {
     // Stop), and returns a specific error
     macro_rules! make_proxy {
         ($request_type:tt, $error_type:tt) => {
-            setup_fake_network_logger(move |req| match req {
+            fho::testing::fake_proxy(move |req| match req {
                 fmetrics::MetricsLoggerRequest::$request_type { responder, .. } => {
                     responder.send(Err(fmetrics::MetricsLoggerError::$error_type)).unwrap();
                 }
@@ -124,7 +133,7 @@ mod tests {
             output_to_syslog: false,
         };
         let (mut sender, mut receiver) = mpsc::channel(1);
-        let proxy = setup_fake_network_logger(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             fmetrics::MetricsLoggerRequest::StartLogging {
                 client_id,
                 metrics,
@@ -158,7 +167,7 @@ mod tests {
         let args =
             args_mod::StartCommand { interval: ONE_SEC, duration: None, output_to_syslog: false };
         let (mut sender, mut receiver) = mpsc::channel(1);
-        let proxy = setup_fake_network_logger(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             fmetrics::MetricsLoggerRequest::StartLoggingForever {
                 client_id,
                 metrics,
@@ -189,7 +198,7 @@ mod tests {
     async fn test_request_dispatch_stop_logging() {
         // Stop logging
         let (mut sender, mut receiver) = mpsc::channel(1);
-        let proxy = setup_fake_network_logger(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             fmetrics::MetricsLoggerRequest::StopLogging { client_id, responder } => {
                 assert_eq!(String::from("ffx_network"), client_id);
                 responder.send(true).unwrap();
@@ -203,7 +212,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stop_logging_error() {
-        let proxy = setup_fake_network_logger(move |req| match req {
+        let proxy = fho::testing::fake_proxy(move |req| match req {
             fmetrics::MetricsLoggerRequest::StopLogging { responder, .. } => {
                 responder.send(false).unwrap();
             }

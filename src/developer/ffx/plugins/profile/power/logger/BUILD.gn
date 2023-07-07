@@ -12,7 +12,9 @@ ffx_plugin("ffx_power_logger") {
 
   deps = [
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/testing/metrics-logger/fuchsia.metricslogger.test:fuchsia.metricslogger.test_rust",
+    "//third_party/rust_crates:async-trait",
   ]
 
   test_deps = [

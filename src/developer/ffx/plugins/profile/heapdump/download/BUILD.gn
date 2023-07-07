@@ -10,10 +10,11 @@ ffx_plugin("ffx_profile_heapdump_download") {
 
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/plugins/profile/heapdump/common:ffx_profile_heapdump_common",
     "//src/performance/memory/heapdump/lib/heapdump_snapshot",
-    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
   ]
 
   args_sources = [ "src/args.rs" ]
