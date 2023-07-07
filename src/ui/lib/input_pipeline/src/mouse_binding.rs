@@ -404,7 +404,7 @@ impl MouseBinding {
         let mouse_report: &fidl_input_report::MouseInputReport = match &report.mouse {
             Some(mouse) => mouse,
             None => {
-                inspect_status.count_filtered_reports(1u64);
+                inspect_status.count_filtered_report(&report);
                 return (previous_report, None);
             }
         };

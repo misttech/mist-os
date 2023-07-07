@@ -543,7 +543,7 @@ fn process_touch_screen_reports(
     let touch_report: &fidl_fuchsia_input_report::TouchInputReport = match &report.touch {
         Some(touch) => touch,
         None => {
-            inspect_status.count_filtered_reports(1u64);
+            inspect_status.count_filtered_report(&report);
             return (previous_report, None);
         }
     };
@@ -558,7 +558,7 @@ fn process_touch_screen_reports(
 
     // Don't send an event if there are no new contacts.
     if previous_contacts.is_empty() && current_contacts.is_empty() {
-        inspect_status.count_filtered_reports(1u64);
+        inspect_status.count_filtered_report(&report);
         return (Some(report), None);
     }
 
@@ -621,7 +621,7 @@ fn process_touchpad_reports(
     let touch_report: &fidl_fuchsia_input_report::TouchInputReport = match &report.touch {
         Some(touch) => touch,
         None => {
-            inspect_status.count_filtered_reports(1u64);
+            inspect_status.count_filtered_report(&report);
             return (None, None);
         }
     };

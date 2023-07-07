@@ -295,7 +295,7 @@ impl LightSensorBinding {
         // Input devices can have multiple types so ensure `report` is a KeyboardInputReport.
         let sensor = match &report.sensor {
             None => {
-                inspect_status.count_filtered_reports(1u64);
+                inspect_status.count_filtered_report(&report);
                 return (previous_report, None);
             }
             Some(sensor) => sensor,
@@ -303,7 +303,7 @@ impl LightSensorBinding {
 
         let values = match &sensor.values {
             None => {
-                inspect_status.count_filtered_reports(1u64);
+                inspect_status.count_filtered_report(&report);
                 return (None, None);
             }
             Some(values) => values,

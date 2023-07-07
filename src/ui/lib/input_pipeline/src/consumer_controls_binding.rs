@@ -224,7 +224,7 @@ impl ConsumerControlsBinding {
                 .map(|buttons| buttons.iter().cloned().collect())
                 .unwrap_or_default(),
             None => {
-                inspect_status.count_filtered_reports(1u64);
+                inspect_status.count_filtered_report(&report);
                 return (previous_report, None);
             }
         };

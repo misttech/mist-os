@@ -441,7 +441,7 @@ impl KeyboardBinding {
         // Input devices can have multiple types so ensure `report` is a KeyboardInputReport.
         match &report.keyboard {
             None => {
-                inspect_status.count_filtered_reports(1u64);
+                inspect_status.count_filtered_report(&report);
                 return (previous_report, None);
             }
             _ => (),
@@ -456,7 +456,7 @@ impl KeyboardBinding {
                 // In this case the report is treated as malformed, and the previous report is not
                 // updated.
                 tracing::error!("Failed to parse keyboard keys: {:?}", report);
-                inspect_status.count_filtered_reports(1u64);
+                inspect_status.count_filtered_report(&report);
                 return (previous_report, None);
             }
         };

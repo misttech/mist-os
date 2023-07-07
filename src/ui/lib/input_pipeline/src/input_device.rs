@@ -132,8 +132,14 @@ impl InputDeviceStatus {
         }
     }
 
-    pub fn count_filtered_reports(&self, count: u64) {
-        self.reports_filtered_count.add(count);
+    pub fn count_filtered_report(&self, report: &InputReport) {
+        self.reports_filtered_count.add(1);
+        match report.event_time {
+            Some(event_time) => self
+                .driver_to_binding_latency_ms
+                .insert(((self.now)() - zx::Time::from_nanos(event_time)).into_millis()),
+            None => (),
+        }
     }
 
     pub fn count_generated_event(&self, event: InputEvent) {
@@ -623,7 +629,9 @@ mod tests {
     #[test_case(1; "positive value")]
     #[test_case(i64::MAX; "max value")]
     #[fuchsia::test(allow_stalls = false)]
-    async fn input_device_status_updates_latency_histogram(latency_nsec: i64) {
+    async fn input_device_status_updates_latency_histogram_on_count_received_report(
+        latency_nsec: i64,
+    ) {
         let mut expected_histogram =
             fuchsia_inspect::HistogramAssertion::exponential(super::LATENCY_HISTOGRAM_PROPERTIES);
         let inspector = fuchsia_inspect::Inspector::default();
@@ -633,6 +641,30 @@ mod tests {
         );
         input_device_status
             .count_received_report(&InputReport { event_time: Some(0), ..InputReport::default() });
+        expected_histogram.insert_values([latency_nsec / 1000 / 1000]);
+        fuchsia_inspect::assert_data_tree!(inspector, root: contains {
+            driver_to_binding_latency_ms: expected_histogram,
+        });
+    }
+
+    #[test_case(i64::MIN; "min value")]
+    #[test_case(-1; "negative value")]
+    #[test_case(0; "zero")]
+    #[test_case(1; "positive value")]
+    #[test_case(i64::MAX; "max value")]
+    #[fuchsia::test(allow_stalls = false)]
+    async fn input_device_status_updates_latency_histogram_on_count_filtered_report(
+        latency_nsec: i64,
+    ) {
+        let mut expected_histogram =
+            fuchsia_inspect::HistogramAssertion::exponential(super::LATENCY_HISTOGRAM_PROPERTIES);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let input_device_status = InputDeviceStatus::new_internal(
+            inspector.root().clone_weak(),
+            Box::new(move || zx::Time::from_nanos(latency_nsec)),
+        );
+        input_device_status
+            .count_filtered_report(&InputReport { event_time: Some(0), ..InputReport::default() });
         expected_histogram.insert_values([latency_nsec / 1000 / 1000]);
         fuchsia_inspect::assert_data_tree!(inspector, root: contains {
             driver_to_binding_latency_ms: expected_histogram,
