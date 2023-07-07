@@ -4,6 +4,8 @@
 
 #include "src/ui/scenic/lib/display/singleton_display_service.h"
 
+#include "fuchsia/ui/composition/internal/cpp/fidl.h"
+
 namespace scenic_impl {
 namespace display {
 
@@ -28,9 +30,28 @@ void SingletonDisplayService::GetMetrics(
   callback(std::move(metrics));
 }
 
+void SingletonDisplayService::GetEvent(
+    fuchsia::ui::composition::internal::DisplayOwnership::GetEventCallback callback) {
+  // These constants are defined as raw hex in the FIDL file, so we confirm here that they are the
+  // same values as the expected constants in the ZX headers.
+  static_assert(fuchsia::ui::composition::internal::SIGNAL_DISPLAY_NOT_OWNED == ZX_USER_SIGNAL_0,
+                "Bad constant");
+  static_assert(fuchsia::ui::composition::internal::SIGNAL_DISPLAY_OWNED == ZX_USER_SIGNAL_1,
+                "Bad constant");
+
+  zx::event dup;
+  if (display_->ownership_event().duplicate(ZX_RIGHTS_BASIC, &dup) != ZX_OK) {
+    FX_LOGS(ERROR) << "Display ownership event duplication error.";
+    callback(zx::event());
+  } else {
+    callback(std::move(dup));
+  }
+}
+
 void SingletonDisplayService::AddPublicService(sys::OutgoingDirectory* outgoing_directory) {
   FX_DCHECK(outgoing_directory);
-  outgoing_directory->AddPublicService(bindings_.GetHandler(this));
+  outgoing_directory->AddPublicService(info_bindings_.GetHandler(this));
+  outgoing_directory->AddPublicService(ownership_bindings_.GetHandler(this));
 }
 
 }  // namespace display

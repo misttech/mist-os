@@ -8,11 +8,13 @@
 
 #include <gtest/gtest.h>
 
+#include "src/lib/fsl/handles/object_info.h"
+
 namespace scenic_impl {
 namespace display {
 namespace test {
 
-TEST(SingletonDisplayService, Request) {
+TEST(SingletonDisplayService, GetMetrics) {
   auto display = std::make_shared<Display>(fuchsia::hardware::display::DisplayId{.value = 1},
                                            /*width_in_px=*/777, /*height_in_px=*/555,
                                            /*width_in_mm=*/77, /*height_in_mm=*/55,
@@ -66,6 +68,16 @@ TEST(SingletonDisplayService, DevicePixelRatioChange) {
 
   EXPECT_EQ(dpr_x, kDPRx);
   EXPECT_EQ(dpr_y, kDPRy);
+}
+
+TEST(SingletonDisplayService, GetOwnershipEvent) {
+  auto display = std::make_shared<Display>(fuchsia::hardware::display::DisplayId{.value = 1},
+                                           /*width_in_px=*/777, /*height_in_px=*/555);
+  auto singleton = std::make_unique<SingletonDisplayService>(display);
+
+  std::optional<zx::event> event;
+  singleton->GetEvent([&](zx::event e) { event = std::move(e); });
+  EXPECT_EQ(fsl::GetKoid(event->get()), fsl::GetKoid(display->ownership_event().get()));
 }
 
 }  // namespace test

@@ -405,6 +405,25 @@ fuchsia_test_component("screen_capture2_integration_test") {
   test_type = "vulkan"
 }
 
+executable("display_ownership_integration_test_bin") {
+  testonly = true
+  sources = [ "display_ownership_integration_test.cc" ]
+  deps = [
+    ":common_deps_cts",
+    ":scenic_realm_builder",
+    "//sdk/fidl/fuchsia.ui.composition.internal:fuchsia.ui.composition.internal_hlcpp",
+    "//src/ui/scenic/lib/utils:utils",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+fuchsia_test_component("display_ownership_integration_test") {
+  component_name = "display_ownership_integration_test"
+  manifest = "meta/display_ownership_integration_test.cml"
+  deps = [ ":display_ownership_integration_test_bin" ]
+  test_type = "vulkan"
+}
+
 executable("singleton_display_integration_test_bin") {
   testonly = true
   sources = [ "singleton_display_integration_test.cc" ]
@@ -539,7 +558,10 @@ fuchsia_test_package("observer_integration_tests") {
 }
 
 fuchsia_test_package("display_integration_tests") {
-  test_components = [ ":singleton_display_integration_test" ]
+  test_components = [
+    ":singleton_display_integration_test",
+    ":display_ownership_integration_test",
+  ]
   test_specs = {
     environments = vulkan_envs
     log_settings = {
