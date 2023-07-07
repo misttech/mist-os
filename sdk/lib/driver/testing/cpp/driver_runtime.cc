@@ -129,8 +129,7 @@ void DriverRuntime::Quit() { fdf_testing_quit(); }
 zx_status_t DriverRuntime::ResetQuit() { return fdf_testing_reset_quit(); }
 
 fit::closure DriverRuntime::QuitClosure() {
-  auto quit_function = quit_receiver_.Repeating(&DriverRuntime::Quit);
-  return [quit = std::move(quit_function)]() mutable { quit(); };
+  return []() { fdf_testing_quit(); };
 }
 
 zx_status_t DriverRuntime::RunUntilIdleInternal() {

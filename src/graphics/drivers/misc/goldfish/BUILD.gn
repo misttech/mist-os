@@ -82,6 +82,7 @@ test("goldfish-pipe-device-test") {
            "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp_mock",
            "//sdk/fidl/fuchsia.hardware.goldfish.pipe:fuchsia.hardware.goldfish.pipe_cpp_wire",
            "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+           "//sdk/lib/async_patterns/testing/cpp",
            "//sdk/lib/component/outgoing/cpp",
            "//src/devices/lib/acpi/mock:mock-acpi",
            "//src/devices/testing/fake-bti",

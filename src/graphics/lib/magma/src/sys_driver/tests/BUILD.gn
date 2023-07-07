@@ -46,6 +46,7 @@ executable("magma_system_dfv2_test_executable") {
   deps = [
     "$magma_build_root/src/sys_driver:magma_driver_base",
     "$magma_build_root/tests/mock:msd_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/trace",

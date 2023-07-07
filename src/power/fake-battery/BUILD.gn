@@ -51,6 +51,7 @@ executable("cpp_test") {
 
   deps = [
     ":fake_battery_driver_lib",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/async-loop:async-loop",

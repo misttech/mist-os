@@ -42,6 +42,7 @@ source_set("devicetree") {
 test("devicetree-manager-test") {
   deps = [
     ":devicetree",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/legacy-bind-constants",
     "//sdk/lib/driver/logging/cpp",
     "//sdk/lib/driver/testing/cpp",

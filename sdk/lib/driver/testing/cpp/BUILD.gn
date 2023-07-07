@@ -39,7 +39,6 @@ source_set("cpp") {
 
   public_deps = [
     ":test_node",
-    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",

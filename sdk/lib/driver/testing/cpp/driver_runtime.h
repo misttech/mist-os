@@ -6,7 +6,6 @@
 #define LIB_DRIVER_TESTING_CPP_DRIVER_RUNTIME_ENV_H_
 
 #include <lib/async/cpp/executor.h>
-#include <lib/async_patterns/cpp/receiver.h>
 #include <lib/driver/runtime/testing/cpp/internal/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
@@ -209,8 +208,6 @@ class DriverRuntime {
 
   fdf_internal::TestSynchronizedDispatcher foreground_dispatcher_;
   std::list<fdf_internal::TestSynchronizedDispatcher> background_dispatchers_;
-
-  async_patterns::Receiver<DriverRuntime> quit_receiver_{this, foreground_dispatcher_.dispatcher()};
 };
 
 // Internal template implementation details
