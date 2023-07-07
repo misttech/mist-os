@@ -87,42 +87,63 @@ fuchsia_test_component("f2fs-dir-compatibility-test-cmp") {
   component_name = "f2fs-dir-compatibility-test-cmp"
   deps = [ ":f2fs-dir-compatibility-test" ] + component_deps
   manifest = "f2fs_dir_compatibility.cml"
+
+  # Needed to access HypervisorResource
+  test_type = "system"
 }
 
 fuchsia_test_component("f2fs-dir-slow-compatibility-test-cmp") {
   component_name = "f2fs-dir-slow-compatibility-test-cmp"
   deps = [ ":f2fs-dir-slow-compatibility-test" ] + component_deps
   manifest = "f2fs_dir_slow_compatibility.cml"
+
+  # Needed to access HypervisorResource
+  test_type = "system"
 }
 
 fuchsia_test_component("f2fs-file-attr-compatibility-test-cmp") {
   component_name = "f2fs-file-attr-compatibility-test-cmp"
   deps = [ ":f2fs-file-attr-compatibility-test" ] + component_deps
   manifest = "f2fs_file_attr_compatibility.cml"
+
+  # Needed to access HypervisorResource
+  test_type = "system"
 }
 
 fuchsia_test_component("f2fs-file-rw-compatibility-test-cmp") {
   component_name = "f2fs-file-rw-compatibility-test-cmp"
   deps = [ ":f2fs-file-rw-compatibility-test" ] + component_deps
   manifest = "f2fs_file_rw_compatibility.cml"
+
+  # Needed to access HypervisorResource
+  test_type = "system"
 }
 
 fuchsia_test_component("f2fs-file-slow-compatibility-test-cmp") {
   component_name = "f2fs-file-slow-compatibility-test-cmp"
   deps = [ ":f2fs-file-slow-compatibility-test" ] + component_deps
   manifest = "f2fs_file_slow_compatibility.cml"
+
+  # Needed to access HypervisorResource
+  test_type = "system"
 }
 
 fuchsia_test_component("f2fs-inline-compatibility-test-cmp") {
   component_name = "f2fs-inline-compatibility-test-cmp"
   deps = [ ":f2fs-inline-compatibility-test" ] + component_deps
   manifest = "f2fs_inline_compatibility.cml"
+
+  # Needed to access HypervisorResource
+  test_type = "system"
 }
 
 fuchsia_test_component("f2fs-mkfs-fsck-compatibility-test-cmp") {
   component_name = "f2fs-mkfs-fsck-compatibility-test-cmp"
   deps = [ ":f2fs-mkfs-fsck-compatibility-test" ] + component_deps
   manifest = "f2fs_mkfs_fsck_compatibility.cml"
+
+  # Needed to access HypervisorResource
+  test_type = "system"
 }
 
 fuchsia_test_package("f2fs-compatibility-test-pkg") {
