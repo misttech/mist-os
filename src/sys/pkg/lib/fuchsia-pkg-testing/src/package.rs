@@ -325,6 +325,8 @@ impl Package {
 fn write_blob(dir: &openat::Dir, merkle: &fuchsia_merkle::Hash, content: &[u8]) {
     // c++blobfs supports uncompressed and delivery blobs and FxBlob only supports delivery blobs,
     // so we always write a delivery blob.
+    #[allow(unknown_lints)] // TODO(fxbug.dev/130265): lint will be recognized after toolchain roll
+    #[allow(clippy::unnecessary_literal_unwrap)]
     let mut file = match dir.new_file(delivery_blob::delivery_blob_path(merkle), 0o600) {
         Ok(file) => file,
         Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
