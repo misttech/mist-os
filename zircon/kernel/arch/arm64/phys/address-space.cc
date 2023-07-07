@@ -126,44 +126,15 @@ void EnablePaging(Paddr root) {
 void ArchSetUpIdentityAddressSpace(page_table::AddressSpaceBuilder& builder) {
   MapUart(builder);
 
-  auto map = [&builder](const memalloc::Range& range) {
-    if (range.type != memalloc::Type::kFreeRam && !memalloc::IsExtendedType(range.type)) {
-      return;
-    }
-
+  memalloc::Pool& pool = Allocation::GetPool();
+  pool.NormalizeRam([&builder](const memalloc::Range& range) {
     auto status = builder.MapRegion(Vaddr(range.addr), Paddr(range.addr), range.size,
                                     page_table::CacheAttributes::kNormal);
     if (status != ZX_OK) {
       ZX_PANIC("Failed to identity-map range [%#" PRIx64 ", %#" PRIx64 ")", range.addr,
                range.end());
     }
-  };
-
-  // We merge ranges of kFreeRam or extended type on the fly, mapping the
-  // previously constructed range when we have hit a hole or the end.
-  constexpr auto normalize_range = [](const memalloc::Range& range) -> memalloc::Range {
-    if (memalloc::IsExtendedType(range.type)) {
-      auto normalized = range;
-      normalized.type = memalloc::Type::kFreeRam;
-      return normalized;
-    }
-    return range;
-  };
-
-  ktl::optional<memalloc::Range> prev;
-  for (const memalloc::Range& raw_range : Allocation::GetPool()) {
-    auto range = normalize_range(raw_range);
-    if (!prev) {
-      prev = range;
-    } else if (prev->end() == range.addr && prev->type == range.type) {
-      prev->size += range.size;
-    } else {
-      map(*prev);
-      prev = range;
-    }
-  }
-  ZX_DEBUG_ASSERT(prev);
-  map(*prev);
+  });
 
   // Enable the MMU and switch to the new page table.
   EnablePaging(builder.root_paddr());

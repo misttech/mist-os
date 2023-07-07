@@ -13,9 +13,11 @@
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/zbi.h>
 #include <stdio.h>
+#include <zircon/assert.h>
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 #include <fbl/intrusive_double_list.h>
@@ -235,14 +237,56 @@ class Pool {
   fit::result<fit::failed, uint64_t> Resize(const Range& original, uint64_t new_size,
                                             uint64_t min_alignment);
 
+  // Gives a custom, normalized view of all tracked ranges. `NormalizeTypeFn`
+  // is a callable with signature `std::optional<Type>(Type)`: std::nullopt
+  // indicates that ranges of this type should not be passed to the callback;
+  // otherwise, the returned type is indicates how the input type should be
+  // normalized. Adjacent ranges of the same normalized type are merged before
+  // being passed to the callback.
+  template <typename RangeCallback, typename NormalizeTypeFn>
+  void NormalizeRanges(RangeCallback&& cb, NormalizeTypeFn&& normalize_type) const {
+    static_assert(std::is_invocable_v<RangeCallback, const Range&>);
+    static_assert(std::is_invocable_r_v<std::optional<Type>, NormalizeTypeFn, Type>);
+
+    std::optional<Range> prev;
+    for (const Range& range : *this) {
+      std::optional<Type> normalized_type = normalize_type(range.type);
+      if (!normalized_type) {
+        continue;
+      }
+      Range normalized = range;
+      normalized.type = *normalized_type;
+      if (!prev) {
+        prev = normalized;
+      } else if (prev->end() == normalized.addr && prev->type == normalized.type) {
+        prev->size += normalized.size;
+      } else {
+        cb(*prev);
+        prev = normalized;
+      }
+    }
+    if (prev) {
+      cb(*prev);
+    }
+  }
+
+  // Provides a callback with a normalized view of RAM ranges alone, reducing
+  // any extended types as kFreeRam.
+  template <typename RangeCallback>
+  void NormalizeRam(RangeCallback&& cb) const {
+    return NormalizeRanges(std::forward<RangeCallback>(cb), [](Type type) {
+      return (IsExtendedType(type) || type == Type::kFreeRam) ? std::make_optional(Type::kFreeRam)
+                                                              : std::nullopt;
+    });
+  }
+
   // Pretty-prints the memory ranges contained in the pool.
   void PrintMemoryRanges(const char* prefix, FILE* f = stdout) const;
 
   // These are the components of what PrintMemoryRanges does internally,
   // for use on different kinds of containers of memalloc::Range objects.
   static void PrintMemoryRangeHeader(const char* prefix, FILE* f = stdout);
-  static void PrintOneMemoryRange(const memalloc::Range& range, const char* prefix,
-                                  FILE* f = stdout);
+  static void PrintOneMemoryRange(const Range& range, const char* prefix, FILE* f = stdout);
 
  private:
   using mutable_iterator = typename List::iterator;

@@ -13,11 +13,13 @@
 #include <zircon/limits.h>
 
 #include <limits>
+#include <optional>
 #include <type_traits>
 #include <vector>
 
 #include <gtest/gtest.h>
 
+#include "lib/memalloc/range.h"
 #include "test.h"
 
 namespace {
@@ -1882,6 +1884,129 @@ TEST(MemallocPoolTests, OutOfMemory) {
     ASSERT_NO_FATAL_FAILURE(TestPoolFreeRamSubrangeUpdating(ctx.pool, Type::kPoolTestPayload,
                                                             it->addr, 1,
                                                             /*alloc_error=*/true));
+  }
+}
+
+TEST(MemallocPoolTests, NormalizeRanges) {
+  PoolContext ctx;
+  Range ranges[] = {
+      // RAM: [0, kChunkSize)
+      {
+          .addr = 0,
+          .size = kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      // data ZBI: [kChunkSize, 2*kChunkSize)
+      {
+          .addr = kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kDataZbi,
+      },
+      // test payload: [2*kChunkSize, 3*kChunkSize)
+      {
+          .addr = 2 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPoolTestPayload,
+      },
+      // peripheral: [3*kChunkSize, 4*kChunkSize)
+      {
+          .addr = 3 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPeripheral,
+      },
+      // test payload: [5*kChunkSize, 6*kChunkSize)
+      {
+          .addr = 5 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPoolTestPayload,
+      },
+      // phys kernel: [6*kChunkSize, 7*kChunkSize)
+      {
+          .addr = 6 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPhysKernel,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+
+  // Normalize away all ranges.
+  {
+    std::vector<Range> normalized;
+    ctx.pool.NormalizeRanges([&normalized](const Range& range) { normalized.push_back(range); },
+                             [](Type) { return std::nullopt; });
+    EXPECT_TRUE(normalized.empty());
+  }
+
+  // Normalize just RAM.
+  {
+    std::vector<Range> normalized;
+    ctx.pool.NormalizeRam([&normalized](const Range& range) { normalized.push_back(range); });
+
+    constexpr Range kExpected[] = {
+        {
+            .addr = 0,
+            .size = 3 * kChunkSize,
+            .type = Type::kFreeRam,
+        },
+        {
+            .addr = 5 * kChunkSize,
+            .size = 2 * kChunkSize,
+            .type = Type::kFreeRam,
+        },
+    };
+    CompareRanges(cpp20::span{kExpected}, {normalized});
+  }
+
+  // Discard RAM.
+  {
+    std::vector<Range> normalized;
+    ctx.pool.NormalizeRanges([&normalized](const Range& range) { normalized.push_back(range); },
+                             [](Type type) {
+                               return (IsExtendedType(type) || type == Type::kFreeRam)
+                                          ? std::nullopt
+                                          : std::make_optional(type);
+                             });
+
+    constexpr Range kExpected[] = {
+        {
+            .addr = 3 * kChunkSize,
+            .size = kChunkSize,
+            .type = Type::kPeripheral,
+        },
+    };
+    CompareRanges(cpp20::span{kExpected}, {normalized});
+  }
+
+  // Just keep pool test payloads and bookkeeping.
+  {
+    std::vector<Range> normalized;
+    ctx.pool.NormalizeRanges(
+        [&normalized](const Range& range) { normalized.push_back(range); },
+        [](Type type) {
+          return (type == Type::kPoolBookkeeping || type == Type::kPoolTestPayload)
+                     ? std::make_optional(type)
+                     : std::nullopt;
+        });
+
+    constexpr Range kExpected[] = {
+        {
+            .addr = 0,
+            .size = kChunkSize,
+            .type = Type::kPoolBookkeeping,
+        },
+        {
+            .addr = 2 * kChunkSize,
+            .size = kChunkSize,
+            .type = Type::kPoolTestPayload,
+        },
+        {
+            .addr = 5 * kChunkSize,
+            .size = kChunkSize,
+            .type = Type::kPoolTestPayload,
+        },
+    };
+    CompareRanges(cpp20::span{kExpected}, {normalized});
   }
 }
 
