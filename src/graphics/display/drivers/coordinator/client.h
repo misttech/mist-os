@@ -287,8 +287,8 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // the layer lists.
   void SetAllConfigPendingLayersToCurrentLayers();
 
-  Controller* controller_;
-  ClientProxy* proxy_;
+  Controller* const controller_;
+  ClientProxy* const proxy_;
   const ClientPriority priority_;
   const ClientId id_;
   bool running_;
@@ -449,7 +449,7 @@ class ClientProxy {
   friend IntegrationTest;
 
   mtx_t mtx_;
-  Controller* controller_;
+  Controller* const controller_;
 
   Client handler_;
   bool enable_vsync_ __TA_GUARDED(&mtx_) = false;
