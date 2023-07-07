@@ -14,7 +14,7 @@ system is made up of a trace manager, a memory buffer, and one or more trace
 providers. A [trace provider][trace-providers] is a component that generates
 trace data on the device, and a system can have
 [many trace providers](#view-trace-providers). (To register your component as
-a trace provider, see [Registering a trace provider][register-a-trace-provider].)
+a trace provider, see [Register a trace provider][register-a-trace-provider].)
 
 The `ffx trace start` command stores the output of tracing as a  [`.fxt`][fxt]
 file on the host machine. You can open this file on the
@@ -400,7 +400,7 @@ to trigger the event.
 
 [ffx-trace]: https://fuchsia.dev/reference/tools/sdk/ffx#trace
 [fuchsia-tracing-system]: /docs/concepts/kernel/tracing-system.md
-[register-a-trace-provider]: /docs/development/tracing/tutorial/registering-a-trace-provider.md
+[register-a-trace-provider]: /docs/development/tracing/tutorial/register-a-trace-provider.md
 [fxt]: /docs/reference/tracing/trace-format.md
 [perfetto-viewer]: https://ui.perfetto.dev/#!/
 [perfetto-docs]: https://perfetto.dev/docs/

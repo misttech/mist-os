@@ -4,15 +4,12 @@ This document describes how to add tracing to a driver in a Fuchsia system.
 
 ## Overview
 
-For an overview of tracing, see
-[Fuchsia tracing system][fuchsia-tracing-system]. However, drivers don't need
-to specify a [trace provider][trace-provider]. The driver host provides one
-for its drivers.
+For an overview of tracing, see [Fuchsia tracing system][fuchsia-tracing-system].
+However, drivers don't need to specify a [trace provider][trace-provider]. The
+driver host provides one for its drivers.
 
-For a tutorial on tracing, see
-[Adding tracing in your code][adding-tracing-in-your-code].
-And for the tracing API reference, see
-[Tracing: C and C++ macros][trace-c-cpp-macros].
+For a tutorial on tracing, see [Add tracing in your code][add-tracing-in-your-code].
+And for the tracing API reference, see [Tracing: C and C++ macros][trace-c-cpp-macros].
 
 ## Add trace records {:#add-trace-records}
 
@@ -121,7 +118,7 @@ through these categories.
 
 For additional details, as well as instructions on tracing directly on a
 Fuchsia device without `ffx`, see
-[Recording a Fuchsia trace][recording-a-fuchsia-trace].
+[Record traces for performance analysis][ffx-trace].
 
 ## Further reading
 
@@ -131,11 +128,10 @@ See [Fuchsia tracing guides][fuchsia-tracing-guides] for more information.
 
 [fuchsia-tracing-system]: /docs/concepts/kernel/tracing-system.md
 [trace-provider]: /docs/concepts/kernel/tracing-system.md#trace-providers
-[adding-tracing-in-your-code]: /docs/development/tracing/tutorial/adding-tracing-in-code.md
+[add-tracing-in-your-code]: /docs/development/tracing/tutorial/add-tracing-in-code.md
 [trace-c-cpp-macros]: /docs/reference/tracing/c_cpp_macros.md
 [fx-workflows]: /docs/development/build/fx.md
 [ffx-trace]: /docs/development/sdk/ffx/record-traces.md
 [perfetto-viewer]: https://ui.perfetto.dev/#!/
-[recording-a-fuchsia-trace]: /docs/development/tracing/tutorial/recording-a-fuchsia-trace.md
 [fuchsia-tracing-guides]: /docs/development/tracing/README.md
 

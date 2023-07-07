@@ -1,15 +1,14 @@
 # Fuchsia tracing system
 
-The purpose of Fuchsia tracing is to provide a means to collect, aggregate,
+The purpose of tracing in Fuchsia is to provide a means to collect, aggregate,
 and visualize diagnostic tracing information from Fuchsia user space
 processes and the Zircon kernel.
 
 For more information on using tracing in Fuchsia, see the following guides:
 
-* [Registering a trace provider](/docs/development/tracing/tutorial/registering-a-trace-provider.md)
-* [Adding tracing in your code](/docs/development/tracing/tutorial/adding-tracing-in-code.md)
-* [Recording a Fuchsia trace](/docs/development/tracing/tutorial/recording-a-fuchsia-trace.md)
-* [Converting and visualizing a trace](/docs/development/tracing/tutorial/converting-visualizing-a-trace.md)
+* [Register a trace provider][register-a-trace-provider]
+* [Add tracing in your code][add-tracing-in-your-code]
+* [Record and visualize a trace][record-and-visualize-a-trace]
 
 By default, tracing in Fuchsia is turned off. When an event occurs, such as a
 system problem or the initiation of a debugging sessions, tracing can be
@@ -169,3 +168,6 @@ trace` in the diagram below.
 
 [glossary.component]: /docs/glossary/README.md#component
 [ffx-trace]: https://fuchsia.dev/reference/tools/sdk/ffx#trace
+[register-a-trace-provider]: /docs/development/tracing/tutorial/register-a-trace-provider.md
+[add-tracing-in-your-code]: /docs/development/tracing/tutorial/add-tracing-in-code.md
+[record-and-visualize-a-trace]: /docs/development/tracing/tutorial/record-and-visualize-a-trace.md

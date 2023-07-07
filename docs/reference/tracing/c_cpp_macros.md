@@ -2,12 +2,12 @@
 
 You can use these C and C++ macros to record tracing data after
 you have set your component as a tracing provider. For more information,
-see [Adding tracing in your code](/docs/development/tracing/tutorial/adding-tracing-in-code.md).
+see [Add tracing in your code](/docs/development/tracing/tutorial/add-tracing-in-code.md).
 
 These macros are defined in
-[//zircon/system/ulib/trace/include/lib/trace/internal/event_common.h](/zircon/system/ulib/trace/include/lib/trace/internal/event_common.h).
+[`//zircon/system/ulib/trace/include/lib/trace/internal/event_common.h`](/zircon/system/ulib/trace/include/lib/trace/internal/event_common.h).
 
-Warning: This reference document is created manually and may be incomplete.
+Important: This reference document is created manually and may be incomplete.
 
 ## Encoding macros {#encoding-macros}
 
