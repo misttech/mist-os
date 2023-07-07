@@ -10,9 +10,7 @@ use {
     async_trait::async_trait,
     fidl_fuchsia_input_report as fidl_input_report,
     fidl_fuchsia_input_report::{InputDeviceProxy, InputReport},
-    fidl_fuchsia_ui_input as fidl_ui_input,
-    fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
-    fidl_fuchsia_ui_pointerinjector as pointerinjector,
+    fidl_fuchsia_ui_input as fidl_ui_input, fidl_fuchsia_ui_pointerinjector as pointerinjector,
     fuchsia_inspect::{health::Reporter, ArrayProperty},
     fuchsia_zircon as zx,
     futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
@@ -285,17 +283,6 @@ impl input_device::InputDeviceBinding for TouchBinding {
             }
             TouchDeviceDescriptor::Touchpad(desc) => {
                 input_device::InputDeviceDescriptor::Touchpad(desc)
-            }
-        }
-    }
-
-    async fn handle_input_config_request(
-        &self,
-        request: &InputConfigFeaturesRequest,
-    ) -> Result<(), Error> {
-        match request {
-            InputConfigFeaturesRequest::SetTouchpadMode { enable, .. } => {
-                self.set_touchpad_mode(*enable).await
             }
         }
     }
@@ -762,23 +749,17 @@ async fn get_device_type(input_device: &fidl_input_report::InputDeviceProxy) -> 
 mod tests {
     use {
         super::*,
-        crate::input_pipeline::InputDeviceBindingHashMap,
-        crate::input_pipeline::InputPipeline,
         crate::testing_utilities::{
             self, create_touch_contact, create_touch_input_report, create_touch_screen_event,
             create_touchpad_event,
         },
         crate::utils::Position,
         assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
         fidl::endpoints::spawn_stream_handler,
-        fidl_fuchsia_ui_input_config::FeaturesMarker as InputConfigFeaturesMarker,
         fuchsia_async as fasync,
         fuchsia_inspect::AnyProperty,
-        futures::lock::Mutex,
         futures::StreamExt,
         pretty_assertions::assert_eq,
-        std::sync::Arc,
         test_case::test_case,
     };
 
@@ -1171,99 +1152,6 @@ mod tests {
         let binding =
             TouchBinding::new(input_device_proxy, 0, device_event_sender, test_node).await.unwrap();
         pretty_assertions::assert_eq!(binding.touch_device_type, expect_touch_device_type);
-    }
-
-    #[test_case(false, fidl_input_report::TouchConfigurationInputMode::MouseCollection; "mouse mode")]
-    #[test_case(true, fidl_input_report::TouchConfigurationInputMode::WindowsPrecisionTouchpadCollection; "touchpad mode")]
-    #[fuchsia::test(allow_stalls = false)]
-    async fn handle_input_config_request(
-        enable_touchpad_mode: bool,
-        want_touch_configuration_input_mode: fidl_input_report::TouchConfigurationInputMode,
-    ) {
-        let (set_feature_report_sender, set_feature_report_receiver) =
-            futures::channel::mpsc::unbounded();
-        let input_device_proxy = spawn_stream_handler(move |input_device_request| {
-            let set_feature_report_sender = set_feature_report_sender.clone();
-            async move {
-                match input_device_request {
-                    fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                        let _ = responder.send(&get_touchpad_device_descriptor(true));
-                    }
-                    fidl_input_report::InputDeviceRequest::GetFeatureReport { responder } => {
-                        let _ = responder.send(Ok(&fidl_input_report::FeatureReport {
-                            touch: Some(fidl_input_report::TouchFeatureReport {
-                                input_mode: Some(
-                                    fidl_input_report::TouchConfigurationInputMode::MouseCollection,
-                                ),
-                                ..Default::default()
-                            }),
-                            ..Default::default()
-                        }));
-                    }
-                    fidl_input_report::InputDeviceRequest::SetFeatureReport {
-                        report,
-                        responder,
-                    } => {
-                        match set_feature_report_sender.unbounded_send(report) {
-                            Ok(_) => {
-                                let _ = responder.send(Ok(()));
-                            }
-                            Err(e) => {
-                                panic!("try_send set_feature_report_request failed: {}", e);
-                            }
-                        };
-                    }
-                    fidl_input_report::InputDeviceRequest::GetInputReportsReader { .. } => {
-                        // Do not panic as `initialize_report_stream()` will call this protocol.
-                    }
-
-                    r => panic!("unsupported request {:?}", r),
-                }
-            }
-        })
-        .unwrap();
-
-        let (device_event_sender, _device_event_receiver) = futures::channel::mpsc::unbounded();
-
-        // Create a test inspect node as required by TouchBinding::new()
-        let inspector = fuchsia_inspect::Inspector::default();
-        let test_node = inspector.root().create_child("test_node");
-
-        let binding =
-            TouchBinding::new(input_device_proxy, 0, device_event_sender, test_node).await.unwrap();
-        let bindings: InputDeviceBindingHashMap = Arc::new(Mutex::new(HashMap::new()));
-        bindings.lock().await.insert(1, vec![Box::new(binding)]);
-
-        let (input_config_features_proxy, input_config_features_request_stream) =
-            create_proxy_and_stream::<InputConfigFeaturesMarker>().unwrap();
-        input_config_features_proxy
-            .set_touchpad_mode(enable_touchpad_mode)
-            .expect("set_touchpad_mode");
-
-        // Drop proxy to terminate request stream.
-        std::mem::drop(input_config_features_proxy);
-
-        InputPipeline::handle_input_config_request_stream(
-            input_config_features_request_stream,
-            &bindings,
-        )
-        .await
-        .expect("handle_input_config_request_stream");
-
-        // Drop the `TouchBinding`, to terminate the `fidl_input_report::InputDeviceRequest`
-        // stream.
-        std::mem::drop(bindings);
-
-        let got_feature_report =
-            set_feature_report_receiver.collect::<Vec<_>>().await.last().cloned();
-        let want_feature_report = Some(fidl_input_report::FeatureReport {
-            touch: Some(fidl_input_report::TouchFeatureReport {
-                input_mode: Some(want_touch_configuration_input_mode),
-                ..Default::default()
-            }),
-            ..Default::default()
-        });
-        pretty_assertions::assert_eq!(want_feature_report, got_feature_report);
     }
 
     /// Returns an |fidl_fuchsia_input_report::DeviceDescriptor| for

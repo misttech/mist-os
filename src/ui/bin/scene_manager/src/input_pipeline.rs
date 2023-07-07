@@ -20,7 +20,6 @@ use {
     fidl_fuchsia_recovery_ui::FactoryResetCountdownRequestStream,
     fidl_fuchsia_settings as fsettings,
     fidl_fuchsia_ui_brightness::ControlMarker as BrightnessControlMarker,
-    fidl_fuchsia_ui_input_config::FeaturesRequestStream as InputConfigFeaturesRequestStream,
     fidl_fuchsia_ui_pointerinjector_configuration::SetupProxy,
     fidl_fuchsia_ui_policy::DeviceListenerRegistryRequestStream,
     focus_chain_provider::FocusChainProviderPublisher,
@@ -55,8 +54,6 @@ use {
 ///
 /// # Parameters
 /// - `scene_manager`: The scene manager used by the session.
-/// - `input_config_request_stream_receiver`:  A receiving end of a MPSC channel for
-///   `InputConfig` messages.
 /// - `input_device_registry_request_stream_receiver`: A receiving end of a MPSC channel for
 ///   `InputDeviceRegistry` messages.
 /// - `light_sensor_request_stream_receiver`: A receiving end of an MPSC channel for
@@ -69,9 +66,6 @@ pub async fn handle_input(
     // new Flatland API.
     use_flatland: bool,
     scene_manager: Arc<Mutex<dyn SceneManager>>,
-    input_config_request_stream_receiver: futures::channel::mpsc::UnboundedReceiver<
-        InputConfigFeaturesRequestStream,
-    >,
     input_device_registry_request_stream_receiver: futures::channel::mpsc::UnboundedReceiver<
         InputDeviceRegistryRequestStream,
     >,
@@ -182,12 +176,6 @@ pub async fn handle_input(
         injected_devices_node,
     );
     fasync::Task::local(input_device_registry_fut).detach();
-
-    let input_config_fut = handle_input_config_request_streams(
-        input_config_request_stream_receiver,
-        input_pipeline.input_device_bindings().clone(),
-    );
-    fasync::Task::local(input_config_fut).detach();
 
     let factory_reset_countdown_fut = handle_factory_reset_countdown_request_stream(
         factory_reset_countdown_request_stream_receiver,
@@ -575,28 +563,6 @@ fn add_touchpad_gestures_handler(
         inspect_node,
         input_handlers_node,
     ))
-}
-
-pub async fn handle_input_config_request_streams(
-    mut stream_receiver: futures::channel::mpsc::UnboundedReceiver<
-        InputConfigFeaturesRequestStream,
-    >,
-    input_device_bindings: InputDeviceBindingHashMap,
-) {
-    while let Some(stream) = stream_receiver.next().await {
-        match InputPipeline::handle_input_config_request_stream(stream, &input_device_bindings)
-            .await
-        {
-            Ok(()) => (),
-            Err(e) => {
-                warn!(
-                    "failure while serving InputConfig.Features: {}; \
-                     will continue serving other clients",
-                    e
-                );
-            }
-        }
-    }
 }
 
 pub async fn handle_device_listener_registry_request_stream(

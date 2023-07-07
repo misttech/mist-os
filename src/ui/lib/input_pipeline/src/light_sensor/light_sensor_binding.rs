@@ -9,7 +9,6 @@ use crate::input_device::{
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_input_report::{InputDeviceProxy, InputReport, SensorDescriptor, SensorType};
-use fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_zircon as zx;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -71,13 +70,6 @@ impl InputDeviceBinding for LightSensorBinding {
 
     fn get_device_descriptor(&self) -> InputDeviceDescriptor {
         InputDeviceDescriptor::LightSensor(self.device_descriptor.clone())
-    }
-
-    async fn handle_input_config_request(
-        &self,
-        _request: &InputConfigFeaturesRequest,
-    ) -> Result<(), Error> {
-        Ok(())
     }
 }
 

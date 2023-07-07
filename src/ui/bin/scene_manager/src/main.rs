@@ -33,7 +33,6 @@ use {
     fidl_fuchsia_ui_composition as flatland, fidl_fuchsia_ui_display_color as color,
     fidl_fuchsia_ui_display_singleton as singleton_display,
     fidl_fuchsia_ui_focus::FocusChainProviderRequestStream,
-    fidl_fuchsia_ui_input_config::FeaturesRequestStream as InputConfigFeaturesRequestStream,
     fidl_fuchsia_ui_policy::{
         DeviceListenerRegistryRequestStream as MediaButtonsListenerRegistryRequestStream,
         DisplayBacklightRequestStream,
@@ -55,7 +54,6 @@ use {
 mod color_transform_manager;
 mod factory_reset_countdown_server;
 mod factory_reset_device_server;
-mod input_config_server;
 mod input_device_registry_server;
 mod input_pipeline;
 mod light_sensor_server;
@@ -70,7 +68,6 @@ enum ExposedServices {
     FactoryReset(FactoryResetDeviceRequestStream),
     FocusChainProvider(FocusChainProviderRequestStream),
     GraphicalPresenter(GraphicalPresenterRequestStream),
-    InputConfigFeatures(InputConfigFeaturesRequestStream),
     InputDeviceRegistry(InputDeviceRegistryRequestStream),
     LightSensor(LightSensorRequestStream),
     SceneManager(SceneManagerRequestStream),
@@ -126,7 +123,6 @@ async fn inner_main() -> Result<(), Error> {
         .add_fidl_service(ExposedServices::FactoryReset)
         .add_fidl_service(ExposedServices::FocusChainProvider)
         .add_fidl_service(ExposedServices::GraphicalPresenter)
-        .add_fidl_service(ExposedServices::InputConfigFeatures)
         .add_fidl_service(ExposedServices::InputDeviceRegistry)
         .add_fidl_service(ExposedServices::SceneManager);
 
@@ -156,9 +152,6 @@ async fn inner_main() -> Result<(), Error> {
 
     let (input_device_registry_server, input_device_registry_request_stream_receiver) =
         input_device_registry_server::make_server_and_receiver();
-
-    let (input_config_server, input_config_receiver) =
-        input_config_server::make_server_and_receiver();
 
     let (
         media_buttons_listener_registry_server,
@@ -280,7 +273,6 @@ async fn inner_main() -> Result<(), Error> {
     if let Ok(input_pipeline) = input_pipeline::handle_input(
         use_flatland,
         scene_manager.clone(),
-        input_config_receiver,
         input_device_registry_request_stream_receiver,
         light_sensor_request_stream_receiver,
         media_buttons_listener_registry_request_stream_receiver,
@@ -385,14 +377,6 @@ async fn inner_main() -> Result<(), Error> {
                                 must restart to enable input injection",
                             e
                         )
-                    }
-                }
-            }
-            ExposedServices::InputConfigFeatures(request_stream) => {
-                match &input_config_server.handle_request(request_stream).await {
-                    Ok(()) => (),
-                    Err(e) => {
-                        warn!("failed to forward InputConfigFeaturesRequestStream: {:?}", e)
                     }
                 }
             }

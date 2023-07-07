@@ -27,7 +27,6 @@ icu_rustc_library("input_pipeline") {
     "//sdk/fidl/fuchsia.ui.brightness:fuchsia.ui.brightness_rust",
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_rust",
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_rust",
-    "//sdk/fidl/fuchsia.ui.input.config:fuchsia.ui.input.config_rust",
     "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_rust",
     "//sdk/fidl/fuchsia.ui.keyboard.focus:fuchsia.ui.keyboard.focus_rust",
     "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_rust",

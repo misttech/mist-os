@@ -9,7 +9,6 @@ use {
     },
     anyhow::{format_err, Context, Error},
     fidl_fuchsia_input_injection, fidl_fuchsia_io as fio,
-    fidl_fuchsia_ui_input_config::FeaturesRequestStream as InputConfigFeaturesRequestStream,
     focus_chain_provider::FocusChainProviderPublisher,
     fuchsia_async as fasync,
     fuchsia_fs::directory::{WatchEvent, Watcher},
@@ -517,35 +516,6 @@ impl InputPipeline {
         Ok(())
     }
 
-    /// Handles the incoming InputConfigFeaturesRequestStream.
-    ///
-    /// This method will end when the request stream is closed. If the stream closes with an
-    /// error the error will be returned in the Result.
-    ///
-    /// # Parameters
-    /// - `stream`: The stream of InputConfigFeaturesRequests.
-    /// - `bindings`: Holds all the InputDeviceBindings associated with the InputPipeline.
-    pub async fn handle_input_config_request_stream(
-        mut stream: InputConfigFeaturesRequestStream,
-        bindings: &InputDeviceBindingHashMap,
-    ) -> Result<(), Error> {
-        while let Some(request) =
-            stream.try_next().await.context("Error handling input config request stream")?
-        {
-            let bindings = bindings.lock().await;
-            for v in bindings.values() {
-                for binding in v.iter() {
-                    match binding.handle_input_config_request(&request).await {
-                        Ok(()) => (),
-                        Err(e) => tracing::error!("Error handling input config request {:?}", e),
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// Starts all tasks in an asynchronous executor.
     fn run(tasks: Vec<fuchsia_async::Task<()>>) {
         fasync::Task::local(async move {
@@ -691,12 +661,7 @@ mod tests {
         crate::mouse_model_database,
         crate::observe_fake_events_input_handler,
         crate::utils::Position,
-        assert_matches::assert_matches,
         fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream},
-        fidl_fuchsia_ui_input_config::{
-            FeaturesMarker as InputConfigFeaturesMarker,
-            FeaturesRequest as InputConfigFeaturesRequest,
-        },
         fuchsia_async as fasync,
         fuchsia_inspect::AnyProperty,
         fuchsia_zircon as zx,
@@ -800,16 +765,10 @@ mod tests {
     async fn multiple_devices_single_handler() {
         // Create two fake device bindings.
         let (device_event_sender, device_event_receiver) = futures::channel::mpsc::unbounded();
-        let (input_config_features_sender, _input_config_features_receiver) =
-            futures::channel::mpsc::channel(1);
-        let first_device_binding = fake_input_device_binding::FakeInputDeviceBinding::new(
-            device_event_sender.clone(),
-            input_config_features_sender.clone(),
-        );
-        let second_device_binding = fake_input_device_binding::FakeInputDeviceBinding::new(
-            device_event_sender.clone(),
-            input_config_features_sender.clone(),
-        );
+        let first_device_binding =
+            fake_input_device_binding::FakeInputDeviceBinding::new(device_event_sender.clone());
+        let second_device_binding =
+            fake_input_device_binding::FakeInputDeviceBinding::new(device_event_sender.clone());
 
         // Create a fake input handler.
         let (handler_event_sender, mut handler_event_receiver) =
@@ -857,12 +816,8 @@ mod tests {
     async fn single_device_multiple_handlers() {
         // Create two fake device bindings.
         let (device_event_sender, device_event_receiver) = futures::channel::mpsc::unbounded();
-        let (input_config_features_sender, _input_config_features_receiver) =
-            futures::channel::mpsc::channel(1);
-        let input_device_binding = fake_input_device_binding::FakeInputDeviceBinding::new(
-            device_event_sender.clone(),
-            input_config_features_sender.clone(),
-        );
+        let input_device_binding =
+            fake_input_device_binding::FakeInputDeviceBinding::new(device_event_sender.clone());
 
         // Create two fake input handlers.
         let (first_handler_event_sender, mut first_handler_event_receiver) =
@@ -1187,39 +1142,6 @@ mod tests {
         // Assert that a device was registered.
         let bindings = bindings.lock().await;
         assert_eq!(bindings.len(), 1);
-    }
-
-    /// Tests that config changes are forwarded to device bindings.
-    #[fasync::run_singlethreaded(test)]
-    async fn handle_input_config_request_stream() {
-        let (device_event_sender, _device_event_receiver) = futures::channel::mpsc::unbounded();
-        let (input_config_features_sender, mut input_config_features_receiver) =
-            futures::channel::mpsc::channel(1);
-        let fake_device_binding = fake_input_device_binding::FakeInputDeviceBinding::new(
-            device_event_sender,
-            input_config_features_sender,
-        );
-        let bindings: InputDeviceBindingHashMap = Arc::new(Mutex::new(HashMap::new()));
-        bindings.lock().await.insert(1, vec![Box::new(fake_device_binding)]);
-
-        let bindings_clone = bindings.clone();
-
-        let (input_config_features_proxy, input_config_features_request_stream) =
-            create_proxy_and_stream::<InputConfigFeaturesMarker>().unwrap();
-        input_config_features_proxy.set_touchpad_mode(true).expect("set_touchpad_mode");
-        // Drop proxy to terminate request stream.
-        std::mem::drop(input_config_features_proxy);
-        InputPipeline::handle_input_config_request_stream(
-            input_config_features_request_stream,
-            &bindings_clone,
-        )
-        .await
-        .expect("handle_input_config_request_stream");
-
-        assert_matches!(
-            input_config_features_receiver.next().await.unwrap(),
-            InputConfigFeaturesRequest::SetTouchpadMode { enable: true, .. }
-        );
     }
 
     // Tests that correct properties are added to inspect node when InputPipeline is created.
