@@ -2,18 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# bringup products have their own assemble_system() instantiation.
-use_bringup_assembly = true
-bootfs_only = true
-
-base_package_labels = []
-cache_package_labels = []
-universe_package_labels = []
-
-product_bootfs_labels = []
-base_driver_package_labels = []
-package_flavor_selections = []
-sdk_archive_labels = []
+import("//products/common/bringup.gni")
 
 product_bootfs_labels += [
   "//products/kernel_cmdline:kernel.oom.behavior--jobkill",

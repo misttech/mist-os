@@ -1,0 +1,31 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# bringup products have their own assemble_system() instantiation.
+use_bringup_assembly = true
+bootfs_only = true
+
+product_bootfs_labels = [
+  "//bundles/drivers:bootstrap",
+  "//bundles/drivers:bootstrap-eng",
+  "//bundles/drivers:usb-host-stack",
+]
+
+meta_package_labels = []
+
+base_driver_package_labels = []
+legacy_base_driver_package_labels = []
+
+base_package_labels = []
+legacy_base_package_labels = []
+
+cache_package_labels = []
+legacy_cache_package_labels = []
+
+universe_package_labels = []
+legacy_universe_package_labels = []
+
+package_flavor_selections = []
+
+sdk_archive_labels = []

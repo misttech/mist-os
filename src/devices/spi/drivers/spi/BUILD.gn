@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -52,15 +51,10 @@ fuchsia_driver("spi-driver") {
 }
 
 fuchsia_driver_component("spi") {
-  visibility = [ ":*" ]
   info = "spi-info.json"
   component_name = "spi"
   manifest = "meta/spi.cml"
   deps = [ ":spi-driver" ]
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [ ":spi" ]
 }
 
 test("spi-test-bin") {

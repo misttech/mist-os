@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -65,15 +64,10 @@ fuchsia_driver("hid-input-report-driver") {
 }
 
 fuchsia_driver_component("hid-input-report") {
-  visibility = [ ":*" ]
   component_name = "hid-input-report"
   deps = [ ":hid-input-report-driver" ]
   info = "hid-input-report-info.json"
   manifest = "meta/hid-input-report.cml"
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [ ":hid-input-report" ]
 }
 
 fuchsia_driver("hid-input-report-driver-v2") {

@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -60,7 +59,6 @@ fuchsia_driver("platform-bus-driver") {
 }
 
 fuchsia_driver_component("platform-bus") {
-  visibility = [ ":*" ]
   component_name = "platform-bus"
   deps = [ ":platform-bus-driver" ]
   info = "platform-bus-info.json"
@@ -84,18 +82,10 @@ fuchsia_driver("platform-bus.proxy-driver") {
 }
 
 fuchsia_driver_component("platform-bus.proxy") {
-  visibility = [ ":*" ]
   component_name = "platform-bus.proxy"
   deps = [ ":platform-bus.proxy-driver" ]
   info = "platform-bus.proxy-info.json"
   manifest = "meta/platform-bus.proxy.cml"
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [
-    ":platform-bus",
-    ":platform-bus.proxy",
-  ]
 }
 
 test("platform-bus-unittest") {

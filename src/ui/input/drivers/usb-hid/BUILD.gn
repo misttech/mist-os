@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -58,15 +57,10 @@ fuchsia_driver("usb-hid-driver") {
 }
 
 fuchsia_driver_component("usb-hid") {
-  visibility = [ ":*" ]
   component_name = "usb-hid"
   deps = [ ":usb-hid-driver" ]
   info = "usb-hid-info.json"
   manifest = "meta/usb-hid.cml"
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [ ":usb-hid" ]
 }
 
 fuchsia_driver("usb-one-endpoint-hid-fake-usb-driver") {

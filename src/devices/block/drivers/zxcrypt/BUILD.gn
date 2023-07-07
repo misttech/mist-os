@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -71,15 +70,10 @@ fuchsia_driver("zxcrypt-driver") {
 }
 
 fuchsia_driver_component("zxcrypt") {
-  visibility = [ ":*" ]
   component_name = "zxcrypt"
   deps = [ ":zxcrypt-driver" ]
   info = "zxcrypt-info.json"
   manifest = "meta/zxcrypt.cml"
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [ ":zxcrypt" ]
 }
 
 driver_bind_rules("bind") {

@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -46,15 +45,10 @@ fuchsia_driver("power-driver") {
 }
 
 fuchsia_driver_component("power") {
-  visibility = [ ":*" ]
   info = "power-info.json"
   component_name = "power"
   deps = [ ":power-driver" ]
   manifest = "meta/power.cml"
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [ ":power" ]
 }
 
 test("power-test-bin") {

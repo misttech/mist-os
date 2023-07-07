@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -42,15 +41,10 @@ fuchsia_driver("gpio-driver") {
 }
 
 fuchsia_driver_component("gpio") {
-  visibility = [ ":*" ]
   component_name = "gpio"
   deps = [ ":gpio-driver" ]
   info = "gpio-info.json"
   manifest = "meta/gpio.cml"
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [ ":gpio" ]
 }
 
 test("gpio-test-bin") {

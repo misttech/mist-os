@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
@@ -27,15 +26,10 @@ fuchsia_driver("coordinator-driver") {
 }
 
 fuchsia_driver_component("coordinator") {
-  visibility = [ ":*" ]
   component_name = "display-coordinator"
   deps = [ ":coordinator-driver" ]
   info = "coordinator-info.json"
   manifest = "meta/display-coordinator.cml"
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [ ":coordinator" ]
 }
 
 # Also used by test/.

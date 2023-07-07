@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
@@ -34,15 +33,10 @@ fuchsia_driver("asix-88772b-driver") {
 }
 
 fuchsia_driver_component("asix-88772b") {
-  visibility = [ ":*" ]
   component_name = "asix-88772b"
   deps = [ ":asix-88772b-driver" ]
   info = "asix-88772b-info.json"
   manifest = "meta/asix-88772b.cml"
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [ ":asix-88772b" ]
 }
 
 group("tests") {

@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
@@ -36,15 +35,10 @@ fuchsia_driver("clock-driver") {
 }
 
 fuchsia_driver_component("clock") {
-  visibility = [ ":*" ]
   component_name = "clock"
   deps = [ ":clock-driver" ]
   info = "clock-info.json"
   manifest = "meta/clock.cml"
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [ ":clock" ]
 }
 
 group("tests") {

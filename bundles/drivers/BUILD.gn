@@ -7,11 +7,34 @@ import("//build/zbi/kernel_cmdline.gni")
 # TODO(fxbug.dev/122864) Remove transitional labels
 group("utils") {
 }
+
 group("bootstrap") {
+  deps = [
+    "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
+    "//src/connectivity/network/drivers/network-device",
+    "//src/devices/bundles:bootstrap-dev",
+    "//src/graphics/display/drivers/coordinator",
+    "//src/ui/input/drivers/hid",
+    "//src/ui/input/drivers/hid-buttons",
+    "//src/ui/input/drivers/hid-input-report",
+  ]
 }
+
+# Drivers which are meant only for non-user facing products.
 group("bootstrap-eng") {
+  deps = [ "//src/devices/misc/drivers/cpu-trace" ]
 }
+
 group("usb-host-stack") {
+  deps = [
+    "//src/connectivity/bluetooth/hci/transport/usb:bt-transport-usb",
+    "//src/connectivity/ethernet/drivers/asix-88179",
+    "//src/connectivity/ethernet/drivers/asix-88772b",
+    "//src/connectivity/ethernet/drivers/usb-cdc-ecm",
+    "//src/devices/bundles:usb-host-stack",
+    "//src/media/audio/drivers/usb-audio",
+    "//src/ui/input/drivers/usb-hid",
+  ]
 }
 
 group("usb-peripheral-stack") {

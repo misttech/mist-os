@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
@@ -26,15 +25,10 @@ fuchsia_driver("serial-async-driver") {
 }
 
 fuchsia_driver_component("serial-async") {
-  visibility = [ ":*" ]
   info = "serial-async-info.json"
   component_name = "serial-async"
   deps = [ ":serial-async-driver" ]
   manifest = "meta/serial-async.cml"
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [ ":serial-async" ]
 }
 
 source_set("common") {
