@@ -868,15 +868,17 @@ zx_status_t Controller::CreateClient(
             // Add all existing displays to the client
             if (displays_.size() > 0) {
               DisplayId current_displays[displays_.size()];
-              int idx = 0;
+              int initialized_display_count = 0;
               for (const DisplayInfo& display : displays_) {
                 if (display.init_done) {
-                  current_displays[idx++] = display.id;
+                  current_displays[initialized_display_count] = display.id;
+                  ++initialized_display_count;
                 }
               }
               cpp20::span<DisplayId> removed_display_ids = {};
               client_ptr->OnDisplaysChanged(
-                  cpp20::span<DisplayId>(current_displays, displays_.size()), removed_display_ids);
+                  cpp20::span<DisplayId>(current_displays, initialized_display_count),
+                  removed_display_ids);
             }
 
             if (virtcon_client_ == client_ptr) {
