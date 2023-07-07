@@ -13,6 +13,13 @@ import("//build/images/vboot/vboot.gni")
 assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
 
+if (has_board) {
+  assert(bringup_images_config_label != false,
+         "Need to define bringup_images_config_label")
+} else {
+  bringup_images_config_label = "//boards/images:bringup_default"
+}
+
 product_assembly_configuration("product_assembly_config") {
   platform = {
     feature_set_level = "bootstrap"
@@ -73,9 +80,7 @@ bringup_base = {
 # is responsible for generating that image.
 assembled_system("bringup_non_fastboot") {
   forward_variables_from(bringup_base, "*")
-  if (bringup_images_config_label != false) {
-    assembly_images_config_label = bringup_images_config_label
-  }
+  assembly_images_config_label = bringup_images_config_label
   image_name = "bringup"
   if (custom_signing_script != "") {
     zbi_signing_script = custom_signing_script
