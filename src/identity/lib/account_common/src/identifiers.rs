@@ -49,7 +49,7 @@ macro_rules! wrapper_type {
 
         impl Clone for $name {
             fn clone(&self) -> $name {
-                $name { inner: self.inner.clone() }
+                *self
             }
         }
 
