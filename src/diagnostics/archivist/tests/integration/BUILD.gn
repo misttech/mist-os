@@ -160,10 +160,10 @@ fuchsia_component("archivist-with-feedback-filtering-disabled") {
   deps = [ "//src/diagnostics/archivist:bin" ]
 }
 
-fuchsia_component("archivist_integration_tests") {
-  testonly = true
+fuchsia_test_component("archivist_integration_tests") {
   deps = [ ":integration_tests_bin" ]
   manifest = "meta/archivist_integration_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_structured_config_values("archivist-for-integration-config") {

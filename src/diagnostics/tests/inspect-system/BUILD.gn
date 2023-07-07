@@ -47,10 +47,10 @@ rustc_binary("bin") {
   ]
 }
 
-fuchsia_component("component") {
-  testonly = true
+fuchsia_test_component("component") {
   component_name = "inspect-system"
   manifest = "meta/inspect_system.cml"
+  test_type = "system"
   deps = [ ":bin" ]
 }
 
