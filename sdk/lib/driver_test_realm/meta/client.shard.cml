@@ -36,5 +36,10 @@
             from: "parent",
             to: "#driver_test_realm",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#driver_test_realm" ],
+        },
     ],
 }

@@ -4,7 +4,10 @@
 
 // TODO(fxbug.dev/116950): Merge this into the driver-test-realm.cml
 {
-    include: [ "syslog/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         {
             name: "driver-manager",
