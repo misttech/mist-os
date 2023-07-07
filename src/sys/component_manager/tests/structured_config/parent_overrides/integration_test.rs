@@ -99,7 +99,6 @@ async fn realm_api_refuses_to_override_immutable_config() {
 async fn realm_builder_without_override_returns_default() {
     let builder = RealmBuilder::new().await.unwrap();
 
-    // TODO(https://fxbug.dev/102211) set a realm-builder-specific config value here
     let expected_value = "default value";
 
     let config_receiver = builder
@@ -129,6 +128,55 @@ async fn realm_builder_without_override_returns_default() {
     let reporter = realm.root.connect_to_protocol_at_exposed_dir::<ReporterMarker>().unwrap();
     let value = reporter.get_parent_provided_config_string().await.unwrap();
     assert_eq!(value, expected_value);
+}
+
+#[fuchsia::test]
+async fn realm_builder_with_override() {
+    let builder = RealmBuilder::new().await.unwrap();
+
+    let mut child_overrides: Vec<fidl_fuchsia_component_decl::ConfigOverride> =
+        Vec::with_capacity(1);
+    child_overrides.push(fidl_fuchsia_component_decl::ConfigOverride {
+        key: Some("parent_provided".to_string()),
+        value: Some(fidl_fuchsia_component_decl::ConfigValue::Single(
+            fidl_fuchsia_component_decl::ConfigSingleValue::String(
+                "Realm Builder parent override".to_string(),
+            ),
+        )),
+        ..Default::default()
+    });
+
+    let config_receiver = builder
+        .add_child(
+            "realm_builder_config_receiver",
+            RECEIVER_URL,
+            ChildOptions::new().eager().config_overrides(child_overrides),
+        )
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .from(Ref::parent())
+                .to(&config_receiver),
+        )
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name(ReporterMarker::PROTOCOL_NAME))
+                .from(&config_receiver)
+                .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+    let realm = builder.build().await.unwrap();
+
+    let reporter = realm.root.connect_to_protocol_at_exposed_dir::<ReporterMarker>().unwrap();
+    let value = reporter.get_parent_provided_config_string().await.unwrap();
+    assert_eq!(value, "Realm Builder parent override");
 }
 
 #[fuchsia::test]

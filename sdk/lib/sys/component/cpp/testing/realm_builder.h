@@ -32,7 +32,13 @@
 namespace component_testing {
 
 // Default child options provided to all components.
-const ChildOptions kDefaultChildOptions{.startup_mode = StartupMode::LAZY, .environment = ""};
+const ChildOptions kDefaultChildOptions {
+  .startup_mode = StartupMode::LAZY, .environment = ""
+#if __Fuchsia_API_level__ >= 13
+      ,
+  .config_overrides = {}
+#endif
+};
 
 // Default child collection name for constructed root.
 constexpr char kDefaultCollection[] = "realm_builder";

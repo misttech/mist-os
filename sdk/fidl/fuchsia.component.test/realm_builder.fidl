@@ -325,6 +325,7 @@ type EventStream = table {
 };
 
 /// Properties that may be set on a child when it is added to a realm.
+// TODO(fxbug.dev/127801): Consider deprecating this type.
 type ChildOptions = table {
     /// For information on this type, see
     /// https://fuchsia.dev/go/components/declaration#StartupMode.
@@ -338,6 +339,13 @@ type ChildOptions = table {
     /// https://fuchsia.dev/go/components/declaration#OnTerminate.
     /// Defaults to `NONE`.
     3: on_terminate fuchsia.component.decl.OnTerminate;
+
+    /// Structured Configuration overrides to be applied to the child.
+    /// Only keys declared by the child component as overridable by parent may
+    /// be provided. For information on overrides, see
+    /// [fuchsia.component.decl/ConfigOverride].
+    @available(added=13)
+    4: config_overrides vector<fuchsia.component.decl.ConfigOverride>:MAX;
 };
 
 /// Maximum number of entries allowed in one call of `Realm.ReadOnlyDirectory`.

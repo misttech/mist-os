@@ -73,6 +73,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.test/ChildOptions.config_overrides",
+        "ordinal": "4",
+        "type": "vector<fuchsia.component.decl/ConfigOverride>"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.test/ChildOptions.environment",
         "ordinal": "2",
         "type": "string:100"

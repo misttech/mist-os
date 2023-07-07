@@ -21,6 +21,7 @@
 #include <string>
 #include <string_view>
 #include <variant>
+#include <vector>
 
 // This file contains structs used by the RealmBuilder library to create realms.
 
@@ -213,10 +214,19 @@ struct ChildOptions {
   // a capability that it offers.
   StartupMode startup_mode = StartupMode::LAZY;
 
-  // Set the environment for this child to run in. The environment specified
+  // The environment for the child to run in. The environment specified
   // by this field must already exist by the time this is set.
-  // Otherwise, calls to AddChild will panic.
+  // Otherwise, calls to AddChild will panic. The referenced string must outlive
+  // this object.
   std::string_view environment;
+
+#if __Fuchsia_API_level__ >= 13
+  // Structured Configuration overrides to be applied to the child.
+  // Only keys declared by the child component as overridable by parent may
+  // be provided.
+  using ConfigOverride = fuchsia::component::decl::ConfigOverride;
+  std::vector<ConfigOverride> config_overrides;
+#endif
 };
 
 // If this is used for the root Realm, then this endpoint refers to the test

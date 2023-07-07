@@ -28,6 +28,7 @@
 #include <zircon/status.h>
 
 #include <cstddef>
+#include <utility>
 
 #include <gtest/gtest.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
@@ -194,27 +195,74 @@ TEST_F(LocalComponentRunnerTest, RunnerGivesComponentItsNamespace) {
 
 template <typename InputType, typename OutputType>
 class ConvertParameterizedFixture
-    : public testing::TestWithParam<std::pair<InputType, std::shared_ptr<OutputType>>> {};
+    : public testing::TestWithParam<std::pair<InputType, std::shared_ptr<OutputType>>> {
+ protected:
+  InputType GetInput(const InputType& input) { return input; }
+};
 
 #define ZX_COMPONENT_TYPED_TEST_P(test_suite_name, method_name) \
   TEST_P(test_suite_name, method_name) {                        \
     auto param = GetParam();                                    \
-    auto actual = ConvertToFidl(param.first);                   \
+    auto actual = ConvertToFidl(GetInput(param.first));         \
     auto expected = std::move(*param.second);                   \
     EXPECT_TRUE(fidl::Equals(actual, expected));                \
   }
 
+// The parameter type must be a copyable type per
+// http://google.github.io/googletest/advanced.html#how-to-write-value-parameterized-tests.
+// Since at least one member of `ChildOptions` is not copyable, we need to work around this.
+// A `std::shared_ptr` is copyable but must be dereferenced to access the value.
+// `GetInput()` abstracts the dereferencing when necessary.
 class ConvertChildOptionsParameterizedFixture
-    : public ConvertParameterizedFixture<ChildOptions, fctest::ChildOptions> {};
+    : public ConvertParameterizedFixture<std::shared_ptr<ChildOptions>, fctest::ChildOptions> {
+ protected:
+  const ChildOptions& GetInput(std::shared_ptr<ChildOptions> input) { return *input; }
+};
+
+std::vector<fcdecl::ConfigOverride> GetTestConfigOverrides() {
+  std::vector<fuchsia::component::decl::ConfigOverride> result;
+  result.emplace_back();
+  result.back().set_key("baz");
+  result.back().set_value(
+      fcdecl::ConfigValue::WithSingle(::fcdecl::ConfigSingleValue::WithUint64(1234u)));
+  result.emplace_back();
+  result.back().set_key("bat");
+  result.back().set_value(
+      fcdecl::ConfigValue::WithSingle(::fcdecl::ConfigSingleValue::WithInt8(-100)));
+
+  // Add the same key with a different value. There are no checks for duplicates.
+  result.emplace_back();
+  result.back().set_key(result[0].key());
+  result.back().set_value(
+      fcdecl::ConfigValue::WithSingle(::fcdecl::ConfigSingleValue::WithString("hello")));
+
+  return result;
+}
+
+std::vector<std::pair<std::string, fcdecl::ConfigValue>> GetExpectedConfigOverrides() {
+  std::vector<std::pair<std::string, fcdecl::ConfigValue>> result;
+  result.emplace_back(std::string("baz"), fcdecl::ConfigValue::WithSingle(
+                                              ::fcdecl::ConfigSingleValue::WithUint64(1234u)));
+  result.emplace_back(std::string("bat"),
+                      fcdecl::ConfigValue::WithSingle(::fcdecl::ConfigSingleValue::WithInt8(-100)));
+  result.emplace_back(std::string("baz"), fcdecl::ConfigValue::WithSingle(
+                                              ::fcdecl::ConfigSingleValue::WithString("hello")));
+  return result;
+}
 
 ZX_COMPONENT_TYPED_TEST_P(ConvertChildOptionsParameterizedFixture, ConvertsAllFields)
 INSTANTIATE_TEST_SUITE_P(
     ConvertTest, ConvertChildOptionsParameterizedFixture,
     testing::Values(
-        std::make_pair(ChildOptions{.startup_mode = StartupMode::EAGER, .environment = "foo"},
-                       component::tests::CreateFidlChildOptions(StartupMode::EAGER, "foo")),
-        std::make_pair(ChildOptions{.startup_mode = StartupMode::LAZY, .environment = "bar"},
-                       component::tests::CreateFidlChildOptions(StartupMode::LAZY, "bar"))));
+        std::make_pair(std::shared_ptr<ChildOptions>(new ChildOptions{
+                           .startup_mode = StartupMode::EAGER,
+                           .environment = "foo",
+                           .config_overrides = GetTestConfigOverrides()}),
+                       component::tests::CreateFidlChildOptions(StartupMode::EAGER, "foo",
+                                                                GetExpectedConfigOverrides())),
+        std::make_pair(std::shared_ptr<ChildOptions>(new ChildOptions{
+                           .startup_mode = StartupMode::LAZY, .environment = "bar"}),
+                       component::tests::CreateFidlChildOptions(StartupMode::LAZY, "bar", {}))));
 
 class ConvertRefParameterizedFixture : public ConvertParameterizedFixture<Ref, fcdecl::Ref> {};
 

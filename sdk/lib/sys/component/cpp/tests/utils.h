@@ -8,7 +8,11 @@
 #include <fuchsia/component/decl/cpp/fidl.h>
 #include <fuchsia/component/test/cpp/fidl.h>
 
+#include <memory>
 #include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace component {
 namespace tests {
@@ -39,8 +43,13 @@ std::shared_ptr<fcdecl::Offer> CreateFidlStorageOfferDecl(std::string_view sourc
                                                           std::shared_ptr<fcdecl::Ref> target);
 
 // Conversion functions for |fuchsia.component.test| types.
-std::shared_ptr<fctest::ChildOptions> CreateFidlChildOptions(fcdecl::StartupMode startup_mode,
-                                                             std::string_view environment);
+std::shared_ptr<fctest::ChildOptions> CreateFidlChildOptions(
+    fcdecl::StartupMode startup_mode, std::string_view environment
+#if __Fuchsia_API_level__ >= 13
+    ,
+    std::vector<std::pair<std::string, fcdecl::ConfigValue>> config_overrides
+#endif
+);
 
 std::shared_ptr<fctest::Capability> CreateFidlProtocolCapability(std::string_view name,
                                                                  std::string_view as,

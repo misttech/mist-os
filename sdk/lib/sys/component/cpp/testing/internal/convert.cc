@@ -4,6 +4,7 @@
 
 #include <fuchsia/component/decl/cpp/fidl.h>
 #include <lib/sys/component/cpp/testing/internal/convert.h>
+#include <lib/sys/component/cpp/testing/internal/errors.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 
 namespace component_testing {
@@ -29,6 +30,20 @@ fuchsia::component::test::ChildOptions ConvertToFidl(const ChildOptions& options
   if (!options.environment.empty()) {
     result.set_environment(std::string(options.environment));
   }
+
+#if __Fuchsia_API_level__ >= 13
+  if (!options.config_overrides.empty()) {
+    result.mutable_config_overrides()->reserve(options.config_overrides.size());
+
+    for (const auto& config_override : options.config_overrides) {
+      ZX_ASSERT(!config_override.IsEmpty());
+      fuchsia::component::decl::ConfigOverride override_clone;
+      ZX_COMPONENT_ASSERT_STATUS_OK("ConfigValue/Clone", config_override.Clone(&override_clone));
+
+      result.mutable_config_overrides()->push_back(std::move(override_clone));
+    }
+  }
+#endif
 
   return result;
 }

@@ -326,9 +326,7 @@ in the component's config schema which has `mutability: [ "parent" ]` and
 You can use [Realm Builder][rb-feature-matrix] to dynamically replace the configuration values of
 a component regardless of the configuration field's `mutability`.
 
-Note: This currently only works for components in the same package as the test.
-Please star https://fxbug.dev/102211 for updates on supporting this feature for
-subpackaged components.
+TODO(fxbug.dev/102211) Add a section covering use with subpackaged components.
 
 * {C++}
 

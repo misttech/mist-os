@@ -853,6 +853,12 @@ impl RealmNodeState {
         child_url: String,
         child_options: ftest::ChildOptions,
     ) {
+        // TODO(fxbug.dev/102211): Validate overrides in cm_fidl_validator before
+        // converting them to cm_rust.
+        let config_overrides: Option<Vec<_>> = child_options
+            .config_overrides
+            .map(|c| c.into_iter().map(|o| o.fidl_into_native()).collect());
+
         self.decl.children.push(cm_rust::ChildDecl {
             name: child_name,
             url: child_url,
@@ -867,8 +873,7 @@ impl RealmNodeState {
                 Some(fcdecl::OnTerminate::Reboot) => Some(fcdecl::OnTerminate::Reboot),
                 None => None,
             },
-            // TODO(https://fxbug.dev/102211) support config overrides
-            config_overrides: None,
+            config_overrides,
         });
     }
 
@@ -1080,6 +1085,13 @@ impl RealmNode2 {
                 } else {
                     let child_node =
                         RealmNode2::load_from_pkg(child.url, Clone::clone(&test_pkg_dir)).await?;
+
+                    // TODO(fxbug.dev/102211): Validate overrides in cm_fidl_validator before
+                    // converting them to cm_rust.
+                    let config_overrides: Option<Vec<_>> = child
+                        .config_overrides
+                        .map(|c| c.into_iter().map(|o| o.native_into_fidl()).collect());
+
                     let child_options = ftest::ChildOptions {
                         startup: match child.startup {
                             fcdecl::StartupMode::Lazy => Some(fcdecl::StartupMode::Lazy),
@@ -1091,6 +1103,7 @@ impl RealmNode2 {
                             Some(fcdecl::OnTerminate::Reboot) => Some(fcdecl::OnTerminate::Reboot),
                             None => None,
                         },
+                        config_overrides,
                         ..Default::default()
                     };
                     state_guard.mutable_children.insert(child.name, (child_options, child_node));
@@ -2008,6 +2021,10 @@ mod tests {
                                     Some(fcdecl::OnTerminate::Reboot) => {
                                         Some(fcdecl::OnTerminate::Reboot)
                                     }
+                                    None => None,
+                                },
+                                config_overrides: match child.config_overrides {
+                                    Some(overrides) => Some(overrides.native_into_fidl()),
                                     None => None,
                                 },
                                 ..Default::default()
@@ -4546,8 +4563,8 @@ mod tests {
                     name: "a".to_string(),
                     url: "test://a".to_string(),
                     startup: fcdecl::StartupMode::Lazy,
-                    on_terminate: None,
                     environment: None,
+                    on_terminate: None,
                     config_overrides: None,
                 }],
                 offers: vec![cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
@@ -4619,7 +4636,7 @@ mod tests {
         assert!(version_history::is_valid_abi_revision(abi_revision.into()));
     }
 
-    // TODO(88429): The following test is impossible to write until sub-realms are supported
+    // TODO(fxbug.dev/88429): The following test is impossible to write until sub-realms are supported
     // #[fuchsia::test]
     // async fn replace_component_decl_where_decl_children_conflict_with_mutable_children() {
     // }

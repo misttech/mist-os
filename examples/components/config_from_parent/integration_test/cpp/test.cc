@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.component.decl/cpp/fidl.h>
+#include <fidl/fuchsia.component.decl/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.component/cpp/fidl.h>
 #include <fidl/fuchsia.diagnostics/cpp/fidl.h>
 #include <fuchsia/diagnostics/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/inspect/contrib/cpp/archive_reader.h>
+#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <string>
@@ -25,21 +27,23 @@ constexpr char kCollectionName[] = "realm_api_collection";
 class IntegrationTest : public gtest::RealLoopFixture {
  protected:
   InspectData GetInspect(const std::string& child_name) {
+    std::string child_moniker = std::string(kCollectionName) + "\\:" + child_name;
+    return GetInspect(child_name, child_moniker);
+  }
+
+  InspectData GetInspect(const std::string& child_name, const std::string& child_moniker) {
     zx::result client_end = component::Connect<fuchsia_diagnostics::ArchiveAccessor>();
     ZX_ASSERT(client_end.is_ok());
     fuchsia::diagnostics::ArchiveAccessorPtr archive;
     archive.Bind(client_end->TakeChannel(), dispatcher());
 
-    std::stringstream selector;
-    selector << kCollectionName << "\\:" << child_name;
-    std::string child_with_collection = selector.str();
-    selector << ":root";
+    std::string selector = child_moniker + ":root";
 
-    inspect::contrib::ArchiveReader reader(std::move(archive), {selector.str()});
+    inspect::contrib::ArchiveReader reader(std::move(archive), {selector});
     fpromise::result<std::vector<InspectData>, std::string> result;
     async::Executor executor(dispatcher());
     executor.schedule_task(
-        reader.SnapshotInspectUntilPresent({child_with_collection})
+        reader.SnapshotInspectUntilPresent({child_moniker})
             .then([&](fpromise::result<std::vector<InspectData>, std::string>& rest) {
               result = std::move(rest);
             }));
@@ -173,3 +177,33 @@ TEST_F(IntegrationTest, DefaultValuesObserved) {
 
   EXPECT_EQ(expected_greeting, data.GetByPath({"root", "config", "greeting"}).GetString());
 }
+
+TEST_F(IntegrationTest, ConfigCppRealmBuilderParentOverride) {
+  std::vector<fuchsia_component_decl::ConfigOverride> child_overrides;
+  child_overrides.emplace_back();
+
+  child_overrides.back().key("greeting");
+  child_overrides.back().value(fuchsia_component_decl::ConfigValue::WithSingle(
+      fuchsia_component_decl::ConfigSingleValue::WithString("parent component")));
+
+  auto realm_builder = component_testing::RealmBuilder::Create();
+  auto options =
+      component_testing::ChildOptions{.startup_mode = component_testing::StartupMode::EAGER,
+                                      .config_overrides = fidl::NaturalToHLCPP(child_overrides)};
+  auto child_name = "config_example_override_mutable_by_parent";
+  realm_builder.AddChild(child_name, kChildUrl, options);
+
+  realm_builder.AddRoute(component_testing::Route{
+      .capabilities = {component_testing::Protocol{"fuchsia.logger.LogSink"}},
+      .source = component_testing::ParentRef(),
+      .targets = {component_testing::ChildRef{child_name}}});
+  auto realm = realm_builder.Build();
+  auto moniker = "realm_builder\\:" + realm.component().GetChildName() + "/" + child_name;
+
+  auto data = GetInspect(child_name, moniker);
+
+  EXPECT_EQ(rapidjson::Value("parent component"), data.GetByPath({"root", "config", "greeting"}));
+}
+
+// TODO(fxbug.dev/102211): Include a subpackaged child component in the examples
+//  and tests, including the Rust version of this suite.

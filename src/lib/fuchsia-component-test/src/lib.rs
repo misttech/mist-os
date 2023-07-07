@@ -1878,6 +1878,7 @@ pub struct ChildOptions {
     startup: fdecl::StartupMode,
     environment: Option<String>,
     on_terminate: fdecl::OnTerminate,
+    config_overrides: Option<Vec<fdecl::ConfigOverride>>,
 }
 
 impl ChildOptions {
@@ -1886,6 +1887,7 @@ impl ChildOptions {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: fdecl::OnTerminate::None,
+            config_overrides: None,
         }
     }
 
@@ -1903,6 +1905,14 @@ impl ChildOptions {
         self.on_terminate = fdecl::OnTerminate::Reboot;
         self
     }
+
+    pub fn config_overrides(
+        mut self,
+        config_overrides: impl Into<Vec<fdecl::ConfigOverride>>,
+    ) -> Self {
+        self.config_overrides = Some(config_overrides.into());
+        self
+    }
 }
 
 impl Into<ftest::ChildOptions> for ChildOptions {
@@ -1911,6 +1921,7 @@ impl Into<ftest::ChildOptions> for ChildOptions {
             startup: Some(self.startup),
             environment: self.environment,
             on_terminate: Some(self.on_terminate),
+            config_overrides: self.config_overrides,
             ..Default::default()
         }
     }
@@ -2190,16 +2201,33 @@ mod tests {
         futures::{channel::mpsc, future::pending, FutureExt, SinkExt, StreamExt, TryStreamExt},
     };
 
+    // To ensure that the exppected value of any new member is explicitly
+    // specified, avoid using `..Default::default()`. To do this, we must work
+    // around fidlgen_rust's mechanism for ensuring that adding FIDL `table`
+    // fields does not break source. We do this by initializing
+    // the hidden `__non_exhaustive` member, which is marked deprecated and thus
+    // requires this lint check attribute..
+    #[allow(deprecated)]
     #[fuchsia::test]
     fn child_options_to_fidl() {
         let options: ftest::ChildOptions = ChildOptions::new().into();
         assert_eq!(
             options,
             ftest::ChildOptions {
+                // Only include values that must be set to pass the test.
+                startup: Some(fdecl::StartupMode::Lazy),
+                on_terminate: Some(fdecl::OnTerminate::None),
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            options,
+            ftest::ChildOptions {
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
                 on_terminate: Some(fdecl::OnTerminate::None),
-                ..Default::default()
+                config_overrides: None,
+                __non_exhaustive: ()
             },
         );
         let options: ftest::ChildOptions = ChildOptions::new().eager().into();
@@ -2209,7 +2237,8 @@ mod tests {
                 startup: Some(fdecl::StartupMode::Eager),
                 environment: None,
                 on_terminate: Some(fdecl::OnTerminate::None),
-                ..Default::default()
+                config_overrides: None,
+                __non_exhaustive: ()
             },
         );
         let options: ftest::ChildOptions = ChildOptions::new().environment("test_env").into();
@@ -2219,7 +2248,8 @@ mod tests {
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: Some("test_env".to_string()),
                 on_terminate: Some(fdecl::OnTerminate::None),
-                ..Default::default()
+                config_overrides: None,
+                __non_exhaustive: ()
             },
         );
         let options: ftest::ChildOptions = ChildOptions::new().reboot_on_terminate().into();
@@ -2229,7 +2259,34 @@ mod tests {
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
                 on_terminate: Some(fdecl::OnTerminate::Reboot),
-                ..Default::default()
+                config_overrides: None,
+                __non_exhaustive: ()
+            },
+        );
+
+        let mut config_overrides: Vec<fdecl::ConfigOverride> = vec![];
+        config_overrides.push(fdecl::ConfigOverride {
+            key: Some("mystring".to_string()),
+            value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::String(
+                "Fuchsia".to_string(),
+            ))),
+            ..Default::default()
+        });
+        config_overrides.push(fdecl::ConfigOverride {
+            key: Some("mynumber".to_string()),
+            value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Uint64(200))),
+            ..Default::default()
+        });
+        let options: ftest::ChildOptions =
+            ChildOptions::new().config_overrides(config_overrides.clone()).into();
+        assert_eq!(
+            options,
+            ftest::ChildOptions {
+                startup: Some(fdecl::StartupMode::Lazy),
+                environment: None,
+                on_terminate: Some(fdecl::OnTerminate::None),
+                config_overrides: Some(config_overrides),
+                __non_exhaustive: ()
             },
         );
     }

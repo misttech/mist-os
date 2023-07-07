@@ -17,6 +17,7 @@ rustc_test("rust_bin") {
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component-test",
     "//third_party/rust_crates:anyhow",
   ]
 
@@ -31,10 +32,12 @@ executable("cpp_bin") {
   public_deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp_hlcpp_conversion",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_cpp",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/inspect/contrib/cpp:archive_reader",
+    "//sdk/lib/sys/component/cpp/testing:cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
   ]

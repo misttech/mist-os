@@ -11,6 +11,7 @@ use fidl_fuchsia_component_decl::{
 use fuchsia_component::client::{
     connect_to_protocol, connect_to_protocol_at_dir_root, open_childs_exposed_directory,
 };
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
 use fuchsia_inspect::assert_data_tree;
 
 const CHILD_URL: &str = "#meta/config_example.cm";
@@ -121,4 +122,59 @@ async fn inspect_default_value() -> anyhow::Result<()> {
     });
 
     Ok(())
+}
+
+#[fuchsia::test]
+async fn inspect_realm_builder_parent_override() {
+    let mut child_overrides: Vec<fidl_fuchsia_component_decl::ConfigOverride> =
+        Vec::with_capacity(1);
+
+    child_overrides.push(fidl_fuchsia_component_decl::ConfigOverride {
+        key: Some("greeting".to_string()),
+        value: Some(fidl_fuchsia_component_decl::ConfigValue::Single(
+            fidl_fuchsia_component_decl::ConfigSingleValue::String("parent component".to_string()),
+        )),
+        ..Default::default()
+    });
+
+    let builder = RealmBuilder::new().await.unwrap();
+    let config_component = builder
+        .add_child(
+            "config_example_realm_builder_parent_override",
+            CHILD_URL,
+            ChildOptions::new().eager().config_overrides(child_overrides),
+        )
+        .await
+        .unwrap();
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .from(Ref::parent())
+                .to(&config_component),
+        )
+        .await
+        .unwrap();
+
+    let _instance = builder.build().await.unwrap();
+
+    let inspector = ArchiveReader::new()
+        .add_selector("*/config_example_realm_builder_parent_override:root")
+        .with_minimum_schema_count(1)
+        .snapshot::<Inspect>()
+        .await
+        .unwrap()
+        .into_iter()
+        .next()
+        .and_then(|result| result.payload)
+        .unwrap();
+
+    assert_eq!(inspector.children.len(), 1, "selector must return exactly one child");
+
+    assert_data_tree!(inspector, root: {
+        config: {
+            greeting: "parent component",
+        }
+    })
 }
