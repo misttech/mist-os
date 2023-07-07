@@ -12,13 +12,10 @@
 namespace f2fs {
 namespace {
 
-using DirtyPageListTest = F2fsFakeDevTestFixture;
+using DirtyPageListTest = SingleFileTest;
 
 TEST_F(DirtyPageListTest, AddAndRemoveDirtyPage) {
-  fbl::RefPtr<fs::Vnode> test_file;
-  root_dir_->Create("test", S_IFREG, &test_file);
-  fbl::RefPtr<f2fs::File> vn = fbl::RefPtr<f2fs::File>::Downcast(std::move(test_file));
-
+  File *vn = &vnode<File>();
   ASSERT_EQ(vn->GetDirtyPageList().Size(), 0U);
   {
     LockedPage locked_page;
@@ -40,20 +37,15 @@ TEST_F(DirtyPageListTest, AddAndRemoveDirtyPage) {
     locked_page->ClearDirtyForIo();
   }
   ASSERT_EQ(vn->GetDirtyPageList().Size(), 0U);
-
-  vn->Close();
-  vn = nullptr;
 }
 
 TEST_F(DirtyPageListTest, TakeDirtyPages) {
-  fbl::RefPtr<fs::Vnode> test_file;
-  root_dir_->Create("test", S_IFREG, &test_file);
-  fbl::RefPtr<f2fs::File> vn = fbl::RefPtr<f2fs::File>::Downcast(std::move(test_file));
+  File *vn = &vnode<File>();
   char buf[kPageSize];
 
   // Make dirty Pages
-  FileTester::AppendToFile(vn.get(), buf, kPageSize);
-  FileTester::AppendToFile(vn.get(), buf, kPageSize);
+  FileTester::AppendToFile(vn, buf, kPageSize);
+  FileTester::AppendToFile(vn, buf, kPageSize);
 
   ASSERT_EQ(vn->GetDirtyPageList().Size(), 2U);
 
@@ -88,19 +80,14 @@ TEST_F(DirtyPageListTest, TakeDirtyPages) {
     ASSERT_EQ(vn->GetDirtyPageList().Size(), 0U);
     ASSERT_TRUE(pages[0]->ClearDirtyForIo());
   }
-
-  vn->Close();
-  vn = nullptr;
 }
 
 TEST_F(DirtyPageListTest, ResetFileCache) {
-  fbl::RefPtr<fs::Vnode> test_file;
-  root_dir_->Create("test", S_IFREG, &test_file);
-  fbl::RefPtr<f2fs::File> vn = fbl::RefPtr<f2fs::File>::Downcast(std::move(test_file));
+  File *vn = &vnode<File>();
   char buf[kPageSize];
 
   // Make dirty Page
-  FileTester::AppendToFile(vn.get(), buf, kPageSize);
+  FileTester::AppendToFile(vn, buf, kPageSize);
 
   ASSERT_EQ(vn->GetDirtyPageList().Size(), 1U);
 
@@ -116,19 +103,14 @@ TEST_F(DirtyPageListTest, ResetFileCache) {
 
   raw_page->GetFileCache().Reset();
   ASSERT_EQ(vn->GetDirtyPageList().Size(), 0U);
-
-  vn->Close();
-  vn = nullptr;
 }
 
 TEST_F(DirtyPageListTest, Invalidate) {
-  fbl::RefPtr<fs::Vnode> test_file;
-  root_dir_->Create("test", S_IFREG, &test_file);
-  fbl::RefPtr<f2fs::File> vn = fbl::RefPtr<f2fs::File>::Downcast(std::move(test_file));
+  File *vn = &vnode<File>();
   char buf[kPageSize];
 
   // Make dirty Page
-  FileTester::AppendToFile(vn.get(), buf, kPageSize);
+  FileTester::AppendToFile(vn, buf, kPageSize);
 
   ASSERT_EQ(vn->GetDirtyPageList().Size(), 1U);
 
@@ -145,9 +127,6 @@ TEST_F(DirtyPageListTest, Invalidate) {
   ASSERT_EQ(vn->GetDirtyPageList().Size(), 1U);
   raw_page->GetFileCache().InvalidatePages();
   ASSERT_EQ(vn->GetDirtyPageList().Size(), 0U);
-
-  vn->Close();
-  vn = nullptr;
 }
 
 }  // namespace

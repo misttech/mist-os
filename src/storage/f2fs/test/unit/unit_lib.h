@@ -43,6 +43,39 @@ class F2fsFakeDevTestFixture : public testing::Test {
   async::Loop loop_ = async::Loop(&kAsyncLoopConfigAttachToCurrentThread);
 };
 
+class SingleFileTest : public F2fsFakeDevTestFixture {
+ public:
+  SingleFileTest(uint32_t mode = S_IFREG, const TestOptions &options = TestOptions())
+      : F2fsFakeDevTestFixture(options), mode_(mode) {}
+
+  void SetUp() override {
+    F2fsFakeDevTestFixture::SetUp();
+    root_dir_->Create("FileCacheTest", mode_, &test_file_);
+  }
+
+  void TearDown() override {
+    test_file_->Close();
+    test_file_.reset();
+    F2fsFakeDevTestFixture::TearDown();
+  }
+
+  LockedPage GetPage(pgoff_t index) {
+    LockedPage page;
+    ZX_ASSERT(vnode().GrabCachePage(index, &page) == ZX_OK);
+    return page;
+  }
+
+ protected:
+  template <typename T = VnodeF2fs>
+  T &vnode() {
+    return *fbl::RefPtr<T>::Downcast(test_file_);
+  }
+
+ private:
+  fbl::RefPtr<fs::Vnode> test_file_;
+  uint32_t mode_ = S_IFREG;
+};
+
 class FileTester {
  public:
   static void MkfsOnFakeDev(std::unique_ptr<Bcache> *bc, uint64_t block_count = 819200,

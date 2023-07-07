@@ -13,39 +13,34 @@
 namespace f2fs {
 namespace {
 
-class VnodeCacheTest : public F2fsFakeDevTestFixture {
+class VnodeCacheTest : public SingleFileTest {
  public:
   VnodeCacheTest()
-      : F2fsFakeDevTestFixture(TestOptions{.mount_options = {{kOptInlineDentry, 0}}}) {}
+      : SingleFileTest(S_IFDIR, TestOptions{.mount_options = {{kOptInlineDentry, 0}}}) {}
+
+  uint32_t GetCachedVnodeCount() {
+    uint32_t cached_vnode_count = 0;
+    fs_->GetVCache().ForAllVnodes([&cached_vnode_count](fbl::RefPtr<VnodeF2fs> &vnode) {
+      ++cached_vnode_count;
+      return ZX_OK;
+    });
+    return cached_vnode_count;
+  }
+
+  uint32_t GetDirtyVnodeCount() {
+    uint32_t dirty_vnode_count = 0;
+    fs_->GetVCache().ForDirtyVnodesIf(
+        [&dirty_vnode_count](fbl::RefPtr<VnodeF2fs> &vnode) {
+          ++dirty_vnode_count;
+          return ZX_OK;
+        },
+        nullptr);
+    return dirty_vnode_count;
+  }
 };
 
-uint32_t GetCachedVnodeCount(VnodeCache &vnode_cache) {
-  uint32_t cached_vnode_count = 0;
-  vnode_cache.ForAllVnodes([&cached_vnode_count](fbl::RefPtr<VnodeF2fs> &vnode) {
-    ++cached_vnode_count;
-    return ZX_OK;
-  });
-  return cached_vnode_count;
-}
-
-uint32_t GetDirtyVnodeCount(VnodeCache &vnode_cache) {
-  uint32_t dirty_vnode_count = 0;
-  vnode_cache.ForDirtyVnodesIf(
-      [&dirty_vnode_count](fbl::RefPtr<VnodeF2fs> &vnode) {
-        ++dirty_vnode_count;
-        return ZX_OK;
-      },
-      nullptr);
-  return dirty_vnode_count;
-}
-
 TEST_F(VnodeCacheTest, Basic) {
-  fbl::RefPtr<fs::Vnode> test_dir;
-  ASSERT_EQ(root_dir_->Create("test", S_IFDIR, &test_dir), ZX_OK);
-
-  fbl::RefPtr<VnodeF2fs> test_dir_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_dir));
-
-  Dir *test_dir_ptr = static_cast<Dir *>(test_dir_vn.get());
+  Dir *test_dir_ptr = &vnode<Dir>();
 
   std::unordered_set<std::string> child_set = {"a", "b", "c", "d", "e"};
   std::vector<ino_t> child_ino_set(0);
@@ -69,7 +64,7 @@ TEST_F(VnodeCacheTest, Basic) {
     vn->Close();
     vn.reset();
   }
-  ASSERT_EQ(test_dir_vn->GetSize(), kPageSize);
+  ASSERT_EQ(test_dir_ptr->GetSize(), kPageSize);
 
   // flush dirty vnodes.
   fs_->WriteCheckpoint(false, false);
@@ -126,37 +121,28 @@ TEST_F(VnodeCacheTest, Basic) {
     }
     ++i;
   }
-
-  ASSERT_EQ(test_dir_vn->Close(), ZX_OK);
-  test_dir_vn = nullptr;
 }
 
 TEST_F(VnodeCacheTest, VnodeCacheExceptionCase) {
-  fbl::RefPtr<VnodeF2fs> test_vnode;
-
+  fbl::RefPtr<VnodeF2fs> new_vnode;
   // Check Create() exception
-  ASSERT_EQ(GetDirtyVnodeCount(fs_->GetVCache()), 0U);
-  ASSERT_EQ(GetCachedVnodeCount(fs_->GetVCache()), 1U);
-  ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->GetSuperblockInfo().GetNodeIno(), &test_vnode),
+  ASSERT_EQ(GetDirtyVnodeCount(), 2U);
+  ASSERT_EQ(GetCachedVnodeCount(), 2U);
+  ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->GetSuperblockInfo().GetNodeIno(), &new_vnode),
             ZX_ERR_NOT_FOUND);
-  ASSERT_EQ(GetDirtyVnodeCount(fs_->GetVCache()), 0U);
-  ASSERT_EQ(GetCachedVnodeCount(fs_->GetVCache()), 1U);
 
   // Check Add() exception
-  fbl::RefPtr<fs::Vnode> test_fs_vnode;
-  FileTester::CreateChild(root_dir_.get(), S_IFDIR, "add_test");
-  FileTester::Lookup(root_dir_.get(), "add_test", &test_fs_vnode);
-  test_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_fs_vnode));
-  ASSERT_EQ(GetDirtyVnodeCount(fs_->GetVCache()), 2U);
-  ASSERT_EQ(GetCachedVnodeCount(fs_->GetVCache()), 2U);
-  fs_->GetVCache().Add(test_vnode.get());
-  ASSERT_EQ(GetDirtyVnodeCount(fs_->GetVCache()), 2U);
-  ASSERT_EQ(GetCachedVnodeCount(fs_->GetVCache()), 2U);
+  auto &test_vnode = vnode<Dir>();
+  ASSERT_EQ(GetDirtyVnodeCount(), 2U);
+  ASSERT_EQ(GetCachedVnodeCount(), 2U);
+  ASSERT_EQ(fs_->GetVCache().Add(&test_vnode), ZX_ERR_ALREADY_EXISTS);
+  ASSERT_EQ(GetDirtyVnodeCount(), 2U);
+  ASSERT_EQ(GetCachedVnodeCount(), 2U);
 
   // Check AddDirty() exception
-  fs_->GetVCache().AddDirty(test_vnode.get());
-  ASSERT_EQ(GetDirtyVnodeCount(fs_->GetVCache()), 2U);
-  ASSERT_EQ(GetCachedVnodeCount(fs_->GetVCache()), 2U);
+  ASSERT_EQ(fs_->GetVCache().AddDirty(&test_vnode), ZX_ERR_ALREADY_EXISTS);
+  ASSERT_EQ(GetDirtyVnodeCount(), 2U);
+  ASSERT_EQ(GetCachedVnodeCount(), 2U);
 
   // Check ForAllVnodes() callback function
   ASSERT_EQ(
@@ -179,28 +165,21 @@ TEST_F(VnodeCacheTest, VnodeCacheExceptionCase) {
 
   // Check Reset()
   WritebackOperation op = {.bSync = true};
-  test_vnode->Writeback(op);
+  test_vnode.Writeback(op);
   WritebackOperation op_root = {.bSync = true};
   root_dir_->Writeback(op_root);
-  ASSERT_TRUE(fs_->GetVCache().RemoveDirty(test_vnode.get()) == ZX_OK);
+  ASSERT_TRUE(fs_->GetVCache().RemoveDirty(&test_vnode) == ZX_OK);
   ASSERT_TRUE(fs_->GetVCache().RemoveDirty(root_dir_.get()) == ZX_OK);
-  ASSERT_EQ(GetDirtyVnodeCount(fs_->GetVCache()), 0U);
-  ASSERT_EQ(GetCachedVnodeCount(fs_->GetVCache()), 2U);
+  ASSERT_EQ(GetDirtyVnodeCount(), 0U);
+  ASSERT_EQ(GetCachedVnodeCount(), 2U);
 
   fs_->GetVCache().Reset();
-  ASSERT_EQ(GetDirtyVnodeCount(fs_->GetVCache()), 0U);
-  ASSERT_EQ(GetCachedVnodeCount(fs_->GetVCache()), 0U);
-
-  ASSERT_EQ(test_vnode->Close(), ZX_OK);
-  test_vnode = nullptr;
+  ASSERT_EQ(GetDirtyVnodeCount(), 0U);
+  ASSERT_EQ(GetCachedVnodeCount(), 0U);
 }
 
 TEST_F(VnodeCacheTest, VnodeActivation) {
-  fbl::RefPtr<fs::Vnode> test_dir;
-  ASSERT_EQ(root_dir_->Create("test", S_IFDIR, &test_dir), ZX_OK);
-
-  fbl::RefPtr<VnodeF2fs> test_dir_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_dir));
-  Dir *test_dir_ptr = static_cast<Dir *>(test_dir_vn.get());
+  Dir *test_dir_ptr = &vnode<Dir>();
 
   std::string child_name = "file";
   FileTester::CreateChild(test_dir_ptr, S_IFDIR, child_name);
@@ -226,14 +205,14 @@ TEST_F(VnodeCacheTest, VnodeActivation) {
     int iter = 10000;
     while (--iter) {
       fbl::RefPtr<VnodeF2fs> test_vnode;
-      ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), 5, &test_vnode), ZX_OK);
+      ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), raw_pointer->Ino(), &test_vnode), ZX_OK);
     }
   });
   std::thread thread2 = std::thread([&]() {
     int iter = 10000;
     while (--iter) {
       fbl::RefPtr<VnodeF2fs> test_vnode;
-      ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), 5, &test_vnode), ZX_OK);
+      ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), raw_pointer->Ino(), &test_vnode), ZX_OK);
     }
   });
 
@@ -241,7 +220,6 @@ TEST_F(VnodeCacheTest, VnodeActivation) {
   thread2.join();
 
   ASSERT_FALSE(raw_pointer->IsActive());
-  ASSERT_EQ(test_dir_vn->Close(), ZX_OK);
 }
 
 }  // namespace
