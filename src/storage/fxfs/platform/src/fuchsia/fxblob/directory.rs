@@ -16,9 +16,9 @@ use {
         node::{FxNode, GetResult, OpenedNode},
         volume::{FxVolume, RootDir},
     },
-    anyhow::{bail, ensure, Error},
+    anyhow::{bail, ensure, Context, Error},
     async_trait::async_trait,
-    delivery_blob::DELIVERY_PATH_PREFIX,
+    delivery_blob::{delivery_blob_path, DELIVERY_PATH_PREFIX},
     fidl::endpoints::{create_proxy, ClientEnd, Proxy as _, ServerEnd},
     fidl_fuchsia_fxfs::{
         BlobCreatorRequest, BlobCreatorRequestStream, BlobWriterMarker, BlobWriterRequest,
@@ -129,7 +129,10 @@ impl BlobDirectory {
         let store = self.store();
         let fs = store.filesystem();
         let name = path.next().unwrap();
-        let name = name.strip_prefix(DELIVERY_PATH_PREFIX).unwrap_or(name);
+        let (name, is_delivery_blob) = name
+            .strip_prefix(DELIVERY_PATH_PREFIX)
+            .map(|name| (name, true))
+            .unwrap_or((name, false));
         let hash = Hash::from_str(name).map_err(|_| FxfsError::InvalidArgs)?;
 
         // TODO(fxbug.dev/122125): Create the transaction here if we might need to create the object
@@ -160,6 +163,11 @@ impl BlobDirectory {
 
                 ensure!(flags.contains(fio::OpenFlags::CREATE), FxfsError::NotFound);
                 ensure!(flags.contains(fio::OpenFlags::RIGHT_WRITABLE), FxfsError::AccessDenied);
+
+                if !is_delivery_blob {
+                    return Err(FxfsError::NotSupported)
+                        .context("Only delivery blobs (RFC 0207) are supported.");
+                }
 
                 let mut transaction = fs.clone().new_transaction(&keys, Options::default()).await?;
 
@@ -259,7 +267,7 @@ impl BlobDirectory {
         let flags = fio::OpenFlags::CREATE
             | fio::OpenFlags::RIGHT_WRITABLE
             | fio::OpenFlags::RIGHT_READABLE;
-        let path = Path::validate_and_split(hash.to_string()).map_err(|e| {
+        let path = Path::validate_and_split(delivery_blob_path(hash.to_string())).map_err(|e| {
             tracing::error!("failed to validate path: {:?}", e);
             CreateBlobError::Internal
         })?;

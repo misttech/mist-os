@@ -187,11 +187,7 @@ impl Inner {
         Ok(())
     }
 
-    fn generate_metadata(
-        &self,
-        merkle_tree: MerkleTree,
-        block_size: u64,
-    ) -> Result<Option<BlobMetadata>, Error> {
+    fn generate_metadata(&self, merkle_tree: MerkleTree) -> Result<Option<BlobMetadata>, Error> {
         // We only write metadata if the Merkle tree has multiple levels or the data is compressed.
         let is_compressed = self.header().is_compressed;
         // Special case: handle empty compressed archive.
@@ -205,7 +201,7 @@ impl Inner {
                 hashes.push(**hash);
             }
             let (uncompressed_size, chunk_size, compressed_offsets) = if is_compressed {
-                parse_seek_table(self.decompressor().seek_table(), block_size)?
+                parse_seek_table(self.decompressor().seek_table())?
             } else {
                 (self.header().payload_length as u64, 0u64, vec![])
             };
@@ -575,7 +571,7 @@ impl FileIo for FxDeliveryBlob {
                     });
                 }
                 // Calculate metadata and promote verified blob into a directory entry.
-                let metadata = inner.generate_metadata(merkle_tree, self.handle.block_size())?;
+                let metadata = inner.generate_metadata(merkle_tree)?;
                 self.complete(metadata).await?;
             }
             Ok(())
@@ -598,7 +594,6 @@ impl FileIo for FxDeliveryBlob {
 
 fn parse_seek_table(
     seek_table: &Vec<ChunkInfo>,
-    block_size: u64,
 ) -> Result<(/*uncompressed_size*/ u64, /*chunk_size*/ u64, /*compressed_offsets*/ Vec<u64>), Error>
 {
     let uncompressed_size = seek_table.last().unwrap().decompressed_range.end;
@@ -617,19 +612,23 @@ fn parse_seek_table(
         .map(|entry| TryInto::<u64>::try_into(entry.compressed_range.start))
         .collect::<Result<Vec<_>, _>>()?;
 
-    // TODO(fxbug.dev/127530): The pager assumes chunks have greater alignment than the block size.
+    // TODO(fxbug.dev/127530): The pager assumes chunk_size alignment is at least the size of a
+    // Merkle tree block. We should allow arbitrary chunk sizes. For now, we reject archives with
+    // multiple chunks that don't meet this requirement (since we control archive generation), and
+    // round up the chunk size for archives with a single chunk, as we won't read past the file end.
     let chunk_size: u64 = chunk_size.try_into()?;
-    let chunk_size: u64 = if seek_table.len() > 1 {
-        if chunk_size < block_size {
+    let alignment: u64 = fuchsia_merkle::BLOCK_SIZE.try_into()?;
+    let aligned_chunk_size = if seek_table.len() > 1 {
+        if chunk_size < alignment || chunk_size % alignment != 0 {
             return Err(FxfsError::NotSupported)
-                .context("Unsupported archive: chunk alignment must exceed block size");
+                .context("Unsupported archive: chunk size must be multiple of Merkle tree block");
         }
         chunk_size
     } else {
-        std::cmp::max(block_size, chunk_size)
+        round_up(chunk_size, alignment).unwrap()
     };
 
-    Ok((uncompressed_size.try_into()?, chunk_size, compressed_offsets))
+    Ok((uncompressed_size.try_into()?, aligned_chunk_size, compressed_offsets))
 }
 
 #[cfg(test)]
