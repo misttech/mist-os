@@ -95,6 +95,8 @@ class FlatlandViewIntegrationTest : public zxtest::Test, public LoggingEventLoop
     BlockingPresent(flatland);
   }
 
+  fuc::FlatlandPtr MakeFlatland() { return realm_->component().Connect<fuc::Flatland>(); }
+
   std::unique_ptr<RealmRoot> realm_;
   fuc::FlatlandDisplayPtr flatland_display_;
   uint32_t display_width_ = 0;
@@ -107,7 +109,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnParentDeath) {
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
   // Create the child view.
   {
-    child = realm_->component().Connect<fuc::Flatland>();
+    child = MakeFlatland();
 
     auto identity = scenic::NewViewIdentityOnCreation();
     child->CreateView2(std::move(child_view_token), std::move(identity), {},
@@ -118,7 +120,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnParentDeath) {
   // Create the parent view and connect the child view to it.
   {
     fuc::FlatlandPtr parent;
-    parent = realm_->component().Connect<fuc::Flatland>();
+    parent = MakeFlatland();
     fidl::InterfacePtr<fuc::ChildViewWatcher> parent_view_watcher;
     auto [parent_view_token, display_viewport_token] = scenic::ViewCreationTokenPair::New();
 
@@ -150,7 +152,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnParentDeath) {
 TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnInvalidTokenTest) {
   // Create the flatland view.
   fuc::FlatlandPtr flatland;
-  flatland = realm_->component().Connect<fuc::Flatland>();
+  flatland = MakeFlatland();
   fuv::ViewCreationToken invalid_token;
 
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
@@ -168,7 +170,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnInvalidTokenTe
 TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnReleaseView) {
   // Create the parent view.
   fuc::FlatlandPtr parent;
-  parent = realm_->component().Connect<fuc::Flatland>();
+  parent = MakeFlatland();
   fidl::InterfacePtr<fuc::ChildViewWatcher> parent_view_watcher;
   auto [parent_view_creation_token, display_viewport_token] = scenic::ViewCreationTokenPair::New();
 
@@ -203,7 +205,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewWatcherUnbindsOnChildDeath) {
 
   // Create the parent view and connect it to the display.
   {
-    parent = realm_->component().Connect<fuc::Flatland>();
+    parent = MakeFlatland();
     fidl::InterfacePtr<fuc::ChildViewWatcher> child_view_watcher;
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
     flatland_display_->SetContent(std::move(parent_viewport_token),
@@ -221,7 +223,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewWatcherUnbindsOnChildDeath) {
   // Create the child view and connect it to the parent view.
   {
     fuc::FlatlandPtr child;
-    child = realm_->component().Connect<fuc::Flatland>();
+    child = MakeFlatland();
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
     fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
     auto identity = scenic::NewViewIdentityOnCreation();
@@ -244,7 +246,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewWatcherUnbindsOnChildDeath) {
 TEST_F(FlatlandViewIntegrationTest, ChildViewWatcherUnbindsOnInvalidToken) {
   // Create the parent view.
   fuc::FlatlandPtr parent;
-  parent = realm_->component().Connect<fuc::Flatland>();
+  parent = MakeFlatland();
 
   fidl::InterfacePtr<fuc::ChildViewWatcher> parent_view_watcher;
   auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
@@ -284,7 +286,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportStatusTest) {
   fuc::FlatlandPtr parent;
   // Create the parent view and connect it to the display.
   {
-    parent = realm_->component().Connect<fuc::Flatland>();
+    parent = MakeFlatland();
     fidl::InterfacePtr<fuc::ChildViewWatcher> child_view_watcher;
 
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
@@ -303,7 +305,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportStatusTest) {
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
   // Create the child view and connect it to the parent.
   {
-    child = realm_->component().Connect<fuc::Flatland>();
+    child = MakeFlatland();
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
 
     auto identity = scenic::NewViewIdentityOnCreation();
@@ -343,7 +345,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewStatusTest) {
   fuc::FlatlandPtr parent;
   // Create the parent view and connect it to the display.
   {
-    parent = realm_->component().Connect<fuc::Flatland>();
+    parent = MakeFlatland();
 
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
     fidl::InterfacePtr<fuc::ChildViewWatcher> parent_view_watcher;
@@ -362,7 +364,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewStatusTest) {
   std::optional<fuc::ChildViewStatus> child_status;
   // Create the child view and connect it to the parent view.
   {
-    child = realm_->component().Connect<fuc::Flatland>();
+    child = MakeFlatland();
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
 
     fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
@@ -391,7 +393,7 @@ TEST_F(FlatlandViewIntegrationTest, GetViewRefTest) {
 
   // Create the parent view.
   {
-    parent = realm_->component().Connect<fuc::Flatland>();
+    parent = MakeFlatland();
 
     fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
     auto identity = scenic::NewViewIdentityOnCreation();
@@ -408,7 +410,7 @@ TEST_F(FlatlandViewIntegrationTest, GetViewRefTest) {
 
   // Create the child view and connect it to the parent view.
   {
-    child = realm_->component().Connect<fuc::Flatland>();
+    child = MakeFlatland();
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
 
     fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
