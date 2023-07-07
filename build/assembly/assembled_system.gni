@@ -231,6 +231,11 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #     image size is unfixed: the generated image will be set to an arbitrary size greater than or
 #     equal to the required size to fit the base system.
 #
+# Board: VBMeta arguments
+#
+#   generate_vbmeta (optional; default: use_vbmeta)
+#     [bool] Whether to generate a VBMeta image.
+#
 # Board: ZBI arguments
 #
 #   zbi_name (optional; default: target_name)
@@ -259,6 +264,10 @@ template("assembled_system") {
   generate_fxfs = false
   if (defined(invoker.generate_fxfs)) {
     generate_fxfs = invoker.generate_fxfs
+  }
+  generate_vbmeta = use_vbmeta
+  if (defined(invoker.generate_vbmeta)) {
+    generate_vbmeta = invoker.generate_vbmeta
   }
   assert(!generate_fvm || !generate_fxfs,
          "Only one of Fxfs and FVM can host blobs")
@@ -290,7 +299,7 @@ template("assembled_system") {
           !defined(image_metadata_overrides.zbi_signed),
           "No signed ZBI will be built: no metadata override should be provided")
     }
-    if (!use_vbmeta) {
+    if (!generate_vbmeta) {
       assert(!defined(image_metadata_overrides.vbmeta),
              "No VBMeta will be built: no metadata override should be provided")
     }
@@ -648,7 +657,7 @@ template("assembled_system") {
           }
         }
       }
-      if (use_vbmeta) {
+      if (generate_vbmeta) {
         vbmeta = {
           key = avb_key
           key_metadata = avb_atx_metadata
@@ -1060,7 +1069,7 @@ template("assembled_system") {
       outputs += [ files.zbi_signed ]
     }
 
-    if (use_vbmeta) {
+    if (generate_vbmeta) {
       outputs += [ files.vbmeta ]
     }
 
@@ -1246,7 +1255,7 @@ template("assembled_system") {
         }
 
         # Optionally add the vbmeta image.
-        if (use_vbmeta) {
+        if (generate_vbmeta) {
           images += [
             {
               name = image_name
@@ -1351,7 +1360,7 @@ template("assembled_system") {
       }
     }
 
-    if (use_vbmeta) {
+    if (generate_vbmeta) {
       copy(labels.copy_vbmeta) {
         forward_variables_from(invoker,
                                [
@@ -1377,7 +1386,7 @@ template("assembled_system") {
       if (defined(invoker.zbi_signing_script)) {
         public_deps += [ ":${labels.copy_zbi_signed}" ]
       }
-      if (use_vbmeta) {
+      if (generate_vbmeta) {
         public_deps += [ ":${labels.copy_vbmeta}" ]
       }
     }
