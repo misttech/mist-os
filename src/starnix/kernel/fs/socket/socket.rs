@@ -547,7 +547,7 @@ impl Socket {
                             // See /src/starnix/lib/linux_uapi/src/types.rs,
                             // `c_char` is an `i8` on `x86_64` and a `u8` on
                             // `arm64` and `riscv`.
-                            addr.sa_data.iter_mut().zip(addr_bytes.into_iter())
+                            addr.sa_data.iter_mut().zip(addr_bytes)
                                 .for_each(|(sa_data_byte, link_addr_byte): (&mut c_char, u8)| {
                                     *sa_data_byte = link_addr_byte as c_char;
                                 });

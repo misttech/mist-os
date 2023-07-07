@@ -108,7 +108,7 @@ impl FakeSpinelDevice {
     fn handle_net_recall(&self) {
         let mut properties = self.properties.lock();
         let saved_network = self.saved_network.lock();
-        properties.extend(saved_network.clone().into_iter());
+        properties.extend(saved_network.clone());
     }
 
     // Must send out update to PropNet::Saved after calling this

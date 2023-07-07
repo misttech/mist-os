@@ -224,17 +224,14 @@ impl StorageFactory for FidlStorageFactory {
                         _ => unreachable!(),
                     };
                 let migration_id = self.migration_id;
-                let (device_storage, sync_tasks) = FidlStorage::with_file_proxy(
-                    initial_keys.into_iter(),
-                    storage_dir,
-                    move |key| {
+                let (device_storage, sync_tasks) =
+                    FidlStorage::with_file_proxy(initial_keys, storage_dir, move |key| {
                         let temp_file_name = format!("{key}.tmp");
                         let file_name = format!("{key}_{migration_id}.pfidl");
                         Ok((temp_file_name, file_name))
-                    },
-                )
-                .await
-                .expect("failed to get storage");
+                    })
+                    .await
+                    .expect("failed to get storage");
                 for task in sync_tasks {
                     task.detach();
                 }

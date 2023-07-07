@@ -85,12 +85,7 @@ where
         // During construction, the `Token` changes the state to `Halted`.  A future attempt to
         // poll this stream, returns `complete`.  Future calls to `get_atomic_oneshot_stream` will
         // result in `s` being `None` unless the previously-issued `Token` is dropped.
-        Box::pin(
-            iter(s.into_iter())
-                .flatten()
-                .map(|item| (Token::new(self.status.clone()), item))
-                .fuse(),
-        )
+        Box::pin(iter(s).flatten().map(|item| (Token::new(self.status.clone()), item)).fuse())
     }
 }
 

@@ -659,8 +659,7 @@ impl<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>> SlaacHandler<C> 
                         //   SHOULD create a new temporary address for such
                         //   prefix.
                         SlaacType::Temporary
-                    })
-                    .into_iter(),
+                    }),
             );
 
         for slaac_type in address_types_to_add {

@@ -456,16 +456,13 @@ mod tests {
         let route_table = &sync_ctx.get_ref().route_table.route_table;
         assert!(route_table.contains(&route), "route_table={route_table:?}");
 
-        non_sync_ctx.timer_ctx().assert_some_timers_installed(
-            match duration {
-                NonZeroNdpLifetime::Finite(duration) => Some((
-                    Ipv6DiscoveredRouteTimerId { device_id: FakeDeviceId, route },
-                    FakeInstant::from(duration.get()),
-                )),
-                NonZeroNdpLifetime::Infinite => None,
-            }
-            .into_iter(),
-        )
+        non_sync_ctx.timer_ctx().assert_some_timers_installed(match duration {
+            NonZeroNdpLifetime::Finite(duration) => Some((
+                Ipv6DiscoveredRouteTimerId { device_id: FakeDeviceId, route },
+                FakeInstant::from(duration.get()),
+            )),
+            NonZeroNdpLifetime::Infinite => None,
+        })
     }
 
     fn trigger_next_timer(

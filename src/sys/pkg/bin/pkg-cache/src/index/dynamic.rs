@@ -817,7 +817,7 @@ mod tests {
                 .list_blobs()
                 .unwrap()
                 .into_iter()
-                .chain(present_package1.list_blobs().unwrap().into_iter())
+                .chain(present_package1.list_blobs().unwrap())
                 .collect()
         );
     }

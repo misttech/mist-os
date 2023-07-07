@@ -143,7 +143,7 @@ mod tests {
             "fuchsia-pkg://foo.bar/qwe/0?hash=0000000000000000000000000000000000000000000000000000000000000000",
             "fuchsia-pkg://foo.bar/rty/0?hash=1111111111111111111111111111111111111111111111111111111111111111"
         ];
-        assert!(packages.into_contents().map(|u| u.to_string()).eq(expected.into_iter()));
+        assert!(packages.into_contents().map(|u| u.to_string()).eq(expected));
     }
 
     #[test]

@@ -237,7 +237,7 @@ mod tests {
         })
         .add_tag("denied-tag")
         .build();
-        let denied_tags = HashSet::from_iter(["denied-tag".to_string()].into_iter());
+        let denied_tags = HashSet::from_iter(["denied-tag".to_string()]);
         let mut sink = Vec::new();
         SerialWriter::log(&log, &denied_tags, &mut sink).expect("write succeeded");
         assert!(sink.is_empty());

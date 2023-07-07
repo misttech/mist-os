@@ -46,7 +46,7 @@ impl Options {
         self.mss
             .map(|mss| TcpOption::Mss(mss.get().get()))
             .into_iter()
-            .chain(self.window_scale.map(|ws| TcpOption::WindowScale(ws.get())).into_iter())
+            .chain(self.window_scale.map(|ws| TcpOption::WindowScale(ws.get())))
     }
 
     pub(crate) fn from_iter<'a>(iter: impl IntoIterator<Item = TcpOption<'a>>) -> Self {

@@ -217,7 +217,7 @@ impl ImageAssemblyConfig {
             boot_args,
             bootfs_files,
             bootfs_packages,
-        } = PartialImageAssemblyConfig::try_from_partials(configs.into_iter())?;
+        } = PartialImageAssemblyConfig::try_from_partials(configs)?;
 
         let PartialKernelConfig { path: kernel_path, args: cmdline_args, clock_backstop } =
             kernel.context("A kernel configuration must be specified")?;

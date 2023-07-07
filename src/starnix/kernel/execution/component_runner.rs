@@ -150,7 +150,7 @@ pub async fn start_component(
     parse_numbered_handles(&current_task, start_info.numbered_handles, &current_task.files)?;
 
     let mut argv = vec![binary_path.clone()];
-    argv.extend(args.into_iter());
+    argv.extend(args);
 
     let executable = current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
     current_task.exec(executable, binary_path, argv, environ)?;

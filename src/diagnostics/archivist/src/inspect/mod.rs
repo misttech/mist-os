@@ -105,7 +105,7 @@ impl ReaderServer {
         let maximum_concurrent_snapshots_per_reader =
             performance_configuration.maximum_concurrent_snapshots_per_reader;
 
-        futures::stream::iter(unpopulated_diagnostics_sources.into_iter())
+        futures::stream::iter(unpopulated_diagnostics_sources)
             .map(move |unpopulated| {
                 let global_stats = Arc::clone(stats.global_stats());
                 unpopulated.populate(batch_timeout, global_stats, parent_trace_id)

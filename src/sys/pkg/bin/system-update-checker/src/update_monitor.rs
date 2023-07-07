@@ -240,7 +240,7 @@ mod test {
             fasync::TestExecutor::new().run_singlethreaded(async {
                 let mut update_monitor = random_update_monitor::<FakeStateNotifier, FakeAttemptNotifier>(initial_state.clone(), version_available).await;
                 let temporary_callback = FakeStateNotifier::new();
-                let expected_states: Vec<_> = initial_state.clone().into_iter().chain(next_states.clone().into_iter()).collect();
+                let expected_states: Vec<_> = initial_state.clone().into_iter().chain(next_states.clone()).collect();
 
                 update_monitor.add_temporary_callback(temporary_callback.clone()).await;
 

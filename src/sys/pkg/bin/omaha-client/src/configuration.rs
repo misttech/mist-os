@@ -124,7 +124,7 @@ impl ClientConfiguration {
                 name: channel_name.clone(),
                 ..Cohort::default()
             })
-            .extra_fields(HashMap::from_iter(extra_fields.into_iter()))
+            .extra_fields(HashMap::from_iter(extra_fields))
             .build();
         let mut app_set = FuchsiaAppSet::new(app, AppMetadata { appid_source });
 
