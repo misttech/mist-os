@@ -5,15 +5,14 @@ library fuchsia.ui.policy;
 
 using fuchsia.ui.input;
 
-@available(deprecated=10, note="Implementation deleted. Do not use.")
+@available(deprecated=10, removed=14, legacy=true, note="Implementation deleted. Do not use.")
 closed protocol PointerCaptureListenerHACK {
     strict OnPointerEvent(struct {
         event fuchsia.ui.input.PointerEvent;
     });
 };
 
-@discoverable
-@available(deprecated=10, note="Implementation deleted. Do not use.")
+@available(deprecated=10, removed=14, legacy=true, note="Implementation deleted. Do not use.")
 closed protocol Presentation {
     strict CapturePointerEventsHACK(resource struct {
         listener client_end:PointerCaptureListenerHACK;
