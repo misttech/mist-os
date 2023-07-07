@@ -100,8 +100,11 @@ pub fn new_fuse_fs(
 
     let fs =
         FileSystem::new(task.kernel(), CacheMode::Cached, FuseFs::new(connection.clone()), options);
-    let fuse_node =
-        Arc::new(FuseNode { connection: connection.clone(), nodeid: uapi::FUSE_ROOT_ID as u64 });
+    let fuse_node = Arc::new(FuseNode {
+        connection: connection.clone(),
+        nodeid: uapi::FUSE_ROOT_ID as u64,
+        state: Default::default(),
+    });
     let mut root_node = FsNode::new_root(fuse_node.clone());
     root_node.node_id = uapi::FUSE_ROOT_ID as u64;
     fs.set_root_node(root_node);
@@ -172,10 +175,16 @@ impl FileSystemOps for FuseFs {
     }
 }
 
+#[derive(Debug, Default)]
+struct FuseNodeMutableState {
+    nlookup: u64,
+}
+
 #[derive(Debug)]
 struct FuseNode {
     connection: Arc<FuseConnection>,
     nodeid: u64,
+    state: Mutex<FuseNodeMutableState>,
 }
 
 impl FuseNode {
@@ -222,13 +231,19 @@ impl FuseNode {
         if entry.nodeid == 0 {
             return error!(ENOENT);
         }
-        node.fs().get_or_create_node(Some(entry.nodeid), |id| {
-            let fuse_node =
-                Arc::new(FuseNode { connection: self.connection.clone(), nodeid: entry.nodeid });
+        let node = node.fs().get_or_create_node(Some(entry.nodeid), |id| {
+            let fuse_node = Arc::new(FuseNode {
+                connection: self.connection.clone(),
+                nodeid: entry.nodeid,
+                state: Default::default(),
+            });
             let mut info = FsNodeInfo::default();
             FuseNode::update_node_info(&mut info, entry.attr)?;
             Ok(FsNode::new_uncached(Box::new(fuse_node), &node.fs(), id, info))
-        })
+        })?;
+        let fuse_node = FuseNode::from_node(&node)?;
+        fuse_node.state.lock().nlookup += 1;
+        Ok(node)
     }
 }
 
@@ -782,6 +797,20 @@ impl FsNodeOps for Arc<FuseNode> {
             error!(EINVAL)
         }
     }
+
+    fn forget(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<(), Errno> {
+        if self.connection.state.lock().disconnected {
+            return Ok(());
+        }
+        let nlookup = self.state.lock().nlookup;
+        self.connection
+            .execute_operation(
+                current_task,
+                self,
+                FuseOperation::Forget(uapi::fuse_forget_in { nlookup }),
+            )
+            .map(|_| ())
+    }
 }
 
 #[derive(Debug, Default)]
@@ -831,12 +860,16 @@ impl FuseConnection {
             FuseOperation::Init => Arc::new(FuseConfiguration::for_init()),
             _ => self.get_configuration(task)?,
         };
-        let waiter = Waiter::new();
-        let is_async = operation.is_async();
         let mut state = self.state.lock();
         if let Some(result) = state.operations_state.get(&operation.opcode()) {
             return result.clone();
         }
+        if !operation.has_response() {
+            state.queue_operation(task, node, operation, configuration, None)?;
+            return Ok(FuseResponse::None);
+        }
+        let waiter = Waiter::new();
+        let is_async = operation.is_async();
         let unique_id =
             state.queue_operation(task, node, operation, configuration.clone(), Some(&waiter))?;
         if is_async {
@@ -1198,6 +1231,7 @@ bitflags::bitflags! {
 #[derive(Debug)]
 enum FuseOperation {
     Flush(uapi::fuse_open_out),
+    Forget(uapi::fuse_forget_in),
     GetAttr,
     Init,
     Interrupt(
@@ -1282,6 +1316,7 @@ impl FuseOperation {
                     uapi::fuse_flush_in { fh: open_in.fh, unused: 0, padding: 0, lock_owner: 0 };
                 data.write_all(message.as_bytes())
             }
+            Self::Forget(forget_in) => data.write_all(forget_in.as_bytes()),
             Self::GetAttr | Self::Readlink | Self::Statfs => Ok(0),
             Self::GetXAttr(getxattr_in, name) => {
                 let mut len = data.write_all(getxattr_in.as_bytes())?;
@@ -1373,6 +1408,7 @@ impl FuseOperation {
     fn opcode(&self) -> u32 {
         match self {
             Self::Flush(_) => uapi::fuse_opcode_FUSE_FLUSH,
+            Self::Forget(_) => uapi::fuse_opcode_FUSE_FORGET,
             Self::GetAttr => uapi::fuse_opcode_FUSE_GETATTR,
             Self::GetXAttr(_, _) => uapi::fuse_opcode_FUSE_GETXATTR,
             Self::Init => uapi::fuse_opcode_FUSE_INIT,
@@ -1443,7 +1479,7 @@ impl FuseOperation {
     }
 
     fn has_response(&self) -> bool {
-        !matches!(self, Self::Interrupt(_))
+        !matches!(self, Self::Interrupt(_) | Self::Forget(_))
     }
 
     fn is_async(&self) -> bool {
@@ -1526,7 +1562,7 @@ impl FuseOperation {
             Self::Write(_, _) => {
                 Ok(FuseResponse::Write(Self::to_response::<uapi::fuse_write_out>(&buffer)))
             }
-            Self::Interrupt(_) => {
+            Self::Interrupt(_) | Self::Forget(_) => {
                 panic!("Response for operation without one");
             }
         }

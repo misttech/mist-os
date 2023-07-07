@@ -8,6 +8,7 @@ use crate::{
     device::DeviceMode,
     fs::{pipe::Pipe, socket::*, *},
     lock::{Mutex, RwLock, RwLockReadGuard},
+    logging::log_error,
     signals::*,
     task::*,
     time::*,
@@ -24,6 +25,10 @@ pub struct FsNode {
     /// The FsNodeOps are implemented by the individual file systems to provide
     /// specific behaviors for this FsNode.
     ops: Box<dyn FsNodeOps>,
+
+    /// The current kernel.
+    // TODO(fxbug.dev/130251): This is a temporary measure to access a task on drop.
+    kernel: Weak<Kernel>,
 
     /// The FileSystem that owns this FsNode's tree.
     fs: Weak<FileSystem>,
@@ -548,6 +553,11 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         error!(ENOTSUP)
     }
+
+    /// Called when the FsNode is freed by the Kernel.
+    fn forget(&self, _node: &FsNode, _current_task: &CurrentTask) -> Result<(), Errno> {
+        Ok(())
+    }
 }
 
 /// Implements [`FsNodeOps`] methods in a way that makes sense for symlinks.
@@ -714,7 +724,7 @@ impl FsNode {
     {
         let mut info = FsNodeInfo::new(0, mode!(IFDIR, 0o777), FsCred::root());
         info_updater(&mut info);
-        Self::new_internal(Box::new(ops), Weak::new(), 0, info)
+        Self::new_internal(Box::new(ops), Weak::new(), Weak::new(), 0, info)
     }
 
     /// Create a node without inserting it into the FileSystem node cache. This is usually not what
@@ -725,11 +735,12 @@ impl FsNode {
         node_id: ino_t,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
-        Arc::new(Self::new_internal(ops, Arc::downgrade(fs), node_id, info))
+        Arc::new(Self::new_internal(ops, fs.kernel.clone(), Arc::downgrade(fs), node_id, info))
     }
 
     fn new_internal(
         ops: Box<dyn FsNodeOps>,
+        kernel: Weak<Kernel>,
         fs: Weak<FileSystem>,
         node_id: ino_t,
         info: FsNodeInfo,
@@ -739,6 +750,7 @@ impl FsNode {
         #[allow(clippy::let_and_return)]
         {
             let result = Self {
+                kernel,
                 ops,
                 fs,
                 node_id,
@@ -773,7 +785,9 @@ impl FsNode {
     }
 
     pub fn set_fs(&mut self, fs: &FileSystemHandle) {
+        debug_assert!(self.fs.ptr_eq(&Weak::new()));
         self.fs = Arc::downgrade(fs);
+        self.kernel = fs.kernel.clone();
     }
 
     pub fn ops(&self) -> &dyn FsNodeOps {
@@ -1396,6 +1410,11 @@ impl Drop for FsNode {
     fn drop(&mut self) {
         if let Some(fs) = self.fs.upgrade() {
             fs.remove_node(self);
+        }
+        if let Some(kernel) = self.kernel.upgrade() {
+            if let Err(err) = self.ops.forget(self, kernel.kthreads.system_task()) {
+                log_error!("Error on FsNodeOps::forget: {err:?}");
+            }
         }
     }
 }

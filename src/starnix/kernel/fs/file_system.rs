@@ -25,7 +25,7 @@ const LRU_CAPACITY: usize = 32;
 
 /// A file system that can be mounted in a namespace.
 pub struct FileSystem {
-    kernel: Weak<Kernel>,
+    pub kernel: Weak<Kernel>,
     root: OnceCell<DirEntryHandle>,
     next_node_id: AtomicU64,
     ops: Box<dyn FileSystemOps>,
