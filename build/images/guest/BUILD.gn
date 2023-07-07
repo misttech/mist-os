@@ -89,6 +89,7 @@ if (labels.images == "//build/images/bringup") {
       "//src/virtualization/tests:virtualization_test_utils_pkg",
       "//src/cobalt/bin/app:cobalt_registry",
       "//src/cobalt/bin/app:config",
+      "//src/security/bin/root_ssl_certificates",
     ]
 
     bootfs_labels = [
