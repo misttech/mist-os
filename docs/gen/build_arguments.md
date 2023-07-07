@@ -264,7 +264,7 @@ be visible to Driver Manager. These package labels are also considered to be in 
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:19
+From //products/bringup.gni:14
 
 **Overridden from the default:** `[]`
 
@@ -272,7 +272,7 @@ From //BUILD.gn:38
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:19
+From //products/bringup.gni:14
 
 **Overridden from the default:** `[]`
 
@@ -504,7 +504,7 @@ From //boards/arm64.gni:24
 
 From //build/board.gni:54
 
-**Current value for `target_cpu = "x64"`:** `["//src/devices/block/drivers/ahci", "//src/devices/block/drivers/mbr", "//src/devices/block/drivers/nvme", "//src/devices/block/drivers/pci-sdhci", "//src/devices/block/drivers/sdhci", "//src/devices/block/drivers/ufs", "//src/devices/board/drivers/x86:platform-bus-x86", "//src/devices/bus/drivers/pci:bus-pci", "//src/devices/i2c/drivers/intel-i2c", "//src/devices/rtc/drivers/intel-rtc", "//src/devices/spi/drivers/intel-gspi", "//src/devices/tpm/drivers/tpm", "//src/devices/usb/drivers/xhci", "//src/graphics/display/drivers/intel-i915", "//src/media/audio/drivers/codecs/alc5514", "//src/media/audio/drivers/codecs/alc5663", "//src/media/audio/drivers/codecs/max98373", "//src/media/audio/drivers/codecs/max98927", "//src/media/audio/drivers/intel-hda/codecs/hdmi:hdmi-audio-codec", "//src/media/audio/drivers/intel-hda/codecs/realtek:realtek-audio-codec", "//src/media/audio/drivers/intel-hda/controller:intel-hda", "//src/ui/input/drivers/ctaphid", "//src/ui/input/drivers/i2c-hid", "//src/ui/input/drivers/pc-ps2", "//src/devices/bin/acpidump", "//src/devices/pci/bin:bootfs", "//src/media/audio/bin/ihda", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//boards/kernel_cmdline:enable-suspend-from-board", "//src/connectivity/ethernet/drivers/gvnic", "//src/connectivity/ethernet/drivers/realtek-8111", "//src/connectivity/ethernet/drivers/third_party/igc", "//src/devices/serial/drivers/uart16550", "//src/graphics/display/drivers/simple:simple.amd-kaveri", "//src/graphics/display/drivers/simple:simple.nv", "//zircon/third_party/dev/ethernet/e1000", "//boards/kernel_cmdline:serial-legacy", "//src/devices/block/drivers/abr-shim", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/display/drivers/virtio-guest:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/graphics/display/drivers/simple:simple.bochs", "//src/graphics/display/drivers/simple:simple.gga", "//src/graphics/display/drivers/simple:simple.intel", "//src/graphics/display/drivers/simple:simple.vmware", "//src/media/audio/drivers/intel-hda/codecs/qemu:qemu-audio-codec"]`
+**Current value for `target_cpu = "x64"`:** `["//src/devices/block/drivers/ahci", "//src/devices/block/drivers/mbr", "//src/devices/block/drivers/nvme", "//src/devices/block/drivers/pci-sdhci", "//src/devices/block/drivers/sdhci", "//src/devices/block/drivers/ufs", "//src/devices/board/drivers/x86:platform-bus-x86", "//src/devices/bus/drivers/pci:bus-pci", "//src/devices/i2c/drivers/intel-i2c", "//src/devices/rtc/drivers/intel-rtc", "//src/devices/spi/drivers/intel-gspi", "//src/devices/tpm/drivers/tpm", "//src/devices/usb/drivers/xhci", "//src/graphics/display/drivers/intel-i915", "//src/media/audio/drivers/codecs/alc5514", "//src/media/audio/drivers/codecs/alc5663", "//src/media/audio/drivers/codecs/max98373", "//src/media/audio/drivers/codecs/max98927", "//src/media/audio/drivers/intel-hda/codecs/hdmi:hdmi-audio-codec", "//src/media/audio/drivers/intel-hda/codecs/realtek:realtek-audio-codec", "//src/media/audio/drivers/intel-hda/controller:intel-hda", "//src/ui/input/drivers/ctaphid", "//src/ui/input/drivers/i2c-hid", "//src/ui/input/drivers/pc-ps2", "//src/devices/pci/bin:bootfs", "//src/media/audio/bin/ihda", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//boards/kernel_cmdline:enable-suspend-from-board", "//src/connectivity/ethernet/drivers/gvnic", "//src/connectivity/ethernet/drivers/realtek-8111", "//src/connectivity/ethernet/drivers/third_party/igc", "//src/devices/serial/drivers/uart16550", "//src/graphics/display/drivers/simple:simple.amd-kaveri", "//src/graphics/display/drivers/simple:simple.nv", "//zircon/third_party/dev/ethernet/e1000", "//boards/kernel_cmdline:serial-legacy", "//src/devices/block/drivers/abr-shim", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/display/drivers/virtio-guest:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/graphics/display/drivers/simple:simple.bochs", "//src/graphics/display/drivers/simple:simple.gga", "//src/graphics/display/drivers/simple:simple.intel", "//src/graphics/display/drivers/simple:simple.vmware", "//src/media/audio/drivers/intel-hda/codecs/qemu:qemu-audio-codec"]`
 
 From //boards/x64.gni:48
 
@@ -573,7 +573,7 @@ From //build/board.gni:25
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/packages/prod:drivers-system", "//src/connectivity/wlan/drivers/wlanphy:wlanphy", "//src/devices/acpi:drivers", "//src/graphics/drivers/msd-intel-gen", "//src/power/fake-battery:fake-battery"]`
 
-From //boards/common/x64-common.gni:55
+From //boards/common/x64-common.gni:54
 
 **Overridden from the default:** `[]`
 
@@ -699,7 +699,7 @@ From //build/board.gni:47
 
 **Current value for `target_cpu = "x64"`:** `["//src/graphics/bin/vulkan_loader", "//src/hwinfo:default_board_config", "//src/graphics/drivers/intel-gen/icd:libvulkan_intel_gen", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config", "//src/media/codec/codecs/vaapi:codec_runner_intel_gen_prebuilt"]`
 
-From //boards/common/x64-common.gni:65
+From //boards/common/x64-common.gni:64
 
 **Overridden from the default:** `[]`
 
@@ -748,7 +748,7 @@ From //boards/arm64.gni:25
 
 From //build/board.gni:68
 
-**Current value for `target_cpu = "x64"`:** `["//src/devices/block/drivers/ahci", "//src/devices/block/drivers/mbr", "//src/devices/block/drivers/nvme", "//src/devices/block/drivers/pci-sdhci", "//src/devices/block/drivers/sdhci", "//src/devices/block/drivers/ufs", "//src/devices/board/drivers/x86:platform-bus-x86", "//src/devices/bus/drivers/pci:bus-pci", "//src/devices/i2c/drivers/intel-i2c", "//src/devices/rtc/drivers/intel-rtc", "//src/devices/spi/drivers/intel-gspi", "//src/devices/tpm/drivers/tpm", "//src/devices/usb/drivers/xhci", "//src/graphics/display/drivers/intel-i915", "//src/media/audio/drivers/codecs/alc5514", "//src/media/audio/drivers/codecs/alc5663", "//src/media/audio/drivers/codecs/max98373", "//src/media/audio/drivers/codecs/max98927", "//src/media/audio/drivers/intel-hda/codecs/hdmi:hdmi-audio-codec", "//src/media/audio/drivers/intel-hda/codecs/realtek:realtek-audio-codec", "//src/media/audio/drivers/intel-hda/controller:intel-hda", "//src/ui/input/drivers/ctaphid", "//src/ui/input/drivers/i2c-hid", "//src/ui/input/drivers/pc-ps2", "//src/devices/bin/acpidump", "//src/devices/pci/bin:bootfs", "//src/media/audio/bin/ihda", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/connectivity/ethernet/drivers/gvnic", "//src/connectivity/ethernet/drivers/realtek-8111", "//src/connectivity/ethernet/drivers/third_party/igc", "//src/devices/serial/drivers/uart16550", "//src/graphics/display/drivers/simple:simple.amd-kaveri", "//src/graphics/display/drivers/simple:simple.nv", "//zircon/third_party/dev/ethernet/e1000", "//boards/kernel_cmdline:serial-legacy", "//src/devices/block/drivers/abr-shim", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/display/drivers/virtio-guest:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/graphics/display/drivers/simple:simple.bochs", "//src/graphics/display/drivers/simple:simple.gga", "//src/graphics/display/drivers/simple:simple.intel", "//src/graphics/display/drivers/simple:simple.vmware", "//src/media/audio/drivers/intel-hda/codecs/qemu:qemu-audio-codec"]`
+**Current value for `target_cpu = "x64"`:** `["//src/devices/block/drivers/ahci", "//src/devices/block/drivers/mbr", "//src/devices/block/drivers/nvme", "//src/devices/block/drivers/pci-sdhci", "//src/devices/block/drivers/sdhci", "//src/devices/block/drivers/ufs", "//src/devices/board/drivers/x86:platform-bus-x86", "//src/devices/bus/drivers/pci:bus-pci", "//src/devices/i2c/drivers/intel-i2c", "//src/devices/rtc/drivers/intel-rtc", "//src/devices/spi/drivers/intel-gspi", "//src/devices/tpm/drivers/tpm", "//src/devices/usb/drivers/xhci", "//src/graphics/display/drivers/intel-i915", "//src/media/audio/drivers/codecs/alc5514", "//src/media/audio/drivers/codecs/alc5663", "//src/media/audio/drivers/codecs/max98373", "//src/media/audio/drivers/codecs/max98927", "//src/media/audio/drivers/intel-hda/codecs/hdmi:hdmi-audio-codec", "//src/media/audio/drivers/intel-hda/codecs/realtek:realtek-audio-codec", "//src/media/audio/drivers/intel-hda/controller:intel-hda", "//src/ui/input/drivers/ctaphid", "//src/ui/input/drivers/i2c-hid", "//src/ui/input/drivers/pc-ps2", "//src/devices/pci/bin:bootfs", "//src/media/audio/bin/ihda", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/connectivity/ethernet/drivers/gvnic", "//src/connectivity/ethernet/drivers/realtek-8111", "//src/connectivity/ethernet/drivers/third_party/igc", "//src/devices/serial/drivers/uart16550", "//src/graphics/display/drivers/simple:simple.amd-kaveri", "//src/graphics/display/drivers/simple:simple.nv", "//zircon/third_party/dev/ethernet/e1000", "//boards/kernel_cmdline:serial-legacy", "//src/devices/block/drivers/abr-shim", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/display/drivers/virtio-guest:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/graphics/display/drivers/simple:simple.bochs", "//src/graphics/display/drivers/simple:simple.gga", "//src/graphics/display/drivers/simple:simple.intel", "//src/graphics/display/drivers/simple:simple.vmware", "//src/media/audio/drivers/intel-hda/codecs/qemu:qemu-audio-codec"]`
 
 From //boards/x64.gni:49
 
@@ -809,7 +809,7 @@ From //boards/arm64.gni:26
 
 From //build/board.gni:65
 
-**Current value for `target_cpu = "x64"`:** `["//src/devices/block/drivers/ahci", "//src/devices/block/drivers/mbr", "//src/devices/block/drivers/nvme", "//src/devices/block/drivers/pci-sdhci", "//src/devices/block/drivers/sdhci", "//src/devices/block/drivers/ufs", "//src/devices/board/drivers/x86:platform-bus-x86", "//src/devices/bus/drivers/pci:bus-pci", "//src/devices/i2c/drivers/intel-i2c", "//src/devices/rtc/drivers/intel-rtc", "//src/devices/spi/drivers/intel-gspi", "//src/devices/tpm/drivers/tpm", "//src/devices/usb/drivers/xhci", "//src/graphics/display/drivers/intel-i915", "//src/media/audio/drivers/codecs/alc5514", "//src/media/audio/drivers/codecs/alc5663", "//src/media/audio/drivers/codecs/max98373", "//src/media/audio/drivers/codecs/max98927", "//src/media/audio/drivers/intel-hda/codecs/hdmi:hdmi-audio-codec", "//src/media/audio/drivers/intel-hda/codecs/realtek:realtek-audio-codec", "//src/media/audio/drivers/intel-hda/controller:intel-hda", "//src/ui/input/drivers/ctaphid", "//src/ui/input/drivers/i2c-hid", "//src/ui/input/drivers/pc-ps2", "//src/devices/bin/acpidump", "//src/devices/pci/bin:bootfs", "//src/media/audio/bin/ihda", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/connectivity/ethernet/drivers/gvnic", "//src/connectivity/ethernet/drivers/realtek-8111", "//src/connectivity/ethernet/drivers/third_party/igc", "//src/devices/serial/drivers/uart16550", "//src/graphics/display/drivers/simple:simple.amd-kaveri", "//src/graphics/display/drivers/simple:simple.nv", "//zircon/third_party/dev/ethernet/e1000", "//boards/kernel_cmdline:serial-legacy", "//src/devices/block/drivers/abr-shim", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/display/drivers/virtio-guest:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/graphics/display/drivers/simple:simple.bochs", "//src/graphics/display/drivers/simple:simple.gga", "//src/graphics/display/drivers/simple:simple.intel", "//src/graphics/display/drivers/simple:simple.vmware", "//src/media/audio/drivers/intel-hda/codecs/qemu:qemu-audio-codec"]`
+**Current value for `target_cpu = "x64"`:** `["//src/devices/block/drivers/ahci", "//src/devices/block/drivers/mbr", "//src/devices/block/drivers/nvme", "//src/devices/block/drivers/pci-sdhci", "//src/devices/block/drivers/sdhci", "//src/devices/block/drivers/ufs", "//src/devices/board/drivers/x86:platform-bus-x86", "//src/devices/bus/drivers/pci:bus-pci", "//src/devices/i2c/drivers/intel-i2c", "//src/devices/rtc/drivers/intel-rtc", "//src/devices/spi/drivers/intel-gspi", "//src/devices/tpm/drivers/tpm", "//src/devices/usb/drivers/xhci", "//src/graphics/display/drivers/intel-i915", "//src/media/audio/drivers/codecs/alc5514", "//src/media/audio/drivers/codecs/alc5663", "//src/media/audio/drivers/codecs/max98373", "//src/media/audio/drivers/codecs/max98927", "//src/media/audio/drivers/intel-hda/codecs/hdmi:hdmi-audio-codec", "//src/media/audio/drivers/intel-hda/codecs/realtek:realtek-audio-codec", "//src/media/audio/drivers/intel-hda/controller:intel-hda", "//src/ui/input/drivers/ctaphid", "//src/ui/input/drivers/i2c-hid", "//src/ui/input/drivers/pc-ps2", "//src/devices/pci/bin:bootfs", "//src/media/audio/bin/ihda", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/connectivity/ethernet/drivers/gvnic", "//src/connectivity/ethernet/drivers/realtek-8111", "//src/connectivity/ethernet/drivers/third_party/igc", "//src/devices/serial/drivers/uart16550", "//src/graphics/display/drivers/simple:simple.amd-kaveri", "//src/graphics/display/drivers/simple:simple.nv", "//zircon/third_party/dev/ethernet/e1000", "//boards/kernel_cmdline:serial-legacy", "//src/devices/block/drivers/abr-shim", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/display/drivers/virtio-guest:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/graphics/display/drivers/simple:simple.bochs", "//src/graphics/display/drivers/simple:simple.gga", "//src/graphics/display/drivers/simple:simple.intel", "//src/graphics/display/drivers/simple:simple.vmware", "//src/media/audio/drivers/intel-hda/codecs/qemu:qemu-audio-codec"]`
 
 From //boards/x64.gni:50
 
@@ -842,7 +842,7 @@ otherwise be /system/... at runtime is /boot/... instead.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //products/common/bringup.gni:7
+From //products/bringup.gni:7
 
 **Overridden from the default:** `false`
 
@@ -850,7 +850,7 @@ From //build/images/args.gni:14
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //products/common/bringup.gni:7
+From //products/bringup.gni:7
 
 **Overridden from the default:** `false`
 
@@ -873,6 +873,44 @@ Each entry in the list is a scope containing:
 **Current value (from the default):** `[]`
 
 From //build/images/args.gni:78
+
+### bringup_fastboot_images_config_label
+
+**Current value for `target_cpu = "arm64"`:** `"//boards/images:bringup_fastboot_default"`
+
+From //boards/arm64.gni:45
+
+**Overridden from the default:** `false`
+
+From //build/board.gni:117
+
+**Current value for `target_cpu = "x64"`:** `"//boards/images:bringup_fastboot_default"`
+
+From //boards/x64.gni:97
+
+**Overridden from the default:** `false`
+
+From //build/board.gni:117
+
+### bringup_images_config_label
+
+The images config information used for bringup images.
+
+**Current value for `target_cpu = "arm64"`:** `"//boards/images:bringup_default"`
+
+From //boards/arm64.gni:43
+
+**Overridden from the default:** `false`
+
+From //build/board.gni:116
+
+**Current value for `target_cpu = "x64"`:** `"//boards/images:bringup_default"`
+
+From //boards/x64.gni:95
+
+**Overridden from the default:** `false`
+
+From //build/board.gni:116
 
 ### buckeye_has_codec
 
@@ -4595,55 +4633,19 @@ From //build/config/BUILDCONFIG.gn:1428
 
 ### legacy_base_driver_package_labels
 
-**Current value for `target_cpu = "arm64"`:** `[]`
-
-From //products/common/bringup.gni:20
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:39
-
-**Current value for `target_cpu = "x64"`:** `[]`
-
-From //products/common/bringup.gni:20
-
-**Overridden from the default:** `[]`
+**Current value (from the default):** `[]`
 
 From //BUILD.gn:39
 
 ### legacy_base_package_labels
 
-**Current value for `target_cpu = "arm64"`:** `[]`
-
-From //products/common/bringup.gni:23
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:47
-
-**Current value for `target_cpu = "x64"`:** `[]`
-
-From //products/common/bringup.gni:23
-
-**Overridden from the default:** `[]`
+**Current value (from the default):** `[]`
 
 From //BUILD.gn:47
 
 ### legacy_cache_package_labels
 
-**Current value for `target_cpu = "arm64"`:** `[]`
-
-From //products/common/bringup.gni:26
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:56
-
-**Current value for `target_cpu = "x64"`:** `[]`
-
-From //products/common/bringup.gni:26
-
-**Overridden from the default:** `[]`
+**Current value (from the default):** `[]`
 
 From //BUILD.gn:56
 
@@ -4673,19 +4675,7 @@ From //BUILD.gn:73
 
 ### legacy_universe_package_labels
 
-**Current value for `target_cpu = "arm64"`:** `[]`
-
-From //products/common/bringup.gni:29
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:65
-
-**Current value for `target_cpu = "x64"`:** `[]`
-
-From //products/common/bringup.gni:29
-
-**Overridden from the default:** `[]`
+**Current value (from the default):** `[]`
 
 From //BUILD.gn:65
 
@@ -4883,19 +4873,7 @@ A list of labels for packages that are appended to the set of base packages,
 but depend on all the other base, cache, and universe packages, therefore
 they must be separated into their own list.
 
-**Current value for `target_cpu = "arm64"`:** `[]`
-
-From //products/common/bringup.gni:17
-
-**Overridden from the default:** `[]`
-
-From //build/images/args.gni:99
-
-**Current value for `target_cpu = "x64"`:** `[]`
-
-From //products/common/bringup.gni:17
-
-**Overridden from the default:** `[]`
+**Current value (from the default):** `[]`
 
 From //build/images/args.gni:99
 
@@ -5622,7 +5600,7 @@ package flavors.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:31
+From //products/bringup.gni:15
 
 **Overridden from the default:** `[]`
 
@@ -5630,7 +5608,7 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:31
+From //products/bringup.gni:15
 
 **Overridden from the default:** `[]`
 
@@ -5653,19 +5631,19 @@ From //zircon/kernel/params.gni:142
 
 **Current value for `target_cpu = "arm64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/arm64.gni:44
+From //boards/arm64.gni:47
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:129
+From //build/board.gni:133
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/x64.gni:96
+From //boards/x64.gni:99
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:129
+From //build/board.gni:133
 
 ### partitions_config_label
 
@@ -5674,19 +5652,19 @@ product bundle.
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/partitions:arm64"`
 
-From //boards/arm64.gni:43
+From //boards/arm64.gni:46
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:128
+From //build/board.gni:132
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/x64.gni:95
+From //boards/x64.gni:98
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:128
+From //build/board.gni:132
 
 ### perfetto_build_with_android
 
@@ -5849,17 +5827,17 @@ From //src/graphics/lib/magma/gnbuild/magma.gni:22
 
 A list of binary labels to include in ZBIs built for this product.
 
-**Current value for `target_cpu = "arm64"`:** `["//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
+**Current value for `target_cpu = "arm64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
-From //products/bringup.gni:14
+From //products/bringup.gni:25
 
 **Overridden from the default:** `[]`
 
 From //build/product.gni:14
 
-**Current value for `target_cpu = "x64"`:** `["//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
+**Current value for `target_cpu = "x64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
-From //products/bringup.gni:14
+From //products/bringup.gni:25
 
 **Overridden from the default:** `[]`
 
@@ -7210,7 +7188,7 @@ fully migrate assembly to Bazel.
 
 **Current value (from the default):** `false`
 
-From //build/board.gni:123
+From //build/board.gni:127
 
 ### recovery_label
 
@@ -7246,7 +7224,7 @@ From //build/images/args.gni:19
 
 **Current value (from the default):** `false`
 
-From //build/board.gni:124
+From //build/board.gni:128
 
 ### recovery_route_sources_config
 
@@ -7695,7 +7673,7 @@ an extension mechanism for SDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:33
+From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
@@ -7703,7 +7681,7 @@ From //BUILD.gn:89
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:33
+From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
@@ -8419,7 +8397,7 @@ one or the bringup one?
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //products/common/bringup.gni:6
+From //products/bringup.gni:6
 
 **Overridden from the default:** `false`
 
@@ -8427,7 +8405,7 @@ From //build/product.gni:11
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //products/common/bringup.gni:6
+From //products/bringup.gni:6
 
 **Overridden from the default:** `false`
 
