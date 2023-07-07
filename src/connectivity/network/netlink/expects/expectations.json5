@@ -17,6 +17,8 @@
                 "interfaces::tests::test_new_addr_failed_unexpected_reason::*",
                 "interfaces::tests::test_del_addr::v[46]_unrecognized_error",
                 "interfaces::tests::test_del_addr_interface_closed_unexpected_reason::*",
+                "interfaces::tests::test_set_link::disable_fails",
+                "interfaces::tests::test_set_link::enable_fails",
                 "routes::tests::test_new_route_failed::v[46]_unauthenticated",
             ],
         },

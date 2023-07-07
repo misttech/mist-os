@@ -61,15 +61,30 @@ pub trait InterfacesHandler: Send + Sync + 'static {
     fn handle_deleted_link(&mut self, name: &str);
 }
 
+/// Represents the ways RTM_*LINK messages may specify an individual link.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum LinkSpecifier {
+    Index(NonZeroU32),
+    Name(String),
+}
+
 /// Arguments for an RTM_GETLINK [`Request`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum GetLinkArgs {
     /// Dump state for all the links.
     Dump,
-    /// Get the link with the provided name.
-    GetByName(String),
-    /// Get the link with the provided ID.
-    GetById(NonZeroU32),
+    /// Get a specific link.
+    Get(LinkSpecifier),
+}
+
+/// Arguments for an RTM_SETLINK ['Request`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SetLinkArgs {
+    /// The link to update.
+    pub(crate) link: LinkSpecifier,
+    /// `Some` if the link's admin enabled state should be updated to the
+    /// provided `bool`.
+    pub(crate) enable: Option<bool>,
 }
 
 /// [`Request`] arguments associated with links.
@@ -77,6 +92,8 @@ pub(crate) enum GetLinkArgs {
 pub(crate) enum LinkRequestArgs {
     /// RTM_GETLINK
     Get(GetLinkArgs),
+    /// RTM_SETLINK
+    Set(SetLinkArgs),
 }
 
 /// Arguments for an RTM_GETADDR [`Request`].
@@ -134,6 +151,7 @@ pub(crate) enum RequestArgs {
 /// An error encountered while handling a [`Request`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum RequestError {
+    Unknown,
     InvalidRequest,
     UnrecognizedInterface,
     AlreadyExists,
@@ -143,6 +161,10 @@ pub(crate) enum RequestError {
 impl RequestError {
     pub(crate) fn into_errno(self) -> Errno {
         match self {
+            RequestError::Unknown => {
+                log_error!("observed an unknown error, reporting `EINVAL` as the best guess");
+                Errno::EINVAL
+            }
             RequestError::InvalidRequest => Errno::EINVAL,
             RequestError::UnrecognizedInterface => Errno::ENODEV,
             RequestError::AlreadyExists => Errno::EEXIST,
@@ -153,7 +175,7 @@ impl RequestError {
 
 fn map_existing_interface_terminal_error(
     e: TerminalError<InterfaceRemovedReason>,
-    interface_id: NonZeroU32,
+    interface_id: NonZeroU64,
 ) -> RequestError {
     match e {
         TerminalError::Fidl(e) => {
@@ -327,16 +349,18 @@ async fn set_link_address(
 }
 
 #[derive(Clone, Copy, Debug)]
-enum PendingAddressRequestKind {
-    Add,
-    Del,
+enum PendingRequestKind {
+    AddAddress(AddressAndInterfaceArgs),
+    DelAddress(AddressAndInterfaceArgs),
+    DisableInterface(NonZeroU64),
+    // TODO(https://issuetracker.google.com/290372180): Support Pending
+    // "EnableInterface" requests once link_state is available via a FIDL API
 }
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
-struct PendingAddressRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
-    kind: PendingAddressRequestKind,
-    address_and_interface_id: AddressAndInterfaceArgs,
+struct PendingRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
+    kind: PendingRequestKind,
     client: InternalClient<NetlinkRoute, S>,
     completer: oneshot::Sender<Result<(), RequestError>>,
 }
@@ -450,16 +474,16 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         // event loop, we can have a dedicated shutdown signal.
         let mut request_stream = request_stream.chain(futures::stream::pending());
 
-        let mut pending_address_request = None;
+        let mut pending_request = None;
 
         loop {
             // Don't handle new requests until we complete handling the pending
             // request.
-            let request_fut = match pending_address_request {
+            let request_fut = match pending_request {
                 Some(_) => {
                     log_debug!(
                         "not awaiting on request stream because of pending request: {:?}",
-                        pending_address_request,
+                        pending_request,
                     );
 
                     futures::future::pending().left_future()
@@ -501,7 +525,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 req = request_fut => {
                     assert_matches!(
                         core::mem::replace(
-                            &mut pending_address_request,
+                            &mut pending_request,
                             self.handle_request(
                                 req.expect(
                                     "request stream should never end because of chained `pending`",
@@ -513,49 +537,66 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 }
             }
 
-            if let Some(pending_address_request_some) = pending_address_request.take() {
-                let PendingAddressRequest {
-                    kind,
-                    address_and_interface_id: AddressAndInterfaceArgs { address, interface_id },
-                    client: _,
-                    completer: _,
-                } = &pending_address_request_some;
+            if let Some(pending_request_some) = pending_request.take() {
+                let PendingRequest { kind, client: _, completer: _ } = &pending_request_some;
 
-                let contains_addr =
-                    self.interface_properties.get(&interface_id.get().into()).map_or(
-                        false,
-                        |fnet_interfaces_ext::PropertiesAndState {
-                             properties: _,
-                             state: InterfaceState { addresses, link_address: _, control: _ },
-                         }| {
-                            let fnet::Subnet { addr, prefix_len: _ } = address.clone().into_ext();
-                            addresses.contains_key(&addr)
-                        },
-                    );
+                let contains_addr = |&AddressAndInterfaceArgs { address, interface_id }| {
+                    // NB: The interface must exist, because we were able to
+                    // successfully add/remove an address (hence the pending
+                    // request). The Netstack will send a 'changed' event to
+                    // reflect the address add/remove before sending a `removed`
+                    // event for the interface.
+                    let fnet_interfaces_ext::PropertiesAndState {
+                        properties: _,
+                        state: InterfaceState { addresses, link_address: _, control: _ },
+                    } = self
+                        .interface_properties
+                        .get(&interface_id.get().into())
+                        .expect("interfaces with pending address change should exist");
+                    let fnet::Subnet { addr, prefix_len: _ } = address.clone().into_ext();
+                    addresses.contains_key(&addr)
+                };
 
                 let done = match kind {
-                    PendingAddressRequestKind::Add => contains_addr,
-                    PendingAddressRequestKind::Del => !contains_addr,
+                    PendingRequestKind::AddAddress(address_and_interface_args) => {
+                        contains_addr(address_and_interface_args)
+                    }
+                    PendingRequestKind::DelAddress(address_and_interface_args) => {
+                        !contains_addr(address_and_interface_args)
+                    }
+                    PendingRequestKind::DisableInterface(interface_id) => {
+                        // NB: The interface must exist, because we were able to
+                        // successfully disabled it (hence the pending request).
+                        // The Netstack will send a 'changed' event to reflect
+                        // the disable, before sending a `removed` event.
+                        let fnet_interfaces_ext::PropertiesAndState { properties, state: _ } = self
+                            .interface_properties
+                            .get(&interface_id.get())
+                            .unwrap_or_else(|| {
+                                panic!("interface {interface_id} with pending disable should exist")
+                            });
+                        // Note here we check "is the interface offline" which
+                        // is a combination of, "is the underlying link state
+                        // down" and "is the interface admin disabled". This
+                        // means we cannot know with certainty whether the link
+                        // is enabled or disabled. we take our best guess here.
+                        // TODO(https://issuetracker.google.com/290372180): Make
+                        // this check exact once link status is available via a
+                        // FIDL API.
+                        !properties.online
+                    }
                 };
 
                 if done {
-                    log_debug!("completed pending request; req = {pending_address_request_some:?}");
+                    log_debug!("completed pending request; req = {pending_request_some:?}");
 
-                    let PendingAddressRequest { kind, address_and_interface_id, client, completer } =
-                        pending_address_request_some;
+                    let PendingRequest { kind, client, completer } = pending_request_some;
 
-                    respond_to_completer(
-                        client,
-                        completer,
-                        Ok(()),
-                        (kind, address_and_interface_id),
-                    );
+                    respond_to_completer(client, completer, Ok(()), kind);
                 } else {
                     // Put the pending request back so that it can be handled later.
-                    log_debug!(
-                        "pending request not done yet; req = {pending_address_request_some:?}"
-                    );
-                    pending_address_request = Some(pending_address_request_some);
+                    log_debug!("pending request not done yet; req = {pending_request_some:?}");
+                    pending_request = Some(pending_request_some);
                 }
             }
         }
@@ -696,9 +737,9 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     /// Returns `None` if the interface is not known by the `EventLoop`.
     fn get_interface_control(
         &mut self,
-        interface_id: NonZeroU32,
+        interface_id: NonZeroU64,
     ) -> Option<&fnet_interfaces_ext::admin::Control> {
-        let interface = self.interface_properties.get_mut(&interface_id.get().into())?;
+        let interface = self.interface_properties.get_mut(&interface_id.get())?;
 
         Some(interface.state.control.get_or_insert_with(|| {
             let (control, server_end) = fnet_interfaces_ext::admin::Control::create_endpoints()
@@ -708,6 +749,21 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 .expect("send get admin request");
             control
         }))
+    }
+
+    // Get the associated `PropertiesAndState` for the given `LinkSpecifier`
+    fn get_link(
+        &self,
+        specifier: LinkSpecifier,
+    ) -> Option<&fnet_interfaces_ext::PropertiesAndState<InterfaceState>> {
+        match specifier {
+            LinkSpecifier::Index(id) => self.interface_properties.get(&id.get().into()),
+            LinkSpecifier::Name(name) => self.interface_properties.values().find(
+                |fnet_interfaces_ext::PropertiesAndState { properties, state: _ }| {
+                    properties.name == name
+                },
+            ),
+        }
     }
 
     /// Handles a "RTM_GETLINK" request.
@@ -725,21 +781,8 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 let ifaces = self.interface_properties.values();
                 (true, Either::Left(ifaces))
             }
-            GetLinkArgs::GetById(id) => {
-                let iface = self
-                    .interface_properties
-                    .get(&id.get().into())
-                    .ok_or(RequestError::UnrecognizedInterface)?;
-                (false, Either::Right(std::iter::once(iface)))
-            }
-            GetLinkArgs::GetByName(name) => {
-                let iface = self
-                    .interface_properties
-                    .values()
-                    .find(|fnet_interfaces_ext::PropertiesAndState { properties, state: _ }| {
-                        properties.name == name
-                    })
-                    .ok_or(RequestError::UnrecognizedInterface)?;
+            GetLinkArgs::Get(specifier) => {
+                let iface = self.get_link(specifier).ok_or(RequestError::UnrecognizedInterface)?;
                 (false, Either::Right(std::iter::once(iface)))
             }
         };
@@ -750,13 +793,66 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                      properties,
                      state: InterfaceState { addresses: _, link_address, control: _ },
                  }| {
-                    NetlinkLinkMessage::optionally_from(properties, link_address)
+                    NetlinkLinkMessage::optionally_from(&properties, &link_address)
                 },
             )
             .for_each(|message| {
                 client.send_unicast(message.into_rtnl_new_link(sequence_number, is_dump))
             });
         Ok(())
+    }
+
+    /// Handles a "RTM_SETLINK" request.
+    async fn handle_set_link_request(
+        &mut self,
+        args: SetLinkArgs,
+    ) -> Result<Option<PendingRequestKind>, RequestError> {
+        let SetLinkArgs { link, enable } = args;
+        let id = self.get_link(link).ok_or(RequestError::UnrecognizedInterface)?.properties.id;
+
+        // NB: Only check if their is a change after verifying the provided
+        // interface is valid. This is for conformance with Linux which will
+        // return ENODEV for invalid devices, even if no-change was requested.
+        let Some(enable) = enable else {
+            return Ok(None)
+        };
+
+        let control = self.get_interface_control(id).ok_or(RequestError::UnrecognizedInterface)?;
+
+        if enable {
+            let _did_enable = control
+                .enable()
+                .await
+                .map_err(|e| {
+                    log_warn!("error enabling interface {id}: {e:?}");
+                    map_existing_interface_terminal_error(e, id)
+                })?
+                .map_err(|e: fnet_interfaces_admin::ControlEnableError| {
+                    // `ControlEnableError` is currently an empty flexible enum.
+                    // It's not possible to know what went wrong.
+                    log_error!("failed to enable interface {id} for unknown reason: {e:?}");
+                    RequestError::Unknown
+                })?;
+            // TODO(https://issuetracker.google.com/290372180): Synchronize this
+            // request with observed changes from the watcher, once link status
+            // is available via a FIDL API.
+            Ok(None)
+        } else {
+            let did_disable = control
+                .disable()
+                .await
+                .map_err(|e| {
+                    log_warn!("error disabling interface {id}: {e:?}");
+                    map_existing_interface_terminal_error(e, id)
+                })?
+                .map_err(|e: fnet_interfaces_admin::ControlDisableError| {
+                    // `ControlDisableError` is currently an empty flexible enum.
+                    // It's not possible to know what went wrong,
+                    log_error!("failed to disable interface {id} for unknown reason: {e:?}");
+                    RequestError::Unknown
+                })?;
+            Ok(did_disable.then_some(PendingRequestKind::DisableInterface(id)))
+        }
     }
 
     /// Handles a new address request.
@@ -772,8 +868,9 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             add_subnet_route,
         }: NewAddressArgs,
     ) -> Result<AddressAndInterfaceArgs, RequestError> {
-        let control =
-            self.get_interface_control(interface_id).ok_or(RequestError::UnrecognizedInterface)?;
+        let control = self
+            .get_interface_control(interface_id.into())
+            .ok_or(RequestError::UnrecognizedInterface)?;
 
         let (asp, asp_server_end) =
             fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
@@ -791,7 +888,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             )
             .map_err(|e| {
                 log_warn!("error adding {address} to interface ({interface_id}): {e:?}");
-                map_existing_interface_terminal_error(e, interface_id)
+                map_existing_interface_terminal_error(e, interface_id.into())
             })?;
 
         // Detach the ASP so that the address's lifetime isn't bound to the
@@ -898,12 +995,13 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 address_and_interface_id @ AddressAndInterfaceArgs { address, interface_id },
         }: DelAddressArgs,
     ) -> Result<AddressAndInterfaceArgs, RequestError> {
-        let control =
-            self.get_interface_control(interface_id).ok_or(RequestError::UnrecognizedInterface)?;
+        let control = self
+            .get_interface_control(interface_id.into())
+            .ok_or(RequestError::UnrecognizedInterface)?;
 
         match control.remove_address(&mut address.into_ext()).await.map_err(|e| {
             log_warn!("error removing {address} from interface ({interface_id}): {e:?}");
-            map_existing_interface_terminal_error(e, interface_id)
+            map_existing_interface_terminal_error(e, interface_id.into())
         })? {
             Ok(did_remove) => {
                 if did_remove {
@@ -932,18 +1030,25 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
 
     /// Handles a [`Request`].
     ///
-    /// Returns a [`PendingAddressRequest`] if an address was updated and the
-    /// caller needs to make sure the update has been propagated to the local
-    /// state (the interfaces watcher has sent an event for our update).
+    /// Returns a [`PendingRequest`] if state was updated and the caller needs
+    /// to make sure the update has been propagated to the local state (the
+    /// interfaces watcher has sent an event for our update).
     async fn handle_request(
         &mut self,
         Request { args, sequence_number, mut client, completer }: Request<S>,
-    ) -> Option<PendingAddressRequest<S>> {
+    ) -> Option<PendingRequest<S>> {
         log_debug!("handling request {args:?} from {client}");
 
         let result = match args.clone() {
             RequestArgs::Link(LinkRequestArgs::Get(args)) => {
                 self.handle_get_link_request(args, sequence_number, &mut client)
+            }
+            RequestArgs::Link(LinkRequestArgs::Set(args)) => {
+                match self.handle_set_link_request(args).await {
+                    Ok(Some(kind)) => return Some(PendingRequest { kind, client, completer }),
+                    Ok(None) => Ok(()),
+                    Err(e) => Err(e),
+                }
             }
             RequestArgs::Address(args) => match args {
                 AddressRequestArgs::Get(args) => match args {
@@ -973,9 +1078,8 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 AddressRequestArgs::New(args) => {
                     match self.handle_new_address_request(args).await {
                         Ok(address_and_interface_id) => {
-                            return Some(PendingAddressRequest {
-                                kind: PendingAddressRequestKind::Add,
-                                address_and_interface_id,
+                            return Some(PendingRequest {
+                                kind: PendingRequestKind::AddAddress(address_and_interface_id),
                                 client,
                                 completer,
                             })
@@ -986,9 +1090,8 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 AddressRequestArgs::Del(args) => {
                     match self.handle_del_address_request(args).await {
                         Ok(address_and_interface_id) => {
-                            return Some(PendingAddressRequest {
-                                kind: PendingAddressRequestKind::Del,
-                                address_and_interface_id,
+                            return Some(PendingRequest {
+                                kind: PendingRequestKind::DelAddress(address_and_interface_id),
                                 client,
                                 completer,
                             })
@@ -1650,7 +1753,7 @@ pub(crate) mod testutil {
 mod tests {
     use super::{testutil::*, *};
 
-    use std::num::NonZeroU64;
+    use std::{num::NonZeroU64, pin::Pin};
 
     use fidl::endpoints::{ControlHandle as _, RequestStream as _, Responder as _};
     use fidl_fuchsia_net as fnet;
@@ -2474,19 +2577,21 @@ mod tests {
         &[LO_INTERFACE_ID, ETH_INTERFACE_ID],
         Ok(()); "dump")]
     #[test_case(
-        GetLinkArgs::GetById(NonZeroU32::new(LO_INTERFACE_ID.try_into().unwrap()).unwrap()),
+        GetLinkArgs::Get(LinkSpecifier::Index(
+            NonZeroU32::new(LO_INTERFACE_ID.try_into().unwrap()).unwrap())),
         &[LO_INTERFACE_ID],
         Ok(()); "id")]
     #[test_case(
-        GetLinkArgs::GetById(NonZeroU32::new(WLAN_INTERFACE_ID.try_into().unwrap()).unwrap()),
+        GetLinkArgs::Get(LinkSpecifier::Index(
+            NonZeroU32::new(WLAN_INTERFACE_ID.try_into().unwrap()).unwrap())),
         &[],
         Err(RequestError::UnrecognizedInterface); "id_not_found")]
     #[test_case(
-        GetLinkArgs::GetByName(LO_NAME.to_string()),
+        GetLinkArgs::Get(LinkSpecifier::Name(LO_NAME.to_string())),
         &[LO_INTERFACE_ID],
         Ok(()); "name")]
     #[test_case(
-        GetLinkArgs::GetByName(WLAN_NAME.to_string()),
+        GetLinkArgs::Get(LinkSpecifier::Name(WLAN_NAME.to_string())),
         &[],
         Err(RequestError::UnrecognizedInterface); "name_not_found")]
     #[fuchsia::test]
@@ -2497,7 +2602,7 @@ mod tests {
     ) {
         let is_dump = match args {
             GetLinkArgs::Dump => true,
-            GetLinkArgs::GetById(_) | GetLinkArgs::GetByName(_) => false,
+            GetLinkArgs::Get(_) => false,
         };
         let expected_messages = expected_new_links
             .iter()
@@ -2529,6 +2634,220 @@ mod tests {
             .await,
             TestRequestResult {
                 messages: expected_messages,
+                waiter_results: vec![expected_result],
+            },
+        )
+    }
+
+    /// Returns a `FnOnce` suitable for use with [`test_request`].
+    ///
+    /// The closure serves a single `GetAdmin` request for the Ethernet
+    /// interface, and handles all subsequent
+    /// [`fnet_interfaces_admin::ControlRequest`] by calling the provided
+    /// handler.
+    // TODO (https://github.com/rust-lang/rust/issues/99697): Remove the
+    // `Pin<Box<dyn ...>>` from the return type once Rust supports
+    // `impl Fn() -> impl <SomeTrait>` style declarations.
+    fn expect_get_admin_with_handler<
+        I: IntoIterator<Item = fnet_interfaces::Event> + 'static,
+        H: FnMut(fnet_interfaces_admin::ControlRequest) -> I + 'static,
+    >(
+        admin_handler: H,
+    ) -> impl FnOnce(
+        fnet_root::InterfacesRequestStream,
+    ) -> Pin<Box<dyn Stream<Item = fnet_interfaces::Event>>> {
+        move |interfaces_request_stream: fnet_root::InterfacesRequestStream| {
+            Box::pin(
+                interfaces_request_stream
+                    .filter_map(|req| {
+                        futures::future::ready(match req.unwrap() {
+                            fnet_root::InterfacesRequest::GetAdmin {
+                                id,
+                                control,
+                                control_handle: _,
+                            } => {
+                                pretty_assertions::assert_eq!(id, ETH_INTERFACE_ID);
+                                Some(control.into_stream().unwrap())
+                            }
+                            req => {
+                                handle_get_mac_root_request_or_panic(req);
+                                None
+                            }
+                        })
+                    })
+                    .into_future()
+                    // This module's implementation is expected to only acquire one
+                    // admin control handle per interface, so drop the remaining
+                    // stream of admin control request streams.
+                    .map(|(admin_control_stream, _stream_of_admin_control_streams)| {
+                        admin_control_stream.unwrap()
+                    })
+                    .flatten_stream()
+                    // Handle each Control request with the provided handler.
+                    // `scan` transfers ownership of `admin_handle`, which
+                    // circumvents some borrow chcker issues we would encounter
+                    // with `map`.
+                    .scan(admin_handler, |admin_handler, req| {
+                        futures::future::ready(Some(futures::stream::iter(admin_handler(
+                            req.unwrap(),
+                        ))))
+                    })
+                    .flatten(),
+            )
+        }
+    }
+
+    #[test_case(
+        SetLinkArgs{
+            link: LinkSpecifier::Name(ETH_NAME.to_string()),
+            enable: None,
+        },
+        Ok(true),
+        Ok(()); "no_change")]
+    #[test_case(
+        SetLinkArgs{
+            link: LinkSpecifier::Name(WLAN_NAME.to_string()),
+            enable: None,
+        },
+        Ok(true),
+        Err(RequestError::UnrecognizedInterface); "no_change_name_not_found")]
+    #[test_case(
+        SetLinkArgs {
+            link: LinkSpecifier::Index(
+                NonZeroU32::new(WLAN_INTERFACE_ID.try_into().unwrap()).unwrap()),
+            enable: None,
+        },
+        Ok(true),
+        Err(RequestError::UnrecognizedInterface); "no_change_id_not_found")]
+    #[test_case(
+        SetLinkArgs{
+            link: LinkSpecifier::Name(ETH_NAME.to_string()),
+            enable: Some(true),
+        },
+        Ok(false),
+        Ok(()); "enable_no_op_succeeds")]
+    #[test_case(
+        SetLinkArgs{
+            link: LinkSpecifier::Name(ETH_NAME.to_string()),
+            enable: Some(true),
+        },
+        Ok(true),
+        Ok(()); "enable_newly_succeeds")]
+    #[test_case(
+        SetLinkArgs{
+            link: LinkSpecifier::Name(WLAN_NAME.to_string()),
+            enable: Some(true),
+        },
+        Ok(true),
+        Err(RequestError::UnrecognizedInterface); "enable_not_found")]
+    #[test_case(
+        SetLinkArgs{
+            link: LinkSpecifier::Name(ETH_NAME.to_string()),
+            enable: Some(true),
+        },
+        Err(()),
+        Err(RequestError::Unknown); "enable_fails")]
+    #[test_case(
+        SetLinkArgs{
+            link: LinkSpecifier::Name(ETH_NAME.to_string()),
+            enable: Some(false),
+        },
+        Ok(false),
+        Ok(()); "disable_no_op_succeeds")]
+    #[test_case(
+        SetLinkArgs{
+            link: LinkSpecifier::Name(ETH_NAME.to_string()),
+            enable: Some(false),
+        },
+        Ok(true),
+        Ok(()); "disable_newly_succeeds")]
+    #[test_case(
+        SetLinkArgs{
+            link: LinkSpecifier::Name(WLAN_NAME.to_string()),
+            enable: Some(false),
+        },
+        Ok(true),
+        Err(RequestError::UnrecognizedInterface); "disable_not_found")]
+    #[test_case(
+        SetLinkArgs{
+            link: LinkSpecifier::Name(ETH_NAME.to_string()),
+            enable: Some(false),
+        },
+        Err(()),
+        Err(RequestError::Unknown); "disable_fails")]
+    #[fuchsia::test]
+    async fn test_set_link(
+        args: SetLinkArgs,
+        control_response: Result<bool, ()>,
+        expected_result: Result<(), RequestError>,
+    ) {
+        let SetLinkArgs { link: _, enable } = args.clone();
+        let request = RequestArgs::Link(LinkRequestArgs::Set(args));
+
+        let control_response_clone = control_response.clone();
+        let handle_enable =
+            move |req: fnet_interfaces_admin::ControlRequest| -> Option<fnet_interfaces::Event> {
+                let responder = match req {
+                    fnet_interfaces_admin::ControlRequest::Enable { responder } => responder,
+                    _ => panic!("unexpected ControlRequest received"),
+                };
+                match control_response {
+                    Err(()) => {
+                        responder
+                            .send(Err(fnet_interfaces_admin::ControlEnableError::unknown()))
+                            .expect("should send response");
+                        None
+                    }
+                    Ok(newly_enabled) => {
+                        responder.send(Ok(newly_enabled)).expect("should send response");
+                        Some(fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
+                            id: Some(ETH_INTERFACE_ID),
+                            online: Some(true),
+                            ..fnet_interfaces::Properties::default()
+                        }))
+                    }
+                }
+            };
+        let handle_disable =
+            move |req: fnet_interfaces_admin::ControlRequest| -> Option<fnet_interfaces::Event> {
+                let responder = match req {
+                    fnet_interfaces_admin::ControlRequest::Disable { responder } => responder,
+                    _ => panic!("unexpected ControlRequest received"),
+                };
+                match control_response_clone {
+                    Err(()) => {
+                        responder
+                            .send(Err(fnet_interfaces_admin::ControlDisableError::unknown()))
+                            .expect("should send response");
+                        None
+                    }
+                    Ok(newly_disabled) => {
+                        responder.send(Ok(newly_disabled)).expect("should send response");
+                        Some(fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
+                            id: Some(ETH_INTERFACE_ID),
+                            online: Some(false),
+                            ..fnet_interfaces::Properties::default()
+                        }))
+                    }
+                }
+            };
+
+        let test_result = match enable {
+            None => test_request([request], expect_only_get_mac_root_requests).await,
+            Some(true) => {
+                test_request([request], expect_get_admin_with_handler(handle_enable)).await
+            }
+            Some(false) => {
+                test_request([request], expect_get_admin_with_handler(handle_disable)).await
+            }
+        };
+
+        assert_eq!(
+            test_result,
+            TestRequestResult {
+                // SetLink requests never result in messages. Acks/errors
+                // are handled by the caller.
+                messages: vec![],
                 waiter_results: vec![expected_result],
             },
         )

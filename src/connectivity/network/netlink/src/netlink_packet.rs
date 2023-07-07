@@ -71,6 +71,7 @@ pub(crate) mod errno {
     impl Errno {
         pub(crate) const EADDRNOTAVAIL: Errno =
             const_unwrap::const_unwrap_option(Errno::new(-libc::EADDRNOTAVAIL));
+        pub(crate) const EBUSY: Errno = const_unwrap::const_unwrap_option(Errno::new(-libc::EBUSY));
         pub(crate) const EEXIST: Errno =
             const_unwrap::const_unwrap_option(Errno::new(-libc::EEXIST));
         pub(crate) const EINVAL: Errno =

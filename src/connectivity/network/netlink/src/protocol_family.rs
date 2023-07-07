@@ -74,19 +74,24 @@ pub mod route {
     };
 
     use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP};
-    use netlink_packet_route::rtnl::{
-        address::{nlas::Nla as AddressNla, AddressMessage},
-        constants::{
-            AF_INET, AF_INET6, AF_UNSPEC, IFA_F_NOPREFIXROUTE, RTNLGRP_DCB, RTNLGRP_DECNET_IFADDR,
-            RTNLGRP_DECNET_ROUTE, RTNLGRP_DECNET_RULE, RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV4_MROUTE,
-            RTNLGRP_IPV4_MROUTE_R, RTNLGRP_IPV4_NETCONF, RTNLGRP_IPV4_ROUTE, RTNLGRP_IPV4_RULE,
-            RTNLGRP_IPV6_IFADDR, RTNLGRP_IPV6_IFINFO, RTNLGRP_IPV6_MROUTE, RTNLGRP_IPV6_MROUTE_R,
-            RTNLGRP_IPV6_NETCONF, RTNLGRP_IPV6_PREFIX, RTNLGRP_IPV6_ROUTE, RTNLGRP_IPV6_RULE,
-            RTNLGRP_LINK, RTNLGRP_MDB, RTNLGRP_MPLS_NETCONF, RTNLGRP_MPLS_ROUTE,
-            RTNLGRP_ND_USEROPT, RTNLGRP_NEIGH, RTNLGRP_NONE, RTNLGRP_NOP2, RTNLGRP_NOP4,
-            RTNLGRP_NOTIFY, RTNLGRP_NSID, RTNLGRP_PHONET_IFADDR, RTNLGRP_PHONET_ROUTE, RTNLGRP_TC,
+    use netlink_packet_route::{
+        rtnl::{
+            address::{nlas::Nla as AddressNla, AddressMessage},
+            constants::{
+                AF_INET, AF_INET6, AF_UNSPEC, IFA_F_NOPREFIXROUTE, RTNLGRP_DCB,
+                RTNLGRP_DECNET_IFADDR, RTNLGRP_DECNET_ROUTE, RTNLGRP_DECNET_RULE,
+                RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV4_MROUTE, RTNLGRP_IPV4_MROUTE_R,
+                RTNLGRP_IPV4_NETCONF, RTNLGRP_IPV4_ROUTE, RTNLGRP_IPV4_RULE, RTNLGRP_IPV6_IFADDR,
+                RTNLGRP_IPV6_IFINFO, RTNLGRP_IPV6_MROUTE, RTNLGRP_IPV6_MROUTE_R,
+                RTNLGRP_IPV6_NETCONF, RTNLGRP_IPV6_PREFIX, RTNLGRP_IPV6_ROUTE, RTNLGRP_IPV6_RULE,
+                RTNLGRP_LINK, RTNLGRP_MDB, RTNLGRP_MPLS_NETCONF, RTNLGRP_MPLS_ROUTE,
+                RTNLGRP_ND_USEROPT, RTNLGRP_NEIGH, RTNLGRP_NONE, RTNLGRP_NOP2, RTNLGRP_NOP4,
+                RTNLGRP_NOTIFY, RTNLGRP_NSID, RTNLGRP_PHONET_IFADDR, RTNLGRP_PHONET_ROUTE,
+                RTNLGRP_TC,
+            },
+            LinkMessage, RtnlMessage,
         },
-        LinkMessage, RtnlMessage,
+        IFF_UP,
     };
 
     /// An implementation of the Netlink Route protocol family.
@@ -324,13 +329,11 @@ pub mod route {
         }))
     }
 
-    struct InvalidGetLinkRequest;
-
     /// Constructs the appropriate [`GetLinkArgs`] for this GetLink request.
     fn to_get_link_args(
         link_msg: LinkMessage,
         is_dump: bool,
-    ) -> Result<interfaces::GetLinkArgs, InvalidGetLinkRequest> {
+    ) -> Result<interfaces::GetLinkArgs, Errno> {
         // NB: In the case where the request is "malformed" and specifies
         // multiple fields, Linux prefers the dump flag over the link index, and
         // prefers the link index over the link_name.
@@ -338,7 +341,7 @@ pub mod route {
             return Ok(interfaces::GetLinkArgs::Dump);
         }
         if let Ok(link_id) = <u32 as TryInto<NonZeroU32>>::try_into(link_msg.header.index) {
-            return Ok(interfaces::GetLinkArgs::GetById(link_id));
+            return Ok(interfaces::GetLinkArgs::Get(interfaces::LinkSpecifier::Index(link_id)));
         }
         if let Some(name) = link_msg.nlas.into_iter().find_map(|nla| match nla {
             netlink_packet_route::rtnl::link::nlas::Nla::IfName(name) => Some(name),
@@ -347,9 +350,43 @@ pub mod route {
                 None
             }
         }) {
-            return Ok(interfaces::GetLinkArgs::GetByName(name));
+            return Ok(interfaces::GetLinkArgs::Get(interfaces::LinkSpecifier::Name(name)));
         }
-        return Err(InvalidGetLinkRequest);
+        return Err(Errno::EINVAL);
+    }
+
+    /// Constructs the appropriate [`SetLinkArgs`] for this SetLink request.
+    fn to_set_link_args(link_msg: LinkMessage) -> Result<interfaces::SetLinkArgs, Errno> {
+        let link_id = NonZeroU32::new(link_msg.header.index);
+        let link_name = link_msg.nlas.into_iter().find_map(|nla| match nla {
+            netlink_packet_route::rtnl::link::nlas::Nla::IfName(name) => Some(name),
+            nla => {
+                log_debug!("ignoring unexpected NLA in SetLink request: {:?}", nla);
+                None
+            }
+        });
+        let link = match (link_id, link_name) {
+            (Some(id), None) => interfaces::LinkSpecifier::Index(id),
+            (None, Some(name)) => interfaces::LinkSpecifier::Name(name),
+            (None, None) => return Err(Errno::EINVAL),
+            // NB: If both the index and name are specified, Linux returns EBUSY
+            // rather than EINVAL. Do the same here for conformance.
+            (Some(_id), Some(_name)) => return Err(Errno::EBUSY),
+        };
+        // `change_mask` specifies which flags should be updated, while `flags`
+        // specifies whether the value should be set/unset.
+        let enable: Option<bool> = ((link_msg.header.change_mask & IFF_UP) == IFF_UP)
+            .then_some((link_msg.header.flags & IFF_UP) != 0);
+
+        let unsupported_changes = link_msg.header.change_mask & !IFF_UP;
+        if unsupported_changes != 0 {
+            log_warn!(
+                "ignoring unsupported changes in SetLink request: {:#X}",
+                unsupported_changes
+            );
+        }
+
+        Ok(interfaces::SetLinkArgs { link, enable })
     }
 
     #[async_trait]
@@ -386,10 +423,9 @@ pub mod route {
                     let (completer, waiter) = oneshot::channel();
                     let args = match to_get_link_args(link_msg, is_dump) {
                         Ok(args) => args,
-                        Err(InvalidGetLinkRequest) => {
+                        Err(e) => {
                             log_debug!("received invalid `GetLink` request from {}", client);
-                            client.send_unicast(
-                                netlink_packet::new_error(Errno::EINVAL, req_header));
+                            client.send_unicast(netlink_packet::new_error(e, req_header));
                             return;
                         }
                     };
@@ -406,6 +442,33 @@ pub mod route {
                             Ok(()) => if is_dump {
                                 client.send_unicast(netlink_packet::new_done(req_header))
                             } else if expects_ack {
+                                client.send_unicast(netlink_packet::new_ack(req_header))
+                            }
+                            Err(e) => client.send_unicast(
+                                netlink_packet::new_error(e.into_errno(), req_header)),
+                        }
+                }
+                SetLink(link_msg) => {
+                    let args = match to_set_link_args(link_msg) {
+                        Ok(args) => args,
+                        Err(e) => {
+                            log_debug!("received invalid `SetLink` request from {}", client);
+                            client.send_unicast(netlink_packet::new_error(e, req_header));
+                            return;
+                        }
+                    };
+                    let (completer, waiter) = oneshot::channel();
+                    interfaces_request_sink.send(
+                        interfaces::Request{
+                        args: interfaces::RequestArgs::Link(interfaces::LinkRequestArgs::Set(args)),
+                        sequence_number: req_header.sequence_number,
+                        client: client.clone(),
+                        completer,
+                    }).await.expect("interface event loop should never terminate");
+                    match waiter
+                        .await
+                        .expect("interfaces event loop should have handled the request") {
+                            Ok(()) => if expects_ack {
                                 client.send_unicast(netlink_packet::new_ack(req_header))
                             }
                             Err(e) => client.send_unicast(
@@ -600,8 +663,6 @@ pub mod route {
                 | NewNeighbour(_)
                 // TODO(https://issuetracker.google.com/285127790): Implement DelNeighbour.
                 | DelNeighbour(_)
-                // TODO(https://issuetracker.google.com/283136220): Implement SetLink.
-                | SetLink(_)
                 // TODO(https://issuetracker.google.com/283136222): Implement NewRoute.
                 | NewRoute(_)
                 // TODO(https://issuetracker.google.com/283136222): Implement DelRoute.
@@ -817,6 +878,7 @@ mod test {
     use netlink_packet_route::{
         rtnl::address::nlas::Nla as AddressNla, AddressMessage, LinkMessage, RouteMessage,
         RtnlMessage, TcMessage, AF_INET, AF_INET6, AF_PACKET, AF_UNSPEC, IFA_F_NOPREFIXROUTE,
+        IFF_UP,
     };
     use test_case::test_case;
 
@@ -1036,49 +1098,56 @@ mod test {
         0,
         FAKE_INTERFACE_ID,
         None,
-        Some(interfaces::GetLinkArgs::GetById(NonZeroU32::new(FAKE_INTERFACE_ID).unwrap())),
+        Some(interfaces::GetLinkArgs::Get(interfaces::LinkSpecifier::Index(
+            NonZeroU32::new(FAKE_INTERFACE_ID).unwrap()))),
         Ok(()),
         None; "id")]
     #[test_case(
         NLM_F_ACK,
         FAKE_INTERFACE_ID,
         None,
-        Some(interfaces::GetLinkArgs::GetById(NonZeroU32::new(FAKE_INTERFACE_ID).unwrap())),
+        Some(interfaces::GetLinkArgs::Get(interfaces::LinkSpecifier::Index(
+            NonZeroU32::new(FAKE_INTERFACE_ID).unwrap()))),
         Ok(()),
         Some(ExpectedResponse::Ack); "id_with_ack")]
     #[test_case(
         0,
         FAKE_INTERFACE_ID,
         Some(FAKE_INTERFACE_NAME),
-        Some(interfaces::GetLinkArgs::GetById(NonZeroU32::new(FAKE_INTERFACE_ID).unwrap())),
+        Some(interfaces::GetLinkArgs::Get(interfaces::LinkSpecifier::Index(
+            NonZeroU32::new(FAKE_INTERFACE_ID).unwrap()))),
         Ok(()),
         None; "id_with_name")]
     #[test_case(
         0,
         0,
         Some(FAKE_INTERFACE_NAME),
-        Some(interfaces::GetLinkArgs::GetByName(FAKE_INTERFACE_NAME.to_string())),
+        Some(interfaces::GetLinkArgs::Get(interfaces::LinkSpecifier::Name(
+            FAKE_INTERFACE_NAME.to_string()))),
         Ok(()),
         None; "name")]
     #[test_case(
         NLM_F_ACK,
         0,
         Some(FAKE_INTERFACE_NAME),
-        Some(interfaces::GetLinkArgs::GetByName(FAKE_INTERFACE_NAME.to_string())),
+        Some(interfaces::GetLinkArgs::Get(interfaces::LinkSpecifier::Name(
+            FAKE_INTERFACE_NAME.to_string()))),
         Ok(()),
         Some(ExpectedResponse::Ack); "name_with_ack")]
     #[test_case(
         0,
         FAKE_INTERFACE_ID,
         None,
-        Some(interfaces::GetLinkArgs::GetById(NonZeroU32::new(FAKE_INTERFACE_ID).unwrap())),
+        Some(interfaces::GetLinkArgs::Get(interfaces::LinkSpecifier::Index(
+            NonZeroU32::new(FAKE_INTERFACE_ID).unwrap()))),
         Err(interfaces::RequestError::UnrecognizedInterface),
         Some(ExpectedResponse::Error(Errno::ENODEV)); "id_not_found")]
     #[test_case(
         0,
         0,
         Some(FAKE_INTERFACE_NAME),
-        Some(interfaces::GetLinkArgs::GetByName(FAKE_INTERFACE_NAME.to_string())),
+        Some(interfaces::GetLinkArgs::Get(interfaces::LinkSpecifier::Name(
+            FAKE_INTERFACE_NAME.to_string()))),
         Err(interfaces::RequestError::UnrecognizedInterface),
         Some(ExpectedResponse::Error(Errno::ENODEV)); "name_not_found")]
     #[fuchsia::test]
@@ -1106,6 +1175,178 @@ mod test {
                 ),
                 expected_request_args.map(|a| RequestAndResponse {
                     request: interfaces::RequestArgs::Link(interfaces::LinkRequestArgs::Get(a)),
+                    response: interfaces_worker_result,
+                }),
+            )
+            .await,
+            expected_response
+                .into_iter()
+                .map(|expected_response| {
+                    SentMessage::unicast(match expected_response {
+                        ExpectedResponse::Ack => netlink_packet::new_ack(header),
+                        ExpectedResponse::Error(e) => netlink_packet::new_error(e, header),
+                        ExpectedResponse::Done => netlink_packet::new_done(header),
+                    })
+                })
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    #[test_case(
+        0,
+        0,
+        None,
+        0,
+        0,
+        None,
+        Ok(()),
+        Some(ExpectedResponse::Error(Errno::EINVAL)); "interface_not_specified")]
+    #[test_case(
+        0,
+        FAKE_INTERFACE_ID,
+        Some(FAKE_INTERFACE_NAME),
+        0,
+        0,
+        None,
+        Ok(()),
+        Some(ExpectedResponse::Error(Errno::EBUSY)); "name_and_id")]
+    #[test_case(
+        0,
+        FAKE_INTERFACE_ID,
+        None,
+        0,
+        0,
+        Some(interfaces::SetLinkArgs{
+            link: interfaces::LinkSpecifier::Index(NonZeroU32::new(FAKE_INTERFACE_ID).unwrap()),
+            enable: None,
+        }),
+        Ok(()),
+        None; "no_change_by_id")]
+    #[test_case(
+        0,
+        0,
+        Some(FAKE_INTERFACE_NAME),
+        0,
+        0,
+        Some(interfaces::SetLinkArgs{
+            link: interfaces::LinkSpecifier::Name(FAKE_INTERFACE_NAME.to_string()),
+            enable: None,
+        }),
+        Ok(()),
+        None; "no_change_by_name")]
+    #[test_case(
+        NLM_F_ACK,
+        0,
+        Some(FAKE_INTERFACE_NAME),
+        0,
+        0,
+        Some(interfaces::SetLinkArgs{
+            link: interfaces::LinkSpecifier::Name(FAKE_INTERFACE_NAME.to_string()),
+            enable: None,
+        }),
+        Ok(()),
+        Some(ExpectedResponse::Ack); "no_change_ack")]
+    #[test_case(
+        0,
+        0,
+        Some(FAKE_INTERFACE_NAME),
+        IFF_UP,
+        IFF_UP,
+        Some(interfaces::SetLinkArgs{
+            link: interfaces::LinkSpecifier::Name(FAKE_INTERFACE_NAME.to_string()),
+            enable: Some(true),
+        }),
+        Ok(()),
+        None; "enable")]
+    #[test_case(
+        NLM_F_ACK,
+        0,
+        Some(FAKE_INTERFACE_NAME),
+        IFF_UP,
+        IFF_UP,
+        Some(interfaces::SetLinkArgs{
+            link: interfaces::LinkSpecifier::Name(FAKE_INTERFACE_NAME.to_string()),
+            enable: Some(true),
+        }),
+        Ok(()),
+        Some(ExpectedResponse::Ack); "enable_ack")]
+    #[test_case(
+        NLM_F_ACK,
+        0,
+        Some(FAKE_INTERFACE_NAME),
+        IFF_UP,
+        IFF_UP,
+        Some(interfaces::SetLinkArgs{
+            link: interfaces::LinkSpecifier::Name(FAKE_INTERFACE_NAME.to_string()),
+            enable: Some(true),
+        }),
+        Err(interfaces::RequestError::UnrecognizedInterface),
+        Some(ExpectedResponse::Error(Errno::ENODEV)); "enable_error")]
+    #[test_case(
+        0,
+        0,
+        Some(FAKE_INTERFACE_NAME),
+        0,
+        IFF_UP,
+        Some(interfaces::SetLinkArgs{
+            link: interfaces::LinkSpecifier::Name(FAKE_INTERFACE_NAME.to_string()),
+            enable: Some(false),
+        }),
+        Ok(()),
+        None; "disable")]
+    #[test_case(
+        NLM_F_ACK,
+        0,
+        Some(FAKE_INTERFACE_NAME),
+        0,
+        IFF_UP,
+        Some(interfaces::SetLinkArgs{
+            link: interfaces::LinkSpecifier::Name(FAKE_INTERFACE_NAME.to_string()),
+            enable: Some(false),
+        }),
+        Ok(()),
+        Some(ExpectedResponse::Ack); "disable_ack")]
+    #[test_case(
+        NLM_F_ACK,
+        0,
+        Some(FAKE_INTERFACE_NAME),
+        0,
+        IFF_UP,
+        Some(interfaces::SetLinkArgs{
+            link: interfaces::LinkSpecifier::Name(FAKE_INTERFACE_NAME.to_string()),
+            enable: Some(false),
+        }),
+        Err(interfaces::RequestError::UnrecognizedInterface),
+        Some(ExpectedResponse::Error(Errno::ENODEV)); "disable_error")]
+    #[fuchsia::test]
+    async fn test_set_link(
+        flags: u16,
+        link_id: u32,
+        link_name: Option<&str>,
+        link_flags: u32,
+        change_mask: u32,
+        expected_request_args: Option<interfaces::SetLinkArgs>,
+        interfaces_worker_result: Result<(), interfaces::RequestError>,
+        expected_response: Option<ExpectedResponse>,
+    ) {
+        let header = header_with_flags(flags);
+        let mut link_message = LinkMessage::default();
+        link_message.header.index = link_id;
+        link_message.header.flags = link_flags;
+        link_message.header.change_mask = change_mask;
+        link_message.nlas = link_name
+            .map(|n| netlink_packet_route::rtnl::link::nlas::Nla::IfName(n.to_string()))
+            .into_iter()
+            .collect();
+
+        pretty_assertions::assert_eq!(
+            test_request(
+                NetlinkMessage::new(
+                    header,
+                    NetlinkPayload::InnerMessage(RtnlMessage::SetLink(link_message)),
+                ),
+                expected_request_args.map(|a| RequestAndResponse {
+                    request: interfaces::RequestArgs::Link(interfaces::LinkRequestArgs::Set(a)),
                     response: interfaces_worker_result,
                 }),
             )
