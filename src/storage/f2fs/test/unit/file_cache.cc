@@ -222,10 +222,18 @@ TEST_F(FileCacheTest, Recycle) {
     raw_page = locked_page.get();
   }
 
+  // raw_page should have a reference in the dirty list.
+  ASSERT_TRUE(raw_page->IsActive());
+  // Remove |raw_page| from the list to invoke Page::fbl_recycle().
+  WritebackOperation op = {.bSync = true, .bReleasePages = false};
+  file.Writeback(op);
+  ASSERT_FALSE(raw_page->IsDirty());
+
+  // raw_page should be inacive and keep a reference in the tree after Page::fbl_recycle().
+  ASSERT_FALSE(raw_page->IsActive());
+  ASSERT_TRUE(raw_page->InTreeContainer());
   fbl::RefPtr<Page> page = fbl::ImportFromRawPtr(raw_page);
-  // ref_count should be set to one in Page::fbl_recycle().
   ASSERT_EQ(page->IsLastReference(), true);
-  // Leak it to keep alive in FileCache.
   raw_page = fbl::ExportToRawPtr(&page);
   FileCache &cache = raw_page->GetFileCache();
 
@@ -235,7 +243,7 @@ TEST_F(FileCacheTest, Recycle) {
     int i = 1000;
     while (--i) {
       LockedPage page = GetPage(0);
-      ASSERT_EQ(page->IsDirty(), true);
+      ASSERT_EQ(page.get(), raw_page);
     }
   });
 
@@ -243,7 +251,7 @@ TEST_F(FileCacheTest, Recycle) {
     int i = 1000;
     while (--i) {
       LockedPage page = GetPage(0);
-      ASSERT_EQ(page->IsDirty(), true);
+      ASSERT_EQ(page.get(), raw_page);
     }
   });
   // Start threads.
