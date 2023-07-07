@@ -805,6 +805,7 @@ pub fn sys_fchmod(current_task: &CurrentTask, fd: FdNumber, mode: FileMode) -> R
     let file = current_task.files.get_unless_opath(fd)?;
     file.name.check_readonly_filesystem()?;
     file.name.entry.node.chmod(current_task, mode)?;
+    file.notify(InotifyMask::ATTRIB);
     Ok(())
 }
 
@@ -819,6 +820,7 @@ pub fn sys_fchmodat(
     let name = lookup_at(current_task, dir_fd, user_path, LookupFlags::default())?;
     name.check_readonly_filesystem()?;
     name.entry.node.chmod(current_task, mode)?;
+    name.notify(InotifyMask::ATTRIB);
     Ok(())
 }
 
@@ -838,7 +840,9 @@ pub fn sys_fchown(
 ) -> Result<(), Errno> {
     let file = current_task.files.get_unless_opath(fd)?;
     file.name.check_readonly_filesystem()?;
-    file.name.entry.node.chown(current_task, maybe_uid(owner), maybe_uid(group))
+    file.name.entry.node.chown(current_task, maybe_uid(owner), maybe_uid(group))?;
+    file.notify(InotifyMask::ATTRIB);
+    Ok(())
 }
 
 pub fn sys_fchownat(
@@ -852,7 +856,9 @@ pub fn sys_fchownat(
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
     let name = lookup_at(current_task, dir_fd, user_path, flags)?;
     name.check_readonly_filesystem()?;
-    name.entry.node.chown(current_task, maybe_uid(owner), maybe_uid(group))
+    name.entry.node.chown(current_task, maybe_uid(owner), maybe_uid(group))?;
+    name.notify(InotifyMask::ATTRIB);
+    Ok(())
 }
 
 fn read_xattr_name(current_task: &CurrentTask, name_addr: UserCString) -> Result<Vec<u8>, Errno> {

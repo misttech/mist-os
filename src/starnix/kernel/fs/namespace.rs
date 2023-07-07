@@ -1158,6 +1158,12 @@ impl NamespaceNode {
         self.update_atime()?;
         self.entry.node.readlink(current_task)
     }
+
+    pub fn notify(&self, event_mask: InotifyMask) {
+        if self.mount.is_some() {
+            self.entry.notify(event_mask);
+        }
+    }
 }
 
 impl fmt::Debug for NamespaceNode {

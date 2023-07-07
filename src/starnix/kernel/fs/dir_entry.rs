@@ -781,6 +781,14 @@ impl DirEntry {
             }
         }
     }
+
+    // Notifies watchers on the current node and its parent about an event.
+    pub fn notify(&self, event_mask: InotifyMask) {
+        if let Some(parent) = self.parent() {
+            parent.node.watchers.notify(event_mask, &self.local_name());
+        }
+        self.node.watchers.notify(event_mask, &FsString::default());
+    }
 }
 
 struct DirEntryLockedChildren<'a> {

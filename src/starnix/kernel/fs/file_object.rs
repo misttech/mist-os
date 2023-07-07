@@ -825,14 +825,16 @@ impl FileObject {
     /// calling NamespaceNode::open.
     pub fn new(ops: Box<dyn FileOps>, name: NamespaceNode, flags: OpenFlags) -> FileHandle {
         let fs = name.entry.node.fs();
-        Arc::new(Self {
+        let file = Self {
             name,
             fs,
             ops,
             offset: Mutex::new(0),
             flags: Mutex::new(flags - OpenFlags::CREAT),
             async_owner: Default::default(),
-        })
+        };
+        file.notify(InotifyMask::OPEN);
+        Arc::new(file)
     }
 
     /// A unique identifier for this file object.
@@ -1264,11 +1266,8 @@ impl FileObject {
     }
 
     // Notifies watchers on the current node and its parent about an event.
-    fn notify(&self, event_mask: InotifyMask) {
-        if let Some(parent) = self.name.entry.parent() {
-            parent.node.watchers.notify(event_mask, &self.name.entry.local_name());
-        }
-        self.node().watchers.notify(event_mask, &FsString::default());
+    pub fn notify(&self, event_mask: InotifyMask) {
+        self.name.notify(event_mask)
     }
 }
 
