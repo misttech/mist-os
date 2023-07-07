@@ -4,6 +4,7 @@
 {
     include: [
         "//src/virtualization/bin/guest_manager/meta/guest_manager.cml",
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
         "trace/client.shard.cml",
     ],
