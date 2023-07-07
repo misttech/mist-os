@@ -23,7 +23,6 @@ bitflags! {
     /// Options that may be used when creating a pager.
     #[repr(transparent)]
     pub struct PagerOptions: u32 {
-        const _RESERVED = 0; // Placeholder until we add some options.
     }
 }
 

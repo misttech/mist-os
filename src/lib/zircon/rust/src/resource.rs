@@ -4,6 +4,8 @@
 
 //! Type-safe bindings for Zircon resources.
 
+#![allow(clippy::bad_bit_mask)] // TODO(fxbug.dev/130219): stop using bitflags for ResourceKind
+
 use crate::ok;
 use crate::{object_get_info, ObjectQuery, Topic};
 use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Status};

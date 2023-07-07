@@ -34,7 +34,6 @@ bitflags! {
 bitflags! {
     #[repr(transparent)]
     pub struct StreamReadOptions: u32 {
-        const _RESERVED = 0; // Placeholder until we add some options.
     }
 }
 

@@ -4,6 +4,8 @@
 
 //! Type-safe bindings for Zircon sockets.
 
+#![allow(clippy::bad_bit_mask)] // TODO(fxbug.dev/130219): stop using bitflags for SocketOpts
+
 use crate::{object_get_info, object_get_property, object_set_property};
 use crate::{ok, Status};
 use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Peered};

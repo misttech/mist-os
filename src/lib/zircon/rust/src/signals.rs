@@ -4,6 +4,9 @@
 
 //! Type-safe bindings for Zircon signals.
 
+// Signals::NONE is not actually a flag but that's not very likely to be confusing
+#![allow(clippy::bad_bit_mask)]
+
 use bitflags::bitflags;
 use fuchsia_zircon_sys::*;
 
