@@ -518,7 +518,7 @@ async fn wait_for_process_async(proc: fuchsia_zircon::Process) -> Result<(), Err
 
 #[cfg(test)]
 mod tests {
-    use {super::*, maplit::btreeset, std::io::Write};
+    use {super::*, std::io::Write as _};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn clean_start_and_stop() {
@@ -534,7 +534,7 @@ mod tests {
     async fn clean_start_contains_no_blobs() {
         let blobfs = BlobfsRamdisk::start().await.unwrap();
 
-        assert_eq!(blobfs.list_blobs().unwrap(), btreeset![]);
+        assert_eq!(blobfs.list_blobs().unwrap(), BTreeSet::new());
 
         blobfs.stop().await.unwrap();
     }
@@ -568,11 +568,11 @@ mod tests {
             .start()
             .await
             .unwrap();
-        assert_eq!(blobfs.list_blobs().unwrap(), btreeset![blob.merkle]);
+        assert_eq!(blobfs.list_blobs().unwrap(), BTreeSet::from([blob.merkle]));
 
         let blobfs =
             blobfs.into_builder().await.unwrap().with_blob(blob.clone()).start().await.unwrap();
-        assert_eq!(blobfs.list_blobs().unwrap(), btreeset![blob.merkle]);
+        assert_eq!(blobfs.list_blobs().unwrap(), BTreeSet::from([blob.merkle]));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -584,10 +584,10 @@ mod tests {
             .await
             .unwrap();
 
-        let expected = btreeset![
+        let expected = BTreeSet::from([
             fuchsia_merkle::MerkleTree::from_reader(&b"blob 1"[..]).unwrap().root(),
             fuchsia_merkle::MerkleTree::from_reader(&b"blob 2"[..]).unwrap().root(),
-        ];
+        ]);
         assert_eq!(expected.len(), 2);
         assert_eq!(blobfs.list_blobs().unwrap(), expected);
 

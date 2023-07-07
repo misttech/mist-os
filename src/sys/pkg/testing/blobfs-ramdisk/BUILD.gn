@@ -36,7 +36,6 @@ rustc_library("blobfs-ramdisk") {
     "//src/lib/storage/ramdevice_client",
     "//src/storage/lib/blob_writer:blob-writer",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:maplit",
   ]
 
   sources = [

@@ -19,9 +19,9 @@ pub(super) fn into_blob_writer_and_closer(
             Ok((Box::new(Clone::clone(&proxy)), Box::new(proxy)))
         }
         Writer(writer) => {
-            let proxy = writer.into_proxy()?;
-            // TODO(fxbug.dev/129995) Add cancellation support to fuchsia.fxfs/BlobWriter
-            Ok((Box::new(FxBlob::new(proxy)), Box::new(())))
+            // fuchsia.fxfs/BlobCreator allows concurrent creation attempts, so we don't need to
+            // cancel an ongoing attempt before trying again.
+            Ok((Box::new(FxBlob::new(writer.into_proxy()?)), Box::new(())))
         }
     }
 }
@@ -47,7 +47,8 @@ impl Closer for fio::FileProxy {
     }
 }
 
-// TODO(fxbug.dev/129995) Add cancellation support to fuchsia.fxfs/BlobWriter.
+// fuchsia.fxfs/BlobCreator allows concurrent creation attempts, so we don't need to cancel an
+// ongoing attempt before trying again.
 #[async_trait::async_trait]
 impl Closer for () {
     async fn close(&mut self) {}

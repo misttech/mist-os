@@ -8,9 +8,7 @@ use {
     fidl_fuchsia_io as fio,
     fuchsia_merkle::MerkleTree,
     fuchsia_zircon::Status,
-    futures::StreamExt,
-    maplit::btreeset,
-    std::{io::Write, time::Duration},
+    std::{io::Write as _, time::Duration},
 };
 
 // merkle root of b"Hello world!\n".
@@ -55,7 +53,7 @@ async fn blobfs() -> Result<(), Error> {
     );
     assert_eq!(
         blobfs_server.list_blobs().expect("list blobs"),
-        btreeset![BLOB_MERKLE.parse().unwrap()],
+        BTreeSet::from([BLOB_MERKLE.parse().unwrap()]),
     );
 
     blobfs_server.stop().await?;
@@ -541,4 +539,30 @@ async fn corrupt_create_fails_on_last_byte_write() -> Result<(), Error> {
     );
 
     blobfs_server.stop().await
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn fxblob_concurrent_creation_succeeds() {
+    let blobfs = BlobfsRamdisk::builder().fxblob().start().await.unwrap();
+    let creator = blobfs.blob_creator_proxy().unwrap().unwrap();
+
+    // 8,194 bytes so that the partial write exceeds 8,192 bytes.
+    let bytes = vec![0u8; 8194];
+    let hash = fuchsia_merkle::MerkleTree::from_reader(&bytes[..]).unwrap().root();
+    let compressed = Type1Blob::generate(&bytes, CompressionMode::Never);
+    let compressed_len: u64 = compressed.len().try_into().unwrap();
+
+    let writer0 = creator.create(&hash, false).await.unwrap().unwrap().into_proxy().unwrap();
+    let vmo0 = writer0.get_vmo(compressed_len).await.unwrap().unwrap();
+    let () = vmo0.write(&compressed, 0).unwrap();
+    let () = writer0.bytes_ready(compressed_len - 1).await.unwrap().unwrap();
+    assert_eq!(blobfs.list_blobs().unwrap(), BTreeSet::new());
+
+    let writer1 = creator.create(&hash, false).await.unwrap().unwrap().into_proxy().unwrap();
+    let vmo1 = writer1.get_vmo(compressed_len).await.unwrap().unwrap();
+    let () = vmo1.write(&compressed, 0).unwrap();
+    let () = writer1.bytes_ready(compressed_len).await.unwrap().unwrap();
+    assert_eq!(blobfs.list_blobs().unwrap(), BTreeSet::from([hash]));
+
+    blobfs.stop().await.unwrap();
 }
