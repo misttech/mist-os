@@ -18,7 +18,9 @@ use {
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
     fuchsia_async as fasync,
     fuchsia_inspect::health::Reporter,
-    fuchsia_inspect::{NumericProperty, Property},
+    fuchsia_inspect::{
+        ExponentialHistogramParams, HistogramProperty as _, NumericProperty, Property,
+    },
     fuchsia_trace as ftrace, fuchsia_zircon as zx,
     futures::{
         channel::mpsc::{UnboundedReceiver, UnboundedSender},
@@ -32,9 +34,30 @@ pub use input_device_constants::InputDeviceType;
 /// The path to the input-report directory.
 pub static INPUT_REPORT_PATH: &str = "/dev/class/input-report";
 
+const LATENCY_HISTOGRAM_PROPERTIES: ExponentialHistogramParams<i64> = ExponentialHistogramParams {
+    floor: 0,
+    initial_step: 1,
+    step_multiplier: 10,
+    // Seven buckets allows us to report
+    // *      < 0 msec (added automatically by Inspect)
+    // *      0-1 msec
+    // *     1-10 msec
+    // *   10-100 msec
+    // * 100-1000 msec
+    // *     1-10 sec
+    // *   10-100 sec
+    // * 100-1000 sec
+    // *    >1000 sec (added automatically by Inspect)
+    buckets: 7,
+};
+
 /// An [`InputDeviceStatus`] is tied to an [`InputDeviceBinding`] and provides properties
 /// detailing its Inspect status.
 pub struct InputDeviceStatus {
+    /// Function for getting the current timestamp. Enables unit testing
+    /// of the latency histogram.
+    now: Box<dyn Fn() -> zx::Time>,
+
     /// A node that contains the state below.
     _node: fuchsia_inspect::Node,
 
@@ -57,10 +80,20 @@ pub struct InputDeviceStatus {
 
     // This node records the health status of the `InputDevice`.
     pub health_node: fuchsia_inspect::health::Node,
+
+    /// Histogram of latency from the driver timestamp for an `InputReport` until
+    /// the time at which the report was seen by the respective binding. Reported
+    /// in milliseconds, because values less than 1 msec aren't especially
+    /// interesting.
+    driver_to_binding_latency_ms: fuchsia_inspect::IntExponentialHistogramProperty,
 }
 
 impl InputDeviceStatus {
     pub fn new(device_node: fuchsia_inspect::Node) -> Self {
+        Self::new_internal(device_node, Box::new(zx::Time::get_monotonic))
+    }
+
+    fn new_internal(device_node: fuchsia_inspect::Node, now: Box<dyn Fn() -> zx::Time>) -> Self {
         let mut health_node = fuchsia_inspect::health::Node::new(&device_node);
         health_node.set_starting_up();
 
@@ -69,8 +102,13 @@ impl InputDeviceStatus {
         let events_generated = device_node.create_uint("events_generated", 0);
         let last_received_timestamp_ns = device_node.create_uint("last_received_timestamp_ns", 0);
         let last_generated_timestamp_ns = device_node.create_uint("last_generated_timestamp_ns", 0);
+        let driver_to_binding_latency_ms = device_node.create_int_exponential_histogram(
+            "driver_to_binding_latency_ms",
+            LATENCY_HISTOGRAM_PROPERTIES,
+        );
 
         Self {
+            now,
             _node: device_node,
             reports_received_count,
             reports_filtered_count,
@@ -78,13 +116,18 @@ impl InputDeviceStatus {
             last_received_timestamp_ns,
             last_generated_timestamp_ns,
             health_node,
+            driver_to_binding_latency_ms,
         }
     }
 
     pub fn count_received_report(&self, report: &InputReport) {
         self.reports_received_count.add(1);
         match report.event_time {
-            Some(event_time) => self.last_received_timestamp_ns.set(event_time.try_into().unwrap()),
+            Some(event_time) => {
+                self.driver_to_binding_latency_ms
+                    .insert(((self.now)() - zx::Time::from_nanos(event_time)).into_millis());
+                self.last_received_timestamp_ns.set(event_time.try_into().unwrap());
+            }
             None => (),
         }
     }
@@ -567,9 +610,32 @@ mod tests {
                             // so we only assert that the property is present.
                             start_timestamp_nanos: AnyProperty
                         },
+                        driver_to_binding_latency_ms: fuchsia_inspect::HistogramAssertion::exponential(super::LATENCY_HISTOGRAM_PROPERTIES),
                     }
                 }
             }
+        });
+    }
+
+    #[test_case(i64::MIN; "min value")]
+    #[test_case(-1; "negative value")]
+    #[test_case(0; "zero")]
+    #[test_case(1; "positive value")]
+    #[test_case(i64::MAX; "max value")]
+    #[fuchsia::test(allow_stalls = false)]
+    async fn input_device_status_updates_latency_histogram(latency_nsec: i64) {
+        let mut expected_histogram =
+            fuchsia_inspect::HistogramAssertion::exponential(super::LATENCY_HISTOGRAM_PROPERTIES);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let input_device_status = InputDeviceStatus::new_internal(
+            inspector.root().clone_weak(),
+            Box::new(move || zx::Time::from_nanos(latency_nsec)),
+        );
+        input_device_status
+            .count_received_report(&InputReport { event_time: Some(0), ..InputReport::default() });
+        expected_histogram.insert_values([latency_nsec / 1000 / 1000]);
+        fuchsia_inspect::assert_data_tree!(inspector, root: contains {
+            driver_to_binding_latency_ms: expected_histogram,
         });
     }
 
