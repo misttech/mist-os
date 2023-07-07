@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-use once_cell::sync::OnceCell;
-use std::sync::{Arc, Weak};
-
 use crate::{
     arch::uapi::stat_time_t,
     auth::FsCred,
@@ -17,6 +13,10 @@ use crate::{
     time::*,
     types::{as_any::AsAny, *},
 };
+use bitflags::bitflags;
+use fuchsia_zircon as zx;
+use once_cell::sync::OnceCell;
+use std::sync::{Arc, Weak};
 
 pub struct FsNode {
     /// The FsNodeOps for this FsNode.
@@ -284,6 +284,17 @@ impl FileObject {
             std::mem::drop(flock_info);
             waiter.wait(current_task)?;
         }
+    }
+}
+
+bitflags! {
+    pub struct StatxFlags: u32 {
+        const AT_SYMLINK_NOFOLLOW = uapi::AT_SYMLINK_NOFOLLOW;
+        const AT_EMPTY_PATH = uapi::AT_EMPTY_PATH;
+        const AT_NO_AUTOMOUNT = uapi::AT_NO_AUTOMOUNT;
+        const AT_STATX_SYNC_AS_STAT = uapi::AT_STATX_SYNC_AS_STAT;
+        const AT_STATX_FORCE_SYNC = uapi::AT_STATX_FORCE_SYNC;
+        const AT_STATX_DONT_SYNC = uapi::AT_STATX_DONT_SYNC;
     }
 }
 
@@ -1177,9 +1188,18 @@ impl FsNode {
         }
     }
 
-    pub fn statx(&self, current_task: &CurrentTask, mask: u32) -> Result<statx, Errno> {
+    pub fn statx(
+        &self,
+        current_task: &CurrentTask,
+        flags: StatxFlags,
+        mask: u32,
+    ) -> Result<statx, Errno> {
         // Ignore mask for now and fill in all of the fields.
-        let info = self.ops().update_info(self, current_task, &self.info)?;
+        let info = if flags.contains(StatxFlags::AT_STATX_DONT_SYNC) {
+            self.info.read()
+        } else {
+            self.ops().update_info(self, current_task, &self.info)?
+        };
         if mask & STATX__RESERVED == STATX__RESERVED {
             return error!(EINVAL);
         }

@@ -420,23 +420,23 @@ where
 }
 
 /// Options for lookup_at.
+#[derive(Debug, Default)]
 struct LookupFlags {
     /// Whether AT_EMPTY_PATH was supplied.
     allow_empty_path: bool,
 
     /// Used to implement AT_SYMLINK_NOFOLLOW.
     symlink_mode: SymlinkMode,
-}
 
-impl Default for LookupFlags {
-    fn default() -> Self {
-        LookupFlags { allow_empty_path: false, symlink_mode: SymlinkMode::Follow }
-    }
+    /// Automount directories on the path.
+    // TODO(fxbug.dev/91430): Support the `AT_NO_AUTOMOUNT` flag.
+    #[allow(dead_code)]
+    automount: bool,
 }
 
 impl LookupFlags {
     fn no_follow() -> Self {
-        Self { allow_empty_path: false, symlink_mode: SymlinkMode::NoFollow }
+        Self { symlink_mode: SymlinkMode::NoFollow, ..Default::default() }
     }
 
     fn from_bits(flags: u32, allowed_flags: u32) -> Result<Self, Errno> {
@@ -448,10 +448,25 @@ impl LookupFlags {
         } else {
             flags & AT_SYMLINK_NOFOLLOW == 0
         };
+        let automount =
+            if allowed_flags & AT_NO_AUTOMOUNT != 0 { flags & AT_NO_AUTOMOUNT == 0 } else { false };
+        if automount {
+            not_implemented_log_once!("LookupFlags::automount is not implemented");
+        }
         Ok(LookupFlags {
             allow_empty_path: flags & AT_EMPTY_PATH != 0,
             symlink_mode: if follow_symlinks { SymlinkMode::Follow } else { SymlinkMode::NoFollow },
+            automount,
         })
+    }
+}
+
+impl From<StatxFlags> for LookupFlags {
+    fn from(flags: StatxFlags) -> Self {
+        let lookup_flags = StatxFlags::AT_SYMLINK_NOFOLLOW
+            | StatxFlags::AT_EMPTY_PATH
+            | StatxFlags::AT_NO_AUTOMOUNT;
+        Self::from_bits((flags & lookup_flags).bits(), lookup_flags.bits()).unwrap()
     }
 }
 
@@ -600,27 +615,15 @@ pub fn sys_statx(
     mask: u32,
     statxbuf: UserRef<statx>,
 ) -> Result<(), Errno> {
-    let implemented_flags = AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH | AT_STATX_SYNC_AS_STAT;
-    let unimplemented_flags =
-        AT_NO_AUTOMOUNT | AT_STATX_SYNC_TYPE | AT_STATX_FORCE_SYNC | AT_STATX_DONT_SYNC;
-    let all_flags = implemented_flags | unimplemented_flags;
-    if flags & !all_flags != 0 {
-        return error!(EINVAL);
-    }
-    if flags & (AT_STATX_FORCE_SYNC | AT_STATX_DONT_SYNC)
-        == (AT_STATX_FORCE_SYNC | AT_STATX_DONT_SYNC)
+    let flags = StatxFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL))?;
+    if flags & (StatxFlags::AT_STATX_FORCE_SYNC | StatxFlags::AT_STATX_DONT_SYNC)
+        == (StatxFlags::AT_STATX_FORCE_SYNC | StatxFlags::AT_STATX_DONT_SYNC)
     {
         return error!(EINVAL);
     }
-    if flags & unimplemented_flags != 0 {
-        // TODO(fxbug.dev/91430): Support the `AT_NO_AUTOMOUNT` flag.
-        not_implemented!("statx: flags 0x{:x}", flags);
-        return error!(ENOSYS);
-    }
 
-    let flags = LookupFlags::from_bits(flags, all_flags)?;
-    let name = lookup_at(current_task, dir_fd, user_path, flags)?;
-    let result = name.entry.node.statx(current_task, mask)?;
+    let name = lookup_at(current_task, dir_fd, user_path, LookupFlags::from(flags))?;
+    let result = name.entry.node.statx(current_task, flags, mask)?;
     current_task.mm.write_object(statxbuf, &result)?;
     Ok(())
 }

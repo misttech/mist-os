@@ -693,9 +693,10 @@ fn for_each_mount<E>(
 }
 
 /// The `SymlinkMode` enum encodes how symlinks are followed during path traversal.
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(Default, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum SymlinkMode {
     /// Follow a symlink at the end of a path resolution.
+    #[default]
     Follow,
 
     /// Do not follow a symlink at the end of a path resolution.

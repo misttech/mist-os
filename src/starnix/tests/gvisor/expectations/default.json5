@@ -693,9 +693,6 @@
                 "TeeTest.NonBlocking",
                 "TeeTest.TwoPipesPartialWrite",
 
-                // stat_test
-                "StatTest.StatxIgnoreNoAutomount",
-
                 // statfs_test
                 "FstatfsTest.BlocksFree",
 
