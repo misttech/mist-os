@@ -69,6 +69,12 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #     [label] A label for the above images config file. If not specified, global
 #     args will be used to generate an images config.
 #
+#   use_explicit_images_config_only (optional; default=false)
+#     [bool] Whether to bother building a GN-generated images config and
+#     comparing against the explicit images config provided by
+#     assembly_images_config_label. This should usually be set to false for
+#     assemblies used in tests.
+#
 #   product_assembly_config_label (required)
 #     [label] A label for the product assembly config, should be a
 #     `product_assembly_configuration` target.
@@ -262,6 +268,16 @@ template("assembled_system") {
         fvm_emmc_partition_size != false || fvm_ftl_nand_block_count != false
   }
 
+  # By default, build a GN-generated images config.
+  _use_explicit_images_config_only = false
+  if (defined(invoker.use_explicit_images_config_only) &&
+      invoker.use_explicit_images_config_only) {
+    assert(
+        defined(invoker.assembly_images_config_label),
+        "use_explicit_images_config_only cannot be enabled without an assembly_images_config_label")
+    _use_explicit_images_config_only = true
+  }
+
   generate_image_metadata = true
   if (defined(invoker.generate_image_metadata)) {
     generate_image_metadata = invoker.generate_image_metadata
@@ -347,7 +363,7 @@ template("assembled_system") {
     all_packages_group = "${namespace}.packages"
     legacy_assembly_input_bundle = "${namespace}.legacy_input_bundle"
     image_assembly_inputs = "${namespace}.image_assembly_inputs"
-    images_config = "${namespace}.images_config"
+    gn_images_config = "${namespace}.images_config"
     images_config_matches = "${namespace}.images_config_matches"
     product_assembler = "${namespace}.product_assembler"
     image_assembler = "${namespace}.image_assembler"
@@ -362,6 +378,13 @@ template("assembled_system") {
     fshost = "${namespace}.fs_host"
     compare_command_logs = "${namespace}.compare_command_logs"
     compare_images_manifests = "${namespace}.compare_images_manifests"
+
+    # Prefer an explicit images config over a GN-generated one.
+    if (defined(invoker.assembly_images_config_label)) {
+      images_config = invoker.assembly_images_config_label
+    } else {
+      images_config = ":${gn_images_config}"
+    }
 
     # *_platform_aib_labels come from //bundles/assembly/platform_aibs.gni
     if (defined(invoker.use_bringup_platform_bundles_only) &&
@@ -396,7 +419,17 @@ template("assembled_system") {
 
     image_assembly_inputs = "$target_out_dir/${namespace}.image_assembly_inputs"
 
-    images_config = "$target_out_dir/${namespace}.images_config.json"
+    gn_images_config = "$target_out_dir/${namespace}.images_config.json"
+
+    # Prefer an explicit images config over a GN-generated one.
+    if (defined(invoker.assembly_images_config_label)) {
+      images_config =
+          get_label_info(invoker.assembly_images_config_label,
+                         "target_out_dir") + "/" +
+          get_label_info(invoker.assembly_images_config_label, "name") + ".json"
+    } else {
+      images_config = gn_images_config
+    }
 
     outdir = "$target_out_dir/$namespace"
     gendir = "$outdir/gen"
@@ -596,109 +629,141 @@ template("assembled_system") {
   # Build the images using the Image Assembler.
   #
 
-  generated_images_config(labels.images_config) {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
+  if (!_use_explicit_images_config_only) {
+    generated_images_config(labels.gn_images_config) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
 
-    output_path = files.images_config
-    zbi = {
-      name = "${image_name}"
-      compression = zbi_compression
-      if (defined(invoker.zbi_signing_script)) {
-        signing_script = invoker.zbi_signing_script
-        if (defined(invoker.zbi_signing_args)) {
-          signing_args = invoker.zbi_signing_args
-        }
-      }
-    }
-    if (use_vbmeta) {
-      vbmeta = {
-        key = avb_key
-        key_metadata = avb_atx_metadata
-        if (extra_vbmeta_descriptors != false) {
-          extra_descriptors = extra_vbmeta_descriptors
-        }
-      }
-    }
-    if (generate_fvm) {
-      _slice_size = 1048576
-      _blob_layout_format = "compact"
-      if (defined(invoker.assembly_fvm_slice_size)) {
-        _slice_size = invoker.assembly_fvm_slice_size
-      }
-      if (defined(invoker.assembly_blob_layout_format)) {
-        _blob_layout_format = invoker.assembly_blob_layout_format
-      }
-
-      fvm = {
-        # Parameters
-        slice_size = _slice_size
-        if (defined(invoker.fvm_truncate_to_length)) {
-          truncate_to_length = invoker.fvm_truncate_to_length
-        }
-        if (fvm_max_disk_size != false) {
-          max_disk_size = fvm_max_disk_size
-        }
-
-        # Filesystems
-        blobfs = {
-          layout = _blob_layout_format
-          if (defined(invoker.blobfs_minimum_inodes)) {
-            minimum_inodes = invoker.blobfs_minimum_inodes
-          }
-          if (defined(invoker.blobfs_minimum_data_bytes)) {
-            minimum_data_bytes = invoker.blobfs_minimum_data_bytes
-          }
-          if (defined(invoker.blobfs_maximum_bytes)) {
-            maximum_bytes = invoker.blobfs_maximum_bytes
-          }
-          if (defined(invoker.blobfs_maximum_contents_size)) {
-            maximum_contents_size = invoker.blobfs_maximum_contents_size
+      output_path = files.gn_images_config
+      zbi = {
+        name = "${image_name}"
+        compression = zbi_compression
+        if (defined(invoker.zbi_signing_script)) {
+          signing_script = invoker.zbi_signing_script
+          if (defined(invoker.zbi_signing_args)) {
+            signing_args = invoker.zbi_signing_args
           }
         }
-        reserved = {
-          slices = fvm_reserved_slices
+      }
+      if (use_vbmeta) {
+        vbmeta = {
+          key = avb_key
+          key_metadata = avb_atx_metadata
+          if (extra_vbmeta_descriptors != false) {
+            extra_descriptors = extra_vbmeta_descriptors
+          }
+        }
+      }
+      if (generate_fvm) {
+        _slice_size = 1048576
+        _blob_layout_format = "compact"
+        if (defined(invoker.assembly_fvm_slice_size)) {
+          _slice_size = invoker.assembly_fvm_slice_size
+        }
+        if (defined(invoker.assembly_blob_layout_format)) {
+          _blob_layout_format = invoker.assembly_blob_layout_format
         }
 
-        # Optional outputs (emmc and nand)
-        if (fvm_partition != "") {
-          if (fvm_emmc_partition_size != false) {
-            emmc = {
-              # EMMC fvms are by default compressed.
-              compress = fvm_fastboot_compression != "none"
-              truncate_to_length = fvm_emmc_partition_size
+        fvm = {
+          # Parameters
+          slice_size = _slice_size
+          if (defined(invoker.fvm_truncate_to_length)) {
+            truncate_to_length = invoker.fvm_truncate_to_length
+          }
+          if (fvm_max_disk_size != false) {
+            max_disk_size = fvm_max_disk_size
+          }
+
+          # Filesystems
+          blobfs = {
+            layout = _blob_layout_format
+            if (defined(invoker.blobfs_minimum_inodes)) {
+              minimum_inodes = invoker.blobfs_minimum_inodes
             }
-          } else if (fvm_ftl_nand_block_count != false) {
-            nand = {
-              if (fvm_max_disk_size != false) {
-                max_disk_size = fvm_max_disk_size
+            if (defined(invoker.blobfs_minimum_data_bytes)) {
+              minimum_data_bytes = invoker.blobfs_minimum_data_bytes
+            }
+            if (defined(invoker.blobfs_maximum_bytes)) {
+              maximum_bytes = invoker.blobfs_maximum_bytes
+            }
+            if (defined(invoker.blobfs_maximum_contents_size)) {
+              maximum_contents_size = invoker.blobfs_maximum_contents_size
+            }
+          }
+          reserved = {
+            slices = fvm_reserved_slices
+          }
+
+          # Optional outputs (emmc and nand)
+          if (fvm_partition != "") {
+            if (fvm_emmc_partition_size != false) {
+              emmc = {
+                # EMMC fvms are by default compressed.
+                compress = fvm_fastboot_compression != "none"
+                truncate_to_length = fvm_emmc_partition_size
               }
+            } else if (fvm_ftl_nand_block_count != false) {
+              nand = {
+                if (fvm_max_disk_size != false) {
+                  max_disk_size = fvm_max_disk_size
+                }
 
-              # NAND fvms are by default uncompressed.
-              compress = fvm_fastboot_compression != "default"
-              block_count = fvm_ftl_nand_block_count
-              oob_size = fvm_ftl_nand_oob_size
-              page_size = fvm_ftl_nand_page_size
-              pages_per_block = fvm_ftl_nand_pages_per_block
+                # NAND fvms are by default uncompressed.
+                compress = fvm_fastboot_compression != "default"
+                block_count = fvm_ftl_nand_block_count
+                oob_size = fvm_ftl_nand_oob_size
+                page_size = fvm_ftl_nand_page_size
+                pages_per_block = fvm_ftl_nand_pages_per_block
+              }
+            } else {
+              assert(
+                  false,
+                  "|fvm_partition| is specified. But failed to determine the target format.")
             }
-          } else {
-            assert(
-                false,
-                "|fvm_partition| is specified. But failed to determine the target format.")
+          }
+        }
+      }
+      if (generate_fxfs) {
+        fxfs = {
+          if (defined(invoker.assembly_fxfs_image_size_bytes)) {
+            size_bytes = invoker.assembly_fxfs_image_size_bytes
           }
         }
       }
     }
-    if (generate_fxfs) {
-      fxfs = {
-        if (defined(invoker.assembly_fxfs_image_size_bytes)) {
-          size_bytes = invoker.assembly_fxfs_image_size_bytes
-        }
+
+    if (defined(invoker.assembly_images_config_label)) {
+      verify_files_match(labels.images_config_matches) {
+        forward_variables_from(invoker,
+                               [
+                                 "testonly",
+                                 "visibility",
+                               ])
+        deps = [
+          ":${labels.gn_images_config}",
+          labels.images_config,
+        ]
+        first = files.gn_images_config
+        second = files.images_config
+        display_text_diff_on_failure = true
       }
     }
+  } else {
+    not_needed(invoker,
+               [
+                 "zbi_signing_args",
+                 "assembly_blob_layout_format",
+                 "blobfs_minimum_inodes",
+                 "blobfs_minimum_data_bytes",
+                 "blobfs_maximum_bytes",
+                 "blobfs_maximum_contents_size",
+                 "assembly_fvm_slice_size",
+                 "fvm_truncate_to_length",
+                 "assembly_fxfs_image_size_bytes",
+               ])
   }
 
   if (defined(_must_exist)) {
@@ -730,28 +795,6 @@ template("assembled_system") {
       include_config_data = true
       create_package = false
       create_package_archive = false
-    }
-  }
-
-  if (defined(invoker.assembly_images_config_label)) {
-    _images_config_file =
-        get_label_info(invoker.assembly_images_config_label, "target_out_dir") +
-        "/" + get_label_info(invoker.assembly_images_config_label, "name") +
-        ".json"
-
-    verify_files_match(labels.images_config_matches) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-      deps = [
-        ":${labels.images_config}",
-        invoker.assembly_images_config_label,
-      ]
-      first = files.images_config
-      second = _images_config_file
-      display_text_diff_on_failure = true
     }
   }
 
@@ -873,8 +916,8 @@ template("assembled_system") {
                              "visibility",
                            ])
     deps = [
-      ":${labels.images_config}",
       ":${labels.product_assembler}",
+      labels.images_config,
     ]
 
     image_assembly_config = files.regenerated_image_assembly_config
@@ -979,8 +1022,8 @@ template("assembled_system") {
       deps += invoker.deps
     }
     deps += [
-      ":${labels.images_config}",
       ":${labels.product_assembler}",
+      labels.images_config,
     ]
 
     # Set the deps needed in order to run the zbi_signing_script
@@ -1374,12 +1417,13 @@ template("assembled_system") {
     # available to external targets.
     public_deps = [
       ":${labels.image_assembler}",
-      ":${labels.images_config}",
+      labels.images_config,
     ]
     if (defined(invoker.output_dir)) {
       public_deps += [ ":${labels.copy_images}" ]
     }
-    if (defined(invoker.assembly_images_config_label)) {
+    if (defined(invoker.assembly_images_config_label) &&
+        !_use_explicit_images_config_only) {
       public_deps += [ ":${labels.images_config_matches}" ]
     }
     if (defined(_must_exist)) {
