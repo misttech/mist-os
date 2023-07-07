@@ -37,7 +37,7 @@ const (
 	Percent = "percent"
 
 	// Count-based units.
-	Count = "count"
+	CountSmallerIsBetter = "count_smallerIsBetter"
 )
 
 // TestCaseResults represents the results for a single test case.

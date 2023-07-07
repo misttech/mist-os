@@ -91,7 +91,7 @@ func runFuchsiaPerfBenchmark(b benchmark_suite.Benchmark, testSuite string) []*b
 		{
 			Label:     "Go/" + b.Label + "/Allocations",
 			TestSuite: testSuite,
-			Unit:      benchmarking.Count,
+			Unit:      benchmarking.CountSmallerIsBetter,
 			Values:    []float64{float64(benchmarkResult.AllocsPerOp())},
 		},
 		{
