@@ -250,7 +250,7 @@ mod tests {
         pub disk_image: DiskImage,
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_env_helper() {
         std::env::set_var("MY_VARIABLE", "my_value");
 
@@ -271,7 +271,7 @@ mod tests {
         assert_eq!(json.unwrap(), "my_value");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ua_helper() {
         let template = "{{ua units}}";
         let units_struct = UnitsStruct { units: DataUnits::Gigabytes };
@@ -290,7 +290,7 @@ mod tests {
         assert_eq!(json.unwrap(), "G");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_eq_helper() {
         let template = r#"{{eq units "Gigabytes"}}"#;
         let if_template = r#"{{#if (eq units "Gigabytes")}}yes{{else}}no{{/if}}"#;
@@ -319,7 +319,7 @@ mod tests {
         assert_eq!(json.unwrap(), "no");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_disk_image_helper() {
         let template = r#"{{di disk_image}}"#;
 
@@ -338,7 +338,7 @@ mod tests {
         assert_eq!(json.unwrap(), "fvm.blk");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_empty_template() -> Result<()> {
         // Fails because empty templates can't be rendered.
         let empty_template = "";
@@ -350,7 +350,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_escaping() -> Result<()> {
         // Make sure equals characters don't get escaped.
         let addl_kernel_args = r#"
@@ -380,7 +380,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_empty_vector_template() -> Result<()> {
         // Succeeds without any content in the vectors.
         let empty_vectors_template = r#"
@@ -404,7 +404,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_invalid_template() -> Result<()> {
         // Fails because it doesn't have all the required fields.
         let invalid_template = r#"
@@ -423,7 +423,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ok_template() -> Result<()> {
         // Succeeds with a single string "value" in the options field, and one in the envs map.
         let ok_template = r#"
@@ -450,7 +450,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_substitution_template() -> Result<()> {
         // Succeeds with the default value of AudioModel in the args field.
         let substitution_template = r#"
@@ -486,7 +486,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_conditional_template() -> Result<()> {
         // Succeeds. If headless is set, features contains the "ok" value.
         // If headless is not set, features contains the "none" value.
@@ -525,7 +525,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ua_template() -> Result<()> {
         // Succeeds, with the abbreviated form of the units field in the kernel_args field.
         // The default value of units is Bytes, which has an empty abbreviation.
@@ -565,7 +565,7 @@ mod tests {
     }
 
     /// Tests invalid substitutions return errors.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_invalid_substitutions() {
         let templates: Vec<(bool, String, String)> = vec![
             (

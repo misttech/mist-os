@@ -21,7 +21,7 @@ if (is_host) {
 
     test_deps = [
       "//src/developer/ffx/config:lib",
-      "//src/lib/fuchsia-async",
+      "//src/lib/fuchsia",
     ]
   }
 

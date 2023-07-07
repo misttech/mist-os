@@ -1013,14 +1013,12 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    #[serial_test::serial]
+    #[fuchsia::test]
     async fn test_staging_no_reuse_fvm() -> Result<()> {
         test_staging_no_reuse_common(DiskImageFormat::Fvm).await
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    #[serial_test::serial]
+    #[fuchsia::test]
     async fn test_staging_no_reuse_fxfs() -> Result<()> {
         test_staging_no_reuse_common(DiskImageFormat::Fxfs).await
     }
@@ -1108,22 +1106,20 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    #[serial_test::serial]
+    #[fuchsia::test]
     async fn test_staging_with_reuse_fvm() -> Result<()> {
         test_staging_with_reuse_common(DiskImageFormat::Fvm).await
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    #[serial_test::serial]
+    #[fuchsia::test]
     async fn test_staging_with_reuse_fxfs() -> Result<()> {
         test_staging_with_reuse_common(DiskImageFormat::Fxfs).await
     }
 
     // There's no equivalent test for FVM for now -- extending FVM images is more complex and
     // depends on an external binary, making testing challenging.
-    #[fuchsia_async::run_singlethreaded(test)]
-    #[serial_test::serial]
+    #[fuchsia::test]
+
     async fn test_staging_resize_fxfs() -> Result<()> {
         let _env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;
@@ -1166,8 +1162,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    #[serial_test::serial]
+    #[fuchsia::test]
     async fn test_embed_boot_data() -> Result<()> {
         let _env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;
@@ -1233,7 +1228,7 @@ mod tests {
         pub arguments: Option<Arguments>,
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_read_port_mappings() -> Result<()> {
         let _env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;

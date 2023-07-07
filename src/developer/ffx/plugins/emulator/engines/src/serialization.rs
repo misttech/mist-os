@@ -31,7 +31,7 @@ mod tests {
     use std::{fs::File, io::Write};
     use tempfile::tempdir;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_write_then_read() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let temp_dir = tempdir()
@@ -72,7 +72,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_read_unknown_engine_type() -> Result<()> {
         let unknown_engine_type = include_str!("../test_data/unknown_engine_type_engine.json");
         let _env = ffx_config::test_init().await.unwrap();

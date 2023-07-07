@@ -300,7 +300,7 @@ mod tests {
     }
 
     // Check that new_engine gets called by default and get_engine_by_name doesn't
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_engine_no_reuse_makes_new() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
 
@@ -316,7 +316,7 @@ mod tests {
     }
 
     // Check that reuse and config together is still new_engine (i.e. config overrides reuse)
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_engine_with_config_doesnt_reuse() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let cmd =
@@ -335,7 +335,7 @@ mod tests {
     }
 
     // Check that reuse and config.is_none calls get_engine_by_name
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_engine_without_config_does_reuse() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let cmd = StartCommand { reuse: true, config: None, ..Default::default() };
@@ -353,7 +353,7 @@ mod tests {
     }
 
     // Check that if get_engine_by_name returns DoesNotExist, new_engine still gets called and reuse is reset
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_engine_doesnotexist_creates_new() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
 
@@ -372,7 +372,7 @@ mod tests {
     }
 
     // Check that if DoesExist, then cmd.name is updated too
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_engine_updates_cmd_name() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
 
@@ -399,7 +399,7 @@ mod tests {
     }
 
     // Check that if DoesExist, then cmd.name is updated too
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_engine_updates_cmd_name_when_blank() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
         env.context.query("emu.name").level(Some(ConfigLevel::User)).set("".into()).await?;
@@ -423,7 +423,7 @@ mod tests {
     }
 
     // Ensure dry-run stops after building command, doesn't stage/run
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_dry_run() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let cmd = StartCommand { dry_run: true, verbose: true, ..Default::default() };
@@ -445,7 +445,7 @@ mod tests {
     }
 
     // Ensure stage stops after staging the files, doesn't run
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stage() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let cmd = StartCommand { stage: true, ..Default::default() };
@@ -467,7 +467,7 @@ mod tests {
     }
 
     // Ensure start goes through config and staging by default and calls start
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let cmd = StartCommand::default();
@@ -491,7 +491,7 @@ mod tests {
     }
 
     // Ensure start() skips the stage() call if the reuse flag is true
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_reuse_doesnt_stage() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let cmd = StartCommand { reuse: true, ..Default::default() };
@@ -514,7 +514,7 @@ mod tests {
     }
 
     // Ensure start() skips the stage() call is a custom config is provided
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_custom_config_doesnt_stage() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let cmd = StartCommand { config: Some("filename".into()), ..Default::default() };
@@ -537,7 +537,7 @@ mod tests {
     }
 
     // Check that the final command reflects changes from the edit stage
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_edit() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let cmd = StartCommand { edit: true, ..Default::default() };
@@ -575,7 +575,7 @@ mod tests {
     }
 
     // Check that the final command reflects changes from staging
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_staging_edits() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let cmd = StartCommand::default();

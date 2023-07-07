@@ -288,7 +288,7 @@ mod tests {
     };
     use tempfile::tempdir;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_apply_command_line_options() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
 
@@ -393,7 +393,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_config_backed_values() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let mut cmd = StartCommand::default();
@@ -435,7 +435,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_accel_auto() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let temp_path = PathBuf::from(tempdir().unwrap().path());

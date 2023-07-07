@@ -100,7 +100,7 @@ mod tests {
     use emulator_instance::{get_instance_dir, write_to_disk, EmulatorInstanceData, EngineState};
     use ffx_writer::{Format, TestBuffers};
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_show() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let mut tool = EmuShowTool { cmd: ShowCommand::default() };
@@ -133,7 +133,7 @@ mod tests {
 
         Ok(())
     }
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_show_unknown() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
 

@@ -41,9 +41,9 @@ if (is_host) {
       "//third_party/rust_crates:tracing",
     ]
     test_deps = [
+      "//src/lib/fuchsia",
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:mockall",
-      "//third_party/rust_crates:serial_test",
       "//third_party/rust_crates:tempfile",
     ]
     inputs = [ "test_data/unknown_engine_type_engine.json" ]

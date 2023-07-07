@@ -112,7 +112,7 @@ mod test {
         .detach();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_is_active() {
         // This handles the OpenTarget request. If the target is opened successfully,
         // the TargetRequest handler is set up so TargetRequest::OpenRemoteControlResponder can be
@@ -147,7 +147,7 @@ mod test {
         assert!(!is_active(&server, "unknown_target_id").await);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_connection_error_for_rcs() {
         // This handler returns connection refused for open rcs requests.
         let handler = |_query: ffx::TargetQuery, _handle: ServerEnd<ffx::TargetMarker>| {

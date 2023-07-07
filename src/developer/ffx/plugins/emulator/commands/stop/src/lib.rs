@@ -76,7 +76,7 @@ impl FfxMain for EmuStopTool {
 mod tests {
     use super::*;
     use emulator_instance::{get_instance_dir, write_to_disk, EmulatorInstanceData, EngineState};
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stop_existing() {
         let _env = ffx_config::test_init().await.unwrap();
         let the_name = "one_instance".to_string();
@@ -89,7 +89,7 @@ mod tests {
         tool.main(SimpleWriter::new()).await.expect("unexpected error");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stop_unknown() {
         let _env = ffx_config::test_init().await.unwrap();
         let cmd = StopCommand { name: Some("unknown_instance".to_string()), ..Default::default() };
@@ -99,7 +99,7 @@ mod tests {
         assert!(err.to_string().contains(expected_phrase), "expected '{expected_phrase}' in {err}");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stop_multiple_running_error() {
         let _env = ffx_config::test_init().await.unwrap();
         let cmd = StopCommand::default();
@@ -116,7 +116,7 @@ mod tests {
         assert!(err.to_string().contains(expected_phrase), "expected '{expected_phrase}' in {err}");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stop_multiple_running() {
         let _env = ffx_config::test_init().await.unwrap();
         let cmd = StopCommand { all: true, ..Default::default() };
@@ -131,7 +131,7 @@ mod tests {
         tool.main(SimpleWriter::new()).await.expect("unexpected error");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stop_not_running() {
         let _env = ffx_config::test_init().await.unwrap();
         let mut cmd = StopCommand::default();
