@@ -161,7 +161,7 @@ mod tests {
     };
 
     struct TestEnv {
-        _blobfs_fake: blobfs::TempDirFake,
+        _blobfs: blobfs_ramdisk::BlobfsRamdisk,
         system_image: fuchsia_pkg_testing::Package,
         inspector: finspect::types::Inspector,
     }
@@ -171,8 +171,10 @@ mod tests {
             static_packages: &[&fuchsia_pkg_testing::Package],
             subpackages: &[&fuchsia_pkg_testing::Package],
         ) -> (Self, BasePackages) {
-            let (blobfs_client, blobfs_fake) = blobfs::Client::new_temp_dir_fake();
-            let blobfs_dir = blobfs_fake.backing_dir_as_openat_dir();
+            let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
+            let blobfs_client = blobfs.client();
+
+            let blobfs_dir = blobfs.root_dir().unwrap();
             for p in static_packages.iter().chain(subpackages) {
                 p.write_to_blobfs_dir(&blobfs_dir);
             }
@@ -199,7 +201,7 @@ mod tests {
             .await
             .unwrap();
 
-            (Self { _blobfs_fake: blobfs_fake, system_image, inspector }, base_packages)
+            (Self { _blobfs: blobfs, system_image, inspector }, base_packages)
         }
 
         async fn new(static_packages: &[&fuchsia_pkg_testing::Package]) -> (Self, BasePackages) {
@@ -358,8 +360,9 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn base_packages_fails_when_loading_fails() {
-        let (blobfs_client, blobfs_fake) = blobfs::Client::new_temp_dir_fake();
-        let blobfs_dir = blobfs_fake.backing_dir_as_openat_dir();
+        let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
+        let blobfs_client = blobfs.client();
+        let blobfs_dir = blobfs.root_dir().unwrap();
         // system_image package has no data/static_packages file
         let system_image = PackageBuilder::new("system_image").build().await.unwrap();
         system_image.write_to_blobfs_dir(&blobfs_dir);

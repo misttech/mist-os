@@ -58,6 +58,7 @@ rustc_binary("bin") {
   test_deps = [
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
+    "//src/sys/pkg/testing/blobfs-ramdisk",
     "//third_party/rust_crates:assert_matches",
   ]
 
@@ -83,6 +84,7 @@ fuchsia_unittest_package("base-resolver-unittests") {
   manifest = "meta/base-resolver-unittests.cml"
   deps = [
     ":bin_test",
+    "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/pkg/bin/pm:pm_bin",
   ]
   test_specs = {

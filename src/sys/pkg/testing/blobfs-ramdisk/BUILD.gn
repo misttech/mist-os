@@ -17,6 +17,7 @@ rustc_library("blobfs-ramdisk") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/lib/storage/delivery_blob",
     "//src/lib/storage/fs_management/rust:fs_management",

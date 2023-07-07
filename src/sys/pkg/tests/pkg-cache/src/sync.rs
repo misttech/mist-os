@@ -10,6 +10,9 @@ impl crate::Blobfs for BrokenBlobfs {
     fn root_proxy(&self) -> fio::DirectoryProxy {
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap().0
     }
+    fn svc_dir(&self) -> fio::DirectoryProxy {
+        panic!("BrokenBlobfs does not have a svc dir")
+    }
 }
 
 #[fuchsia::test]

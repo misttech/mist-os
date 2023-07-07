@@ -8,7 +8,7 @@
 
 use {
     fidl::endpoints::{Proxy as _, ServerEnd},
-    fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
+    fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
     fuchsia_hash::{Hash, ParseHashError},
     fuchsia_zircon::{self as zx, AsHandleRef as _, Status},
     futures::{stream, StreamExt as _},
@@ -41,6 +41,9 @@ pub enum BlobfsError {
 
     #[error("FIDL error")]
     Fidl(#[from] fidl::Error),
+
+    #[error("while connecting to fuchsia.fxfs/BlobCreator")]
+    ConnectToBlobCreator(#[source] anyhow::Error),
 }
 
 /// An error encountered while creating a blob
@@ -55,49 +58,75 @@ pub enum CreateError {
 
     #[error("while converting the proxy into a client end")]
     ConvertToClientEnd,
+
+    #[error("FIDL error")]
+    Fidl(#[from] fidl::Error),
+
+    #[error("while calling fuchsia.fxfs/BlobCreator.Create: {0:?}")]
+    BlobCreator(ffxfs::CreateBlobError),
+
+    #[error("unsupported blob type {0:?}")]
+    UnsupportedBlobType(fpkg::BlobType),
+}
+
+impl From<ffxfs::CreateBlobError> for CreateError {
+    fn from(e: ffxfs::CreateBlobError) -> Self {
+        match e {
+            ffxfs::CreateBlobError::AlreadyExists => CreateError::AlreadyExists,
+            e @ ffxfs::CreateBlobError::Internal => CreateError::BlobCreator(e),
+        }
+    }
 }
 
 /// Blobfs client
 #[derive(Debug, Clone)]
 pub struct Client {
-    proxy: fio::DirectoryProxy,
+    dir: fio::DirectoryProxy,
+    blob_creator: Option<ffxfs::BlobCreatorProxy>,
 }
 
 impl Client {
-    /// Returns an client connected to blobfs from the current component's namespace.
-    pub fn open_from_namespace() -> Result<Self, BlobfsError> {
-        let proxy = fuchsia_fs::directory::open_in_namespace(
-            "/blob",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        )?;
-        Ok(Client { proxy })
-    }
-
-    /// Returns a client connected to blobfs from the current component's namespace with
+    /// Returns a client connected to /blob in the current component's namespace with
     /// OPEN_RIGHT_READABLE and OPEN_RIGHT_EXECUTABLE.
-    pub fn open_from_namespace_executable() -> Result<Self, BlobfsError> {
-        let proxy = fuchsia_fs::directory::open_in_namespace(
+    /// Does not use fuchsia.fxfs/BlobCreator.
+    pub fn open_from_namespace_rx() -> Result<Self, BlobfsError> {
+        let dir = fuchsia_fs::directory::open_in_namespace(
             "/blob",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         )?;
-        Ok(Client { proxy })
+        Ok(Client { dir, blob_creator: None })
     }
 
-    /// Returns a client connected to blobfs from the current component's namespace with
-    /// OPEN_RIGHT_READABLE, OPEN_RIGHT_WRITABLE, OPEN_RIGHT_EXECUTABLE.
+    /// Returns a client connected to /blob in the current component's namespace with
+    /// OPEN_RIGHT_READABLE, OPEN_RIGHT_WRITABLE, and OPEN_RIGHT_EXECUTABLE.
+    /// Uses /blob for writes, does not connect to fuchsia.fxfs/BlobCreator.
     pub fn open_from_namespace_rwx() -> Result<Self, BlobfsError> {
-        let proxy = fuchsia_fs::directory::open_in_namespace(
+        let dir = fuchsia_fs::directory::open_in_namespace(
             "/blob",
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::RIGHT_EXECUTABLE,
         )?;
-        Ok(Client { proxy })
+        Ok(Client { dir, blob_creator: None })
     }
 
-    /// Returns an client connected to blobfs from the given blobfs root dir.
-    pub fn new(proxy: fio::DirectoryProxy) -> Self {
-        Client { proxy }
+    /// Returns a client connected to /blob in the current component's namespace with
+    /// OPEN_RIGHT_READABLE, OPEN_RIGHT_WRITABLE, and OPEN_RIGHT_EXECUTABLE.
+    /// Connects to and uses fuchsia.fxfs/BlobCreator for writes.
+    /// WRITABLE is needed so that `delete_blob` can call fuchsia.io/Directory.Unlink.
+    pub fn open_from_namespace_rwx_use_fxblob() -> Result<Self, BlobfsError> {
+        let mut ret = Self::open_from_namespace_rwx()?;
+        ret.blob_creator = Some(
+            fuchsia_component::client::connect_to_protocol::<ffxfs::BlobCreatorMarker>()
+                .map_err(BlobfsError::ConnectToBlobCreator)?,
+        );
+        Ok(ret)
+    }
+
+    /// Returns a client connected to the given blob directory and BlobCreatorProxy.
+    /// If `blob_creator` is not supplied, writes will be performed through the blob directory.
+    pub fn new(dir: fio::DirectoryProxy, blob_creator: Option<ffxfs::BlobCreatorProxy>) -> Self {
+        Client { dir, blob_creator }
     }
 
     /// Creates a new client backed by the returned request stream. This constructor should not be
@@ -107,10 +136,10 @@ impl Client {
     ///
     /// Panics on error
     pub fn new_test() -> (Self, fio::DirectoryRequestStream) {
-        let (proxy, stream) =
+        let (dir, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
 
-        (Self { proxy }, stream)
+        (Self { dir, blob_creator: None }, stream)
     }
 
     /// Creates a new client backed by the returned mock. This constructor should not be used
@@ -120,42 +149,10 @@ impl Client {
     ///
     /// Panics on error
     pub fn new_mock() -> (Self, mock::Mock) {
-        let (proxy, stream) =
+        let (dir, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
 
-        (Self { proxy }, mock::Mock { stream })
-    }
-
-    /// Creates a new *read-only* client backed by the returned `TempDirFake`.
-    /// `TempDirFake` is a thin wrapper around a `tempfile::TempDir` and therefore *does not*
-    /// replicate many of the important properties of blobfs, including:
-    ///   * requiring truncate before write
-    ///   * requiring file names be hashes of contents
-    ///
-    /// This should therefore generally only be used to test read-only clients of blobfs (i.e.
-    /// tests in which only the test harness itself is writing to blobfs and the code-under-test is
-    /// only reading from blobfs).
-    ///
-    /// To help enforce this, the DirectoryProxy used to create the `Client` is opened with only
-    /// OPEN_RIGHT_READABLE.
-    ///
-    /// Requires a RW directory at "/tmp" in the component namespace.
-    ///
-    /// This constructor should not be used outside of tests.
-    ///
-    /// # Panics
-    ///
-    /// Panics on error
-    pub fn new_temp_dir_fake() -> (Self, TempDirFake) {
-        let blobfs_dir = tempfile::TempDir::new().unwrap();
-        let blobfs = Client::new(
-            fuchsia_fs::directory::open_in_namespace(
-                blobfs_dir.path().to_str().unwrap(),
-                fio::OpenFlags::RIGHT_READABLE,
-            )
-            .unwrap(),
-        );
-        (blobfs, TempDirFake { dir: blobfs_dir })
+        (Self { dir, blob_creator: None }, mock::Mock { stream })
     }
 
     /// Forward an open request directly to BlobFs.
@@ -165,13 +162,13 @@ impl Client {
         flags: fio::OpenFlags,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fidl::Error> {
-        self.proxy.open(flags, fio::ModeType::empty(), &blob.to_string(), server_end)
+        self.dir.open(flags, fio::ModeType::empty(), &blob.to_string(), server_end)
     }
 
     /// Returns the list of known blobs in blobfs.
     pub async fn list_known_blobs(&self) -> Result<HashSet<Hash>, BlobfsError> {
         let entries =
-            fuchsia_fs::directory::readdir(&self.proxy).await.map_err(BlobfsError::ReadDir)?;
+            fuchsia_fs::directory::readdir(&self.dir).await.map_err(BlobfsError::ReadDir)?;
 
         entries
             .into_iter()
@@ -182,7 +179,7 @@ impl Client {
 
     /// Delete the blob with the given merkle hash.
     pub async fn delete_blob(&self, blob: &Hash) -> Result<(), BlobfsError> {
-        self.proxy
+        self.dir
             .unlink(&blob.to_string(), &fio::UnlinkOptions::default())
             .await?
             .map_err(|s| BlobfsError::Unlink(Status::from_raw(s)))
@@ -194,7 +191,7 @@ impl Client {
         blob: &Hash,
     ) -> Result<fio::FileProxy, fuchsia_fs::node::OpenError> {
         fuchsia_fs::directory::open_file(
-            &self.proxy,
+            &self.dir,
             &blob.to_string(),
             fio::OpenFlags::RIGHT_READABLE,
         )
@@ -208,14 +205,38 @@ impl Client {
         blob: &Hash,
     ) -> Result<fio::FileProxy, fuchsia_fs::node::OpenError> {
         fuchsia_fs::directory::open_file_no_describe(
-            &self.proxy,
+            &self.dir,
             &blob.to_string(),
             fio::OpenFlags::RIGHT_READABLE,
         )
     }
 
     /// Open a new blob for write.
-    pub async fn open_blob_proxy_for_write(
+    pub async fn open_blob_for_write(
+        &self,
+        blob: &Hash,
+        blob_type: fpkg::BlobType,
+    ) -> Result<fpkg::BlobWriter, CreateError> {
+        Ok(if let Some(blob_creator) = &self.blob_creator {
+            // FxBlob only supports Delivery blobs.
+            if blob_type != fpkg::BlobType::Delivery {
+                return Err(CreateError::UnsupportedBlobType(blob_type));
+            }
+            fpkg::BlobWriter::Writer(blob_creator.create(blob, false).await??)
+        } else {
+            fpkg::BlobWriter::File(
+                self.open_blob_proxy_from_dir_for_write(blob, blob_type)
+                    .await?
+                    .into_channel()
+                    .map_err(|_: fio::FileProxy| CreateError::ConvertToClientEnd)?
+                    .into_zx_channel()
+                    .into(),
+            )
+        })
+    }
+
+    /// Open a new blob for write, unconditionally using the blob directory.
+    async fn open_blob_proxy_from_dir_for_write(
         &self,
         blob: &Hash,
         blob_type: fpkg::BlobType,
@@ -228,7 +249,7 @@ impl Client {
             fpkg::BlobType::Uncompressed => blob.to_string(),
             fpkg::BlobType::Delivery => format!("v1-{blob}"),
         };
-        fuchsia_fs::directory::open_file(&self.proxy, &path, flags).await.map_err(|e| match e {
+        fuchsia_fs::directory::open_file(&self.dir, &path, flags).await.map_err(|e| match e {
             fuchsia_fs::node::OpenError::OpenError(Status::ACCESS_DENIED) => {
                 CreateError::AlreadyExists
             }
@@ -236,25 +257,10 @@ impl Client {
         })
     }
 
-    /// Open a new blob for write.
-    pub async fn open_blob_for_write(
-        &self,
-        blob: &Hash,
-        blob_type: fpkg::BlobType,
-    ) -> Result<fidl::endpoints::ClientEnd<fio::FileMarker>, CreateError> {
-        Ok(self
-            .open_blob_proxy_for_write(blob, blob_type)
-            .await?
-            .into_channel()
-            .map_err(|_: fio::FileProxy| CreateError::ConvertToClientEnd)?
-            .into_zx_channel()
-            .into())
-    }
-
     /// Returns whether blobfs has a blob with the given hash.
     pub async fn has_blob(&self, blob: &Hash) -> bool {
         let file = match fuchsia_fs::directory::open_file_no_describe(
-            &self.proxy,
+            &self.dir,
             &blob.to_string(),
             fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE,
         ) {
@@ -353,39 +359,7 @@ impl Client {
 
     /// Call fuchsia.io/Node.Sync on the blobfs directory.
     pub async fn sync(&self) -> Result<(), BlobfsError> {
-        self.proxy.sync().await?.map_err(zx::Status::from_raw).map_err(BlobfsError::Sync)
-    }
-}
-
-/// `TempDirFake` is a thin wrapper around a `tempfile::TempDir` and therefore *does not*
-/// replicate many of the important properties of blobfs, including:
-///   * requiring truncate before write
-///   * requiring file names be hashes of contents
-///
-/// This should therefore generally only be used to test read-only clients of blobfs (i.e.
-/// tests in which only the test harness itself is writing to blobfs and the code-under-test is
-/// only reading from blobfs).
-pub struct TempDirFake {
-    dir: tempfile::TempDir,
-}
-
-impl TempDirFake {
-    /// Access the backing `tempfile::TempDir`.
-    pub fn backing_temp_dir(&self) -> &tempfile::TempDir {
-        &self.dir
-    }
-
-    /// Access the backing directory as an `openat::Dir`.
-    ///
-    /// # Panics
-    ///
-    /// Panics on error.
-    pub fn backing_dir_as_openat_dir(&self) -> openat::Dir {
-        // NB: openat::Dir::open() uses O_PATH which causes fdio not to apply
-        // POSIX_WRITABLE, and we need this to be writable.
-        let file = std::fs::File::open(self.dir.path()).unwrap();
-        let fd = std::os::fd::IntoRawFd::into_raw_fd(file);
-        unsafe { std::os::fd::FromRawFd::from_raw_fd(fd) }
+        self.dir.sync().await?.map_err(zx::Status::from_raw).map_err(BlobfsError::Sync)
     }
 }
 
@@ -402,7 +376,7 @@ impl Client {
     ///
     /// Panics on error.
     pub fn for_ramdisk(blobfs: &blobfs_ramdisk::BlobfsRamdisk) -> Self {
-        Self::new(blobfs.root_dir_proxy().unwrap())
+        Self::new(blobfs.root_dir_proxy().unwrap(), blobfs.blob_creator_proxy().unwrap())
     }
 }
 
@@ -541,8 +515,10 @@ mod tests {
         let content = [3; 1024];
         let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
 
-        let proxy =
-            client.open_blob_proxy_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap();
+        let proxy = client
+            .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Uncompressed)
+            .await
+            .unwrap();
 
         let () = resize(&proxy, content.len()).await;
         let () = write(&proxy, &content).await;
@@ -562,8 +538,10 @@ mod tests {
         let delivery_content =
             fuchsia_pkg_testing::generate_delivery_blob(&content, 1).await.unwrap();
 
-        let proxy =
-            client.open_blob_proxy_for_write(&hash, fpkg::BlobType::Delivery).await.unwrap();
+        let proxy = client
+            .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Delivery)
+            .await
+            .unwrap();
 
         let () = resize(&proxy, delivery_content.len()).await;
         let () = write(&proxy, &delivery_content).await;
@@ -583,23 +561,29 @@ mod tests {
 
     async fn open_blob_only(client: &Client, blob: &[u8; 1024]) -> TestBlob {
         let hash = MerkleTree::from_reader(&blob[..]).unwrap().root();
-        let _blob =
-            client.open_blob_proxy_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap();
+        let _blob = client
+            .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Uncompressed)
+            .await
+            .unwrap();
         TestBlob { _blob, hash }
     }
 
     async fn open_and_truncate_blob(client: &Client, content: &[u8; 1024]) -> TestBlob {
         let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
-        let _blob =
-            client.open_blob_proxy_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap();
+        let _blob = client
+            .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Uncompressed)
+            .await
+            .unwrap();
         let () = resize(&_blob, content.len()).await;
         TestBlob { _blob, hash }
     }
 
     async fn partially_write_blob(client: &Client, content: &[u8; 1024]) -> TestBlob {
         let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
-        let _blob =
-            client.open_blob_proxy_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap();
+        let _blob = client
+            .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Uncompressed)
+            .await
+            .unwrap();
         let () = resize(&_blob, content.len()).await;
         let () = write(&_blob, &content[..512]).await;
         TestBlob { _blob, hash }
@@ -607,8 +591,10 @@ mod tests {
 
     async fn fully_write_blob(client: &Client, content: &[u8; 1024]) -> TestBlob {
         let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
-        let _blob =
-            client.open_blob_proxy_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap();
+        let _blob = client
+            .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Uncompressed)
+            .await
+            .unwrap();
         let () = resize(&_blob, content.len()).await;
         let () = write(&_blob, content).await;
         TestBlob { _blob, hash }
@@ -804,40 +790,53 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn temp_dir_fake_backing_dir() {
-        let (blobfs, fake) = Client::new_temp_dir_fake();
+    async fn open_blob_for_write_uses_fxblob_if_configured() {
+        let (blob_creator, mut blob_creator_stream) =
+            fidl::endpoints::create_proxy_and_stream::<ffxfs::BlobCreatorMarker>().unwrap();
+        let client = Client::new(
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap().0,
+            Some(blob_creator),
+        );
 
-        std::fs::File::create(
-            fake.backing_temp_dir()
-                .path()
-                .join("0000000000000000000000000000000000000000000000000000000000000000"),
-        )
-        .unwrap();
-
-        let actual = blobfs.list_known_blobs().await.unwrap();
-
-        assert_eq!(actual, hashset! {[0u8; 32].into()});
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn temp_dir_fake_backing_dir_as_openat_dir() {
-        let (blobfs, fake) = Client::new_temp_dir_fake();
-
-        fake.backing_dir_as_openat_dir()
-            .write_file("0000000000000000000000000000000000000000000000000000000000000000", 0o600)
-            .unwrap();
-
-        let actual = blobfs.list_known_blobs().await.unwrap();
-
-        assert_eq!(actual, hashset! {[0u8; 32].into()});
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn temp_dir_fake_read_only() {
-        let (blobfs, _fake) = Client::new_temp_dir_fake();
+        fuchsia_async::Task::spawn(async move {
+            match blob_creator_stream.next().await.unwrap().unwrap() {
+                ffxfs::BlobCreatorRequest::Create { hash, allow_existing, responder } => {
+                    assert_eq!(hash, [0; 32]);
+                    assert!(!allow_existing);
+                    let () = responder.send(Ok(fidl::endpoints::create_endpoints().0)).unwrap();
+                }
+            }
+        })
+        .detach();
 
         assert_matches!(
-            blobfs.open_blob_for_write(&Hash::from([0; 32]), fpkg::BlobType::Uncompressed).await,
+            client.open_blob_for_write(&[0; 32].into(), fpkg::BlobType::Delivery).await,
+            Ok(fpkg::BlobWriter::Writer(_))
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_blob_for_write_fxblob_maps_already_exists() {
+        let (blob_creator, mut blob_creator_stream) =
+            fidl::endpoints::create_proxy_and_stream::<ffxfs::BlobCreatorMarker>().unwrap();
+        let client = Client::new(
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap().0,
+            Some(blob_creator),
+        );
+
+        fuchsia_async::Task::spawn(async move {
+            match blob_creator_stream.next().await.unwrap().unwrap() {
+                ffxfs::BlobCreatorRequest::Create { hash, allow_existing, responder } => {
+                    assert_eq!(hash, [0; 32]);
+                    assert!(!allow_existing);
+                    let () = responder.send(Err(ffxfs::CreateBlobError::AlreadyExists)).unwrap();
+                }
+            }
+        })
+        .detach();
+
+        assert_matches!(
+            client.open_blob_for_write(&[0; 32].into(), fpkg::BlobType::Delivery).await,
             Err(CreateError::AlreadyExists)
         );
     }

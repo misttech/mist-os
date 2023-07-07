@@ -11,10 +11,10 @@ use {
     assert_matches::assert_matches,
     blobfs_ramdisk::BlobfsRamdisk,
     fidl::endpoints::DiscoverableProtocolMarker as _,
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics,
-    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as fpkg_ext, fidl_fuchsia_space as fspace,
-    fidl_fuchsia_update as fupdate, fidl_fuchsia_update_verify as fupdate_verify,
-    fuchsia_async as fasync,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
+    fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as fpkg_ext,
+    fidl_fuchsia_space as fspace, fidl_fuchsia_update as fupdate,
+    fidl_fuchsia_update_verify as fupdate_verify, fuchsia_async as fasync,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_inspect::{reader::DiagnosticsHierarchy, testing::TreeAssertion},
     fuchsia_merkle::Hash,
@@ -57,8 +57,17 @@ async fn write_blob(contents: &[u8], blob: fpkg::BlobWriter) -> Result<(), zx::S
             })?;
             let () = file.close().await.unwrap().map_err(zx::Status::from_raw).unwrap();
         }
-        // TODO(fxbug.dev/129281) Support fxblob write api in pkg-cache.
-        fpkg::BlobWriter::Writer(_writer) => panic!("fxblob write api not supported"),
+        fpkg::BlobWriter::Writer(writer) => {
+            let () = blob_writer::BlobWriter::create(
+                writer.into_proxy().unwrap(),
+                contents.len().try_into().unwrap(),
+            )
+            .await
+            .unwrap()
+            .write(contents)
+            .await
+            .unwrap();
+        }
     }
 
     Ok(())
@@ -283,33 +292,54 @@ async fn verify_packages_cached(proxy: &fpkg::PackageCacheProxy, packages: &[Pac
 
 trait Blobfs {
     fn root_proxy(&self) -> fio::DirectoryProxy;
+    fn svc_dir(&self) -> fio::DirectoryProxy;
 }
 
 impl Blobfs for BlobfsRamdisk {
     fn root_proxy(&self) -> fio::DirectoryProxy {
         self.root_dir_proxy().unwrap()
     }
+    fn svc_dir(&self) -> fio::DirectoryProxy {
+        self.svc_dir().unwrap().unwrap()
+    }
 }
 
 struct TestEnvBuilder<BlobfsAndSystemImageFut> {
     paver_service_builder: Option<MockPaverServiceBuilder>,
-    blobfs_and_system_image: BlobfsAndSystemImageFut,
+    blobfs_and_system_image: Box<dyn FnOnce(BlobImplementation) -> BlobfsAndSystemImageFut>,
     ignore_system_image: bool,
+    blob_implementation: BlobImplementation,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum BlobImplementation {
+    Blobfs,
+    FxBlob,
 }
 
 impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
     fn new() -> Self {
         Self {
-            blobfs_and_system_image: async {
-                let system_image_package =
-                    fuchsia_pkg_testing::SystemImageBuilder::new().build().await;
-                let blobfs = BlobfsRamdisk::start().await.unwrap();
-                let () = system_image_package.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
-                (blobfs, Some(*system_image_package.meta_far_merkle_root()))
-            }
-            .boxed(),
+            blobfs_and_system_image: Box::new(|blob_impl| {
+                async move {
+                    let system_image_package =
+                        fuchsia_pkg_testing::SystemImageBuilder::new().build().await;
+                    let blobfs = BlobfsRamdisk::builder();
+                    let blobfs = match blob_impl {
+                        BlobImplementation::Blobfs => blobfs.blobfs(),
+                        BlobImplementation::FxBlob => blobfs.fxblob(),
+                    }
+                    .start()
+                    .await
+                    .unwrap();
+                    let () = system_image_package.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
+                    (blobfs, Some(*system_image_package.meta_far_merkle_root()))
+                }
+                .boxed()
+            }),
             paver_service_builder: None,
             ignore_system_image: false,
+            blob_implementation: BlobImplementation::Blobfs,
         }
     }
 }
@@ -329,12 +359,13 @@ where
         system_image: Option<Hash>,
     ) -> TestEnvBuilder<future::Ready<(OtherBlobfs, Option<Hash>)>>
     where
-        OtherBlobfs: Blobfs,
+        OtherBlobfs: Blobfs + 'static,
     {
         TestEnvBuilder {
-            blobfs_and_system_image: future::ready((blobfs, system_image)),
+            blobfs_and_system_image: Box::new(move |_| future::ready((blobfs, system_image))),
             paver_service_builder: self.paver_service_builder,
             ignore_system_image: self.ignore_system_image,
+            blob_implementation: self.blob_implementation,
         }
     }
 
@@ -360,14 +391,15 @@ where
         for pkg in extra_packages {
             let () = pkg.write_to_blobfs_dir(&root_dir);
         }
+        let system_image_hash = *system_image.meta_far_merkle_root();
 
         TestEnvBuilder::<_> {
-            blobfs_and_system_image: future::ready((
-                blobfs,
-                Some(*system_image.meta_far_merkle_root()),
-            )),
+            blobfs_and_system_image: Box::new(move |_| {
+                future::ready((blobfs, Some(system_image_hash)))
+            }),
             paver_service_builder: self.paver_service_builder,
             ignore_system_image: self.ignore_system_image,
+            blob_implementation: self.blob_implementation,
         }
     }
 
@@ -376,8 +408,13 @@ where
         Self { ignore_system_image: true, ..self }
     }
 
+    fn use_fxblob(self) -> Self {
+        assert_eq!(self.blob_implementation, BlobImplementation::Blobfs);
+        Self { blob_implementation: BlobImplementation::FxBlob, ..self }
+    }
+
     async fn build(self) -> TestEnv<ConcreteBlobfs> {
-        let (blobfs, system_image) = self.blobfs_and_system_image.await;
+        let (blobfs, system_image) = (self.blobfs_and_system_image)(self.blob_implementation).await;
         let local_child_svc_dir = vfs::pseudo_directory! {};
 
         // Cobalt mocks so we can assert that we emit the correct events
@@ -461,6 +498,11 @@ where
             "blob" => vfs::remote::remote_dir(blobfs.root_proxy()),
             "svc" => local_child_svc_dir,
         };
+        if self.blob_implementation == BlobImplementation::FxBlob {
+            local_child_out_dir
+                .add_entry("blob-svc", vfs::remote::remote_dir(blobfs.svc_dir()))
+                .unwrap();
+        }
 
         let local_child_out_dir = Mutex::new(Some(local_child_out_dir));
 
@@ -469,9 +511,14 @@ where
             .add_child("pkg_cache", "#meta/pkg-cache.cm", ChildOptions::new())
             .await
             .unwrap();
-        if self.ignore_system_image {
+        if self.ignore_system_image || self.blob_implementation == BlobImplementation::FxBlob {
             builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
-            builder.set_config_value_bool(&pkg_cache, "use_system_image", false).await.unwrap();
+            if self.ignore_system_image {
+                builder.set_config_value_bool(&pkg_cache, "use_system_image", false).await.unwrap();
+            }
+            if self.blob_implementation == BlobImplementation::FxBlob {
+                builder.set_config_value_bool(&pkg_cache, "use_fxblob", true).await.unwrap();
+            }
         }
         let system_update_committer = builder
             .add_child(
@@ -537,6 +584,22 @@ where
             )
             .await
             .unwrap();
+        if self.blob_implementation == BlobImplementation::FxBlob {
+            builder
+                .add_route(
+                    Route::new()
+                        .capability(
+                            Capability::protocol::<ffxfs::BlobCreatorMarker>().path(format!(
+                                "/blob-svc/{}",
+                                ffxfs::BlobCreatorMarker::PROTOCOL_NAME
+                            )),
+                        )
+                        .from(&service_reflector)
+                        .to(&pkg_cache),
+                )
+                .await
+                .unwrap();
+        }
         builder
             .add_route(
                 Route::new()
@@ -735,12 +798,14 @@ impl<B: Blobfs> TestEnv<B> {
     }
 
     async fn write_to_blobfs(&self, hash: &Hash, contents: &[u8]) {
-        let blobfs = blobfs::Client::new(self.blobfs.root_proxy());
+        let blobfs = blobfs::Client::new(self.blobfs.root_proxy(), None);
+        // c++blobfs supports uncompressed and delivery blobs and FxBlob only supports delivery
+        // blobs, so we always write delivery blobs.
+        let compressed =
+            delivery_blob::Type1Blob::generate(contents, delivery_blob::CompressionMode::Always);
         let () = write_blob(
-            contents,
-            fpkg::BlobWriter::File(
-                blobfs.open_blob_for_write(hash, fpkg::BlobType::Uncompressed).await.unwrap(),
-            ),
+            &compressed,
+            blobfs.open_blob_for_write(hash, fpkg::BlobType::Delivery).await.unwrap(),
         )
         .await
         .unwrap();

@@ -272,6 +272,7 @@ impl VolumesDirectory {
         self: &Arc<Self>,
         volume: &FxVolumeAndRoot,
         outgoing_dir_server_end: ServerEnd<fio::DirectoryMarker>,
+        // TODO(fxbug.dev/129991) Remove the `executable` parameter, use `as_blob` instead.
         executable: bool,
         as_blob: bool,
     ) -> Result<(), Error> {
@@ -372,7 +373,7 @@ impl VolumesDirectory {
         let crypt = crypt
             .map(|crypt| Arc::new(RemoteCrypt::new(crypt.into_proxy().unwrap())) as Arc<dyn Crypt>);
         let volume = self.create_and_mount_volume(&name, crypt, as_blob).await?;
-        self.serve_volume(&volume, outgoing_directory, false, as_blob).await
+        self.serve_volume(&volume, outgoing_directory, as_blob, as_blob).await
     }
 
     async fn handle_volume_requests(

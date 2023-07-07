@@ -102,6 +102,11 @@
         // to make reverting easier.
         pkgfs_versions_base_only: { type: "bool" },
 
+        // If true, then pkg-cache will use the fuchsia.fxfs.BlobCreator capability from its
+        // environment to write blobs.
+        // Otherwise, pkg-cache will use the /blob directory to write blobs.
+        use_fxblob: { type: "bool" },
+
         // If true, pkg-cache will load the system_image package and use the settings contained
         // therein.
         // This is true except on some configurations that do not have a system_image package, such

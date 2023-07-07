@@ -323,16 +323,20 @@ impl Package {
 }
 
 fn write_blob(dir: &openat::Dir, merkle: &fuchsia_merkle::Hash, content: &[u8]) {
-    let mut file = match dir.write_file(merkle.to_string(), 0o777) {
+    // c++blobfs supports uncompressed and delivery blobs and FxBlob only supports delivery blobs,
+    // so we always write a delivery blob.
+    let mut file = match dir.new_file(delivery_blob::delivery_blob_path(merkle), 0o600) {
         Ok(file) => file,
-        Err(e) if e.kind() == io::ErrorKind::PermissionDenied => {
+        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
             // blob is being written or already written
             return;
         }
         Err(e) => Err(e).unwrap(),
     };
-    file.set_len(content.len().try_into().unwrap()).unwrap();
-    file.write_all(content).unwrap();
+    let compressed =
+        delivery_blob::Type1Blob::generate(content, delivery_blob::CompressionMode::Attempt);
+    file.set_len(compressed.len().try_into().unwrap()).unwrap();
+    file.write_all(&compressed).unwrap();
 }
 
 async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, VerificationError> {

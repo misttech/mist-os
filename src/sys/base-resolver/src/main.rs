@@ -20,8 +20,7 @@ mod package;
 async fn main() -> anyhow::Result<()> {
     tracing::info!("started");
 
-    let blobfs =
-        blobfs::Client::open_from_namespace_executable().context("failed to open /blob")?;
+    let blobfs = blobfs::Client::open_from_namespace_rx().context("failed to open /blob")?;
     let base_packages = determine_base_packages(
         &blobfs,
         &fuchsia_component::client::connect_to_protocol::<fboot::ArgumentsMarker>()

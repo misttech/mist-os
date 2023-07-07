@@ -246,8 +246,9 @@ mod tests {
     #[fuchsia::test]
     async fn resolve_clears_zero_variant() {
         let pkg = fuchsia_pkg_testing::PackageBuilder::new("name").build().await.unwrap();
-        let (blobfs, fake) = blobfs::Client::new_temp_dir_fake();
-        pkg.write_to_blobfs_dir(&fake.backing_dir_as_openat_dir());
+        let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
+        let blobfs_client = blobfs.client();
+        pkg.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
         let (proxy, server) = fidl::endpoints::create_proxy().unwrap();
 
         let _: fpkg::ResolutionContext = resolve(
@@ -258,7 +259,7 @@ mod tests {
                 *pkg.meta_far_merkle_root(),
             )]),
             crate::context_authenticator::ContextAuthenticator::new(),
-            &blobfs,
+            &blobfs_client,
         )
         .await
         .unwrap();

@@ -538,3 +538,67 @@ async fn get_package_with_transitive_subpackage_as_content_blob() {
 
     let () = verify_superpackage_get(&superpackage, &[subpackage0, subpackage1]).await;
 }
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn fxblob() {
+    let env = TestEnv::builder().use_fxblob().build().await;
+    let initial_blobfs_blobs = env.blobfs.list_blobs().unwrap();
+    let pkg = PackageBuilder::new("single-blob")
+        .add_resource_at("content-blob", &b"content-blob-contents"[..])
+        .build()
+        .await
+        .unwrap();
+    let meta_blob_info =
+        BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
+    let (needed_blobs, needed_blobs_server_end) =
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+
+    let get_fut = env
+        .proxies
+        .package_cache
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .map_ok(|res| res.map_err(Status::from_raw));
+
+    let (meta_far, _) = pkg.contents();
+    let meta_blob =
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    match &*meta_blob {
+        fpkg::BlobWriter::File(_) => panic!("should be using fuchsia.fxfs.BlobWriter"),
+        fpkg::BlobWriter::Writer(_) => (),
+    }
+    let compressed = delivery_blob::Type1Blob::generate(
+        &meta_far.contents,
+        delivery_blob::CompressionMode::Always,
+    );
+    let () = write_blob(&compressed, *meta_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, meta_far.merkle).await;
+
+    let [missing_blob]: [_; 1] = get_missing_blobs(&needed_blobs).await.try_into().unwrap();
+    let content_blob = needed_blobs
+        .open_blob(&missing_blob.blob_id, fpkg::BlobType::Delivery)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    match &*content_blob {
+        fpkg::BlobWriter::File(_) => panic!("should be using fuchsia.fxfs.BlobWriter"),
+        fpkg::BlobWriter::Writer(_) => (),
+    }
+    let compressed = delivery_blob::Type1Blob::generate(
+        b"content-blob-contents",
+        delivery_blob::CompressionMode::Always,
+    );
+    let () = write_blob(&compressed, *content_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, BlobId::from(missing_blob.blob_id).into()).await;
+
+    let () = get_fut.await.unwrap().unwrap();
+    let () = pkg.verify_contents(&dir).await.unwrap();
+
+    // All blobs in the package should now be present in blobfs.
+    let pkg_blobs = pkg.list_blobs().unwrap();
+    assert!(initial_blobfs_blobs.is_disjoint(&pkg_blobs));
+    assert!(env.blobfs.list_blobs().unwrap().is_superset(&pkg_blobs));
+
+    let () = env.stop().await;
+}

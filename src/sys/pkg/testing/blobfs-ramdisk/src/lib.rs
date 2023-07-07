@@ -224,16 +224,32 @@ impl ServingFilesystem {
         }
     }
 
-    /// None if the filesystem does not support the API.
-    fn blob_creator_proxy(&self) -> Result<Option<ffxfs::BlobCreatorProxy>, Error> {
+    /// None if the filesystem does not expose any services.
+    fn svc_dir(&self) -> Result<Option<fio::DirectoryProxy>, Error> {
         match self {
             Self::SingleVolume(_) => Ok(None),
-            Self::MultiVolume(_) => fuchsia_component::client::connect_to_protocol_at_dir_svc::<
-                ffxfs::BlobCreatorMarker,
-            >(self.exposed_dir()?)
-            .context("connecting to fuchsia.fxfs.BlobCreator")
-            .map(Some),
+            Self::MultiVolume(_) => Ok(Some(
+                fuchsia_fs::directory::open_directory_no_describe(
+                    self.exposed_dir()?,
+                    "svc",
+                    fio::OpenFlags::RIGHT_READABLE,
+                )
+                .context("opening svc dir")?,
+            )),
         }
+    }
+
+    /// None if the filesystem does not support the API.
+    fn blob_creator_proxy(&self) -> Result<Option<ffxfs::BlobCreatorProxy>, Error> {
+        Ok(match self.svc_dir()? {
+            Some(d) => Some(
+                fuchsia_component::client::connect_to_protocol_at_dir_root::<
+                    ffxfs::BlobCreatorMarker,
+                >(&d)
+                .context("connecting to fuchsia.fxfs.BlobCreator")?,
+            ),
+            None => None,
+        })
     }
 
     fn implementation(&self) -> Implementation {
@@ -261,7 +277,7 @@ impl BlobfsRamdisk {
     ///
     /// Panics on error
     pub fn client(&self) -> blobfs::Client {
-        blobfs::Client::new(self.root_dir_proxy().unwrap())
+        blobfs::Client::new(self.root_dir_proxy().unwrap(), self.blob_creator_proxy().unwrap())
     }
 
     /// Returns a new connection to blobfs's root directory as a raw zircon channel.
@@ -283,7 +299,7 @@ impl BlobfsRamdisk {
         Ok(self.root_dir_handle()?.into_proxy()?)
     }
 
-    /// Returns a new connetion to blobfs's root directory as a openat::Dir.
+    /// Returns a new connection to blobfs's root directory as a openat::Dir.
     pub fn root_dir(&self) -> Result<openat::Dir, Error> {
         fdio::create_fd(self.root_dir_handle()?.into()).context("failed to create fd")
     }
@@ -339,6 +355,14 @@ impl BlobfsRamdisk {
         file.set_len(compressed_data.len().try_into().unwrap())?;
         file.write_all(&compressed_data)?;
         Ok(())
+    }
+
+    /// Returns a connection to blobfs's exposed "svc" directory, or None if the
+    /// implementation does not expose any services.
+    /// More convenient than using `blob_creator_proxy` directly when forwarding the service
+    /// to RealmBuilder components.
+    pub fn svc_dir(&self) -> Result<Option<fio::DirectoryProxy>, Error> {
+        self.fs.svc_dir()
     }
 
     /// Returns a new connection to blobfs's fuchsia.fxfs/BlobCreator API, or None if the

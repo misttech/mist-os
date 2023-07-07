@@ -26,12 +26,12 @@ fuchsia_test_package("example-test-package") {
 
 ### Component Manifest
 
-In the component manifest tests that utilize this crate, add the decompressor
-sandbox shard and driver test realm shard:
+In the component manifest tests that utilize this crate, include the following shards:
 
 ```json5
 {
     include: [
+        "//src/lib/storage/fs_management/client.shard.cml",
         "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
     ],
 }

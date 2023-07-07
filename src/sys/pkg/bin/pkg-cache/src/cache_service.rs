@@ -606,19 +606,18 @@ async fn handle_open_blobs(
 }
 
 // Allow a function to generically respond to either an OpenMetaBlob or OpenBlob request.
-type OpenBlobResponse =
-    Result<Option<fidl::endpoints::ClientEnd<fio::FileMarker>>, fpkg::OpenBlobError>;
+type OpenBlobResponse = Result<Option<fpkg::BlobWriter>, fpkg::OpenBlobError>;
 trait OpenBlobResponder {
     fn send(self, res: OpenBlobResponse) -> Result<(), fidl::Error>;
 }
 impl OpenBlobResponder for fpkg::NeededBlobsOpenBlobResponder {
     fn send(self, res: OpenBlobResponse) -> Result<(), fidl::Error> {
-        self.send(res.map(|o| o.map(fpkg::BlobWriter::File)))
+        self.send(res)
     }
 }
 impl OpenBlobResponder for fpkg::NeededBlobsOpenMetaBlobResponder {
     fn send(self, res: OpenBlobResponse) -> Result<(), fidl::Error> {
-        self.send(res.map(|o| o.map(fpkg::BlobWriter::File)))
+        self.send(res)
     }
 }
 
@@ -650,7 +649,26 @@ async fn open_blob(
         Ok(blob) => (Ok(Some(blob)), Ok(Needed)),
         Err(AlreadyExists) if is_readable => (Ok(None), Ok(AlreadyCached)),
         Err(AlreadyExists) => (Err(fErr::ConcurrentWrite), Ok(Needed)),
-        Err(Io(_)) | Err(ConvertToClientEnd) => (Err(fErr::UnspecifiedIo), Ok(Needed)),
+        Err(Io(e)) => {
+            warn!(%blob_id, ?blob_type, "io error opening blob {:#}", anyhow!(e));
+            (Err(fErr::UnspecifiedIo), Ok(Needed))
+        }
+        Err(ConvertToClientEnd) => {
+            warn!(%blob_id, ?blob_type, "converting blob handle");
+            (Err(fErr::UnspecifiedIo), Ok(Needed))
+        }
+        Err(Fidl(e)) => {
+            warn!(%blob_id, ?blob_type, "fidl error opening blob {:#}", anyhow!(e));
+            (Err(fErr::UnspecifiedIo), Ok(Needed))
+        }
+        Err(UnsupportedBlobType(error_type)) => {
+            warn!(%blob_id, ?blob_type, ?error_type, "opening an unsupported blob type");
+            (Err(fErr::Internal), Ok(Needed))
+        }
+        Err(BlobCreator(error)) => {
+            warn!(?error, %blob_id, ?blob_type, "error calling blob creator");
+            (Err(fErr::Internal), Ok(Needed))
+        }
     };
     let () = responder.send(fidl_resp).map_err(ServeNeededBlobsError::SendResponse)?;
     fn_ret
@@ -820,7 +838,7 @@ mod serve_needed_blobs_tests {
         // The operation should succeed, to allow retries, but it should report the failure to the
         // fidl responder.
         assert_matches!(res, Ok(OpenBlobSuccess::Needed));
-        assert_eq!(response.take(), Err(fpkg::OpenBlobError::UnspecifiedIo));
+        assert_matches!(response.take(), Err(fpkg::OpenBlobError::UnspecifiedIo));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
