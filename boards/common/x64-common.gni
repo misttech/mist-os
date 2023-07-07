@@ -40,6 +40,7 @@ _bootfs_deps = [
   "//src/ui/input/drivers/pc-ps2",
 
   # Tools
+  "//src/devices/bin/acpidump",
   "//src/devices/pci/bin:bootfs",
   "//src/media/audio/bin/ihda",
 

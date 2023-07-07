@@ -4,10 +4,6 @@
 
 import("//build/zbi/kernel_cmdline.gni")
 
-# TODO(fxbug.dev/122864) Remove transitional labels
-group("utils") {
-}
-
 group("bootstrap") {
   deps = [
     "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
@@ -42,6 +38,16 @@ group("usb-peripheral-stack") {
     "//src/connectivity/ethernet/drivers/rndis-function",
     "//src/connectivity/ethernet/drivers/usb-cdc-function",
     "//src/devices/bundles:usb-peripheral-stack",
+  ]
+}
+
+group("utils") {
+  deps = [
+    "//build/validate:non_production_tag",
+    "//src/devices/bundles:utils",
+    "//src/graphics/display/bin/dsiutil",
+    "//src/media/audio/tools/audio-driver-ctl:bin",
+    "//src/ui/bundles:utils",
   ]
 }
 

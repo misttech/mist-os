@@ -2,10 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
+import("//build/components/fuchsia_shell_package.gni")
 
 executable("backlight") {
-  visibility = [ ":*" ]
   sources = [ "main.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp_wire",
@@ -13,6 +12,8 @@ executable("backlight") {
   ]
 }
 
-bootfs_files_for_assembly("bootfs") {
+fuchsia_shell_package("backlight-pkg") {
+  package_name = "backlight"
   deps = [ ":backlight" ]
+  manifest = "meta/backlight.cml"
 }

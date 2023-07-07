@@ -31,6 +31,7 @@ assembled_system("overnet") {
     "//bundles/drivers:bootstrap",
     "//bundles/drivers:usb-host-stack",
     "//bundles/drivers:usb-peripheral-stack",
+    "//bundles/drivers:utils",
   ]
   bootfs_labels += [
     "//src/sys/component_manager:component_manager_bootfs_config",
