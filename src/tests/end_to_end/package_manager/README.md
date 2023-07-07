@@ -11,6 +11,9 @@ creation to running binaries on-device from the served `*.far`.
 See [packages](https://fuchsia.dev/fuchsia-src/development/sdk/documentation/packages)
 for more documentation.
 
+Note that these tests may not function on products which have deprecated support for
+writing blobs that are not RFC-0207 compliant.
+
 ### What are the corresponding smaller tests?
 
 The individual tests can be found in `test/package_manager_test.dart`.
