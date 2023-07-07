@@ -445,7 +445,7 @@ class ClientProxy {
   // stored due to client non-acknowledgement.
   static constexpr uint32_t kMaxImageHandles = 8;
 
- protected:
+ private:
   friend IntegrationTest;
 
   mtx_t mtx_;
@@ -484,7 +484,6 @@ class ClientProxy {
   // Ordered by |controller_stamp_| in increasing order.
   std::list<ConfigStampPair> pending_applied_config_stamps_;
 
- private:
   inspect::Node node_;
   inspect::BoolProperty is_owner_property_;
 };
