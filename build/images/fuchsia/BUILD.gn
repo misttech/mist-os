@@ -464,66 +464,17 @@ if (is_fuchsia) {
 
   generated_assembly_inputs("assembly_inputs") {
     testonly = fuchsia_zbi_testonly
-    partitions_config = _partitions_config_file
     output_path = files.assembly_inputs
-
-    # Add the images configs and their dependencies.
-    images_configs = [
-      files.images_config,
-      files.recovery_images_config,
-    ]
 
     # Add the legacy AIB for the assemblies. The platform AIBs are added
     # automatically from the build_api_module("assembly_input_archives")
-    sources = [
-      "${files.outdir}/legacy",
-      "${files.recovery_outdir}/legacy",
-    ]
+    sources = [ "${files.outdir}/legacy" ]
 
-    deps = [
-      ":fuchsia_assembly",
-      partitions_config_label,
-    ]
+    deps = [ ":fuchsia_assembly" ]
 
     # Add the product configs and their dependencies.
-    product_configs = [
-      files.product_assembly_config_file,
-      files.recovery_product_assembly_config_file,
-    ]
-    deps += [
-      "//build/assembly:bootable_product_config",
-      fuchsia_product_assembly_config_label,
-      recovery_label,
-    ]
-
-    # Add the security configs and goldens.
-    sources += fuchsia_static_pkgs_goldens
-    sources += fuchsia_verify_routes_exceptions_allowlist_product
-    sources += fuchsia_zbi_bootfs_filelist_goldens
-    sources += fuchsia_zbi_bootfs_packages_goldens
-    sources += fuchsia_zbi_kernel_cmdline_goldens
-    sources += recovery_static_pkgs_goldens
-    sources += recovery_verify_routes_exceptions_allowlist_product
-    sources += recovery_zbi_bootfs_filelist_goldens
-    sources += recovery_zbi_bootfs_packages_goldens
-    sources += recovery_zbi_kernel_cmdline_goldens
-    _optional_files = [
-      fuchsia_route_sources_config,
-      fuchsia_structured_config_policy,
-      fuchsia_verify_component_resolvers_allowlist,
-      fuchsia_verify_routes_component_tree_config,
-      fuchsia_verify_routes_exceptions_allowlist,
-      recovery_route_sources_config,
-      recovery_structured_config_policy,
-      recovery_verify_component_resolvers_allowlist,
-      recovery_verify_routes_component_tree_config,
-      recovery_verify_routes_exceptions_allowlist,
-    ]
-    foreach(file, _optional_files) {
-      if (file != "") {
-        sources += [ file ]
-      }
-    }
+    product_configs = [ files.product_assembly_config_file ]
+    deps += [ fuchsia_product_assembly_config_label ]
   }
 
   ##################################################
