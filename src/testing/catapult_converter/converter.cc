@@ -163,8 +163,8 @@ std::string ConvertUnits(const char* input_unit, std::vector<double>* vals) {
     return "n%_smallerIsBetter";
   } else if (strcmp(input_unit, "count_smallerIsBetter") == 0) {
     return "count_smallerIsBetter";
-  } else if (strcmp(input_unit, "count") == 0) {
-    return "count";
+  } else if (strcmp(input_unit, "count_biggerIsBetter") == 0) {
+    return "count_biggerIsBetter";
   } else if (strcmp(input_unit, "Watts") == 0) {
     return "W_smallerIsBetter";
   } else {

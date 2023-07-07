@@ -79,17 +79,23 @@ List<TestCaseResults> powerMetricsProcessor(
     // specifying what statistics to compute for a metric, then we should remove
     // these separate percentile metrics.
     for (final percentile in [5, 25, 50, 75, 95]) {
-      testCaseResults.add(TestCaseResults('power_p$percentile', Unit.count,
+      testCaseResults.add(TestCaseResults(
+          'power_p$percentile',
+          Unit.countSmallerIsBetter,
           [computePercentile<double>(powerValues, percentile)]));
     }
     testCaseResults.addAll([
-      TestCaseResults('power_min', Unit.count, [computeMin(powerValues)]),
-      TestCaseResults('power_max', Unit.count, [computeMax(powerValues)]),
-      TestCaseResults('power_average', Unit.count, [computeMean(powerValues)])
+      TestCaseResults(
+          'power_min', Unit.countSmallerIsBetter, [computeMin(powerValues)]),
+      TestCaseResults(
+          'power_max', Unit.countSmallerIsBetter, [computeMax(powerValues)]),
+      TestCaseResults('power_average', Unit.countSmallerIsBetter,
+          [computeMean(powerValues)])
     ]);
   } else {
     testCaseResults.add(
-      TestCaseResults('Device power', Unit.count, powerValues.toList()),
+      TestCaseResults(
+          'Device power', Unit.countSmallerIsBetter, powerValues.toList()),
     );
   }
   return testCaseResults;

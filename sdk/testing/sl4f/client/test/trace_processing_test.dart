@@ -771,7 +771,7 @@ void main(List<String> args) {
         [
           TestCaseResults(
             'test',
-            Unit.count,
+            Unit.countBiggerIsBetter,
             [
               1234,
               5678,

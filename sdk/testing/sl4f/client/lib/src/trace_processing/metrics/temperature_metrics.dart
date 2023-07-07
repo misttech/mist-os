@@ -54,21 +54,21 @@ List<TestCaseResults> temperatureMetricsProcessor(
     for (final percentile in [5, 25, 50, 75, 95]) {
       testCaseResults.add(TestCaseResults(
           'temperature_p$percentile',
-          Unit.count,
+          Unit.countSmallerIsBetter,
           [computePercentile<double>(temperatureReadings, percentile)]));
     }
     testCaseResults.addAll([
-      TestCaseResults(
-          'temperature_min', Unit.count, [computeMin(temperatureReadings)]),
-      TestCaseResults(
-          'temperature_max', Unit.count, [computeMax(temperatureReadings)]),
-      TestCaseResults(
-          'temperature_average', Unit.count, [computeMean(temperatureReadings)])
+      TestCaseResults('temperature_min', Unit.countSmallerIsBetter,
+          [computeMin(temperatureReadings)]),
+      TestCaseResults('temperature_max', Unit.countSmallerIsBetter,
+          [computeMax(temperatureReadings)]),
+      TestCaseResults('temperature_average', Unit.countSmallerIsBetter,
+          [computeMean(temperatureReadings)])
     ]);
   } else {
     testCaseResults.add(
-      TestCaseResults(
-          'Device temperature', Unit.count, temperatureReadings.toList()),
+      TestCaseResults('Device temperature', Unit.countSmallerIsBetter,
+          temperatureReadings.toList()),
     );
   }
   return testCaseResults;
