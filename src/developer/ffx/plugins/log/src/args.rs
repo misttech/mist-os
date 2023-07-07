@@ -109,7 +109,7 @@ pub struct LogCommand {
     #[argh(subcommand)]
     pub sub_command: Option<LogSubCommand>,
 
-    /// filter for a string in either the message, component or url.
+    /// filter for a string in either the message, component moniker, or url.
     /// May be repeated.
     #[argh(option)]
     pub filter: Vec<String>,
@@ -119,7 +119,7 @@ pub struct LogCommand {
     #[argh(option)]
     pub moniker: Vec<String>,
 
-    /// exclude a string in either the message, component or url.
+    /// exclude a string in either the message, component moniker, or url.
     /// May be repeated.
     #[argh(option)]
     pub exclude: Vec<String>,

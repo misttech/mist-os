@@ -145,29 +145,48 @@ where
 /// Parses a log severity selector of the form `component_selector#SEVERITY`. For example:
 /// core/foo#DEBUG.
 pub fn parse_log_interest_selector(selector: &str) -> Result<LogInterestSelector, anyhow::Error> {
-    let invalid_selector = format_err!("Invalid component interest selector: '{}'.", selector);
+    let default_invalid_selector_err = format_err!(
+        "Invalid component interest selector: '{}'. Expecting: '/some/moniker/selector#<log-level>'.",
+        selector
+    );
     let mut parts = selector.split('#');
 
     // Split each arg into sub string vectors containing strings
     // for component [0] and interest [1] respectively.
     let Some(component) = parts.next() else {
-        return Err(invalid_selector);
+        return Err(default_invalid_selector_err);
     };
     let Some(interest) = parts.next() else {
-        return Err(invalid_selector);
+        return Err(format_err!(
+            concat!(
+                "Missing <log-level> in selector. Expecting: '{}#<log-level>', ",
+                "such as #DEBUG or #INFO."),
+            selector
+        ));
     };
     if parts.next().is_some() {
-        return Err(invalid_selector);
+        return Err(default_invalid_selector_err);
     }
-    let selector = match parse_component_selector::<VerboseError>(component) {
+    let parsed_selector = match parse_component_selector::<VerboseError>(component) {
         Ok(s) => s,
-        Err(e) => return Err(format_err!("{} Error: {}", invalid_selector, e)),
+        Err(e) => {
+            return Err(format_err!(
+                "Invalid component interest selector: '{}'. Error: {}",
+                selector,
+                e
+            ))
+        }
     };
     let Some(min_severity) = parse_severity(interest.to_uppercase().as_ref()) else {
-        return Err(invalid_selector);
+        return Err(format_err!(
+            concat!(
+                "Invalid <log-level> in selector '{}'. Expecting: a min log level ",
+                "such as #DEBUG or #INFO."),
+            selector
+        ));
     };
     Ok(LogInterestSelector {
-        selector,
+        selector: parsed_selector,
         interest: Interest { min_severity: Some(min_severity), ..Default::default() },
     })
 }

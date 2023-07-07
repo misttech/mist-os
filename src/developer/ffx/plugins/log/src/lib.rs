@@ -26,7 +26,8 @@ use fidl_fuchsia_developer_ffx::{
 use fidl_fuchsia_developer_remotecontrol::{ArchiveIteratorError, RemoteControlProxy};
 use fidl_fuchsia_diagnostics::LogSettingsProxy;
 use futures::{AsyncWrite, AsyncWriteExt};
-use std::{fs, iter::Iterator, sync::Arc, time::SystemTime};
+use moniker::AbsoluteMoniker;
+use std::{fs, iter::Iterator, str::FromStr, sync::Arc, time::SystemTime};
 
 use ffx_log_frontend::{RemoteDiagnosticsBridgeProxyWrapper, StreamDiagnostics};
 mod spam_filter;
@@ -167,16 +168,22 @@ impl LogFilterCriteria {
     }
 
     fn matches_filter_string(filter_string: &str, message: &str, log: &LogsData) -> bool {
+        let filter_moniker = AbsoluteMoniker::from_str(filter_string);
+        let moniker = AbsoluteMoniker::from_str(log.moniker.as_str());
         return message.contains(filter_string)
             || log.moniker.contains(filter_string)
+            || moniker.clone().map(|m| m.to_string().contains(filter_string)).unwrap_or(false)
+            || match (moniker, filter_moniker) {
+                (Ok(m), Ok(f)) => m.to_string().contains(&f.to_string()),
+                _ => false,
+            }
             || log.metadata.component_url.as_ref().map_or(false, |s| s.contains(filter_string));
     }
 
-    fn matches_filter_by_moniker_string(mut filter_string: &str, log: &LogsData) -> bool {
-        if filter_string.starts_with("/") {
-            filter_string = &filter_string[1..];
-        }
-        return log.moniker == filter_string;
+    fn matches_filter_by_moniker_string(filter_string: &str, log: &LogsData) -> bool {
+        let filter_moniker = AbsoluteMoniker::from_str(filter_string);
+        let moniker = AbsoluteMoniker::from_str(log.moniker.as_str());
+        matches!((moniker, filter_moniker), (Ok(a), Ok(b)) if a == b)
     }
 
     fn match_filters_to_event(&self) -> bool {
@@ -1253,6 +1260,18 @@ mod test {
                 timestamp_nanos: 0.into(),
                 component_url: Some(String::default()),
                 moniker: "included/moniker".to_string(),
+                severity: diagnostics_data::Severity::Fatal,
+            })
+            .set_message("included message")
+            .build()
+            .into()
+        )));
+        assert!(criteria.matches_filters_to_log_entry(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                // Include a "/" prefix on the moniker to test filter permissiveness.
+                moniker: "/included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Fatal,
             })
             .set_message("included message")
