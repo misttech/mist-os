@@ -78,6 +78,7 @@ class Paver final : public PaverInterface {
     kDataFile,
     kFvmSparse,
     kFvmFull,
+    kFxfsSparse,
     kInitPartitionTables,
     kWipePartitionTables,
   };

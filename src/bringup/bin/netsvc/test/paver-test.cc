@@ -459,7 +459,7 @@ TEST_F(PaverTest, WriteFxfs) {
   ASSERT_NO_FATAL_FAILURE(AssertExitCode(ZX_OK));
   paver_.Close();
   ValidateCommandTrace(fake_svc_.fake_paver().GetCommandTrace(),
-                       {paver_test::Command::kWriteOpaqueVolume});
+                       {paver_test::Command::kWriteSparseVolume});
 }
 
 TEST_F(PaverTest, WriteFvmManySmallWrites) {

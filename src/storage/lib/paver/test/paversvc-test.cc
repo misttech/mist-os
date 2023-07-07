@@ -23,6 +23,10 @@
 #include <lib/sysconfig/sync-client.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zx/vmo.h>
+#include <sparse_format.h>
+// Clean up the unhelpful defines from sparse_format.h
+#undef error
+
 #include <zircon/hw/gpt.h>
 
 #include <memory>
@@ -2131,6 +2135,112 @@ TEST_F(PaverServiceLuisTest, WriteOpaqueVolume) {
 
   // Verify the written data against the payload
   ASSERT_BYTES_EQ(block_read_vmo_mapper.start(), payload.data(), kPayloadSize);
+}
+
+struct SparseImageResult {
+  std::vector<uint8_t> sparse;
+  std::vector<uint8_t> raw_data;
+  // image_length can be > raw_data.size(), simulating an image with sparse padding at the end.
+  size_t image_length;
+};
+
+SparseImageResult CreateSparseImage() {
+  constexpr size_t kBlockSize = 512;
+  constexpr size_t kDataSize = (1024 * 1024) + 512;
+  constexpr size_t kPadSize = 1024 * 1024;
+  constexpr size_t kImageLength = kDataSize + kPadSize;
+  const std::vector<uint8_t> raw(kDataSize, 0x4a);
+  std::vector<uint8_t> sparse;
+
+  sparse_header_t header = {
+      .magic = SPARSE_HEADER_MAGIC,
+      .major_version = 1,
+      .file_hdr_sz = sizeof(sparse_header_t),
+      .chunk_hdr_sz = sizeof(chunk_header_t),
+      .blk_sz = kBlockSize,
+      .total_blks = kDataSize / kBlockSize,
+      .total_chunks = 2,
+      .image_checksum = 0xDEADBEEF  // We don't do crc validation as of 2023-07-05
+  };
+  const uint8_t* header_bytes = reinterpret_cast<const uint8_t*>(&header);
+  sparse.insert(sparse.end(), header_bytes, header_bytes + sizeof(header));
+
+  chunk_header_t hdr1 = {
+      .chunk_type = CHUNK_TYPE_RAW,
+      .reserved1 = 0,
+      .chunk_sz = kDataSize / kBlockSize,
+      .total_sz = sizeof(chunk_header_t) + kDataSize,
+  };
+  const uint8_t* hdr1_bytes = reinterpret_cast<const uint8_t*>(&hdr1);
+  sparse.insert(sparse.end(), hdr1_bytes, hdr1_bytes + sizeof(hdr1));
+  sparse.insert(sparse.end(), raw.cbegin(), raw.cend());
+
+  chunk_header_t hdr2 = {
+      .chunk_type = CHUNK_TYPE_DONT_CARE,
+      .reserved1 = 0,
+      .chunk_sz = kPadSize / kBlockSize,
+      .total_sz = sizeof(chunk_header_t),
+  };
+  const uint8_t* hdr2_bytes = reinterpret_cast<const uint8_t*>(&hdr2);
+  sparse.insert(sparse.end(), hdr2_bytes, hdr2_bytes + sizeof(hdr2));
+
+  return SparseImageResult{
+      .sparse = std::move(sparse),
+      .raw_data = raw,
+      .image_length = kImageLength,
+  };
+}
+
+TEST_F(PaverServiceLuisTest, WriteSparseVolume) {
+  ASSERT_NO_FATAL_FAILURE(InitializeLuisGPTPartitions());
+  auto endpoints = fidl::CreateEndpoints<fuchsia_paver::DynamicDataSink>();
+  ASSERT_OK(endpoints.status_value());
+  auto& [local, remote] = endpoints.value();
+
+  {
+    zx::result connections = GetNewConnections(gpt_dev_->block_controller_interface());
+    ASSERT_OK(connections);
+    ASSERT_OK(client_->UseBlockDevice(
+        fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(connections->device)),
+        std::move(connections->controller), std::move(remote)));
+  }
+  fidl::WireSyncClient data_sink{std::move(local)};
+
+  SparseImageResult image = CreateSparseImage();
+
+  fuchsia_mem::wire::Buffer payload_wire_buffer;
+  zx::vmo payload_vmo;
+  fzl::VmoMapper payload_vmo_mapper;
+  ASSERT_OK(payload_vmo_mapper.CreateAndMap(image.sparse.size(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
+                                            nullptr, &payload_vmo));
+  std::copy(image.sparse.cbegin(), image.sparse.cend(),
+            static_cast<uint8_t*>(payload_vmo_mapper.start()));
+  payload_wire_buffer.vmo = std::move(payload_vmo);
+  payload_wire_buffer.size = image.sparse.size();
+
+  auto result = data_sink->WriteSparseVolume(std::move(payload_wire_buffer));
+  ASSERT_OK(result.status());
+
+  // Create a block partition client to read the written content directly.
+  fidl::UnownedClientEnd block_interface = gpt_dev_->block_interface();
+  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+  zx::result block_service_channel =
+      component::Clone(block_interface, component::AssumeProtocolComposesNode);
+  ASSERT_OK(block_service_channel.status_value());
+  std::unique_ptr<paver::BlockPartitionClient> block_client =
+      std::make_unique<paver::BlockPartitionClient>(std::move(block_service_channel.value()));
+
+  // Read the partition directly from block and verify.  Read `image.image_length` bytes so we know
+  // the image was paved to the desired length, although we only verify the bytes up to the size of
+  // `image.raw_data`.
+  zx::vmo block_read_vmo;
+  fzl::VmoMapper block_read_vmo_mapper;
+  ASSERT_OK(block_read_vmo_mapper.CreateAndMap(image.image_length, ZX_VM_PERM_READ, nullptr,
+                                               &block_read_vmo));
+  ASSERT_OK(block_client->Read(block_read_vmo, image.image_length, kFvmBlockStart, 0));
+
+  // Verify the written data against the unsparsed payload
+  ASSERT_BYTES_EQ(block_read_vmo_mapper.start(), image.raw_data.data(), image.raw_data.size());
 }
 
 TEST_F(PaverServiceLuisTest, OneShotRecovery) {

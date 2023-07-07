@@ -508,6 +508,10 @@ zx_status_t Paver::MonitorBuffer() {
       auto res = data_sink->WriteOpaqueVolume(std::move(buffer));
       return (res.status() == ZX_OK ? (res.ok() ? ZX_OK : res->error_value()) : res.status());
     }
+    case Command::kFxfsSparse: {
+      auto res = data_sink->WriteSparseVolume(std::move(buffer));
+      return (res.status() == ZX_OK ? (res.ok() ? ZX_OK : res->error_value()) : res.status());
+    }
     default:
       result = TFTP_ERR_INTERNAL;
       return ZX_ERR_INTERNAL;
@@ -590,9 +594,12 @@ tftp_status Paver::OpenWrite(std::string_view filename, size_t size, zx::duratio
   }
 
   // Paving an image to disk.
-  if (host_filename == NETBOOT_FVM_HOST_FILENAME || host_filename == NETBOOT_FXFS_HOST_FILENAME) {
-    printf("netsvc: Running FVM/Fxfs Paver\n");
+  if (host_filename == NETBOOT_FVM_HOST_FILENAME) {
+    printf("netsvc: Running FVM full Paver\n");
     command_ = Command::kFvmFull;
+  } else if (host_filename == NETBOOT_FXFS_HOST_FILENAME) {
+    printf("netsvc: Running Fxfs Paver\n");
+    command_ = Command::kFxfsSparse;
   } else if (host_filename == NETBOOT_FVM_SPARSE_HOST_FILENAME) {
     printf("netsvc: Running FVM Paver\n");
     command_ = Command::kFvmSparse;

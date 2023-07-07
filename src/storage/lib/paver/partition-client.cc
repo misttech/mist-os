@@ -112,13 +112,13 @@ zx::result<> BlockPartitionClient::Read(const zx::vmo& vmo, size_t size, size_t 
   return Read(vmoid->get(), size, dev_offset, vmo_offset);
 }
 
-zx::result<> BlockPartitionClient::Read(vmoid_t vmoid, size_t size, size_t dev_offset,
+zx::result<> BlockPartitionClient::Read(vmoid_t vmoid, size_t vmo_size, size_t dev_offset,
                                         size_t vmo_offset) {
   zx::result block_size = GetBlockSize();
   if (block_size.is_error()) {
     return block_size.take_error();
   }
-  const uint64_t length = size / block_size.value();
+  const uint64_t length = vmo_size / block_size.value();
   if (length > UINT32_MAX) {
     ERROR("Error reading partition data: Too large\n");
     return zx::error(ZX_ERR_OUT_OF_RANGE);
@@ -279,12 +279,28 @@ zx::result<size_t> FixedOffsetBlockPartitionClient::GetPartitionSize() {
   return zx::ok(full_size - block_size * offset_partition_in_blocks_);
 }
 
+zx::result<storage::OwnedVmoid> FixedOffsetBlockPartitionClient::RegisterVmoid(const zx::vmo& vmo) {
+  return client_.RegisterVmoid(vmo);
+}
+
 zx::result<> FixedOffsetBlockPartitionClient::Read(const zx::vmo& vmo, size_t size) {
   return client_.Read(vmo, size, offset_partition_in_blocks_, offset_buffer_in_blocks_);
 }
 
+zx::result<> FixedOffsetBlockPartitionClient::Read(vmoid_t vmoid, size_t vmo_size,
+                                                   size_t dev_offset, size_t vmo_offset) {
+  return client_.Read(vmoid, vmo_size, offset_partition_in_blocks_ + dev_offset,
+                      offset_buffer_in_blocks_ + vmo_offset);
+}
+
 zx::result<> FixedOffsetBlockPartitionClient::Write(const zx::vmo& vmo, size_t vmo_size) {
   return client_.Write(vmo, vmo_size, offset_partition_in_blocks_, offset_buffer_in_blocks_);
+}
+
+zx::result<> FixedOffsetBlockPartitionClient::Write(vmoid_t vmoid, size_t vmo_size,
+                                                    size_t dev_offset, size_t vmo_offset) {
+  return client_.Write(vmoid, vmo_size, offset_partition_in_blocks_ + dev_offset,
+                       offset_buffer_in_blocks_ + vmo_offset);
 }
 
 zx::result<size_t> FixedOffsetBlockPartitionClient::GetBufferOffsetInBytes() {

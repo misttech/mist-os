@@ -10,6 +10,7 @@
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
 #include <cstddef>
@@ -37,6 +38,15 @@ class BlockDeviceClient {
 
   // Returns a file descriptor representing the partition.
   virtual fbl::unique_fd block_fd() = 0;
+
+  virtual zx::result<storage::OwnedVmoid> RegisterVmoid(const zx::vmo& vmo) = 0;
+
+  // Optimized Read/Write variants for an existing vmoid registered with `RegisterVmoid`.
+  // Both offsets are in blocks, and vmo_size is in bytes.
+  virtual zx::result<> Read(vmoid_t vmoid, size_t vmo_size, size_t dev_offset,
+                            size_t vmo_offset) = 0;
+  virtual zx::result<> Write(vmoid_t vmoid, size_t vmo_size, size_t dev_offset,
+                             size_t vmo_offset) = 0;
 };
 
 // Interface to synchronously read/write to a partition.
@@ -97,15 +107,13 @@ class BlockPartitionClient final : public BlockDevicePartitionClient {
 
   zx::result<> Read(const zx::vmo& vmo, size_t size) final;
   zx::result<> Read(const zx::vmo& vmo, size_t size, size_t dev_offset, size_t vmo_offset);
-  // Optimized Read variant for an existing vmoid registered with `RegisterVmoid`.
-  zx::result<> Read(vmoid_t vmoid, size_t size, size_t dev_offset, size_t vmo_offset);
 
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) final;
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size, size_t dev_offset, size_t vmo_offset);
-  // Optimized Write variant for an existing vmoid registered with `RegisterVmoid`.
-  zx::result<> Write(vmoid_t vmoid, size_t vmo_size, size_t dev_offset, size_t vmo_offset);
 
-  zx::result<storage::OwnedVmoid> RegisterVmoid(const zx::vmo& vmo);
+  zx::result<storage::OwnedVmoid> RegisterVmoid(const zx::vmo& vmo) final;
+  zx::result<> Read(vmoid_t vmoid, size_t vmo_size, size_t dev_offset, size_t vmo_offset) final;
+  zx::result<> Write(vmoid_t vmoid, size_t vmo_size, size_t dev_offset, size_t vmo_offset) final;
 
   zx::result<> Trim() final;
   zx::result<> Flush() final;
@@ -159,6 +167,10 @@ class FixedOffsetBlockPartitionClient final : public BlockDevicePartitionClient 
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) final;
   zx::result<> Trim() final;
   zx::result<> Flush() final;
+
+  zx::result<storage::OwnedVmoid> RegisterVmoid(const zx::vmo& vmo) final;
+  zx::result<> Read(vmoid_t vmoid, size_t vmo_size, size_t dev_offset, size_t vmo_offset) final;
+  zx::result<> Write(vmoid_t vmoid, size_t vmo_size, size_t dev_offset, size_t vmo_offset) final;
 
   fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block_channel() final;
   fidl::UnownedClientEnd<fuchsia_device::Controller> controller_channel() final;

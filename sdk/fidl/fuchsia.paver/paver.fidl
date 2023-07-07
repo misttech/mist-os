@@ -220,6 +220,13 @@ closed protocol DataSink {
         payload fuchsia.mem.Buffer;
     }) -> () error zx.Status;
 
+    /// Writes an image in the Android Sparse format.  Identical in behaviour to
+    /// `WriteOpaqueVolume`, except the contents of `payload` are parsed as a sparse image and
+    /// unpacked before being written to disk.
+    strict WriteSparseVolume(resource struct {
+        payload fuchsia.mem.Buffer;
+    }) -> () error zx.Status;
+
     /// Flush all previously buffered writes to persistent storage.
     strict Flush() -> (struct {
         status zx.Status;

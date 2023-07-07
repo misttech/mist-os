@@ -202,7 +202,7 @@ bool sparse_unpack_image(SparseIoInterface* io, SparseLogFn log, SparseIoBufferH
 
         for (size_t j = 0; j < LE32(chunk.chunk_sz); j++) {
           if (!io->write(io->ctx, out_offset, io->scratch_handle, 0, LE32(file_header.blk_sz))) {
-            log("write failure\n");
+            log("Failed to write from scratch buffer\n");
             return false;
           }
           out_offset += LE32(file_header.blk_sz);

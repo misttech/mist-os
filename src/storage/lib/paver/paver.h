@@ -5,12 +5,14 @@
 #ifndef SRC_STORAGE_LIB_PAVER_PAVER_H_
 #define SRC_STORAGE_LIB_PAVER_PAVER_H_
 
-#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
+#include <fidl/fuchsia.mem/cpp/wire.h>
 #include <fidl/fuchsia.paver/cpp/wire.h>
 #include <lib/async/dispatcher.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/result.h>
 #include <zircon/types.h>
 
+#include <utility>
 #include <variant>
 
 #include <fbl/mutex.h>
@@ -62,11 +64,6 @@ class Paver : public fidl::WireServer<fuchsia_paver::Paver> {
   std::shared_ptr<Context> context_;
 };
 
-struct VolumeManagerClient {
-  fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager> device;
-  fidl::ClientEnd<fuchsia_device::Controller> controller;
-};
-
 // Common shared implementation for DataSink and DynamicDataSink. Necessary to work around lack of
 // "is-a" relationship in llcpp bindings.
 class DataSinkImpl {
@@ -81,6 +78,8 @@ class DataSinkImpl {
                           fuchsia_paver::wire::Asset asset, fuchsia_mem::wire::Buffer payload);
 
   zx::result<> WriteOpaqueVolume(fuchsia_mem::wire::Buffer payload);
+
+  zx::result<> WriteSparseVolume(fuchsia_mem::wire::Buffer payload);
 
   // FIDL llcpp unions don't currently support memory ownership so we need to
   // return something that does own the underlying memory.
@@ -138,6 +137,16 @@ class DataSink : public fidl::WireServer<fuchsia_paver::DataSink> {
     }
   }
 
+  void WriteSparseVolume(WriteSparseVolumeRequestView request,
+                         WriteSparseVolumeCompleter::Sync& completer) override {
+    zx::result<> res = sink_.WriteSparseVolume(std::move(request->payload));
+    if (res.is_ok()) {
+      completer.ReplySuccess();
+    } else {
+      completer.ReplyError(res.status_value());
+    }
+  }
+
   void WriteFirmware(WriteFirmwareRequestView request,
                      WriteFirmwareCompleter::Sync& completer) override;
 
@@ -182,6 +191,16 @@ class DynamicDataSink : public fidl::WireServer<fuchsia_paver::DynamicDataSink> 
   void WriteOpaqueVolume(WriteOpaqueVolumeRequestView request,
                          WriteOpaqueVolumeCompleter::Sync& completer) override {
     zx::result<> res = sink_.WriteOpaqueVolume(std::move(request->payload));
+    if (res.is_ok()) {
+      completer.ReplySuccess();
+    } else {
+      completer.ReplyError(res.status_value());
+    }
+  }
+
+  void WriteSparseVolume(WriteSparseVolumeRequestView request,
+                         WriteSparseVolumeCompleter::Sync& completer) override {
+    zx::result<> res = sink_.WriteSparseVolume(std::move(request->payload));
     if (res.is_ok()) {
       completer.ReplySuccess();
     } else {

@@ -10,9 +10,11 @@
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/epitaph.h>
+#include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
 #include <libgen.h>
@@ -21,7 +23,9 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
+#include <zircon/types.h>
 
+#include <cstdarg>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -29,9 +33,13 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/unique_fd.h>
+#include <storage/buffer/owned_vmoid.h>
 
+#include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/fvm.h"
+#include "src/storage/lib/paver/partition-client.h"
 #include "src/storage/lib/paver/pave-logging.h"
+#include "src/storage/lib/paver/sparse.h"
 #include "src/storage/lib/paver/stream-reader.h"
 #include "src/storage/lib/paver/validation.h"
 #include "sysconfig-fidl.h"
@@ -217,7 +225,7 @@ zx::result<fuchsia_mem::wire::Buffer> PartitionRead(const DevicePartitioner& par
 
 zx::result<> ValidatePartitionPayload(const DevicePartitioner& partitioner,
                                       const zx::vmo& payload_vmo, size_t payload_size,
-                                      const PartitionSpec& spec) {
+                                      const PartitionSpec& spec, bool sparse) {
   fzl::VmoMapper payload_mapper;
   // The payload VMO can be pager-backed, mapping which requires ZX_VM_ALLOW_FAULTS. Otherwise, the
   // ZX_VM_ALLOW_FAULTS flag is a no-op.
@@ -229,15 +237,74 @@ zx::result<> ValidatePartitionPayload(const DevicePartitioner& partitioner,
   }
   ZX_ASSERT(payload_mapper.size() >= payload_size);
 
-  auto payload =
-      cpp20::span<const uint8_t>(static_cast<const uint8_t*>(payload_mapper.start()), payload_size);
+  // Pass an empty payload for the sparse image; if any of the validators need to look at contents,
+  // they will simply fail.
+  // At this time none of them do so in a context where the sparse format is used.
+  auto payload = sparse ? cpp20::span<const uint8_t>()
+                        : cpp20::span<const uint8_t>(
+                              static_cast<const uint8_t*>(payload_mapper.start()), payload_size);
   return partitioner.ValidatePayload(spec, payload);
 }
 
-// Paves an image onto the disk.
+zx::result<> WriteOpaque(PartitionClient& partition, const PartitionSpec& spec, zx::vmo payload_vmo,
+                         size_t payload_size) {
+  zx::result block_size = partition.GetBlockSize();
+  if (block_size.is_error()) {
+    ERROR("Couldn't get partition \"%s\" block size\n", spec.ToString().c_str());
+    return block_size.take_error();
+  }
+  const size_t block_size_bytes = block_size.value();
+
+  if (CheckIfSame(&partition, payload_vmo, payload_size, block_size_bytes)) {
+    LOG("Skipping write as partition \"%s\" contents match payload.\n", spec.ToString().c_str());
+    return zx::ok();
+  }
+
+  // Pad payload with 0s to make it block size aligned.
+  if (payload_size % block_size_bytes != 0) {
+    const size_t remaining_bytes = block_size_bytes - (payload_size % block_size_bytes);
+    size_t vmo_size;
+    if (zx::result status = zx::make_result(payload_vmo.get_size(&vmo_size)); status.is_error()) {
+      ERROR("Couldn't get vmo size for \"%s\"\n", spec.ToString().c_str());
+      return status.take_error();
+    }
+    // Grow VMO if it's too small.
+    if (vmo_size < payload_size + remaining_bytes) {
+      const size_t new_size =
+          fbl::round_up(payload_size + remaining_bytes, zx_system_get_page_size());
+      zx::result status = zx::make_result(payload_vmo.set_size(new_size));
+      if (status.is_error()) {
+        ERROR("Couldn't grow vmo for \"%s\"\n", spec.ToString().c_str());
+        return status.take_error();
+      }
+    }
+    auto buffer = std::make_unique<uint8_t[]>(remaining_bytes);
+    memset(buffer.get(), 0, remaining_bytes);
+    zx::result status =
+        zx::make_result(payload_vmo.write(buffer.get(), payload_size, remaining_bytes));
+    if (status.is_error()) {
+      ERROR("Failed to write padding to vmo for \"%s\"\n", spec.ToString().c_str());
+      return status.take_error();
+    }
+    payload_size += remaining_bytes;
+  }
+  if (zx::result status = partition.Write(payload_vmo, payload_size); status.is_error()) {
+    ERROR("Error writing partition \"%s\" data: %s\n", spec.ToString().c_str(),
+          status.status_string());
+    return status.take_error();
+  }
+  return zx::ok();
+}
+
+// Paves an image onto the disk.  If `sparse` is set, the image is treated as an Android Sparse
+// image and unpacked.
 zx::result<> PartitionPave(const DevicePartitioner& partitioner, zx::vmo payload_vmo,
-                           size_t payload_size, const PartitionSpec& spec) {
-  LOG("Paving partition \"%s\".\n", spec.ToString().c_str());
+                           size_t payload_size, const PartitionSpec& spec, bool sparse) {
+  if (sparse) {
+    LOG("Paving sparse partition \"%s\".\n", spec.ToString().c_str());
+  } else {
+    LOG("Paving partition \"%s\".\n", spec.ToString().c_str());
+  }
 
   // The payload_vmo might be pager-backed. Commit its pages first before using it for
   // block writes below, to avoid deadlocks in the block server. If all the pages of the
@@ -259,7 +326,7 @@ zx::result<> PartitionPave(const DevicePartitioner& partitioner, zx::vmo payload
   // need to lock it instead of simply committing its pages, to opt it out of eviction. The assert
   // below verifying that it's a pager-backed clone will need to be removed as well.
   zx_info_vmo_t info;
-  auto status =
+  zx::result status =
       zx::make_result(payload_vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
   if (status.is_error()) {
     ERROR("Failed to get info for payload VMO for partition \"%s\": %s\n", spec.ToString().c_str(),
@@ -277,7 +344,7 @@ zx::result<> PartitionPave(const DevicePartitioner& partitioner, zx::vmo payload
   }
 
   // Perform basic safety checking on the partition before we attempt to write it.
-  status = ValidatePartitionPayload(partitioner, payload_vmo, payload_size, spec);
+  status = ValidatePartitionPayload(partitioner, payload_vmo, payload_size, spec, sparse);
   if (status.is_error()) {
     ERROR("Failed to validate partition \"%s\": %s\n", spec.ToString().c_str(),
           status.status_string());
@@ -308,48 +375,10 @@ zx::result<> PartitionPave(const DevicePartitioner& partitioner, zx::vmo payload
     }
   }
 
-  zx::result<size_t> status_or_size = partition->GetBlockSize();
-  if (status_or_size.is_error()) {
-    ERROR("Couldn't get partition \"%s\" block size\n", spec.ToString().c_str());
-    return status_or_size.take_error();
-  }
-  const size_t block_size_bytes = status_or_size.value();
-
-  if (CheckIfSame(partition.get(), payload_vmo, payload_size, block_size_bytes)) {
-    LOG("Skipping write as partition \"%s\" contents match payload.\n", spec.ToString().c_str());
-  } else {
-    // Pad payload with 0s to make it block size aligned.
-    if (payload_size % block_size_bytes != 0) {
-      const size_t remaining_bytes = block_size_bytes - (payload_size % block_size_bytes);
-      size_t vmo_size;
-      if (auto status = zx::make_result(payload_vmo.get_size(&vmo_size)); status.is_error()) {
-        ERROR("Couldn't get vmo size for \"%s\"\n", spec.ToString().c_str());
-        return status.take_error();
-      }
-      // Grow VMO if it's too small.
-      if (vmo_size < payload_size + remaining_bytes) {
-        const auto new_size =
-            fbl::round_up(payload_size + remaining_bytes, zx_system_get_page_size());
-        status = zx::make_result(payload_vmo.set_size(new_size));
-        if (status.is_error()) {
-          ERROR("Couldn't grow vmo for \"%s\"\n", spec.ToString().c_str());
-          return status.take_error();
-        }
-      }
-      auto buffer = std::make_unique<uint8_t[]>(remaining_bytes);
-      memset(buffer.get(), 0, remaining_bytes);
-      status = zx::make_result(payload_vmo.write(buffer.get(), payload_size, remaining_bytes));
-      if (status.is_error()) {
-        ERROR("Failed to write padding to vmo for \"%s\"\n", spec.ToString().c_str());
-        return status.take_error();
-      }
-      payload_size += remaining_bytes;
-    }
-    if (auto status = partition->Write(payload_vmo, payload_size); status.is_error()) {
-      ERROR("Error writing partition \"%s\" data: %s\n", spec.ToString().c_str(),
-            status.status_string());
-      return status.take_error();
-    }
+  status = sparse ? WriteSparse(*partition, spec, std::move(payload_vmo), payload_size)
+                  : WriteOpaque(*partition, spec, std::move(payload_vmo), payload_size);
+  if (status.is_error()) {
+    return status.take_error();
   }
 
   if (auto status = partitioner.FinalizePartition(spec); status.is_error()) {
@@ -530,7 +559,16 @@ zx::result<> DataSinkImpl::WriteOpaqueVolume(fuchsia_mem::wire::Buffer payload) 
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  return PartitionPave(*partitioner_, std::move(payload.vmo), payload.size, spec);
+  return PartitionPave(*partitioner_, std::move(payload.vmo), payload.size, spec, false);
+}
+
+zx::result<> DataSinkImpl::WriteSparseVolume(fuchsia_mem::wire::Buffer payload) {
+  PartitionSpec spec(Partition::kFuchsiaVolumeManager, kOpaqueVolumeContentType);
+  if (!partitioner_->SupportsPartition(spec)) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  return PartitionPave(*partitioner_, std::move(payload.vmo), payload.size, spec, true);
 }
 
 zx::result<> DataSinkImpl::WriteAsset(Configuration configuration, Asset asset,
@@ -546,7 +584,7 @@ zx::result<> DataSinkImpl::WriteAsset(Configuration configuration, Asset asset,
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  return PartitionPave(*partitioner_, std::move(payload.vmo), payload.size, spec);
+  return PartitionPave(*partitioner_, std::move(payload.vmo), payload.size, spec, false);
 }
 
 std::optional<PartitionSpec> DataSinkImpl::GetFirmwarePartitionSpec(Configuration configuration,
@@ -584,7 +622,8 @@ std::variant<zx_status_t, bool> DataSinkImpl::WriteFirmware(Configuration config
                                                             fuchsia_mem::wire::Buffer payload) {
   std::optional<PartitionSpec> spec = GetFirmwarePartitionSpec(configuration, type);
   if (spec) {
-    return PartitionPave(*partitioner_, std::move(payload.vmo), payload.size, *spec).status_value();
+    return PartitionPave(*partitioner_, std::move(payload.vmo), payload.size, *spec, false)
+        .status_value();
   }
 
   // unsupported_type = true.

@@ -252,6 +252,17 @@ void FakePaver::WriteOpaqueVolume(WriteOpaqueVolumeRequestView request,
   }
 }
 
+void FakePaver::WriteSparseVolume(WriteSparseVolumeRequestView request,
+                                  WriteSparseVolumeCompleter::Sync& completer) {
+  fbl::AutoLock al(&lock_);
+  AppendCommand(Command::kWriteSparseVolume);
+  if (request->payload.size == expected_payload_size_) {
+    completer.ReplySuccess();
+  } else {
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
+  }
+}
+
 void FakePaver::WriteFirmware(WriteFirmwareRequestView request,
                               WriteFirmwareCompleter::Sync& completer) {
   using fuchsia_paver::wire::WriteFirmwareResult;
