@@ -201,10 +201,8 @@
         },
         {
             protocol: [
-                "fuchsia.session.scene.Manager",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.composition.Screenshot",
                 "fuchsia.ui.scenic.Scenic",
             ],
             from: "#ui",

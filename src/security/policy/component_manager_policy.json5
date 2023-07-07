@@ -844,7 +844,6 @@
                     "/core/termina-guest-manager",
                     "/core/test_manager/google-tests:**",
                     "/core/test_manager/system-tests:**",
-                    "/core/test_manager/system-validation-tests:**",
                     "/core/testing/devices-tests:**",
                     "/core/testing/drm-tests:**",
                     "/core/testing/system-tests:**",

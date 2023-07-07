@@ -26,7 +26,6 @@ pub const VULKAN_TESTS_COLLECTION: &'static str = "vulkan-tests";
 pub const CHROMIUM_TESTS_COLLECTION: &'static str = "chromium-tests";
 pub const CHROMIUM_SYSTEM_TESTS_COLLECTION: &'static str = "chromium-system-tests";
 pub const GOOGLE_TESTS_COLLECTION: &'static str = "google-tests";
-pub const SYSTEM_VALIDATION_COLLECTION: &'static str = "system-validation-tests";
 
 lazy_static! {
     pub static ref TEST_TYPE_REALM_MAP: HashMap<&'static str, &'static str> = [
@@ -37,7 +36,6 @@ lazy_static! {
         ("google", GOOGLE_TESTS_COLLECTION),
         ("starnix", STARNIX_TESTS_COLLECTION),
         ("system", SYSTEM_TESTS_COLLECTION),
-        ("system-validation", SYSTEM_VALIDATION_COLLECTION),
         ("vulkan", VULKAN_TESTS_COLLECTION),
     ]
     .iter()
