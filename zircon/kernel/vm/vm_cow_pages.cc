@@ -4804,6 +4804,10 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
     return ZX_ERR_OUT_OF_RANGE;
   }
 
+  if (page_source_->is_detached()) {
+    return ZX_ERR_BAD_STATE;
+  }
+
   const uint64_t start = offset;
   const uint64_t end = offset + len;
 
@@ -4972,6 +4976,10 @@ zx_status_t VmCowPages::FailPageRequestsLocked(uint64_t offset, uint64_t len,
     return ZX_ERR_OUT_OF_RANGE;
   }
 
+  if (page_source_->is_detached()) {
+    return ZX_ERR_BAD_STATE;
+  }
+
   page_source_->OnPagesFailed(offset, len, error_status);
   return ZX_OK;
 }
@@ -5019,6 +5027,10 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
   // requests and return an error.
   if (end_offset > size_locked()) {
     return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  if (page_source_->is_detached()) {
+    return ZX_ERR_BAD_STATE;
   }
 
   // If any of the pages in the range are zero page markers (Clean zero pages), they need to be

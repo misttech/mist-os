@@ -5065,8 +5065,8 @@ VMO_VMAR_TEST(PagerWriteback, DetachWithPendingDirtyRequest) {
   ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
 }
 
-// Tests that failing a DIRTY request after the VMO is detached is a no-op.
-TEST(PagerWriteback, FailDirtyRequestAfterDetach) {
+// Tests that resolving (or failing) a DIRTY request after the VMO is detached fails.
+TEST(PagerWriteback, ResolveDirtyRequestAfterDetach) {
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5093,10 +5093,13 @@ TEST(PagerWriteback, FailDirtyRequestAfterDetach) {
   uint64_t offset, length;
   ASSERT_FALSE(pager.GetPageDirtyRequest(vmo, 0, &offset, &length));
 
-  // This is a no-op.
-  ASSERT_TRUE(pager.FailPages(vmo, 0, 1));
+  // This should fail.
+  ASSERT_FALSE(pager.FailPages(vmo, 0, 1));
 
   ASSERT_FALSE(pager.GetPageDirtyRequest(vmo, 0, &offset, &length));
+
+  // Dirtying the page should fail as well.
+  ASSERT_FALSE(pager.DirtyPages(vmo, 0, 1));
 
   // The page was not dirtied.
   ASSERT_TRUE(pager.VerifyDirtyRanges(vmo, nullptr, 0));

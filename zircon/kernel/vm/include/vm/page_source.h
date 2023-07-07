@@ -348,6 +348,11 @@ class PageSource final : public PageRequestInterface {
 
   void Dump(uint depth) const;
 
+  bool is_detached() const {
+    Guard<Mutex> guard{&page_source_mtx_};
+    return detached_;
+  }
+
  protected:
   // destructor should only be invoked from RefPtr
   virtual ~PageSource();

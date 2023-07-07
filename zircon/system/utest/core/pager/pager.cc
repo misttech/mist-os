@@ -664,6 +664,10 @@ VMO_VMAR_TEST(Pager, DecommitOnDetachTest) {
   } else {
     ASSERT_TRUE(t5.WaitForFailure());
   }
+
+  // No page requests seen.
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
 }
 
 // Tests that closing results in a complete request.
@@ -708,6 +712,10 @@ TEST(Pager, DetachNonMappingAccess) {
   ASSERT_TRUE(t.WaitForTerm());
 
   EXPECT_EQ(ZX_ERR_BAD_STATE, vmo_result);
+
+  // No page requests seen.
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
 }
 
 // Tests that interrupting a read after receiving the request doesn't result in hanging threads.
@@ -2125,7 +2133,7 @@ TEST(Pager, FailRedundant) {
   ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
 }
 
-// Tests that failing a range after the vmo is detached is a no-op.
+// Tests that failing a range after the vmo is detached fails.
 TEST(Pager, FailAfterDetach) {
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -2146,8 +2154,27 @@ TEST(Pager, FailAfterDetach) {
   uint64_t offset, length;
   ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
 
-  // This is a no-op.
-  ASSERT_TRUE(pager.FailPages(vmo, 0, kNumPages));
+  ASSERT_FALSE(pager.FailPages(vmo, 0, kNumPages));
+
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+}
+
+// Test that supply_pages fails after detach.
+TEST(Pager, SupplyAfterDetach) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  constexpr uint64_t kNumPages = 11;
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(kNumPages, &vmo));
+
+  ASSERT_TRUE(pager.DetachVmo(vmo));
+
+  // No page requests seen.
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+
+  ASSERT_FALSE(pager.SupplyPages(vmo, 0, kNumPages));
 
   ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
 }
