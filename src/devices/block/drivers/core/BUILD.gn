@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -22,10 +23,15 @@ fuchsia_driver("core-driver") {
 }
 
 fuchsia_driver_component("core") {
+  visibility = [ ":*" ]
   component_name = "block.core"
   deps = [ ":core-driver" ]
   info = "core-info.json"
   manifest = "meta/core.cml"
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":core" ]
 }
 
 group("tests") {

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -30,10 +31,15 @@ fuchsia_driver("usb-bus-driver") {
 }
 
 fuchsia_driver_component("usb-bus") {
+  visibility = [ ":*" ]
   info = "usb-bus-info.json"
   component_name = "usb-bus"
   deps = [ ":usb-bus-driver" ]
   manifest = "meta/usb-bus.cml"
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":usb-bus" ]
 }
 
 source_set("common") {
