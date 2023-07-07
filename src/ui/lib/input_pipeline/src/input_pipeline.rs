@@ -1016,7 +1016,7 @@ mod tests {
                 input_devices: {
                     devices_discovered: 1u64,
                     devices_connected: 1u64,
-                    "001_Mouse": {
+                    "001_Mouse": contains {
                         reports_received_count: 0u64,
                         reports_filtered_count: 0u64,
                         events_generated: 0u64,

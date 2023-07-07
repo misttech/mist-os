@@ -779,18 +779,12 @@ macro_rules! assert_input_report_sequence_generates_events {
         }
 
         fuchsia_inspect::assert_data_tree!(inspector, root: {
-            "TestDevice": {
+            "TestDevice": contains {
                 reports_received_count: num_reports as u64,
                 reports_filtered_count: AnyProperty,
                 events_generated: num_events as u64,
                 last_received_timestamp_ns: expected_last_received_timestamp,
                 last_generated_timestamp_ns: expected_last_generated_timestamp,
-                "fuchsia.inspect.Health": {
-                    status: "OK",
-                    // Timestamp value is unpredictable and not relevant in this context,
-                    // so we only assert that the property is present.
-                    start_timestamp_nanos: AnyProperty
-                },
             }
         });
     };

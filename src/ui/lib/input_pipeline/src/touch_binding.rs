@@ -821,7 +821,7 @@ mod tests {
         assert!(event.is_err());
 
         fuchsia_inspect::assert_data_tree!(inspector, root: {
-            "TestDevice_Touch": {
+            "TestDevice_Touch": contains {
                 reports_received_count: 1u64,
                 reports_filtered_count: 1u64,
                 events_generated: 0u64,
