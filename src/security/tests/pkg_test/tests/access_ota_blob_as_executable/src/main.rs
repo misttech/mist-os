@@ -26,7 +26,7 @@ use {
     fuchsia_merkle::MerkleTree,
     fuchsia_zircon::{AsHandleRef, Rights, Status},
     futures::{channel::oneshot::channel, join, TryStreamExt},
-    security_pkg_test_util::load_config,
+    security_pkg_test_util::{config::load_config, storage::mount_image_as_ramdisk},
     std::{convert::TryInto, fs::File},
     tracing::info,
 };
@@ -214,6 +214,7 @@ impl AccessCheckRequest {
             info!(%url_with_hash, "Skipping open package via pkg-resolver");
             None
         };
+
         let url_without_hash = format!(
             "fuchsia-pkg://{}/{}/0",
             &self.config.domain_without_hash, &self.config.package_name
@@ -436,6 +437,7 @@ async fn access_ota_blob_as_executable() {
     let config = load_config(test_config_path);
 
     // Setup storage capabilities.
+    let ramdisk_client = mount_image_as_ramdisk("/pkg/data/assemblies/hello_world_v0/fs.blk").await;
     let pkg_resolver_storage_proxy = get_storage_for_component_instance("./pkg-resolver").await;
     // TODO(fxbug.dev/88453): Need a test that confirms assumption: Production
     // configuration is an empty mutable storage directory.
@@ -500,11 +502,13 @@ async fn access_ota_blob_as_executable() {
         },
     );
 
-    // Setup package server and perform pre-update access check.
-    let (hello_world_v0_access_check_result, update_merkle, package_server_url) = join!(
+    // Setup package server, which must be ready before access checks are performed.
+    let package_server_url = get_local_package_server_url().await;
+
+    // Get v1 update merkle and perform pre-update access check.
+    let (hello_world_v0_access_check_result, update_merkle) = join!(
         hello_world_v0_access_check.perform_access_check(),
-        get_hello_world_v1_update_merkle(v1_update_far_path.to_string()),
-        get_local_package_server_url()
+        get_hello_world_v1_update_merkle(v1_update_far_path.to_string())
     );
 
     // Pre-update base version access check: Access should always succeed.
@@ -566,4 +570,7 @@ async fn access_ota_blob_as_executable() {
         .pkg_resolver_with_hash
         .unwrap()
         .is_executable_err());
+
+    // Clean up ramdisk, not necessary but good practice
+    ramdisk_client.destroy().await.unwrap();
 }
