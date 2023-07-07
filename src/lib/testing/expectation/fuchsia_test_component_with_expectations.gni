@@ -132,6 +132,7 @@ template("fuchsia_test_component_with_expectations") {
     deps = [
       ":${_expectations_target}",
       ":${_merged_cml_target}",
+      "//src/lib/testing/expectation:expectation_comparer",
       _include_check_target,
     ]
     manifest = _merged_cml_file
