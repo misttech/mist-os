@@ -724,6 +724,34 @@ TEST_F(FlatlandManagerTest, OnFramePresentedEvent) {
   EXPECT_EQ(info2->presentation_infos.size(), 2ul);
   EXPECT_EQ(zx::time(info2->presentation_infos[0].latched_time()), latch_time2_1);
   EXPECT_EQ(zx::time(info2->presentation_infos[1].latched_time()), latch_time2_2);
+
+  // Call `OnFramePresented()` after the first session has terminated.
+  //
+  // Verify that Scenic does not crash, and that the second session still gets its
+  // `OnFramePresented` event.
+  //
+  // Note: The iteration order of sessions within the argument to `OnFramePresented()`
+  // is dependent on a hash function. Hence: if the hash ordering varies from one test
+  // run to another (for identical builds), and there is a bug in `OnFramePresented()`,
+  // this test could flake.
+  PRESENT(flatland1, id1, true);
+  PRESENT(flatland2, id2, true);
+  EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(id1, _));
+  flatland1 = {};
+  FX_LOGS(INFO) << "Waiting for removal of session " << id1;
+  RunLoopUntil([this, id1] {
+    std::lock_guard lock(removed_session_thread_checker_);
+    return removed_sessions_.find(id1) != removed_sessions_.end();
+  });
+  info2 = {};
+  manager_->OnFramePresented({{id1, {{PopPendingPresent(id1), zx::time(789)}}},
+                              {id2, {{PopPendingPresent(id2), zx::time(789)}}}},
+                             scheduling::PresentTimestamps({
+                                 .presented_time = zx::time(777),
+                                 .vsync_interval = zx::duration(16),
+                             }));
+  FX_LOGS(INFO) << "Waiting for event on session " << id2;
+  RunLoopUntil([&info2] { return info2.has_value(); });
 }
 
 TEST_F(FlatlandManagerTest, ViewBoundProtocolsAreRegistered) {
