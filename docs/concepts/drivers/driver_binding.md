@@ -54,9 +54,9 @@ was written previously for the driver framework version 1 (DFv1).
 
 ## Board driver and USB devices
 
-While drivers are often bound to devices, some drivers are bound to
-[boards](/docs/glossary/README.md#board) (such as PCI and ACPI) that may
-have multiple devices connected to them, both statically and dynamically.
+While drivers are often bound to devices, some drivers (such as PCI and ACPI) are
+bound to [boards](/docs/glossary/README.md#board) that may have multiple devices
+connected to them, both statically and dynamically.
 
 Upon the initial binding to a node, a [board driver](/docs/glossary/README.md#board-driver)
 (such as `acpi`) parses a binary blob passed from the system (which can be
