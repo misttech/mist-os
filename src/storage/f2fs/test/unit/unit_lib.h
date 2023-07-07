@@ -54,8 +54,7 @@ class SingleFileTest : public F2fsFakeDevTestFixture {
   }
 
   void TearDown() override {
-    test_file_->Close();
-    test_file_.reset();
+    CloseVnode();
     F2fsFakeDevTestFixture::TearDown();
   }
 
@@ -65,9 +64,17 @@ class SingleFileTest : public F2fsFakeDevTestFixture {
     return page;
   }
 
+  void CloseVnode() {
+    if (test_file_) {
+      test_file_->Close();
+      test_file_.reset();
+    }
+  }
+
  protected:
   template <typename T = VnodeF2fs>
   T &vnode() {
+    ZX_ASSERT(test_file_);
     return *fbl::RefPtr<T>::Downcast(test_file_);
   }
 
