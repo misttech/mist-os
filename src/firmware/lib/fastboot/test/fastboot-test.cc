@@ -870,6 +870,25 @@ TEST_F(FastbootFlashTest, GetVarIsUserspace) {
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 }
 
+TEST_F(FastbootFlashTest, GetVarAll) {
+  Fastboot fastboot(0x40000, std::move(svc_chan()));
+  std::string command = "getvar:all";
+  TestTransport transport;
+  transport.AddInPacket(command);
+  zx::result<> ret = fastboot.ProcessPacket(&transport);
+  ASSERT_OK(ret);
+  std::vector<std::string> expected_packets = {
+      "INFOversion: 0.4",
+      "INFOslot-count: 1",
+      "INFOproduct: [error: ZX_ERR_PEER_CLOSED]",
+      "INFOis-userspace: yes",
+      "INFOhw-revision: [error: ZX_ERR_PEER_CLOSED]",
+      "INFOmax-download-size: 0x00040000",
+      "OKAYnot all variables were retrieved successfully",
+  };
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
 // Returns a block device path that looks like a ramdisk. Fastboot GPT functionality should
 // always ignore ramdisks.
 std::string RamDiskPath(int i) { return std::string(kRamDiskString) + "-" + std::to_string(i); }

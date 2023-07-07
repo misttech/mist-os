@@ -22,6 +22,7 @@
 #include <fbl/unique_fd.h>
 #include <sdk/lib/syslog/cpp/macros.h>
 
+#include "lib/zx/result.h"
 #include "payload-streamer.h"
 #include "sparse_format.h"
 #include "src/lib/fxl/strings/split_string.h"
@@ -127,6 +128,7 @@ const Fastboot::VariableHashTable& Fastboot::GetVariableTable() {
       {"hw-revision", &Fastboot::GetVarHwRevision},
       {"product", &Fastboot::GetVarHwRevision},
       {"version", &Fastboot::GetVarVersion},
+      {"all", &Fastboot::GetVarAll},
   });
   return *kVariableTable;
 }
@@ -186,6 +188,36 @@ zx::result<> Fastboot::GetVar(const std::string& command, Transport* transport) 
 
 zx::result<std::string> Fastboot::GetVarVersion(const std::vector<std::string_view>&, Transport*) {
   return zx::ok("0.4");
+}
+
+zx::result<std::string> Fastboot::GetVarAll(const std::vector<std::string_view>& args,
+                                            Transport* transport) {
+  zx::result<std::string> res(zx::ok("done"));
+
+  const VariableHashTable& var_table = GetVariableTable();
+  for (const auto& [name, func] : var_table) {
+    if (name == "all") {
+      continue;
+    }
+
+    std::vector<std::string_view> var_args = {"getvar", name};
+    zx::result<std::string> var_ret = (this->*(func))(var_args, transport);
+
+    if (var_ret.is_error()) {
+      res = zx::ok("not all variables were retrieved successfully");
+    }
+
+    std::string response = fxl::StringPrintf(
+        "%s: %s", name.c_str(),
+        var_ret.value_or(std::string("[error: ") + var_ret.status_string() + "]").c_str());
+
+    zx::result<> ret = SendResponse(ResponseType::kInfo, response, transport);
+    if (ret.is_error()) {
+      return zx::error(ret.status_value());
+    }
+  }
+
+  return res;
 }
 
 zx::result<std::string> Fastboot::GetVarMaxDownloadSize(const std::vector<std::string_view>&,
