@@ -4,18 +4,18 @@
 
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_tap::{WlantapPhyEvent, WlantapPhyProxy},
+    fidl_fuchsia_wlan_tap::WlantapPhyProxy,
     fuchsia_zircon::DurationNum as _,
     futures::{channel::oneshot, join, TryFutureExt},
     pin_utils::pin_mut,
     tracing::{info, warn},
     wlan_common::{bss::Protection::Wpa2Personal, buffer_reader::BufferReader, mac},
     wlan_hw_sim::{
-        default_wlantap_config_ap, default_wlantap_config_client, event, has_id_and_state,
-        init_syslog, loop_until_iface_is_found, netdevice_helper, rx_info_with_default_ap,
-        send_scan_complete, test_utils, wait_until_client_state, ApAdvertisement, Beacon,
-        NetworkConfigBuilder, AP_MAC_ADDR, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC,
-        WLANCFG_DEFAULT_AP_CHANNEL,
+        default_wlantap_config_ap, default_wlantap_config_client,
+        event::{self, action, Handler},
+        has_id_and_state, init_syslog, loop_until_iface_is_found, netdevice_helper,
+        rx_info_with_default_ap, test_utils, wait_until_client_state, Beacon, NetworkConfigBuilder,
+        AP_MAC_ADDR, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC, WLANCFG_DEFAULT_AP_CHANNEL,
     },
 };
 
@@ -24,18 +24,6 @@ const PASS_PHRASE: &str = "wpa2duel";
 // TODO(fxbug.dev/73871): Encode constants like this in the type system.
 const WAIT_FOR_PAYLOAD_INTERVAL: i64 = 500; // milliseconds
 const WAIT_FOR_ACK_INTERVAL: i64 = 500; // milliseconds
-
-fn packet_forwarder<'a>(
-    peer_phy: &'a WlantapPhyProxy,
-    context: &'a str,
-) -> impl Fn(&WlantapPhyEvent) + 'a {
-    move |event| {
-        if let WlantapPhyEvent::Tx { ref args } = event {
-            let frame = &args.packet.data;
-            peer_phy.rx(frame, &rx_info_with_default_ap()).expect(context);
-        }
-    }
-}
 
 // Connect stage
 
@@ -89,22 +77,19 @@ async fn verify_client_connects_to_ap(
     let client_fut = client_helper.run_until_complete_or_timeout(
         10.seconds(),
         "connecting to AP",
-        event::matched(|_, event| match event {
-            WlantapPhyEvent::StartScan { ref args } => {
-                Beacon {
-                    channel: WLANCFG_DEFAULT_AP_CHANNEL.clone(),
-                    bssid: AP_MAC_ADDR,
-                    ssid: AP_SSID.clone(),
-                    protection: Wpa2Personal,
-                    rssi_dbm: -30,
-                }
-                .send(client_proxy)
-                .expect("failed to send beacon");
-                send_scan_complete(args.scan_id, 0, &client_proxy)
-                    .expect("failed to send scan complete");
-            }
-            event => packet_forwarder(&ap_proxy, "frame client -> ap")(event),
-        }),
+        event::on_scan(action::send_advertisements_and_scan_completion(
+            &client_proxy,
+            [Beacon {
+                channel: WLANCFG_DEFAULT_AP_CHANNEL.clone(),
+                bssid: AP_MAC_ADDR,
+                ssid: AP_SSID.clone(),
+                protection: Wpa2Personal,
+                rssi_dbm: -30,
+            }],
+        ))
+        .or(event::on_transmit(
+            action::send_packet(&ap_proxy, rx_info_with_default_ap()).context("client -> AP"),
+        )),
         connect_fut,
     );
 
@@ -113,9 +98,10 @@ async fn verify_client_connects_to_ap(
         .run_until_complete_or_timeout(
             10.seconds(),
             "serving as an AP",
-            event::matched(|_, event| {
-                packet_forwarder(&client_proxy, "frame ap ->  client")(event)
-            }),
+            event::on_transmit(
+                action::send_packet(&client_proxy, rx_info_with_default_ap())
+                    .context("AP -> client"),
+            ),
             connect_confirm_receiver,
         )
         .unwrap_or_else(|oneshot::Canceled| panic!("waiting for connect confirmation"));
@@ -208,8 +194,8 @@ async fn send_then_receive(
             }
         }
 
-        // Peer packets cannot be received unless the incoming packet_forwarder is running, so this
-        // function must wait until the peer receives the payload.
+        // Peer packets cannot be received unless the incoming packet forwarder (`send_packet`) is
+        // running, so this function must wait until the peer receives the payload.
         match receiver_from_peer_ptr.take() {
             None => info!(
                 "{} already received acknowledgement from {}. Skipping wait for acknowledgement.",
@@ -312,7 +298,9 @@ async fn verify_ethernet_in_both_directions(
         // once Policy no longer mistakenly schedules unneeded scans.
         60.seconds(),
         "client trying to exchange data with a peer behind AP",
-        event::matched(|_, event| packet_forwarder(&ap_proxy, "frame client -> ap")(event)),
+        event::on_transmit(
+            action::send_packet(&ap_proxy, rx_info_with_default_ap()).context("client -> AP"),
+        ),
         client_fut,
     );
     let peer_behind_ap_with_timeout = ap_helper.run_until_complete_or_timeout(
@@ -320,7 +308,9 @@ async fn verify_ethernet_in_both_directions(
         // once Policy no longer mistakenly schedules unneeded scans.
         60.seconds(),
         "AP forwarding data between client and its peer",
-        event::matched(|_, event| packet_forwarder(&client_proxy, "frame ap ->  client")(event)),
+        event::on_transmit(
+            action::send_packet(&client_proxy, rx_info_with_default_ap()).context("AP -> client"),
+        ),
         peer_behind_ap_fut,
     );
 

@@ -3,16 +3,15 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Error,
+    anyhow::{Context, Error},
     fidl_fuchsia_wlan_common::{WlanTxResult, WlanTxResultCode, WlanTxResultEntry},
-    fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_tap::{WlantapPhyConfig, WlantapPhyEvent, WlantapPhyProxy},
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap,
     fuchsia_async::Interval,
     fuchsia_zircon::DurationNum,
     futures::{channel::mpsc, StreamExt},
     ieee80211::Bssid,
     pin_utils::pin_mut,
-    std::collections::HashMap,
+    std::collections::{hash_map::Entry, HashMap},
     tracing::info,
     wlan_common::{
         appendable::Appendable,
@@ -22,9 +21,14 @@ use {
         mac,
     },
     wlan_hw_sim::{
-        connect_with_security_type, default_wlantap_config_client, event, init_syslog,
-        loop_until_iface_is_found, netdevice_helper, test_utils, ApAdvertisement, Beacon, AP_SSID,
-        CLIENT_MAC_ADDR, ETH_DST_MAC,
+        connect_with_security_type, default_wlantap_config_client,
+        event::{
+            self,
+            buffered::{Buffered, DataFrame},
+            Handler,
+        },
+        init_syslog, loop_until_iface_is_found, netdevice_helper, test_utils, ApAdvertisement,
+        Beacon, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC,
     },
 };
 // Remedy for fxbug.dev/8165 (fxbug.dev/33151)
@@ -33,72 +37,193 @@ const DATA_FRAME_INTERVAL_NANOS: i64 = 4_000_000;
 
 const BSS_MINSTL: Bssid = Bssid([0x6d, 0x69, 0x6e, 0x73, 0x74, 0x0a]);
 
-fn create_wlan_tx_result_entry(tx_vec_idx: u16) -> WlanTxResultEntry {
-    WlanTxResultEntry { tx_vector_idx: tx_vec_idx, attempts: 1 }
-}
+// Simulated hardware supports eight ERP transmission vectors with indices 129 to 136, inclusive.
+// See the `send_association_response` function.
+const REQUIRED_IDXS: &[u16] = &[129, 130, 131, 132, 133, 134, 136]; // Missing 135 is OK.
+const SUPPORTED_IDXS: &[u16] = &[129, 130, 131, 132, 133, 134, 135, 136];
+const ERP_STARTING_IDX: u16 = 129;
+const MAX_SUCCESSFUL_IDX: u16 = 130;
 
-fn send_tx_status_report(
-    bssid: Bssid,
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct TxVecCount {
     tx_vec_idx: u16,
-    is_successful: bool,
-    proxy: &WlantapPhyProxy,
-) -> Result<(), Error> {
-    let result_code =
-        if is_successful { WlanTxResultCode::Success } else { WlanTxResultCode::Failed };
-    let tr = WlanTxResult {
-        peer_addr: bssid.0,
-        result_code,
-        tx_result_entry: [
-            create_wlan_tx_result_entry(tx_vec_idx),
-            create_wlan_tx_result_entry(0),
-            create_wlan_tx_result_entry(0),
-            create_wlan_tx_result_entry(0),
-            create_wlan_tx_result_entry(0),
-            create_wlan_tx_result_entry(0),
-            create_wlan_tx_result_entry(0),
-            create_wlan_tx_result_entry(0),
-        ],
-    };
-    proxy.report_tx_result(&tr)?;
-    Ok(())
+    count: u64,
 }
 
-fn handle_rate_selection_event<F, G>(
-    event: &WlantapPhyEvent,
-    phy: &WlantapPhyProxy,
-    bssid: &Bssid,
-    hm: &mut HashMap<u16, u64>,
-    should_succeed: F,
-    is_converged: &mut G,
-    mut sender: mpsc::Sender<bool>,
-) where
-    F: Fn(u16) -> bool,
-    G: FnMut(&HashMap<u16, u64>) -> bool,
-{
-    match event {
-        WlantapPhyEvent::Tx { ref args } => {
-            if let Some(mac::MacFrame::Data { .. }) =
-                mac::MacFrame::parse(&args.packet.data[..], false)
-            {
-                let tx_vec_idx = args.packet.info.tx_vector_idx;
-                send_tx_status_report(*bssid, tx_vec_idx, should_succeed(tx_vec_idx), phy)
-                    .expect("Error sending tx_status report");
-                let count = hm.entry(tx_vec_idx).or_insert(0);
-                *count += 1;
-                if *count == 1 {
-                    info!("new tx_vec_idx: {} at #{}", tx_vec_idx, hm.values().sum::<u64>());
-                }
-                sender.try_send(is_converged(hm)).expect("sending message to ethernet sender");
-            }
-        }
-        _ => {}
+impl From<(u16, u64)> for TxVecCount {
+    fn from((tx_vec_idx, count): (u16, u64)) -> Self {
+        TxVecCount { tx_vec_idx, count }
     }
 }
 
-async fn eth_and_beacon_sender<'a>(
-    receiver: &'a mut mpsc::Receiver<bool>,
-    phy: &'a WlantapPhyProxy,
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct Maxima<T> {
+    pub max: T,
+    pub penult: T,
+}
+
+impl Maxima<TxVecCount> {
+    pub fn by_tx_vec_idx(self) -> Maxima<u16> {
+        let Maxima {
+            max: TxVecCount { tx_vec_idx: max, .. },
+            penult: TxVecCount { tx_vec_idx: penult, .. },
+        } = self;
+        Maxima { max, penult }
+    }
+}
+
+trait TxVecCountMaxima {
+    fn maxima_by_count(&self) -> Option<Maxima<TxVecCount>>;
+}
+
+impl TxVecCountMaxima for HashMap<u16, u64> {
+    fn maxima_by_count(&self) -> Option<Maxima<TxVecCount>> {
+        fn copied((key, value): (&u16, &u64)) -> (u16, u64) {
+            (*key, *value)
+        }
+        self.iter().map(copied).max_by_key(|(_, n)| *n).map(TxVecCount::from).and_then(|max| {
+            self.iter()
+                .filter(|(&tx_vec_idx, _)| tx_vec_idx != max.tx_vec_idx)
+                .map(copied)
+                .max_by_key(|(_, n)| *n)
+                .map(TxVecCount::from)
+                .map(|penult| Maxima { max, penult })
+        })
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct MinstrelConvergence {
+    snapshot: Option<Maxima<TxVecCount>>,
+}
+
+impl MinstrelConvergence {
+    pub fn get_and_snapshot(
+        &mut self,
+        tx_vec_counts: &HashMap<u16, u64>,
+    ) -> Option<Maxima<TxVecCount>> {
+        tx_vec_counts.maxima_by_count().and_then(|maxima| {
+            let is_converged = self.is_converged(tx_vec_counts.len(), &maxima);
+            // Take snapshots at a reduced frequency to determine convergence more reliably by
+            // ignoring early fluctuations.
+            if maxima.max.count % 100 == 0 {
+                info!(
+                    "snapshotting tx_vec_idx counts with maxima {:?}: {:?}",
+                    maxima, tx_vec_counts
+                );
+                self.snapshot = Some(maxima);
+            }
+            is_converged.then(|| self.snapshot).flatten()
+        })
+    }
+
+    // Check for convergence in the snapshots. A snapshot is taken when "100 frames (~4 minstrel
+    // cycles) are sent with the same tx vector index". This function examines the most used and
+    // the second most used transmission vectors (i.e., data rates) since the last snapshot.
+    //
+    // Once Minstrel converges, the optimal transmission vector will remain unchanged and, due to
+    // the probing mechanism, the second most used transmission vector will also be used regularly
+    // (though much less frequently) to ensure that it is still viable.
+    fn is_converged(&self, n: usize, maxima: &Maxima<TxVecCount>) -> bool {
+        // Due to its randomness, Minstrel may skip vector 135, but the other 7 must be present.
+        if n < REQUIRED_IDXS.len() {
+            return false;
+        }
+        if let Some(snapshot) = self.snapshot.as_ref() {
+            if maxima.by_tx_vec_idx() != snapshot.by_tx_vec_idx() {
+                false
+            } else {
+                // One transmission vector has become dominant, because the number of data frames
+                // transmitted on that vector is at least 15 times as large as any other vector.
+                // Note that there are 15 non-probing data frames between any two consecutive
+                // probing data frames.
+                const FRAMES_PER_PROBE: u64 = 15;
+
+                let max = maxima.max.count - snapshot.max.count;
+                let penult = maxima.penult.count - snapshot.penult.count;
+                // The penult vector is used regularly (more than once), but much less frequently
+                // than the dominant vector.
+                penult > 1 && max >= (FRAMES_PER_PROBE * penult)
+            }
+        } else {
+            false
+        }
+    }
+}
+
+fn send_tx_result_and_minstrel_convergence<'h>(
+    phy: &'h fidl_tap::WlantapPhyProxy,
+    bssid: &'h Bssid,
+    tx_vec_counts: &'h mut HashMap<u16, u64>,
+    mut sender: mpsc::Sender<Option<Maxima<TxVecCount>>>,
+) -> impl Handler<(), fidl_tap::WlantapPhyEvent> + 'h {
+    let mut convergence = MinstrelConvergence::default();
+    event::on_transmit(event::extract(
+        move |_: Buffered<DataFrame>, packet: fidl_tap::WlanTxPacket| {
+            let tx_vec_idx = packet.info.tx_vector_idx;
+            send_tx_result(
+                *bssid,
+                tx_vec_idx,
+                // Only the lowest indices can succeed in the simulated environment.
+                (ERP_STARTING_IDX..=MAX_SUCCESSFUL_IDX).contains(&tx_vec_idx),
+                phy,
+            )
+            .context("failed to send transmission status report")?;
+            match tx_vec_counts.entry(tx_vec_idx) {
+                Entry::Occupied(mut count) => *count.get_mut() += 1,
+                Entry::Vacant(vacancy) => {
+                    vacancy.insert(1);
+                    info!(
+                        "new tx_vec_idx: {} at #{}",
+                        tx_vec_idx,
+                        tx_vec_counts.values().sum::<u64>()
+                    );
+                }
+            };
+            sender
+                .try_send(convergence.get_and_snapshot(tx_vec_counts))
+                .context("failed to send Minstrel convergence")
+        },
+    ))
+    .expect("failed to simulate station")
+}
+
+fn wlan_tx_result_entry(tx_vec_idx: u16) -> WlanTxResultEntry {
+    WlanTxResultEntry { tx_vector_idx: tx_vec_idx, attempts: 1 }
+}
+
+fn send_tx_result(
+    bssid: Bssid,
+    tx_vec_idx: u16,
+    is_successful: bool,
+    proxy: &fidl_tap::WlantapPhyProxy,
 ) -> Result<(), Error> {
+    let result = WlanTxResult {
+        peer_addr: bssid.0,
+        result_code: if is_successful {
+            WlanTxResultCode::Success
+        } else {
+            WlanTxResultCode::Failed
+        },
+        tx_result_entry: [
+            wlan_tx_result_entry(tx_vec_idx),
+            wlan_tx_result_entry(0),
+            wlan_tx_result_entry(0),
+            wlan_tx_result_entry(0),
+            wlan_tx_result_entry(0),
+            wlan_tx_result_entry(0),
+            wlan_tx_result_entry(0),
+            wlan_tx_result_entry(0),
+        ],
+    };
+    proxy.report_tx_result(&result)?;
+    Ok(())
+}
+
+async fn send_eth_beacons<'a>(
+    receiver: &'a mut mpsc::Receiver<Option<Maxima<TxVecCount>>>,
+    phy: &'a fidl_tap::WlantapPhyProxy,
+) -> Result<Maxima<TxVecCount>, Error> {
     let (client, port) = netdevice_helper::create_client(fidl_fuchsia_net::MacAddress {
         octets: CLIENT_MAC_ADDR.clone(),
     })
@@ -119,8 +244,8 @@ async fn eth_and_beacon_sender<'a>(
     loop {
         timer_stream.next().await;
 
-        // auto-deauthentication timeout is 10.24 seconds.
-        // Send a beacon before that to stay connected.
+        // The auto-deauthentication timeout is 10.24 seconds. Send a beacon before then to stay
+        // connected.
         if (intervals_since_last_beacon * DATA_FRAME_INTERVAL_NANOS).nanos() >= 8765.millis() {
             intervals_since_last_beacon = 0;
             Beacon {
@@ -136,12 +261,10 @@ async fn eth_and_beacon_sender<'a>(
         intervals_since_last_beacon += 1;
 
         netdevice_helper::send(&session, &port, &buf).await;
-        let converged = receiver.next().await.expect("error receiving channel message");
-        if converged {
-            break;
+        if let Some(snapshot) = receiver.next().await.expect("failed to receive convergence") {
+            return Ok(snapshot);
         }
     }
-    Ok(())
 }
 
 /// Test rate selection is working correctly by verifying data rate is reduced once the Minstrel
@@ -151,7 +274,7 @@ async fn eth_and_beacon_sender<'a>(
 async fn rate_selection() {
     init_syslog();
 
-    let mut helper = test_utils::TestHelper::begin_test(WlantapPhyConfig {
+    let mut helper = test_utils::TestHelper::begin_test(fidl_tap::WlantapPhyConfig {
         quiet: true,
         ..default_wlantap_config_client()
     })
@@ -170,108 +293,42 @@ async fn rate_selection() {
 
     let phy = helper.proxy();
     let (sender, mut receiver) = mpsc::channel(1);
-    let eth_and_beacon_sender_fut = eth_and_beacon_sender(&mut receiver, &phy);
-    pin_mut!(eth_and_beacon_sender_fut);
+    let send_eth_beacons = send_eth_beacons(&mut receiver, &phy);
+    pin_mut!(send_eth_beacons);
 
-    // Simulated hardware supports 8 ERP tx vectors with idx 129 to 136, both inclusive.
-    // (see `fn send_association_response(...)`)
-    const MUST_USE_IDX: &[u16] = &[129, 130, 131, 132, 133, 134, 136]; // Missing 135 is OK.
-    const ALL_SUPPORTED_IDX: &[u16] = &[129, 130, 131, 132, 133, 134, 135, 136];
-    const ERP_STARTING_IDX: u16 = 129;
-    const MAX_SUCCESSFUL_IDX: u16 = 130;
-
-    // Only the lowest ones can succeed in the simulated environment.
-    let will_succeed = |idx| ERP_STARTING_IDX <= idx && idx <= MAX_SUCCESSFUL_IDX;
-
-    let mut tx_vec_count_map = HashMap::new();
-    let mut max_key_prev = std::u16::MAX;
-    let mut second_max_key_prev = max_key_prev;
-    let mut max_val_prev = 0u64;
-    let mut second_max_val_prev = 0u64;
-
-    // Check for convergence by taking snapshots. A snapshot is taken when "100
-    // frames (~4 minstrel cycles) are sent with the same tx vector index". we
-    // check the most used and the second most used tx vectors (aka data rates)
-    // since last snapshot.
-    //
-    // Once Minstrel converges, the optimal tx vector will remain unchanged for
-    // the rest of the time. And due to its "probing" mechanism, the second most
-    // used tx vector will also be used regularly (but much less frequently) to
-    // make sure it is still viable.
-    let mut is_converged = |hm: &HashMap<u16, u64>| {
-        // Due to its randomness, Minstrel may skip 135. But the other 7 must be present.
-        if hm.keys().len() < MUST_USE_IDX.len() {
-            return false;
-        }
-        // safe to unwrap below because there are at least 7 entries
-        let max_key = hm.keys().max_by_key(|k| hm[&k]).unwrap();
-        let (second_max_key, second_max_val) =
-            hm.iter().filter(|(k, _v)| k != &max_key).max_by_key(|(_k, v)| *v).unwrap();
-        let max_val = hm[&max_key];
-
-        let is_converged = if !(max_key == &max_key_prev && second_max_key == &second_max_key_prev)
-        {
-            // optimal values changed, not stabilized yet
-            false
-        } else {
-            // One tx vector has become dominant as the number of data frames transmitted with it
-            // is at least 15 times as large as anyone else. 15 is the number of non-probing data
-            // frames between 2 consecutive probing data frames.
-            const NORMAL_FRAMES_PER_PROBE: u64 = 15;
-            let diff_max = max_val - max_val_prev;
-            let diff_second_max = second_max_val - second_max_val_prev;
-            // second_max is used regularly (> 1) but still much less frequently than the dominant.
-            (diff_second_max > 1) && (diff_max >= NORMAL_FRAMES_PER_PROBE * diff_second_max)
-        };
-
-        // Take a snapshot every once in a while to reduce the effect of early fluctuations.
-        // This makes determining convergence more reliable.
-        if max_val % 100 == 0 {
-            info!("Snapshotting HashMap: {:?}", hm);
-            max_key_prev = *max_key;
-            second_max_key_prev = *second_max_key;
-            max_val_prev = max_val;
-            second_max_val_prev = *second_max_val;
-        }
-        is_converged
-    };
-    helper
+    let mut tx_vec_counts = HashMap::new();
+    let snapshot = helper
         .run_until_complete_or_timeout(
             30.seconds(),
             "verify rate selection converges to 130",
-            event::matched(|_, event| {
-                handle_rate_selection_event(
-                    event,
-                    &phy,
-                    &BSS_MINSTL,
-                    &mut tx_vec_count_map,
-                    will_succeed,
-                    &mut is_converged,
-                    sender.clone(),
-                );
-            }),
-            eth_and_beacon_sender_fut,
+            send_tx_result_and_minstrel_convergence(
+                &phy,
+                &BSS_MINSTL,
+                &mut tx_vec_counts,
+                sender.clone(),
+            ),
+            send_eth_beacons,
         )
         .await
         .expect("running main future");
 
-    let total = tx_vec_count_map.values().sum::<u64>();
-    info!("final tx vector counts:\n{:#?}\ntotal: {}", tx_vec_count_map, total);
-    assert!(tx_vec_count_map.contains_key(&MAX_SUCCESSFUL_IDX));
-    let others = total - tx_vec_count_map[&MAX_SUCCESSFUL_IDX];
+    let sum = tx_vec_counts.values().sum::<u64>();
+    info!("final tx_vec_idx counts:\n{:#?}\ntotal: {}", tx_vec_counts, sum);
+    assert!(tx_vec_counts.contains_key(&MAX_SUCCESSFUL_IDX));
+    let others = sum - tx_vec_counts[&MAX_SUCCESSFUL_IDX];
     info!("others: {}", others);
-    let mut tx_vec_idx_seen: Vec<_> = tx_vec_count_map.keys().cloned().collect();
-    tx_vec_idx_seen.sort();
-    if tx_vec_idx_seen.len() == MUST_USE_IDX.len() {
-        // 135 may not be attempted due to randomness and it is OK.
-        assert_eq!(&tx_vec_idx_seen[..], MUST_USE_IDX);
+    let mut tx_vecs: Vec<_> = tx_vec_counts.keys().cloned().collect();
+    tx_vecs.sort();
+    if tx_vecs.len() == REQUIRED_IDXS.len() {
+        // Vector 135 may not be attempted due to randomness and that's OK.
+        assert_eq!(&tx_vecs[..], REQUIRED_IDXS);
     } else {
-        assert_eq!(&tx_vec_idx_seen[..], ALL_SUPPORTED_IDX);
+        assert_eq!(&tx_vecs[..], SUPPORTED_IDXS);
     }
     info!(
         "If the test fails due to QEMU slowness outside of the scope of WLAN (See fxbug.dev/8165, \
          fxbug.dev/33151). Try increasing |DATA_FRAME_INTERVAL_NANOS| above."
     );
-    assert_eq!(max_key_prev, MAX_SUCCESSFUL_IDX);
+    assert_eq!(snapshot.max.tx_vec_idx, MAX_SUCCESSFUL_IDX);
     helper.stop().await;
 }

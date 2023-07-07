@@ -12,7 +12,7 @@ use {
         bss::Protection,
         channel::{Cbw, Channel},
     },
-    wlan_hw_sim::*,
+    wlan_hw_sim::{event::action, *},
 };
 
 const BSS_FOO: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
@@ -39,58 +39,6 @@ async fn simulate_scan() {
     let () = loop_until_iface_is_found(&mut helper).await;
     let phy = helper.proxy();
 
-    // Configure the scan event to return Beacon frames corresponding to each
-    // BeaconInfo specified.
-    let mut scan_event = EventHandlerBuilder::new()
-        .on_start_scan(start_scan_handler(
-            &phy,
-            Ok(vec![
-                Beacon {
-                    channel: Channel::new(1, Cbw::Cbw20),
-                    bssid: BSS_FOO,
-                    ssid: SSID_FOO.clone(),
-                    protection: Protection::Wpa2Personal,
-                    rssi_dbm: -60,
-                },
-                Beacon {
-                    channel: Channel::new(2, Cbw::Cbw20),
-                    bssid: BSS_FOO_2,
-                    ssid: SSID_FOO.clone(),
-                    protection: Protection::Open,
-                    rssi_dbm: -60,
-                },
-                Beacon {
-                    channel: Channel::new(3, Cbw::Cbw20),
-                    bssid: BSS_BAR,
-                    ssid: SSID_BAR.clone(),
-                    protection: Protection::Wpa2Personal,
-                    rssi_dbm: -60,
-                },
-                Beacon {
-                    channel: Channel::new(4, Cbw::Cbw20),
-                    bssid: BSS_BAR_2,
-                    ssid: SSID_BAR.clone(),
-                    protection: Protection::Wpa2Personal,
-                    rssi_dbm: -40,
-                },
-                Beacon {
-                    channel: Channel::new(5, Cbw::Cbw20),
-                    bssid: BSS_BAZ,
-                    ssid: SSID_BAZ.clone(),
-                    protection: Protection::Open,
-                    rssi_dbm: -60,
-                },
-                Beacon {
-                    channel: Channel::new(6, Cbw::Cbw20),
-                    bssid: BSS_BAZ_2,
-                    ssid: SSID_BAZ.clone(),
-                    protection: Protection::Wpa2Personal,
-                    rssi_dbm: -60,
-                },
-            ]),
-        ))
-        .build();
-
     // Create a client controller.
     let (client_controller, _update_stream) = init_client_controller().await;
 
@@ -100,7 +48,55 @@ async fn simulate_scan() {
         .run_until_complete_or_timeout(
             *SCAN_RESPONSE_TEST_TIMEOUT,
             "receive a scan response",
-            event::matched(|_, event| scan_event(event)),
+            // Configure the scan event to return beacon frames corresponding to each `Beacon`
+            // specified.
+            event::on_scan(action::send_advertisements_and_scan_completion(
+                &phy,
+                [
+                    Beacon {
+                        channel: Channel::new(1, Cbw::Cbw20),
+                        bssid: BSS_FOO,
+                        ssid: SSID_FOO.clone(),
+                        protection: Protection::Wpa2Personal,
+                        rssi_dbm: -60,
+                    },
+                    Beacon {
+                        channel: Channel::new(2, Cbw::Cbw20),
+                        bssid: BSS_FOO_2,
+                        ssid: SSID_FOO.clone(),
+                        protection: Protection::Open,
+                        rssi_dbm: -60,
+                    },
+                    Beacon {
+                        channel: Channel::new(3, Cbw::Cbw20),
+                        bssid: BSS_BAR,
+                        ssid: SSID_BAR.clone(),
+                        protection: Protection::Wpa2Personal,
+                        rssi_dbm: -60,
+                    },
+                    Beacon {
+                        channel: Channel::new(4, Cbw::Cbw20),
+                        bssid: BSS_BAR_2,
+                        ssid: SSID_BAR.clone(),
+                        protection: Protection::Wpa2Personal,
+                        rssi_dbm: -40,
+                    },
+                    Beacon {
+                        channel: Channel::new(5, Cbw::Cbw20),
+                        bssid: BSS_BAZ,
+                        ssid: SSID_BAZ.clone(),
+                        protection: Protection::Open,
+                        rssi_dbm: -60,
+                    },
+                    Beacon {
+                        channel: Channel::new(6, Cbw::Cbw20),
+                        bssid: BSS_BAZ_2,
+                        ssid: SSID_BAZ.clone(),
+                        protection: Protection::Wpa2Personal,
+                        rssi_dbm: -60,
+                    },
+                ],
+            )),
             scan_result_list_fut,
         )
         .await;

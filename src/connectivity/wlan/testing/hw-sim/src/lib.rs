@@ -44,12 +44,10 @@ pub mod netdevice_helper;
 pub mod test_utils;
 
 pub use device_helper::*;
-pub use event_handler_helper::*;
 pub use wlancfg_helper::*;
 
 mod config;
 mod device_helper;
-mod event_handler_helper;
 mod wlancfg_helper;
 
 pub const PSK_STR_LEN: usize = 64;

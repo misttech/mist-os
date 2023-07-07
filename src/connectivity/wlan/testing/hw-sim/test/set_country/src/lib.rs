@@ -6,16 +6,15 @@ use {
     fidl_fuchsia_wlan_device_service::{
         DeviceMonitorMarker, DeviceMonitorProxy, SetCountryRequest,
     },
-    fidl_fuchsia_wlan_tap::WlantapPhyEvent,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon::sys::ZX_OK,
     fuchsia_zircon::DurationNum,
     futures::channel::oneshot,
     pin_utils::pin_mut,
-    wlan_hw_sim::*,
+    wlan_hw_sim::{event::Handler, *},
 };
 
-async fn set_country_helper<'a>(
+async fn set_country_and_await_match<'a>(
     receiver: oneshot::Receiver<()>,
     svc: &'a DeviceMonitorProxy,
     req: &'a mut SetCountryRequest,
@@ -46,22 +45,20 @@ async fn set_country() {
     let mut req = SetCountryRequest { phy_id, alpha2: *ALPHA2 };
 
     let (sender, receiver) = oneshot::channel();
-    // Employ a future to make sure this test does not end before WlantanPhyEvent is captured.
-    let set_country_fut = set_country_helper(receiver, &svc, &mut req);
-    pin_mut!(set_country_fut);
+    // Set the country and await a signal from the event handler via `sender`.
+    let set_country_and_await_match = set_country_and_await_match(receiver, &svc, &mut req);
+    pin_mut!(set_country_and_await_match);
 
-    let mut sender = Some(sender);
     helper
         .run_until_complete_or_timeout(
-            std::i64::MAX.nanos(), // Unlimited timeout since set_country must be called.
+            std::i64::MAX.nanos(), // Unlimited timeout. Await `set_country` in the event handler.
             "wlanstack_dev_svc set_country",
-            event::matched(|_, event| {
-                if let WlantapPhyEvent::SetCountry { ref args } = event {
-                    assert_eq!(args.alpha2, *ALPHA2);
-                    sender.take().map(|s| s.send(()));
-                }
-            }),
-            set_country_fut,
+            event::on_set_country(
+                event::extract(|alpha2: [u8; 2]| assert_eq!(alpha2, *ALPHA2))
+                    .and(event::once(|_, _| sender.send(())))
+                    .expect("failed to send completion signal"),
+            ),
+            set_country_and_await_match,
         )
         .await;
     helper.stop().await;

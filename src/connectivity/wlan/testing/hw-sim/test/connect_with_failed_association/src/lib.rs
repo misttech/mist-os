@@ -4,70 +4,51 @@
 
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_tap::{self as wlantap, WlantapPhyProxy},
+    fidl_fuchsia_wlan_tap as fidl_tap,
     fuchsia_zircon::DurationNum,
     ieee80211::{Bssid, Ssid},
     pin_utils::pin_mut,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},
-        mac,
     },
-    wlan_hw_sim::*,
+    wlan_hw_sim::{
+        event::{action, branch, Handler},
+        *,
+    },
 };
 
-const BSSID: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
-
-fn build_event_handler<'a>(
-    ssid: &'a Ssid,
-    bssid: Bssid,
-    phy: &'a WlantapPhyProxy,
-) -> impl FnMut(&wlantap::WlantapPhyEvent) + 'a {
-    EventHandlerBuilder::new()
-        .on_start_scan(start_scan_handler(
-            &phy,
-            Ok(vec![Beacon {
-                channel: Channel::new(1, Cbw::Cbw20),
+fn scan_and_associate<'h>(
+    phy: &'h fidl_tap::WlantapPhyProxy,
+    ssid: &'h Ssid,
+    bssid: &'h Bssid,
+    channel: &'h Channel,
+) -> impl Handler<(), fidl_tap::WlantapPhyEvent> + 'h {
+    let beacons = [Beacon {
+        channel: *channel,
+        bssid: *bssid,
+        ssid: ssid.clone(),
+        protection: Protection::Wpa2Personal,
+        rssi_dbm: -30,
+    }];
+    branch::or((
+        event::on_scan(action::send_advertisements_and_scan_completion(phy, beacons)),
+        event::on_transmit(branch::or((
+            action::send_open_authentication(
+                phy,
                 bssid,
-                ssid: ssid.clone(),
-                protection: Protection::Wpa2Personal,
-                rssi_dbm: -30,
-            }]),
-        ))
-        .on_tx(
-            TxHandlerBuilder::new()
-                .on_mgmt_frame(move |frame: &Vec<u8>| {
-                    match mac::MacFrame::parse(&frame[..], false) {
-                        Some(mac::MacFrame::Mgmt { mgmt_hdr, body, .. }) => {
-                            match mac::MgmtBody::parse({ mgmt_hdr.frame_ctrl }.mgmt_subtype(), body)
-                            {
-                                Some(mac::MgmtBody::Authentication { .. }) => {
-                                    send_open_authentication(
-                                        &Channel::new(1, Cbw::Cbw20),
-                                        &bssid,
-                                        fidl_ieee80211::StatusCode::Success,
-                                        &phy,
-                                    )
-                                    .expect("Error sending fake authentication frame.");
-                                }
-                                Some(mac::MgmtBody::AssociationReq { .. }) => {
-                                    send_association_response(
-                                        &Channel::new(1, Cbw::Cbw20),
-                                        &bssid,
-                                        fidl_ieee80211::StatusCode::RefusedTemporarily,
-                                        &phy,
-                                    )
-                                    .expect("Error sending fake association response with failure");
-                                }
-                                _ => (),
-                            }
-                        }
-                        _ => (),
-                    }
-                })
-                .build(),
-        )
-        .build()
+                channel,
+                fidl_ieee80211::StatusCode::Success,
+            ),
+            action::send_association_response(
+                phy,
+                bssid,
+                channel,
+                fidl_ieee80211::StatusCode::RefusedTemporarily,
+            ),
+        ))),
+    ))
+    .expect("failed to scan and associate")
 }
 
 async fn save_network_and_await_failed_connection(
@@ -97,6 +78,8 @@ async fn save_network_and_await_failed_connection(
 /// not success.
 #[fuchsia_async::run_singlethreaded(test)]
 async fn connect_with_failed_association() {
+    const BSSID: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
+
     init_syslog();
 
     let mut helper = test_utils::TestHelper::begin_test(default_wlantap_config_client()).await;
@@ -110,13 +93,12 @@ async fn connect_with_failed_association() {
     );
     pin_mut!(save_network_fut);
 
-    let proxy = helper.proxy();
-    let mut handler = build_event_handler(&AP_SSID, BSSID, &proxy);
+    let phy = helper.proxy();
     let () = helper
         .run_until_complete_or_timeout(
             240.seconds(),
             format!("connecting to {} ({:02X?})", AP_SSID.to_string_not_redactable(), BSSID),
-            event::matched(|_, event| handler(event)),
+            scan_and_associate(&phy, &AP_SSID, &BSSID, &Channel::new(1, Cbw::Cbw20)),
             save_network_fut,
         )
         .await;

@@ -12,7 +12,7 @@ use {
         bss::Protection,
         channel::{Cbw, Channel},
     },
-    wlan_hw_sim::*,
+    wlan_hw_sim::{event::action, *},
 };
 
 const BSS_WPA1: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
@@ -33,37 +33,6 @@ async fn scan_contemporary_privacy() {
     let () = loop_until_iface_is_found(&mut helper).await;
     let phy = helper.proxy();
 
-    // Configure the scan event to return Beacon frames corresponding to each
-    // BeaconInfo specified.
-    let mut scan_event = EventHandlerBuilder::new()
-        .on_start_scan(start_scan_handler(
-            &phy,
-            Ok(vec![
-                Beacon {
-                    channel: Channel::new(1, Cbw::Cbw20),
-                    bssid: BSS_WPA1,
-                    ssid: SSID_WPA1.clone(),
-                    protection: Protection::Wpa1,
-                    rssi_dbm: -30,
-                },
-                Beacon {
-                    channel: Channel::new(1, Cbw::Cbw20),
-                    bssid: BSS_WEP,
-                    ssid: SSID_WEP.clone(),
-                    protection: Protection::Wep,
-                    rssi_dbm: -40,
-                },
-                Beacon {
-                    channel: Channel::new(1, Cbw::Cbw20),
-                    bssid: BSS_MIXED,
-                    ssid: SSID_MIXED.clone(),
-                    protection: Protection::Wpa1Wpa2Personal,
-                    rssi_dbm: -50,
-                },
-            ]),
-        ))
-        .build();
-
     // Create a client controller.
     let (client_controller, _update_stream) = init_client_controller().await;
 
@@ -73,7 +42,34 @@ async fn scan_contemporary_privacy() {
         .run_until_complete_or_timeout(
             *SCAN_RESPONSE_TEST_TIMEOUT,
             "receive a scan response",
-            event::matched(|_, event| scan_event(event)),
+            // Configure the scan event to return beacon frames corresponding to each `Beacon`
+            // specified.
+            event::on_scan(action::send_advertisements_and_scan_completion(
+                &phy,
+                [
+                    Beacon {
+                        channel: Channel::new(1, Cbw::Cbw20),
+                        bssid: BSS_WPA1,
+                        ssid: SSID_WPA1.clone(),
+                        protection: Protection::Wpa1,
+                        rssi_dbm: -30,
+                    },
+                    Beacon {
+                        channel: Channel::new(1, Cbw::Cbw20),
+                        bssid: BSS_WEP,
+                        ssid: SSID_WEP.clone(),
+                        protection: Protection::Wep,
+                        rssi_dbm: -40,
+                    },
+                    Beacon {
+                        channel: Channel::new(1, Cbw::Cbw20),
+                        bssid: BSS_MIXED,
+                        ssid: SSID_MIXED.clone(),
+                        protection: Protection::Wpa1Wpa2Personal,
+                        rssi_dbm: -50,
+                    },
+                ],
+            )),
             scan_result_list_fut,
         )
         .await;

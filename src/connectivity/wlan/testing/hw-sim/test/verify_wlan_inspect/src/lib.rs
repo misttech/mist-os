@@ -6,19 +6,20 @@ use {
     anyhow::{format_err, Error},
     diagnostics_hierarchy::{self, DiagnosticsHierarchy},
     diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect},
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_tap::{self as wlantap, WlantapPhyProxy},
+    fidl_fuchsia_wlan_policy as fidl_policy,
     fuchsia_inspect::testing::{assert_data_tree, AnyProperty},
     fuchsia_zircon::DurationNum,
-    ieee80211::{Bssid, Ssid},
+    ieee80211::Bssid,
     pin_utils::pin_mut,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},
         format::MacFmt as _,
-        mac,
     },
-    wlan_hw_sim::*,
+    wlan_hw_sim::{
+        event::{action, Handler},
+        *,
+    },
 };
 
 const BSSID: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
@@ -59,59 +60,6 @@ const DEVICEMONITOR_MONIKER: &'static str = "wlandevicemonitor";
 // const WLANSTACK_MONIKER: &'static str = "wlanstack";
 const POLICY_MONIKER: &'static str = "wlancfg";
 
-fn build_event_handler<'a>(
-    ssid: &'a Ssid,
-    bssid: Bssid,
-    phy: &'a WlantapPhyProxy,
-) -> impl FnMut(&wlantap::WlantapPhyEvent) + 'a {
-    EventHandlerBuilder::new()
-        .on_start_scan(start_scan_handler(
-            &phy,
-            Ok(vec![ProbeResponse {
-                channel: Channel::new(1, Cbw::Cbw20),
-                bssid,
-                ssid: ssid.clone(),
-                protection: Protection::Open,
-                rssi_dbm: -10,
-                wsc_ie: Some(WSC_IE_BODY.to_vec()),
-            }]),
-        ))
-        .on_tx(
-            TxHandlerBuilder::new()
-                .on_mgmt_frame(move |mgmt_frame: &Vec<u8>| {
-                    match mac::MacFrame::parse(&mgmt_frame[..], false) {
-                        Some(mac::MacFrame::Mgmt { mgmt_hdr, body, .. }) => {
-                            match mac::MgmtBody::parse({ mgmt_hdr.frame_ctrl }.mgmt_subtype(), body)
-                            {
-                                Some(mac::MgmtBody::Authentication { .. }) => {
-                                    send_open_authentication(
-                                        &Channel::new(1, Cbw::Cbw20),
-                                        &bssid,
-                                        fidl_ieee80211::StatusCode::Success,
-                                        &phy,
-                                    )
-                                    .expect("Error sending fake authentication frame.");
-                                }
-                                Some(mac::MgmtBody::AssociationReq { .. }) => {
-                                    send_association_response(
-                                        &Channel::new(1, Cbw::Cbw20),
-                                        &bssid,
-                                        fidl_ieee80211::StatusCode::Success,
-                                        &phy,
-                                    )
-                                    .expect("Error sending fake association response frame");
-                                }
-                                _ => (),
-                            }
-                        }
-                        _ => (),
-                    }
-                })
-                .build(),
-        )
-        .build()
-}
-
 /// Test a client can connect to a network with no protection by simulating an AP that sends out
 /// hard coded authentication and association response frames.
 #[fuchsia_async::run_singlethreaded(test)]
@@ -125,7 +73,19 @@ async fn verify_wlan_inspect() {
         wlan_hw_sim::init_client_controller().await;
     let security_type = fidl_policy::SecurityType::None;
     {
-        let connect_fut = async {
+        let phy = helper.proxy();
+        let channel = Channel::new(1, Cbw::Cbw20);
+        let protection = Protection::Open;
+        let probes = [ProbeResponse {
+            channel,
+            bssid: BSSID,
+            ssid: AP_SSID.clone(),
+            protection,
+            rssi_dbm: -10,
+            wsc_ie: Some(WSC_IE_BODY.to_vec()),
+        }];
+
+        let connect_future = async {
             save_network(
                 &client_controller,
                 &AP_SSID,
@@ -140,16 +100,21 @@ async fn verify_wlan_inspect() {
             })
             .await;
         };
-        pin_mut!(connect_fut);
-
-        let proxy = helper.proxy();
-        let mut handler = build_event_handler(&AP_SSID, BSSID, &proxy);
+        pin_mut!(connect_future);
         let () = helper
             .run_until_complete_or_timeout(
                 240.seconds(),
                 format!("connecting to {} ({:02X?})", AP_SSID.to_string_not_redactable(), BSSID),
-                event::matched(|_, event| handler(event)),
-                connect_fut,
+                event::on_scan(action::send_advertisements_and_scan_completion(&phy, probes))
+                    .or(event::on_transmit(action::connect_with_open_authentication(
+                        &phy,
+                        &AP_SSID,
+                        &BSSID,
+                        &channel,
+                        &protection,
+                    )))
+                    .expect("failed to scan and associate"),
+                connect_future,
             )
             .await;
     }
