@@ -29,6 +29,7 @@ source_set("sdio") {
   deps = []
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_bindlib_cpp",
     "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac:core",
     "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac:debug",
   ]

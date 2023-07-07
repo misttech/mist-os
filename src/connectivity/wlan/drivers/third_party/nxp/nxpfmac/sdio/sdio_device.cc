@@ -14,7 +14,10 @@
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/sdio/sdio_device.h"
 
 #include <lib/async-loop/default.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
+
+#include <bind/fuchsia/wlan/phyimpl/cpp/bind.h>
 
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/debug.h"
 #include "src/devices/lib/nxp/include/wifi/wifi-config.h"
@@ -50,8 +53,16 @@ zx_status_t SdioDevice::Create(zx_device_t* parent_device) {
       fuchsia_wlan_phyimpl::Service::Name,
   };
 
+  zx_device_str_prop_t props[] = {
+      {
+          .key = bind_fuchsia_wlan_phyimpl::WLANPHYIMPL.c_str(),
+          .property_value =
+              str_prop_str_val(bind_fuchsia_wlan_phyimpl::WLANPHYIMPL_DRIVERTRANSPORT.c_str()),
+      },
+  };
+
   if ((status = device->DdkAdd(ddk::DeviceAddArgs("nxpfmac_sdio-wlanphy")
-                                   .set_proto_id(ZX_PROTOCOL_WLANPHY_IMPL)
+                                   .set_str_props(props)
                                    .set_runtime_service_offers(offers)
                                    .set_outgoing_dir(endpoints->client.TakeChannel()))) != ZX_OK) {
     NXPF_ERR("DdkAdd failed: %s", zx_status_get_string(status));

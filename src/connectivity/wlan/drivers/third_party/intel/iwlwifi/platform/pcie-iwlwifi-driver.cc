@@ -13,6 +13,7 @@
 
 #include <memory>
 
+#include <bind/fuchsia/wlan/phyimpl/cpp/bind.h>
 #include <wlan/drivers/log_instance.h>
 
 extern "C" {
@@ -95,7 +96,8 @@ zx_status_t PcieIwlwifiDriver::AddWlanphyChild() {
   offers.push_back(fuchsia_component_decl::wire::Offer::WithService(arena, service_offer));
 
   // Set the properties of the node that a driver will bind to.
-  auto property = fdf::MakeProperty(arena, 1, ZX_PROTOCOL_WLANPHY_IMPL);
+  auto property = fdf::MakeProperty(arena, bind_fuchsia_wlan_phyimpl::WLANPHYIMPL,
+                                    bind_fuchsia_wlan_phyimpl::WLANPHYIMPL_DRIVERTRANSPORT);
 
   auto args = fdf::wire::NodeAddArgs::Builder(arena)
                   .name("iwlwifi-wlanphyimpl")

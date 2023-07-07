@@ -14,11 +14,13 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sdio/sdio_device.h"
 
 #include <lib/async-loop/default.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/zircon-internal/align.h>
 
 #include <limits>
 #include <string>
 
+#include <bind/fuchsia/wlan/phyimpl/cpp/bind.h>
 #include <ddktl/init-txn.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bus.h"
@@ -77,8 +79,16 @@ zx_status_t SdioDevice::Create(zx_device_t* parent_device) {
       fuchsia_wlan_phyimpl::Service::Name,
   };
 
+  zx_device_str_prop_t props[] = {
+      {
+          .key = bind_fuchsia_wlan_phyimpl::WLANPHYIMPL.c_str(),
+          .property_value =
+              str_prop_str_val(bind_fuchsia_wlan_phyimpl::WLANPHYIMPL_DRIVERTRANSPORT.c_str()),
+      },
+  };
+
   if ((status = device->DdkAdd(ddk::DeviceAddArgs("brcmfmac-wlanphy")
-                                   .set_proto_id(ZX_PROTOCOL_WLANPHY_IMPL)
+                                   .set_str_props(props)
                                    .set_inspect_vmo(device->inspect_->inspector().DuplicateVmo())
                                    .set_runtime_service_offers(offers)
                                    .set_outgoing_dir(endpoints->client.TakeChannel()))) != ZX_OK) {

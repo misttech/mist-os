@@ -41,6 +41,7 @@ fuchsia_driver("wlantap_driver-driver") {
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_hlcpp",
     "//sdk/fidl/fuchsia.wlan.device:fuchsia.wlan.device_hlcpp",
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_cpp",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_bindlib_cpp",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_driver",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_wire",
@@ -51,9 +52,7 @@ fuchsia_driver("wlantap_driver-driver") {
     "//sdk/lib/driver/devfs/cpp",
     "//src/connectivity/wlan/lib/common/cpp:common",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
     "//zircon/system/public:public",
-    "//zircon/system/ulib/zx",
   ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
 
