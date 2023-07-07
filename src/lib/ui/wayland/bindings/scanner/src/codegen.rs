@@ -76,6 +76,7 @@ impl<W: io::Write> Codegen<W> {
             self.w,
             "
 #![allow(warnings)]
+#![allow(clippy::all)]
 use bitflags::*;
 use anyhow;
 use fuchsia_trace;
