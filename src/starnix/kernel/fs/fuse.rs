@@ -7,9 +7,9 @@ use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer, OutputBufferCallback},
         default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
-        fs_args, CacheMode, DirectoryEntryType, DirentSink, FdEvents, FdNumber, FileObject,
-        FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode,
-        FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget,
+        fs_args, CacheMode, DirEntry, DirectoryEntryType, DirentSink, FdEvents, FdNumber,
+        FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
+        FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget,
         ValueOrSize, XattrOp,
     },
     lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
@@ -105,6 +105,7 @@ pub fn new_fuse_fs(
         nodeid: uapi::FUSE_ROOT_ID as u64,
         state: Default::default(),
     });
+    fuse_node.state.lock().nlookup += 1;
     let mut root_node = FsNode::new_root(fuse_node.clone());
     root_node.node_id = uapi::FUSE_ROOT_ID as u64;
     fs.set_root_node(root_node);
@@ -221,6 +222,7 @@ impl FuseNode {
     fn fs_node_from_entry(
         &self,
         node: &FsNode,
+        name: &FsStr,
         response: FuseResponse,
     ) -> Result<FsNodeHandle, Errno> {
         let entry = if let FuseResponse::Entry(entry) = response {
@@ -241,8 +243,11 @@ impl FuseNode {
             FuseNode::update_node_info(&mut info, entry.attr)?;
             Ok(FsNode::new_uncached(Box::new(fuse_node), &node.fs(), id, info))
         })?;
-        let fuse_node = FuseNode::from_node(&node)?;
-        fuse_node.state.lock().nlookup += 1;
+        // . and .. do not get their lookup count increased.
+        if !DirEntry::is_reserved_name(name) {
+            let fuse_node = FuseNode::from_node(&node)?;
+            fuse_node.state.lock().nlookup += 1;
+        }
         Ok(node)
     }
 }
@@ -455,37 +460,76 @@ impl FileOps for FuseFileObject {
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
-        let node = self.get_fuse_node(file)?;
+        let configuration = self.connection.get_configuration(current_task)?;
+        let use_readdirplus = {
+            if configuration.flags.contains(FuseInitFlags::DO_READDIRPLUS) {
+                if configuration.flags.contains(FuseInitFlags::READDIRPLUS_AUTO) {
+                    sink.offset() == 0
+                } else {
+                    true
+                }
+            } else {
+                false
+            }
+        };
         // Request a number of bytes related to the user capacity. If none is given, default to a
         // single page of data.
-        let user_capacity = sink.user_capacity().unwrap_or(*PAGE_SIZE as usize);
+        let user_capacity = if let Some(base_user_capacity) = sink.user_capacity() {
+            if use_readdirplus {
+                // Add some amount of capacity for the entries.
+                base_user_capacity * 3 / 2
+            } else {
+                base_user_capacity
+            }
+        } else {
+            *PAGE_SIZE as usize
+        };
+        let node = self.get_fuse_node(file)?;
         let response = self.connection.execute_operation(
             current_task,
             node,
-            FuseOperation::Readdir(uapi::fuse_read_in {
-                fh: self.open_out.fh,
-                offset: sink.offset().try_into().map_err(|_| errno!(EINVAL))?,
-                size: user_capacity.try_into().map_err(|_| errno!(EINVAL))?,
-                read_flags: 0,
-                lock_owner: 0,
-                flags: 0,
-                padding: 0,
-            }),
+            FuseOperation::Readdir(
+                uapi::fuse_read_in {
+                    fh: self.open_out.fh,
+                    offset: sink.offset().try_into().map_err(|_| errno!(EINVAL))?,
+                    size: user_capacity.try_into().map_err(|_| errno!(EINVAL))?,
+                    read_flags: 0,
+                    lock_owner: 0,
+                    flags: 0,
+                    padding: 0,
+                },
+                use_readdirplus,
+            ),
         )?;
         let dirents = if let FuseResponse::Readdir(dirents) = response {
             dirents
         } else {
             return error!(EINVAL);
         };
-        for (dirent, name) in dirents {
-            sink.add(
-                dirent.ino,
-                dirent.off.try_into().map_err(|_| errno!(EINVAL))?,
-                DirectoryEntryType::from_bits(dirent.type_.try_into().map_err(|_| errno!(EINVAL))?),
-                &name,
-            )?;
+        let mut sink_result = Ok(());
+        for (dirent, name, entry) in dirents {
+            if let Some(entry) = entry {
+                // nodeid == 0 means the server doesn't want to send entry info.
+                if entry.nodeid != 0 {
+                    if let Err(e) =
+                        node.fs_node_from_entry(file.node(), &name, FuseResponse::Entry(entry))
+                    {
+                        log_error!("Unable to prefill entry: {e:?}");
+                    }
+                }
+            }
+            if sink_result.is_ok() {
+                sink_result = sink.add(
+                    dirent.ino,
+                    dirent.off.try_into().map_err(|_| errno!(EINVAL))?,
+                    DirectoryEntryType::from_bits(
+                        dirent.type_.try_into().map_err(|_| errno!(EINVAL))?,
+                    ),
+                    &name,
+                );
+            }
         }
-        Ok(())
+        sink_result
     }
 
     fn ioctl(
@@ -549,7 +593,7 @@ impl FsNodeOps for Arc<FuseNode> {
             self,
             FuseOperation::Lookup(name.to_owned()),
         )?;
-        self.fs_node_from_entry(node, response)
+        self.fs_node_from_entry(node, name, response)
     }
 
     fn mknod(
@@ -574,7 +618,7 @@ impl FsNodeOps for Arc<FuseNode> {
                 name.to_owned(),
             ),
         )?;
-        self.fs_node_from_entry(node, response)
+        self.fs_node_from_entry(node, name, response)
     }
 
     fn mkdir(
@@ -593,7 +637,7 @@ impl FsNodeOps for Arc<FuseNode> {
                 name.to_owned(),
             ),
         )?;
-        self.fs_node_from_entry(node, response)
+        self.fs_node_from_entry(node, name, response)
     }
 
     fn create_symlink(
@@ -609,7 +653,7 @@ impl FsNodeOps for Arc<FuseNode> {
             self,
             FuseOperation::Symlink(target.to_owned(), name.to_owned()),
         )?;
-        self.fs_node_from_entry(node, response)
+        self.fs_node_from_entry(node, name, response)
     }
 
     fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
@@ -803,13 +847,14 @@ impl FsNodeOps for Arc<FuseNode> {
             return Ok(());
         }
         let nlookup = self.state.lock().nlookup;
-        self.connection
-            .execute_operation(
+        if nlookup > 0 {
+            self.connection.execute_operation(
                 current_task,
                 self,
                 FuseOperation::Forget(uapi::fuse_forget_in { nlookup }),
-            )
-            .map(|_| ())
+            )?;
+        };
+        Ok(())
     }
 }
 
@@ -982,6 +1027,7 @@ struct FuseMutableState {
 impl FuseMutableState {
     fn set_configuration(&mut self, configuration: FuseConfiguration) {
         debug_assert!(self.configuration.is_none());
+        log_trace!("Fuse configuration: {configuration:?}");
         self.configuration = Some(Arc::new(configuration));
         self.waiters.notify_value_event(CONFIGURATION_AVAILABLE_EVENT);
     }
@@ -1221,9 +1267,11 @@ bitflags::bitflags! {
     pub struct FuseInitFlags : u32 {
         const BIG_WRITES = uapi::FUSE_BIG_WRITES;
         const DONT_MASK = uapi::FUSE_DONT_MASK;
-        const SPLICE_READ = uapi::FUSE_SPLICE_READ;
         const SPLICE_WRITE = uapi::FUSE_SPLICE_WRITE;
         const SPLICE_MOVE = uapi::FUSE_SPLICE_MOVE;
+        const SPLICE_READ = uapi::FUSE_SPLICE_READ;
+        const DO_READDIRPLUS = uapi::FUSE_DO_READDIRPLUS;
+        const READDIRPLUS_AUTO = uapi::FUSE_READDIRPLUS_AUTO;
         const SETXATTR_EXT = uapi::FUSE_SETXATTR_EXT;
     }
 }
@@ -1251,7 +1299,11 @@ enum FuseOperation {
     Open(OpenFlags, FileMode),
     Poll(uapi::fuse_poll_in),
     Read(uapi::fuse_read_in),
-    Readdir(uapi::fuse_read_in),
+    Readdir(
+        uapi::fuse_read_in,
+        // use_readdirplus
+        bool,
+    ),
     Readlink,
     Release(OpenFlags, FileMode, uapi::fuse_open_out),
     RemoveXAttr(
@@ -1298,7 +1350,7 @@ enum FuseResponse {
         Vec<u8>,
     ),
     Seek(uapi::fuse_lseek_out),
-    Readdir(Vec<(uapi::fuse_dirent, FsString)>),
+    Readdir(Vec<(uapi::fuse_dirent, FsString, Option<uapi::fuse_entry_out>)>),
     Statfs(uapi::fuse_statfs_out),
     Write(uapi::fuse_write_out),
     None,
@@ -1358,7 +1410,7 @@ impl FuseOperation {
                 len += Self::write_null_terminated(data, name)?;
                 Ok(len)
             }
-            Self::Read(read_in) | Self::Readdir(read_in) => data.write_all(read_in.as_bytes()),
+            Self::Read(read_in) | Self::Readdir(read_in, _) => data.write_all(read_in.as_bytes()),
             Self::Release(_, _, open_in) => {
                 let message = uapi::fuse_release_in {
                     fh: open_in.fh,
@@ -1427,7 +1479,13 @@ impl FuseOperation {
             }
             Self::Poll(_) => uapi::fuse_opcode_FUSE_POLL,
             Self::Read(_) => uapi::fuse_opcode_FUSE_READ,
-            Self::Readdir(_) => uapi::fuse_opcode_FUSE_READDIR,
+            Self::Readdir(_, use_readdirplus) => {
+                if *use_readdirplus {
+                    uapi::fuse_opcode_FUSE_READDIRPLUS
+                } else {
+                    uapi::fuse_opcode_FUSE_READDIR
+                }
+            }
             Self::Readlink => uapi::fuse_opcode_FUSE_READLINK,
             Self::Release(flags, mode, _) => {
                 if mode.is_dir() || flags.contains(OpenFlags::DIRECTORY) {
@@ -1525,26 +1583,39 @@ impl FuseOperation {
                 Ok(FuseResponse::Poll(Self::to_response::<uapi::fuse_poll_out>(&buffer)))
             }
             Self::Read(_) | Self::Readlink => Ok(FuseResponse::Read(buffer)),
-            Self::Readdir(_) => {
+            Self::Readdir(_, use_readdirplus) => {
                 let mut result = vec![];
                 let mut slice = &buffer[..];
-                while slice.len() >= std::mem::size_of::<uapi::fuse_dirent>() {
+                while !slice.is_empty() {
+                    // If using READDIRPLUS, the data starts with the entry.
+                    let entry = if *use_readdirplus {
+                        if slice.len() < std::mem::size_of::<uapi::fuse_entry_out>() {
+                            return error!(EINVAL);
+                        }
+                        let entry = Self::to_response::<uapi::fuse_entry_out>(slice);
+                        slice = &slice[std::mem::size_of::<uapi::fuse_entry_out>()..];
+                        Some(entry)
+                    } else {
+                        None
+                    };
+                    // The next item is the dirent.
+                    if slice.len() < std::mem::size_of::<uapi::fuse_dirent>() {
+                        return error!(EINVAL);
+                    }
                     let dirent = Self::to_response::<uapi::fuse_dirent>(slice);
+                    // And it ends with the name.
                     slice = &slice[std::mem::size_of::<uapi::fuse_dirent>()..];
                     let namelen = dirent.namelen as usize;
                     if slice.len() < namelen {
                         return error!(EINVAL);
                     }
                     let name: FsString = slice[..namelen].to_owned();
-                    result.push((dirent, name));
+                    result.push((dirent, name, entry));
                     let skipped = round_up_to_increment(namelen, 8)?;
                     if slice.len() < skipped {
                         return error!(EINVAL);
                     }
                     slice = &slice[skipped..];
-                }
-                if !slice.is_empty() {
-                    return error!(EINVAL);
                 }
                 Ok(FuseResponse::Readdir(result))
             }
