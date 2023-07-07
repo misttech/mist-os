@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/legacy_image_metadata_overrides.gni")
+import("//build/board.gni")
 import("//build/images/args.gni")
 import("//build/images/custom_signing.gni")
 import("//build/images/vbmeta.gni")
@@ -12,6 +13,13 @@ import("//build/images/zedboot/zedboot_args.gni")
 
 assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
+
+if (has_board) {
+  assert(zedboot_images_config_label != false,
+         "Need to define zedboot_images_config_label")
+} else {
+  zedboot_images_config_label = "//boards/images:default"
+}
 
 # Note: This ZBI output is also used by a script in //scripts/verify_cmdline_params.
 assembled_system("zedboot_assembly") {
@@ -24,11 +32,8 @@ assembled_system("zedboot_assembly") {
   fshost_config = board_zedboot_fshost_config
   use_bringup_platform_bundles_only = true
 
+  assembly_images_config_label = zedboot_images_config_label
   product_assembly_config_label = "//build/assembly:default_product_config"
-
-  if (zedboot_images_config_label != false) {
-    assembly_images_config_label = zedboot_images_config_label
-  }
 
   base_packages = []
 
