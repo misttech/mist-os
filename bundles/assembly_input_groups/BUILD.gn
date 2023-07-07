@@ -30,7 +30,6 @@ assembly_input_groups("bootstrap") {
     "//bundles/drivers:bootstrap",
     "//bundles/drivers:usb-host-stack",
     "//bundles/drivers:usb-peripheral-stack",
-    "//bundles/drivers:utils",
     "//src/sys/component_manager:component_manager_bootfs_config",
   ]
   base_packages = [ "//src/sys/full-resolver" ]
