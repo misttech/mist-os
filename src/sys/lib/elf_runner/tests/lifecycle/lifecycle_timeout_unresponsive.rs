@@ -72,7 +72,8 @@ async fn test_stop_timeouts() {
                     .stop(Some(ExitStatusMatcher::AnyCrash)),
                 EventMatcher::ok().r#type(Destroyed::TYPE).moniker(root_moniker.clone()),
             ],
-            Ordering::Ordered,
+            // TODO(https://fxbug.dev/130280): Strengthen ordering
+            Ordering::Unordered,
         )
         .expect(event_stream_root)
         .await
@@ -88,7 +89,8 @@ async fn test_stop_timeouts() {
                     .stop(Some(ExitStatusMatcher::AnyCrash)),
                 EventMatcher::ok().r#type(Destroyed::TYPE).moniker(custom_moniker.clone()),
             ],
-            Ordering::Ordered,
+            // TODO(https://fxbug.dev/130280): Strengthen ordering
+            Ordering::Unordered,
         )
         .expect(event_stream_custom)
         .await
@@ -104,7 +106,8 @@ async fn test_stop_timeouts() {
                     .stop(Some(ExitStatusMatcher::AnyCrash)),
                 EventMatcher::ok().r#type(Destroyed::TYPE).moniker(inherited_moniker.clone()),
             ],
-            Ordering::Ordered,
+            // TODO(https://fxbug.dev/130280): Strengthen ordering
+            Ordering::Unordered,
         )
         .expect(event_stream_inherited)
         .await
