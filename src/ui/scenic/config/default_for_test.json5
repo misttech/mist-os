@@ -3,7 +3,7 @@
     i_can_haz_flatland: true,
     enable_allocator_for_flatland: true,
     pointer_auto_focus: true,
-    flatland_enable_display_composition: false,
+    flatland_enable_display_composition: true,
     i_can_haz_display_id: -1,
     i_can_haz_display_mode: -1,
 }
