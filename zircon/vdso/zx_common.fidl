@@ -36,6 +36,7 @@ alias Off = uint64;
 // source.
 const CHANNEL_MAX_MSG_BYTES uint64 = 65536;
 const CHANNEL_MAX_MSG_HANDLES uint64 = 64;
+const IOB_MAX_REGIONS uint64 = 64;
 const MAX_NAME_LEN uint64 = 32;
 const MAX_CPUS uint64 = 512;
 

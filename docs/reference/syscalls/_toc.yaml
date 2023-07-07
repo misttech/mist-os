@@ -200,6 +200,10 @@ toc:
     path: /docs/reference/syscalls/vmo_set_size.md
   - title: "zx_vmo_write"
     path: /docs/reference/syscalls/vmo_write.md
+- title: "IOBuffers"
+  section:
+  - title: "zx_iob_create"
+    path: /docs/reference/syscalls/iob_create.md
 - title: "Virtual memory address regions"
   section:
   - title: "zx_vmar_allocate"
@@ -214,6 +218,8 @@ toc:
     path: /docs/reference/syscalls/vmar_protect.md
   - title: "zx_vmar_unmap"
     path: /docs/reference/syscalls/vmar_unmap.md
+  - title: "zx_vmar_map_iob"
+    path: /docs/reference/syscalls/vmar_map_iob.md
 - title: "Userspace pagers"
   section:
   - title: "zx_pager_create"

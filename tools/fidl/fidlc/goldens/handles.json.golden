@@ -37,6 +37,9 @@
         "zx/DEFAULT_EVENT_RIGHTS": {
           "kind": "const"
         },
+        "zx/IOB_MAX_REGIONS": {
+          "kind": "const"
+        },
         "zx/MAX_CPUS": {
           "kind": "const"
         },

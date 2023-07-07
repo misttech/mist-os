@@ -39,6 +39,7 @@ source_set("impl") {
     "futex.cc",
     "handle_ops.cc",
     "hypervisor.cc",
+    "iob.cc",
     "object.cc",
     "object_wait.cc",
     "pager.cc",

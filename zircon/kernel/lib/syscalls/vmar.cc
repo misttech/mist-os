@@ -270,3 +270,10 @@ zx_status_t sys_vmar_op_range(zx_handle_t handle, uint32_t op, zx_vaddr_t addr, 
 
   return vmar->RangeOp(op, addr, len, vmar_rights, _buffer, buffer_size);
 }
+
+// zx_status_t zx_vmar_map_iob
+zx_status_t sys_vmar_map_iob(zx_handle_t handle, zx_vm_option_t options, size_t vmar_offset,
+                             zx_handle_t ep, uint32_t region_index, size_t region_offset,
+                             size_t region_length, user_out_ptr<vaddr_t> mapped_addr) {
+  return ZX_ERR_NOT_SUPPORTED;
+}

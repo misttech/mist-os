@@ -44,6 +44,7 @@ fidl("zx") {
     "guest.fidl",
     "handle.fidl",
     "interrupt.fidl",
+    "iob.fidl",
     "iommu.fidl",
     "ioports.fidl",
     "job.fidl",
