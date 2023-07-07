@@ -206,6 +206,9 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #   generate_fvm (optional; default: false)
 #     [bool] Whether to generate a FVM image.
 #
+#   generate_fvm_fastboot (optional; default: false)
+#     [bool] Whether to generate a FVM image for flashing via fastboot.
+#
 #   generate_fxfs (optional; default: false)
 #     [bool] Whether to generate an Fxfs image.  Exclusive with generate_fvm.  EXPERIMENTAL.
 #
@@ -261,6 +264,11 @@ template("assembled_system") {
   if (defined(invoker.generate_fvm)) {
     generate_fvm = invoker.generate_fvm
   }
+  generate_fvm_fastboot = generate_fvm && (fvm_emmc_partition_size != false ||
+                                           fvm_ftl_nand_block_count != false)
+  if (defined(invoker.generate_fvm_fastboot)) {
+    generate_fvm_fastboot = invoker.generate_fvm_fastboot
+  }
   generate_fxfs = false
   if (defined(invoker.generate_fxfs)) {
     generate_fxfs = invoker.generate_fxfs
@@ -272,10 +280,6 @@ template("assembled_system") {
   assert(!generate_fvm || !generate_fxfs,
          "Only one of Fxfs and FVM can host blobs")
   _supports_blobs = generate_fvm || generate_fxfs
-  if (generate_fvm) {
-    _has_fastboot_fvm =
-        fvm_emmc_partition_size != false || fvm_ftl_nand_block_count != false
-  }
 
   # By default, build a GN-generated images config.
   _use_explicit_images_config_only = false
@@ -1106,7 +1110,7 @@ template("assembled_system") {
           files.blobfs,
           files.fvm_blob_sparse,
         ]
-        if (_has_fastboot_fvm) {
+        if (generate_fvm_fastboot) {
           outputs += [ files.fvm_fastboot ]
           if (fvm_ftl_nand_block_count != false) {
             outputs += [ files.fvm_fastboot_tmp ]
@@ -1289,7 +1293,7 @@ template("assembled_system") {
         }
 
         # Optionally include the fastboot FVM.
-        if (generate_fvm && _has_fastboot_fvm) {
+        if (generate_fvm_fastboot) {
           images += [
             {
               name = "${image_name}.fvm_fastboot"
