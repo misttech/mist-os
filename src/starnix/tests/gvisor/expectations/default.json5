@@ -151,7 +151,6 @@
                 "Inotify.InOnlyDirFlagRespected",
                 "Inotify.RmdirOnWatchedTargetGeneratesEvent",
                 "Inotify.ChildrenDeletionInWatchedDirGeneratesEvent",
-                "Inotify.CoalesceEvents",
                 "Inotify.TruncateGeneratesModifyEvent",
                 "Inotify.SymlinkGeneratesCreateEvent",
                 "Inotify.SymlinkFollow",

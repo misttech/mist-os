@@ -52,6 +52,7 @@ pub struct InotifyWatchers {
 }
 
 // Serialized to inotify_event, see inotify(7).
+#[derive(PartialEq, Eq)]
 struct InotifyEvent {
     watch_id: WdNumber,
 
@@ -130,8 +131,12 @@ impl InotifyFileObject {
         oneshot: bool,
     ) {
         let mut state = self.state.lock();
-        let event = InotifyEvent::new(watch_id, event_mask, cookie, name);
-        state.events.push_back(event);
+        let new_event = InotifyEvent::new(watch_id, event_mask, cookie, name);
+        if Some(&new_event) == state.events.back() {
+            debug_assert!(!oneshot, "oneshot watchers cannot create 2 equivalent events");
+            return;
+        }
+        state.events.push_back(new_event);
         if oneshot {
             state.watches.remove(&watch_id);
             state.events.push_back(InotifyEvent::new(
@@ -502,6 +507,35 @@ mod tests {
             assert_eq!(watchers.len(), 1);
             assert!(watchers.get(&file_key).unwrap().mask.contains(InotifyMask::ACCESS));
             assert!(watchers.get(&file_key).unwrap().mask.contains(InotifyMask::MODIFY));
+        }
+    }
+
+    #[::fuchsia::test]
+    async fn coalesce_events() {
+        let (_kernel, current_task) = create_kernel_and_task();
+
+        let file = InotifyFileObject::new_file(&current_task, true);
+        let inotify =
+            file.downcast_file::<InotifyFileObject>().expect("failed to downcast to inotify");
+
+        // Use root as the watched directory.
+        let root = current_task.fs().root().entry;
+        assert!(inotify.add_watch(root.clone(), InotifyMask::ALL_EVENTS, &file).is_ok());
+
+        {
+            let watchers = root.node.watchers.watchers.lock();
+            assert_eq!(watchers.len(), 1);
+        }
+
+        // Generate 2 identical events. They should combine into 1.
+        root.node.watchers.notify(InotifyMask::ACCESS, &"".into());
+        root.node.watchers.notify(InotifyMask::ACCESS, &"".into());
+
+        assert_eq!(inotify.available(), DATA_SIZE);
+        {
+            let state = inotify.state.lock();
+            assert_eq!(state.watches.len(), 1);
+            assert_eq!(state.events.len(), 1);
         }
     }
 }
