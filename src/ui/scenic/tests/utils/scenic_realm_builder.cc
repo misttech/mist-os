@@ -43,16 +43,13 @@ ScenicRealmBuilder& ScenicRealmBuilder::Init(RealmBuilderArgs args) {
   realm_builder_.SetConfigValue(kScenic, "i_can_haz_flatland",
                                 ConfigValue::Bool(args.use_flatland));
 
-  // Route the protocols required by the scenic subrealm from the test_manager.
-  realm_builder_.AddRoute(
-      Route{.capabilities = {Protocol{fuchsia::logger::LogSink::Name_},
-                             Protocol{fuchsia::media::ProfileProvider::Name_},
-                             Protocol{fuchsia::scheduler::ProfileProvider::Name_},
-                             Protocol{fuchsia::sysmem::Allocator::Name_},
-                             Protocol{fuchsia::tracing::provider::Registry::Name_},
-                             Protocol{fuchsia::vulkan::loader::Loader::Name_}},
-            .source = ParentRef(),
-            .targets = {ChildRef{kScenic}}});
+  // Only fuchsia.media.ProfileProvider is not already included by scenic_only.cml.
+  realm_builder_.AddRoute(Route{.capabilities =
+                                    {
+                                        Protocol{fuchsia::media::ProfileProvider::Name_},
+                                    },
+                                .source = ParentRef(),
+                                .targets = {ChildRef{kScenic}}});
 
   // Configure the ViewProvider for the test fixture. This setup is done for tests requiring a view
   // provider.

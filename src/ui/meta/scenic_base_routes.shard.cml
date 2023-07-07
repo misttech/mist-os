@@ -29,11 +29,16 @@
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.stash.Store",
                 "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
             to: [ "#scenic" ],
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: [ "#scenic" ],
+            availability: "optional",
         },
     ],
     expose: [

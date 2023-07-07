@@ -22,12 +22,15 @@
 {
     offer: [
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: [ "fuchsia.logger.LogSink" ],
             from: "parent",
             to: [ "#virtual_keyboard_manager" ],
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: [ "#virtual_keyboard_manager" ],
+            availability: "optional",
         },
         {
             protocol: [ "fuchsia.ui.focus.FocusChainListenerRegistry" ],

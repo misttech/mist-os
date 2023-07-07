@@ -21,12 +21,15 @@
 {
     offer: [
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [ "#text_manager" ],
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: [ "#text_manager" ],
+            availability: "optional",
         },
     ],
     expose: [

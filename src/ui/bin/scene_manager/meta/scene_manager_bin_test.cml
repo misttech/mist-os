@@ -16,12 +16,17 @@
             protocol: [
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.input.ImeService",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
             to: "#realm_builder",
+        },
+        {
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            from: "parent",
+            to: "#realm_builder",
+            availability: "optional",
         },
     ],
 }

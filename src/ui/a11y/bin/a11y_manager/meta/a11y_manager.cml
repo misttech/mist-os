@@ -6,6 +6,7 @@
         // Expose the diagnostics directory capability for Inspect
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
+        "trace/use.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -32,7 +33,6 @@
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.logger.LogSink",
                 "fuchsia.settings.Accessibility",
-                "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.accessibility.view.Registry",
                 "fuchsia.ui.annotation.Registry",
                 "fuchsia.ui.composition.Flatland",

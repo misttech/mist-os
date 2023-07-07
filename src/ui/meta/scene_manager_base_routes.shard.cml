@@ -25,7 +25,6 @@
             protocol: [
                 "fuchsia.logger.LogSink",
                 "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
 
                 // TODO(103539): Remove once cursor component is no longer
                 // a child of scene manager.
@@ -33,6 +32,12 @@
             ],
             from: "parent",
             to: [ "#scene_manager" ],
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: [ "#scene_manager" ],
+            availability: "optional",
         },
         {
             protocol: [
