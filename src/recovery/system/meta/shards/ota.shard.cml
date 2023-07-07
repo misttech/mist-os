@@ -77,5 +77,10 @@
             from: "parent",
             to: "#ota",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#ota" ],
+        },
     ],
 }
