@@ -11,7 +11,7 @@ For driver-to-driver communication, Fuchsia uses the
 [node topology][node-topology] to place parent nodes' capabilities in a child
 node's incoming FIDL namespace (that is, under `/svc` as directories and files).
 This setup enables a driver (once bound to the child node) to access FIDL
-services inherited from the parent nodes.
+services given to the child node from the parent nodes.
 
 However, communication from a non-driver component to a driver takes place in
 two phases:
@@ -30,7 +30,8 @@ The following events take place for non-driver to driver communication:
    directories and files in `devfs`.
 2. The non-driver component finds a file in `devfs` that represents a service
    provided by the target driver.
-3. The non-driver component opens this file and contacts the target driver.
+3. The non-driver component opens this file which establishes a connection
+   with the target driver.
 4. After the initial contact, a FIDL connection is established between the
    non-driver component and the driver.
 5. From this point, all communication takes place over the FIDL channels.
@@ -74,7 +75,7 @@ other components in Fuchsia.
 
 Drivers, as [Fuchsia components][components], have an incoming FIDL namespace
 filled with capabilities the drivers can use. Some of these capabilities may be
-inherited from their parent driver (for example, a PCI device will have
+given to the driver from its parent drivers (for example, a PCI device will have
 a `fuchsia.hardware.PCI` capability from its parent node). Drivers can use
 these capabilities to make FIDL calls to their parent drivers. Similarly,
 their clients (that is, non-driver components) can also use the capabilities

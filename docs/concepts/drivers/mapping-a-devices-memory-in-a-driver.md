@@ -41,7 +41,8 @@ a device's memory:
    [binds][driver-binding] a driver to it.
 1. The driver makes a request to [generate a VMO](#generating-a-vmo-for-a-device)
    for the device.
-1. The root bus driver invokes a special syscall to create a VMO for the device.
+1. The root bus driver invokes a [syscall][zx-vmo-create-physical]
+   to create a VMO for the device.
 1. The Zircon kernel creates a VMO that represents the device’s memory region.
 1. The root bus driver receives the VMO and passes it to the driver.
 1. The driver [maps the VMO](#mapping-a-vmo-to-a-vmar-in-a-driver) to a virtual
@@ -123,22 +124,18 @@ This is because all memory is mapped into the kernel's address space, and only
 syscalls can switch into the kernel mode to directly read from or write to
 the memory.
 
-In Fuchsia, however, drivers cannot use these syscalls to interact with a
-device’s memory for the following reasons:
+Drivers must not use these syscalls to interact with device memory VMOs and must
+map the VMO that represents the device's memory region to a VMAR in the
+[driver host][driver-host] (which is the process that the driver resides in).
+Drivers must not use syscalls to interact with a device’s memory because of:
 
 - Issues surrounding how registers are mapped (see
   [Cached and uncached registers](#cached-and-uncached-registers)).
-- Limitation on the types of instructions that are safe to use for interacting
+- Limitations on the types of instructions that are safe to use for interacting
   with registers.
 
-Hence, if a driver wants to read and write data in a device’s memory, the driver
-must map the VMO that represents the device’s memory region in the system to a
-VMAR in the [driver host][driver-host] (which is the process that the driver
-resides in).
-
 In case of multiple drivers in a single driver host, all drivers in the same
-driver host share the same [root VMAR][root-vmar]. And VMOs from these drivers
-get mapped to child VMARs that are created from this root VMAR of the driver host.
+driver host share the same [root VMAR][root-vmar].
 
 ### Helper library for interacting with a device’s memory {:#helper-library-for-interacting-with-a-devices-memory}
 
