@@ -283,7 +283,7 @@ impl FileOps for FuseFileObject {
         if let Err(e) = self.connection.execute_operation(
             self.kernel.kthreads.system_task(),
             node,
-            FuseOperation::Release(file.flags(), mode, self.open_out),
+            FuseOperation::Release { flags: file.flags(), mode, open_out: self.open_out },
         ) {
             log_error!("Error when relasing fh: {e:?}");
         }
@@ -352,8 +352,8 @@ impl FileOps for FuseFileObject {
         let response = self.connection.execute_operation(
             current_task,
             node,
-            FuseOperation::Write(
-                uapi::fuse_write_in {
+            FuseOperation::Write {
+                write_in: uapi::fuse_write_in {
                     fh: self.open_out.fh,
                     offset: offset.try_into().map_err(|_| errno!(EINVAL))?,
                     size: content.len().try_into().map_err(|_| errno!(EINVAL))?,
@@ -363,7 +363,7 @@ impl FileOps for FuseFileObject {
                     padding: 0,
                 },
                 content,
-            ),
+            },
         )?;
         let write_out = if let FuseResponse::Write(write_out) = response {
             write_out
@@ -488,8 +488,8 @@ impl FileOps for FuseFileObject {
         let response = self.connection.execute_operation(
             current_task,
             node,
-            FuseOperation::Readdir(
-                uapi::fuse_read_in {
+            FuseOperation::Readdir {
+                read_in: uapi::fuse_read_in {
                     fh: self.open_out.fh,
                     offset: sink.offset().try_into().map_err(|_| errno!(EINVAL))?,
                     size: user_capacity.try_into().map_err(|_| errno!(EINVAL))?,
@@ -499,7 +499,7 @@ impl FileOps for FuseFileObject {
                     padding: 0,
                 },
                 use_readdirplus,
-            ),
+            },
         )?;
         let dirents = if let FuseResponse::Readdir(dirents) = response {
             dirents
@@ -568,7 +568,7 @@ impl FsNodeOps for Arc<FuseNode> {
         let response = self.connection.execute_operation(
             current_task,
             self,
-            FuseOperation::Open(flags, mode),
+            FuseOperation::Open { flags, mode },
         )?;
         let open_out = if let FuseResponse::Open(open_out) = response {
             open_out
@@ -591,7 +591,7 @@ impl FsNodeOps for Arc<FuseNode> {
         let response = self.connection.execute_operation(
             current_task,
             self,
-            FuseOperation::Lookup(name.to_owned()),
+            FuseOperation::Lookup { name: name.to_owned() },
         )?;
         self.fs_node_from_entry(node, name, response)
     }
@@ -608,15 +608,15 @@ impl FsNodeOps for Arc<FuseNode> {
         let response = self.connection.execute_operation(
             current_task,
             self,
-            FuseOperation::Mknod(
-                uapi::fuse_mknod_in {
+            FuseOperation::Mknod {
+                mknod_in: uapi::fuse_mknod_in {
                     mode: mode.bits(),
                     rdev: dev.bits() as u32,
                     umask: current_task.fs().umask().bits(),
                     padding: 0,
                 },
-                name.to_owned(),
-            ),
+                name: name.to_owned(),
+            },
         )?;
         self.fs_node_from_entry(node, name, response)
     }
@@ -632,10 +632,13 @@ impl FsNodeOps for Arc<FuseNode> {
         let response = self.connection.execute_operation(
             current_task,
             self,
-            FuseOperation::Mkdir(
-                uapi::fuse_mkdir_in { mode: mode.bits(), umask: current_task.fs().umask().bits() },
-                name.to_owned(),
-            ),
+            FuseOperation::Mkdir {
+                mkdir_in: uapi::fuse_mkdir_in {
+                    mode: mode.bits(),
+                    umask: current_task.fs().umask().bits(),
+                },
+                name: name.to_owned(),
+            },
         )?;
         self.fs_node_from_entry(node, name, response)
     }
@@ -651,7 +654,7 @@ impl FsNodeOps for Arc<FuseNode> {
         let response = self.connection.execute_operation(
             current_task,
             self,
-            FuseOperation::Symlink(target.to_owned(), name.to_owned()),
+            FuseOperation::Symlink { target: target.to_owned(), name: name.to_owned() },
         )?;
         self.fs_node_from_entry(node, name, response)
     }
@@ -679,10 +682,10 @@ impl FsNodeOps for Arc<FuseNode> {
             .execute_operation(
                 current_task,
                 self,
-                FuseOperation::Link(
-                    uapi::fuse_link_in { oldnodeid: child_node.nodeid },
-                    name.to_owned(),
-                ),
+                FuseOperation::Link {
+                    link_in: uapi::fuse_link_in { oldnodeid: child_node.nodeid },
+                    name: name.to_owned(),
+                },
             )
             .map(|_| ())
     }
@@ -695,7 +698,7 @@ impl FsNodeOps for Arc<FuseNode> {
         _child: &FsNodeHandle,
     ) -> Result<(), Errno> {
         self.connection
-            .execute_operation(current_task, self, FuseOperation::Unlink(name.to_owned()))
+            .execute_operation(current_task, self, FuseOperation::Unlink { name: name.to_owned() })
             .map(|_| ())
     }
 
@@ -761,13 +764,13 @@ impl FsNodeOps for Arc<FuseNode> {
         let response = self.connection.execute_operation(
             current_task,
             self,
-            FuseOperation::GetXAttr(
-                uapi::fuse_getxattr_in {
+            FuseOperation::GetXAttr {
+                getxattr_in: uapi::fuse_getxattr_in {
                     size: max_size.try_into().map_err(|_| errno!(EINVAL))?,
                     padding: 0,
                 },
-                name.to_vec(),
-            ),
+                name: name.to_vec(),
+            },
         )?;
         if let FuseResponse::GetXAttr(result) = response {
             Ok(result)
@@ -787,16 +790,16 @@ impl FsNodeOps for Arc<FuseNode> {
         self.connection.execute_operation(
             current_task,
             self,
-            FuseOperation::SetXAttr(
-                uapi::fuse_setxattr_in {
+            FuseOperation::SetXAttr {
+                setxattr_in: uapi::fuse_setxattr_in {
                     size: value.len().try_into().map_err(|_| errno!(EINVAL))?,
                     flags: op.into_flags(),
                     setxattr_flags: 0,
                     padding: 0,
                 },
-                name.to_owned(),
-                value.to_owned(),
-            ),
+                name: name.to_owned(),
+                value: value.to_owned(),
+            },
         )?;
         Ok(())
     }
@@ -810,7 +813,7 @@ impl FsNodeOps for Arc<FuseNode> {
         self.connection.execute_operation(
             current_task,
             self,
-            FuseOperation::RemoveXAttr(name.to_owned()),
+            FuseOperation::RemoveXAttr { name: name.to_owned() },
         )?;
         Ok(())
     }
@@ -1105,8 +1108,14 @@ impl FuseMutableState {
             // Nothing to do, the operation has been cancelled before being sent.
             return error!(EINTR);
         }
-        self.queue_operation(task, node, FuseOperation::Interrupt(unique_id), configuration, None)
-            .map(|_| ())
+        self.queue_operation(
+            task,
+            node,
+            FuseOperation::Interrupt { unique_id },
+            configuration,
+            None,
+        )
+        .map(|_| ())
     }
 
     /// Returns the response for the operation with the given identifier. Returns None if the
@@ -1282,59 +1291,81 @@ enum FuseOperation {
     Forget(uapi::fuse_forget_in),
     GetAttr,
     Init,
-    Interrupt(
-        // Identifier of the operation to interrupt
-        u64,
-    ),
-    GetXAttr(
-        uapi::fuse_getxattr_in,
-        // Name of the attribute
-        FsString,
-    ),
+    Interrupt {
+        /// Identifier of the operation to interrupt
+        unique_id: u64,
+    },
+    GetXAttr {
+        getxattr_in: uapi::fuse_getxattr_in,
+        /// Name of the attribute
+        name: FsString,
+    },
     ListXAttr(uapi::fuse_getxattr_in),
-    Lookup(FsString),
-    Mkdir(uapi::fuse_mkdir_in, FsString),
-    Mknod(uapi::fuse_mknod_in, FsString),
-    Link(uapi::fuse_link_in, FsString),
-    Open(OpenFlags, FileMode),
+    Lookup {
+        /// Name of the entry to lookup
+        name: FsString,
+    },
+    Mkdir {
+        mkdir_in: uapi::fuse_mkdir_in,
+        /// Name of the entry to create
+        name: FsString,
+    },
+    Mknod {
+        mknod_in: uapi::fuse_mknod_in,
+        /// Name of the node to create
+        name: FsString,
+    },
+    Link {
+        link_in: uapi::fuse_link_in,
+        /// Name of the link to create
+        name: FsString,
+    },
+    Open {
+        flags: OpenFlags,
+        mode: FileMode,
+    },
     Poll(uapi::fuse_poll_in),
     Read(uapi::fuse_read_in),
-    Readdir(
-        uapi::fuse_read_in,
-        // use_readdirplus
-        bool,
-    ),
+    Readdir {
+        read_in: uapi::fuse_read_in,
+        /// Whether to use the READDIRPLUS api
+        use_readdirplus: bool,
+    },
     Readlink,
-    Release(OpenFlags, FileMode, uapi::fuse_open_out),
-    RemoveXAttr(
-        // Name of the attribute
-        FsString,
-    ),
+    Release {
+        flags: OpenFlags,
+        mode: FileMode,
+        open_out: uapi::fuse_open_out,
+    },
+    RemoveXAttr {
+        /// Name of the attribute
+        name: FsString,
+    },
     Seek(uapi::fuse_lseek_in),
     SetAttr(uapi::fuse_setattr_in),
-    SetXAttr(
-        uapi::fuse_setxattr_in,
-        // Name of the attribute
-        FsString,
-        // Value of the attribute
-        FsString,
-    ),
+    SetXAttr {
+        setxattr_in: uapi::fuse_setxattr_in,
+        /// Name of the attribute
+        name: FsString,
+        /// Value of the attribute
+        value: FsString,
+    },
     Statfs,
-    Symlink(
-        // Target of the link
-        FsString,
-        // Name of the link
-        FsString,
-    ),
-    Unlink(
-        // Name of the file to unlink
-        FsString,
-    ),
-    Write(
-        uapi::fuse_write_in,
+    Symlink {
+        /// Target of the link
+        target: FsString,
+        /// Name of the link
+        name: FsString,
+    },
+    Unlink {
+        /// Name of the file to unlink
+        name: FsString,
+    },
+    Write {
+        write_in: uapi::fuse_write_in,
         // Content to write
-        Vec<u8>,
-    ),
+        content: Vec<u8>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -1370,7 +1401,7 @@ impl FuseOperation {
             }
             Self::Forget(forget_in) => data.write_all(forget_in.as_bytes()),
             Self::GetAttr | Self::Readlink | Self::Statfs => Ok(0),
-            Self::GetXAttr(getxattr_in, name) => {
+            Self::GetXAttr { getxattr_in, name } => {
                 let mut len = data.write_all(getxattr_in.as_bytes())?;
                 len += Self::write_null_terminated(data, name)?;
                 Ok(len)
@@ -1384,46 +1415,48 @@ impl FuseOperation {
                 };
                 data.write_all(message.as_bytes())
             }
-            Self::Interrupt(unique) => {
-                let message = uapi::fuse_interrupt_in { unique: *unique };
+            Self::Interrupt { unique_id } => {
+                let message = uapi::fuse_interrupt_in { unique: *unique_id };
                 data.write_all(message.as_bytes())
             }
             Self::ListXAttr(getxattr_in) => data.write_all(getxattr_in.as_bytes()),
-            Self::Lookup(name) => Self::write_null_terminated(data, name),
-            Self::Open(open_flags, _) => {
-                let message = uapi::fuse_open_in { flags: open_flags.bits(), open_flags: 0 };
+            Self::Lookup { name } => Self::write_null_terminated(data, name),
+            Self::Open { flags, .. } => {
+                let message = uapi::fuse_open_in { flags: flags.bits(), open_flags: 0 };
                 data.write_all(message.as_bytes())
             }
             Self::Poll(poll_in) => data.write_all(poll_in.as_bytes()),
-            Self::Mkdir(mkdir_in, name) => {
+            Self::Mkdir { mkdir_in, name } => {
                 let mut len = data.write_all(mkdir_in.as_bytes())?;
                 len += Self::write_null_terminated(data, name)?;
                 Ok(len)
             }
-            Self::Mknod(mknod_in, name) => {
+            Self::Mknod { mknod_in, name } => {
                 let mut len = data.write_all(mknod_in.as_bytes())?;
                 len += Self::write_null_terminated(data, name)?;
                 Ok(len)
             }
-            Self::Link(link_in, name) => {
+            Self::Link { link_in, name } => {
                 let mut len = data.write_all(link_in.as_bytes())?;
                 len += Self::write_null_terminated(data, name)?;
                 Ok(len)
             }
-            Self::Read(read_in) | Self::Readdir(read_in, _) => data.write_all(read_in.as_bytes()),
-            Self::Release(_, _, open_in) => {
+            Self::Read(read_in) | Self::Readdir { read_in, .. } => {
+                data.write_all(read_in.as_bytes())
+            }
+            Self::Release { open_out, .. } => {
                 let message = uapi::fuse_release_in {
-                    fh: open_in.fh,
+                    fh: open_out.fh,
                     flags: 0,
                     release_flags: 0,
                     lock_owner: 0,
                 };
                 data.write_all(message.as_bytes())
             }
-            Self::RemoveXAttr(name) => Self::write_null_terminated(data, name),
+            Self::RemoveXAttr { name } => Self::write_null_terminated(data, name),
             Self::Seek(seek_in) => data.write_all(seek_in.as_bytes()),
             Self::SetAttr(setattr_in) => data.write_all(setattr_in.as_bytes()),
-            Self::SetXAttr(setxattr_in, name, value) => {
+            Self::SetXAttr { setxattr_in, name, value } => {
                 let header = if configuration.flags.contains(FuseInitFlags::SETXATTR_EXT) {
                     setxattr_in.as_bytes()
                 } else {
@@ -1434,14 +1467,14 @@ impl FuseOperation {
                 len += data.write_all(value.as_bytes())?;
                 Ok(len)
             }
-            Self::Symlink(target, name) => {
+            Self::Symlink { target, name } => {
                 let mut len = Self::write_null_terminated(data, name)?;
                 len += Self::write_null_terminated(data, target)?;
                 Ok(len)
             }
-            Self::Unlink(name) => Self::write_null_terminated(data, name),
-            Self::Write(fuse_write_in, content) => {
-                let mut len = data.write_all(fuse_write_in.as_bytes())?;
+            Self::Unlink { name } => Self::write_null_terminated(data, name),
+            Self::Write { write_in, content } => {
+                let mut len = data.write_all(write_in.as_bytes())?;
                 len += data.write_all(content)?;
                 Ok(len)
             }
@@ -1462,15 +1495,15 @@ impl FuseOperation {
             Self::Flush(_) => uapi::fuse_opcode_FUSE_FLUSH,
             Self::Forget(_) => uapi::fuse_opcode_FUSE_FORGET,
             Self::GetAttr => uapi::fuse_opcode_FUSE_GETATTR,
-            Self::GetXAttr(_, _) => uapi::fuse_opcode_FUSE_GETXATTR,
+            Self::GetXAttr { .. } => uapi::fuse_opcode_FUSE_GETXATTR,
             Self::Init => uapi::fuse_opcode_FUSE_INIT,
-            Self::Interrupt(_) => uapi::fuse_opcode_FUSE_INTERRUPT,
+            Self::Interrupt { .. } => uapi::fuse_opcode_FUSE_INTERRUPT,
             Self::ListXAttr(_) => uapi::fuse_opcode_FUSE_LISTXATTR,
-            Self::Lookup(_) => uapi::fuse_opcode_FUSE_LOOKUP,
-            Self::Mkdir(_, _) => uapi::fuse_opcode_FUSE_MKDIR,
-            Self::Mknod(_, _) => uapi::fuse_opcode_FUSE_MKNOD,
-            Self::Link(_, _) => uapi::fuse_opcode_FUSE_LINK,
-            Self::Open(flags, mode) => {
+            Self::Lookup { .. } => uapi::fuse_opcode_FUSE_LOOKUP,
+            Self::Mkdir { .. } => uapi::fuse_opcode_FUSE_MKDIR,
+            Self::Mknod { .. } => uapi::fuse_opcode_FUSE_MKNOD,
+            Self::Link { .. } => uapi::fuse_opcode_FUSE_LINK,
+            Self::Open { flags, mode } => {
                 if mode.is_dir() || flags.contains(OpenFlags::DIRECTORY) {
                     uapi::fuse_opcode_FUSE_OPENDIR
                 } else {
@@ -1479,7 +1512,7 @@ impl FuseOperation {
             }
             Self::Poll(_) => uapi::fuse_opcode_FUSE_POLL,
             Self::Read(_) => uapi::fuse_opcode_FUSE_READ,
-            Self::Readdir(_, use_readdirplus) => {
+            Self::Readdir { use_readdirplus, .. } => {
                 if *use_readdirplus {
                     uapi::fuse_opcode_FUSE_READDIRPLUS
                 } else {
@@ -1487,21 +1520,21 @@ impl FuseOperation {
                 }
             }
             Self::Readlink => uapi::fuse_opcode_FUSE_READLINK,
-            Self::Release(flags, mode, _) => {
+            Self::Release { flags, mode, .. } => {
                 if mode.is_dir() || flags.contains(OpenFlags::DIRECTORY) {
                     uapi::fuse_opcode_FUSE_RELEASEDIR
                 } else {
                     uapi::fuse_opcode_FUSE_RELEASE
                 }
             }
-            Self::RemoveXAttr(_) => uapi::fuse_opcode_FUSE_REMOVEXATTR,
+            Self::RemoveXAttr { .. } => uapi::fuse_opcode_FUSE_REMOVEXATTR,
             Self::Seek(_) => uapi::fuse_opcode_FUSE_LSEEK,
             Self::SetAttr(_) => uapi::fuse_opcode_FUSE_SETATTR,
-            Self::SetXAttr(_, _, _) => uapi::fuse_opcode_FUSE_SETXATTR,
+            Self::SetXAttr { .. } => uapi::fuse_opcode_FUSE_SETXATTR,
             Self::Statfs => uapi::fuse_opcode_FUSE_STATFS,
-            Self::Symlink(_, _) => uapi::fuse_opcode_FUSE_SYMLINK,
-            Self::Unlink(_) => uapi::fuse_opcode_FUSE_UNLINK,
-            Self::Write(_, _) => uapi::fuse_opcode_FUSE_WRITE,
+            Self::Symlink { .. } => uapi::fuse_opcode_FUSE_SYMLINK,
+            Self::Unlink { .. } => uapi::fuse_opcode_FUSE_UNLINK,
+            Self::Write { .. } => uapi::fuse_opcode_FUSE_WRITE,
         }
     }
 
@@ -1537,7 +1570,7 @@ impl FuseOperation {
     }
 
     fn has_response(&self) -> bool {
-        !matches!(self, Self::Interrupt(_) | Self::Forget(_))
+        !matches!(self, Self::Interrupt { .. } | Self::Forget(_))
     }
 
     fn is_async(&self) -> bool {
@@ -1557,7 +1590,7 @@ impl FuseOperation {
             Self::GetAttr | Self::SetAttr(_) => {
                 Ok(FuseResponse::Attr(Self::to_response::<uapi::fuse_attr_out>(&buffer)))
             }
-            Self::GetXAttr(getxattr_in, _) | Self::ListXAttr(getxattr_in) => {
+            Self::GetXAttr { getxattr_in, .. } | Self::ListXAttr(getxattr_in) => {
                 if getxattr_in.size == 0 {
                     if buffer.len() < std::mem::size_of::<uapi::fuse_getxattr_out>() {
                         return error!(EINVAL);
@@ -1569,21 +1602,21 @@ impl FuseOperation {
                 }
             }
             Self::Init => Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer))),
-            Self::Lookup(_)
-            | Self::Mkdir(_, _)
-            | Self::Mknod(_, _)
-            | Self::Link(_, _)
-            | Self::Symlink(_, _) => {
+            Self::Lookup { .. }
+            | Self::Mkdir { .. }
+            | Self::Mknod { .. }
+            | Self::Link { .. }
+            | Self::Symlink { .. } => {
                 Ok(FuseResponse::Entry(Self::to_response::<uapi::fuse_entry_out>(&buffer)))
             }
-            Self::Open(_, _) => {
+            Self::Open { .. } => {
                 Ok(FuseResponse::Open(Self::to_response::<uapi::fuse_open_out>(&buffer)))
             }
             Self::Poll(_) => {
                 Ok(FuseResponse::Poll(Self::to_response::<uapi::fuse_poll_out>(&buffer)))
             }
             Self::Read(_) | Self::Readlink => Ok(FuseResponse::Read(buffer)),
-            Self::Readdir(_, use_readdirplus) => {
+            Self::Readdir { use_readdirplus, .. } => {
                 let mut result = vec![];
                 let mut slice = &buffer[..];
                 while !slice.is_empty() {
@@ -1620,20 +1653,20 @@ impl FuseOperation {
                 Ok(FuseResponse::Readdir(result))
             }
             Self::Flush(_)
-            | Self::Release(_, _, _)
-            | Self::RemoveXAttr(_)
-            | Self::SetXAttr(_, _, _)
-            | Self::Unlink(_) => Ok(FuseResponse::None),
+            | Self::Release { .. }
+            | Self::RemoveXAttr { .. }
+            | Self::SetXAttr { .. }
+            | Self::Unlink { .. } => Ok(FuseResponse::None),
             Self::Statfs => {
                 Ok(FuseResponse::Statfs(Self::to_response::<uapi::fuse_statfs_out>(&buffer)))
             }
             Self::Seek(_) => {
                 Ok(FuseResponse::Seek(Self::to_response::<uapi::fuse_lseek_out>(&buffer)))
             }
-            Self::Write(_, _) => {
+            Self::Write { .. } => {
                 Ok(FuseResponse::Write(Self::to_response::<uapi::fuse_write_out>(&buffer)))
             }
-            Self::Interrupt(_) | Self::Forget(_) => {
+            Self::Interrupt { .. } | Self::Forget(_) => {
                 panic!("Response for operation without one");
             }
         }
