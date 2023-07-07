@@ -1037,64 +1037,6 @@ impl Task {
         };
     }
 
-    /// Processes a Zircon exception associated with this task.
-    ///
-    /// If the exception is fully handled, returns Ok(None)
-    /// If the exception produces a signal, returns Ok(Some(SigInfo)).
-    /// If the exception could not be handled returns Err(())
-    // TODO(https://fxbug.dev/117302): Move to CurrentTask when the restricted executor's flow allows the exception handler to
-    // access CurrentTask. It does not make sense to handle a Zircon exception for another task.
-    pub fn process_exception(&self, report: &zx::sys::zx_exception_report_t) -> ExceptionResult {
-        if report.header.type_ == zx::sys::ZX_EXCP_FATAL_PAGE_FAULT {
-            // A page fault may be resolved by extending a growsdown mapping to cover the faulting
-            // address. Ask the memory manager if it can extend a mapping to cover the faulting
-            // address and if says that it's found a mapping that exists or that can be extended to
-            // cover this address mark the exception as handled so that the instruction can try
-            // again. Otherwise let the regular handling proceed.
-
-            // We should only attempt growth on a not-present fault and we should only extend if the
-            // access type matches the protection on the GROWSDOWN mapping.
-            let decoded = decode_page_fault_exception_report(report);
-            if decoded.not_present {
-                match self.mm.extend_growsdown_mapping_to_address(
-                    UserAddress::from(decoded.faulting_address),
-                    decoded.is_write,
-                ) {
-                    Ok(true) => {
-                        return ExceptionResult::Handled;
-                    }
-                    Err(e) => {
-                        log_warn!("Error handling page fault: {e}")
-                    }
-                    _ => {}
-                }
-            }
-        }
-        match report.header.type_ {
-            zx::sys::ZX_EXCP_GENERAL => match get_signal_for_general_exception(&report.context) {
-                Some(sig) => ExceptionResult::Signal(SignalInfo::default(sig)),
-                None => {
-                    log_warn!("Unrecognized general exception: {:?}", report);
-                    ExceptionResult::Signal(SignalInfo::default(SIGILL))
-                }
-            },
-            zx::sys::ZX_EXCP_FATAL_PAGE_FAULT => {
-                ExceptionResult::Signal(SignalInfo::default(SIGSEGV))
-            }
-            zx::sys::ZX_EXCP_UNDEFINED_INSTRUCTION => {
-                ExceptionResult::Signal(SignalInfo::default(SIGILL))
-            }
-            zx::sys::ZX_EXCP_UNALIGNED_ACCESS => {
-                ExceptionResult::Signal(SignalInfo::default(SIGBUS))
-            }
-            zx::sys::ZX_EXCP_SW_BREAKPOINT => ExceptionResult::Signal(SignalInfo::default(SIGTRAP)),
-            _ => {
-                log_error!("Unknown exception {:?}", report);
-                ExceptionResult::Signal(SignalInfo::default(SIGSEGV))
-            }
-        }
-    }
-
     pub fn set_seccomp_state(&self, state: SeccompStateValue) -> Result<(), Errno> {
         self.seccomp_filter_state.set(&state)
     }
@@ -1732,6 +1674,62 @@ impl CurrentTask {
 
     pub fn set_seccomp_notifier(&mut self, notifier: Option<SeccompNotifierHandle>) {
         self.mutable_state.write().seccomp_filters.notifier = notifier;
+    }
+
+    /// Processes a Zircon exception associated with this task.
+    ///
+    /// If the exception is fully handled, returns Ok(None)
+    /// If the exception produces a signal, returns Ok(Some(SigInfo)).
+    /// If the exception could not be handled returns Err(())
+    pub fn process_exception(&self, report: &zx::sys::zx_exception_report_t) -> ExceptionResult {
+        if report.header.type_ == zx::sys::ZX_EXCP_FATAL_PAGE_FAULT {
+            // A page fault may be resolved by extending a growsdown mapping to cover the faulting
+            // address. Ask the memory manager if it can extend a mapping to cover the faulting
+            // address and if says that it's found a mapping that exists or that can be extended to
+            // cover this address mark the exception as handled so that the instruction can try
+            // again. Otherwise let the regular handling proceed.
+
+            // We should only attempt growth on a not-present fault and we should only extend if the
+            // access type matches the protection on the GROWSDOWN mapping.
+            let decoded = decode_page_fault_exception_report(report);
+            if decoded.not_present {
+                match self.mm.extend_growsdown_mapping_to_address(
+                    UserAddress::from(decoded.faulting_address),
+                    decoded.is_write,
+                ) {
+                    Ok(true) => {
+                        return ExceptionResult::Handled;
+                    }
+                    Err(e) => {
+                        log_warn!("Error handling page fault: {e}")
+                    }
+                    _ => {}
+                }
+            }
+        }
+        match report.header.type_ {
+            zx::sys::ZX_EXCP_GENERAL => match get_signal_for_general_exception(&report.context) {
+                Some(sig) => ExceptionResult::Signal(SignalInfo::default(sig)),
+                None => {
+                    log_warn!("Unrecognized general exception: {:?}", report);
+                    ExceptionResult::Signal(SignalInfo::default(SIGILL))
+                }
+            },
+            zx::sys::ZX_EXCP_FATAL_PAGE_FAULT => {
+                ExceptionResult::Signal(SignalInfo::default(SIGSEGV))
+            }
+            zx::sys::ZX_EXCP_UNDEFINED_INSTRUCTION => {
+                ExceptionResult::Signal(SignalInfo::default(SIGILL))
+            }
+            zx::sys::ZX_EXCP_UNALIGNED_ACCESS => {
+                ExceptionResult::Signal(SignalInfo::default(SIGBUS))
+            }
+            zx::sys::ZX_EXCP_SW_BREAKPOINT => ExceptionResult::Signal(SignalInfo::default(SIGTRAP)),
+            _ => {
+                log_error!("Unknown exception {:?}", report);
+                ExceptionResult::Signal(SignalInfo::default(SIGSEGV))
+            }
+        }
     }
 }
 
