@@ -153,16 +153,6 @@ pub trait NonSyncContext: TimerContext<TimerId> + TracingContext {
     /// connections for `listener`.
     fn on_waiting_connections_change<I: Ip>(&mut self, listener: ListenerId<I>, count: usize);
 
-    /// Called when a connection's status changes due to external events.
-    ///
-    /// See [`ConnectionStatusUpdate`] for the set of events that may result in
-    /// this method being called.
-    fn on_connection_status_change<I: Ip>(
-        &mut self,
-        connection: ConnectionId<I>,
-        status: ConnectionStatusUpdate,
-    );
-
     /// Creates new buffers and returns the object that Bindings need to
     /// read/write from/into the created buffers.
     fn new_passive_open_buffers(
@@ -905,6 +895,8 @@ struct Connection<I: IpExt, D: Id, II: Instant, R: ReceiveBuffer, S: SendBuffer,
     /// a soft error will not abort the connection, but it can be read by either
     /// calling `get_connection_error`, or after the connection times out.
     soft_error: Option<ConnectionError>,
+    /// Whether the handshake has finished or aborted.
+    handshake_status: HandshakeStatus,
 }
 
 /// The Listener state.
@@ -1242,6 +1234,27 @@ impl<I: Ip> From<BoundId<I>> for SocketId<I> {
     }
 }
 
+/// The status of a handshake.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum HandshakeStatus {
+    /// The handshake is still pending.
+    Pending,
+    /// The handshake is aborted.
+    Aborted,
+    /// The handshake is completed.
+    Completed {
+        /// Whether it has been reported to the user yet.
+        reported: bool,
+    },
+}
+
+impl HandshakeStatus {
+    fn update_if_pending(&mut self, new_status: Self) {
+        if *self == HandshakeStatus::Pending {
+            *self = new_status;
+        }
+    }
+}
 pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
     DeviceIdContext<AnyDevice>
 {
@@ -1287,6 +1300,8 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         remote_port: NonZeroU16,
         netstack_buffers: C::ProvidedBuffers,
     ) -> Result<ConnectionId<I>, ConnectError>;
+
+    fn get_handshake_status(&mut self, id: ConnectionId<I>) -> HandshakeStatus;
 
     fn shutdown_conn(&mut self, ctx: &mut C, id: ConnectionId<I>) -> Result<(), NoConnection>;
     fn close_conn(&mut self, ctx: &mut C, id: ConnectionId<I>);
@@ -1707,6 +1722,18 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         )
     }
 
+    fn get_handshake_status(&mut self, id: ConnectionId<I>) -> HandshakeStatus {
+        self.with_tcp_sockets_mut(|sockets| {
+            let (conn, _sharing, _addr) =
+                id.get_from_bound_state_mut(&mut sockets.bound_state).expect("invalid conn ID");
+            let status = conn.handshake_status;
+            if let HandshakeStatus::Completed { reported } = &mut conn.handshake_status {
+                *reported = true;
+            }
+            status
+        })
+    }
+
     fn shutdown_conn(&mut self, ctx: &mut C, id: ConnectionId<I>) -> Result<(), NoConnection> {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(|ip_transport_ctx, sockets| {
             debug!("shutdown on {id:?}");
@@ -1929,6 +1956,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                             defunct: _,
                             socket_options: _,
                             soft_error: _,
+                            handshake_status: _,
                         } = connection;
                         *ip_sock = new_socket;
                         Ok(())
@@ -2134,7 +2162,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
 
     fn on_icmp_error(
         &mut self,
-        ctx: &mut C,
+        _ctx: &mut C,
         orig_src_ip: SpecifiedAddr<I::Addr>,
         orig_dst_ip: SpecifiedAddr<I::Addr>,
         orig_src_port: NonZeroU16,
@@ -2162,6 +2190,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         defunct: _,
                         socket_options: _,
                         soft_error,
+                        handshake_status,
                     },
                     _sharing,
                     _addr,
@@ -2169,6 +2198,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 *soft_error = soft_error.or(state.on_icmp_error(error, seq));
 
                 if let State::Closed(Closed { reason }) = state {
+                    handshake_status.update_if_pending(HandshakeStatus::Aborted);
                     match *acceptor {
                         Some(acceptor) => match acceptor {
                             Acceptor::Pending(listener_id) | Acceptor::Ready(listener_id) => {
@@ -2196,11 +2226,6 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                                 if *err == ConnectionError::TimedOut {
                                     *err = soft_error.unwrap_or(ConnectionError::TimedOut);
                                 }
-                                let MaybeClosedConnectionId(id, marker) = conn_id;
-                                ctx.on_connection_status_change(
-                                    ConnectionId(id, marker),
-                                    ConnectionStatusUpdate::Aborted(*err),
-                                )
                             }
                         }
                     }
@@ -2255,6 +2280,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                             defunct,
                             socket_options: _,
                             soft_error: _,
+                            handshake_status: _,
                         } = state;
                         (!defunct).then(|| {
                             let ConnAddr {
@@ -2477,6 +2503,7 @@ fn set_buffer_size<
                     defunct: _,
                     socket_options: _,
                     soft_error: _,
+                    handshake_status: _,
                 } = conn;
                 return Which::set_connected_size(state, size);
             }
@@ -2532,6 +2559,7 @@ fn get_buffer_size<
                         defunct: _,
                         socket_options: _,
                         soft_error: _,
+                        handshake_status: _,
                     } = conn;
                     return state.target_buffer_sizes();
                 }
@@ -2950,6 +2978,7 @@ where
                     defunct: false,
                     socket_options,
                     soft_error: None,
+                    handshake_status: HandshakeStatus::Pending,
                 },
             )
             .into()
@@ -2987,6 +3016,25 @@ where
     )
 }
 
+/// Gets the handshake status for the connection.
+pub fn get_handshake_status<I, C>(sync_ctx: &SyncCtx<C>, id: ConnectionId<I>) -> HandshakeStatus
+where
+    I: IpExt,
+    C: crate::NonSyncContext,
+{
+    let mut sync_ctx = Locked::new(sync_ctx);
+    let IpInvariant(status) = I::map_ip(
+        (IpInvariant(&mut sync_ctx), id),
+        |(IpInvariant(sync_ctx), id)| {
+            IpInvariant(SocketHandler::get_handshake_status(sync_ctx, id))
+        },
+        |(IpInvariant(sync_ctx), id)| {
+            IpInvariant(SocketHandler::get_handshake_status(sync_ctx, id))
+        },
+    );
+    status
+}
+
 /// Shuts down the write-half of the connection. Calling this function signals
 /// the other side of the connection that we will not be sending anything over
 /// the connection; The connection will still stay in the socketmap even after
@@ -3007,16 +3055,6 @@ where
         |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::shutdown_conn(sync_ctx, ctx, id),
         |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::shutdown_conn(sync_ctx, ctx, id),
     )
-}
-
-/// The new status of a connection.
-#[derive(Copy, Clone, Debug, GenericOverIp)]
-#[cfg_attr(test, derive(Eq, PartialEq))]
-pub enum ConnectionStatusUpdate {
-    /// The connection has been established on both ends.
-    Connected,
-    /// The connection was closed by an RST or an ICMP message.
-    Aborted(ConnectionError),
 }
 
 /// Removes an unbound socket.
@@ -3724,10 +3762,6 @@ mod tests {
     #[derive(Debug, Eq, PartialEq)]
     enum NonSyncEvent {
         ListenerConnectionCount(EitherId<ListenerId<Ipv4>, ListenerId<Ipv6>>, usize),
-        ConnectionStatusUpdate(
-            EitherId<ConnectionId<Ipv4>, ConnectionId<Ipv6>>,
-            ConnectionStatusUpdate,
-        ),
     }
 
     type TcpNonSyncCtx = FakeNonSyncCtx<TimerId, (), NonSyncState>;
@@ -3853,15 +3887,6 @@ mod tests {
                 TestSendBuffer::new(Rc::clone(&client.send), RingBuffer::default()),
                 client,
             )
-        }
-
-        fn on_connection_status_change<I: Ip>(
-            &mut self,
-            connection: ConnectionId<I>,
-            status: ConnectionStatusUpdate,
-        ) {
-            let NonSyncState(events) = self.state_mut();
-            events.push(NonSyncEvent::ConnectionStatusUpdate(connection.into(), status))
         }
 
         fn default_buffer_sizes() -> BufferSizes {
@@ -4240,6 +4265,13 @@ mod tests {
             assert_eq!(addr.ip, ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip));
         }
 
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+            assert_eq!(
+                SocketHandler::get_handshake_status(sync_ctx, client),
+                HandshakeStatus::Completed { reported: false },
+            );
+        });
+
         let mut assert_connected = |name: &'static str, conn_id: ConnectionId<I>| {
             let (conn, _, _): (_, &SharingState, &ConnAddr<_, _, _, _>) = conn_id
                 .get_from_bound_state(&net.sync_ctx(name).outer.sockets.bound_state)
@@ -4253,22 +4285,13 @@ mod tests {
                     defunct: false,
                     socket_options: _,
                     soft_error: None,
+                    handshake_status: HandshakeStatus::Completed { reported: true },
                 }
             )
         };
 
         assert_connected(LOCAL, client);
         assert_connected(REMOTE, accepted);
-
-        net.with_context(LOCAL, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
-            assert_eq!(
-                non_sync_ctx.take_tcp_events(),
-                &[NonSyncEvent::ConnectionStatusUpdate(
-                    client.into(),
-                    ConnectionStatusUpdate::Connected
-                )]
-            );
-        });
 
         let ClientBuffers { send: client_snd_end, receive: client_rcv_end } =
             client_ends.as_ref().borrow_mut().take().unwrap();
@@ -4530,9 +4553,9 @@ mod tests {
         net.run_until_idle(handle_frame, handle_timer);
 
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            assert_matches!(
-                &non_sync_ctx.take_tcp_events()[..],
-                &[NonSyncEvent::ConnectionStatusUpdate(_, ConnectionStatusUpdate::Connected)]
+            assert_eq!(
+                SocketHandler::get_handshake_status(sync_ctx, client_connection),
+                HandshakeStatus::Completed { reported: false },
             );
 
             let info = SocketHandler::get_connection_info(sync_ctx, client_connection);
@@ -4599,7 +4622,7 @@ mod tests {
             SocketHandler::listen(sync_ctx, non_sync_ctx, bound, NonZeroUsize::MIN)
                 .expect("can listen")
         });
-        let _client_connection = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+        let client_connection = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let socket = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
             SocketHandler::connect_unbound(
                 sync_ctx,
@@ -4658,10 +4681,10 @@ mod tests {
                 Err(SetDeviceError::ZoneChange)
             );
         });
-        net.with_context(REMOTE, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
-            assert_matches!(
-                &non_sync_ctx.take_tcp_events()[..],
-                &[NonSyncEvent::ConnectionStatusUpdate(_, ConnectionStatusUpdate::Connected)]
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+            assert_eq!(
+                SocketHandler::get_handshake_status(sync_ctx, client_connection),
+                HandshakeStatus::Completed { reported: false },
             );
         });
     }
@@ -4725,15 +4748,13 @@ mod tests {
                 defunct: false,
                 socket_options: _,
                 soft_error: None,
+                handshake_status: HandshakeStatus::Aborted,
             }
         );
-        net.with_context(LOCAL, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
             assert_eq!(
-                non_sync_ctx.take_tcp_events(),
-                &[NonSyncEvent::ConnectionStatusUpdate(
-                    client.into(),
-                    ConnectionStatusUpdate::Aborted(ConnectionError::ConnectionReset),
-                )]
+                SocketHandler::get_handshake_status(sync_ctx, client),
+                HandshakeStatus::Aborted,
             );
         });
     }
@@ -5316,13 +5337,10 @@ mod tests {
                 &[NonSyncEvent::ListenerConnectionCount(local_listener.into(), 1)]
             );
         });
-        net.with_context(REMOTE, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
             assert_eq!(
-                non_sync_ctx.take_tcp_events(),
-                &[NonSyncEvent::ConnectionStatusUpdate(
-                    remote_connection.into(),
-                    ConnectionStatusUpdate::Connected,
-                )]
+                SocketHandler::get_handshake_status(sync_ctx, remote_connection),
+                HandshakeStatus::Completed { reported: false },
             );
         });
 
@@ -5360,28 +5378,13 @@ mod tests {
         net.run_until_idle(handle_frame, handle_timer);
 
         // Both remote sockets should now be reset to Closed state.
-        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            assert_eq!(
-                non_sync_ctx.take_tcp_events(),
-                &[
-                    // Before it receives the RST, the second connection
-                    // receives the SYN and is connected.
-                    NonSyncEvent::ConnectionStatusUpdate(
-                        second_connection.into(),
-                        ConnectionStatusUpdate::Connected
-                    ),
-                    // Both connections are reset in the order they were
-                    // established in.
-                    NonSyncEvent::ConnectionStatusUpdate(
-                        remote_connection.into(),
-                        ConnectionStatusUpdate::Aborted(ConnectionError::ConnectionReset),
-                    ),
-                    NonSyncEvent::ConnectionStatusUpdate(
-                        second_connection.into(),
-                        ConnectionStatusUpdate::Aborted(ConnectionError::ConnectionReset),
-                    ),
-                ]
-            );
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+            for conn in [remote_connection, second_connection] {
+                assert_eq!(
+                    SocketHandler::get_connection_error(sync_ctx, conn),
+                    Some(ConnectionError::ConnectionReset),
+                )
+            }
 
             sync_ctx.with_tcp_sockets(|sockets| {
                 let (conn, _, _addr) =
@@ -5431,18 +5434,15 @@ mod tests {
 
         net.run_until_idle(handle_frame, handle_timer);
 
-        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
             sync_ctx.with_tcp_sockets(|sockets| {
                 let (conn, _, _addr) =
                     new_remote_connection.get_from_bound_state(&sockets.bound_state).unwrap();
                 assert_matches!(conn.state, State::Established(_));
             });
             assert_eq!(
-                non_sync_ctx.take_tcp_events(),
-                &[NonSyncEvent::ConnectionStatusUpdate(
-                    new_remote_connection.into(),
-                    ConnectionStatusUpdate::Connected
-                )]
+                SocketHandler::get_handshake_status(sync_ctx, new_remote_connection),
+                HandshakeStatus::Completed { reported: false },
             );
         });
 
@@ -5782,13 +5782,10 @@ mod tests {
         });
         // Finish the connection establishment.
         net.run_until_idle(handle_frame, handle_timer);
-        net.with_context(REMOTE, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
             assert_eq!(
-                non_sync_ctx.take_tcp_events(),
-                &[NonSyncEvent::ConnectionStatusUpdate(
-                    client.into(),
-                    ConnectionStatusUpdate::Connected
-                )]
+                SocketHandler::get_handshake_status(sync_ctx, client),
+                HandshakeStatus::Completed { reported: false },
             );
         });
 
@@ -5999,7 +5996,7 @@ mod tests {
             ));
 
         let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
-        let _connection = SocketHandler::connect_unbound(
+        let connection = SocketHandler::connect_unbound(
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
@@ -6019,13 +6016,11 @@ mod tests {
             icmp_error,
         );
         // The TCP handshake should be aborted.
-        assert_matches!(
-            &non_sync_ctx.take_tcp_events()[..],
-            &[NonSyncEvent::ConnectionStatusUpdate(
-                _,
-                ConnectionStatusUpdate::Aborted(connection_error)
-            )] => connection_error
-        )
+        assert_eq!(
+            SocketHandler::get_handshake_status(&mut sync_ctx, connection),
+            HandshakeStatus::Aborted,
+        );
+        SocketHandler::get_connection_error(&mut sync_ctx, connection).unwrap()
     }
 
     #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnreachable => ConnectionError::NetworkUnreachable)]
@@ -6229,13 +6224,10 @@ mod tests {
                 &[NonSyncEvent::ListenerConnectionCount(listener.into(), 1)]
             );
         });
-        net.with_context(REMOTE, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
             assert_eq!(
-                non_sync_ctx.take_tcp_events(),
-                &[NonSyncEvent::ConnectionStatusUpdate(
-                    extra_conn.into(),
-                    ConnectionStatusUpdate::Connected
-                )]
+                SocketHandler::get_handshake_status(sync_ctx, extra_conn),
+                HandshakeStatus::Completed { reported: false },
             );
         });
 
@@ -6338,13 +6330,10 @@ mod tests {
         });
         // The TIME-WAIT socket should be reused to establish the connection.
         net.run_until_idle(handle_frame, handle_timer);
-        net.with_context(REMOTE, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
             assert_eq!(
-                non_sync_ctx.take_tcp_events(),
-                &[NonSyncEvent::ConnectionStatusUpdate(
-                    conn.into(),
-                    ConnectionStatusUpdate::Connected
-                )]
+                SocketHandler::get_handshake_status(sync_ctx, conn),
+                HandshakeStatus::Completed { reported: false },
             );
         });
         net.with_context(LOCAL, |TcpCtx { sync_ctx: _, non_sync_ctx }| {

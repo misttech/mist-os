@@ -39,10 +39,10 @@ use crate::{
         segment::{Options, Segment},
         seqnum::UnscaledWindowSize,
         socket::{
-            do_send_inner, isn::IsnGenerator, Acceptor, Connection, ConnectionId,
-            ConnectionStatusUpdate, Listener, ListenerAddrState, ListenerId, ListenerSharingState,
-            MaybeClosedConnectionId, MaybeListener, MaybeListenerId, NonSyncContext, Sockets,
-            SyncContext, TcpIpTransportContext, TimerId,
+            do_send_inner, isn::IsnGenerator, Acceptor, Connection, ConnectionId, HandshakeStatus,
+            Listener, ListenerAddrState, ListenerId, ListenerSharingState, MaybeClosedConnectionId,
+            MaybeListener, MaybeListenerId, NonSyncContext, Sockets, SyncContext,
+            TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State, TimeWait},
         BufferSizes, ConnectionError, Control, Mss, SocketOptions,
@@ -305,7 +305,15 @@ where
     let (conn, _, addr) =
         conn_id.get_from_bound_state_mut(&mut sockets.bound_state).expect("invalid connection");
 
-    let Connection { acceptor, state, ip_sock, defunct, socket_options, soft_error: _ } = conn;
+    let Connection {
+        acceptor,
+        state,
+        ip_sock,
+        defunct,
+        socket_options,
+        soft_error: _,
+        handshake_status,
+    } = conn;
 
     // Per RFC 9293 Section 3.6.1:
     //   When a connection is closed actively, it MUST linger in the TIME-WAIT
@@ -333,40 +341,27 @@ where
         }
     }
 
-    #[derive(Debug)]
-    enum StateCategory {
-        Connecting,
-        Connected,
-        Closed(Option<ConnectionError>),
-    }
-    impl StateCategory {
-        fn new<I, R, S, A>(state: &State<I, R, S, A>) -> Self {
-            match state {
-                State::Established(_)
-                | State::CloseWait(_)
-                | State::LastAck(_)
-                | State::FinWait1(_)
-                | State::FinWait2(_)
-                | State::Closing(_)
-                | State::TimeWait(_) => StateCategory::Connected,
-                State::Closed(Closed { reason }) => StateCategory::Closed(*reason),
-                State::Listen(_) | State::SynRcvd(_) | State::SynSent(_) => {
-                    StateCategory::Connecting
-                }
-            }
-        }
-    }
-
-    let prev_state = StateCategory::new(state);
-
     // Send the reply to the segment immediately.
     let (reply, passive_open) = state.on_segment::<_, C>(incoming, now, socket_options, *defunct);
 
-    let current_state = StateCategory::new(state);
-
-    match current_state {
-        StateCategory::Connecting => (),
-        StateCategory::Closed(reason) => {
+    match state {
+        State::Listen(_) => {
+            unreachable!("has an invalid status: {:?}", conn.state)
+        }
+        State::SynSent(_) | State::SynRcvd(_) => {
+            assert_eq!(*handshake_status, HandshakeStatus::Pending)
+        }
+        State::Established(_)
+        | State::FinWait1(_)
+        | State::FinWait2(_)
+        | State::Closing(_)
+        | State::CloseWait(_)
+        | State::LastAck(_)
+        | State::TimeWait(_) => {
+            handshake_status
+                .update_if_pending(HandshakeStatus::Completed { reported: acceptor.is_some() });
+        }
+        State::Closed(Closed { reason }) => {
             if *defunct {
                 // If the incoming segment caused the state machine to
                 // enter Closed state, and the user has already promised
@@ -379,45 +374,10 @@ where
                 let _: Option<_> = ctx.cancel_timer(TimerId::new::<I>(conn_id));
                 return ConnectionIncomingSegmentDisposition::FoundSocket;
             }
-
-            // If the socket does have an acceptor, it hasn't been pulled from
-            // the accept queue of a listener and so its ID isn't yet known to
-            // bindings. We only want to notify of connection status updates for
-            // IDs that bindings is aware of.
-            if acceptor.is_none() {
-                match (prev_state, reason) {
-                    (StateCategory::Connected | StateCategory::Connecting, err) => {
-                        if let Some(err) = err {
-                            let MaybeClosedConnectionId(id, marker) = conn_id;
-                            let conn_id = ConnectionId(id, marker);
-                            ctx.on_connection_status_change(
-                                conn_id,
-                                ConnectionStatusUpdate::Aborted(err),
-                            )
-                        }
-                    }
-                    (StateCategory::Closed(_), _) => {
-                        // No change, no need to signal.
-                    }
-                }
-            }
-        }
-        StateCategory::Connected => {
-            match prev_state {
-                StateCategory::Connected => {
-                    // No change, no need to signal
-                }
-                StateCategory::Connecting => {
-                    if acceptor.is_none() {
-                        let MaybeClosedConnectionId(id, marker) = conn_id;
-                        let conn_id = ConnectionId(id, marker);
-                        ctx.on_connection_status_change(conn_id, ConnectionStatusUpdate::Connected)
-                    }
-                }
-                StateCategory::Closed(_) => {
-                    unreachable!("can't go from closed to established")
-                }
-            }
+            handshake_status.update_if_pending(match reason {
+                None => HandshakeStatus::Completed { reported: acceptor.is_some() },
+                Some(_err) => HandshakeStatus::Aborted,
+            });
         }
     }
 
@@ -443,7 +403,9 @@ where
             state: _,
             ip_sock: _,
             defunct: _,
-            socket_options: _, soft_error: _
+            socket_options: _,
+            soft_error: _,
+            handshake_status: _,
         } => {
             let listener_id = *listener_id;
             conn.acceptor = Some(Acceptor::Ready(listener_id));
@@ -628,6 +590,7 @@ where
                         defunct: false,
                         socket_options,
                         soft_error: None,
+                        handshake_status: HandshakeStatus::Pending,
                     };
                     let entry = bound_state.push_entry(
                         |index| SocketId::Connection(index.into()),

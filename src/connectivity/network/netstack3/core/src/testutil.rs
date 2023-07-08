@@ -291,13 +291,6 @@ impl NonSyncContext for FakeNonSyncCtx {
         (RingBuffer::new(receive), RingBuffer::new(send), ())
     }
 
-    fn on_connection_status_change<I: Ip>(
-        &mut self,
-        _connection: crate::transport::tcp::socket::ConnectionId<I>,
-        _status: crate::transport::tcp::socket::ConnectionStatusUpdate,
-    ) {
-    }
-
     fn default_buffer_sizes() -> BufferSizes {
         // Use the test-only default impl.
         BufferSizes::default()

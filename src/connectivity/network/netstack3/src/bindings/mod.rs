@@ -33,7 +33,7 @@ use std::{
     ops::Deref,
     // TODO(https://fxbug.dev/125488): Use RC types exported from Core, after
     // we make sockets reference-backed.
-    sync::{Arc, Weak},
+    sync::Arc,
     time::Duration,
 };
 
@@ -178,10 +178,6 @@ pub(crate) struct BindingsNonSyncCtxImplInner {
     udp_sockets: UdpSockets,
     tcp_v4_listeners: CoreMutex<IdMap<crate::bindings::socket::stream::ListenerState>>,
     tcp_v6_listeners: CoreMutex<IdMap<crate::bindings::socket::stream::ListenerState>>,
-    tcp_v4_connections:
-        CoreMutex<IdMap<(crate::bindings::socket::stream::ConnectionStatus, Weak<zx::Socket>)>>,
-    tcp_v6_connections:
-        CoreMutex<IdMap<(crate::bindings::socket::stream::ConnectionStatus, Weak<zx::Socket>)>>,
     route_update_dispatcher: CoreMutex<routes_fidl_worker::RouteUpdateDispatcher>,
 }
 
