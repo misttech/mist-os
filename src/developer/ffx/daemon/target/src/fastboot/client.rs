@@ -547,6 +547,7 @@ mod test {
         FastbootError, FastbootMarker, FastbootProxy, RebootListenerMarker, RebootListenerRequest,
         UploadProgressListenerMarker,
     };
+    use fuchsia_async::TimeoutExt;
     use futures::task::{Context as fContext, Poll};
     use serial_test::serial;
     use std::{
@@ -557,6 +558,7 @@ mod test {
 
     struct TestTransport {
         replies: Vec<Reply>,
+        timeout_at_end: bool,
     }
 
     impl AsyncRead for TestTransport {
@@ -565,13 +567,20 @@ mod test {
             _cx: &mut fContext<'_>,
             buf: &mut [u8],
         ) -> Poll<std::io::Result<usize>> {
+            let timeout_at_end = self.timeout_at_end;
             match self.get_mut().replies.pop() {
                 Some(r) => {
                     let reply = Vec::<u8>::from(r);
                     buf[..reply.len()].copy_from_slice(&reply);
                     Poll::Ready(Ok(reply.len()))
                 }
-                None => Poll::Ready(Ok(0)),
+                None => {
+                    if timeout_at_end {
+                        Poll::Pending
+                    } else {
+                        Poll::Ready(Ok(0))
+                    }
+                }
             }
         }
     }
@@ -595,8 +604,8 @@ mod test {
     }
 
     impl TestTransport {
-        pub fn new() -> Self {
-            TestTransport { replies: Vec::new() }
+        pub fn new(timeout_at_end: bool) -> Self {
+            TestTransport { replies: Vec::new(), timeout_at_end }
         }
 
         pub fn push(&mut self, reply: Reply) {
@@ -606,18 +615,19 @@ mod test {
 
     struct TestFactory {
         replies: Vec<Reply>,
+        timeout_at_end: bool,
     }
 
     impl TestFactory {
-        pub fn new(replies: Vec<Reply>) -> Self {
-            Self { replies }
+        pub fn new(replies: Vec<Reply>, timeout_at_end: bool) -> Self {
+            Self { replies, timeout_at_end }
         }
     }
 
     #[async_trait(?Send)]
     impl InterfaceFactory<TestTransport> for TestFactory {
         async fn open(&mut self, _target: &Target) -> Result<TestTransport> {
-            let mut transport = TestTransport::new();
+            let mut transport = TestTransport::new(self.timeout_at_end);
             self.replies.iter().rev().for_each(|r| transport.push(r.clone()));
             return Ok(transport);
         }
@@ -626,9 +636,18 @@ mod test {
     }
 
     async fn setup(replies: Vec<Reply>) -> (Rc<Target>, FastbootProxy) {
+        setup_with_timeout(replies, false).await
+    }
+
+    async fn setup_with_timeout(
+        replies: Vec<Reply>,
+        timeout_at_end: bool,
+    ) -> (Rc<Target>, FastbootProxy) {
         let target = Target::new_named("scooby-dooby-doo");
-        let mut fb =
-            FastbootImpl::<TestTransport>::new(target.clone(), Box::new(TestFactory::new(replies)));
+        let mut fb = FastbootImpl::<TestTransport>::new(
+            target.clone(),
+            Box::new(TestFactory::new(replies, timeout_at_end)),
+        );
         let (proxy, mut stream) = create_proxy_and_stream::<FastbootMarker>().unwrap();
         fuchsia_async::Task::local(async move {
             loop {
@@ -907,5 +926,47 @@ mod test {
         let res = proxy.oem("a").await?;
         assert_eq!(res.err(), Some(FastbootError::ProtocolError));
         Ok(())
+    }
+
+    // The following four tests interact due to the SEND_LOCK in fastboot, so they
+    // are marked as "serial"
+
+    #[fuchsia::test]
+    #[serial]
+    async fn test_timeout_on_boot_is_ok() -> Result<()> {
+        let (_, proxy) = setup_with_timeout(vec![], true).await;
+        proxy
+            .boot()
+            .map_err(|e| anyhow!("FIDL failure: {e:?}"))
+            .on_timeout(Duration::from_secs(5), || Err(anyhow!("boot test timed out")))
+            .await?
+            .map_err(|e| anyhow!("fastboot boot failed: {e:?}"))
+    }
+
+    #[fuchsia::test]
+    #[serial]
+    async fn test_timeout_on_reboot_is_ok() -> Result<()> {
+        let mut interface = TestTransport::new(true);
+        reboot(&mut interface)
+            .on_timeout(Duration::from_secs(5), || Err(anyhow!("reboot test timed out")))
+            .await
+    }
+
+    #[fuchsia::test]
+    #[serial]
+    async fn test_timeout_on_reboot_bootloader_is_ok() -> Result<()> {
+        let mut interface = TestTransport::new(true);
+        reboot_bootloader(&mut interface)
+            .on_timeout(Duration::from_secs(5), || Err(anyhow!("rbb test timed out")))
+            .await
+    }
+
+    #[fuchsia::test]
+    #[serial]
+    async fn test_timeout_on_continue_is_ok() -> Result<()> {
+        let mut interface = TestTransport::new(true);
+        continue_boot(&mut interface)
+            .on_timeout(Duration::from_secs(5), || Err(anyhow!("continue_boot test timed out")))
+            .await
     }
 }
