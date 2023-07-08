@@ -29,9 +29,6 @@ enum Unit {
   percent,
 
   // Count-based units.
-  // TODO(https://fxbug.dev/129671): Remove "count" when uses have been changed
-  // to explicitly use "countBiggerIsBetter" or "countSmallerIsBetter".
-  count,
   countSmallerIsBetter,
   countBiggerIsBetter,
 
@@ -46,7 +43,6 @@ const _unitToCatapultConverterString = {
   Unit.bytesPerSecond: 'bytes/second',
   Unit.framesPerSecond: 'frames/second',
   Unit.percent: 'percent',
-  Unit.count: 'count_biggerIsBetter',
   Unit.countSmallerIsBetter: 'count_smallerIsBetter',
   Unit.countBiggerIsBetter: 'count_biggerIsBetter',
   Unit.watts: 'Watts',

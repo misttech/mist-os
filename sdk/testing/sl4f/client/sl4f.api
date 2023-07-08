@@ -3651,10 +3651,6 @@
               "name": "bytesPerSecond",
               "type": "EnumConstantDeclarationImpl"
             },
-            "count": {
-              "name": "count",
-              "type": "EnumConstantDeclarationImpl"
-            },
             "countBiggerIsBetter": {
               "name": "countBiggerIsBetter",
               "type": "EnumConstantDeclarationImpl"
