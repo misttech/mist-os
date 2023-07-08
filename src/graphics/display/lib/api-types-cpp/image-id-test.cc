@@ -53,33 +53,12 @@ TEST(ImageIdTest, ToFidlImageId) {
   EXPECT_EQ(fuchsia_hardware_display::wire::kInvalidDispId, ToFidlImageId(kInvalidImageId).value);
 }
 
-TEST(ImageIdTest, ToFidlImageIdValue) {
-  EXPECT_EQ(1u, ToFidlImageIdValue(kOne));
-  EXPECT_EQ(2u, ToFidlImageIdValue(kTwo));
-  EXPECT_EQ(kLargeIdValue, ToFidlImageIdValue(kLargeId));
-  EXPECT_EQ(fuchsia_hardware_display::wire::kInvalidDispId, ToFidlImageIdValue(kInvalidImageId));
-}
-
-TEST(ImageIdTest, ToImageIdWithFidlImageId) {
+TEST(ImageIdTest, ToImageIdWithFidlValue) {
   EXPECT_EQ(kOne, ToImageId(fuchsia_hardware_display::wire::ImageId{.value = 1}));
   EXPECT_EQ(kTwo, ToImageId(fuchsia_hardware_display::wire::ImageId{.value = 2}));
   EXPECT_EQ(kLargeId, ToImageId(fuchsia_hardware_display::wire::ImageId{.value = kLargeIdValue}));
   EXPECT_EQ(kInvalidImageId, ToImageId(fuchsia_hardware_display::wire::ImageId{
                                  .value = fuchsia_hardware_display::wire::kInvalidDispId}));
-}
-
-TEST(ImageIdTest, ToImageIdWithFidlValue) {
-  EXPECT_EQ(kOne, ToImageId(1));
-  EXPECT_EQ(kTwo, ToImageId(2));
-  EXPECT_EQ(kLargeId, ToImageId(kLargeIdValue));
-  EXPECT_EQ(kInvalidImageId, ToImageId(fuchsia_hardware_display::wire::kInvalidDispId));
-}
-
-TEST(ImageIdTest, FidlImageIdValueConversionRoundtrip) {
-  EXPECT_EQ(kOne, ToImageId(ToFidlImageIdValue(kOne)));
-  EXPECT_EQ(kTwo, ToImageId(ToFidlImageIdValue(kTwo)));
-  EXPECT_EQ(kLargeId, ToImageId(ToFidlImageIdValue(kLargeId)));
-  EXPECT_EQ(kInvalidImageId, ToImageId(ToFidlImageIdValue(kInvalidImageId)));
 }
 
 TEST(ImageIdTest, FidlImageIdConversionRoundtrip) {
