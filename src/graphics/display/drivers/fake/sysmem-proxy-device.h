@@ -10,21 +10,17 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/zx/bti.h>
 #include <lib/zx/channel.h>
+#include <threads.h>
+#include <zircon/types.h>
 
-#include <limits>
-#include <map>
-#include <memory>
-#include <unordered_set>
+#include <cstdint>
 
 #include <ddktl/device.h>
-#include <fbl/vector.h>
-#include <region-alloc/region-alloc.h>
+#include <ddktl/unbind-txn.h>
 
 namespace sysmem_driver {
 class Driver;

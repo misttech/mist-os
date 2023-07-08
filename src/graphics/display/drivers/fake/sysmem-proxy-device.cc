@@ -2,23 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sysmem-proxy-device.h"
+#include "src/graphics/display/drivers/fake/sysmem-proxy-device.h"
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
-#include <lib/async/dispatcher.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/platform-defs.h>
+#include <lib/ddk/driver.h>
 #include <lib/fdio/directory.h>
-#include <lib/sync/completion.h>
-#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/channel.h>
-#include <lib/zx/event.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
-#include <cinttypes>
-#include <memory>
+#include <cstdint>
+#include <utility>
+
+#include <ddktl/device.h>
+#include <ddktl/unbind-txn.h>
 
 namespace display {
 

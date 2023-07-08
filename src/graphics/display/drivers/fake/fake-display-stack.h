@@ -5,14 +5,20 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_STACK_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_STACK_H_
 
+#include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/sysmem/c/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
 
-#include <ddktl/device.h>
+#include <memory>
+#include <optional>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
-#include "src/devices/sysmem/drivers/sysmem/device.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/drivers/fake/sysmem-device-wrapper.h"

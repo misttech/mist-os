@@ -9,21 +9,22 @@
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/zircon-internal/thread_annotations.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/vmo.h>
+#include <threads.h>
 #include <zircon/compiler.h>
-#include <zircon/errors.h>
 #include <zircon/types.h>
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 
 #include <ddktl/device.h>
 #include <fbl/auto_lock.h>

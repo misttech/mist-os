@@ -6,11 +6,11 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_SYSMEM_DEVICE_WRAPPER_H_
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/sysmem/cpp/banjo.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <memory>
 #include <type_traits>
-
-#include <ddktl/device.h>
 
 #include "src/devices/sysmem/drivers/sysmem/driver.h"
 

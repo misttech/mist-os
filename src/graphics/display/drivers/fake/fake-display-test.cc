@@ -5,19 +5,33 @@
 #include "src/graphics/display/drivers/fake/fake-display.h"
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <lib/fpromise/result.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/image-format/image_format.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/reader.h>
 #include <lib/inspect/cpp/vmo/types.h>
+#include <lib/stdcompat/span.h>
 #include <lib/sync/cpp/completion.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
+#include <zircon/status.h>
+#include <zircon/syscalls.h>
+#include <zircon/types.h>
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <memory>
+#include <utility>
+#include <vector>
 
+#include <fbl/algorithm.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -27,6 +41,7 @@
 #include "src/graphics/display/drivers/fake/sysmem-device-wrapper.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace fake_display {

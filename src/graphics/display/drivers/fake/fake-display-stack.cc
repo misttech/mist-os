@@ -5,12 +5,22 @@
 #include "src/graphics/display/drivers/fake/fake-display-stack.h"
 
 #include <lib/async/cpp/task.h>
-#include <lib/ddk/debug.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/ddk/device.h>
+#include <lib/ddk/driver.h>
 #include <lib/sync/cpp/completion.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/status.h>
+
+#include <memory>
+#include <utility>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
+#include "src/graphics/display/drivers/fake/sysmem-device-wrapper.h"
 
 namespace display {
 
