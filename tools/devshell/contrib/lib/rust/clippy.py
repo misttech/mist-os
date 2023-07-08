@@ -93,14 +93,23 @@ def main():
     return returncode
 
 
-# To deduplicate lints, use the message, code, and all top level spans
+# To deduplicate lints, use the message, code, all top level spans, and macro
+# expansion spans
 def fingerprint_diagnostic(lint):
     code = lint.get("code")
+
+    def expand_spans(span):
+      yield span
+      if expansion := span.get("expansion"):
+        yield from expand_spans(expansion["span"])
+
+    spans = [x for span in lint["spans"] for x in expand_spans(span)]
+
     return (
         lint["message"],
         code.get("code") if code else None,
         frozenset(
-            (x["file_name"], x["byte_start"], x["byte_end"]) for x in lint["spans"]
+            (x["file_name"], x["byte_start"], x["byte_end"]) for x in spans
         ),
     )
 
