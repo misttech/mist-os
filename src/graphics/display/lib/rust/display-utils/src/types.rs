@@ -6,7 +6,7 @@ use crate::{error::Result, pixel_format::PixelFormat};
 use {
     fidl_fuchsia_hardware_display::{
         BufferCollectionId as FidlCollectionId, DisplayId as FidlDisplayId, EventId as FidlEventId,
-        Info, LayerId as FidlLayerId, INVALID_DISP_ID,
+        ImageId as FidlImageId, Info, LayerId as FidlLayerId, INVALID_DISP_ID,
     },
     fuchsia_async::OnSignals,
     fuchsia_zircon::{self as zx, AsHandleRef},
@@ -89,8 +89,29 @@ impl From<LayerId> for FidlLayerId {
 }
 
 /// Strongly typed wrapper around an image ID.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ImageId(pub u64);
+
+/// Represents an invalid ImageId value.
+pub const INVALID_IMAGE_ID: ImageId = ImageId(INVALID_DISP_ID);
+
+impl Default for ImageId {
+    fn default() -> Self {
+        INVALID_IMAGE_ID
+    }
+}
+
+impl From<FidlImageId> for ImageId {
+    fn from(fidl_image_id: FidlImageId) -> Self {
+        ImageId(fidl_image_id.value)
+    }
+}
+
+impl From<ImageId> for FidlImageId {
+    fn from(image_id: ImageId) -> Self {
+        FidlImageId { value: image_id.0 }
+    }
+}
 
 /// Strongly typed wrapper around a sysmem buffer collection ID.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -357,5 +378,47 @@ mod tests {
     fn event_id_default() {
         let default: EventId = Default::default();
         assert_eq!(default, INVALID_EVENT_ID);
+    }
+
+    #[fuchsia::test]
+    fn image_id_from_fidl_image_id() {
+        assert_eq!(ImageId(1), ImageId::from(FidlImageId { value: 1 }));
+        assert_eq!(ImageId(2), ImageId::from(FidlImageId { value: 2 }));
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(ImageId(LARGE), ImageId::from(FidlImageId { value: LARGE }));
+        assert_eq!(INVALID_IMAGE_ID, ImageId::from(FidlImageId { value: INVALID_DISP_ID }));
+    }
+
+    #[fuchsia::test]
+    fn fidl_image_id_from_image_id() {
+        assert_eq!(FidlImageId { value: 1 }, FidlImageId::from(ImageId(1)));
+        assert_eq!(FidlImageId { value: 2 }, FidlImageId::from(ImageId(2)));
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(FidlImageId { value: LARGE }, FidlImageId::from(ImageId(LARGE)));
+        assert_eq!(FidlImageId { value: INVALID_DISP_ID }, FidlImageId::from(INVALID_IMAGE_ID));
+    }
+
+    #[fuchsia::test]
+    fn fidl_image_id_to_image_id() {
+        assert_eq!(ImageId(1), FidlImageId { value: 1 }.into());
+        assert_eq!(ImageId(2), FidlImageId { value: 2 }.into());
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(ImageId(LARGE), FidlImageId { value: LARGE }.into());
+        assert_eq!(INVALID_IMAGE_ID, FidlImageId { value: INVALID_DISP_ID }.into());
+    }
+
+    #[fuchsia::test]
+    fn image_id_to_fidl_image_id() {
+        assert_eq!(FidlImageId { value: 1 }, ImageId(1).into());
+        assert_eq!(FidlImageId { value: 2 }, ImageId(2).into());
+        const LARGE: u64 = 1 << 63;
+        assert_eq!(FidlImageId { value: LARGE }, ImageId(LARGE).into());
+        assert_eq!(FidlImageId { value: INVALID_DISP_ID }, INVALID_IMAGE_ID.into());
+    }
+
+    #[fuchsia::test]
+    fn image_id_default() {
+        let default: ImageId = Default::default();
+        assert_eq!(default, INVALID_IMAGE_ID);
     }
 }

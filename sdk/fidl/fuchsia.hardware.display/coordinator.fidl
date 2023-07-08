@@ -51,7 +51,7 @@ closed protocol Coordinator {
     strict ImportImage(struct {
         image_config ImageConfig;
         buffer_collection_id BufferCollectionId;
-        image_id uint64;
+        image_id ImageIdValue;
         buffer_index uint32;
     }) -> (struct {
         res zx.Status;
@@ -76,7 +76,7 @@ closed protocol Coordinator {
     // non-capture images. We should have a unified design on image reuse for
     // both capture and non-capture images.
     strict ReleaseImage(struct {
-        image_id uint64;
+        image_id ImageIdValue;
     });
 
     /// Imports an event into the driver and associates it with the given id.
@@ -296,7 +296,7 @@ closed protocol Coordinator {
     // another layer that has not been presented is waiting on.
     strict SetLayerImage(struct {
         layer_id LayerId;
-        image_id uint64;
+        image_id ImageIdValue;
         wait_event_id EventId;
         signal_event_id EventId;
     });
@@ -489,7 +489,7 @@ closed protocol Coordinator {
     /// Returns ZX_ERR_NOT_SUPPORTED if coordinator does not support capture
     strict StartCapture(struct {
         signal_event_id EventId;
-        image_id uint64;
+        image_id ImageIdValue;
     }) -> () error zx.Status;
 
     /// Set the minimum value of rgb channels. Valid range [0 255] inclusive. Returns

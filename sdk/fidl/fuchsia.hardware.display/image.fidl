@@ -3,6 +3,25 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display;
 
+/// Type of the internal value in [`fuchsia.hardware.display/ImageId`].
+alias ImageIdValue = uint64;
+
+/// Identifies an image resource shared between the Display Coordinator and
+/// its client.
+///
+/// [`fuchsia.hardware.display/INVALID_DISP_ID`] represents an invalid value.
+///
+/// Values are managed by [`fuchsia.hardware.display/Coordinator`] clients, to
+/// facilitate feed-forward dataflow.
+///
+/// Valid values uniquely identify imported images within a Display Coordinator
+/// connection.
+// TODO(fxbug.dev/130027): Figure out a more accurate description for the
+// ID uniqueness.
+type ImageId = struct {
+    value ImageIdValue;
+};
+
 /// Information about the usage and storage format of an image buffer.
 ///
 /// Values other than [`fuchsia.hardware.display/TYPE_SIMPLE`] and
