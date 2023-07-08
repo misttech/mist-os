@@ -8,6 +8,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/event.h>
+#include <zircon/status.h>
 
 #include "src/ui/scenic/lib/allocation/id.h"
 
@@ -86,10 +87,11 @@ bool IsCaptureSupported(const fuchsia::hardware::display::CoordinatorSyncPtr& di
   return capture_supported_result.response().supported;
 }
 
-uint64_t ImportImageForCapture(
+zx_status_t ImportImageForCapture(
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
     const fuchsia::hardware::display::ImageConfig& image_config,
-    allocation::GlobalBufferCollectionId buffer_collection_id, uint32_t vmo_idx) {
+    allocation::GlobalBufferCollectionId buffer_collection_id, uint32_t vmo_idx,
+    allocation::GlobalImageId image_id) {
   if (buffer_collection_id == 0) {
     FX_LOGS(ERROR) << "Buffer collection id is 0.";
     return 0;
@@ -102,19 +104,19 @@ uint64_t ImportImageForCapture(
 
   const fuchsia::hardware::display::BufferCollectionId display_buffer_collection_id =
       allocation::ToDisplayBufferCollectionId(buffer_collection_id);
-  fuchsia::hardware::display::Coordinator_ImportImageForCapture_Result import_result;
-  auto status = display_coordinator->ImportImageForCapture(
-      image_config, display_buffer_collection_id, vmo_idx, &import_result);
+  zx_status_t import_result;
+  auto status = display_coordinator->ImportImage(image_config, display_buffer_collection_id,
+                                                 image_id, vmo_idx, &import_result);
 
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "FIDL transport error, status: " << status;
-    return 0;
-  } else if (import_result.is_err()) {
-    FX_LOGS(ERROR) << "FIDL server error response: " << import_result.err();
-    return 0;
-  } else {
-    return import_result.response().image_id;
+    return status;
   }
+  if (import_result != ZX_OK) {
+    FX_LOGS(ERROR) << "FIDL server error response: " << zx_status_get_string(import_result);
+    return import_result;
+  }
+  return ZX_OK;
 }
 
 }  // namespace scenic_impl

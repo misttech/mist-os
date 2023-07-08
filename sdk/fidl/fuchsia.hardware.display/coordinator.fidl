@@ -38,30 +38,43 @@ closed protocol Coordinator {
         removed vector<DisplayId>:MAX;
     });
 
-    // Imports a Buffer-Collection backed image. If tiling is not TYPE_SIMPLE,
-    // it is up to the driver and client to agree on its meaning through some
-    // mechanism outside the scope of this API. The ImageConfig must be
-    // compatible with that passed through SetBufferCollectionConstraints on
-    // the collection id. If the provided |image_id| is already in use, this
-    // function will return |ZX_ERR_ALREADY_EXISTS|.
-    @selector("ImportImage2")
+    /// Imports a Buffer-Collection backed image.
+    ///
+    /// `image_config` must be compatible with that passed through
+    /// [`fuchsia.hardware.display/Coordinator.SetBufferCollectionConstraints`]
+    /// on the `buffer_collection_id`.
+    ///
+    /// Returns `ZX_ERR_NOT_SUPPORTED` if the display hardware doesn't support
+    /// `image_config`.
+    /// Returns `ZX_ERR_ALREADY_EXISTS` if `image_id` was used in a successful
+    /// `ImportImage()` without a corresponding `ReleaseImage()`.
     strict ImportImage(struct {
         image_config ImageConfig;
-        collection_id BufferCollectionId;
+        buffer_collection_id BufferCollectionId;
         image_id uint64;
-        index uint32;
+        buffer_index uint32;
     }) -> (struct {
         res zx.Status;
     });
 
 
-    // Releases an image.
+    /// Releases an imported image.
+    ///
+    /// `image_id` must be already imported by
+    /// [`fuchsia.hardware.display/Coordinator.ImportImage`].
+    ///
+    /// The image must not be the capture target of an ongoing capture specified
+    /// in [`fuchsia.hardware.display/Coordinator.StartCapture`].
+    ///
+    /// When an image is released, it is immediately removed from any pending
+    /// or active configurations, and any fences associated with the image are
+    /// dropped. The resources associated with the image will be released as
+    /// soon as the image is no longer in use.
     //
-    // It is safe to call this at any time. When an image is released, it
-    // is immediately removed from any pending or active configurations,
-    // and any fences associated with the image are dropped. The resources
-    // associated with the image will be released as soon as the image is
-    // no longer in use.
+    // TODO(fxbug.dev/130027): The precondition on capture image exists because
+    // capture images have different constraints on image reuse compared with
+    // non-capture images. We should have a unified design on image reuse for
+    // both capture and non-capture images.
     strict ReleaseImage(struct {
         image_id uint64;
     });
@@ -469,20 +482,6 @@ closed protocol Coordinator {
         supported bool;
     }) error zx.Status;
 
-    /// Imports a buffer collection backed VMO into the display coordinator. The VMO
-    /// will be used by display coordinator to capture the image being displayed.
-    /// Returns ZX_OK along with an image_id.
-    /// image_id must be used by the client to start capture and/or release
-    /// resources allocated for capture.
-    /// Returns ZX_ERR_NOT_SUPPORTED if coordinator does not support capture
-    strict ImportImageForCapture(struct {
-        image_config ImageConfig;
-        collection_id BufferCollectionId;
-        index uint32;
-    }) -> (struct {
-        image_id uint64;
-    }) error zx.Status;
-
     /// Starts capture. Client must provide a valid signal_event_id and
     /// image_id. signal_event_id must have been imported into the driver
     /// using ImportEvent FIDL API. Image_id is the id from ImportImageForCapture.
@@ -490,12 +489,6 @@ closed protocol Coordinator {
     /// Returns ZX_ERR_NOT_SUPPORTED if coordinator does not support capture
     strict StartCapture(struct {
         signal_event_id EventId;
-        image_id uint64;
-    }) -> () error zx.Status;
-
-    /// Releases resources allocated for capture.
-    /// Returns ZX_ERR_NOT_SUPPORTED if coordinator does not support capture
-    strict ReleaseCapture(struct {
         image_id uint64;
     }) -> () error zx.Status;
 

@@ -24,6 +24,7 @@
 #include "src/ui/lib/escher/test/common/gtest_escher.h"
 #include "src/ui/lib/escher/util/image_utils.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
+#include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/display/display_manager.h"
 #include "src/ui/scenic/lib/display/util.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
@@ -389,6 +390,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   // assumptions here, such as making the pixel format for the capture image BGR24, as that
   // is the only capture format that AMLOGIC supports.
   //
+  // `image_id` must be an unique image ID not used by any other image.
+  //
   // TODO(fxbug.dev/125735): Instead of providing hardcoded pixel type for
   // capture buffer, tests should let display driver make decision for the
   // capture buffer format, and use the sysmem format in BufferCollectionInfo
@@ -396,7 +399,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   fpromise::result<fuchsia::sysmem::BufferCollectionSyncPtr, zx_status_t> SetupCapture(
       allocation::GlobalBufferCollectionId collection_id,
       fuchsia::sysmem::PixelFormatType pixel_type,
-      fuchsia::sysmem::BufferCollectionInfo_2* collection_info, uint64_t* image_id) {
+      fuchsia::sysmem::BufferCollectionInfo_2* collection_info, uint64_t image_id) {
     auto display = display_manager_->default_display();
     auto display_coordinator = display_manager_->default_display_coordinator();
     EXPECT_TRUE(display);
@@ -477,8 +480,12 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
       EXPECT_EQ(allocation_status, ZX_OK);
     }
 
-    *image_id = scenic_impl::ImportImageForCapture(*display_coordinator.get(), image_config,
-                                                   collection_id, 0);
+    zx_status_t import_status = scenic_impl::ImportImageForCapture(
+        *display_coordinator.get(), image_config, collection_id, 0, image_id);
+    EXPECT_EQ(import_status, ZX_OK);
+    if (import_status != ZX_OK) {
+      return fpromise::error(import_status);
+    }
 
     return fpromise::ok(std::move(collection));
   }
@@ -529,8 +536,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
   // Captures the pixel values on the display and reads them into |read_values|.
   void CaptureDisplayOutput(const fuchsia::sysmem::BufferCollectionInfo_2& collection_info,
-                            uint64_t capture_image_id, std::vector<uint8_t>* read_values,
-                            bool release_capture_image = true) {
+                            allocation::GlobalImageId capture_image_id,
+                            std::vector<uint8_t>* read_values, bool release_capture_image = true) {
     // Make sure the config from the DisplayCompositor has been completely applied first before
     // attempting to capture pixels from the display. This only matters for the real display.
     WaitOnVSync();
@@ -566,9 +573,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // Cleanup the capture.
     if (release_capture_image) {
-      fuchsia::hardware::display::Coordinator_ReleaseCapture_Result result_capture_result;
-      (*display_coordinator.get())->ReleaseCapture(capture_image_id, &result_capture_result);
-      EXPECT_TRUE(result_capture_result.is_response());
+      status = (*display_coordinator.get())->ReleaseImage(capture_image_id);
+      EXPECT_EQ(status, ZX_OK);
     }
   }
 
@@ -784,10 +790,10 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
   // Set up buffer collection and image for display_coordinator capture.
-  uint64_t capture_image_id;
+  allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueBufferCollectionId();
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
-      SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, &capture_image_id);
+      SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
       capture_collection_result.error() == ZX_ERR_NOT_SUPPORTED) {
     GTEST_SKIP();
@@ -910,10 +916,10 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
   // Set up buffer collection and image for display_coordinator capture.
-  uint64_t capture_image_id;
+  allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
-      SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, &capture_image_id);
+      SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
       capture_collection_result.error() == ZX_ERR_NOT_SUPPORTED) {
     GTEST_SKIP();
@@ -1018,10 +1024,10 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
   // Set up buffer collection and image for display_coordinator capture.
-  uint64_t capture_image_id;
+  allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
-      SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, &capture_image_id);
+      SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
       capture_collection_result.error() == ZX_ERR_NOT_SUPPORTED) {
     GTEST_SKIP();
@@ -1117,10 +1123,10 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
   // Set up buffer collection and image for display_coordinator capture.
-  uint64_t capture_image_id;
+  allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
-      SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, &capture_image_id);
+      SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
       capture_collection_result.error() == ZX_ERR_NOT_SUPPORTED) {
     GTEST_SKIP();
@@ -1239,11 +1245,11 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
   // Set up buffer collection and image for display_coordinator capture.
-  uint64_t capture_image_id;
+  allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
       SetupCapture(kCaptureCollectionId, fuchsia::sysmem::PixelFormatType::BGRA32, &capture_info,
-                   &capture_image_id);
+                   capture_image_id);
   if (capture_collection_result.is_error() &&
       capture_collection_result.error() == ZX_ERR_NOT_SUPPORTED) {
     GTEST_SKIP();
@@ -1422,11 +1428,11 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
   // Set up buffer collection and image for display_coordinator capture.
-  uint64_t capture_image_id;
+  allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
       SetupCapture(kCaptureCollectionId, fuchsia::sysmem::PixelFormatType::BGRA32, &capture_info,
-                   &capture_image_id);
+                   capture_image_id);
   if (capture_collection_result.is_error() &&
       capture_collection_result.error() == ZX_ERR_NOT_SUPPORTED) {
     GTEST_SKIP();
@@ -1630,10 +1636,10 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
   // Set up buffer collection and image for display_coordinator capture.
-  uint64_t capture_image_id;
+  allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
-      SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, &capture_image_id);
+      SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
       capture_collection_result.error() == ZX_ERR_NOT_SUPPORTED) {
     GTEST_SKIP();
@@ -1868,10 +1874,10 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
   // Set up buffer collection and image for display_coordinator capture.
-  uint64_t capture_image_id;
+  allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
-      SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, &capture_image_id);
+      SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
       capture_collection_result.error() == ZX_ERR_NOT_SUPPORTED) {
     GTEST_SKIP();
@@ -2055,10 +2061,10 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
   // Set up buffer collection and image for display_coordinator capture.
-  uint64_t capture_image_id;
+  allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
-      SetupCapture(kCaptureCollectionId, kPixelFormat, &capture_info, &capture_image_id);
+      SetupCapture(kCaptureCollectionId, kPixelFormat, &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
       capture_collection_result.error() == ZX_ERR_NOT_SUPPORTED) {
     GTEST_SKIP();
@@ -2241,9 +2247,8 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   EXPECT_TRUE(images_are_same);
 
   // Cleanup.
-  fuchsia::hardware::display::Coordinator_ReleaseCapture_Result result_capture_result;
-  (*display_coordinator.get())->ReleaseCapture(capture_image_id, &result_capture_result);
-  EXPECT_TRUE(result_capture_result.is_response());
+  zx_status_t release_status = (*display_coordinator.get())->ReleaseImage(capture_image_id);
+  EXPECT_EQ(release_status, ZX_OK);
 }
 
 }  // namespace

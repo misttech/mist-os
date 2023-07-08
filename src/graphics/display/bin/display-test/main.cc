@@ -25,6 +25,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -54,8 +55,9 @@ static fidl::WireSyncClient<fhd::Coordinator> dc;
 static bool has_ownership;
 
 constexpr display::EventId kEventId(13);
-constexpr display::BufferCollectionId kCollectionId(12);
-uint64_t capture_id = 0;
+constexpr display::BufferCollectionId kBufferCollectionId(12);
+// Use a large ID to avoid conflict with Image IDs allocated by VirtualLayers.
+constexpr uint64_t kCaptureImageId = std::numeric_limits<uint64_t>::max();
 zx::event client_event_;
 fidl::WireSyncClient<sysmem::BufferCollection> collection_;
 zx::vmo capture_vmo;
@@ -372,8 +374,8 @@ zx_status_t capture_setup() {
   }
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)token->Sync();
-  auto import_resp = dc->ImportBufferCollection(display::ToFidlBufferCollectionId(kCollectionId),
-                                                display_token.TakeClientEnd());
+  auto import_resp = dc->ImportBufferCollection(
+      display::ToFidlBufferCollectionId(kBufferCollectionId), display_token.TakeClientEnd());
   if (import_resp.status() != ZX_OK) {
     printf("Could not import token: %s\n", import_resp.FormatDescription().c_str());
     return import_resp.status();
@@ -383,7 +385,7 @@ zx_status_t capture_setup() {
   fhd::wire::ImageConfig image_config = {};
   image_config.type = fhd::wire::kTypeCapture;
   auto constraints_resp = dc->SetBufferCollectionConstraints(
-      display::ToFidlBufferCollectionId(kCollectionId), image_config);
+      display::ToFidlBufferCollectionId(kBufferCollectionId), image_config);
   if (constraints_resp.status() != ZX_OK) {
     printf("Could not set capture constraints %s\n", constraints_resp.FormatDescription().c_str());
     return constraints_resp.status();
@@ -452,26 +454,22 @@ zx_status_t capture_setup() {
   capture_vmo = std::move(wait_resp.value().buffer_collection_info.buffers[0].vmo);
   // import image for capture
   fhd::wire::ImageConfig capture_cfg = {};  // will contain a handle
-  auto importcap_resp =
-      dc->ImportImageForCapture(capture_cfg, display::ToFidlBufferCollectionId(kCollectionId), 0);
-  if (importcap_resp.status() != ZX_OK) {
-    printf("Failed to start capture: %s\n", importcap_resp.FormatDescription().c_str());
-    return importcap_resp.status();
+  fidl::WireResult import_capture_result = dc->ImportImage(
+      capture_cfg, display::ToFidlBufferCollectionId(kBufferCollectionId), kCaptureImageId, 0);
+  if (import_capture_result.status() != ZX_OK) {
+    printf("Failed to start capture: %s\n", import_capture_result.FormatDescription().c_str());
+    return import_capture_result.status();
   }
-  if (importcap_resp->is_error()) {
-    printf("Could not import image for capture %d\n", importcap_resp->error_value());
-    return importcap_resp->error_value();
-  }
-  capture_id = importcap_resp->value()->image_id;
   return ZX_OK;
 }
 
 zx_status_t capture_start() {
   // start capture
-  auto capstart_resp = dc->StartCapture(display::ToFidlEventId(kEventId), capture_id);
-  if (capstart_resp.status() != ZX_OK) {
-    printf("Could not start capture: %s\n", capstart_resp.FormatDescription().c_str());
-    return capstart_resp.status();
+  fidl::WireResult start_capture_result =
+      dc->StartCapture(display::ToFidlEventId(kEventId), kCaptureImageId);
+  if (start_capture_result.status() != ZX_OK) {
+    printf("Could not start capture: %s\n", start_capture_result.FormatDescription().c_str());
+    return start_capture_result.status();
   }
   // wait for capture to complete
   uint32_t observed;
@@ -580,9 +578,9 @@ bool CompareCapturedImage(cpp20::span<const uint8_t> input_image,
 
 void capture_release() {
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)dc->ReleaseCapture(capture_id);
+  (void)dc->ReleaseImage(kCaptureImageId);
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)dc->ReleaseBufferCollection(display::ToFidlBufferCollectionId(kCollectionId));
+  (void)dc->ReleaseBufferCollection(display::ToFidlBufferCollectionId(kBufferCollectionId));
 }
 
 void usage(void) {

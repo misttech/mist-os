@@ -34,13 +34,20 @@ DisplayEventId ImportEvent(
 // screenshotting).
 bool IsCaptureSupported(const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator);
 
-// Imports an image to be used for capture (i.e. screenshotting) of the display controller. This
-// function returns the internal image id used by the display controller for the image. On failure,
-// this function returns a value of 0 for the image id.
-uint64_t ImportImageForCapture(
+// Imports an image to be used for capture (i.e. screenshotting) of the display
+// controller, associated with `capture_image_id`.
+//
+// `capture_image_id` must not be used for any images, including images
+// imported for display.
+//
+// On failure, this function returns the error value.
+//
+// TODO(fxbug.dev/130268): Unify this method with ImportBufferImage().
+zx_status_t ImportImageForCapture(
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
     const fuchsia::hardware::display::ImageConfig& image_config,
-    allocation::GlobalBufferCollectionId buffer_collection_id, uint32_t vmo_idx);
+    allocation::GlobalBufferCollectionId buffer_collection_id, uint32_t vmo_idx,
+    allocation::GlobalImageId capture_image_id);
 
 }  // namespace scenic_impl
 

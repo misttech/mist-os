@@ -51,12 +51,12 @@
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types-cpp/capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 
 namespace display {
@@ -251,14 +251,9 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
                                ReleaseBufferCollectionCompleter::Sync& _completer) override;
 
   void IsCaptureSupported(IsCaptureSupportedCompleter::Sync& _completer) override;
-  void ImportImageForCapture(ImportImageForCaptureRequestView request,
-                             ImportImageForCaptureCompleter::Sync& _completer) override;
 
   void StartCapture(StartCaptureRequestView request,
                     StartCaptureCompleter::Sync& _completer) override;
-
-  void ReleaseCapture(ReleaseCaptureRequestView request,
-                      ReleaseCaptureCompleter::Sync& _completer) override;
 
   void AcknowledgeVsync(AcknowledgeVsyncRequestView request,
                         AcknowledgeVsyncCompleter::Sync& _completer) override;
@@ -277,7 +272,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // Cleans up layer state associated with an Image. `image` must be valid.
   // Returns true if a current layer has been modified.
   bool CleanUpImage(Image& image);
-  void CleanUpCaptureImage(CaptureImageId id);
+  void CleanUpCaptureImage(ImageId id);
 
   // Displays' pending layers list may have been changed by pending
   // SetDisplayLayers() operations.
@@ -287,16 +282,31 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // the layer lists.
   void SetAllConfigPendingLayersToCurrentLayers();
 
+  // `fuchsia.hardware.display/Coordinator.ImportImage()` helper for display
+  // images.
+  //
+  // `image_id` must be unused and `image_config` contains metadata for an
+  // image used for display.
+  zx_status_t ImportImageForDisplay(const fuchsia_hardware_display::wire::ImageConfig& image_config,
+                                    BufferCollectionId buffer_collection_id, uint32_t buffer_index,
+                                    ImageId image_id);
+
+  // `fuchsia.hardware.display/Coordinator.ImportImage()` helper for capture
+  // images.
+  //
+  // `image_id` must be unused and `image_config` contains metadata for an
+  // image used for capture.
+  zx_status_t ImportImageForCapture(const fuchsia_hardware_display::wire::ImageConfig& image_config,
+                                    BufferCollectionId buffer_collection_id, uint32_t buffer_index,
+                                    ImageId image_id);
+
   Controller* const controller_;
   ClientProxy* const proxy_;
   const ClientPriority priority_;
   const ClientId id_;
   bool running_;
+
   Image::Map images_;
-
-  // Only kInvalidCaptureImageId == 0 is invalid.
-  CaptureImageId next_capture_image_id_ = CaptureImageId(1);
-
   CaptureImage::Map capture_images_;
 
   DisplayConfig::Map configs_;
@@ -348,7 +358,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // Points to the image whose contents is modified by the current capture.
   //
   // Invalid when no is capture in progress.
-  CaptureImageId current_capture_image_id_ = kInvalidCaptureImageId;
+  ImageId current_capture_image_id_ = kInvalidImageId;
 
   // Tracks an image released by the client while used by a capture.
   //
@@ -356,7 +366,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // engine is writing to it. If a client attempts to release the image used by
   // an in-progress capture, we defer the release operation until the capture
   // completes. The deferred release is tracked here.
-  CaptureImageId pending_release_capture_image_id_ = kInvalidCaptureImageId;
+  ImageId pending_release_capture_image_id_ = kInvalidImageId;
 
   VsyncAckCookie acked_cookie_ = kInvalidVsyncAckCookie;
 };

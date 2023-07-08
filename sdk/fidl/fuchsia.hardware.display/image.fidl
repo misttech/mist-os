@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display;
 
-/// Information about the provider of an image buffer.
+/// Information about the usage and storage format of an image buffer.
 ///
 /// Values other than [`fuchsia.hardware.display/TYPE_SIMPLE`] and
 /// [`fuchsia.hardware.display/TYPE_CAPTURE`] are an escape hatch. The driver
@@ -19,7 +19,7 @@ const TYPE_SIMPLE ImageTypeValue = 0;
 // replaced by better primitives for discovering and negotiating image
 // contracts.
 
-/// The image is used for capture.
+/// The image buffer is used by the display engine to store displayed contents.
 const TYPE_CAPTURE ImageTypeValue = 10;
 
 /// Defines how data in an image buffer is interpreted.

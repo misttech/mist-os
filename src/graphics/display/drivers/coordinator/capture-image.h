@@ -13,15 +13,15 @@
 
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
-#include "src/graphics/display/lib/api-types-cpp/capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 
 namespace display {
 
 class Controller;
 
 class CaptureImage : public fbl::RefCounted<CaptureImage>,
-                     public IdMappable<fbl::RefPtr<CaptureImage>, CaptureImageId> {
+                     public IdMappable<fbl::RefPtr<CaptureImage>, ImageId> {
  public:
   CaptureImage(Controller* controller, DriverCaptureImageId driver_capture_image_id,
                inspect::Node* parent_node, ClientId client_id);
