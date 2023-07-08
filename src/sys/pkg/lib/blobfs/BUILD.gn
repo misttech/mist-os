@@ -16,6 +16,7 @@ rustc_library("blobfs") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
+    "//src/lib/storage/delivery_blob",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/sys/pkg/lib/fuchsia-hash",
@@ -28,7 +29,6 @@ rustc_library("blobfs") {
   test_deps = [
     "//src/lib/fuchsia-async",
     "//src/sys/pkg/lib/fuchsia-merkle",
-    "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/testing/blobfs-ramdisk",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:maplit",
@@ -46,7 +46,6 @@ fuchsia_unittest_package("blobfs-lib-tests") {
   deps = [
     ":blobfs_test",
     "//src/storage/testing:storage_driver_test_realm",
-    "//src/storage/tools/blobfs-compression",
   ]
   test_specs = {
     log_settings = {

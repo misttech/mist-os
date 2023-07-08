@@ -491,7 +491,7 @@ mod tests {
         assert_eq!(repo.read_blob(&same_contents_merkle).unwrap(), same_contents);
         assert_eq!(
             repo.read_delivery_blob(1, &same_contents_merkle).unwrap(),
-            crate::delivery_blob::generate_delivery_blob(same_contents, 1).await.unwrap()
+            delivery_blob::generate(delivery_blob::DeliveryBlobType::Type1, same_contents)
         );
 
         let packages = repo.list_packages().unwrap();

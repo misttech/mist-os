@@ -247,7 +247,7 @@ impl Client {
 
         let path = match blob_type {
             fpkg::BlobType::Uncompressed => blob.to_string(),
-            fpkg::BlobType::Delivery => format!("v1-{blob}"),
+            fpkg::BlobType::Delivery => delivery_blob::delivery_blob_path(blob),
         };
         fuchsia_fs::directory::open_file(&self.dir, &path, flags).await.map_err(|e| match e {
             fuchsia_fs::node::OpenError::OpenError(Status::ACCESS_DENIED) => {
@@ -536,7 +536,7 @@ mod tests {
         let content = [3; 1024];
         let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
         let delivery_content =
-            fuchsia_pkg_testing::generate_delivery_blob(&content, 1).await.unwrap();
+            delivery_blob::Type1Blob::generate(&content, delivery_blob::CompressionMode::Always);
 
         let proxy = client
             .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Delivery)
