@@ -30,6 +30,10 @@ constexpr inline fuchsia::hardware::display::BufferCollectionId ToDisplayBufferC
   return {.value = global_buffer_collection_id};
 }
 
+constexpr inline fuchsia::hardware::display::ImageId ToFidlImageId(GlobalImageId global_image_id) {
+  return {.value = global_image_id};
+}
+
 }  // namespace allocation
 
 #endif  // SRC_UI_SCENIC_LIB_ALLOCATION_ID_H_

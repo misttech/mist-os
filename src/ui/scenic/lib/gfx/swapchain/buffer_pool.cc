@@ -75,7 +75,7 @@ void BufferPool::Clear(
     std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator) {
   for (size_t i = 0; i < buffers_.size(); ++i) {
     if ((*display_coordinator)->ReleaseImage(buffers_[i].id) != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to release image id=" << buffers_[i].id;
+      FX_LOGS(ERROR) << "Failed to release image id=" << buffers_[i].id.value;
     }
   }
   buffers_.clear();
@@ -347,18 +347,18 @@ bool BufferPool::CreateBuffers(size_t count, BufferPool::Environment* environmen
       layout_updater.ScheduleSetImageInitialLayout(buffer.escher_image, kSwapchainLayout);
     }
 
-    buffer.id = allocation::GenerateUniqueImageId();
+    buffer.id = allocation::ToFidlImageId(allocation::GenerateUniqueImageId());
     zx_status_t import_image_status = ZX_OK;
     zx_status_t transport_status =
         (*environment->display_coordinator)
             ->ImportImage(image_config_, display_collection_id, buffer.id, i, &import_image_status);
     if (transport_status != ZX_OK) {
-      buffer.id = fuchsia::hardware::display::INVALID_DISP_ID;
+      buffer.id = {.value = fuchsia::hardware::display::INVALID_DISP_ID};
       FX_PLOGS(ERROR, transport_status) << "Importing image FIDL call failed.";
       return false;
     }
     if (import_image_status != ZX_OK) {
-      buffer.id = fuchsia::hardware::display::INVALID_DISP_ID;
+      buffer.id = {.value = fuchsia::hardware::display::INVALID_DISP_ID};
       FX_PLOGS(ERROR, import_image_status)
           << "Importing image failed (" << image_info
           << "  use_protected_memory=" << (use_protected_memory ? "true" : "false") << ").";

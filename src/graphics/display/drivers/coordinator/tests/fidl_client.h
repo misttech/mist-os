@@ -23,6 +23,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 
@@ -61,10 +62,10 @@ class TestFidlClient {
     zx::event event = {};
   };
 
-  zx::result<uint64_t> ImportImageWithSysmem(
+  zx::result<ImageId> ImportImageWithSysmem(
       const fuchsia_hardware_display::wire::ImageConfig& image_config) TA_EXCL(mtx());
 
-  zx::result<uint64_t> CreateImage() TA_EXCL(mtx());
+  zx::result<ImageId> CreateImage() TA_EXCL(mtx());
   zx::result<LayerId> CreateLayer() TA_EXCL(mtx());
   zx::result<EventInfo> CreateEvent() TA_EXCL(mtx());
 
@@ -72,7 +73,7 @@ class TestFidlClient {
 
   struct PresentLayerInfo {
     LayerId layer_id;
-    uint64_t image_id;
+    ImageId image_id;
     std::optional<EventId> image_ready_wait_event_id;
   };
 
@@ -107,11 +108,11 @@ class TestFidlClient {
   async_dispatcher_t* dispatcher_ = nullptr;
   uint64_t vsync_count_ TA_GUARDED(mtx()) = 0;
   VsyncAckCookie vsync_ack_cookie_ = kInvalidVsyncAckCookie;
-  uint64_t next_image_id_ TA_GUARDED(mtx()) = 1;
+  ImageId next_image_id_ TA_GUARDED(mtx()) = ImageId(1);
   fuchsia_hardware_display::wire::ConfigStamp recent_presented_config_stamp_;
   const fidl::WireSyncClient<fuchsia_sysmem::Allocator>& sysmem_;
 
-  zx::result<uint64_t> ImportImageWithSysmemLocked(
+  zx::result<ImageId> ImportImageWithSysmemLocked(
       const fuchsia_hardware_display::wire::ImageConfig& image_config) TA_REQ(mtx());
   zx::result<LayerId> CreateLayerLocked() TA_REQ(mtx());
   zx::result<EventInfo> CreateEventLocked() TA_REQ(mtx());

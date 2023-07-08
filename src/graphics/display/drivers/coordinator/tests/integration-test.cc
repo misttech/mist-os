@@ -29,6 +29,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
@@ -558,11 +559,12 @@ TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
   ASSERT_TRUE(client.Bind(dispatcher()));
 
   fbl::AutoLock lock(client.mtx());
-  constexpr uint64_t image_id = fuchsia_hardware_display::wire::kInvalidDispId;
+  constexpr ImageId image_id = kInvalidImageId;
   constexpr BufferCollectionId buffer_collection_id(0xffeeeedd);
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
       client.dc_->ImportImage(client.displays_[0].image_config_,
-                              ToFidlBufferCollectionId(buffer_collection_id), image_id,
+                              ToFidlBufferCollectionId(buffer_collection_id),
+                              ToFidlImageId(image_id),
                               /*index=*/0);
   ASSERT_OK(import_image_reply.status());
   EXPECT_NE(ZX_OK, import_image_reply.value().res);
@@ -575,10 +577,11 @@ TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
 
   fbl::AutoLock lock(client.mtx());
   constexpr BufferCollectionId kNonExistentCollectionId(0xffeeeedd);
-  constexpr uint64_t image_id = 1;
+  constexpr ImageId image_id(1);
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
       client.dc_->ImportImage(client.displays_[0].image_config_,
-                              ToFidlBufferCollectionId(kNonExistentCollectionId), image_id,
+                              ToFidlBufferCollectionId(kNonExistentCollectionId),
+                              ToFidlImageId(image_id),
                               /*index=*/0);
   ASSERT_OK(import_image_reply.status());
   EXPECT_NE(ZX_OK, import_image_reply.value().res);
@@ -731,16 +734,16 @@ TEST_F(IntegrationTest, VsyncEvent) {
   EXPECT_NE(0u, present_config_stamp_0.value());
 
   zx::result<LayerId> create_default_layer_result = primary_client->CreateLayer();
-  zx::result<uint64_t> create_image_0_result = primary_client->CreateImage();
-  zx::result<uint64_t> create_image_1_result = primary_client->CreateImage();
+  zx::result<ImageId> create_image_0_result = primary_client->CreateImage();
+  zx::result<ImageId> create_image_1_result = primary_client->CreateImage();
 
   EXPECT_EQ(ZX_OK, create_default_layer_result.status_value());
   EXPECT_EQ(ZX_OK, create_image_0_result.status_value());
   EXPECT_EQ(ZX_OK, create_image_1_result.status_value());
 
   LayerId default_layer_id = create_default_layer_result.value();
-  uint64_t image_0_id = create_image_0_result.value();
-  uint64_t image_1_id = create_image_1_result.value();
+  ImageId image_0_id = create_image_0_result.value();
+  ImageId image_1_id = create_image_1_result.value();
 
   // Present one single image without wait.
   EXPECT_EQ(ZX_OK, primary_client->PresentLayers({
@@ -860,8 +863,8 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_NE(0u, present_config_stamp_0.value());
 
   zx::result<LayerId> create_default_layer_result = primary_client->CreateLayer();
-  zx::result<uint64_t> create_image_0_result = primary_client->CreateImage();
-  zx::result<uint64_t> create_image_1_result = primary_client->CreateImage();
+  zx::result<ImageId> create_image_0_result = primary_client->CreateImage();
+  zx::result<ImageId> create_image_1_result = primary_client->CreateImage();
   zx::result<TestFidlClient::EventInfo> create_image_1_ready_fence_result =
       primary_client->CreateEvent();
 
@@ -871,8 +874,8 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_EQ(ZX_OK, create_image_1_ready_fence_result.status_value());
 
   LayerId default_layer_id = create_default_layer_result.value();
-  uint64_t image_0_id = create_image_0_result.value();
-  uint64_t image_1_id = create_image_1_result.value();
+  ImageId image_0_id = create_image_0_result.value();
+  ImageId image_1_id = create_image_1_result.value();
   TestFidlClient::EventInfo image_1_ready_fence =
       std::move(create_image_1_ready_fence_result.value());
 
@@ -993,8 +996,8 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_NE(0u, present_config_stamp_0.value());
 
   zx::result<LayerId> create_default_layer_result = primary_client->CreateLayer();
-  zx::result<uint64_t> create_image_0_result = primary_client->CreateImage();
-  zx::result<uint64_t> create_image_1_result = primary_client->CreateImage();
+  zx::result<ImageId> create_image_0_result = primary_client->CreateImage();
+  zx::result<ImageId> create_image_1_result = primary_client->CreateImage();
   zx::result<TestFidlClient::EventInfo> create_image_1_ready_fence_result =
       primary_client->CreateEvent();
 
@@ -1004,8 +1007,8 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_EQ(ZX_OK, create_image_1_ready_fence_result.status_value());
 
   LayerId default_layer_id = create_default_layer_result.value();
-  uint64_t image_0_id = create_image_0_result.value();
-  uint64_t image_1_id = create_image_1_result.value();
+  ImageId image_0_id = create_image_0_result.value();
+  ImageId image_1_id = create_image_1_result.value();
   TestFidlClient::EventInfo image_1_ready_fence =
       std::move(create_image_1_ready_fence_result.value());
 
@@ -1115,9 +1118,9 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   ASSERT_TRUE(primary_client->Bind(dispatcher()));
 
   zx::result<LayerId> create_default_layer_result = primary_client->CreateLayer();
-  zx::result<uint64_t> create_image_0_result = primary_client->CreateImage();
-  zx::result<uint64_t> create_image_1_result = primary_client->CreateImage();
-  zx::result<uint64_t> create_image_2_result = primary_client->CreateImage();
+  zx::result<ImageId> create_image_0_result = primary_client->CreateImage();
+  zx::result<ImageId> create_image_1_result = primary_client->CreateImage();
+  zx::result<ImageId> create_image_2_result = primary_client->CreateImage();
   zx::result<TestFidlClient::EventInfo> create_image_1_ready_fence_result =
       primary_client->CreateEvent();
   zx::result<TestFidlClient::EventInfo> create_image_2_ready_fence_result =
@@ -1131,9 +1134,9 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   EXPECT_EQ(ZX_OK, create_image_2_ready_fence_result.status_value());
 
   LayerId default_layer_id = create_default_layer_result.value();
-  uint64_t image_0_id = create_image_0_result.value();
-  uint64_t image_1_id = create_image_1_result.value();
-  uint64_t image_2_id = create_image_2_result.value();
+  ImageId image_0_id = create_image_0_result.value();
+  ImageId image_1_id = create_image_1_result.value();
+  ImageId image_2_id = create_image_2_result.value();
   TestFidlClient::EventInfo image_1_ready_fence =
       std::move(create_image_1_ready_fence_result.value());
   TestFidlClient::EventInfo image_2_ready_fence =

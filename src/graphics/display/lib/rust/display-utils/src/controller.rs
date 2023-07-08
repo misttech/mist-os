@@ -235,7 +235,7 @@ impl Coordinator {
                         proxy.set_layer_primary_config(&layer.id.into(), &image_config)?;
                         proxy.set_layer_image(
                             &layer.id.into(),
-                            image_id.0,
+                            &(*image_id).into(),
                             &unblock_event.unwrap_or(INVALID_EVENT_ID).into(),
                             &retirement_event.unwrap_or(INVALID_EVENT_ID).into(),
                         )?;
@@ -300,7 +300,7 @@ impl Coordinator {
         config: display::ImageConfig,
     ) -> Result<()> {
         let result =
-            self.proxy().import_image(&config, &collection_id.into(), image_id.0, 0).await?;
+            self.proxy().import_image(&config, &collection_id.into(), &image_id.into(), 0).await?;
         zx::Status::ok(result)?;
         Ok(())
     }

@@ -34,6 +34,10 @@ namespace {
 
 const char* const kTag = "ImagePipeSurfaceDisplay";
 
+constexpr inline fuchsia::hardware::display::ImageId ToFidlImageId(uint32_t image_id) {
+  return {.value = image_id};
+}
+
 }  // namespace
 
 ImagePipeSurfaceDisplay::ImagePipeSurfaceDisplay()
@@ -484,7 +488,8 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
     }
 
     uint32_t image_id = next_image_id();
-    display_coordinator_->ImportImage(image_config, kBufferCollectionId, image_id, i,
+    const fuchsia::hardware::display::ImageId fidl_image_id = ToFidlImageId(image_id);
+    display_coordinator_->ImportImage(image_config, kBufferCollectionId, fidl_image_id, i,
                                       [this, &status](zx_status_t import_status) {
                                         status = import_status;
                                         got_message_response_ = true;
@@ -595,7 +600,8 @@ void ImagePipeSurfaceDisplay::PresentImage(
   }
 
   // image_id is also used in DisplayController interface.
-  display_coordinator_->SetLayerImage(layer_id_, image_id, wait_event_id, signal_event_id);
+  const fuchsia::hardware::display::ImageId fidl_image_id = ToFidlImageId(image_id);
+  display_coordinator_->SetLayerImage(layer_id_, fidl_image_id, wait_event_id, signal_event_id);
   display_coordinator_->ApplyConfig();
 
   if (wait_event_id.value != fuchsia::hardware::display::INVALID_DISP_ID) {

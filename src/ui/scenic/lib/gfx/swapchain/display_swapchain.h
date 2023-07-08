@@ -165,7 +165,7 @@ class DisplaySwapchain : public Swapchain {
   // Keep track of all the frame buffers that are currently used by this
   // DisplaySwapchain / DisplayCompositor so that we can distinguish if Vsync
   // events should be handled by this DisplaySwapchain instance.
-  std::unordered_set<uint64_t> frame_buffer_ids_;
+  std::unordered_set</*fuchsia::hardware::display::ImageId::value*/ uint64_t> frame_buffer_ids_;
 
   struct FrameInfo {
     fuchsia::hardware::display::ConfigStamp config_stamp;

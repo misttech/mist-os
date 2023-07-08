@@ -13,6 +13,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 
 // Indicies into event and event_ids
 #define WAIT_EVENT 0
@@ -21,7 +22,7 @@
 namespace display_test {
 
 typedef struct image_import {
-  uint64_t id;
+  display::ImageId id;
   zx::event events[2];
   display::EventId event_ids[2];
 } image_import_t;
@@ -48,7 +49,7 @@ class Image {
 
   void GetConfig(fuchsia_hardware_display::wire::ImageConfig* config_out) const;
   bool Import(const fidl::WireSyncClient<fuchsia_hardware_display::Coordinator>& dc,
-              uint64_t image_id, image_import_t* info_out) const;
+              display::ImageId image_id, image_import_t* info_out) const;
 
  private:
   Image(uint32_t width, uint32_t height, int32_t stride, fuchsia_images2::wire::PixelFormat format,

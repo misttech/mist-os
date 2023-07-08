@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "src/ui/lib/escher/util/trace_macros.h"
+#include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/flatland/global_image_data.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
@@ -399,8 +400,10 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   const fuchsia::hardware::display::ImageConfig image_config = CreateImageConfig(metadata);
   zx_status_t import_image_status = ZX_OK;
   {
+    const fuchsia::hardware::display::ImageId fidl_image_id =
+        allocation::ToFidlImageId(metadata.identifier);
     const auto status = (*display_coordinator_)
-                            ->ImportImage(image_config, display_collection_id, metadata.identifier,
+                            ->ImportImage(image_config, display_collection_id, fidl_image_id,
                                           metadata.vmo_index, &import_image_status);
     FX_DCHECK(status == ZX_OK);
   }
@@ -419,9 +422,10 @@ void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image
 
   renderer_->ReleaseBufferImage(image_id);
 
+  const fuchsia::hardware::display::ImageId fidl_image_id = allocation::ToFidlImageId(image_id);
   std::scoped_lock lock(lock_);
   FX_DCHECK(display_coordinator_);
-  (*display_coordinator_)->ReleaseImage(image_id);
+  (*display_coordinator_)->ReleaseImage(fidl_image_id);
   image_event_map_.erase(image_id);
 }
 
@@ -572,7 +576,8 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia::hardware::display::LayerI
   (*display_coordinator_)->SetLayerPrimaryPosition(layer_id, transform, src, dst);
   (*display_coordinator_)->SetLayerPrimaryAlpha(layer_id, alpha_mode, image.multiply_color[3]);
   // Set the imported image on the layer.
-  (*display_coordinator_)->SetLayerImage(layer_id, image.identifier, wait_id, signal_id);
+  const fuchsia::hardware::display::ImageId image_id = allocation::ToFidlImageId(image.identifier);
+  (*display_coordinator_)->SetLayerImage(layer_id, image_id, wait_id, signal_id);
 }
 
 bool DisplayCompositor::CheckConfig() {

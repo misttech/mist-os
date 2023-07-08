@@ -12,6 +12,7 @@
 #include <zircon/types.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/testing/client-utils/display.h"
 #include "src/graphics/display/testing/client-utils/image.h"
@@ -69,7 +70,7 @@ class VirtualLayer {
   }
 
   // Gets the ID of the image on the given display.
-  virtual uint64_t image_id(display::DisplayId display_id) const = 0;
+  virtual display::ImageId image_id(display::DisplayId display_id) const = 0;
 
   void set_frame_done(display::DisplayId display_id) {
     for (unsigned i = 0; i < displays_.size(); i++) {
@@ -153,13 +154,13 @@ class PrimaryLayer : public VirtualLayer {
   void* GetCurrentImageBuf() override;
   size_t GetCurrentImageSize() override;
 
-  uint64_t image_id(display::DisplayId display_id) const override {
+  display::ImageId image_id(display::DisplayId display_id) const override {
     for (unsigned i = 0; i < displays_.size(); i++) {
       if (displays_[i]->id() == display_id && layers_[i].active) {
         return layers_[i].import_info[alt_image_].id;
       }
     }
-    return fuchsia_hardware_display::wire::kInvalidDispId;
+    return display::kInvalidImageId;
   }
 
  private:
@@ -210,13 +211,13 @@ class CursorLayer : public VirtualLayer {
   void* GetCurrentImageBuf() override { return nullptr; }
   size_t GetCurrentImageSize() override { return 0; }
 
-  uint64_t image_id(display::DisplayId display_id) const override {
+  display::ImageId image_id(display::DisplayId display_id) const override {
     for (unsigned i = 0; i < displays_.size(); i++) {
       if (displays_[i]->id() == display_id && layers_[i].active) {
         return layers_[i].import_info[0].id;
       }
     }
-    return fuchsia_hardware_display::wire::kInvalidDispId;
+    return display::kInvalidImageId;
   }
 
  private:
@@ -239,8 +240,8 @@ class ColorLayer : public VirtualLayer {
   void Render(int32_t frame_num) override {}
   void* GetCurrentImageBuf() override { return nullptr; }
   size_t GetCurrentImageSize() override { return 0; }
-  uint64_t image_id(display::DisplayId display_id) const override {
-    return fuchsia_hardware_display::wire::kInvalidDispId;
+  display::ImageId image_id(display::DisplayId display_id) const override {
+    return display::kInvalidImageId;
   }
   virtual bool is_done() const override { return true; }
 };

@@ -36,6 +36,7 @@
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/testing/client-utils/display.h"
 #include "src/graphics/display/testing/client-utils/virtual-layer.h"
@@ -57,7 +58,7 @@ static bool has_ownership;
 constexpr display::EventId kEventId(13);
 constexpr display::BufferCollectionId kBufferCollectionId(12);
 // Use a large ID to avoid conflict with Image IDs allocated by VirtualLayers.
-constexpr uint64_t kCaptureImageId = std::numeric_limits<uint64_t>::max();
+constexpr display::ImageId kCaptureImageId(std::numeric_limits<uint64_t>::max());
 zx::event client_event_;
 fidl::WireSyncClient<sysmem::BufferCollection> collection_;
 zx::vmo capture_vmo;
@@ -454,8 +455,9 @@ zx_status_t capture_setup() {
   capture_vmo = std::move(wait_resp.value().buffer_collection_info.buffers[0].vmo);
   // import image for capture
   fhd::wire::ImageConfig capture_cfg = {};  // will contain a handle
-  fidl::WireResult import_capture_result = dc->ImportImage(
-      capture_cfg, display::ToFidlBufferCollectionId(kBufferCollectionId), kCaptureImageId, 0);
+  fidl::WireResult import_capture_result =
+      dc->ImportImage(capture_cfg, display::ToFidlBufferCollectionId(kBufferCollectionId),
+                      display::ToFidlImageId(kCaptureImageId), 0);
   if (import_capture_result.status() != ZX_OK) {
     printf("Failed to start capture: %s\n", import_capture_result.FormatDescription().c_str());
     return import_capture_result.status();
@@ -466,7 +468,7 @@ zx_status_t capture_setup() {
 zx_status_t capture_start() {
   // start capture
   fidl::WireResult start_capture_result =
-      dc->StartCapture(display::ToFidlEventId(kEventId), kCaptureImageId);
+      dc->StartCapture(display::ToFidlEventId(kEventId), display::ToFidlImageId(kCaptureImageId));
   if (start_capture_result.status() != ZX_OK) {
     printf("Could not start capture: %s\n", start_capture_result.FormatDescription().c_str());
     return start_capture_result.status();
@@ -578,7 +580,7 @@ bool CompareCapturedImage(cpp20::span<const uint8_t> input_image,
 
 void capture_release() {
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)dc->ReleaseImage(kCaptureImageId);
+  (void)dc->ReleaseImage(display::ToFidlImageId(kCaptureImageId));
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)dc->ReleaseBufferCollection(display::ToFidlBufferCollectionId(kBufferCollectionId));
 }

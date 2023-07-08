@@ -17,6 +17,7 @@
 #include <fbl/algorithm.h>
 
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/testing/client-utils/utils.h"
 
@@ -31,14 +32,14 @@ static constexpr uint32_t kScalePeriod = 45;
 
 namespace {
 
-constexpr uint64_t GetPrimaryImageImportId(unsigned display_index, int image_index) {
+constexpr display::ImageId GetPrimaryImageImportId(unsigned display_index, int image_index) {
   ZX_ASSERT(image_index >= 0);
   ZX_ASSERT(image_index <= 1);
-  return 1 + display_index * 3 + image_index;
+  return display::ImageId(1 + display_index * 3 + image_index);
 }
 
-constexpr uint64_t GetCursorImageImportId(unsigned display_index) {
-  return 1 + display_index * 3 + 2;
+constexpr display::ImageId GetCursorImageImportId(unsigned display_index) {
+  return display::ImageId(1 + display_index * 3 + 2);
 }
 
 }  // namespace
@@ -341,12 +342,13 @@ void VirtualLayer::SetLayerImages(const fidl::WireSyncClient<fhd::Coordinator>& 
   for (auto& layer : layers_) {
     const auto& image = layer.import_info[alt_image];
     const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
+    const fhd::wire::ImageId fidl_image_id = display::ToFidlImageId(image.id);
     const fhd::wire::EventId fidl_wait_event_id =
         display::ToFidlEventId(image.event_ids[WAIT_EVENT]);
     const fhd::wire::EventId fidl_signal_event_id =
         display::ToFidlEventId(image.event_ids[SIGNAL_EVENT]);
     auto result =
-        dc->SetLayerImage(fidl_layer_id, image.id, fidl_wait_event_id, fidl_signal_event_id);
+        dc->SetLayerImage(fidl_layer_id, fidl_image_id, fidl_wait_event_id, fidl_signal_event_id);
 
     ZX_ASSERT(result.ok());
   }

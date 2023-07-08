@@ -216,8 +216,8 @@ void DisplaySwapchain::ResetFrameRecord(const std::unique_ptr<FrameRecord>& fram
     } else {
       swapchain_buffers_.Put(frame_record->buffer);
     }
-    FX_DCHECK(frame_buffer_ids_.find(frame_record->buffer->id) != frame_buffer_ids_.end());
-    frame_buffer_ids_.erase(frame_record->buffer->id);
+    FX_DCHECK(frame_buffer_ids_.find(frame_record->buffer->id.value) != frame_buffer_ids_.end());
+    frame_buffer_ids_.erase(frame_record->buffer->id.value);
     frame_record->buffer = nullptr;
   }
 
@@ -272,8 +272,8 @@ bool DisplaySwapchain::DrawAndPresentFrame(const std::shared_ptr<FrameTimings>& 
   frame_record->use_protected_memory = use_protected_memory_;
   FX_CHECK(frame_record->buffer != nullptr);
 
-  FX_DCHECK(frame_buffer_ids_.find(frame_record->buffer->id) == frame_buffer_ids_.end());
-  frame_buffer_ids_.insert(frame_record->buffer->id);
+  FX_DCHECK(frame_buffer_ids_.find(frame_record->buffer->id.value) == frame_buffer_ids_.end());
+  frame_buffer_ids_.insert(frame_record->buffer->id.value);
 
   // Bump the ring head.
   next_frame_index_ = (next_frame_index_ + 1) % swapchain_image_count_;
@@ -450,7 +450,7 @@ void DisplaySwapchain::OnVsync(zx::time timestamp,
 
 void DisplaySwapchain::Flip(fuchsia::hardware::display::LayerId layer_id,
                             FrameRecord* frame_record) {
-  const uint64_t framebuffer_id = frame_record->buffer->id;
+  const fuchsia::hardware::display::ImageId framebuffer_id = frame_record->buffer->id;
   fuchsia::hardware::display::EventId wait_event_id = frame_record->render_finished_event_id;
   fuchsia::hardware::display::EventId signal_event_id = frame_record->retired_event_id;
 

@@ -14,6 +14,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 #include "src/lib/testing/predicates/status.h"
@@ -74,7 +75,7 @@ bool TestFidlClient::CreateChannel(const fidl::WireSyncClient<fhd::Provider>& pr
   return true;
 }
 
-zx::result<uint64_t> TestFidlClient::CreateImage() {
+zx::result<ImageId> TestFidlClient::CreateImage() {
   return ImportImageWithSysmem(displays_[0].image_config_);
 }
 
@@ -275,7 +276,7 @@ zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_
   for (const auto& info : present_layers) {
     const fhd::wire::LayerId fidl_layer_id = ToFidlLayerId(info.layer_id);
     const EventId wait_event_id = info.image_ready_wait_event_id.value_or(kInvalidEventId);
-    if (auto reply = dc_->SetLayerImage(fidl_layer_id, info.image_id,
+    if (auto reply = dc_->SetLayerImage(fidl_layer_id, ToFidlImageId(info.image_id),
                                         /*wait_event_id=*/ToFidlEventId(wait_event_id),
                                         /*signal_event_id=*/ToFidlEventId(kInvalidEventId));
         !reply.ok()) {
@@ -298,7 +299,7 @@ fuchsia_hardware_display::wire::ConfigStamp TestFidlClient::GetRecentAppliedConf
   return result.value().stamp;
 }
 
-zx::result<uint64_t> TestFidlClient::ImportImageWithSysmem(
+zx::result<ImageId> TestFidlClient::ImportImageWithSysmem(
     const fhd::wire::ImageConfig& image_config) {
   fbl::AutoLock lock(mtx());
   return ImportImageWithSysmemLocked(image_config);
@@ -308,7 +309,7 @@ std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPrese
   zx::result<LayerId> layer_result = CreateLayer();
   EXPECT_OK(layer_result.status_value());
 
-  zx::result<uint64_t> image_result = ImportImageWithSysmem(displays_[0].image_config_);
+  zx::result<ImageId> image_result = ImportImageWithSysmem(displays_[0].image_config_);
   EXPECT_OK(image_result.status_value());
 
   return {
@@ -318,7 +319,7 @@ std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPrese
   };
 }
 
-zx::result<uint64_t> TestFidlClient::ImportImageWithSysmemLocked(
+zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     const fhd::wire::ImageConfig& image_config) {
   // Create all the tokens.
   fidl::WireSyncClient<sysmem::BufferCollectionToken> local_token;
@@ -428,8 +429,9 @@ zx::result<uint64_t> TestFidlClient::ImportImageWithSysmemLocked(
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  auto image_id = next_image_id_++;
-  auto import_result = dc_->ImportImage(image_config, fidl_display_collection_id, image_id, 0);
+  const ImageId image_id = next_image_id_++;
+  const fhd::wire::ImageId fidl_image_id = ToFidlImageId(image_id);
+  auto import_result = dc_->ImportImage(image_config, fidl_display_collection_id, fidl_image_id, 0);
   if (!import_result.ok() || import_result.value().res != ZX_OK) {
     zxlogf(ERROR, "Importing image failed (fidl=%d, res=%d)", import_result.status(),
            import_result.value().res);

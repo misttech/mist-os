@@ -30,7 +30,7 @@ class BufferPool {
   struct Framebuffer {
     escher::GpuMemPtr device_memory;
     escher::ImagePtr escher_image;
-    uint64_t id;
+    fuchsia::hardware::display::ImageId id;
   };
 
   struct Environment {

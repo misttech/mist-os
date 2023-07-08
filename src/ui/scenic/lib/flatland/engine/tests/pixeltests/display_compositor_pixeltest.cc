@@ -399,7 +399,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   fpromise::result<fuchsia::sysmem::BufferCollectionSyncPtr, zx_status_t> SetupCapture(
       allocation::GlobalBufferCollectionId collection_id,
       fuchsia::sysmem::PixelFormatType pixel_type,
-      fuchsia::sysmem::BufferCollectionInfo_2* collection_info, uint64_t image_id) {
+      fuchsia::sysmem::BufferCollectionInfo_2* collection_info,
+      allocation::GlobalImageId image_id) {
     auto display = display_manager_->default_display();
     auto display_coordinator = display_manager_->default_display_coordinator();
     EXPECT_TRUE(display);
@@ -544,6 +545,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // This ID would only be zero if we were running in an environment without capture support.
     EXPECT_NE(capture_image_id, 0U);
+    const fuchsia::hardware::display::ImageId fidl_capture_image_id =
+        allocation::ToFidlImageId(capture_image_id);
 
     auto display = display_manager_->default_display();
     auto display_coordinator = display_manager_->default_display_coordinator();
@@ -556,7 +559,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
         scenic_impl::ImportEvent(*display_coordinator.get(), capture_signal_fence);
     fuchsia::hardware::display::Coordinator_StartCapture_Result start_capture_result;
     (*display_coordinator.get())
-        ->StartCapture(capture_signal_fence_id, capture_image_id, &start_capture_result);
+        ->StartCapture(capture_signal_fence_id, fidl_capture_image_id, &start_capture_result);
     EXPECT_TRUE(start_capture_result.is_response()) << start_capture_result.err();
 
     // We must wait for the capture to finish before we can proceed. Time out after 3 seconds.
@@ -573,7 +576,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // Cleanup the capture.
     if (release_capture_image) {
-      status = (*display_coordinator.get())->ReleaseImage(capture_image_id);
+      status = (*display_coordinator.get())->ReleaseImage(fidl_capture_image_id);
       EXPECT_EQ(status, ZX_OK);
     }
   }
@@ -2247,7 +2250,8 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   EXPECT_TRUE(images_are_same);
 
   // Cleanup.
-  zx_status_t release_status = (*display_coordinator.get())->ReleaseImage(capture_image_id);
+  zx_status_t release_status =
+      (*display_coordinator.get())->ReleaseImage(allocation::ToFidlImageId(capture_image_id));
   EXPECT_EQ(release_status, ZX_OK);
 }
 

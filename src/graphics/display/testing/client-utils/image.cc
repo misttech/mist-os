@@ -30,6 +30,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/testing/client-utils/utils.h"
 
 static constexpr uint32_t kRenderPeriod = 120;
@@ -469,7 +470,7 @@ void Image::GetConfig(fhd::wire::ImageConfig* config_out) const {
   }
 }
 
-bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint64_t image_id,
+bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, display::ImageId image_id,
                    image_import_t* info_out) const {
   for (int i = 0; i < 2; i++) {
     static display::EventId next_event_id(fhd::wire::kInvalidDispId + 1);
@@ -500,8 +501,9 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint64_t im
 
   fhd::wire::ImageConfig image_config;
   GetConfig(&image_config);
-  const fidl::WireResult import_result = dc->ImportImage(
-      image_config, display::ToFidlBufferCollectionId(collection_id_), image_id, /*index=*/0);
+  const fidl::WireResult import_result =
+      dc->ImportImage(image_config, display::ToFidlBufferCollectionId(collection_id_),
+                      display::ToFidlImageId(image_id), /*index=*/0);
   if (!import_result.ok()) {
     printf("Failed to import image: %s\n", import_result.FormatDescription().c_str());
     return false;

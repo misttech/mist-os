@@ -104,9 +104,10 @@ zx_status_t ImportImageForCapture(
 
   const fuchsia::hardware::display::BufferCollectionId display_buffer_collection_id =
       allocation::ToDisplayBufferCollectionId(buffer_collection_id);
+  const fuchsia::hardware::display::ImageId fidl_image_id = allocation::ToFidlImageId(image_id);
   zx_status_t import_result;
   auto status = display_coordinator->ImportImage(image_config, display_buffer_collection_id,
-                                                 image_id, vmo_idx, &import_result);
+                                                 fidl_image_id, vmo_idx, &import_result);
 
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "FIDL transport error, status: " << status;

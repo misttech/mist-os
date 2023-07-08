@@ -21,7 +21,9 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
-use display_utils::{CollectionId, EventId, LayerId, PixelFormat, INVALID_LAYER_ID};
+use display_utils::{
+    CollectionId, EventId, ImageId as DisplayImageId, LayerId, PixelFormat, INVALID_LAYER_ID,
+};
 use euclid::size2;
 use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy, ImageConfig};
 use fuchsia_async::{self as fasync, OnSignals};
@@ -358,9 +360,15 @@ impl DisplayDirectViewStrategy {
         for index in 0..buffers.buffer_count as usize {
             let uindex = index as u32;
             let image_id = next_image_id();
+            let display_image_id = DisplayImageId(image_id);
             let status = display
                 .coordinator
-                .import_image(&image_config, &collection_id.into(), image_id, uindex)
+                .import_image(
+                    &image_config,
+                    &collection_id.into(),
+                    &display_image_id.into(),
+                    uindex,
+                )
                 .await
                 .context("coordinator import_image")?;
             ensure!(status == 0, "import_image error {} ({})", Status::from_raw(status), status);
@@ -543,12 +551,13 @@ impl ViewStrategy for DisplayDirectViewStrategy {
                 *self.display_resources().wait_events.get(&prepared).expect("wait event");
             let (_, signal_event_id) =
                 *self.display_resources().signal_events.get(&prepared).expect("signal event");
-            let image_id = prepared;
+
+            let image_id = DisplayImageId(prepared);
             self.display
                 .coordinator
                 .set_layer_image(
                     &self.display.layer_id.into(),
-                    prepared,
+                    &image_id.into(),
                     &wait_event_id.into(),
                     &signal_event_id.into(),
                 )
@@ -562,7 +571,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
                 signal_sender
                     .unbounded_send(MessageInternal::ImageFreed(
                         view_key,
-                        image_id,
+                        image_id.0,
                         collection_id.0 as u32,
                     ))
                     .expect("unbounded_send");

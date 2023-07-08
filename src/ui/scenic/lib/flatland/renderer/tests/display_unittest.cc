@@ -193,10 +193,11 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   fuchsia::hardware::display::ImageConfig image_config{};
 
   // Try to import the image into the display coordinator API and make sure it succeeds.
-  uint64_t display_image_id = allocation::GenerateUniqueImageId();
+  allocation::GlobalImageId display_image_id = allocation::GenerateUniqueImageId();
   zx_status_t import_image_status = ZX_OK;
   (*display_coordinator.get())
-      ->ImportImage(image_config, display_collection_id, display_image_id, /*vmo_index*/ 0,
+      ->ImportImage(image_config, display_collection_id,
+                    allocation::ToFidlImageId(display_image_id), /*vmo_index*/ 0,
                     &import_image_status);
   EXPECT_EQ(import_image_status, ZX_OK);
 }
@@ -246,13 +247,14 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       sysmem_allocator_.get(), std::move(tokens.local_token), kNumVmos, kWidth, kHeight);
 
   // Import the images to the display.
-  uint64_t image_ids[kNumVmos];
+  allocation::GlobalImageId image_ids[kNumVmos];
   for (uint32_t i = 0; i < kNumVmos; i++) {
     image_ids[i] = allocation::GenerateUniqueImageId();
     zx_status_t import_image_status = ZX_OK;
-    auto transport_status = (*display_coordinator.get())
-                                ->ImportImage(image_config, display_collection_id, image_ids[i], i,
-                                              &import_image_status);
+    auto transport_status =
+        (*display_coordinator.get())
+            ->ImportImage(image_config, display_collection_id,
+                          allocation::ToFidlImageId(image_ids[i]), i, &import_image_status);
     ASSERT_EQ(transport_status, ZX_OK);
     ASSERT_EQ(import_image_status, ZX_OK);
     ASSERT_NE(image_ids[i], fuchsia::hardware::display::INVALID_DISP_ID);
@@ -282,8 +284,8 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   static constexpr scenic_impl::DisplayEventId kInvalidEventId = {
       .value = fuchsia::hardware::display::INVALID_DISP_ID};
   status = (*display_coordinator.get())
-               ->SetLayerImage(layer_id, image_ids[0], /*wait_event_id=*/kInvalidEventId,
-                               display_signal_event_id);
+               ->SetLayerImage(layer_id, allocation::ToFidlImageId(image_ids[0]),
+                               /*wait_event_id=*/kInvalidEventId, display_signal_event_id);
   EXPECT_EQ(status, ZX_OK);
 
   // Apply the config.
@@ -301,9 +303,10 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
 
   // Set the layer image again, to the second image, so that our first call to SetLayerImage()
   // above will signal.
-  status = (*display_coordinator.get())
-               ->SetLayerImage(layer_id, image_ids[1], display_wait_event_id,
-                               /*signal_event_id=*/kInvalidEventId);
+  status =
+      (*display_coordinator.get())
+          ->SetLayerImage(layer_id, allocation::ToFidlImageId(image_ids[1]), display_wait_event_id,
+                          /*signal_event_id=*/kInvalidEventId);
   EXPECT_EQ(status, ZX_OK);
 
   // Apply the config to display the second image.
