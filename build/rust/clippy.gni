@@ -95,6 +95,15 @@ template("clippy") {
         "-Dclippy::correctness",
         "-Dclippy::missing_safety_doc",
       ]
+      if (rustc_version_string !=
+          "dblnU3tEhEv7oy3yIm63PMqD3dsqu8htntNrnj3hkd0C" &&
+          rustc_version_string !=
+          "BG--B-lzsrwvrm4m6pDwqtoZwA94paiLv2WNuRyRDP4C" &&
+          rustc_version_string !=
+          "IFTslrzqy7n06fK7OK-X_EnZR0Y2MgX4z4hh1XR6SgUC") {
+        # TODO(fxbug.dev/130290): remove when lint is more useful
+        args += [ "-Aclippy::arc_with_non_send_sync" ]
+      }
     }
     args += [
       "-Wclippy::expect_fun_call",
