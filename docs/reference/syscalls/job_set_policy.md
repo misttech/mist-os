@@ -114,6 +114,8 @@ Where *condition* is one of
   **ZX_POL_NEW_PORT**, **ZX_POL_NEW_SOCKET**, **ZX_POL_NEW_FIFO**,
   and any future **ZX_NEW** policy. This will include any new
   kernel objects that do not require a parent object for creation.
++ **ZX_POL_NEW_IOB** a process under this job is attempting to create
+  a new IOBuffer.
 
 Where *policy* for **ZX_JOB_POL_BASIC_V1** or *action* for **ZX_JOB_POL_BASIC_V2**
 is one of

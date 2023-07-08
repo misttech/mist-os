@@ -124,7 +124,7 @@ void InvalidCalls(uint32_t options, uint32_t flags) {
   {
     // Too many.
     auto job = MakeJob();
-    zx_policy_basic_v2_t policy[17]{};
+    zx_policy_basic_v2_t policy[18]{};
     for (unsigned i = 0; i < std::size(policy); ++i) {
       policy[i] = {ZX_POL_BAD_HANDLE, ZX_POL_ACTION_KILL, flags};
     }

@@ -24,7 +24,7 @@ namespace {
 constexpr uint32_t kNewObjectPolicies[]{
     ZX_POL_NEW_VMO,     ZX_POL_NEW_CHANNEL, ZX_POL_NEW_EVENT, ZX_POL_NEW_EVENTPAIR,
     ZX_POL_NEW_PORT,    ZX_POL_NEW_SOCKET,  ZX_POL_NEW_FIFO,  ZX_POL_NEW_TIMER,
-    ZX_POL_NEW_PROCESS, ZX_POL_NEW_PROFILE, ZX_POL_NEW_PAGER,
+    ZX_POL_NEW_PROCESS, ZX_POL_NEW_PROFILE, ZX_POL_NEW_PAGER, ZX_POL_NEW_IOB,
 };
 static_assert(
     ktl::size(kNewObjectPolicies) + 5 == ZX_POL_MAX,
@@ -62,7 +62,9 @@ FBL_BITFIELD_MEMBER(new_pager, 52, 3);
 FBL_BITFIELD_MEMBER(new_pager_override, 55, 1);
 FBL_BITFIELD_MEMBER(ambient_mark_vmo_exec, 56, 3);
 FBL_BITFIELD_MEMBER(ambient_mark_vmo_exec_override, 59, 1);
-FBL_BITFIELD_MEMBER(unused_bits, 60, 4);
+FBL_BITFIELD_MEMBER(new_iob, 60, 3);
+FBL_BITFIELD_MEMBER(new_iob_override, 63, 1);
+FBL_BITFIELD_MEMBER(unused_bits, 64, 0);
 FBL_BITFIELD_DEF_END();
 
 template <uint32_t condition>
@@ -90,6 +92,7 @@ FIELD_SELECTOR_DEF(ZX_POL_NEW_PROCESS, new_process);
 FIELD_SELECTOR_DEF(ZX_POL_NEW_PROFILE, new_profile);
 FIELD_SELECTOR_DEF(ZX_POL_NEW_PAGER, new_pager);
 FIELD_SELECTOR_DEF(ZX_POL_AMBIENT_MARK_VMO_EXEC, ambient_mark_vmo_exec);
+FIELD_SELECTOR_DEF(ZX_POL_NEW_IOB, new_iob);
 
 #define CASE_RETURN_ACTION(id, bits) \
   case id:                           \
@@ -149,6 +152,7 @@ zx_status_t AddPartial(uint32_t mode, uint32_t condition, uint32_t action, uint3
     CASE_SET_ENTRY(ZX_POL_NEW_PROFILE, bits, action, override);
     CASE_SET_ENTRY(ZX_POL_NEW_PAGER, bits, action, override);
     CASE_SET_ENTRY(ZX_POL_AMBIENT_MARK_VMO_EXEC, bits, action, override);
+    CASE_SET_ENTRY(ZX_POL_NEW_IOB, bits, action, override);
     default:
       return ZX_ERR_INVALID_ARGS;
   }
@@ -177,6 +181,7 @@ zx_status_t SetOverride(JobPolicyBits* policy, uint32_t condition, uint32_t over
     CASE_SET_OVERRIDE(ZX_POL_NEW_PROFILE, policy, override);
     CASE_SET_OVERRIDE(ZX_POL_NEW_PAGER, policy, override);
     CASE_SET_OVERRIDE(ZX_POL_AMBIENT_MARK_VMO_EXEC, policy, override);
+    CASE_SET_OVERRIDE(ZX_POL_NEW_IOB, policy, override);
     default:
       return ZX_ERR_INVALID_ARGS;
   }
@@ -200,6 +205,7 @@ uint64_t GetAction(JobPolicyBits policy, uint32_t condition) {
     CASE_RETURN_ACTION(ZX_POL_NEW_PROFILE, &policy);
     CASE_RETURN_ACTION(ZX_POL_NEW_PAGER, &policy);
     CASE_RETURN_ACTION(ZX_POL_AMBIENT_MARK_VMO_EXEC, &policy);
+    CASE_RETURN_ACTION(ZX_POL_NEW_IOB, &policy);
     default:
       return ZX_POL_ACTION_DENY;
   }
@@ -222,6 +228,7 @@ uint64_t GetOverride(JobPolicyBits policy, uint32_t condition) {
     CASE_RETURN_OVERRIDE(ZX_POL_NEW_PROFILE, &policy);
     CASE_RETURN_OVERRIDE(ZX_POL_NEW_PAGER, &policy);
     CASE_RETURN_OVERRIDE(ZX_POL_AMBIENT_MARK_VMO_EXEC, &policy);
+    CASE_RETURN_OVERRIDE(ZX_POL_NEW_IOB, &policy);
     default:
       return ZX_POL_OVERRIDE_DENY;
   }
@@ -351,6 +358,7 @@ bool JobPolicy::operator!=(const JobPolicy& rhs) const { return !operator==(rhs)
   DEFINE_COUNTER(action, new_profile)                                           \
   DEFINE_COUNTER(action, new_pager)                                             \
   DEFINE_COUNTER(action, ambient_mark_vmo_exec)                                 \
+  DEFINE_COUNTER(action, new_iob)                                               \
   static constexpr const Counter* const COUNTER_ARRAY(action)[] = {             \
       [ZX_POL_BAD_HANDLE] = &COUNTER(action, bad_handle),                       \
       [ZX_POL_WRONG_OBJECT] = &COUNTER(action, wrong_object),                   \
@@ -368,6 +376,7 @@ bool JobPolicy::operator!=(const JobPolicy& rhs) const { return !operator==(rhs)
       [ZX_POL_NEW_PROFILE] = &COUNTER(action, new_profile),                     \
       [ZX_POL_NEW_PAGER] = &COUNTER(action, new_pager),                         \
       [ZX_POL_AMBIENT_MARK_VMO_EXEC] = &COUNTER(action, ambient_mark_vmo_exec), \
+      [ZX_POL_NEW_IOB] = &COUNTER(action, new_iob),                             \
   };                                                                            \
   static_assert(ktl::size(COUNTER_ARRAY(action)) == ZX_POL_MAX);
 

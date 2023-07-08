@@ -59,8 +59,9 @@ typedef struct zx_policy_basic_v1 zx_policy_basic_t;
 #define ZX_POL_NEW_PROFILE                  13u
 #define ZX_POL_NEW_PAGER                    14u
 #define ZX_POL_AMBIENT_MARK_VMO_EXEC        15u
+#define ZX_POL_NEW_IOB                      16u
 #ifdef _KERNEL
-#define ZX_POL_MAX                          16u
+#define ZX_POL_MAX                          17u
 #endif
 
 // Policy actions.

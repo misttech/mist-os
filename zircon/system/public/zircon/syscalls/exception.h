@@ -83,6 +83,7 @@ __BEGIN_CDECLS
 // handle buffer for syscalls that return handles. This is temporary until we
 // have fully migrated to HandleTableV3.
 #define ZX_EXCP_POLICY_CODE_HANDLE_LEAK             20u
+#define ZX_EXCP_POLICY_CODE_NEW_IOB                 21u
 
 // A process is starting.
 // This exception is sent to job debuggers only
