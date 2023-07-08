@@ -181,7 +181,7 @@ pub struct ObjectRef<T: 'static>(PhantomData<T>, wl::ObjectId);
 impl<T: 'static> Copy for ObjectRef<T> {}
 impl<T: 'static> Clone for ObjectRef<T> {
     fn clone(&self) -> Self {
-        ObjectRef(PhantomData, self.1)
+        *self
     }
 }
 impl<T: 'static> Debug for ObjectRef<T> {

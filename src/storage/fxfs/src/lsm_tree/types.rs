@@ -91,7 +91,7 @@ impl<K: Clone, V: Clone> ItemRef<'_, K, V> {
 
 impl<'a, K, V> Clone for ItemRef<'a, K, V> {
     fn clone(&self) -> Self {
-        ItemRef { key: self.key, value: self.value, sequence: self.sequence }
+        *self
     }
 }
 impl<'a, K, V> Copy for ItemRef<'a, K, V> {}
