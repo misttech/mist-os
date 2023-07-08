@@ -456,6 +456,7 @@ TEST_F(ProcessGetInfoTest, InfoProcessHandleTableSelf) {
       case ZX_OBJ_TYPE_FIFO:
       case ZX_OBJ_TYPE_THREAD:
       case ZX_OBJ_TYPE_PROCESS:
+      case ZX_OBJ_TYPE_IOB:
         EXPECT_GT(handle_info[ix].related_koid, 0);
         break;
       case ZX_OBJ_TYPE_JOB:

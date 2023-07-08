@@ -16,6 +16,7 @@
 #include <arch/ops.h>
 #include <fbl/ref_ptr.h>
 #include <object/handle.h>
+#include <object/io_buffer_dispatcher.h>
 #include <object/process_dispatcher.h>
 #include <object/vm_address_region_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
@@ -90,29 +91,12 @@ zx_status_t sys_vmar_destroy(zx_handle_t handle) {
   return vmar->Destroy();
 }
 
-// zx_status_t zx_vmar_map
-zx_status_t sys_vmar_map(zx_handle_t handle, zx_vm_option_t options, uint64_t vmar_offset,
-                         zx_handle_t vmo_handle, uint64_t vmo_offset, uint64_t len,
-                         user_out_ptr<zx_vaddr_t> mapped_addr) {
-  auto* up = ProcessDispatcher::GetCurrent();
-
-  // lookup the VMAR dispatcher from handle
-  fbl::RefPtr<VmAddressRegionDispatcher> vmar;
-  zx_rights_t vmar_rights;
-  zx_status_t status = up->handle_table().GetDispatcherAndRights(*up, handle, &vmar, &vmar_rights);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  // lookup the VMO dispatcher from handle
-  fbl::RefPtr<VmObjectDispatcher> vmo;
-  zx_rights_t vmo_rights;
-  status = up->handle_table().GetDispatcherAndRights(*up, vmo_handle, &vmo, &vmo_rights);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  // test to see if we should even be able to map this
+namespace {
+zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionDispatcher> vmar,
+                            uint64_t vmar_offset, zx_rights_t vmar_rights,
+                            fbl::RefPtr<VmObject> vmo, uint64_t vmo_offset, zx_rights_t vmo_rights,
+                            uint64_t len, user_out_ptr<zx_vaddr_t> mapped_addr) {
+  // Test to see if we should even be able to map this.
   if (!(vmo_rights & ZX_RIGHT_MAP)) {
     return ZX_ERR_ACCESS_DENIED;
   }
@@ -143,12 +127,12 @@ zx_status_t sys_vmar_map(zx_handle_t handle, zx_vm_option_t options, uint64_t vm
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // Permissions allowed by both the VMO and the VMAR
+  // Permissions allowed by both the VMO and the VMAR.
   const bool can_read = (vmo_rights & ZX_RIGHT_READ) && (vmar_rights & ZX_RIGHT_READ);
   const bool can_write = (vmo_rights & ZX_RIGHT_WRITE) && (vmar_rights & ZX_RIGHT_WRITE);
   const bool can_exec = (vmo_rights & ZX_RIGHT_EXECUTE) && (vmar_rights & ZX_RIGHT_EXECUTE);
 
-  // test to see if the requested mapping protections are allowed
+  // Test to see if the requested mapping protections are allowed.
   if ((options & ZX_VM_PERM_READ) && !can_read) {
     return ZX_ERR_ACCESS_DENIED;
   }
@@ -173,7 +157,8 @@ zx_status_t sys_vmar_map(zx_handle_t handle, zx_vm_option_t options, uint64_t vm
   }
 
   fbl::RefPtr<VmMapping> vm_mapping;
-  status = vmar->Map(vmar_offset, vmo->vmo(), vmo_offset, len, options, &vm_mapping);
+  zx_status_t status =
+      vmar->Map(vmar_offset, ktl::move(vmo), vmo_offset, len, options, &vm_mapping);
   if (status != ZX_OK) {
     return status;
   }
@@ -201,6 +186,33 @@ zx_status_t sys_vmar_map(zx_handle_t handle, zx_vm_option_t options, uint64_t vm
   VmMapping::MarkMergeable(ktl::move(vm_mapping));
 
   return ZX_OK;
+}
+}  // namespace
+
+// zx_status_t zx_vmar_map
+zx_status_t sys_vmar_map(zx_handle_t handle, zx_vm_option_t options, uint64_t vmar_offset,
+                         zx_handle_t vmo_handle, uint64_t vmo_offset, uint64_t len,
+                         user_out_ptr<zx_vaddr_t> mapped_addr) {
+  auto* up = ProcessDispatcher::GetCurrent();
+
+  // lookup the VMAR dispatcher from handle
+  fbl::RefPtr<VmAddressRegionDispatcher> vmar;
+  zx_rights_t vmar_rights;
+  zx_status_t status = up->handle_table().GetDispatcherAndRights(*up, handle, &vmar, &vmar_rights);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  // lookup the VMO dispatcher from handle
+  fbl::RefPtr<VmObjectDispatcher> vmo;
+  zx_rights_t vmo_rights;
+  status = up->handle_table().GetDispatcherAndRights(*up, vmo_handle, &vmo, &vmo_rights);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  return vmar_map_common(options, ktl::move(vmar), vmar_offset, vmar_rights, vmo->vmo(), vmo_offset,
+                         vmo_rights, len, mapped_addr);
 }
 
 // zx_status_t zx_vmar_unmap
@@ -275,5 +287,39 @@ zx_status_t sys_vmar_op_range(zx_handle_t handle, uint32_t op, zx_vaddr_t addr, 
 zx_status_t sys_vmar_map_iob(zx_handle_t handle, zx_vm_option_t options, size_t vmar_offset,
                              zx_handle_t ep, uint32_t region_index, size_t region_offset,
                              size_t region_length, user_out_ptr<vaddr_t> mapped_addr) {
-  return ZX_ERR_NOT_SUPPORTED;
+  auto* up = ProcessDispatcher::GetCurrent();
+
+  // Lookup the VMAR dispatcher from handle.
+  fbl::RefPtr<VmAddressRegionDispatcher> vmar;
+  zx_rights_t vmar_rights;
+  zx_status_t status = up->handle_table().GetDispatcherAndRights(*up, handle, &vmar, &vmar_rights);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  // Lookup the iob dispatcher from handle.
+  fbl::RefPtr<IoBufferDispatcher> iobuffer_disp;
+  zx_rights_t iobuffer_rights;
+  status = up->handle_table().GetDispatcherAndRights(*up, ep, &iobuffer_disp, &iobuffer_rights);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  if (region_index >= iobuffer_disp->RegionCount()) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  zx_rights_t region_rights = iobuffer_disp->GetMapRights(iobuffer_rights, region_index);
+  fbl::RefPtr<VmObject> child_reference;
+  Resizability resizability = iobuffer_disp->GetVmo(region_index)->is_resizable()
+                                  ? Resizability::Resizable
+                                  : Resizability::NonResizable;
+  status = iobuffer_disp->GetVmo(region_index)
+               ->CreateChildReference(resizability, 0, 0, true, &child_reference);
+  if (status != ZX_OK) {
+    return status;
+  }
+  return vmar_map_common(options, ktl::move(vmar), vmar_offset, vmar_rights,
+                         ktl::move(child_reference), region_offset, region_rights, region_length,
+                         mapped_addr);
 }

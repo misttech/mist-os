@@ -724,6 +724,14 @@
               "type": "VariableDeclarationImpl",
               "varType": "int"
             },
+            "DEFAULT_IOB_RIGHTS": {
+              "isConst": true,
+              "isFinal": false,
+              "isLate": false,
+              "name": "DEFAULT_IOB_RIGHTS",
+              "type": "VariableDeclarationImpl",
+              "varType": "int"
+            },
             "DEFAULT_IOMMU_RIGHTS": {
               "isConst": true,
               "isFinal": false,
@@ -1460,6 +1468,14 @@
               "type": "VariableDeclarationImpl",
               "varType": "int"
             },
+            "IOB_PEER_CLOSED": {
+              "isConst": true,
+              "isFinal": false,
+              "isLate": false,
+              "name": "IOB_PEER_CLOSED",
+              "type": "VariableDeclarationImpl",
+              "varType": "int"
+            },
             "JOB_CRITICAL_PROCESS_RETCODE_NONZERO": {
               "isConst": true,
               "isFinal": false,
@@ -1625,6 +1641,14 @@
               "isFinal": false,
               "isLate": false,
               "name": "OBJ_TYPE_INTERRUPT",
+              "type": "VariableDeclarationImpl",
+              "varType": "int"
+            },
+            "OBJ_TYPE_IOB": {
+              "isConst": true,
+              "isFinal": false,
+              "isLate": false,
+              "name": "OBJ_TYPE_IOB",
               "type": "VariableDeclarationImpl",
               "varType": "int"
             },

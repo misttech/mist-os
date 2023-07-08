@@ -124,4 +124,8 @@ typedef uint32_t zx_rights_t;
 
 #define ZX_DEFAULT_CLOCK_RIGHTS (ZX_RIGHTS_BASIC | ZX_RIGHTS_IO)
 
+#define ZX_DEFAULT_IOB_RIGHTS                                                           \
+  (ZX_RIGHTS_BASIC | ZX_RIGHT_WAIT | ZX_RIGHTS_IO | ZX_RIGHTS_PROPERTY | ZX_RIGHT_MAP | \
+   ZX_RIGHT_SIGNAL | ZX_RIGHT_SIGNAL_PEER)
+
 #endif  // ZIRCON_RIGHTS_H_

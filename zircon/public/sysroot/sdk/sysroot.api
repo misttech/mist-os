@@ -171,7 +171,7 @@
   "include/zircon/lookup.h": "053d29f711949d3d47b7a6b97b62d735",
   "include/zircon/process.h": "4cb14694964f8b707445d0585d914f8a",
   "include/zircon/processargs.h": "005c4e1060fee0ae9973e3f8c4b76729",
-  "include/zircon/rights.h": "798fc544435330e0930dfd895b03b8f3",
+  "include/zircon/rights.h": "af98386af6dee149dd8926fe62ceec82",
   "include/zircon/sanitizer.h": "a7a9edce90d9bee88342351c3c0daf0e",
   "include/zircon/status.h": "dd933b11e68e1c297bc781074bae511a",
   "include/zircon/string_view.h": "788f391dd888268860606d352c6a1ffd",
@@ -198,6 +198,6 @@
   "include/zircon/threads.h": "0e01c22126479fb344bddd7d924cff0e",
   "include/zircon/time.h": "477629b939476cb4f2e8210c3d4f4895",
   "include/zircon/tls.h": "a58546d629e67c2a21cb10f628afe1c2",
-  "include/zircon/types.h": "6d1de82363baef27e7c8d247ce80ad6e",
+  "include/zircon/types.h": "390a268a3b787057a0e263d867dd1366",
   "include/zircon/utc.h": "febff051fa44aebb4ad7950d9ecd9a74"
 }
