@@ -52,6 +52,11 @@ class FakeCompositeNodeSpec : public CompositeNodeSpec {
       const DeviceOrNode& device_or_node) override {
     return zx::ok(std::shared_ptr<DeviceV1Wrapper>(new DeviceV1Wrapper{}));
   }
+
+  fuchsia_driver_development::wire::CompositeInfo GetCompositeInfo(
+      fidl::AnyArena& arena) const override {
+    return fuchsia_driver_development::wire::CompositeInfo::Builder(arena).Build();
+  }
 };
 
 class FakeDeviceManagerBridge : public CompositeManagerBridge {

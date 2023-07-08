@@ -284,8 +284,12 @@ fpromise::promise<inspect::Inspector> DriverRunner::Inspect() const {
 
 std::vector<fdd::wire::CompositeInfo> DriverRunner::GetCompositeListInfo(
     fidl::AnyArena& arena) const {
-  // TODO(fxb/119947): Add composite node specs to the list.
-  return bind_manager_.GetCompositeListInfo(arena);
+  auto spec_composite_list = composite_node_spec_manager_.GetCompositeInfo(arena);
+  auto list = bind_manager_.GetCompositeListInfo(arena);
+  list.reserve(list.size() + spec_composite_list.size());
+  list.insert(list.end(), std::make_move_iterator(spec_composite_list.begin()),
+              std::make_move_iterator(spec_composite_list.end()));
+  return list;
 }
 
 void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing) {

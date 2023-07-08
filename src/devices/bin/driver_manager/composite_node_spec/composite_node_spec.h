@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_COMPOSITE_NODE_SPEC_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_COMPOSITE_NODE_SPEC_H_
 
+#include <fidl/fuchsia.driver.development/cpp/wire.h>
 #include <fidl/fuchsia.driver.index/cpp/fidl.h>
 
 struct DeviceV1Wrapper;
@@ -37,6 +38,9 @@ class CompositeNodeSpec {
       fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
       const DeviceOrNode& device_or_node);
 
+  virtual fuchsia_driver_development::wire::CompositeInfo GetCompositeInfo(
+      fidl::AnyArena& arena) const = 0;
+
   // Exposed for testing.
   const std::vector<std::optional<DeviceOrNode>>& parent_specs() const { return parent_specs_; }
 
@@ -51,6 +55,8 @@ class CompositeNodeSpec {
       const DeviceOrNode& device_or_node) = 0;
 
   const std::string& name() const { return name_; }
+
+  size_t size() const { return parent_specs_.size(); }
 
  private:
   std::string name_;

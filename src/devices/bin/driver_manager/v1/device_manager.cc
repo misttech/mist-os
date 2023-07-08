@@ -417,16 +417,20 @@ zx_status_t DeviceManager::RemoveDevice(const fbl::RefPtr<Device>& dev, bool for
   return ZX_OK;
 }
 
-std::vector<fdd::wire::CompositeInfo> DeviceManager::GetCompositeInfoList(
+std::vector<fdd::wire::CompositeInfo> DeviceManager::GetLegacyCompositeInfoList(
     fidl::AnyArena& arena) const {
   std::vector<fuchsia_driver_development::wire::CompositeInfo> list;
   for (auto& composite : composite_devices_) {
     list.push_back(composite.GetCompositeInfo(arena));
   }
-
-  for (auto& [spec, composite] : composites_from_specs_) {
-    list.push_back(composite->GetCompositeInfo(arena));
-  }
-
   return list;
+}
+
+zx::result<fdd::wire::CompositeInfo> DeviceManager::GetCompositeInfoForSpec(
+    fidl::AnyArena& arena, std::string spec) const {
+  if (const auto& composite = composites_from_specs_.find(spec);
+      composite == composites_from_specs_.end()) {
+    return zx::ok(composite->second->GetCompositeInfo(arena));
+  }
+  return zx::error(ZX_ERR_NOT_FOUND);
 }

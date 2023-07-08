@@ -841,7 +841,13 @@ void Coordinator::GetDeviceInfo(GetDeviceInfoRequestView request,
 void Coordinator::GetCompositeInfo(GetCompositeInfoRequestView request,
                                    GetCompositeInfoCompleter::Sync& completer) {
   auto arena = std::make_unique<fidl::Arena<512>>();
-  auto list = device_manager_->GetCompositeInfoList(*arena);
+  auto list = device_manager_->GetLegacyCompositeInfoList(*arena);
+
+  auto spec_composite_list = composite_node_spec_manager_->GetCompositeInfo(*arena);
+  list.reserve(list.size() + spec_composite_list.size());
+  list.insert(list.end(), std::make_move_iterator(spec_composite_list.begin()),
+              std::make_move_iterator(spec_composite_list.end()));
+
   auto iterator = std::make_unique<driver_development::CompositeInfoIterator>(std::move(arena),
                                                                               std::move(list));
   fidl::BindServer(dispatcher(), std::move(request->iterator), std::move(iterator),

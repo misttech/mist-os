@@ -12,6 +12,7 @@ source_set("lib") {
   ]
   public_deps = [ "//zircon/system/ulib/fbl" ]
   deps = [
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
     "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp",
     "//src/devices/lib/log",
   ]

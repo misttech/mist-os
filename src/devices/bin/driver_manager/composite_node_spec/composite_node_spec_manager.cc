@@ -8,6 +8,7 @@
 
 #include "src/devices/lib/log/log.h"
 
+namespace fdd = fuchsia_driver_development;
 namespace fdi = fuchsia_driver_index;
 namespace fdf = fuchsia_driver_framework;
 
@@ -145,4 +146,15 @@ zx::result<std::vector<CompositeNodeAndDriver>> CompositeNodeSpecManager::BindPa
   fidl::Arena<> arena;
   return BindParentSpec(fidl::ToWire(arena, std::move(match_info)), device_or_node,
                         enable_multibind);
+}
+
+std::vector<fdd::wire::CompositeInfo> CompositeNodeSpecManager::GetCompositeInfo(
+    fidl::AnyArena &arena) const {
+  std::vector<fdd::wire::CompositeInfo> composites;
+  for (auto &[name, spec] : specs_) {
+    if (spec) {
+      composites.push_back(spec->GetCompositeInfo(arena));
+    }
+  }
+  return composites;
 }

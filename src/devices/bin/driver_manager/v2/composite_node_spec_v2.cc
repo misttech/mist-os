@@ -4,7 +4,7 @@
 
 #include "src/devices/bin/driver_manager/v2/composite_node_spec_v2.h"
 
-#include "src/devices/lib/log/log.h"
+namespace fdd = fuchsia_driver_development;
 
 namespace dfv2 {
 
@@ -26,54 +26,52 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV2::BindParentImpl(
   ZX_ASSERT(info.has_name());
 
   if (!parent_set_collector_) {
-    parent_set_collector_ = ParentSetCollector(info.node_names().count());
+    auto node_names = std::vector<std::string>(info.node_names().count());
+    for (size_t i = 0; i < info.node_names().count(); i++) {
+      node_names[i] = std::string(info.node_names()[i].get());
+    }
+    parent_set_collector_ = ParentSetCollector(std::string(info.name().get()),
+                                               std::move(node_names), info.primary_index());
   }
 
-  if (parent_set_collector_->ContainsNode(info.node_index())) {
-    return zx::error(ZX_ERR_ALREADY_BOUND);
+  zx::result<> add_result = parent_set_collector_->AddNode(info.node_index(), *node_ptr);
+  if (add_result.is_error()) {
+    return add_result.take_error();
   }
 
-  parent_set_collector_->AddNode(info.node_index(), *node_ptr);
-
-  auto owned_node = (*node_ptr).lock();
-  if (owned_node->name() == "sysmem-fidl" || owned_node->name() == "sysmem-banjo") {
-    LOGF(DEBUG, "Node '%s' matched parent '%d' of composite node spec '%s'",
-         owned_node->name().c_str(), info.node_index(), std::string(info.name().get()).c_str());
-  } else {
-    LOGF(INFO, "Node '%s' matched parent '%d' of composite node spec '%s'",
-         owned_node->name().c_str(), info.node_index(), std::string(info.name().get()).c_str());
-  }
-
-  // Check if we have all the nodes for the composite node spec.
-  auto completed_parents = parent_set_collector_->GetIfComplete();
-  if (!completed_parents.has_value()) {
-    // Parent set is not complete yet.
+  auto composite_node = parent_set_collector_->TryToAssemble(node_manager_, dispatcher_);
+  if (composite_node.is_error()) {
+    if (composite_node.status_value() != ZX_ERR_SHOULD_WAIT) {
+      return composite_node.take_error();
+    }
     return zx::ok(std::nullopt);
   }
 
-  auto node_names = std::vector<std::string>(info.node_names().count());
-  for (size_t i = 0; i < info.node_names().count(); i++) {
-    node_names[i] = std::string(info.node_names()[i].get());
+  return zx::ok(composite_node.value());
+}
+
+fdd::wire::CompositeInfo CompositeNodeSpecV2::GetCompositeInfo(fidl::AnyArena& arena) const {
+  auto composite_info =
+      fdd::wire::CompositeInfo::Builder(arena).name(fidl::StringView(arena, name().c_str()));
+  if (!parent_set_collector_) {
+    fidl::VectorView<fdd::wire::CompositeParentNodeInfo> parents(arena, size());
+    composite_info.node_info(fdd::wire::CompositeNodeInfo::WithParents(arena, parents));
+    return composite_info.Build();
   }
 
-  auto node_name = std::string(info.name().get());
+  composite_info.driver(driver_url_)
+      .primary_index(parent_set_collector_->primary_index())
+      .node_info(fdd::wire::CompositeNodeInfo::WithParents(
+          arena, parent_set_collector_->GetParentInfo(arena)));
 
-  // Create a composite node for the composite node spec with our complete parent set.
-  auto composite = Node::CreateCompositeNode(node_name, std::move(*completed_parents), node_names,
-                                             {}, node_manager_, dispatcher_, info.primary_index());
-  if (composite.is_error()) {
-    // If we are returning an error we should clear out what we have.
-    parent_set_collector_->RemoveNode(info.node_index());
-    return composite.take_error();
+  std::optional<std::weak_ptr<dfv2::Node>> composite_node =
+      parent_set_collector_->completed_composite_node();
+  if (composite_node) {
+    if (auto node_ptr = composite_node->lock(); node_ptr) {
+      composite_info.topological_path(node_ptr->MakeTopologicalPath());
+    }
   }
-
-  LOGF(INFO, "Built composite node '%s' for completed composite node spec '%s'",
-       composite.value()->name().c_str(), std::string(info.name().get()).c_str());
-
-  completed_composite_node_.emplace(composite.value()->weak_from_this());
-
-  // We can return a pointer, as the composite node is owned by its parents.
-  return zx::ok(composite.value()->weak_from_this());
+  return composite_info.Build();
 }
 
 }  // namespace dfv2

@@ -38,6 +38,9 @@ class CompositeNodeSpecV1 : public CompositeNodeSpec {
       fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
       const DeviceOrNode& device_or_node) override;
 
+  fuchsia_driver_development::wire::CompositeInfo GetCompositeInfo(
+      fidl::AnyArena& arena) const override;
+
   // Should only be called when |has_composite_device_| is false.
   void SetupCompositeDevice(fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info);
 

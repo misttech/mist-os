@@ -45,6 +45,9 @@ class CompositeNodeSpecManager {
       fuchsia_driver_index::MatchedCompositeNodeParentInfo match_info,
       const DeviceOrNode& device_or_node, bool enable_multibind = false);
 
+  std::vector<fuchsia_driver_development::wire::CompositeInfo> GetCompositeInfo(
+      fidl::AnyArena& arena) const;
+
   // Exposed for testing only.
   const CompositeNodeSpecMap& specs() const { return specs_; }
 

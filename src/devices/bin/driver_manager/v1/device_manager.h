@@ -68,8 +68,11 @@ class DeviceManager {
   // Pushes |new_device| to |devices_|.
   void AddToDevices(fbl::RefPtr<Device> new_device);
 
-  std::vector<fuchsia_driver_development::wire::CompositeInfo> GetCompositeInfoList(
+  std::vector<fuchsia_driver_development::wire::CompositeInfo> GetLegacyCompositeInfoList(
       fidl::AnyArena& arena) const;
+
+  zx::result<fuchsia_driver_development::wire::CompositeInfo> GetCompositeInfoForSpec(
+      fidl::AnyArena& arena, std::string spec) const;
 
   fbl::TaggedDoublyLinkedList<fbl::RefPtr<Device>, Device::AllDevicesListTag>& devices() {
     return devices_;

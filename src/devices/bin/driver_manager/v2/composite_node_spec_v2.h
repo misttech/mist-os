@@ -19,7 +19,7 @@ class CompositeNodeSpecV2 : public CompositeNodeSpec {
   ~CompositeNodeSpecV2() override = default;
 
   std::optional<std::weak_ptr<dfv2::Node>> completed_composite_node() {
-    return completed_composite_node_;
+    return parent_set_collector_ ? parent_set_collector_->completed_composite_node() : std::nullopt;
   }
 
  protected:
@@ -28,11 +28,15 @@ class CompositeNodeSpecV2 : public CompositeNodeSpec {
       const DeviceOrNode& device_or_node) override;
 
  private:
+  fuchsia_driver_development::wire::CompositeInfo GetCompositeInfo(
+      fidl::AnyArena& arena) const override;
+
   std::optional<ParentSetCollector> parent_set_collector_;
+
+  std::string driver_url_;
+
   async_dispatcher_t* const dispatcher_;
   NodeManager* node_manager_;
-  // When the composite node spec is completed, we store the newly created composite node here.
-  std::optional<std::weak_ptr<dfv2::Node>> completed_composite_node_;
 };
 
 }  // namespace dfv2

@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
 
 #include "src/devices/bin/driver_manager/v2/node.h"
+#include "src/devices/lib/log/log.h"
 
 namespace dfv2 {
 
@@ -16,34 +17,50 @@ namespace dfv2 {
 // it will return a vector containing all the parent node pointers.
 class ParentSetCollector {
  public:
-  explicit ParentSetCollector(size_t size) : size_(size), parents_(size) {}
+  explicit ParentSetCollector(std::string composite_name, std::vector<std::string> parent_names,
+                              uint32_t primary_index)
+      : composite_name_(composite_name),
+        parents_(parent_names.size()),
+        parent_names_(std::move(parent_names)),
+        primary_index_(primary_index) {}
 
   // Add a node to the parent set at the specified index.
   // Caller should check that |ContainsNode| is false for the index before calling this.
   // Only a weak_ptr of the node is stored by this class (until collection in GetIfComplete).
-  void AddNode(uint32_t index, std::weak_ptr<Node> node);
+  zx::result<> AddNode(uint32_t index, std::weak_ptr<Node> node);
 
   // Remove a node at a specific index from the parent set.
   void RemoveNode(uint32_t index);
 
-  // Returns the completed parent set if it is a completed set.
-  // Otherwise a nullopt.
-  // The lifetime of the Node objects is managed by their parent nodes. This method
-  // will only return a vector where none of the elements are null pointers.
-  std::optional<std::vector<Node*>> GetIfComplete();
+  // Check if all parents are found. If so, then create and return the composite node. If the
+  // node is already created, return ZX_ERR_ALREADY_EXISTS.
+  zx::result<std::shared_ptr<Node>> TryToAssemble(NodeManager* node_manager,
+                                                  async_dispatcher_t* dispatcher);
 
-  // Returns whether the parent set is occupied at the index.
-  bool ContainsNode(uint32_t index) const;
+  fidl::VectorView<fuchsia_driver_development::wire::CompositeParentNodeInfo> GetParentInfo(
+      fidl::AnyArena& arena) const;
 
-  size_t size() const { return size_; }
   const std::weak_ptr<Node>& get(uint32_t index) const { return parents_[index]; }
 
+  uint32_t primary_index() const { return primary_index_; }
+
+  std::optional<std::weak_ptr<dfv2::Node>> completed_composite_node() const {
+    return completed_composite_node_;
+  }
+
  private:
-  size_t size_;
+  std::string composite_name_;
 
   // Nodes are stored as weak_ptrs. Only when trying to collect the completed set are they
   // locked into shared_ptrs and validated to not be null.
   std::vector<std::weak_ptr<Node>> parents_;
+
+  std::vector<std::string> parent_names_;
+
+  uint32_t primary_index_;
+
+  // Contains a weak pointer to the composite node when the parent set is assembled.
+  std::optional<std::weak_ptr<dfv2::Node>> completed_composite_node_;
 };
 
 }  // namespace dfv2

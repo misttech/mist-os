@@ -6,6 +6,8 @@
 
 #include "src/devices/lib/log/log.h"
 
+namespace fdd = fuchsia_driver_development;
+
 namespace composite_node_specs {
 
 zx::result<std::unique_ptr<CompositeNodeSpecV1>> CompositeNodeSpecV1::Create(
@@ -111,6 +113,21 @@ void CompositeNodeSpecV1::SetupCompositeDevice(
   device_manager_.AddCompositeDeviceFromSpec(composite_info, std::move(metadata_));
   has_composite_device_ = true;
   metadata_ = fbl::Array<std::unique_ptr<Metadata>>();
+}
+
+fdd::wire::CompositeInfo CompositeNodeSpecV1::GetCompositeInfo(fidl::AnyArena& arena) const {
+  if (has_composite_device_) {
+    auto composite_info = device_manager_.GetCompositeInfoForSpec(arena, name());
+    if (composite_info.is_ok()) {
+      return composite_info.value();
+    }
+  }
+
+  fidl::VectorView<fdd::wire::CompositeParentNodeInfo> parents(arena, size());
+  return fdd::wire::CompositeInfo::Builder(arena)
+      .name(fidl::StringView(arena, name().c_str()))
+      .node_info(fdd::wire::CompositeNodeInfo::WithParents(arena, parents))
+      .Build();
 }
 
 }  // namespace composite_node_specs
