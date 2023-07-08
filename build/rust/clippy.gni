@@ -93,6 +93,9 @@ template("clippy") {
       args += [
         "-${_level}clippy::all",
         "-Dclippy::correctness",
+
+        # TODO(fxbug.dev/130287): upgrade bitflags to a version that doesn't trigger this and remove
+        "-Aclippy::bad_bit_mask",
         "-Dclippy::missing_safety_doc",
       ]
       if (rustc_version_string !=
