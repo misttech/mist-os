@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 use {
     fidl_fuchsia_wlan_policy as fidl_policy,
+    fuchsia_zircon::{self as zx, prelude::*},
     ieee80211::{Bssid, Ssid},
     pin_utils::pin_mut,
     tracing::info,
@@ -11,82 +12,48 @@ use {
         ie::rsn::cipher::{Cipher, CIPHER_CCMP_128, CIPHER_TKIP},
     },
     wlan_hw_sim::*,
-    wlan_rsn,
 };
 
 const BSSID: &Bssid = &Bssid(*b"wpa2ok");
 const AUTHENTICATOR_PASSWORD: &str = "goodpassword";
 const SUPPLICANT_PASSWORD: &str = "badpassword";
 
-async fn connect_future(
-    client_controller: &fidl_policy::ClientControllerProxy,
-    client_state_update_stream: &mut fidl_policy::ClientStateUpdatesRequestStream,
-    security_type: fidl_policy::SecurityType,
+async fn connect_and_wait_for_failure(
     ssid: &Ssid,
-    password: &str,
+    supplicant: Supplicant<'_>,
     expected_failure: fidl_policy::DisconnectStatus,
 ) {
-    save_network(
-        client_controller,
-        ssid,
-        security_type,
-        password_or_psk_to_policy_credential(Some(password)),
-    )
-    .await;
+    let credential = password_or_psk_to_policy_credential(supplicant.password);
+    save_network(supplicant.controller, ssid, supplicant.security_type, credential.clone()).await;
     let network_identifier =
-        fidl_policy::NetworkIdentifier { ssid: ssid.to_vec(), type_: security_type };
-    await_failed(client_state_update_stream, network_identifier.clone(), expected_failure).await;
-    remove_network(
-        client_controller,
-        ssid,
-        security_type,
-        password_or_psk_to_policy_credential(Some(password)),
-    )
-    .await;
+        fidl_policy::NetworkIdentifier { ssid: ssid.to_vec(), type_: supplicant.security_type };
+    await_failed(supplicant.state_update_stream, network_identifier.clone(), expected_failure)
+        .await;
+    remove_network(supplicant.controller, ssid, supplicant.security_type, credential).await;
 }
 
-async fn run_bad_password_test(
-    client_controller: &fidl_policy::ClientControllerProxy,
-    client_state_update_stream: &mut fidl_policy::ClientStateUpdatesRequestStream,
-    test_helper: &mut test_utils::TestHelper,
-    bssid: &Bssid,
+async fn fail_to_connect_or_timeout(
+    helper: &mut test_utils::TestHelper,
+    timeout: zx::Duration,
     ssid: &Ssid,
-    authenticator_pass: &str,
-    suplicant_pass: &str,
+    bssid: &Bssid,
+    protection: &Protection,
     cipher: Cipher,
-    protection: Protection,
-    policy_security_type: fidl_policy::SecurityType,
+    password: &str,
+    supplicant: Supplicant<'_>,
     expected_failure: fidl_policy::DisconnectStatus,
-    timeout: Option<i64>,
 ) {
-    let mut authenticator =
-        Some(create_authenticator(bssid, ssid, authenticator_pass, cipher, protection, protection));
-
-    let main_fut = connect_future(
-        client_controller,
-        client_state_update_stream,
-        policy_security_type,
-        ssid,
-        suplicant_pass,
-        expected_failure,
-    );
-    pin_mut!(main_fut);
+    let authenticator =
+        create_authenticator(bssid, ssid, password, cipher, *protection, *protection);
+    let connect = connect_and_wait_for_failure(ssid, supplicant, expected_failure);
+    pin_mut!(connect);
     info!(
-        "Attempting to connect to a network with {:?} security using the wrong password.",
+        "Attempting to connect to a network with {:?} protection **using an incorrect password**.",
         protection
     );
-    handle_connect_future(
-        main_fut,
-        test_helper,
-        ssid,
-        bssid,
-        &protection,
-        &mut authenticator,
-        &mut Some(wlan_rsn::rsna::UpdateSink::default()),
-        timeout,
-    )
-    .await;
-    info!("As expected, the connection failed.")
+    connect_or_timeout_with(helper, timeout, ssid, bssid, protection, Some(authenticator), connect)
+        .await;
+    info!("OK: invalid connection parameters failed as expected.");
 }
 
 /// Test a client fails to connect to a network if the wrong credential type is
@@ -99,61 +66,55 @@ async fn connect_with_bad_password() {
     let () = loop_until_iface_is_found(&mut helper).await;
 
     let (client_controller, mut client_state_update_stream) = init_client_controller().await;
+    let mut supplicant = Supplicant {
+        controller: &client_controller,
+        state_update_stream: &mut client_state_update_stream,
+        security_type: fidl_policy::SecurityType::None,
+        password: Some(SUPPLICANT_PASSWORD),
+    };
 
-    // Test a client fails to connect to a network protected by WPA3-Personal if the wrong
-    // password is provided. The DisconnectStatus::CredentialsFailed status should be
-    // returned by policy.
-    run_bad_password_test(
-        &client_controller,
-        &mut client_state_update_stream,
+    // Test a client fails to connect to a network protected by WPA3-Personal if the wrong password
+    // is provided. The DisconnectStatus::CredentialsFailed status should be returned by policy.
+    fail_to_connect_or_timeout(
         &mut helper,
-        BSSID,
+        60.seconds(),
         &Ssid::try_from("wpa3network").unwrap(),
-        AUTHENTICATOR_PASSWORD,
-        SUPPLICANT_PASSWORD,
+        &BSSID,
+        &Protection::Wpa3Personal,
         CIPHER_CCMP_128,
-        Protection::Wpa3Personal,
-        fidl_policy::SecurityType::Wpa3,
+        AUTHENTICATOR_PASSWORD,
+        Supplicant { security_type: fidl_policy::SecurityType::Wpa3, ..supplicant.reborrow() },
         fidl_policy::DisconnectStatus::ConnectionFailed,
-        Some(60),
     )
     .await;
 
-    // Test a client fails to connect to a network protected by WPA2-PSK if the wrong
-    // password is provided. The DisconnectStatus::CredentialsFailed status should be
-    // returned by policy.
-    run_bad_password_test(
-        &client_controller,
-        &mut client_state_update_stream,
+    // Test a client fails to connect to a network protected by WPA2-PSK if the wrong password is
+    // provided. The DisconnectStatus::CredentialsFailed status should be returned by policy.
+    fail_to_connect_or_timeout(
         &mut helper,
-        BSSID,
+        30.seconds(),
         &Ssid::try_from("wpa2network").unwrap(),
-        AUTHENTICATOR_PASSWORD,
-        SUPPLICANT_PASSWORD,
+        &BSSID,
+        &Protection::Wpa2Personal,
         CIPHER_CCMP_128,
-        Protection::Wpa2Personal,
-        fidl_policy::SecurityType::Wpa2,
+        AUTHENTICATOR_PASSWORD,
+        Supplicant { security_type: fidl_policy::SecurityType::Wpa2, ..supplicant.reborrow() },
         fidl_policy::DisconnectStatus::CredentialsFailed,
-        None,
     )
     .await;
 
-    // Test a client fails to connect to a network protected by WPA1-PSK if the wrong
-    // password is provided. The DisconnectStatus::CredentialsFailed status should be
-    // returned by policy.
-    run_bad_password_test(
-        &client_controller,
-        &mut client_state_update_stream,
+    // Test a client fails to connect to a network protected by WPA1-PSK if the wrong password is
+    // provided. The DisconnectStatus::CredentialsFailed status should be returned by policy.
+    fail_to_connect_or_timeout(
         &mut helper,
-        BSSID,
+        30.seconds(),
         &Ssid::try_from("wpa1network").unwrap(),
-        AUTHENTICATOR_PASSWORD,
-        SUPPLICANT_PASSWORD,
+        &BSSID,
+        &Protection::Wpa1,
         CIPHER_TKIP,
-        Protection::Wpa1,
-        fidl_policy::SecurityType::Wpa,
+        AUTHENTICATOR_PASSWORD,
+        Supplicant { security_type: fidl_policy::SecurityType::Wpa, ..supplicant },
         fidl_policy::DisconnectStatus::CredentialsFailed,
-        None,
     )
     .await;
 

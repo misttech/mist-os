@@ -12,6 +12,7 @@ rustc_test("autoconnect_idle_iface") {
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//src/connectivity/wlan/testing/hw-sim:wlan-hw-sim",
     "//src/lib/fuchsia-async",
+    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:tracing",
   ]
 

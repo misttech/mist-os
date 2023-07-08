@@ -4,6 +4,7 @@
 
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
+    fuchsia_zircon::prelude::*,
     tracing::info,
     wlan_common::{assert_variant, bss::Protection},
     wlan_hw_sim::*,
@@ -57,15 +58,14 @@ async fn autoconnect_idle_iface() {
             has_id_and_state(update, &network_id, fidl_policy::ConnectionState::Connected)
         }));
 
-    handle_connect_future(
-        wait_for_connect,
+    connect_or_timeout_with(
         &mut helper,
+        30.seconds(),
         &AP_SSID,
         &AP_MAC_ADDR,
         &Protection::Open,
-        &mut None,
-        &mut None,
         None,
+        wait_for_connect,
     )
     .await;
 

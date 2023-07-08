@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    fidl_fuchsia_wlan_policy as fidl_policy, ieee80211::Bssid, wlan_common::bss::Protection,
-    wlan_hw_sim::*,
+    fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_zircon::prelude::*, ieee80211::Bssid,
+    wlan_common::bss::Protection, wlan_hw_sim::*,
 };
 
 /// Test a client can connect to a network with no protection by simulating an AP that sends out
@@ -18,12 +18,13 @@ async fn connect_to_open_network() {
     let mut helper = test_utils::TestHelper::begin_test(default_wlantap_config_client()).await;
     let () = loop_until_iface_is_found(&mut helper).await;
 
-    let () = connect_with_security_type(
+    let () = connect_or_timeout(
         &mut helper,
+        30.seconds(),
         &AP_SSID,
         &BSS,
+        &Protection::Open,
         None,
-        Protection::Open,
         fidl_policy::SecurityType::None,
     )
     .await;

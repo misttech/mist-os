@@ -15,7 +15,7 @@ use {
         mac,
     },
     wlan_hw_sim::{
-        connect_with_security_type, default_wlantap_config_client,
+        connect_or_timeout, default_wlantap_config_client,
         event::{
             self,
             buffered::{Buffered, DataFrame},
@@ -99,12 +99,13 @@ async fn ethernet_tx_rx() {
     let mut helper = test_utils::TestHelper::begin_test(default_wlantap_config_client()).await;
     let () = loop_until_iface_is_found(&mut helper).await;
 
-    connect_with_security_type(
+    connect_or_timeout(
         &mut helper,
+        30.seconds(),
         &AP_SSID,
         &BSS,
+        &Protection::Open,
         None,
-        Protection::Open,
         fidl_policy::SecurityType::None,
     )
     .await;

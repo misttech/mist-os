@@ -21,7 +21,7 @@ use {
         mac,
     },
     wlan_hw_sim::{
-        connect_with_security_type, default_wlantap_config_client,
+        connect_or_timeout, default_wlantap_config_client,
         event::{
             self,
             buffered::{Buffered, DataFrame},
@@ -281,12 +281,13 @@ async fn rate_selection() {
     .await;
     let () = loop_until_iface_is_found(&mut helper).await;
 
-    let () = connect_with_security_type(
+    let () = connect_or_timeout(
         &mut helper,
+        30.seconds(),
         &AP_SSID,
         &BSS_MINSTL,
+        &Protection::Open,
         None,
-        Protection::Open,
         fidl_policy::SecurityType::None,
     )
     .await;

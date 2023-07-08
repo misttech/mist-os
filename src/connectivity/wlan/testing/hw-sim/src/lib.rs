@@ -3,24 +3,24 @@
 // found in the LICENSE file.
 
 use {
-    crate::event::action,
+    crate::event::{
+        action::{self, AuthenticationControl, AuthenticationTap},
+        branch, Handler,
+    },
     anyhow::Error,
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl::endpoints::{create_endpoints, create_proxy},
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_common::WlanMacRole,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_tap::{
-        StartScanArgs, TxArgs, WlanRxInfo, WlantapPhyConfig, WlantapPhyEvent, WlantapPhyProxy,
-    },
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_policy as fidl_policy,
+    fidl_fuchsia_wlan_tap::{WlanRxInfo, WlantapPhyConfig, WlantapPhyProxy},
     fuchsia_component::client::connect_to_protocol,
+    fuchsia_zircon as zx,
     fuchsia_zircon::prelude::*,
     ieee80211::{Bssid, Ssid},
     lazy_static::lazy_static,
     pin_utils::pin_mut,
     std::{convert::TryFrom, future::Future, marker::Unpin},
-    tracing::{debug, error},
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},
@@ -36,7 +36,7 @@ use {
         mac, mgmt_writer, TimeUnit,
     },
     wlan_frame_writer::write_frame_with_dynamic_buf,
-    wlan_rsn::{self, rsna::SecAssocUpdate},
+    wlan_rsn::{self, rsna::UpdateSink},
 };
 
 pub mod event;
@@ -69,6 +69,39 @@ lazy_static! {
     // to complete (see fxbug.dev/109900). Allow at least double that amount of time to reduce
     // flakiness and longer than the timeout WLAN policy should have.
     pub static ref SCAN_RESPONSE_TEST_TIMEOUT: fuchsia_zircon::Duration = 70.seconds();
+}
+
+/// A client supplicant.
+///
+/// Provides the client and security components necessary to attempt a connection via Policy.
+pub struct Supplicant<'a> {
+    pub controller: &'a fidl_policy::ClientControllerProxy,
+    pub state_update_stream: &'a mut fidl_policy::ClientStateUpdatesRequestStream,
+    pub security_type: fidl_policy::SecurityType,
+    pub password: Option<&'a str>,
+}
+
+impl<'a> Supplicant<'a> {
+    /// Clones the supplicant through reborrowing of mutable references.
+    ///
+    /// # Examples
+    ///
+    /// This function can be used for templating.
+    ///
+    /// ```rust,ignore
+    /// let mut supplicant = Supplicant { /* ... */ }; // Template.
+    /// // ...
+    /// // Connect via the template supplicant but with a particular password.
+    /// let _ = connect(Supplicant { password: "********", ..supplicant.reborrow() });
+    /// ```
+    pub fn reborrow(&mut self) -> Supplicant<'_> {
+        Supplicant {
+            controller: self.controller,
+            state_update_stream: &mut *self.state_update_stream,
+            security_type: self.security_type,
+            password: self.password,
+        }
+    }
 }
 
 pub fn default_wlantap_config_client() -> WlantapPhyConfig {
@@ -325,55 +358,6 @@ pub fn create_authenticator(
     }
 }
 
-pub fn process_tx_auth_updates(
-    authenticator: &mut wlan_rsn::Authenticator,
-    update_sink: &mut wlan_rsn::rsna::UpdateSink,
-    channel: &Channel,
-    bssid: &Bssid,
-    phy: &WlantapPhyProxy,
-    ready_for_sae_frames: bool,
-    ready_for_eapol_frames: bool,
-) -> Result<(), anyhow::Error> {
-    if !ready_for_sae_frames && !ready_for_eapol_frames {
-        return Ok(());
-    }
-
-    // TODO(fxbug.dev/69580): Use Vec::drain_filter instead.
-    let mut i = 0;
-    while i < update_sink.len() {
-        match &update_sink[i] {
-            SecAssocUpdate::TxSaeFrame(sae_frame) if ready_for_sae_frames => {
-                send_sae_authentication_frame(
-                    &sae_frame,
-                    &Channel::new(1, Cbw::Cbw20),
-                    bssid,
-                    &phy,
-                )
-                .expect("Error sending fake SAE authentication frame.");
-                update_sink.remove(i);
-            }
-            SecAssocUpdate::TxEapolKeyFrame { frame, .. } if ready_for_eapol_frames => {
-                rx_wlan_data_frame(
-                    channel,
-                    &CLIENT_MAC_ADDR,
-                    &bssid.0,
-                    &bssid.0,
-                    &frame[..],
-                    mac::ETHER_TYPE_EAPOL,
-                    phy,
-                )?;
-                update_sink.remove(i);
-                authenticator
-                    .on_eapol_conf(update_sink, fidl_mlme::EapolResultCode::Success)
-                    .expect("Error sending EAPOL confirm");
-            }
-            _ => i += 1,
-        };
-    }
-
-    Ok(())
-}
-
 pub enum ApAdvertisementMode {
     Beacon,
     ProbeResponse,
@@ -538,255 +522,6 @@ impl ApAdvertisement for ProbeResponse {
     }
 }
 
-pub fn send_scan_complete(
-    scan_id: u64,
-    status: i32,
-    phy: &WlantapPhyProxy,
-) -> Result<(), anyhow::Error> {
-    tracing::info!(
-        "TODO(fxbug.dev/108667): Sleep {} seconds before `ScanComplete()`",
-        ARTIFICIAL_SCAN_SLEEP.into_seconds()
-    );
-    ARTIFICIAL_SCAN_SLEEP.sleep();
-    phy.scan_complete(scan_id, status).map_err(|e| e.into())
-}
-
-pub fn handle_start_scan_event(
-    args: &StartScanArgs,
-    phy: &WlantapPhyProxy,
-    ap_advertisement: &impl ApAdvertisement,
-) {
-    debug!("Handling start scan event with scan_id {:?}", args.scan_id);
-    ap_advertisement.send(phy).expect("failed to send beacon");
-    send_scan_complete(args.scan_id, 0, phy).expect("failed to send scan complete");
-}
-
-pub fn handle_tx_event<F>(
-    args: &TxArgs,
-    phy: &WlantapPhyProxy,
-    ssid: &Ssid,
-    bssid: &Bssid,
-    protection: &Protection,
-    authenticator: &mut Option<wlan_rsn::Authenticator>,
-    update_sink: &mut Option<wlan_rsn::rsna::UpdateSink>,
-    mut process_auth_update: F,
-) where
-    F: FnMut(
-        &mut wlan_rsn::Authenticator,
-        &mut wlan_rsn::rsna::UpdateSink,
-        &Channel,
-        &Bssid,
-        &WlantapPhyProxy,
-        bool, // ready_for_sae_frames
-        bool, // ready_for_eapol_frames
-    ) -> Result<(), anyhow::Error>,
-{
-    debug!("Handling tx event.");
-    match mac::MacFrame::parse(&args.packet.data[..], false) {
-        Some(mac::MacFrame::Mgmt { mgmt_hdr, body, .. }) => {
-            match mac::MgmtBody::parse({ mgmt_hdr.frame_ctrl }.mgmt_subtype(), body) {
-                Some(mac::MgmtBody::Authentication { auth_hdr, elements }) => {
-                    match auth_hdr.auth_alg_num {
-                        mac::AuthAlgorithmNumber::OPEN => match authenticator {
-                            Some(wlan_rsn::Authenticator {
-                                auth_cfg: wlan_rsn::auth::Config::ComputedPsk(_),
-                                ..
-                            })
-                            | None => {
-                                send_open_authentication(
-                                    &Channel::new(1, Cbw::Cbw20),
-                                    bssid,
-                                    fidl_ieee80211::StatusCode::Success,
-                                    &phy,
-                                )
-                                .expect("Error sending fake OPEN authentication frame.");
-                            }
-                            _ => panic!(
-                                "Unexpected OPEN authentication frame for {:?}",
-                                authenticator
-                            ),
-                        },
-                        mac::AuthAlgorithmNumber::SAE => {
-                            let mut authenticator = authenticator.as_mut().unwrap_or_else(|| {
-                                panic!("Unexpected SAE authentication frame with no Authenticator")
-                            });
-                            let mut update_sink = update_sink.as_mut().unwrap_or_else(|| {
-                                panic!("No UpdateSink provided with Authenticator.")
-                            });
-                            tracing::info!("auth_txn_seq_num: {}", { auth_hdr.auth_txn_seq_num });
-                            // Reset authenticator state just in case this is not the 1st
-                            // connection attempt. SAE handshake uses multiple frames, so only
-                            // reset on the first auth frame.
-                            // Note: If we want to test retransmission of auth frame 1, we should
-                            //       find a different way to do this.
-                            if auth_hdr.auth_txn_seq_num == 1 {
-                                authenticator.reset();
-                                // Clear out update sink so that the authenticator doesn't process
-                                // the PMK from the first attempt.
-                                update_sink.clear();
-                            }
-
-                            authenticator
-                                .on_sae_frame_rx(
-                                    &mut update_sink,
-                                    fidl_mlme::SaeFrame {
-                                        peer_sta_address: bssid.0,
-                                        // TODO(fxbug.dev/91353): All reserved values mapped to REFUSED_REASON_UNSPECIFIED.
-                                        status_code: Option::<fidl_ieee80211::StatusCode>::from(
-                                            auth_hdr.status_code,
-                                        )
-                                        .unwrap_or(
-                                            fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
-                                        ),
-                                        seq_num: auth_hdr.auth_txn_seq_num,
-                                        sae_fields: elements.to_vec(),
-                                    },
-                                )
-                                .expect("processing SAE frame");
-                            process_auth_update(
-                                &mut authenticator,
-                                &mut update_sink,
-                                &Channel::new(1, Cbw::Cbw20),
-                                bssid,
-                                &phy,
-                                true,
-                                false,
-                            )
-                            .expect("processing authenticator updates during authentication");
-                        }
-                        auth_alg_num => {
-                            panic!("Unexpected authentication algorithm number: {:?}", auth_alg_num)
-                        }
-                    }
-                }
-                Some(mac::MgmtBody::AssociationReq { .. }) => {
-                    send_association_response(
-                        &Channel::new(1, Cbw::Cbw20),
-                        bssid,
-                        fidl_ieee80211::StatusCode::Success,
-                        &phy,
-                    )
-                    .expect("Error sending fake association response frame.");
-                    if let Some(authenticator) = authenticator {
-                        let mut update_sink = update_sink.as_mut().unwrap_or_else(|| {
-                            panic!("No UpdateSink provided with Authenticator.")
-                        });
-                        match authenticator.auth_cfg {
-                            wlan_rsn::auth::Config::Sae { .. } => {}
-                            wlan_rsn::auth::Config::ComputedPsk(_) => authenticator.reset(),
-                            wlan_rsn::auth::Config::DriverSae { .. } => panic!(
-                                "hw-sim does not support wlan_rsn::auth::Config::DriverSae(_)"
-                            ),
-                        }
-                        authenticator.initiate(&mut update_sink).expect("initiating authenticator");
-                        process_auth_update(authenticator, &mut update_sink, &Channel::new(1, Cbw::Cbw20), bssid, &phy, true, true).expect(
-                            "processing authenticator updates immediately after association complete",
-                        );
-                    }
-                }
-                Some(mac::MgmtBody::ProbeReq { .. }) => {
-                    // Normally, the AP would only send probe response on the channel it's
-                    // on, but our TestHelper doesn't have that feature yet and it
-                    // does not affect any current tests.
-                    ProbeResponse {
-                        channel: Channel::new(1, Cbw::Cbw20),
-                        bssid: *bssid,
-                        ssid: ssid.clone(),
-                        protection: *protection,
-                        rssi_dbm: -10,
-                        wsc_ie: None,
-                    }
-                    .send(&phy)
-                    .expect("failed to send probe response frame");
-                }
-                _ => {}
-            }
-        }
-        // EAPOL frames are transmitted as data frames with LLC protocol being EAPOL
-        Some(mac::MacFrame::Data { .. }) => {
-            let msdus = mac::MsduIterator::from_raw_data_frame(&args.packet.data[..], false)
-                .expect("reading msdu from data frame");
-            for mac::Msdu { llc_frame, .. } in msdus {
-                assert_eq!(llc_frame.hdr.protocol_id.to_native(), mac::ETHER_TYPE_EAPOL);
-                if let Some(authenticator) = authenticator {
-                    let mut update_sink = update_sink
-                        .as_mut()
-                        .unwrap_or_else(|| panic!("No UpdateSink provided with Authenticator."));
-                    let mic_size = authenticator.get_negotiated_protection().mic_size;
-                    let frame_rx = eapol::KeyFrameRx::parse(mic_size as usize, llc_frame.body)
-                        .expect("parsing EAPOL frame");
-                    if let Err(e) =
-                        authenticator.on_eapol_frame(&mut update_sink, eapol::Frame::Key(frame_rx))
-                    {
-                        error!("error sending EAPOL frame to authenticator: {}", e);
-                    }
-                    process_auth_update(
-                        authenticator,
-                        update_sink,
-                        &Channel::new(1, Cbw::Cbw20),
-                        bssid,
-                        &phy,
-                        true,
-                        true,
-                    )
-                    .expect("processing authenticator updates after EAPOL frame");
-                }
-            }
-        }
-        _ => (),
-    }
-}
-
-pub fn handle_connect_events(
-    event: &WlantapPhyEvent,
-    phy: &WlantapPhyProxy,
-    ssid: &Ssid,
-    bssid: &Bssid,
-    protection: &Protection,
-    authenticator: &mut Option<wlan_rsn::Authenticator>,
-    update_sink: &mut Option<wlan_rsn::rsna::UpdateSink>,
-) {
-    match event {
-        WlantapPhyEvent::StartScan { args } => handle_start_scan_event(
-            &args,
-            phy,
-            &Beacon {
-                channel: Channel::new(1, Cbw::Cbw20),
-                bssid: bssid.clone(),
-                ssid: ssid.clone(),
-                protection: protection.clone(),
-                rssi_dbm: -30,
-            },
-        ),
-        WlantapPhyEvent::Tx { args } => match authenticator {
-            Some(_) => match update_sink {
-                Some(_) => handle_tx_event(
-                    &args,
-                    phy,
-                    ssid,
-                    bssid,
-                    protection,
-                    authenticator,
-                    update_sink,
-                    process_tx_auth_updates,
-                ),
-                None => panic!("No UpdateSink provided with Authenticator."),
-            },
-            None => handle_tx_event(
-                &args,
-                phy,
-                ssid,
-                bssid,
-                protection,
-                &mut None,
-                &mut None,
-                process_tx_auth_updates,
-            ),
-        },
-        _ => (),
-    }
-}
-
 pub async fn save_network_and_wait_until_connected(
     ssid: &Ssid,
     security_type: fidl_policy::SecurityType,
@@ -808,111 +543,120 @@ pub async fn save_network_and_wait_until_connected(
     (client_controller, client_state_update_stream)
 }
 
-pub async fn handle_connect_future<F, R>(
-    connect_fut: F,
+/// Runs a future until completion or timeout with a client event handler that attempts to connect
+/// to an AP with the given SSID, BSSID, and protection.
+pub async fn connect_or_timeout_with<F>(
     helper: &mut test_utils::TestHelper,
-    ap_ssid: &Ssid,
-    ap_bssid: &Bssid,
+    timeout: zx::Duration,
+    ssid: &Ssid,
+    bssid: &Bssid,
     protection: &Protection,
-    authenticator: &mut Option<wlan_rsn::Authenticator>,
-    update_sink: &mut Option<wlan_rsn::rsna::UpdateSink>,
-    timeout: Option<i64>,
-) -> R
+    authenticator: Option<wlan_rsn::Authenticator>,
+    future: F,
+) -> F::Output
 where
-    F: Future<Output = R> + Unpin,
+    F: Future + Unpin,
 {
-    // Assert UpdateSink provided if there is an Authenticator.
-    if matches!(authenticator, Some(_)) && !matches!(update_sink, Some(_)) {
-        panic!("No UpdateSink provided with Authenticator");
-    };
-
     let phy = helper.proxy();
+    let channel = Channel::new(1, Cbw::Cbw20);
+    let beacons = [Beacon {
+        channel,
+        bssid: bssid.clone(),
+        ssid: ssid.clone(),
+        protection: protection.clone(),
+        rssi_dbm: -30,
+    }];
+    let mut control = authenticator
+        .map(|authenticator| AuthenticationControl { updates: UpdateSink::new(), authenticator });
+    let connect = if let Some(ref mut control) = control {
+        let tap = AuthenticationTap { control, handler: action::authenticate_with_control_state() };
+        event::boxed(action::connect_with_authentication_tap(
+            &phy, ssid, bssid, &channel, protection, tap,
+        ))
+    } else {
+        event::boxed(action::connect_with_open_authentication(
+            &phy, ssid, bssid, &channel, protection,
+        ))
+    };
     helper
         .run_until_complete_or_timeout(
-            timeout.unwrap_or(30).seconds(),
-            format!("connecting to {} ({:02X?})", ap_ssid.to_string_not_redactable(), ap_bssid),
-            event::matched(|_, event| {
-                handle_connect_events(
-                    event,
-                    &phy,
-                    ap_ssid,
-                    ap_bssid,
-                    protection,
-                    authenticator,
-                    update_sink,
-                );
-            }),
-            connect_fut,
+            timeout,
+            format!(
+                "connecting to {} ({:02X?}) with {:?} protection",
+                ssid.to_string_not_redactable(),
+                bssid,
+                protection,
+            ),
+            branch::or((
+                event::on_scan(action::send_advertisements_and_scan_completion(&phy, beacons)),
+                event::on_transmit(connect),
+            ))
+            .expect("failed to connect client"),
+            future,
         )
         .await
 }
 
-pub async fn connect_with_security_type(
+/// Waits for a timeout or Policy to establish a connection to an AP with the given SSID, BSSID,
+/// and protection.
+pub async fn connect_or_timeout(
     helper: &mut test_utils::TestHelper,
+    timeout: zx::Duration,
     ssid: &Ssid,
     bssid: &Bssid,
+    bss_protection: &Protection,
     password_or_psk: Option<&str>,
-    bss_protection: Protection,
-    policy_security_type: fidl_policy::SecurityType,
+    security_type: fidl_policy::SecurityType,
 ) {
-    let credential = password_or_psk_to_policy_credential(password_or_psk);
-    let connect_fut = save_network_and_wait_until_connected(ssid, policy_security_type, credential);
-    pin_mut!(connect_fut);
-
-    // Create the authenticator
-    let (mut authenticator, mut update_sink) = match bss_protection {
-        Protection::Wpa3Personal | Protection::Wpa2Wpa3Personal => (
-            password_or_psk.map(|p| {
+    let authenticator = match bss_protection {
+        Protection::Wpa3Personal | Protection::Wpa2Wpa3Personal => {
+            password_or_psk.map(|password_or_psk| {
                 create_authenticator(
                     bssid,
                     ssid,
-                    p,
+                    password_or_psk,
                     CIPHER_CCMP_128,
-                    bss_protection,
+                    *bss_protection,
                     Protection::Wpa3Personal,
                 )
-            }),
-            Some(wlan_rsn::rsna::UpdateSink::default()),
-        ),
-        Protection::Wpa2Personal | Protection::Wpa1Wpa2Personal => (
-            password_or_psk.map(|p| {
+            })
+        }
+        Protection::Wpa2Personal | Protection::Wpa1Wpa2Personal => {
+            password_or_psk.map(|password_or_psk| {
                 create_authenticator(
                     bssid,
                     ssid,
-                    p,
+                    password_or_psk,
                     CIPHER_CCMP_128,
-                    bss_protection,
+                    *bss_protection,
                     Protection::Wpa2Personal,
                 )
-            }),
-            Some(wlan_rsn::rsna::UpdateSink::default()),
-        ),
-        Protection::Wpa2PersonalTkipOnly | Protection::Wpa1Wpa2PersonalTkipOnly => {
-            panic!("need tkip support")
+            })
         }
-        Protection::Wpa1 => (
-            password_or_psk.map(|p| {
-                create_authenticator(bssid, ssid, p, CIPHER_TKIP, bss_protection, Protection::Wpa1)
-            }),
-            Some(wlan_rsn::rsna::UpdateSink::default()),
-        ),
-        Protection::Open => (None, None),
+        Protection::Wpa2PersonalTkipOnly | Protection::Wpa1Wpa2PersonalTkipOnly => {
+            panic!("Hardware simulator does not support WPA2-TKIP.")
+        }
+        Protection::Wpa1 => password_or_psk.map(|password_or_psk| {
+            create_authenticator(
+                bssid,
+                ssid,
+                password_or_psk,
+                CIPHER_TKIP,
+                *bss_protection,
+                Protection::Wpa1,
+            )
+        }),
+        Protection::Open => None,
         _ => {
-            panic!("This helper doesn't yet support {}", bss_protection)
+            panic!("Unsupported WLAN protection: {}", bss_protection)
         }
     };
 
-    handle_connect_future(
-        connect_fut,
-        helper,
-        ssid,
-        bssid,
-        &bss_protection,
-        &mut authenticator,
-        &mut update_sink,
-        None,
-    )
-    .await;
+    let credential = password_or_psk_to_policy_credential(password_or_psk);
+    let connect = save_network_and_wait_until_connected(ssid, security_type, credential);
+    pin_mut!(connect);
+    connect_or_timeout_with(helper, timeout, ssid, bssid, bss_protection, authenticator, connect)
+        .await;
 }
 
 pub fn rx_wlan_data_frame(

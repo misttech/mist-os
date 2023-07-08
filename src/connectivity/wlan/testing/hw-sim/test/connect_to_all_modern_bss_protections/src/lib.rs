@@ -4,6 +4,7 @@
 
 use {
     fidl_fuchsia_wlan_policy as fidl_policy,
+    fuchsia_zircon::prelude::*,
     ieee80211::{Bssid, Ssid},
     tracing::info,
     wlan_common::bss::Protection,
@@ -58,12 +59,13 @@ async fn connect_to_modern_wpa_network() {
             bss_protection, policy_security_type, credential
         );
 
-        let () = connect_with_security_type(
+        let () = connect_or_timeout(
             &mut helper,
+            30.seconds(),
             &ssid,
             &bss,
+            &bss_protection,
             credential,
-            bss_protection,
             policy_security_type,
         )
         .await;
