@@ -425,82 +425,49 @@ pub async fn erase<T: AsyncRead + AsyncWrite + Unpin>(
     }
 }
 
-fn handle_timeout_as_okay(r: Result<Reply>) -> Result<Reply> {
-    match r {
-        Err(e) if matches!(e.downcast_ref::<SendError>(), Some(SendError::Timeout)) => {
-            tracing::debug!("Timed out waiting for bootloader response; assuming it's okay");
-            Ok(Reply::Okay("".to_string()))
-        }
-        _ => r,
-    }
-}
 pub async fn boot<T: AsyncRead + AsyncWrite + Unpin>(interface: &mut T) -> Result<()> {
-    // Note: the target may not successfully send a response when asked to boot,
-    // so let's use a short time-out, and treat a timeout error as a success.
-    let reply = handle_timeout_as_okay(
-        send_with_timeout(Command::Boot, interface, Duration::seconds(3)).await,
-    )
-    .context("sending boot")?;
+    let reply = send(Command::Boot, interface).await.context("sending boot")?;
     match reply {
         Reply::Okay(_) => {
             tracing::debug!("Successfully sent boot");
             Ok(())
         }
         Reply::Fail(s) => bail!("Failed to boot: {}", s),
-        _ => bail!("Unexpected reply from fastboot device for boot command: {reply:?}"),
+        _ => bail!("Unexpected reply from fastboot device for boot command: {:?}", reply),
     }
 }
 
 pub async fn reboot<T: AsyncRead + AsyncWrite + Unpin>(interface: &mut T) -> Result<()> {
-    // Note: the target may not successfully send a response when asked to reboot,
-    // so let's use a short time-out, and treat a timeout error as a success.
-    let reply = handle_timeout_as_okay(
-        send_with_timeout(Command::Reboot, interface, Duration::seconds(3)).await,
-    )
-    .context("sending reboot")?;
+    let reply = send(Command::Reboot, interface).await.context("sending reboot")?;
     match reply {
         Reply::Okay(_) => {
             tracing::debug!("Successfully sent reboot");
             Ok(())
         }
         Reply::Fail(s) => bail!("Failed to reboot: {}", s),
-        _ => bail!("Unexpected reply from fastboot device for reboot command: {reply:?}"),
+        _ => bail!("Unexpected reply from fastboot device for reboot command: {:?}", reply),
     }
 }
 
 pub async fn reboot_bootloader<T: AsyncRead + AsyncWrite + Unpin>(interface: &mut T) -> Result<()> {
-    // Note: the target may not successfully send a response when asked to reboot-bootloader,
-    // so let's use a short time-out, and treat a timeout error as a success.
-    let reply = handle_timeout_as_okay(
-        send_with_timeout(Command::RebootBootLoader, interface, Duration::seconds(3)).await,
-    )
-    .context("sending reboot bootloader")?;
-    match reply {
+    match send(Command::RebootBootLoader, interface).await.context("sending reboot bootloader")? {
         Reply::Okay(_) => {
             tracing::debug!("Successfully sent reboot bootloader");
             Ok(())
         }
         Reply::Fail(s) => bail!("Failed to reboot to bootloader: {}", s),
-        _ => {
-            bail!("Unexpected reply from fastboot device for reboot bootloader command: {reply:?}")
-        }
+        _ => bail!("Unexpected reply from fastboot device for reboot bootloader command"),
     }
 }
 
 pub async fn continue_boot<T: AsyncRead + AsyncWrite + Unpin>(interface: &mut T) -> Result<()> {
-    // Note: the target may not successfully send a response when asked to continue,
-    // so let's use a short time-out, and treat a timeout error as a success.
-    let reply = handle_timeout_as_okay(
-        send_with_timeout(Command::Continue, interface, Duration::seconds(3)).await,
-    )
-    .context("sending continue")?;
-    match reply {
+    match send(Command::Continue, interface).await.context("sending continue")? {
         Reply::Okay(_) => {
             tracing::debug!("Successfully sent continue");
             Ok(())
         }
         Reply::Fail(s) => bail!("Failed to continue: {}", s),
-        _ => bail!("Unexpected reply from fastboot device for continue command: {reply:?}"),
+        _ => bail!("Unexpected reply from fastboot device for continue command"),
     }
 }
 

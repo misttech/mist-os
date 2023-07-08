@@ -4,9 +4,9 @@
 
 use {
     anyhow::{anyhow, bail, Result},
-    chrono::Duration,
+    chrono::{Duration, Utc},
     command::Command,
-    fuchsia_async::TimeoutExt,
+    fuchsia_async::Timer,
     futures::{
         io::{AsyncRead, AsyncWrite},
         lock::Mutex,
@@ -23,6 +23,7 @@ pub mod reply;
 
 const MAX_PACKET_SIZE: usize = 64;
 const DEFAULT_READ_TIMEOUT_SECS: i64 = 30;
+const READ_INTERVAL_MS: i64 = 100;
 
 lazy_static! {
     static ref SEND_LOCK: Mutex<()> = Mutex::new(());
@@ -76,15 +77,23 @@ async fn read_with_timeout<T: AsyncRead + Unpin>(
     listener: &impl InfoListener,
     timeout: Duration,
 ) -> Result<Reply> {
-    let std_timeout = timeout.to_std().expect("converting chrono Duration to std");
-    let end_time = std::time::Instant::now() + std_timeout;
+    let start = Utc::now();
     loop {
-        match read_from_interface(interface)
-            .on_timeout(end_time, || Err(anyhow!(SendError::Timeout)))
-            .await
-        {
-            Ok(Reply::Info(msg)) => listener.on_info(msg)?,
-            other => return other,
+        match read_from_interface(interface).await {
+            Ok(reply) => match reply {
+                Reply::Info(msg) => listener.on_info(msg)?,
+                _ => return Ok(reply),
+            },
+            Err(err) => {
+                let elapsed_time = Utc::now().signed_duration_since(start);
+                if elapsed_time >= timeout {
+                    tracing::error!(?err, "timed out reading reply");
+                    bail!(SendError::Timeout);
+                } else {
+                    let d = Duration::milliseconds(READ_INTERVAL_MS);
+                    Timer::new(d.to_std()?).await;
+                }
+            }
         }
     }
 }
