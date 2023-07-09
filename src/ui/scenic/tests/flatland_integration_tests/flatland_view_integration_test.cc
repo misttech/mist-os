@@ -95,12 +95,29 @@ class FlatlandViewIntegrationTest : public zxtest::Test, public LoggingEventLoop
     BlockingPresent(flatland);
   }
 
-  fuc::FlatlandPtr MakeFlatland() { return realm_->component().Connect<fuc::Flatland>(); }
+  fuc::FlatlandPtr MakeFlatland() {
+    auto flatland = realm_->component().Connect<fuc::Flatland>();
+    flatland.set_error_handler([](zx_status_t error) {
+      // Log at INFO so that tests which deliberately close a session don't require
+      // `max_severity_logs` to be adjusted.
+      FX_LOGS(INFO) << "Received FIDL error " << zx_status_get_string(error)
+                    << " on a Flatland session";
+    });
+    flatland.events().OnError = [this](fuc::FlatlandError error) {
+      // Log at INFO so that tests which deliberately induce errors don't require
+      // `max_severity_logs` to be adjusted.
+      FX_LOGS(INFO) << "Received FlatlandError "
+                    << static_cast<typename std::underlying_type<decltype(error)>::type>(error);
+      last_error_ = std::move(error);
+    };
+    return flatland;
+  }
 
   std::unique_ptr<RealmRoot> realm_;
   fuc::FlatlandDisplayPtr flatland_display_;
   uint32_t display_width_ = 0;
   uint32_t display_height_ = 0;
+  std::optional<fuc::FlatlandError> last_error_;
 };
 
 TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnParentDeath) {
@@ -446,6 +463,14 @@ TEST_F(FlatlandViewIntegrationTest, GetViewRefTest) {
   // Parent's ChildViewWatcher receives the view ref as it is now connected to the display.
   RunLoopUntil([&child_view_ref] { return child_view_ref.has_value(); });
   EXPECT_EQ(ExtractKoid(*child_view_ref), ExtractKoid(expected_child_view_ref));
+}
+
+TEST_F(FlatlandViewIntegrationTest, SpuriousReleaseViewYieldsError) {
+  fuc::FlatlandPtr flatland = MakeFlatland();
+  flatland->ReleaseView();
+  flatland->Present({});
+  RunLoopUntil([this] { return last_error_.has_value(); });
+  EXPECT_EQ(last_error_, fuc::FlatlandError::BAD_OPERATION);
 }
 
 }  // namespace integration_tests
