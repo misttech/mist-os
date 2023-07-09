@@ -154,8 +154,7 @@ if (current_toolchain != default_toolchain) {
                              ])
     }
 
-    # TODO(fxbug.dev/129401): Support RISC-V
-    if (current_cpu == "arm64") {
+    if (have_devicetree) {
       devicetree_boot_test("devicetree-$target_name") {
         visibility = [ ":*" ]
         forward_variables_from(invoker,
@@ -198,8 +197,7 @@ if (current_toolchain != default_toolchain) {
         ":zbi-$target_name",
       ]
 
-      # TODO(fxbug.dev/129401): Support RISC-V
-      if (current_cpu == "arm64") {
+      if (have_devicetree) {
         deps += [ ":devicetree-$target_name" ]
       }
       if (have_efi) {
@@ -600,7 +598,7 @@ if (current_toolchain != default_toolchain) {
       ]
     }
 
-    if (current_cpu == "arm64") {
+    if (have_devicetree) {
       deps += [ ":devicetree-memory-test" ]
     }
 

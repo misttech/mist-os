@@ -70,3 +70,5 @@ template("devicetree_boot_test") {
     not_needed(invoker, "*")
   }
 }
+
+have_devicetree = current_cpu != "x64"

@@ -31,13 +31,13 @@ struct Driver : public ns8250::PioDriver {
 
 #elif defined(__riscv)
 
-struct Driver : public ns8250::MmioDriver {
+struct Driver : public ns8250::Mmio8Driver {
   static constexpr zbi_dcfg_simple_t kQemuConfig = {
       .mmio_phys = 0x10000000,
       .irq = 10,
   };
 
-  explicit Driver(zbi_dcfg_simple_t cfg = kQemuConfig) : ns8250::MmioDriver(cfg) {}
+  explicit Driver(zbi_dcfg_simple_t cfg = kQemuConfig) : ns8250::Mmio8Driver(cfg) {}
 };
 
 #else

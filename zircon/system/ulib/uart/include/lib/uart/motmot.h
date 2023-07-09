@@ -131,7 +131,6 @@ struct FIFO_DEPTH : public hwreg::RegisterBase<FIFO_DEPTH, uint32_t> {
 struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_MOTMOT_UART, zbi_dcfg_simple_t> {
   using Base = DriverBase<Driver, ZBI_KERNEL_DRIVER_MOTMOT_UART, zbi_dcfg_simple_t>;
 
-  static constexpr std::array<std::string_view, 0> kDevicetreeBindings = {};
   static constexpr std::string_view config_name() { return "motmot"; }
 
   template <typename... Args>

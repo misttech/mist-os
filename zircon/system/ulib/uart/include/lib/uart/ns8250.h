@@ -10,6 +10,7 @@
 #include <lib/zbi-format/driver-config.h>
 
 #include <array>
+#include <optional>
 #include <string_view>
 
 #include <hwreg/bitfields.h>
@@ -20,8 +21,6 @@
 
 namespace uart {
 namespace ns8250 {
-
-constexpr uint16_t kPortCount = 8;
 
 constexpr uint32_t kDefaultBaudRate = 115200;
 constexpr uint32_t kMaxBaudRate = 115200;
@@ -165,17 +164,35 @@ class DivisorLatchUpperRegister : public hwreg::RegisterBase<DivisorLatchUpperRe
   static auto Get() { return hwreg::RegisterAddr<DivisorLatchUpperRegister>(1); }
 };
 
+// Determines the flavor of the MMIO access to be performed by the |BasicIoProvider| for MMIO
+// access. When this is 0, an unscaled access is perfomed, that is byte aligned 1 byte regions.
+//
+// When this value is non zero, then each 1 byte region is aligned as the least significant byte of
+// of a 4 byte region, hence 'scaled' mmio is performed. This flavor also implies that all accesses
+// are performed through 4 byte read/writes.
+//
+// TODO(fxbug.dev/130249): Clean up port count usage.
+template <uint32_t KdrvExtra>
+inline constexpr uint32_t kPortCount = 8;
+
+template <>
+inline constexpr uint32_t kPortCount<ZBI_KERNEL_DRIVER_I8250_MMIO8_UART> = 0;
+
 // This provides the actual driver logic common to MMIO and PIO variants.
 template <uint32_t KdrvExtra, typename KdrvConfig>
-class DriverImpl
-    : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtra, KdrvConfig, kPortCount> {
+class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtra, KdrvConfig,
+                                     kPortCount<KdrvExtra>> {
  public:
-  using Base = DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtra, KdrvConfig, kPortCount>;
+  using Base =
+      DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtra, KdrvConfig, kPortCount<KdrvExtra>>;
 
   static constexpr auto kDevicetreeBindings = []() {
-    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_DW8250_UART) {
+    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO32_UART ||
+                  KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO8_UART) {
       return cpp20::to_array<std::string_view>(
           {"ns8250", "ns16450", "ns16550a", "ns16550", "ns16750", "ns16850"});
+    } else if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_DW8250_UART) {
+      return cpp20::to_array<std::string_view>({"snps,dw-apb-uart"});
     } else {
       return std::array<std::string_view, 0>{};
     }
@@ -186,10 +203,13 @@ class DriverImpl
       return "ioport";
     }
 #if defined(__i386__) || defined(__x86_64__)
-    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO_UART) {
+    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO32_UART) {
       return "mmio";
     }
 #endif
+    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO8_UART) {
+      return "ns8250-8bit";
+    }
     return "ns8250";
   }
 
@@ -200,7 +220,7 @@ class DriverImpl
 
   static std::optional<DriverImpl> MaybeCreate(
       const acpi_lite::AcpiDebugPortDescriptor& debug_port) {
-    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO_UART) {
+    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO32_UART) {
       if (debug_port.type == acpi_lite::AcpiDebugPortDescriptor::Type::kMmio) {
         return DriverImpl(KdrvConfig{.mmio_phys = debug_port.address});
       }
@@ -221,6 +241,31 @@ class DriverImpl
       }
     }
     return Base::MaybeCreate(string);
+  }
+
+  static bool MatchDevicetree(const devicetree::PropertyDecoder& decoder) {
+    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_PIO_UART) {
+      return false;
+    } else {
+      // Check that the compatible property contains a compatible devicetree binding.
+      if (!Base::MatchDevicetree(decoder)) {
+        return false;
+      }
+
+      auto [io_width_prop, reg_shift_prop] = decoder.FindProperties("reg-io-width", "reg-shift");
+
+      std::optional<uint32_t> io_width = io_width_prop ? io_width_prop->AsUint32() : std::nullopt;
+      std::optional<uint32_t> reg_shift =
+          reg_shift_prop ? reg_shift_prop->AsUint32() : std::nullopt;
+
+      // Must provide io-width and reg-shift of 32 bits.
+      if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO32_UART ||
+                    KdrvExtra == ZBI_KERNEL_DRIVER_DW8250_UART) {
+        return io_width == 4 && reg_shift == 2;
+      } else {
+        return io_width.value_or(1) == 1 && reg_shift.value_or(0) == 0;
+      }
+    }
   }
 
   template <class IoProvider>
@@ -398,8 +443,12 @@ class DriverImpl
   uint8_t fifo_depth_ = kFifoDepthGeneric;
 };
 
-// uart::KernelDriver UartDriver API for PIO via MMIO.
-using MmioDriver = DriverImpl<ZBI_KERNEL_DRIVER_I8250_MMIO_UART, zbi_dcfg_simple_t>;
+// uart::KernelDriver UartDriver API for PIO via MMIO where offsets expressed in bytes are scaled
+// by 4. Additionally all read or write operations are performed in 4 byte regions.
+using Mmio32Driver = DriverImpl<ZBI_KERNEL_DRIVER_I8250_MMIO32_UART, zbi_dcfg_simple_t>;
+
+// uart::KernelDriver UartDriver API for PIO via MMIO where offsets are expressed in bytes.
+using Mmio8Driver = DriverImpl<ZBI_KERNEL_DRIVER_I8250_MMIO8_UART, zbi_dcfg_simple_t>;
 
 // uart::KernelDriver UartDriver API for direct PIO.
 using PioDriver = DriverImpl<ZBI_KERNEL_DRIVER_I8250_PIO_UART, zbi_dcfg_simple_pio_t>;

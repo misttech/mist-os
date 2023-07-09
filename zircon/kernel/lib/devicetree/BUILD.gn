@@ -23,7 +23,7 @@ zx_library("devicetree") {
   if (is_kernel) {
     public_deps += [
       "//zircon/kernel/lib/ktl",
-      "//zircon/kernel/lib/libc",
+      "//zircon/kernel/lib/libc:headers",
     ]
   }
 

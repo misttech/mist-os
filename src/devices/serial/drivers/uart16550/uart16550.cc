@@ -112,7 +112,7 @@ zx_status_t Uart16550::Init() {
     return ZX_ERR_BAD_STATE;
   }
 
-  if (port_size != kPortCount) {
+  if (port_size != kPortCount<ZBI_KERNEL_DRIVER_I8250_PIO_UART>) {
     zxlogf(ERROR, "%s: unsupported UART port count", __func__);
     return ZX_ERR_NOT_SUPPORTED;
   }

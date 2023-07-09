@@ -281,15 +281,15 @@ void CheckMaybeCreateFromAcpi(const U& debug_port) {
 }
 
 TEST(ParsingTests, Ns8250MmioDriver) {
-  auto driver = uart::ns8250::MmioDriver::MaybeCreate(kX86 ? "mmio,0xa,0xb" : "ns8250,0xa,0xb");
+  auto driver = uart::ns8250::Mmio32Driver::MaybeCreate(kX86 ? "mmio,0xa,0xb" : "ns8250,0xa,0xb");
   ASSERT_TRUE(driver.has_value());
   EXPECT_STREQ(kX86 ? "mmio" : "ns8250", driver->config_name());
   const zbi_dcfg_simple_t& config = driver->config();
   EXPECT_EQ(0xa, config.mmio_phys);
   EXPECT_EQ(0xb, config.irq);
 
-  CheckMaybeCreateFromAcpi<uart::ns8250::MmioDriver, true>(kMmioDebugPort);
-  CheckMaybeCreateFromAcpi<uart::ns8250::MmioDriver, false>(kPioDebugPort);
+  CheckMaybeCreateFromAcpi<uart::ns8250::Mmio32Driver, true>(kMmioDebugPort);
+  CheckMaybeCreateFromAcpi<uart::ns8250::Mmio32Driver, false>(kPioDebugPort);
 }
 
 TEST(ParsingTests, Ns8250PioDriver) {

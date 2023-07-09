@@ -45,7 +45,10 @@ type KernelDriver = enum : uint32 {
     I8250PioUart = 0x30353238;
 
     /// '825M'
-    I8250MmioUart = 0x4d353238;
+    I8250Mmio32Uart = 0x4d353238;
+
+    /// '825B'
+    I8250Mmio8Uart = 0x42353238;
 
     /// 'MMTU'
     MotmotUart = 0x4d4d5455;

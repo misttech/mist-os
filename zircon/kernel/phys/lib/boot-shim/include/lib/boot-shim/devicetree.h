@@ -229,6 +229,7 @@ class DevicetreeBootstrapChosenNodeItemBase
   bool found_chosen_ = false;
   std::string_view stdout_path_;
   std::optional<devicetree::ResolvedPath> resolved_stdout_;
+  zbi_dcfg_simple_t uart_dcfg_ = {};
 
   // Command line provided by the devicetree.
   std::string_view cmdline_;
@@ -236,8 +237,8 @@ class DevicetreeBootstrapChosenNodeItemBase
   zbitl::ByteView zbi_;
 
   // Type erased match.
-  fit::inline_function<bool(const devicetree::StringList<>&, const zbi_dcfg_simple_t&)> match_ =
-      nullptr;
+  fit::inline_function<bool(const devicetree::PropertyDecoder&)> match_ = nullptr;
+  fit::inline_function<void(const zbi_dcfg_simple_t&)> emplacer_ = nullptr;
 };
 
 template <typename AllUartDrivers = uart::all::Driver>
@@ -246,29 +247,18 @@ class DevicetreeBootstrapChosenNodeItem : public DevicetreeBootstrapChosenNodeIt
   // DevicetreeItem API.
   template <typename T>
   void Init(T& shim) {
-    match_ = [this](const auto& compatible_devices, const auto& dcfg) {
-      uart::all::KernelDriver<uart::BasicIoProvider, uart::UnsynchronizedPolicy, AllUartDrivers>
-          driver;
-      // Prefer matching drivers to bindings at the start of the compatible list, this follows the
-      // compatible spec of more specific to more general compatible binding order.
-      // See
-      // https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#compatible
-      for (std::string_view compatible_device : compatible_devices) {
-        if (driver.Match(compatible_device, &dcfg)) {
-          uart_ = driver.uart();
-          return true;
-        }
-      }
-      return false;
+    match_ = [this](const auto& decoder) -> bool {
+      emplacer_ = uart_.MatchDevicetree(decoder);
+      return emplacer_ != nullptr;
     };
 
     DevicetreeBootstrapChosenNodeItemBase::Init(shim);
   }
 
-  constexpr std::optional<AllUartDrivers> uart() const { return uart_; }
+  constexpr const auto& uart() const { return uart_; }
 
  private:
-  std::optional<AllUartDrivers> uart_;
+  uart::all::KernelDriver<uart::BasicIoProvider, uart::UnsynchronizedPolicy, AllUartDrivers> uart_;
 };
 
 // Parses 'memory' and 'reserved_memory' device nodes and 'memranges' from the devicetree,

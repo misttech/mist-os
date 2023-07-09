@@ -36,13 +36,14 @@ TEST(UartItemTest, SetItemWithNullDriverIsNoOp) {
 }
 
 TEST(UartItemTest, SetItemWithMmioDriver) {
-  std::array<std::byte, 2 * zbitl::AlignedItemLength(sizeof(uart::ns8250::MmioDriver().config()))>
+  std::array<std::byte, 2 * zbitl::AlignedItemLength(sizeof(uart::ns8250::Mmio32Driver().config()))>
       data;
   zbitl::Image<cpp20::span<std::byte>> image(data);
   ASSERT_TRUE(image.clear().is_ok());
 
   UartItem item;
-  auto mmio_dcfg = uart::ns8250::MmioDriver(zbi_dcfg_simple_t{.mmio_phys = 0xBEEF, .irq = 0xDEAD});
+  auto mmio_dcfg =
+      uart::ns8250::Mmio32Driver(zbi_dcfg_simple_t{.mmio_phys = 0xBEEF, .irq = 0xDEAD});
   uart::all::Driver dcfg = mmio_dcfg;
   item.Init(dcfg);
 

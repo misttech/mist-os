@@ -55,7 +55,10 @@ typedef uint32_t zbi_kernel_driver_t;
 #define ZBI_KERNEL_DRIVER_I8250_PIO_UART ((zbi_kernel_driver_t)(0x30353238u))
 
 // '825M'
-#define ZBI_KERNEL_DRIVER_I8250_MMIO_UART ((zbi_kernel_driver_t)(0x4d353238u))
+#define ZBI_KERNEL_DRIVER_I8250_MMIO32_UART ((zbi_kernel_driver_t)(0x4d353238u))
+
+// '825B'
+#define ZBI_KERNEL_DRIVER_I8250_MMIO8_UART ((zbi_kernel_driver_t)(0x42353238u))
 
 // 'MMTU'
 #define ZBI_KERNEL_DRIVER_MOTMOT_UART ((zbi_kernel_driver_t)(0x4d4d5455u))

@@ -92,7 +92,7 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   auto& memory_item = shim.Get<boot_shim::DevicetreeMemoryItem>();
   auto& chosen_item = shim.Get<boot_shim::DevicetreeBootstrapChosenNodeItem<>>();
 
-  uart = chosen_item.uart().value_or(uart::null::Driver{});
+  uart = chosen_item.uart().uart();
   SetUartConsole(uart);
 
   // ZBI-provided UART trumps bootloader-provided.

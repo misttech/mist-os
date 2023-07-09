@@ -340,19 +340,14 @@ devicetree::ScanState DevicetreeBootstrapChosenNodeItemBase::HandleBootstrapStdo
   auto addr = (*reg)[0].address();
 
   if (addr) {
-    auto compatible_with = compatible->AsStringList();
-    if (!compatible_with) {
+    uart_dcfg_.mmio_phys = *addr;
+    uart_dcfg_.irq = 0;
+
+    if (!match_(decoder)) {
+      // TODO(fxbug.dev/129729): Move this to after resolving interrupts.
       return devicetree::ScanState::kDone;
     }
-
-    zbi_dcfg_simple_t dcfg{
-        .mmio_phys = *addr,
-        .irq = 0,
-    };
-
-    if (!match_(*compatible_with, dcfg)) {
-      return devicetree::ScanState::kDone;
-    }
+    emplacer_(uart_dcfg_);
   }
 
   return devicetree::ScanState::kDone;

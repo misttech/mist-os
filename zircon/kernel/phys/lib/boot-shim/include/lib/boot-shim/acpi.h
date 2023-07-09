@@ -38,7 +38,7 @@ class AcpiUartItem : public boot_shim::SingleVariantItemBase<AcpiUartItem, zbi_d
   void Init(const acpi_lite::AcpiParserInterface& parser, const char* shim_name, FILE* log);
 
   static constexpr zbi_header_t ItemHeader(const zbi_dcfg_simple_t& cfg) {
-    return {.type = ZBI_TYPE_KERNEL_DRIVER, .extra = ZBI_KERNEL_DRIVER_I8250_MMIO_UART};
+    return {.type = ZBI_TYPE_KERNEL_DRIVER, .extra = ZBI_KERNEL_DRIVER_I8250_MMIO32_UART};
   }
 
   static constexpr zbi_header_t ItemHeader(const zbi_dcfg_simple_pio_t& cfg) {

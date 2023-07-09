@@ -17,11 +17,14 @@
 #include <lib/zbitl/item.h>
 
 #include <array>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <type_traits>
 
 #include <zxtest/zxtest.h>
+
+#include "fbl/type_info.h"
 
 namespace {
 
@@ -279,24 +282,20 @@ void CheckChosenItem(const ChosenItemType& item, const ExpectedChosen& expected)
   EXPECT_EQ(*item.stdout_path(), expected_uart_path);
 
   // Uart.
-  std::optional<AllUartDrivers> uart = item.uart();
-
-  ASSERT_TRUE(uart);
-
-  std::visit(
-      [&](auto& dcfg) {
-        using config_t = std::decay_t<decltype(dcfg.config())>;
-        if constexpr (std::is_same_v<config_t, zbi_dcfg_simple_t>) {
-          EXPECT_EQ(dcfg.config_name(), expected.uart_config_name, "Actual name %s\n",
-                    dcfg.config_name().data());
-          EXPECT_EQ(dcfg.config().mmio_phys, expected.uart_config.mmio_phys);
-          // The bootstrap phase does not decode interrupt.
-          EXPECT_EQ(dcfg.config().irq, expected.uart_config.irq);
-        } else {
-          FAIL("Unexpected driver.");
-        }
-      },
-      *uart);
+  item.uart().Visit([&](const auto& driver) {
+    using config_t = std::decay_t<decltype(driver.uart().config())>;
+    if constexpr (std::is_same_v<config_t, zbi_dcfg_simple_t>) {
+      auto& uart = driver.uart();
+      EXPECT_EQ(uart.config_name(), expected.uart_config_name, "Actual name %s\n",
+                uart.config_name().data());
+      EXPECT_EQ(uart.config().mmio_phys, expected.uart_config.mmio_phys);
+      // The bootstrap phase does not decode interrupt.
+      EXPECT_EQ(uart.config().irq, expected.uart_config.irq);
+    } else {
+      std::cout << fbl::TypeInfo<decltype(driver)>::Name() << std::endl;
+      FAIL("Unexpected driver.");
+    }
+  });
 }
 
 TEST_F(BootstrapChosenItemTest, ParseChosen) {

@@ -16,6 +16,10 @@
 
 #include "uart.h"
 
+namespace devicetree {
+class PropertyDecoder;
+}
+
 namespace uart {
 namespace null {
 
@@ -54,9 +58,7 @@ struct Driver {
   }
 
   // API to match devicetree node compatible list.
-  static std::optional<Driver> MaybeCreate(std::string_view compatible_device, const void*) {
-    return {};
-  }
+  static bool MatchDevicetree(const devicetree::PropertyDecoder&) { return false; }
 
   void Unparse(FILE* out) const { fprintf(out, "none"); }
 

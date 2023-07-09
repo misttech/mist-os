@@ -5,6 +5,8 @@
 #ifndef LIB_UART_ALL_H_
 #define LIB_UART_ALL_H_
 
+#include <lib/fit/function.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/zbi.h>
 #include <stdio.h>
 
@@ -21,6 +23,10 @@
 #include "null.h"
 #include "pl011.h"
 #include "uart.h"
+
+namespace devicetree {
+class PropertyDecoder;
+}
 
 namespace uart {
 
@@ -57,9 +63,11 @@ using WithAllDrivers = Template<
     // A default-constructed variant gets the null driver.
     null::Driver,
     // This driver is potentially used on all machines.
-    ns8250::MmioDriver,
+    ns8250::Mmio32Driver,
 #if defined(__aarch64__) || UART_ALL_DRIVERS
     amlogic::Driver, motmot::Driver, ns8250::LegacyDw8250Driver, pl011::Driver, imx::Driver,
+#elif defined(__riscv) || UART_ALL_DRIVERS
+    ns8250::Mmio8Driver,
 #endif
 #if defined(__x86_64__) || defined(__i386__) || UART_ALL_DRIVERS
     ns8250::PioDriver,
@@ -115,11 +123,15 @@ class KernelDriver {
   // instantiate that driver and return true.
   bool Match(const acpi_lite::AcpiDebugPortDescriptor& debug_port) { return DoMatch(debug_port); }
 
-  // This is like Match, but instead of matching a ZBI item, it matches a devicetree compatible
-  // list of values.
-  bool Match(std::string_view compatible_device, const void* payload) {
-    return DoMatch(compatible_device, payload);
+  // Returns an empty callable if no drivers match, otherwise returns a callable that will
+  // instantiate the selected instance with the supplied configuration object.
+  fit::inline_function<void(const zbi_dcfg_simple_t&)> MatchDevicetree(
+      const devicetree::PropertyDecoder& decoder) {
+    return DoMatch(decoder);
   }
+
+  // After succesfully matching through |MatchDevicetree| the selected instance can be instantiated
+  // through this method.
 
   // This is like Match, but instead of matching a ZBI item, it matches a
   // string value for the "kernel.serial" boot option.
@@ -169,8 +181,6 @@ class KernelDriver {
     using type = Variant<Args...>;
   };
 
-  typename OneDriverVariant<UartDriver>::type variant_;
-
   template <size_t I, typename... Args>
   bool TryOneMatch(Args&&... args) {
     using Try = std::variant_alternative_t<I, decltype(variant_)>;
@@ -181,16 +191,34 @@ class KernelDriver {
     return false;
   }
 
+  template <size_t I>
+  fit::inline_function<void(const zbi_dcfg_simple_t&)> TryOneMatch(
+      const devicetree::PropertyDecoder& decoder) {
+    using Try = std::variant_alternative_t<I, decltype(variant_)>;
+    using ConfigType = typename Try::uart_type::config_type;
+
+    if constexpr (std::is_same_v<ConfigType, zbi_dcfg_simple_t>) {
+      if (Try::uart_type::MatchDevicetree(decoder)) {
+        return [this](const zbi_dcfg_simple_t& config) { variant_.template emplace<I>(config); };
+      }
+    }
+    return nullptr;
+  }
+
   template <size_t... I, typename... Args>
-  bool DoMatchHelper(std::index_sequence<I...>, Args&&... args) {
-    return (TryOneMatch<I>(std::forward<Args>(args)...) || ...);
+  auto DoMatchHelper(std::index_sequence<I...>, Args&&... args) {
+    decltype(TryOneMatch<0>(std::forward<Args>(args)...)) result{};
+    ((result = TryOneMatch<I>(std::forward<Args>(args)...)) || ...);
+    return result;
   }
 
   template <typename... Args>
-  bool DoMatch(Args&&... args) {
+  auto DoMatch(Args&&... args) {
     constexpr auto n = std::variant_size_v<decltype(variant_)>;
     return DoMatchHelper(std::make_index_sequence<n>(), std::forward<Args>(args)...);
   }
+
+  typename OneDriverVariant<UartDriver>::type variant_;
 };
 
 }  // namespace all

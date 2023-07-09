@@ -156,7 +156,7 @@ ktl::optional<uart::all::Driver> GetUartFromLegacyUart(LegacyBootShim::InputZbi:
         });
 
       case LegacyBootdataUart::Type::kMmio:
-        return uart::ns8250::MmioDriver(zbi_dcfg_simple_t{.mmio_phys = uart.base});
+        return uart::ns8250::Mmio32Driver(zbi_dcfg_simple_t{.mmio_phys = uart.base});
     }
   }
   return std::nullopt;

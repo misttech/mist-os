@@ -42,8 +42,7 @@ void UartInitEarly(uint32_t extra, const uart::null::Driver::config_type& config
 
 void UartInitEarly(uint32_t extra, const zbi_dcfg_simple_t& config) {
   switch (extra) {
-    case ZBI_KERNEL_DRIVER_I8250_MMIO_UART:
-    case ZBI_KERNEL_DRIVER_DW8250_UART:
+    case ZBI_KERNEL_DRIVER_I8250_MMIO8_UART:
       // TODO-rvbringup: pull stride out of the config entry, but for now hard
       // code that the register stride is 1 byte.
       Dw8250UartInitEarly(config, 1);
@@ -53,8 +52,7 @@ void UartInitEarly(uint32_t extra, const zbi_dcfg_simple_t& config) {
 
 void UartInitLate(uint32_t extra) {
   switch (extra) {
-    case ZBI_KERNEL_DRIVER_I8250_MMIO_UART:
-    case ZBI_KERNEL_DRIVER_DW8250_UART:
+    case ZBI_KERNEL_DRIVER_I8250_MMIO8_UART:
       Dw8250UartInitLate();
       break;
   }

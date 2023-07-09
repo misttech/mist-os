@@ -6,6 +6,7 @@
 #define LIB_UART_UART_H_
 
 #include <lib/arch/intrin.h>
+#include <lib/devicetree/devicetree.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zircon-internal/macros.h>
@@ -114,6 +115,9 @@ class DriverBase {
  public:
   using config_type = KdrvConfig;
 
+  // No devicetree bindings by default.
+  static constexpr std::array<std::string_view, 0> kDevicetreeBindings{};
+
   explicit DriverBase(const config_type& cfg) : cfg_(cfg) {}
 
   constexpr bool operator==(const Driver& other) const {
@@ -151,16 +155,24 @@ class DriverBase {
   }
 
   // API to match a devicetree bindings.
-  static std::optional<Driver> MaybeCreate(std::string_view compatible_device,
-                                           const void* payload) {
-    // parsing of compatible property for every uart::nnnn::Driver
-    for (std::string_view supported_device : Driver::kDevicetreeBindings) {
-      if (compatible_device == supported_device) {
-        return Driver{*reinterpret_cast<const config_type*>(payload)};
+  static bool MatchDevicetree(const devicetree::PropertyDecoder& decoder) {
+    if constexpr (Driver::kDevicetreeBindings.size() == 0) {
+      return false;
+    } else {
+      auto compatible = decoder.FindProperty("compatible");
+      if (!compatible) {
+        return false;
       }
-    }
 
-    return {};
+      auto compatible_list = compatible->AsStringList();
+      if (!compatible_list) {
+        return false;
+      }
+
+      return std::find_first_of(compatible_list->begin(), compatible_list->end(),
+                                Driver::kDevicetreeBindings.begin(),
+                                Driver::kDevicetreeBindings.end()) != compatible_list->end();
+    }
   }
 
   // API to match DBG2 Table (ACPI). Currently only 16550 compatible uarts are supported.
@@ -292,20 +304,9 @@ class BasicIoProvider<zbi_dcfg_simple_t> {
   BasicIoProvider(const zbi_dcfg_simple_t& cfg, uint16_t pio_size, T&& map_mmio)
       : pio_size_(pio_size) {
     auto ptr = map_mmio(cfg.mmio_phys);
-    // TODO(fxbug.dev/121917): This used to use hwreg::RegisterPio if
-    // pio_size!=0; even on x86 that always boiled down to RegisterMmioPio,
-    // which RegisterMmio but with the offsets scaled by 4. That's not right
-    // for the riscv64 qemu virt machine's MMIO 16550, so that's disabled here.
-    // It's not clear how different MMIO-based 16550/8250-compatible UARTs
-    // actually deal with offset scaling and MMIO access size, so that will
-    // have to be figured out to cleanly support both the riscv case and the
-    // scaled access cases.
-#ifdef __riscv
-    pio_size = 0;
-#endif
     if (pio_size != 0) {
-      // This is PIO via MMIO, i.e. scaled MMIO.
-      io_.emplace<hwreg::RegisterPio>(ptr);
+      // Scaled MMIO with 32-byte I/O access.
+      io_.emplace<hwreg::RegisterMmioScaled<uint32_t>>(ptr);
     } else {
       // This is normal MMIO.
       io_.emplace<hwreg::RegisterMmio>(ptr);
@@ -326,7 +327,8 @@ class BasicIoProvider<zbi_dcfg_simple_t> {
   uint16_t pio_size() const { return pio_size_; }
 
  private:
-  std::variant<hwreg::RegisterMmio, hwreg::RegisterPio> io_{std::in_place_index<0>, nullptr};
+  std::variant<hwreg::RegisterMmio, hwreg::RegisterMmioScaled<uint32_t>> io_{std::in_place_index<0>,
+                                                                             nullptr};
   uint16_t pio_size_;
 };
 

@@ -97,8 +97,6 @@ struct IrqControlRegister : public hwreg::RegisterBase<IrqControlRegister, uint3
 };
 
 struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dcfg_simple_t> {
-  static constexpr std::array<std::string_view, 0> kDevicetreeBindings = {};
-
   template <typename... Args>
   explicit Driver(Args&&... args)
       : DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dcfg_simple_t>(
