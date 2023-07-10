@@ -22,6 +22,7 @@ use {
         path::Path,
         str,
     },
+    tempfile_ext::NamedTempFileExt as _,
     utf8_path::{path_relative_from_file, resolve_path_from_file},
 };
 
@@ -271,7 +272,7 @@ impl PackageManifest {
                 let contents = archive_reader.read_file(&path)?;
                 let mut tmp = tempfile::NamedTempFile::new_in(blobs_dir)?;
                 tmp.write_all(&contents)?;
-                tmp.persist(&blob_path)?;
+                tmp.persist_if_changed(&blob_path)?;
             }
         }
 
@@ -281,7 +282,7 @@ impl PackageManifest {
         let meta_far_path = blobs_dir.join(meta_far_hash.to_string());
         let mut tmp = tempfile::NamedTempFile::new_in(blobs_dir)?;
         tmp.write_all(&meta_far)?;
-        tmp.persist(meta_far_path)?;
+        tmp.persist_if_changed(meta_far_path)?;
 
         PackageManifest::from_blobs_dir(blobs_dir, meta_far_hash, out_manifest_dir)
     }
@@ -558,9 +559,15 @@ impl PackageManifestV1 {
 
             let versioned_manifest = VersionedPackageManifest::Version1(manifest.clone());
 
-            create_dir_all(manifest_path.parent().unwrap())?;
-            let file = File::create(manifest_path)?;
-            serde_json::to_writer(file, &versioned_manifest)?;
+            let mut tmp = if let Some(parent) = manifest_path.parent() {
+                create_dir_all(parent)?;
+                tempfile::NamedTempFile::new_in(parent)?
+            } else {
+                tempfile::NamedTempFile::new()?
+            };
+
+            serde_json::to_writer(&mut tmp, &versioned_manifest)?;
+            tmp.persist_if_changed(manifest_path)?;
 
             Ok(manifest)
         }

@@ -18,6 +18,8 @@ use {
         io::{BufReader, BufWriter, Cursor},
         path::{Path, PathBuf},
     },
+    tempfile::NamedTempFile,
+    tempfile_ext::NamedTempFileExt as _,
     version_history::AbiRevision,
 };
 
@@ -446,14 +448,20 @@ impl PackageBuilder {
                 package_manifest
             } else {
                 // Write the package manifest to a file.
-                let package_manifest_file = std::fs::File::create(&manifest_path)
-                    .context(format!("Failed to create package manifest: {manifest_path}"))?;
+                let mut tmp = if let Some(parent) = manifest_path.parent() {
+                    NamedTempFile::new_in(parent)?
+                } else {
+                    NamedTempFile::new()?
+                };
 
-                serde_json::ser::to_writer(
-                    BufWriter::new(package_manifest_file),
-                    &package_manifest,
-                )
-                .with_context(|| format!("writing package manifest to {manifest_path}"))?;
+                serde_json::ser::to_writer(BufWriter::new(&mut tmp), &package_manifest)
+                    .with_context(|| {
+                        format!("writing package manifest to {}", tmp.path().display())
+                    })?;
+
+                tmp.persist_if_changed(&manifest_path).with_context(|| {
+                    format!("Failed to persist package manifest: {manifest_path}")
+                })?;
 
                 package_manifest
             }

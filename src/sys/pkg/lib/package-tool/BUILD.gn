@@ -24,6 +24,7 @@ if (is_host) {
       "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
       "//src/lib/fuchsia-async",
       "//src/lib/fuchsia-lockfile:lib",
+      "//src/lib/tempfile-ext",
       "//src/lib/versioning/version-history/rust:version-history",
       "//src/sys/pkg/lib/fuchsia-hash",
       "//src/sys/pkg/lib/fuchsia-merkle",

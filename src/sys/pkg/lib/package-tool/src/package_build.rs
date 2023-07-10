@@ -17,6 +17,8 @@ use {
         fs::{create_dir_all, File},
         io::{BufReader, BufWriter, Write},
     },
+    tempfile::NamedTempFile,
+    tempfile_ext::NamedTempFileExt as _,
     version_history::AbiRevision,
 };
 
@@ -120,22 +122,35 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
     // should migrate them over to using `package_manifest.json` so we can stop producing this file.
     if cmd.blobs_json {
         let blobs_json_path = cmd.out.join(BLOBS_JSON_NAME);
-        let file = File::create(&blobs_json_path)
+
+        let mut tmp = NamedTempFile::new_in(&cmd.out)
             .with_context(|| format!("creating {blobs_json_path}"))?;
-        to_writer_json_pretty(file, package_manifest.blobs())?;
+
+        to_writer_json_pretty(&mut tmp, package_manifest.blobs())
+            .with_context(|| format!("creating {blobs_json_path}"))?;
+
+        tmp.persist_if_changed(&blobs_json_path)
+            .with_context(|| format!("creating {blobs_json_path}"))?;
     }
 
     // FIXME(fxbug.dev/101304): Some tools still depend on the legacy `blobs.manifest` file. We
     // should migrate them over to using `package_manifest.json` so we can stop producing this file.
     if cmd.blobs_manifest {
         let blobs_manifest_path = cmd.out.join(BLOBS_MANIFEST_NAME);
-        let file = File::create(&blobs_manifest_path)
-            .with_context(|| format!("creating {blobs_manifest_path}"))?;
-        let mut file = BufWriter::new(file);
 
-        for entry in package_manifest.blobs() {
-            writeln!(file, "{}={}", entry.merkle, entry.source_path)?;
+        let mut tmp = NamedTempFile::new_in(&cmd.out)
+            .with_context(|| format!("creating {blobs_manifest_path}"))?;
+
+        {
+            let mut file = BufWriter::new(&mut tmp);
+
+            for entry in package_manifest.blobs() {
+                writeln!(file, "{}={}", entry.merkle, entry.source_path)?;
+            }
         }
+
+        tmp.persist_if_changed(&blobs_manifest_path)
+            .with_context(|| format!("creating {blobs_manifest_path}"))?;
     }
 
     Ok(())

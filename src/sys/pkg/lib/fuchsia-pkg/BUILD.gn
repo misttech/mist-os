@@ -11,6 +11,7 @@ lib_deps = [
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia-fs",
   "//src/lib/fuchsia-url",
+  "//src/lib/tempfile-ext",
   "//src/lib/utf8_path",
   "//src/lib/versioning/version-history/rust:version-history",
   "//src/lib/zircon/rust:fuchsia-zircon-status",
