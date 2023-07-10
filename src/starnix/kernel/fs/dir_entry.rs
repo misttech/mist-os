@@ -488,9 +488,6 @@ impl DirEntry {
         self_children.children.remove(name);
 
         std::mem::drop(child_children);
-        // We drop our children lock before we drop the child so that we do
-        // not trigger a deadlock in the Drop trait for FsNode, which attempts
-        // to remove the FsNode from its parent's child list.
         std::mem::drop(self_children);
 
         child.destroy();
