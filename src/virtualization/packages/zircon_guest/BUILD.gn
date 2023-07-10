@@ -23,7 +23,7 @@ guest_package("zircon_guest") {
   # within the guest image.
   testonly = true
   deps = [ "//build/images/guest" ]
-  zircon = guest_image_dir + "/guest/guest.zbi"
+  zircon = guest_image_dir + "/guest/fuchsia.zbi"
 
   cmdline = "console.device_topological_suffix=/virtio-console"
   cmdline += " console.shell=true"
