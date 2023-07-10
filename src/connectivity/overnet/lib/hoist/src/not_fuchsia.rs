@@ -197,14 +197,23 @@ impl Hoist {
         // connections (one for legacy, one for CSO), so make this a closure so we can do it twice.
         let connect = || async {
             let safe_socket_path = short_socket_path(&sockpath)?;
-            async_net::unix::UnixStream::connect(&safe_socket_path)
-                .on_timeout(Duration::from_millis(100), || {
+            let started = std::time::Instant::now();
+            let ret = async_net::unix::UnixStream::connect(&safe_socket_path)
+                .on_timeout(Duration::from_secs(30), || {
                     Err(std::io::Error::new(
                         TimedOut,
-                        format_err!("connecting to ascendd socket at {}", sockpath.display()),
+                        format_err!(
+                            "Timed out (30s) connecting to ascendd socket at {}",
+                            sockpath.display()
+                        ),
                     ))
                 })
-                .await
+                .await;
+            let elapsed = std::time::Instant::now() - started;
+            if elapsed.as_millis() > 100 {
+                tracing::warn!("Socket connection took {elapsed:?}");
+            }
+            ret
         };
 
         let uds_a = loop {
@@ -226,7 +235,7 @@ impl Hoist {
                 // There was an unknown error connecting.
                 Err(e) => {
                     bail!(
-                        "unexpected error while trying to connect to ascendd socket at {}: {e}",
+                        "unexpected error while trying to connect to ascendd socket at {}: {e:?}",
                         sockpath.display()
                     );
                 }
