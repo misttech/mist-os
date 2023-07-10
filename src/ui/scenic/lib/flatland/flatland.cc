@@ -229,12 +229,14 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
 
   // Close any clients that had invalid operations on link protocols.
   if (link_protocol_error_) {
+    error_reporter_->ERROR() << "Link protocol error";
     CloseConnection(FlatlandError::BAD_HANGING_GET);
     return;
   }
 
   // Close any clients that call Present() without any present tokens.
   if (present_credits_ == 0) {
+    error_reporter_->ERROR() << "Out of present credits";
     CloseConnection(FlatlandError::NO_PRESENTS_REMAINING);
     return;
   }
