@@ -513,7 +513,10 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
     kernel_framebuffer_released_ = true;
   }
 
-  fbl::Array<const display_config_t*> display_configs(new const display_config_t*[count], count);
+  // TODO(fxbug.dev/130367): Replace VLA with fixed-size array once we have a
+  // limit on the number of connected displays.
+  const int32_t display_configs_size = std::max(1, count);
+  const display_config_t* display_configs[display_configs_size];
   uint32_t display_count = 0;
 
   // The applied configuration's stamp.
@@ -633,7 +636,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
   }
 
   const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(applied_config_stamp);
-  dc_.ApplyConfiguration(display_configs.get(), display_count, &banjo_config_stamp);
+  dc_.ApplyConfiguration(display_configs, display_count, &banjo_config_stamp);
 }
 
 void Controller::ReleaseImage(Image* image) { dc_.ReleaseImage(&image->info()); }
