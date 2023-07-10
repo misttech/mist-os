@@ -294,26 +294,6 @@ bool VkReadbackTest::InitImage() {
       ctx_->device()->bindImageMemory(*image_, *device_memory_, bind_offset_ ? *bind_offset_ : 0);
   RTN_IF_VKH_ERR(false, bind_image_result, "vk::Device::bindImageMemory()\n");
 
-  VkDeviceSize device_memory_size;
-  {
-    // Now that image is bound we can reliably get image size on Android.
-    auto image_mem_reqs =
-        ctx_->device()->getImageMemoryRequirements2(vk::ImageMemoryRequirementsInfo2(*image_));
-
-    device_memory_size = image_mem_reqs.memoryRequirements.size;
-  }
-
-  if (import_export_ != IMPORT_EXTERNAL_MEMORY) {
-    auto [map_device_memory_result, device_memory_address] = ctx_->device()->mapMemory(
-        *device_memory_, 0 /* offset= */, VK_WHOLE_SIZE, vk::MemoryMapFlags{});
-    RTN_IF_VKH_ERR(false, map_device_memory_result, "vk::Device::mapMemory()\n");
-
-    constexpr int kFill = 0xab;
-    memset(device_memory_address, kFill, device_memory_size + (bind_offset_ ? *bind_offset_ : 0));
-
-    ctx_->device()->unmapMemory(*device_memory_);
-  }
-
   image_initialized_ = true;
 
   return true;
@@ -351,7 +331,7 @@ bool VkReadbackTest::AllocateDeviceMemory() {
       FindReadableMemoryType(allocation_size, image_memory_requirements.memoryTypeBits);
   if (!memory_type) {
     ADD_FAILURE()
-        << "Memory requirements for linear images must always include a host-coherent memory type";
+        << "Memory requirements for linear images must always include a host-visible memory type";
     return false;
   }
 
@@ -402,13 +382,8 @@ std::optional<uint32_t> VkReadbackTest::FindReadableMemoryType(vk::DeviceSize al
 
     vk::MemoryPropertyFlags memory_type_properties = memory_type_info.propertyFlags;
 
-    // Restrict ourselves to host-coherent memory so we don't need to use
-    // vkInvalidateMappedMemoryRanges() after mapping memory in Readback().
-    if (!(memory_type_properties & vk::MemoryPropertyFlagBits::eHostCoherent))
+    if (!(memory_type_properties & vk::MemoryPropertyFlagBits::eHostVisible))
       continue;
-
-    EXPECT_TRUE(memory_type_properties & vk::MemoryPropertyFlagBits::eHostVisible)
-        << "Host-coherent memory must always be host-visible";
 
     return memory_type;
   }
@@ -633,6 +608,29 @@ bool VkReadbackTest::InitCommandBuffers() {
 }
 
 bool VkReadbackTest::Exec(vk::Fence fence) {
+  // First initialize the device memory contents.
+  {
+    auto image_mem_reqs =
+        ctx_->device()->getImageMemoryRequirements2(vk::ImageMemoryRequirementsInfo2(*image_));
+
+    VkDeviceSize device_memory_size = image_mem_reqs.memoryRequirements.size;
+
+    auto [map_device_memory_result, device_memory_address] = ctx_->device()->mapMemory(
+        *device_memory_, 0 /* offset= */, VK_WHOLE_SIZE, vk::MemoryMapFlags{});
+    RTN_IF_VKH_ERR(false, map_device_memory_result, "vk::Device::mapMemory()\n");
+
+    constexpr int kFill = 0xab;
+    memset(device_memory_address, kFill, device_memory_size + (bind_offset_ ? *bind_offset_ : 0));
+
+    {
+      vk::MappedMemoryRange range(*device_memory_, /*offset=*/0, VK_WHOLE_SIZE);
+      auto result = ctx_->device()->flushMappedMemoryRanges(1, &range);
+      RTN_IF_VKH_ERR(false, result, "vk::Device::flushMappedMemoryRanges()\n");
+    }
+
+    ctx_->device()->unmapMemory(*device_memory_);
+  }
+
   if (!Submit({.include_start_transition = true, .include_end_barrier = true}, fence)) {
     return false;
   }
@@ -705,6 +703,12 @@ bool VkReadbackTest::Readback() {
   auto [map_result, map_address] = ctx_->device()->mapMemory(
       *device_memory_, /* offset= */ vk::DeviceSize{}, VK_WHOLE_SIZE, vk::MemoryMapFlags{});
   RTN_IF_VKH_ERR(false, map_result, "vk::Device::mapMemory()\n");
+
+  {
+    vk::MappedMemoryRange range(*device_memory_, /*offset=*/0, VK_WHOLE_SIZE);
+    auto result = ctx_->device()->invalidateMappedMemoryRanges(1, &range);
+    RTN_IF_VKH_ERR(false, result, "vk::Device::invalidateMappedMemoryRanges()\n");
+  }
 
   auto* data = reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(map_address) +
                                            (bind_offset_ ? *bind_offset_ : 0));
