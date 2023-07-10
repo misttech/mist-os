@@ -227,7 +227,6 @@ impl IpTables {
 
             // Sets the counters of the [`IpTable`] specified by `user_opt`.
             IPT_SO_SET_ADD_COUNTERS => {
-                if socket.domain == SocketDomain::Inet {}
                 let counters_info =
                     xt_counters_info::read_from_prefix(&*bytes).ok_or_else(|| errno!(EINVAL))?;
 
