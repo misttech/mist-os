@@ -16,14 +16,16 @@
             from: "#ui",
             dependency: "weak_for_migration",
         },
+        {
+            protocol: [ "fuchsia.lightsensor.Sensor" ],
+            from: "#ui",
+            dependency: "weak_for_migration",
+        },
     ],
     offer: [
         // Routes to session-manager.
         {
-            protocol: [
-                "fuchsia.session.scene.Manager",
-                "fuchsia.ui.pointer.augment.GlobalMouse",
-            ],
+            protocol: [ "fuchsia.session.scene.Manager" ],
             from: "#ui",
             to: "#session-manager",
         },
@@ -33,8 +35,29 @@
         //
         // PLEASE KEEP THESE ALPHABETICAL IN TERMS OF "FROM".
         {
-            protocol: [ "fuchsia.settings.Keyboard" ],
+            protocol: [ "fuchsia.ui.brightness.Control" ],
+            from: "#brightness_manager",
+            to: "#ui",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.factory.MiscFactoryStoreProvider" ],
+            from: "#factory_store_providers",
+            to: "#ui",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.settings.Keyboard",
+                "fuchsia.settings.Light",
+            ],
             from: "#setui_service",
+            to: "#ui",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.media.sounds.Player" ],
+            from: "#soundplayer",
             to: "#ui",
             source_availability: "unknown",
         },
