@@ -576,7 +576,24 @@ zx_status_t LibFuzzerRunner::AddArgs() {
       return status;
     }
   }
-
+  auto output_flags = options_->output_flags();
+  size_t close_fd_mask = 0;
+  if (bool(output_flags & OutputFlags::CLOSE_STDOUT)) {
+    close_fd_mask |= 1;
+  }
+  if (bool(output_flags & OutputFlags::CLOSE_STDERR)) {
+    close_fd_mask |= 2;
+  }
+  if (close_fd_mask) {
+    if (auto status = process_.AddArg(MakeArg("close_fd_mask", close_fd_mask)); status != ZX_OK) {
+      return status;
+    }
+  }
+  if (bool(output_flags & OutputFlags::VERBOSE)) {
+    if (auto status = process_.AddArg(MakeArg("verbosity", 2)); status != ZX_OK) {
+      return status;
+    }
+  }
   if (has_dictionary_) {
     if (auto status = process_.AddArg(MakeArg("dict", kDictionaryPath)); status != ZX_OK) {
       return status;
