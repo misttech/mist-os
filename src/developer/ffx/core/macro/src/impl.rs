@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_diagnostics::{Selector, StringSelector, TreeSelector};
 use lazy_static::lazy_static;
 use proc_macro2::{Punct, Span, TokenStream};
 use quote::{quote, ToTokens};
-use selectors::{self, TreeSelector as _, VerboseError};
 use std::collections::HashMap;
 use syn::{
     parse::{Parse, ParseStream},
@@ -34,6 +32,11 @@ const UNRECOGNIZED_PARAMETER: &str = "If this is a proxy, make sure the paramete
                                       the mapping passed into the ffx_plugin attribute.";
 
 const DAEMON_PROTOCOL_IDENT: &str = "daemon::protocol";
+
+const CONNECT_TO_CUSTOM_PROTOCOL_ERROR: &str =
+    "Connecting to custom target protocols is no longer \
+     supported by ffx_plugin. Please migrate to use fho. See: \
+     https://fuchsia.dev/fuchsia-src/development/tools/ffx/development/subtools/migrating?hl=en";
 
 lazy_static! {
     static ref KNOWN_PROXIES: Vec<(&'static str, &'static str, bool)> = vec![
@@ -168,7 +171,7 @@ fn parse_arguments(
                         implementation,
                         testing,
                         ffx_attr,
-                    }) = generate_mapped_proxy(proxies, &pat, path)?
+                    }) = generate_mapped_proxy(proxies, path)?
                     {
                         if extract_ffx_attribute_tokens(&attrs).is_some() {
                             return Err(Error::new(arg.span(), ATTRIBUTE_ON_WRONG_PROXY_TYPE));
@@ -500,7 +503,6 @@ struct GeneratedProxyParts {
 
 fn generate_mapped_proxy(
     proxies: &ProxyMap,
-    pattern_type: &Box<Pat>,
     path: &syn::Path,
 ) -> Result<Option<GeneratedProxyParts>, Error> {
     let proxy_wrapper_type = extract_proxy_type(path)?;
@@ -511,87 +513,8 @@ fn generate_mapped_proxy(
         if mapping_lit.value() == DAEMON_PROTOCOL_IDENT {
             return Ok(None);
         }
-        if let Pat::Ident(pat_ident) = pattern_type.as_ref() {
-            let output = pat_ident.ident.clone();
-            let output_fut = Ident::new(&format!("{}_fut", output), Span::call_site());
-            let output_fut_res = Ident::new(&format!("{}_fut_res", output), Span::call_site());
-            let server_end = Ident::new(&format!("{}_server_end", output), Span::call_site());
-            let selector = Ident::new(&format!("{}_selector", output), Span::call_site());
-            let implementation = generate_proxy_from_selector(
-                proxy_type_path,
-                mapping,
-                mapping_lit,
-                &output,
-                &output_fut,
-                server_end,
-                selector,
-            );
-            let testing = generate_fake_test_proxy_method(pat_ident.ident.clone(), proxy_type_path);
-            let arg = proxy_wrapper_type.map_result_stream(&output_fut_res, &output);
-            return Ok(Some(GeneratedProxyParts {
-                arg,
-                fut: output_fut,
-                fut_res: output_fut_res,
-                implementation,
-                testing,
-                ffx_attr: None,
-            }));
-        }
     }
     Ok(None)
-}
-
-fn generate_proxy_from_selector(
-    path: &syn::Path,
-    _mapping: &String,
-    mapping_lit: LitStr,
-    output: &Ident,
-    output_fut: &Ident,
-    server_end: Ident,
-    selector: Ident,
-) -> TokenStream {
-    quote! {
-        let (#output, #server_end) =
-            ffx_core::macro_deps::fidl::endpoints::create_proxy::<<#path as ffx_core::macro_deps::fidl::endpoints::Proxy>::Protocol>()?;
-        let #selector =
-            ffx_core::macro_deps::selectors::parse_selector::<ffx_core::macro_deps::selectors::VerboseError>(#mapping_lit)?;
-        let #output_fut =
-        async {
-            // This needs to be a block in order for this `use` to avoid conflicting with a plugins own `use` for this trait.
-            use ffx_core::macro_deps::futures::TryFutureExt;
-
-            let retry_count = 1;
-            let mut tries = 0;
-            // We try `retry_count` + 1 times to get a non-error result from calling
-            // injectory.remote_factory(). The __remote_factory variable will be a Result<P> which
-            // is why we use the ? operator at the end of the loop to early return an error from
-            // this block if we didn't manage to get a handle to the remote control proxy.
-            let __remote_factory = loop {
-                tries += 1;
-                let remote_factory = injector.remote_factory().await;
-                if remote_factory.is_ok() || tries > retry_count {
-                    break remote_factory;
-                }
-            }?;
-
-            // TODO(fxbug.dev/126721): remove this and just take monikers. For now we can take
-            // advantage of the fact that the selector has been parsed and validated already.
-            // So we can just extract the moniker out of it and remove selector-related escaping.
-            let mut parts = #mapping_lit.split(":expose:");
-            let moniker = parts.next().unwrap().replace("\\:", ":");
-            let moniker = format!("/{moniker}");
-            let capability_name = parts.next().unwrap();
-
-            ffx_core::macro_deps::rcs::connect_with_timeout_at(
-                std::time::Duration::from_secs(15),
-                &moniker,
-                &capability_name,
-                &__remote_factory,
-                #server_end.into_channel()
-            )
-            .await
-        };
-    }
 }
 
 fn remove_all_ffx_attrs(mut input: ItemFn) -> ItemFn {
@@ -726,75 +649,6 @@ pub fn ffx_plugin(input: ItemFn, proxies: ProxyMap) -> Result<TokenStream, Error
     Ok(res)
 }
 
-fn cmp_string_selector(selector: &StringSelector, expected: &str) -> bool {
-    match selector {
-        StringSelector::ExactMatch(s) => s == expected,
-        StringSelector::StringPattern(s) => s == expected,
-        _ => false,
-    }
-}
-
-fn is_namespace(span: Span, selector: &TreeSelector, namespace: &str) -> Result<bool, Error> {
-    match selector {
-        TreeSelector::SubtreeSelector(ref subtree) => {
-            if subtree.node_path.is_empty() {
-                return Err(Error::new(
-                    span,
-                    format!("Got an invalid tree selector. {:?}", selector),
-                ));
-            }
-            Ok(cmp_string_selector(subtree.node_path.get(0).unwrap(), namespace))
-        }
-        TreeSelector::PropertySelector(ref selector) => {
-            if selector.node_path.is_empty() {
-                return Err(Error::new(
-                    span,
-                    format!("Got an invalid tree selector. {:?}", selector),
-                ));
-            }
-            Ok(cmp_string_selector(selector.node_path.get(0).unwrap(), namespace))
-        }
-        _ => Err(Error::new(span, "Compiled with an unexpected TreeSelector variant.")),
-    }
-}
-
-fn has_wildcard(span: Span, selector: &StringSelector) -> Result<bool, Error> {
-    match selector {
-        StringSelector::ExactMatch(_) => Ok(false),
-        StringSelector::StringPattern(s) => Ok(s.contains("*")),
-        _ => Err(Error::new(span, "Compiled with an unexpected StringSelector variant.")),
-    }
-}
-
-fn any_wildcards(span: Span, selectors: &Vec<StringSelector>) -> Result<bool, Error> {
-    for selector in selectors.iter() {
-        if has_wildcard(span, selector)? {
-            return Ok(true);
-        }
-    }
-    return Ok(false);
-}
-
-fn has_wildcards(span: Span, selector: &Selector) -> Result<bool, Error> {
-    let moniker = selector.component_selector.as_ref().unwrap();
-    if any_wildcards(span, moniker.moniker_segments.as_ref().unwrap())? {
-        return Ok(true);
-    }
-
-    let tree_selector = selector.tree_selector.as_ref().unwrap();
-    match tree_selector {
-        TreeSelector::SubtreeSelector(subtree) => Ok(any_wildcards(span, &subtree.node_path)?),
-        TreeSelector::PropertySelector(selector) => {
-            if any_wildcards(span, &selector.node_path)? {
-                Ok(true)
-            } else {
-                has_wildcard(span, &selector.target_properties)
-            }
-        }
-        _ => Err(Error::new(span, "Compiled with an unexpected TreeSelector variant.")),
-    }
-}
-
 #[derive(Debug)]
 pub struct ProxyMap {
     experiment_key: Option<String>,
@@ -824,28 +678,10 @@ impl Parse for ProxyMap {
                         let selector = if selection.value() == DAEMON_PROTOCOL_IDENT {
                             selection.value()
                         } else {
-                            let parsed_selector =
-                                selectors::parse_selector::<VerboseError>(&selection.value())
-                                    .map_err(|e| {
-                                        Error::new(
-                                            selection.span(),
-                                            format!("Invalid component selector string: {}", e),
-                                        )
-                                    })?;
-
-                            if has_wildcards(selection.span(), &parsed_selector)? {
-                                return Err(Error::new(selection.span(), format!("Component selectors in plugin definitions cannot use wildcards ('*').")));
-                            }
-                            let subdir = parsed_selector.tree_selector.unwrap();
-
-                            if subdir.property().is_none() {
-                                return Err(Error::new(selection.span(), format!("Selectors in plugin definitions must specify a protocol name")));
-                            }
-
-                            if !is_namespace(selection.span(), &subdir, "expose")? {
-                                return Err(Error::new(selection.span(), format!("Selectors in plugin definitions must use `expose`. `out` and `in` are unsupported. See fxbug.dev/60910.")));
-                            }
-                            selection.value()
+                            return Err(Error::new(
+                                selection.span(),
+                                CONNECT_TO_CUSTOM_PROTOCOL_ERROR,
+                            ));
                         };
                         map.insert(qualified_name(&path), selector);
                     }
@@ -890,8 +726,6 @@ mod test {
         parse::{Parse, ParseStream},
         parse2, parse_quote, Attribute, ItemType, ReturnType,
     };
-
-    const TEST_SELECTOR: &str = "core/my_test_component:expose";
 
     struct WrappedCommand {
         original: ItemStruct,
@@ -991,54 +825,6 @@ mod test {
     }
 
     #[test]
-    fn test_ffx_plugin_with_proxy_map_and_command() -> Result<(), Error> {
-        let mut map = HashMap::new();
-        map.insert("TestProxy".to_string(), "test".to_string());
-        let proxies = ProxyMap { map, ..Default::default() };
-        let original: ItemFn = parse_quote! {
-            pub async fn echo(
-                test: TestProxy,
-                cmd: WhateverCommand,
-                ) -> anyhow::Result<()> { Ok(()) }
-        };
-        ffx_plugin(original.clone(), proxies).map(|_| ())
-    }
-
-    #[test]
-    fn test_ffx_plugin_with_multiple_proxy_map_and_command() -> Result<(), Error> {
-        let mut map = HashMap::new();
-        map.insert("TestProxy".to_string(), "test".to_string());
-        map.insert("FooProxy".to_string(), "foo".to_string());
-        let proxies = ProxyMap { map, ..Default::default() };
-        let original: ItemFn = parse_quote! {
-            pub async fn echo(
-                foo: FooProxy,
-                cmd: WhateverCommand,
-                test: TestProxy,
-                ) -> anyhow::Result<()> { Ok(()) }
-        };
-        ffx_plugin(original.clone(), proxies).map(|_| ())
-    }
-
-    #[test]
-    fn test_ffx_plugin_with_multiple_proxy_map_and_command_and_experiment_key() -> Result<(), Error>
-    {
-        let mut map = HashMap::new();
-        map.insert("TestProxy".to_string(), "test".to_string());
-        map.insert("FooProxy".to_string(), "foo".to_string());
-        let experiment_key = Some("foo_key".to_string());
-        let proxies = ProxyMap { map, experiment_key };
-        let original: ItemFn = parse_quote! {
-            pub async fn echo(
-                foo: FooProxy,
-                cmd: WhateverCommand,
-                test: TestProxy,
-                ) -> anyhow::Result<()> { Ok(()) }
-        };
-        ffx_plugin(original.clone(), proxies).map(|_| ())
-    }
-
-    #[test]
     fn test_ffx_plugin_with_no_parameters_should_err() -> Result<(), Error> {
         let proxies = Default::default();
         let original: ItemFn = parse_quote! {
@@ -1080,54 +866,9 @@ mod test {
     }
 
     #[test]
-    fn test_map_expose_with_service_succeeds() {
+    #[should_panic]
+    fn test_map_expose_with_service_fails() {
         let _proxy_map: ProxyMap = parse_quote! {test = "test:expose:anything"};
-    }
-
-    fn proxy_map_test_value(test: String) -> (String, String, TokenStream) {
-        let test_value = format!("{}:{}", TEST_SELECTOR, test);
-        let test_ident = Ident::new(&test, Span::call_site());
-        let mapping_lit = LitStr::new(&test_value, Span::call_site());
-        (test.to_string(), test_value.clone(), quote! {#test_ident = #mapping_lit})
-    }
-
-    fn test_populating_proxy_map_times(num_of_mappings: usize) {
-        let mut proxy_mapping = quote! {};
-        let mut key_values = Vec::<(String, String)>::with_capacity(num_of_mappings);
-        for x in 0..num_of_mappings {
-            let (test_key, test_value, test_proxy_mapping) =
-                proxy_map_test_value(format!("test{}", x));
-            key_values.push((test_key, test_value));
-            proxy_mapping = quote! {
-                #test_proxy_mapping,
-                #proxy_mapping
-            };
-        }
-        let proxy_map: ProxyMap = parse_quote! { #proxy_mapping };
-        for (key, value) in key_values {
-            assert_eq!(proxy_map.map.get(&key), Some(&value));
-        }
-    }
-
-    #[test]
-    fn test_populating_proxy_map() -> Result<(), Error> {
-        test_populating_proxy_map_times(20);
-        Ok(())
-    }
-
-    #[test]
-    fn test_populating_proxy_map_without_trailing_comma() -> Result<(), Error> {
-        let (test1_key, test1_value, test1_proxy_mapping) =
-            proxy_map_test_value("test1".to_string());
-        let (test2_key, test2_value, test2_proxy_mapping) =
-            proxy_map_test_value("test2".to_string());
-        let proxy_map: ProxyMap = parse_quote! {
-            #test1_proxy_mapping,
-            #test2_proxy_mapping
-        };
-        assert_eq!(proxy_map.map.get(&test1_key), Some(&test1_value));
-        assert_eq!(proxy_map.map.get(&test2_key), Some(&test2_value));
-        Ok(())
     }
 
     #[test]
@@ -1163,14 +904,6 @@ mod test {
     }
 
     #[test]
-    fn test_map_using_expose_ok() {
-        let result: Result<ProxyMap, Error> = parse2(quote! {
-            test = "test:expose:anything"
-        });
-        assert!(result.is_ok());
-    }
-
-    #[test]
     fn test_invalid_mapping_should_err() {
         let result: Result<ProxyMap, Error> = parse2(quote! {
             test, "test"
@@ -1203,60 +936,6 @@ mod test {
     fn test_experiment_key_literal_with_trailing_comma() -> Result<(), Error> {
         let result: ProxyMap = parse2(quote! {"test",})?;
         assert_eq!(result.experiment_key, Some("test".to_string()));
-        Ok(())
-    }
-
-    #[test]
-    fn test_experiment_key_before_mapping() -> Result<(), Error> {
-        let (test1_key, test1_value, test1_proxy_mapping) =
-            proxy_map_test_value("test1".to_string());
-        let (test2_key, test2_value, test2_proxy_mapping) =
-            proxy_map_test_value("test2".to_string());
-        let ex_key = "test_experimental_key".to_string();
-        let proxy_map: ProxyMap = parse_quote! {
-            #ex_key,
-            #test1_proxy_mapping,
-            #test2_proxy_mapping
-        };
-        assert_eq!(proxy_map.map.get(&test1_key), Some(&test1_value));
-        assert_eq!(proxy_map.map.get(&test2_key), Some(&test2_value));
-        assert_eq!(proxy_map.experiment_key, Some(ex_key));
-        Ok(())
-    }
-
-    #[test]
-    fn test_experiment_key_after_mapping() -> Result<(), Error> {
-        let (test1_key, test1_value, test1_proxy_mapping) =
-            proxy_map_test_value("test1".to_string());
-        let (test2_key, test2_value, test2_proxy_mapping) =
-            proxy_map_test_value("test2".to_string());
-        let ex_key = "test_experimental_key".to_string();
-        let proxy_map: ProxyMap = parse_quote! {
-            #test1_proxy_mapping,
-            #test2_proxy_mapping,
-            #ex_key,
-        };
-        assert_eq!(proxy_map.map.get(&test1_key), Some(&test1_value));
-        assert_eq!(proxy_map.map.get(&test2_key), Some(&test2_value));
-        assert_eq!(proxy_map.experiment_key, Some(ex_key));
-        Ok(())
-    }
-
-    #[test]
-    fn test_experiment_key_in_the_middle_of_the_mapping() -> Result<(), Error> {
-        let (test1_key, test1_value, test1_proxy_mapping) =
-            proxy_map_test_value("test1".to_string());
-        let (test2_key, test2_value, test2_proxy_mapping) =
-            proxy_map_test_value("test2".to_string());
-        let ex_key = "test_experimental_key".to_string();
-        let proxy_map: ProxyMap = parse_quote! {
-            #test1_proxy_mapping,
-            #ex_key,
-            #test2_proxy_mapping,
-        };
-        assert_eq!(proxy_map.map.get(&test1_key), Some(&test1_value));
-        assert_eq!(proxy_map.map.get(&test2_key), Some(&test2_value));
-        assert_eq!(proxy_map.experiment_key, Some(ex_key));
         Ok(())
     }
 
@@ -1424,49 +1103,6 @@ mod test {
     }
 
     #[test]
-    fn test_generate_mapped_proxy_generates_name_and_future() -> Result<(), Error> {
-        let proxy_map: ProxyMap = parse_quote! { TestProxy= "test:expose:anything" };
-        let input: ItemFn = parse_quote!(
-            fn test_fn(test_param: TestProxy) {}
-        );
-        let param = input.sig.inputs[0].clone();
-        if let Some(GeneratedProxyParts { arg, fut, .. }) = match param {
-            FnArg::Typed(PatType { ty, pat, .. }) => match ty.as_ref() {
-                Path(TypePath { path, .. }) => generate_mapped_proxy(&proxy_map, &pat, path)?,
-                _ => return Err(Error::new(Span::call_site(), "unexpected param")),
-            },
-            _ => return Err(Error::new(Span::call_site(), "unexpected param")),
-        } {
-            assert_eq!(
-                arg.to_string(),
-                quote! { test_param_fut_res.map(|_| test_param)? }.to_string()
-            );
-            assert_eq!(fut, Ident::new("test_param_fut", Span::call_site()));
-            Ok(())
-        } else {
-            Err(Error::new(Span::call_site(), "mappedproxy not generated"))
-        }
-    }
-
-    #[test]
-    fn test_generate_mapped_proxy_does_not_generate_unmapped_proxies() -> Result<(), Error> {
-        let proxy_map: ProxyMap = parse_quote! { TestProxy= "test:expose:anything" };
-        let input: ItemFn = parse_quote!(
-            fn test_fn(test_param: AnotherTestProxy) {}
-        );
-        let param = input.sig.inputs[0].clone();
-        let result = match param {
-            FnArg::Typed(PatType { ty, pat, .. }) => match ty.as_ref() {
-                Path(TypePath { path, .. }) => generate_mapped_proxy(&proxy_map, &pat, path)?,
-                _ => return Err(Error::new(Span::call_site(), "unexpected param")),
-            },
-            _ => return Err(Error::new(Span::call_site(), "unexpected param")),
-        };
-        assert!(result.is_none());
-        Ok(())
-    }
-
-    #[test]
     fn test_known_proxy_works_with_options() -> Result<(), Error> {
         let proxies = Default::default();
         let input: ItemFn = parse_quote! {
@@ -1480,57 +1116,6 @@ mod test {
         let proxies = Default::default();
         let input: ItemFn = parse_quote! {
             fn test_fn(test_param: Result<DaemonProxy>, cmd: ResultCommand) -> Result<()> {}
-        };
-        ffx_plugin(input, proxies).map(|_| ())
-    }
-
-    #[test]
-    fn test_mapped_proxy_works_with_options() -> Result<(), Error> {
-        let proxies: ProxyMap = parse_quote! { TestProxy= "test:expose:anything" };
-        let input: ItemFn = parse_quote! {
-            fn test_fn(test_param: Option<TestProxy>, cmd: ResultCommand) -> Result<()> {}
-        };
-        ffx_plugin(input, proxies).map(|_| ())
-    }
-
-    #[test]
-    fn test_mapped_proxy_works_with_results() -> Result<(), Error> {
-        let proxies: ProxyMap = parse_quote! { TestProxy= "test:expose:anything" };
-        let input: ItemFn = parse_quote! {
-            fn test_fn(test_param: Result<TestProxy>, cmd: ResultCommand) -> Result<()> {}
-        };
-        ffx_plugin(input, proxies).map(|_| ())
-    }
-
-    #[test]
-    fn test_mapped_proxy_works_with_both_options_and_results() -> Result<(), Error> {
-        let proxies: ProxyMap = parse_quote! {
-            TestProxy = "test:expose:anything",
-            TestProxy2 = "test:expose:anything"
-        };
-        let input: ItemFn = parse_quote! {
-            fn test_fn(
-                test_param: Result<TestProxy>,
-                test_param_2: Option<TestProxy2>,
-                cmd: ResultCommand) -> Result<()> {}
-        };
-        ffx_plugin(input, proxies).map(|_| ())
-    }
-
-    #[test]
-    fn test_both_known_and_mapped_proxy_works_with_both_options_and_results() -> Result<(), Error> {
-        let proxies: ProxyMap = parse_quote! {
-            TestProxy = "test:expose:anything",
-            TestProxy2 = "test:expose:anything"
-        };
-        let input: ItemFn = parse_quote! {
-            fn test_fn(
-                test_param: Result<TestProxy>,
-                test_param_2: Option<TestProxy2>,
-                daemon_proxy: DaemonProxy,
-                fastboot_proxy: Option<FastbootProxy>,
-                remote_proxy: Result<RemoteControlProxy>,
-                cmd: ResultCommand) -> Result<()> {}
         };
         ffx_plugin(input, proxies).map(|_| ())
     }

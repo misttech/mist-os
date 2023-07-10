@@ -20,7 +20,6 @@ pub mod macro_deps {
     pub use fuchsia_async;
     pub use futures;
     pub use rcs;
-    pub use selectors;
 }
 
 #[async_trait(?Send)]
