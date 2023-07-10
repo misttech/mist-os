@@ -108,7 +108,6 @@ if (labels.images == "//build/images/bringup") {
       "//src/devices/block/drivers/virtio:virtio_block",
       "//src/devices/block/drivers/virtio:virtio_scsi",
       "//src/devices/board/drivers/machina",
-      "//src/devices/bundles:bootstrap-dev",
       "//src/devices/bus/drivers/pci:bus-pci",
       "//src/devices/misc/drivers/virtio-rng:virtio_rng",
       "//src/devices/serial/drivers/virtio-console:virtio_console",

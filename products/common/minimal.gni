@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/security/policies.gni")
-import("//products/common/bringup.gni")
 
 # Minimal, and all products based on it, use the "standard" assembled_system()
 # impl in `//build/images/fuchsia`
@@ -11,6 +10,19 @@ use_bringup_assembly = false
 bootfs_only = false
 
 include_shell_commands_package = true
+
+product_bootfs_labels = []
+meta_package_labels = []
+base_driver_package_labels = []
+legacy_base_driver_package_labels = []
+base_package_labels = []
+legacy_base_package_labels = []
+cache_package_labels = []
+legacy_cache_package_labels = []
+universe_package_labels = []
+legacy_universe_package_labels = []
+package_flavor_selections = []
+sdk_archive_labels = []
 
 core_realm_shards = [
   "//src/connectivity/network:virtualization-core-shard",

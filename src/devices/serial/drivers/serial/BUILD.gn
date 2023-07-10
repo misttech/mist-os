@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
@@ -25,10 +26,15 @@ fuchsia_driver("serial-driver") {
 }
 
 fuchsia_driver_component("serial") {
+  visibility = [ ":*" ]
   info = "serial-info.json"
   component_name = "serial"
   deps = [ ":serial-driver" ]
   manifest = "meta/serial.cml"
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":serial" ]
 }
 
 source_set("common") {
