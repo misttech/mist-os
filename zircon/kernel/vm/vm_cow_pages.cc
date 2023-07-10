@@ -760,11 +760,16 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
       }
       break;
     }
-    case CloneType::SnapshotAtLeastOnWrite:
+    case CloneType::SnapshotAtLeastOnWrite: {
       if (!is_snapshot_at_least_on_write_supported()) {
         return ZX_ERR_NOT_SUPPORTED;
       }
       break;
+    }
+    case CloneType::SnapshotModified: {
+      return ZX_ERR_NOT_SUPPORTED;
+      break;
+    }
   }
 
   uint64_t new_root_parent_offset;
@@ -831,6 +836,9 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
       VMO_FRUGAL_VALIDATION_ASSERT((*cow_child)->DebugValidateVmoPageBorrowingLocked());
 
       return ZX_OK;
+    }
+    case CloneType::SnapshotModified: {
+      return ZX_ERR_NOT_SUPPORTED;
     }
   }
   return ZX_ERR_NOT_SUPPORTED;

@@ -3969,6 +3969,29 @@ static bool vmo_high_priority_reclaim_test() {
   END_TEST;
 }
 
+// Tests that calling snapshot modified will return ZX_ERR_NOT_SUPPORTED
+static bool vmo_snapshot_modified_smoke_test() {
+  BEGIN_TEST;
+
+  // Create VMO
+  fbl::RefPtr<VmObjectPaged> vmo;
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE,
+                                             AttributionObject::GetKernelAttribution(), &vmo);
+  ASSERT_EQ(ZX_OK, status, "vmobject creation\n");
+  ASSERT_NONNULL(vmo, "vmobject creation\n");
+
+  vmo->set_user_id(ZX_KOID_KERNEL);
+
+  // Attempt to snapshot-modified, which should fail as it is unimplemented
+  fbl::RefPtr<VmObject> clone;
+  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0, PAGE_SIZE,
+                            false, AttributionObject::GetKernelAttribution(), &clone);
+  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, status, "vmobject creation\n");
+  ASSERT_NULL(clone, "vmobject creation\n");
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(vmo_tests)
 VM_UNITTEST(vmo_create_test)
 VM_UNITTEST(vmo_create_maximum_size)
@@ -4029,6 +4052,7 @@ VM_UNITTEST(vmo_zero_pinned_test)
 VM_UNITTEST(vmo_pinned_wrapper_test)
 VM_UNITTEST(vmo_dedup_dirty_test)
 VM_UNITTEST(vmo_high_priority_reclaim_test)
+VM_UNITTEST(vmo_snapshot_modified_smoke_test)
 UNITTEST_END_TESTCASE(vmo_tests, "vmo", "VmObject tests")
 
 }  // namespace vm_unittest

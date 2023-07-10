@@ -58,6 +58,7 @@ enum class Resizability {
 enum class CloneType {
   Snapshot,
   SnapshotAtLeastOnWrite,
+  SnapshotModified,
 };
 
 namespace internal {
