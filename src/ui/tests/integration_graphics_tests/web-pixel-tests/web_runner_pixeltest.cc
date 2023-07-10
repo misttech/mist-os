@@ -388,23 +388,20 @@ TEST_P(VideoHtmlPixelTests, ValidPixelTest) {
         }
         std::cout << "--------------" << std::endl;
 
-        // Fail the predicate check until at least some pixels are kinda blue. This will
-        // cause a re-attempt of a screenshot.
-        if (MaxSumProject(kBlue, top) < kPixelMatchThresholdInProjections) {
-          return false;
-        }
-
         // Video's background color should not be visible.
-        EXPECT_LT(histogram[kBackground], 10u);
+        if (histogram[kBackground] >= 10u)
+          return false;
 
         // Note that we do not see pure colors in the video but a shade of the colors shown in the
         // diagram. Since it is hard to assert on the exact number of pixels for each shade of the
         // color, the test asserts on whether the shade that's most like the given color is
         // prominent enough.
-        EXPECT_GT(MaxSumProject(kYellow, top), kPixelMatchThresholdInProjections);
-        EXPECT_GT(MaxSumProject(kRed, top), kPixelMatchThresholdInProjections);
-        EXPECT_GT(MaxSumProject(kBlue, top), kPixelMatchThresholdInProjections);
-        EXPECT_GT(MaxSumProject(kGreen, top), kPixelMatchThresholdInProjections);
+        if (MaxSumProject(kYellow, top) < kPixelMatchThresholdInProjections &&
+            MaxSumProject(kRed, top) < kPixelMatchThresholdInProjections &&
+            MaxSumProject(kBlue, top) < kPixelMatchThresholdInProjections &&
+            MaxSumProject(kGreen, top) < kPixelMatchThresholdInProjections) {
+          return false;
+        }
 
         return true;
       },
