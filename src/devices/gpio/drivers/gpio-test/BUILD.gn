@@ -28,8 +28,8 @@ fuchsia_driver("gpio-test-driver") {
   sources = [ "gpio-test.cc" ]
   deps = [
     ":gpio_test_bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",

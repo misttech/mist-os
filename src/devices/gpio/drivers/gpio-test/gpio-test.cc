@@ -23,7 +23,13 @@ void GpioTest::DdkRelease() {
   done_ = true;
   thrd_join(output_thread_, nullptr);
   thrd_join(interrupt_thread_, nullptr);
-  gpios_[GPIO_BUTTON].ReleaseInterrupt();
+
+  fidl::WireResult result = gpios_[GPIO_BUTTON]->ReleaseInterrupt();
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send ReleaseInterrupt request: %s", result.status_string());
+  } else if (result->is_error()) {
+    zxlogf(ERROR, "Failed to release interrupt: %s", zx_status_get_string(result->error_value()));
+  }
 
   delete this;
 }
@@ -31,9 +37,15 @@ void GpioTest::DdkRelease() {
 // test thread that cycles all of the GPIOs provided to us
 int GpioTest::OutputThread() {
   for (uint32_t i = 0; i < gpio_count_ - 1; i++) {
-    if (gpios_[i].ConfigOut(0) != ZX_OK) {
-      zxlogf(ERROR, "gpio-test: ConfigOut failed for gpio %u", i);
-      return -1;
+    fidl::WireResult result = gpios_[i]->ConfigOut(0);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigOut request to gpio %u: %s", i, result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure gpio %u to output: %s", i,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
     }
   }
 
@@ -41,9 +53,31 @@ int GpioTest::OutputThread() {
     // Assuming here that the last GPIO is the input button
     // so we don't toggle that one
     for (uint32_t i = 0; i < gpio_count_ - 1; i++) {
-      gpios_[i].Write(1);
+      {
+        fidl::WireResult result = gpios_[i]->Write(1);
+        if (!result.ok()) {
+          zxlogf(ERROR, "Failed to send Write request to gpio %u: %s", i, result.status_string());
+          return result.status();
+        }
+        if (result->is_error()) {
+          zxlogf(ERROR, "Failed to write to gpio %u: %s", i,
+                 zx_status_get_string(result->error_value()));
+          return result->error_value();
+        }
+      }
       sleep(1);
-      gpios_[i].Write(0);
+      {
+        fidl::WireResult result = gpios_[i]->Write(0);
+        if (!result.ok()) {
+          zxlogf(ERROR, "Failed to send Write request to gpio %u: %s", i, result.status_string());
+          return result.status();
+        }
+        if (result->is_error()) {
+          zxlogf(ERROR, "Failed to write to gpio %u: %s", i,
+                 zx_status_get_string(result->error_value()));
+          return result->error_value();
+        }
+      }
       sleep(1);
     }
   }
@@ -52,32 +86,72 @@ int GpioTest::OutputThread() {
 }
 
 // test thread that cycles runs tests for GPIO interrupts
-int GpioTest::InterruptThread() {
-  if (gpios_[GPIO_BUTTON].ConfigIn(GPIO_PULL_DOWN) != ZX_OK) {
-    zxlogf(ERROR, "%s: gpio_config failed for gpio %u ", __func__, GPIO_BUTTON);
-    return -1;
+zx_status_t GpioTest::InterruptThread() {
+  {
+    fidl::WireResult result =
+        gpios_[GPIO_BUTTON]->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigIn request to gpio %u: %s", GPIO_BUTTON,
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure gpio %u to input: %s", GPIO_BUTTON,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
-  if (gpios_[GPIO_BUTTON].GetInterrupt(ZX_INTERRUPT_MODE_EDGE_HIGH, &interrupt_) != ZX_OK) {
-    zxlogf(ERROR, "%s: gpio_get_interrupt failed for gpio %u", __func__, GPIO_BUTTON);
-    return -1;
+  fidl::WireResult interrupt_result =
+      gpios_[GPIO_BUTTON]->GetInterrupt(ZX_INTERRUPT_MODE_EDGE_HIGH);
+  if (!interrupt_result.ok()) {
+    zxlogf(ERROR, "Failed to send GetInterrupt request to gpio %u: %s", GPIO_BUTTON,
+           interrupt_result.status_string());
+    return interrupt_result.status();
   }
+  if (interrupt_result->is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt from gpio %u: %s", GPIO_BUTTON,
+           zx_status_get_string(interrupt_result->error_value()));
+    return interrupt_result->error_value();
+  }
+  interrupt_ = std::move(interrupt_result.value()->irq);
 
   while (!done_) {
     zxlogf(INFO, "Waiting for GPIO Test Input Interrupt");
     auto status = interrupt_.wait(nullptr);
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: interrupt wait failed %d", __func__, status);
-      return -1;
+      return status;
     }
     zxlogf(INFO, "Received GPIO Test Input Interrupt");
-    uint8_t out;
-    gpios_[GPIO_LED].Read(&out);
-    gpios_[GPIO_LED].Write(!out);
+    fidl::WireResult read_result = gpios_[GPIO_LED]->Read();
+    if (!read_result.ok()) {
+      zxlogf(ERROR, "Failed to send Read request to gpio %u: %s", GPIO_LED,
+             read_result.status_string());
+      return read_result.status();
+    }
+    if (read_result->is_error()) {
+      zxlogf(ERROR, "Failed to read gpio %u: %s", GPIO_LED,
+             zx_status_get_string(read_result->error_value()));
+      return read_result->error_value();
+    }
+    {
+      fidl::WireResult result = gpios_[GPIO_LED]->Write(!read_result.value()->value);
+      if (!result.ok()) {
+        zxlogf(ERROR, "Failed to send Write request to gpio %u: %s", GPIO_LED,
+               result.status_string());
+        return result.status();
+      }
+      if (result->is_error()) {
+        zxlogf(ERROR, "Failed to write to gpio %u: %s", GPIO_LED,
+               zx_status_get_string(result->error_value()));
+        return result->error_value();
+      }
+    }
     sleep(1);
   }
 
-  return 0;
+  return ZX_OK;
 }
 
 zx_status_t GpioTest::Create(void* ctx, zx_device_t* parent) {
@@ -101,7 +175,8 @@ zx_status_t GpioTest::Init() {
   gpio_count_ = DdkGetFragmentCount();
 
   fbl::AllocChecker ac;
-  gpios_ = fbl::Array(new (&ac) ddk::GpioProtocolClient[gpio_count_], gpio_count_);
+  gpios_ = fbl::Array(new (&ac) fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>[gpio_count_],
+                      gpio_count_);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -114,10 +189,14 @@ zx_status_t GpioTest::Init() {
   }
 
   for (uint32_t i = 0; i < gpio_count_; i++) {
-    auto status = device_get_protocol(fragments[i].device, ZX_PROTOCOL_GPIO, &gpios_[i]);
-    if (status != ZX_OK) {
-      return status;
+    zx::result client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+        parent(), fragments[i].name);
+    if (client.is_error()) {
+      zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", fragments[i].name,
+             client.status_string());
+      return client.status_value();
     }
+    gpios_[i].Bind(std::move(client.value()));
   }
 
   auto status = DdkAdd("gpio-test", DEVICE_ADD_NON_BINDABLE);

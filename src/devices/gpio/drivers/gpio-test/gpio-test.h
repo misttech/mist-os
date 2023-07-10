@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_GPIO_DRIVERS_GPIO_TEST_GPIO_TEST_H_
 #define SRC_DEVICES_GPIO_DRIVERS_GPIO_TEST_GPIO_TEST_H_
 
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/zx/interrupt.h>
 #include <threads.h>
 
@@ -38,9 +38,9 @@ class GpioTest : public GpioTestType {
 
   zx_status_t Init();
   int OutputThread();
-  int InterruptThread();
+  zx_status_t InterruptThread();
 
-  fbl::Array<ddk::GpioProtocolClient> gpios_;
+  fbl::Array<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpios_;
 
   uint32_t gpio_count_;
   thrd_t output_thread_;
