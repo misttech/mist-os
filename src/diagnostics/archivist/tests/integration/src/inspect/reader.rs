@@ -294,7 +294,7 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
     let accessor = connect_to_feedback_accessor(&instance);
     retrieve_and_validate_results(
         accessor,
-        vec![r#"test_component:root:array\:0x15"#],
+        vec![r"test_component:root:array\:0x15"],
         &PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN,
         3,
     )
@@ -376,7 +376,7 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
     let accessor = connect_to_lowpan_accessor(&instance);
     retrieve_and_validate_results(
         accessor,
-        vec![r#"test_component:root:array\:0x15"#],
+        vec![r"test_component:root:array\:0x15"],
         &PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN,
         3,
     )
