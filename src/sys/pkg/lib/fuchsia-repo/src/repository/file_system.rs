@@ -485,9 +485,53 @@ async fn set_blob_read_only(path: &Utf8Path) -> Result<()> {
     Ok(())
 }
 
+// Performs a Copy-on-Write (reflink) of the file at `src_path` to `dst_path`.
+#[cfg(target_os = "linux")]
+async fn reflink(src_path: &Utf8Path, dst_path: &Utf8Path) -> Result<(), std::io::Error> {
+    use std::os::fd::AsRawFd;
+
+    let src = async_fs::File::open(src_path).await?;
+    let dst = async_fs::File::create(dst_path).await?;
+
+    // Safe because this is a synchronous syscall and the raw fds don't outlive the call.
+    let res = unsafe { libc::ioctl(dst.as_raw_fd(), libc::FICLONE, src.as_raw_fd()) };
+
+    match res {
+        -1 => {
+            let err = std::io::Error::last_os_error();
+
+            drop(dst);
+            let _ = async_fs::remove_file(dst_path).await;
+
+            match err.raw_os_error().unwrap() {
+                // The filesystem does not support reflinks.
+                libc::EOPNOTSUPP |
+                // src_path and dst_path are different filesystems.
+                libc::EXDEV => {
+                    Err(std::io::Error::new(std::io::ErrorKind::Unsupported, err))
+                }
+                _ => Err(err),
+            }
+        }
+        _ => Ok(()),
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+async fn reflink(_src_path: &Utf8Path, _dst_path: &Utf8Path) -> Result<(), std::io::Error> {
+    use libc as _;
+    Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
+}
+
 async fn copy_blob(src: &Utf8Path, dst: &Utf8Path) -> Result<()> {
     let temp_path = create_temp_file(dst).await?;
-    async_fs::copy(src, &temp_path).await?;
+    match reflink(src, (*temp_path).try_into()?).await {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::Unsupported => {
+            async_fs::copy(src, &temp_path).await?;
+        }
+        Err(e) => return Err(anyhow!(e)),
+    }
     temp_path.persist(dst)?;
 
     set_blob_read_only(dst).await
