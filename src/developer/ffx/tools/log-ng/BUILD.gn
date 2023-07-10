@@ -27,12 +27,15 @@ rustc_library("lib") {
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:serde",
     "//third_party/rust_crates:thiserror",
   ]
 
   sources = [
     "src/error.rs",
     "src/lib.rs",
+    "src/spam_filter.rs",
     "src/testing_utils.rs",
   ]
 

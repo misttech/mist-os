@@ -22,6 +22,7 @@ use log_command::{
 };
 
 mod error;
+pub mod spam_filter;
 #[cfg(test)]
 mod testing_utils;
 

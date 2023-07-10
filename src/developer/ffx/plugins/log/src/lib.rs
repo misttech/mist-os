@@ -30,7 +30,7 @@ use moniker::AbsoluteMoniker;
 use std::{fs, iter::Iterator, str::FromStr, sync::Arc, time::SystemTime};
 
 use ffx_log_frontend::{RemoteDiagnosticsBridgeProxyWrapper, StreamDiagnostics};
-mod spam_filter;
+use ffx_tool_log_ng::spam_filter;
 
 type ArchiveIteratorResult = Result<LogEntry, ArchiveIteratorError>;
 const COLOR_CONFIG_NAME: &str = "log_cmd.color";
@@ -163,7 +163,11 @@ impl LogFilterCriteria {
     fn data_matches_spam(&self, data: &LogsData, msg: &str) -> bool {
         match &self.spam_filter {
             None => false,
-            Some(f) => f.is_spam(data.metadata.file.as_ref(), data.metadata.line, msg),
+            Some(f) => f.is_spam(
+                data.metadata.file.as_ref().map(|value| value.as_str()),
+                data.metadata.line,
+                msg,
+            ),
         }
     }
 
@@ -782,7 +786,7 @@ mod test {
     }
 
     impl spam_filter::LogSpamFilter for FakeLogSpamFilter {
-        fn is_spam(&self, _: Option<&String>, _: Option<u64>, _: &str) -> bool {
+        fn is_spam(&self, _: Option<&str>, _: Option<u64>, _: &str) -> bool {
             self.is_spam_result
         }
     }
@@ -1801,7 +1805,7 @@ mod test {
             last_message_was_spam: Cell<bool>,
         }
         impl LogSpamFilter for AlternatingSpamFilter {
-            fn is_spam(&self, _file: Option<&String>, _line: Option<u64>, _msg: &str) -> bool {
+            fn is_spam(&self, _file: Option<&str>, _line: Option<u64>, _msg: &str) -> bool {
                 let prev = self.last_message_was_spam.get();
                 self.last_message_was_spam.set(!prev);
                 prev

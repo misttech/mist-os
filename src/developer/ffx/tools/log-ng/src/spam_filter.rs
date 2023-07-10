@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub use log_command::log_formatter::LogSpamFilter;
 use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -88,11 +89,11 @@ impl LogSpamCache {
 
     fn get_spam_regex_list(
         &self,
-        file: Option<&String>,
+        file: Option<&str>,
         line: Option<u64>,
     ) -> Option<&Vec<LogSpamRegex>> {
         let default_file = "".to_string();
-        let file = file.unwrap_or(&default_file);
+        let file = file.unwrap_or(&default_file.as_str());
         let line = line.unwrap_or_default();
 
         let line_num_to_regex_vector_map = self.map.get(file)?;
@@ -111,12 +112,8 @@ impl LogSpamFilterImpl {
     }
 }
 
-pub trait LogSpamFilter {
-    fn is_spam(&self, file: Option<&String>, line: Option<u64>, msg: &str) -> bool;
-}
-
 impl LogSpamFilter for LogSpamFilterImpl {
-    fn is_spam(&self, file: Option<&String>, line: Option<u64>, msg: &str) -> bool {
+    fn is_spam(&self, file: Option<&str>, line: Option<u64>, msg: &str) -> bool {
         let regex_list = self.cache.get_spam_regex_list(file, line);
         match regex_list {
             Some(l) => l.iter().any(|r| r.re.is_match(msg)),
@@ -233,9 +230,9 @@ mod test {
 
         let filter = LogSpamFilterImpl::new(spam_list);
 
-        assert!(filter.is_spam(Some("file_a".to_string()).as_ref(), Some(1), "regex_a"));
-        assert!(filter.is_spam(Some("file_a".to_string()).as_ref(), Some(1), "regex_b"));
-        assert!(filter.is_spam(Some("file_b".to_string()).as_ref(), Some(1), "arbitrary string"));
+        assert!(filter.is_spam(Some("file_a"), Some(1), "regex_a"));
+        assert!(filter.is_spam(Some("file_a"), Some(1), "regex_b"));
+        assert!(filter.is_spam(Some("file_b"), Some(1), "arbitrary string"));
         assert!(filter.is_spam(None, None, "sourceless_regex"));
     }
 }
