@@ -100,6 +100,10 @@ struct Driver {
   template <typename IoProvider>
   void EnableTxInterrupt(IoProvider& io) {}
 
+  // Enable receive interrupts so Interrupt will be called when RxReady().
+  template <typename IoProvider>
+  void EnableRxInterrupt(IoProvider& io) {}
+
   // Set the UART up to deliver interrupts.  This is called after Init.
   template <typename IoProvider>
   void InitInterrupt(IoProvider& io) {}

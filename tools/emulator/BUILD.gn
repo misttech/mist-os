@@ -15,6 +15,20 @@ group("tests") {
   }
 }
 
+group("kernel") {
+  testonly = true
+
+  # qemu_boot_shim must be interpreted in the default toolchain.
+  if (current_toolchain == default_toolchain) {
+    deps = qemu_boot_shim.deps
+    metadata = {
+      test_runtime_deps = [ qemu_boot_shim.path ]
+    }
+  } else {
+    deps = [ ":kernel($default_toolchain)" ]
+  }
+}
+
 # Currently, we only support working with QEMU or FEMU on Linux.
 if (is_linux) {
   # The infrastructure does not provide a way for host tests to access
@@ -63,13 +77,6 @@ if (is_linux) {
       "--depfile",
       rebase_path(depfile, root_build_dir),
     ]
-  }
-
-  host_test_data("kernel") {
-    visibility = [ ":*" ]
-
-    deps = qemu_boot_shim.deps
-    sources = [ qemu_boot_shim.path ]
   }
 
   generated_file("buildinfo.ini") {

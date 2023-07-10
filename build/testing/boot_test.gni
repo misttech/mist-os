@@ -67,7 +67,11 @@ template("_boot_test") {
     ]
 
     metadata = {
-      test_runtime_deps = inputs + outputs
+      test_runtime_deps = []
+      if (defined(invoker.metadata)) {
+        forward_variables_from(invoker.metadata, "*")
+      }
+      test_runtime_deps += inputs + outputs
     }
   }
 
@@ -184,7 +188,7 @@ template("_boot_test") {
 #    - Type: int
 #    - Default: 600 (10 minutes)
 #
-#  * visibility, assert_no_deps
+#  * assert_no_deps, metadata, visibility
 #    - Optional: Usual GN meanings.
 #
 template("boot_test") {

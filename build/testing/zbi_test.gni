@@ -40,7 +40,7 @@ import("//build/zbi/zbi_input.gni")
 #     specifying QEMU kernel + ZBI initrd, rather than allowing QEMU kernel to
 #     be supplied here.
 #
-#   deps, data_deps, replace, complete, compress
+#   deps, data_deps, replace, complete, compress, metadata
 #     See //build/zbi/zbi.gni.
 template("zbi_test") {
   main_target = target_name
@@ -167,6 +167,7 @@ template("zbi_test") {
                            [
                              "assert_no_deps",
                              "device_types",
+                             "metadata",
                              "qemu_kernel",
                              "timeout",
                            ])

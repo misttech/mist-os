@@ -65,18 +65,21 @@ size_t Cbuf::WriteChar(char c) {
   return 1;
 }
 
-zx::result<char> Cbuf::ReadChar(bool block) {
+zx::result<Cbuf::ReadContext> Cbuf::ReadCharWithContext(bool block) {
   while (true) {
     {
       AutoSpinLock guard(&lock_);
-
       if (!Empty()) {
-        char c = buf_[tail_];
+        ReadContext res = {
+            .c = buf_[tail_],
+            .transitioned_from_full = Full(),
+        };
+
         IncPointer(&tail_, 1);
         if (Empty()) {
           event_.Unsignal();
         }
-        return zx::ok(c);
+        return zx::ok(res);
       }
 
       // Because the signal state does not 100% match the buffer state, it is critical that the

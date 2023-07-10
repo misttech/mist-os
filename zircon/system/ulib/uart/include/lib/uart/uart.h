@@ -476,6 +476,12 @@ class KernelDriver {
     return uart_.Read(io_);
   }
 
+  template <typename LockPolicy = DefaultLockPolicy>
+  void EnableRxInterrupt() {
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
+    uart_.EnableRxInterrupt(io_);
+  }
+
  private:
   Lock<KernelDriver> lock_;
   Waiter waiter_ TA_GUARDED(lock_);

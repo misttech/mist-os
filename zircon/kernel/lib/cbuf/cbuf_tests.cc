@@ -8,6 +8,10 @@
 #include <lib/unittest/unittest.h>
 #include <zircon/errors.h>
 
+#include <cstddef>
+
+#include <ktl/array.h>
+
 namespace {
 
 bool Constructor() {
@@ -38,17 +42,18 @@ bool ReadWrite() {
   ASSERT_EQ(ZX_ERR_SHOULD_WAIT, cbuf.ReadChar(false).status_value());
 
   // Write some characters.
-  char data[] = {'A', 'B', 'C'};
+  ktl::array data = {'A', 'B', 'C'};
   for (char c : data) {
     ASSERT_EQ(1U, cbuf.WriteChar(c));
   }
   ASSERT_TRUE(cbuf.Full());
 
   // Read them back.
-  for (char c : data) {
-    zx::result<char> result = cbuf.ReadChar(true);
+  for (size_t i = 0; i < data.size(); ++i) {
+    auto result = cbuf.ReadCharWithContext(true);
     ASSERT_TRUE(result.is_ok());
-    ASSERT_EQ(result.value(), c);
+    ASSERT_EQ(result->transitioned_from_full, i == 0);
+    ASSERT_EQ(result->c, data[i]);
   }
   ASSERT_FALSE(cbuf.Full());
 

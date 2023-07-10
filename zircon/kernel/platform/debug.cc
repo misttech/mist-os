@@ -228,6 +228,7 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
           Guard<MonitoredSpinLock, NoIrqSave> lock(&spinlock, SOURCE_TAG);
           mask_tx_interrupts();
         }
+
         // Do not signal the event while holding the sync capability, this could lead
         // to invalid lock dependencies.
         waiter.Wake();
@@ -292,11 +293,25 @@ int platform_dgetc(char* c, bool wait) {
     return legacy_platform_dgetc(c, wait);
   }
 
-  auto read = rx_queue.ReadChar(wait);
+  auto read = rx_queue.ReadCharWithContext(wait);
 
   // 1 => Character read.
   if (read.is_ok()) {
-    *c = *read;
+    // This is safe because:
+    //   * The RX IRQ handler is holding the UART lock while the queue is being inspected (Full) and
+    //     the RX IRQ is being disabled.
+    //   * The Read path, which is the only path which can transition the queue from full to not
+    //     full, is not holding the the UART lock while inspecting, but the operations is deferred
+    //     and acquires the lock before enabling interrupts.
+    //
+    // As a consequence, the IRQ RX Interrupt cannot be enabled by this path, until the RX IRQ
+    // Handler, has disabled it and released the lock. This means there is no possible interleaving,
+    // where both paths observe full queue, and we enable the RX IRQ followed by the IRQ RX Handler
+    // disabling them.
+    if (read->transitioned_from_full) {
+      gUart.Visit([](auto& driver) { driver.template EnableRxInterrupt<IrqSave>(); });
+    }
+    *c = read->c;
     return 1;
   }
 

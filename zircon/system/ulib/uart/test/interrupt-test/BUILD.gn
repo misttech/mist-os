@@ -1,0 +1,61 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/go/go_library.gni")
+import("//build/go/go_test.gni")
+import("//build/testing/kernel_zbi_test.gni")
+import("//build/testing/zbi_test.gni")
+import("//build/testing/zbi_test_executable.gni")
+
+group("interrupt-test") {
+  testonly = true
+  deps = []
+  if (host_os == "linux") {
+    deps += [ ":uart-interrupt-host-test($host_toolchain)" ]
+  }
+}
+
+if (toolchain_variant.base == default_toolchain) {
+  zbi_test_executable("uart-interrupt-test") {
+    sources = [ "uart-interrupt-test.cc" ]
+    deps = [
+      "//src/zircon/testing/standalone-test",
+      "//zircon/system/ulib/zx",
+      "//zircon/system/ulib/zxtest",
+    ]
+  }
+
+  zbi = "$target_out_dir/uart-interrupt-test-zbi.zbi"
+  kernel_zbi_test("uart-interrupt-test-zbi") {
+    deps = [ ":uart-interrupt-test($default_toolchain)" ]
+
+    # TODO(fxbug.dev/115209): This ZBI is not actually a ZBI test, but relies
+    # on the specification just for the `images` metadata implicitly set by
+    # `zbi_test()` and not `zbi()`. Investigate whether we can have `zbi()`
+    # targets set this metadata and update this target accordingly - and
+    # disable the ZBI from being booted as a ZBI test for now.
+    device_types = []
+
+    metadata = {
+      test_runtime_deps = [ zbi ]
+    }
+  }
+
+  # Assert that the zbi path was indeed correct.
+  zbi_outputs = get_target_outputs(":uart-interrupt-test-zbi.zbi")
+  assert(zbi_outputs + [ zbi ] - [ zbi ] != zbi_outputs)
+}
+
+if (is_host) {
+  go_library("lib") {
+    testonly = true
+    sources = [ "uart_interrupt_host_test.go" ]
+    deps = [ "//tools/emulator/emulatortest" ]
+  }
+
+  go_test("uart-interrupt-host-test") {
+    library = ":lib"
+    non_go_deps = [ ":uart-interrupt-test-zbi($default_toolchain)" ]
+  }
+}

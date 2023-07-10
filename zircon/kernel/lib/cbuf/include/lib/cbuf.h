@@ -19,6 +19,14 @@
 
 class Cbuf {
  public:
+  struct ReadContext {
+    // Char read from the buffer.
+    char c;
+
+    // Whether the queue was full before reading.
+    bool transitioned_from_full;
+  };
+
   /**
    * Constructor
    *
@@ -52,7 +60,18 @@ class Cbuf {
    *
    * If |wait| is false and no character is ready, ZX_ERR_SHOULD_WAIT is returned.
    */
-  zx::result<char> ReadChar(bool block);
+  zx::result<char> ReadChar(bool block) {
+    if (auto result = ReadCharWithContext(block); result.is_ok()) {
+      return zx::ok(result->c);
+    } else {
+      return result.take_error();
+    }
+  }
+
+  /**
+   * Same as ReadChar(bool block), but returns |ReadContext| instead of just the read character.
+   **/
+  zx::result<ReadContext> ReadCharWithContext(bool block);
 
   size_t WriteChar(char c);
 
