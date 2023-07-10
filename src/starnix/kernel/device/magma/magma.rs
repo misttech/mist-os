@@ -70,6 +70,11 @@ pub fn create_drm_image(
     magma_status_t,
 > {
     let flags = create_info.flags as u32;
+    const SUPPORTED_FLAGS: u32 =
+        MAGMA_IMAGE_CREATE_FLAGS_VULKAN_USAGE | MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE;
+    if (flags & !SUPPORTED_FLAGS) != 0 {
+        return Err(MAGMA_STATUS_INVALID_ARGS);
+    }
     let use_scenic = (flags & MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE) != 0;
 
     let vk_format = drm_format_to_vulkan_format(create_info.drm_format as u32)
