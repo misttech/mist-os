@@ -20,6 +20,7 @@ rustc_library("moniker") {
     "//src/security/lib/scrutiny/*",
     "//src/sys/component_manager/*",
     "//src/sys/lib/cm_moniker/*",
+    "//src/sys/lib/component-events/*",
     "//src/sys/lib/component_debug/*",
     "//src/sys/lib/component_id_index/*",
     "//src/sys/lib/elf_runner/*",

@@ -9,8 +9,9 @@ use {
     },
     anyhow::Error,
     fidl_fuchsia_component as fcomponent,
+    moniker::AbsoluteMoniker,
     regex::RegexSet,
-    std::{convert::TryFrom, fmt},
+    std::{convert::TryFrom, fmt, str::FromStr},
     thiserror::Error,
 };
 
@@ -106,7 +107,7 @@ impl RawFieldMatcher<String> for CapabilityNameMatcher {
 #[derive(Clone, Debug)]
 pub enum MonikerMatcher {
     Regex(RegexSet),
-    Direct(Vec<String>),
+    Direct(Vec<AbsoluteMoniker>),
 }
 
 impl MonikerMatcher {
@@ -123,7 +124,8 @@ impl MonikerMatcher {
         S: AsRef<str>,
         I: IntoIterator<Item = S>,
     {
-        let monikers = monikers.into_iter().map(|m| m.as_ref().to_string()).collect();
+        let monikers =
+            monikers.into_iter().map(|m| AbsoluteMoniker::try_from(m.as_ref()).unwrap()).collect();
         Self::Direct(monikers)
     }
 }
@@ -141,9 +143,13 @@ impl RawFieldMatcher<String> for MonikerMatcher {
     const NAME: &'static str = "target_monikers";
 
     fn matches(&self, other: &String) -> bool {
+        let moniker_result = AbsoluteMoniker::from_str(other);
         match self {
             Self::Regex(regex_set) => regex_set.is_match(other),
-            Self::Direct(monikers) => monikers.iter().any(|m| m == other),
+            Self::Direct(monikers) => match moniker_result {
+                Ok(try_moniker) => monikers.iter().any(|m| m == &try_moniker),
+                Err(_) => false,
+            },
         }
     }
 }
@@ -263,12 +269,12 @@ impl EventMatcher {
         self
     }
 
-    /// The expected target moniker.
+    /// The expected target moniker. Will panic if the moniker is invalid.
     pub fn moniker(self, moniker: impl Into<String>) -> Self {
         self.monikers(&[moniker.into()])
     }
 
-    /// The expected target monikers.
+    /// The expected target monikers. Will panic if any moniker is invalid.
     pub fn monikers<I, S>(mut self, monikers: I) -> Self
     where
         S: AsRef<str>,
