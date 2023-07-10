@@ -172,8 +172,10 @@ class Runner {
   virtual void StartWorkflow(Scope& scope) {}
   virtual void FinishWorkflow() {}
 
-  // Collects the current status, labels it with the given |reason|, and sends it all attached
-  //|Monitor|s.
+  // Labels the current status with the given `reason`, and sends it all attached `Monitor`s.
+  virtual void UpdateMonitorsWithStatus(UpdateReason reason, Status status);
+
+  // Like `UpdateMonitorsWithStatus`, but provides the status via `CollectStatus`.
   void UpdateMonitors(UpdateReason reason);
 
  private:
