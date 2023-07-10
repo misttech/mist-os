@@ -158,6 +158,7 @@ Sampler::Sampler(ResourceRecycler* resource_recycler, vk::Format format, vk::Fil
   sampler_info.addressModeW = vk::SamplerAddressMode::eClampToEdge;
 
   sampler_ = ESCHER_CHECKED_VK_RESULT(vk_device().createSampler(sampler_info));
+  FX_CHECK(sampler_);
 }
 
 Sampler::~Sampler() {
