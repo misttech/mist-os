@@ -5,7 +5,10 @@
 // which connects to this injected server, tests it and passes back result using
 // `fuchsia.test.Suite`
 {
-    include: [ "syslog/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         {
             name: "echo_server",

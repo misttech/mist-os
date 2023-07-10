@@ -25,5 +25,10 @@
             from: "parent",
             to: "#fuzz_test_runner",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#fuzz_test_runner" ],
+        },
     ],
 }

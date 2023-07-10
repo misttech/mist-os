@@ -5,6 +5,7 @@
 // to be executed in parallel to succeed as echo server will only reply back once it gets
 // 5 requests.
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "echo_server",

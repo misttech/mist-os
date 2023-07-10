@@ -70,5 +70,10 @@
             from: "self",
             to: [ "#starnix-tests" ],
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#starnix-tests" ],
+        },
     ],
 }

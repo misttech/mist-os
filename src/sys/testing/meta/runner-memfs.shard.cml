@@ -16,4 +16,11 @@
             storage_id: "static_instance_id_or_moniker",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#runner_memfs" ],
+        },
+    ],
 }

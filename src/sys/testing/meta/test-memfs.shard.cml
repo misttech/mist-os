@@ -45,5 +45,13 @@
             from: "parent",
             to: "#fxfs_data",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [
+                "#fxfs_data",
+                "#test_tmpfs",
+            ],
+        },
     ],
 }

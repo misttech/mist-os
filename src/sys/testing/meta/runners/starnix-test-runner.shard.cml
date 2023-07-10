@@ -16,6 +16,7 @@
     offer: [
         {
             protocol: [
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",

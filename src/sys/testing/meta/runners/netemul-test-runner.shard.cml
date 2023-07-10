@@ -10,7 +10,10 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.process.Launcher",
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.process.Launcher",
+            ],
             from: "parent",
             to: [ "#netemul_test_runner" ],
         },

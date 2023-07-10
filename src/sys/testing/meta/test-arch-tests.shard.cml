@@ -84,5 +84,10 @@
             from: "self",
             to: [ "#test-arch-tests" ],
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#test-arch-tests" ],
+        },
     ],
 }

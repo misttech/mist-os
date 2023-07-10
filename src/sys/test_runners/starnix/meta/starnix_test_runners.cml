@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    include: [ "inspect/offer.shard.cml" ],
+
     // This component bundles all the different test runners starnix uses, and exposes all their
     // runner capabilities. This makes it easier for the test runner component to include all the
     // starnix test runners.

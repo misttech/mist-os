@@ -8,4 +8,11 @@
             url: "fuchsia-pkg://fuchsia.com/stress-test-runner#meta/stress-test-runner.cm",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#stress_test_runner" ],
+        },
+    ],
 }

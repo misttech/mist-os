@@ -27,5 +27,10 @@
             as: "fuchsia.diagnostics.RealLegacyMetricsArchiveAccessor",
             to: [ "#inspect_test_runner" ],
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#inspect_test_runner" ],
+        },
     ],
 }

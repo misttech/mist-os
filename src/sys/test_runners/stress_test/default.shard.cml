@@ -20,6 +20,13 @@
             from: "framework",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#actors" ],
+        },
+    ],
     expose: [
         {
             protocol: "fuchsia.test.Suite",

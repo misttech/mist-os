@@ -320,5 +320,10 @@
             to: [ "#system-tests" ],
             rights: [ "r*" ],
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
     ],
 }
