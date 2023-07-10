@@ -5,6 +5,7 @@
 // This realm contains the test cases for fuchsia_component_v2_test.
 {
     include: [
+        "inspect/offer.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
     ],

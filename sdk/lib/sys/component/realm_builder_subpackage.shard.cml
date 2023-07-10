@@ -9,4 +9,11 @@
             url: "fuchsia-component-test#meta/realm_builder_server.cm",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#realm_builder_server" ],
+        },
+    ],
 }

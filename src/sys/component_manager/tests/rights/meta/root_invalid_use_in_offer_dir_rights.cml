@@ -5,6 +5,7 @@
 // correctly working and that rights that are filtered are correctly being opened with lower
 // privileges in the use_dir_rights child.
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "use_dir_rights",

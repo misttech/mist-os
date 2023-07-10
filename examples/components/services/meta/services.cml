@@ -31,9 +31,12 @@
             to: [ "#bank_branch" ],
         },
 
-        // Logging for all components.
+        // Diagnostics for all components.
         {
-            protocol: "fuchsia.logger.LogSink",
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
             from: "parent",
             to: [
                 "#account_providers",

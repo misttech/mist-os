@@ -24,5 +24,10 @@
             as: "fuchsia.component.resolver.RealmBuilder",
             to: [ "#realm_builder" ],
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#realm_builder_server" ],
+        },
     ],
 }

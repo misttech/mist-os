@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 // Constructs an intermediate node that attempts to increase its rights to the read only directory.
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "expose_dir_rights",

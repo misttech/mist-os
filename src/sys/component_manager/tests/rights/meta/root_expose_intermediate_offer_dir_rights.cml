@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 // Same as a normal offer directory rights except it utilizes the intermediate expose directory.
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "use_dir_rights",

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 // Intermediate offer that attempts to increase its permissions on the read only directory.
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "use_dir_rights",

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 // Verifies that rights are passed correctly the "as" keyword is used.
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "use_dir_rights",

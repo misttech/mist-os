@@ -6,6 +6,7 @@
 // this realm.
 {
     include: [
+        "inspect/offer.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
     ],

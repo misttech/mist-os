@@ -4,6 +4,7 @@
 // Passes routes from the expose across to a child which attempts to increase its rights on
 // the read only directory.
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "use_dir_rights",

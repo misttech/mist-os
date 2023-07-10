@@ -5,7 +5,10 @@
 // Tests that a component can be launched in an arbitrary realm.
 // In this test we will launch it inside child_realm.
 {
-    include: [ "//src/sys/test_runners/rust/default.shard.cml" ],
+    include: [
+        "//src/sys/test_runners/rust/default.shard.cml",
+        "inspect/offer.shard.cml",
+    ],
     program: {
         binary: "bin/arbitrary_realm_test_bin",
     },

@@ -18,7 +18,7 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
+            protocol: "fuchsia.inspect.InspectSink",
             from: "parent",
             to: [ "#realm_builder_server" ],
         },
@@ -27,7 +27,7 @@
         {
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.logger.LogSink",
+                "fuchsia.inspect.InspectSink",
             ],
             from: "parent",
             to: [ "#realm_builder" ],

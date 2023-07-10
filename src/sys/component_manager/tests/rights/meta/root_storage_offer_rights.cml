@@ -4,6 +4,7 @@
 // Passes a read only storage capability to a child, this is invalid and so should not be mapped
 // into the child process as it is expecting read write.
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "use_storage",

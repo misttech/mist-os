@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 // Integration test realm that hosts a trigger component.
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "trigger",

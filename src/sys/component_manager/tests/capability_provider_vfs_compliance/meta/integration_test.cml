@@ -5,6 +5,7 @@
     include: [
         // Run as a non-hermetic system-ish test because we can't nest fuchsia.boot/fuchsia.kernel capabilities.
         "//src/sys/test_runners/rust/default.shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {

@@ -15,6 +15,7 @@
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.HypervisorResource",

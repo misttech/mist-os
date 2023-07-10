@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 // Passes a valid read write storage capability to a child, this is valid.
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "use_storage",

@@ -7,6 +7,7 @@
     // [START_EXCLUDE]
     include: [
         "//src/sys/test_runners/rust/default.shard.cml",
+        "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
 
@@ -37,7 +38,10 @@
     // Capabilities required by components under test.
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
             from: "parent",
             to: "#echo_server",
         },

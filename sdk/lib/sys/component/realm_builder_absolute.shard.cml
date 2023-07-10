@@ -9,6 +9,16 @@
             url: "fuchsia-pkg://fuchsia.com/test_manager#meta/realm_builder_server.cm",
         },
     ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent",
+            to: [ "#realm_builder_server" ],
+        },
+    ],
     facets: {
         "fuchsia.test": {
             "deprecated-allowed-packages": [ "test_manager" ],

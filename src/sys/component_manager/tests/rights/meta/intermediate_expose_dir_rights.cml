@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 // Constructs an intermediate node that reduces the rights of the /read_only_after_scoped directory.
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "expose_dir_rights",

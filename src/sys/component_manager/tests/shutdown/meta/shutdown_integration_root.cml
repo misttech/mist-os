@@ -4,6 +4,7 @@
 
 // Realm for the shutdown integration test, it requests the SystemController protocol
 {
+    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "power_switch",
