@@ -33,4 +33,11 @@
             url: "fuchsia-pkg://fuchsia.com/virtual_keyboard_manager#meta/virtual_keyboard_manager.cm",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#virtual_keyboard_manager" ],
+        },
+    ],
 }

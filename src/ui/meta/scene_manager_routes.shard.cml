@@ -73,6 +73,14 @@
             to: [ "#scene_manager" ],
             dependency: "weak",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [
+                "#scene_manager",
+                "#sensor-config",
+            ],
+        },
     ],
     expose: [
         {

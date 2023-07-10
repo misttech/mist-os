@@ -51,6 +51,7 @@
         // scenic_base_routes.shard.cml.
         {
             protocol: [
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.media.ProfileProvider",
                 "fuchsia.metrics.MetricEventLoggerFactory",
             ],

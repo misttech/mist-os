@@ -4,6 +4,7 @@
 {
     include: [
         "//sdk/lib/inspect/client.shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {

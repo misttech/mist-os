@@ -9,4 +9,11 @@
             url: "#meta/virtual_keyboard_manager.cm",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#virtual_keyboard_manager" ],
+        },
+    ],
 }

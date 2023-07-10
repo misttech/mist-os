@@ -19,6 +19,11 @@
             from: "#scenic",
             to: "#scene-provider",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#scene-provider" ],
+        },
     ],
     expose: [
         {

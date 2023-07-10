@@ -34,6 +34,7 @@
         {
             protocol: [
                 "fuchsia.feedback.LastRebootInfoProvider",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.settings.Accessibility",
             ],

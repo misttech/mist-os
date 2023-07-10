@@ -60,6 +60,15 @@
             from: "#scenic",
             to: [ "#input-helper" ],
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [
+                "#input-helper",
+                "#input-synthesis",
+                "#scene_manager",
+            ],
+        },
     ],
     expose: [
         {

@@ -9,4 +9,11 @@
             url: "#meta/text_manager.cm",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#text_manager" ],
+        },
+    ],
 }

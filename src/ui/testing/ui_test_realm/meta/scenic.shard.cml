@@ -40,6 +40,15 @@
             from: "#mock_cobalt",
             to: [ "#scenic" ],
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [
+                "#display-coordinator-connector",
+                "#mock_cobalt",
+                "#scenic",
+            ],
+        },
     ],
     expose: [
         {
