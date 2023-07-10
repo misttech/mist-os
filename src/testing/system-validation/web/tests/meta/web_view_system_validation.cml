@@ -6,6 +6,7 @@
 {
     include: [
         "//src/testing/system-validation/web/tests/meta/web_system_validation_base.cml",
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {

@@ -41,6 +41,14 @@
             from: "parent",
             to: "#subpackaged_gtest_runner",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [
+                "#lib_loader_cache",
+                "#subpackaged_gtest_runner",
+            ],
+        },
     ],
     environments: [
         {

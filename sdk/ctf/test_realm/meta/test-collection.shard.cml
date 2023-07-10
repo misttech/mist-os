@@ -89,5 +89,10 @@
             from: "self",
             to: [ "#cts-tests" ],
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#cts-tests" ],
+        },
     ],
 }

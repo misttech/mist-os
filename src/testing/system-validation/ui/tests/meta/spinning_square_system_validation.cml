@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/testing/system-validation/ui/tests/meta/system_validation_base.cml" ],
+    include: [
+        "//src/testing/system-validation/ui/tests/meta/system_validation_base.cml",
+        "inspect/offer.shard.cml",
+    ],
     children: [
         {
             name: "sample-app",

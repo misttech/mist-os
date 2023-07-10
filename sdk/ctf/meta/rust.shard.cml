@@ -36,6 +36,14 @@
             from: "#lib_loader_cache",
             to: "#subpackaged_rust_test_runner",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [
+                "#lib_loader_cache",
+                "#subpackaged_rust_test_runner",
+            ],
+        },
     ],
     environments: [
         {

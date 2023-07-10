@@ -25,6 +25,7 @@
                 "fuchsia.feedback.ComponentDataRegister",
                 "fuchsia.feedback.CrashReportingProductRegister",
                 "fuchsia.fonts.Provider",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.logger.LogSink",
                 "fuchsia.media.Audio",
