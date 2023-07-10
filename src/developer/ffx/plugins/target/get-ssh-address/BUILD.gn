@@ -14,9 +14,11 @@ ffx_plugin("ffx_get_ssh_address") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/timeout:lib",
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:async-trait",
   ]
 
   args_sources = [ "src/args.rs" ]

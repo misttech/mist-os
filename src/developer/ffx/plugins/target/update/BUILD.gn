@@ -12,12 +12,14 @@ ffx_plugin("ffx_update") {
   deps = [
     "//sdk/fidl/fuchsia.update:fuchsia.update_rust",
     "//sdk/fidl/fuchsia.update.channelcontrol:fuchsia.update.channelcontrol_rust",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-url",
     "//src/sys/pkg/fidl/fuchsia.update.installer:fuchsia.update.installer_rust",
     "//src/sys/pkg/lib/fidl-fuchsia-update-ext",
     "//src/sys/pkg/lib/fidl-fuchsia-update-installer-ext",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
   ]
 

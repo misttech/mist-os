@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context as _, Result};
+use async_trait::async_trait;
 use errors::FfxError;
-use ffx_core::ffx_plugin;
 use ffx_wait_args::WaitCommand;
+use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_developer_ffx::{DaemonError, TargetCollectionProxy, TargetMarker, TargetQuery};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
@@ -14,11 +15,26 @@ use std::time::Duration;
 use thiserror::Error;
 use timeout::timeout;
 
-#[ffx_plugin(TargetCollectionProxy = "daemon::protocol")]
-pub async fn wait_for_device(
-    target_collection: TargetCollectionProxy,
+#[derive(FfxTool)]
+pub struct WaitTool {
+    #[command]
     cmd: WaitCommand,
-) -> Result<()> {
+    #[with(daemon_protocol())]
+    target_collection_proxy: TargetCollectionProxy,
+}
+
+fho::embedded_plugin!(WaitTool);
+
+#[async_trait(?Send)]
+impl FfxMain for WaitTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        wait_for_device(self.target_collection_proxy, self.cmd).await?;
+        Ok(())
+    }
+}
+
+async fn wait_for_device(target_collection: TargetCollectionProxy, cmd: WaitCommand) -> Result<()> {
     let ffx: ffx_command::Ffx = argh::from_env();
     let knock_fut = async {
         loop {

@@ -17,7 +17,9 @@ ffx_plugin("ffx_flash") {
     "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fastboot:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/ssh:lib",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:termion",
     "//third_party/rust_crates:tracing",
   ]

@@ -2,14 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context as _, Result};
-use ffx_core::ffx_plugin;
+use anyhow::{Context, Result};
+use async_trait::async_trait;
 use ffx_target_set_preferred_ssh_address_args::SetPreferredSshAddressCommand;
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_net as fnet;
 
-#[ffx_plugin()]
-pub async fn set_preferred_ssh_address(
+#[derive(FfxTool)]
+pub struct SetPreferredSshAddressTool {
+    #[command]
+    cmd: SetPreferredSshAddressCommand,
+    target_proxy: ffx::TargetProxy,
+}
+
+fho::embedded_plugin!(SetPreferredSshAddressTool);
+
+#[async_trait(?Send)]
+impl FfxMain for SetPreferredSshAddressTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        set_preferred_ssh_address(self.target_proxy, self.cmd).await?;
+        Ok(())
+    }
+}
+
+async fn set_preferred_ssh_address(
     target_proxy: ffx::TargetProxy,
     cmd: SetPreferredSshAddressCommand,
 ) -> Result<()> {
@@ -47,7 +65,7 @@ mod tests {
     const IPV4_ADDRESS: fnet::IpAddress = fidl_ip!("192.168.0.1");
 
     fn setup_fake_target_server(expected_ip: ffx::TargetIp) -> ffx::TargetProxy {
-        setup_fake_target_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             ffx::TargetRequest::SetPreferredSshAddress { ip, responder } => {
                 assert_eq!(expected_ip, ip);
                 responder.send(Ok(())).expect("set_preferred_ssh_address failed");

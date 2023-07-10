@@ -3,20 +3,34 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use errors::ffx_bail;
-use ffx_core::ffx_plugin;
 use ffx_fastboot::common::{cmd::OemFile, from_manifest};
 use ffx_flash_args::FlashCommand;
 use ffx_ssh::SshKeyFiles;
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::FastbootProxy;
-use std::io::{stdout, Write};
+use std::io::Write;
 use termion::{color, style};
 
 const SSH_OEM_COMMAND: &str = "add-staged-bootloader-file ssh.authorized_keys";
 
-#[ffx_plugin()]
-pub async fn flash(fastboot_proxy: FastbootProxy, cmd: FlashCommand) -> Result<()> {
-    flash_plugin_impl(fastboot_proxy, cmd, &mut stdout()).await
+#[derive(FfxTool)]
+pub struct FlashTool {
+    #[command]
+    cmd: FlashCommand,
+    fastboot_proxy: FastbootProxy,
+}
+
+fho::embedded_plugin!(FlashTool);
+
+#[async_trait(?Send)]
+impl FfxMain for FlashTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        flash_plugin_impl(self.fastboot_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
 }
 
 #[tracing::instrument(skip(fastboot_proxy, writer))]
@@ -84,12 +98,13 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_nonexistent_file_throws_err() {
-        assert!(flash(
+        assert!(flash_plugin_impl(
             setup().1,
             FlashCommand {
                 manifest_path: Some(PathBuf::from("ffx_test_does_not_exist")),
                 ..Default::default()
-            }
+            },
+            &mut vec![],
         )
         .await
         .is_err())
@@ -99,13 +114,14 @@ mod test {
     async fn test_nonexistent_ssh_file_throws_err() {
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
-        assert!(flash(
+        assert!(flash_plugin_impl(
             setup().1,
             FlashCommand {
                 manifest_path: Some(PathBuf::from(tmp_file_name)),
                 authorized_keys: Some("ssh_does_not_exist".to_string()),
                 ..Default::default()
-            }
+            },
+            &mut vec![],
         )
         .await
         .is_err())

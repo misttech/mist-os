@@ -12,8 +12,10 @@ ffx_plugin("ffx_target_repository_register") {
     "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
+    "//third_party/rust_crates:async-trait",
   ]
   test_deps = [
     "//src/lib/fuchsia-async",

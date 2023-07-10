@@ -2,31 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_target_get_time_args::GetTimeCommand;
-use ffx_writer::Writer;
+use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as rcs;
 use rcs::RemoteControlProxy;
 
-async fn get_time_impl<W>(rcs_proxy: RemoteControlProxy, mut writer: W) -> Result<()>
+#[derive(FfxTool)]
+pub struct GetTimeTool {
+    #[command]
+    _cmd: GetTimeCommand,
+    rcs_proxy: RemoteControlProxy,
+}
+
+fho::embedded_plugin!(GetTimeTool);
+
+#[async_trait(?Send)]
+impl FfxMain for GetTimeTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        get_time_impl(self.rcs_proxy, &mut writer).await
+    }
+}
+
+async fn get_time_impl<W>(rcs_proxy: RemoteControlProxy, mut writer: W) -> fho::Result<()>
 where
     W: std::io::Write,
 {
-    writer.write_all(format!("{}", rcs_proxy.get_time().await?).as_bytes()).unwrap();
+    let time = rcs_proxy.get_time().await.user_message("Failed to get time")?;
+    writer.write_all(format!("{time}").as_bytes()).unwrap();
     Ok(())
-}
-
-// Need an invalid path so that the toolchain generates a
-// setup_fake_remote_control_proxy method for testing.
-
-#[ffx_plugin()]
-pub async fn get_time(
-    rcs_proxy: Option<RemoteControlProxy>,
-    mut writer: Writer,
-    _cmd: GetTimeCommand,
-) -> Result<()> {
-    get_time_impl(rcs_proxy.unwrap(), &mut writer).await
 }
 
 #[cfg(test)]
@@ -34,7 +39,7 @@ mod test {
     use super::*;
 
     fn setup_fake_time_server_proxy() -> rcs::RemoteControlProxy {
-        setup_fake_rcs_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             rcs::RemoteControlRequest::GetTime { responder } => {
                 responder.send(123456789).unwrap();
             }

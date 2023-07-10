@@ -3,21 +3,38 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_config::keys::TARGET_DEFAULT_KEY;
-use ffx_core::ffx_plugin;
 use ffx_target_repository_deregister_args::DeregisterCommand;
+use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
 use fidl_fuchsia_developer_ffx_ext::RepositoryError;
 
-#[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
-pub async fn deregister_cmd(cmd: DeregisterCommand, repos: RepositoryRegistryProxy) -> Result<()> {
-    deregister(
-        ffx_config::get(TARGET_DEFAULT_KEY).await.context("getting default target from config")?,
-        cmd,
-        repos,
-    )
-    .await
+#[derive(FfxTool)]
+pub struct DeregisterTool {
+    #[command]
+    cmd: DeregisterCommand,
+    #[with(daemon_protocol())]
+    repos: RepositoryRegistryProxy,
+}
+
+fho::embedded_plugin!(DeregisterTool);
+
+#[async_trait(?Send)]
+impl FfxMain for DeregisterTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        deregister(
+            ffx_config::get(TARGET_DEFAULT_KEY)
+                .await
+                .user_message("Failed to get default target from config")?,
+            self.cmd,
+            self.repos,
+        )
+        .await?;
+        Ok(())
+    }
 }
 
 async fn deregister(
@@ -79,7 +96,7 @@ mod test {
     async fn setup_fake_server() -> (RepositoryRegistryProxy, Receiver<(String, Option<String>)>) {
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = setup_fake_repos(move |req| match req {
+        let repos = fho::testing::fake_proxy(move |req| match req {
             RepositoryRegistryRequest::DeregisterTarget {
                 repository_name,
                 target_identifier,
@@ -126,7 +143,7 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_deregister_returns_error() {
-        let repos = setup_fake_repos(move |req| match req {
+        let repos = fho::testing::fake_proxy(move |req| match req {
             RepositoryRegistryRequest::DeregisterTarget {
                 repository_name: _,
                 target_identifier: _,

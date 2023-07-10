@@ -14,7 +14,8 @@ ffx_plugin("ffx_target_get_time") {
   sources = [ "src/lib.rs" ]
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:async-trait",
   ]
   test_deps = [ "//src/lib/fuchsia" ]
 }

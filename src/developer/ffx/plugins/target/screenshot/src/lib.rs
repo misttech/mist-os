@@ -4,9 +4,10 @@
 
 use {
     anyhow::{anyhow, bail, Context, Result},
+    async_trait::async_trait,
     chrono::{Datelike, Local, Timelike},
-    ffx_core::ffx_plugin,
     ffx_target_screenshot_args::{Format, ScreenshotCommand},
+    fho::{moniker, FfxContext, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_io as fio,
     fidl_fuchsia_math::SizeU,
     fidl_fuchsia_ui_composition::{ScreenshotFormat, ScreenshotProxy, ScreenshotTakeFileRequest},
@@ -33,10 +34,8 @@ pub async fn read_data(file: &fio::FileProxy) -> Result<Vec<u8>> {
 
     let mut out = Vec::new();
 
-    let (status, attrs) = file
-        .get_attr()
-        .await
-        .context(format!("Error: Failed to get attributes of file (fidl failure)"))?;
+    let (status, attrs) =
+        file.get_attr().await.user_message("Failed to get attributes of file (fidl failure)")?;
 
     if status != 0 {
         bail!("Error: Failed to get attributes, status: {}", status);
@@ -53,7 +52,7 @@ pub async fn read_data(file: &fio::FileProxy) -> Result<Vec<u8>> {
             .next()
             .await
             .context("read stream closed prematurely")??
-            .map_err(|status: i32| anyhow!("read error: status={}", status))?;
+            .map_err(|status: i32| fho::Error::from(anyhow!("read error: status={status}")))?;
 
         if bytes.is_empty() {
             break;
@@ -65,19 +64,38 @@ pub async fn read_data(file: &fio::FileProxy) -> Result<Vec<u8>> {
         }
     }
 
-    if out.len() != usize::try_from(attrs.content_size).map_err(|e| anyhow!(e))? {
-        bail!("Error: Expected {} bytes, but instead read {} bytes", attrs.content_size, out.len());
+    if out.len() != usize::try_from(attrs.content_size).bug_context("failed to convert to usize")? {
+        return Err(anyhow!(
+            "Error: Expected {} bytes, but instead read {} bytes",
+            attrs.content_size,
+            out.len()
+        )
+        .into());
     }
 
     Ok(out)
 }
 
-#[ffx_plugin(ScreenshotProxy = "core/ui:expose:fuchsia.ui.composition.Screenshot")]
-pub async fn screenshot(screenshot_proxy: ScreenshotProxy, cmd: ScreenshotCommand) -> Result<()> {
-    screenshot_impl(screenshot_proxy, cmd, &mut std::io::stdout()).await
+#[derive(FfxTool)]
+pub struct ScreenshotTool {
+    #[command]
+    cmd: ScreenshotCommand,
+    #[with(moniker("/core/ui"))]
+    screenshot_proxy: ScreenshotProxy,
 }
 
-pub async fn screenshot_impl<W: Write>(
+fho::embedded_plugin!(ScreenshotTool);
+
+#[async_trait(?Send)]
+impl FfxMain for ScreenshotTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        screenshot_impl(self.screenshot_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
+}
+
+async fn screenshot_impl<W: Write>(
     screenshot_proxy: ScreenshotProxy,
     cmd: ScreenshotCommand,
     writer: &mut W,
@@ -105,7 +123,9 @@ pub async fn screenshot_impl<W: Write>(
             ..Default::default()
         })
         .await
-        .map_err(|e| anyhow!("Error: Could not get the screenshot from the target: {:?}", e))?;
+        .map_err(|e| {
+            fho::Error::from(anyhow!("Error: Could not get the screenshot from the target: {e:?}"))
+        })?;
 
     let img_size = screenshot_response.size.expect("no data size returned from screenshot");
     let client_end = screenshot_response.file.expect("no file returned from screenshot");
@@ -250,7 +270,7 @@ mod test {
     }
 
     fn setup_fake_screenshot_server() -> ScreenshotProxy {
-        setup_fake_screenshot_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             ScreenshotRequest::TakeFile { payload: _, responder } => {
                 let mut screenshot = ScreenshotTakeFileResponse::default();
 

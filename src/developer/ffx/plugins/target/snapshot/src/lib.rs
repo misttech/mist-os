@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Context, Result};
+use async_trait::async_trait;
 use chrono::{Datelike, Local, Timelike};
-use ffx_core::ffx_plugin;
 use ffx_snapshot_args::SnapshotCommand;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_feedback::{
     Annotation, DataProviderProxy, GetAnnotationsParameters, GetSnapshotParameters,
 };
@@ -18,6 +19,25 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
+
+#[derive(FfxTool)]
+pub struct SnapshotTool {
+    #[command]
+    cmd: SnapshotCommand,
+    #[with(moniker("/core/feedback"))]
+    data_provider_proxy: DataProviderProxy,
+}
+
+fho::embedded_plugin!(SnapshotTool);
+
+#[async_trait(?Send)]
+impl FfxMain for SnapshotTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        snapshot_impl(self.data_provider_proxy, self.cmd, &mut writer).await?;
+        Ok(())
+    }
+}
 
 // read_data reads all of the contents of the given file from the current seek
 // offset to end of file, returning the content. It errors if the seek pointer
@@ -146,11 +166,6 @@ pub async fn dump_annotations<W: Write>(
     Ok(())
 }
 
-#[ffx_plugin(DataProviderProxy = "core/feedback:expose:fuchsia.feedback.DataProvider")]
-pub async fn snapshot(data_provider_proxy: DataProviderProxy, cmd: SnapshotCommand) -> Result<()> {
-    snapshot_impl(data_provider_proxy, cmd, &mut std::io::stdout()).await
-}
-
 pub async fn snapshot_impl<W: Write>(
     data_provider_proxy: DataProviderProxy,
     cmd: SnapshotCommand,
@@ -274,7 +289,7 @@ mod test {
     }
 
     fn setup_fake_data_provider_server(annotations: Annotations) -> DataProviderProxy {
-        setup_fake_data_provider_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             DataProviderRequest::GetSnapshot { params, responder } => {
                 let channel = params.response_channel.unwrap();
                 let server_end = ServerEnd::<fio::FileMarker>::new(channel);

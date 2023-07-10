@@ -4,11 +4,11 @@
 
 use crate::target_formatter::{JsonTarget, JsonTargetFormatter, TargetFormatter};
 use anyhow::Result;
+use async_trait::async_trait;
 use errors::{ffx_bail, ffx_bail_with_code};
 use ffx_config::keys::TARGET_DEFAULT_KEY;
-use ffx_core::ffx_plugin;
 use ffx_list_args::{AddressTypes, ListCommand};
-use ffx_writer::Writer;
+use fho::{daemon_protocol, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_ffx::{
     TargetCollectionProxy, TargetCollectionReaderMarker, TargetCollectionReaderRequest, TargetQuery,
 };
@@ -29,10 +29,28 @@ fn address_types_from_cmd(cmd: &ListCommand) -> AddressTypes {
     }
 }
 
-#[ffx_plugin(TargetCollectionProxy = "daemon::protocol")]
-pub async fn list_targets(
+#[derive(FfxTool)]
+pub struct ListTool {
+    #[command]
+    cmd: ListCommand,
+    #[with(daemon_protocol())]
     tc_proxy: TargetCollectionProxy,
-    #[ffx(machine = Vec<JsonTarget>)] writer: Writer,
+}
+
+fho::embedded_plugin!(ListTool);
+
+#[async_trait(?Send)]
+impl FfxMain for ListTool {
+    type Writer = MachineWriter<Vec<JsonTarget>>;
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        list_targets(self.tc_proxy, writer, self.cmd).await?;
+        Ok(())
+    }
+}
+
+async fn list_targets(
+    tc_proxy: TargetCollectionProxy,
+    mut writer: MachineWriter<Vec<JsonTarget>>,
     cmd: ListCommand,
 ) -> Result<()> {
     let (reader, server) = fidl::endpoints::create_endpoints::<TargetCollectionReaderMarker>();
@@ -63,9 +81,9 @@ pub async fn list_targets(
                 ffx_bail_with_code!(2, "Device {} not found.", n);
             } else {
                 if !writer.is_machine() {
-                    writer.error("No devices found.")?;
+                    writeln!(writer.stderr(), "No devices found.")?;
                 } else {
-                    writer.machine(&Vec::<String>::new())?;
+                    writer.machine(&Vec::new())?;
                 }
             }
         }
@@ -99,6 +117,7 @@ mod test {
     use super::*;
     use addr::TargetAddr;
     use ffx_list_args::Format;
+    use ffx_writer::TestBuffers;
     use fidl_fuchsia_developer_ffx as ffx;
     use fidl_fuchsia_developer_ffx::{
         RemoteControlState, TargetInfo as FidlTargetInfo, TargetState, TargetType,
@@ -128,7 +147,7 @@ mod test {
     }
 
     fn setup_fake_target_collection_server(num_tests: usize) -> TargetCollectionProxy {
-        setup_fake_tc_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             ffx::TargetCollectionRequest::ListTargets { query, reader, .. } => {
                 let reader = reader.into_proxy().unwrap();
                 let fidl_values: Vec<FidlTargetInfo> =
@@ -163,9 +182,10 @@ mod test {
 
     async fn try_run_list_test(num_tests: usize, cmd: ListCommand) -> Result<String> {
         let proxy = setup_fake_target_collection_server(num_tests);
-        let writer = Writer::new_test(None);
-        list_targets(proxy, writer.clone(), cmd).await?;
-        writer.test_output()
+        let test_buffers = TestBuffers::default();
+        let writer = MachineWriter::new_test(None, &test_buffers);
+        list_targets(proxy, writer, cmd).await?;
+        Ok(test_buffers.into_stdout_str())
     }
 
     async fn run_list_test(num_tests: usize, cmd: ListCommand) -> String {

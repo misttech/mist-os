@@ -3,13 +3,26 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
+use async_trait::async_trait;
 use ffx_config::keys::TARGET_DEFAULT_KEY;
-use ffx_core::ffx_plugin;
 use ffx_target_default_args::{SubCommand, TargetDefaultCommand, TargetDefaultGetCommand};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 
-#[ffx_plugin()]
-pub async fn exec_target_default(cmd: TargetDefaultCommand) -> Result<()> {
-    exec_target_default_impl(cmd, &mut std::io::stdout()).await
+#[derive(FfxTool)]
+pub struct TargetDefaultTool {
+    #[command]
+    cmd: TargetDefaultCommand,
+}
+
+fho::embedded_plugin!(TargetDefaultTool);
+
+#[async_trait(?Send)]
+impl FfxMain for TargetDefaultTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        exec_target_default_impl(self.cmd, &mut writer).await?;
+        Ok(())
+    }
 }
 
 pub async fn exec_target_default_impl<W: std::io::Write>(

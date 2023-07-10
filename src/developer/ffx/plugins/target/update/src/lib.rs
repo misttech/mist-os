@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_update_args as args;
+use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_update::{
     CheckOptions, Initiator, ManagerProxy, MonitorMarker, MonitorRequest, MonitorRequestStream,
 };
@@ -15,29 +16,40 @@ use fidl_fuchsia_update_installer_ext as installer;
 use fuchsia_url::AbsolutePackageUrl;
 use futures::prelude::*;
 
-/// Main entry point for the `update` subcommand.
-#[ffx_plugin(
-    "target_update",
-    ManagerProxy = "core/system-update:expose:fuchsia.update.Manager",
-    ChannelControlProxy = "core/system-update:expose:fuchsia.update.channelcontrol.ChannelControl"
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("target_update"))]
+pub struct UpdateTool {
+    #[command]
+    cmd: args::Update,
+    #[with(moniker("/core/system-update"))]
+    update_manager_proxy: ManagerProxy,
+    #[with(moniker("/core/system-update"))]
+    channel_control_proxy: ChannelControlProxy,
     // TODO(https://fxbug.dev/123798): Connect to this at
     // core/system-update/system-updater once that move rolls through.
-    InstallerProxy = "core:expose:fuchsia.update.installer.Installer",
-)]
-pub async fn update_cmd(
-    update_manager_proxy: ManagerProxy,
-    channel_control_proxy: ChannelControlProxy,
+    #[with(moniker("/core"))]
     installer_proxy: InstallerProxy,
-    update_args: args::Update,
-) -> Result<(), Error> {
-    update_cmd_impl(
-        update_manager_proxy,
-        channel_control_proxy,
-        installer_proxy,
-        update_args,
-        &mut std::io::stdout(),
-    )
-    .await
+}
+
+fho::embedded_plugin!(UpdateTool);
+
+#[async_trait(?Send)]
+impl FfxMain for UpdateTool {
+    type Writer = SimpleWriter;
+
+    /// Main entry point for the `update` subcommand.
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        let UpdateTool { cmd, update_manager_proxy, channel_control_proxy, installer_proxy } = self;
+        update_cmd_impl(
+            update_manager_proxy,
+            channel_control_proxy,
+            installer_proxy,
+            cmd,
+            &mut writer,
+        )
+        .await?;
+        Ok(())
+    }
 }
 
 pub async fn update_cmd_impl<W: std::io::Write>(

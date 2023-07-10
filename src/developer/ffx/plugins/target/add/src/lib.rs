@@ -2,18 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
+use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error, FfxError};
-use ffx_core::ffx_plugin;
 use ffx_target_add_args::AddCommand;
+use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{self as ffx, TargetCollectionProxy};
 use fidl_fuchsia_net as net;
 use futures::TryStreamExt;
 use netext::parse_address_parts;
 use std::net::IpAddr;
 
-#[ffx_plugin(TargetCollectionProxy = "daemon::protocol")]
-pub async fn add(target_collection_proxy: TargetCollectionProxy, cmd: AddCommand) -> Result<()> {
+#[derive(FfxTool)]
+pub struct AddTool {
+    #[command]
+    cmd: AddCommand,
+    #[with(daemon_protocol())]
+    target_collection_proxy: TargetCollectionProxy,
+}
+
+fho::embedded_plugin!(AddTool);
+
+#[async_trait(?Send)]
+impl FfxMain for AddTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        add_impl(self.target_collection_proxy, self.cmd).await
+    }
+}
+
+pub async fn add_impl(
+    target_collection_proxy: TargetCollectionProxy,
+    cmd: AddCommand,
+) -> fho::Result<()> {
     let (addr, scope, port) =
         parse_address_parts(cmd.addr.as_str()).map_err(|e| ffx_error!("{}", e))?;
     let scope_id = if let Some(scope) = scope {
@@ -39,13 +59,16 @@ pub async fn add(target_collection_proxy: TargetCollectionProxy, cmd: AddCommand
         ffx::TargetAddrInfo::Ip(ffx::TargetIp { ip, scope_id })
     };
 
-    let (client, server) = fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
-    target_collection_proxy.add_target(
-        &addr,
-        &ffx::AddTargetConfig { verify_connection: Some(!cmd.nowait), ..Default::default() },
-        client,
-    )?;
-    let mut stream = server.into_stream()?;
+    let (client, mut stream) =
+        fidl::endpoints::create_request_stream::<ffx::AddTargetResponder_Marker>()
+            .bug_context("create endpoints")?;
+    target_collection_proxy
+        .add_target(
+            &addr,
+            &ffx::AddTargetConfig { verify_connection: Some(!cmd.nowait), ..Default::default() },
+            client,
+        )
+        .user_message("Failed to call AddTarget")?;
     let res = if let Ok(Some(req)) = stream.try_next().await {
         match req {
             ffx::AddTargetResponder_Request::Success { .. } => Ok(()),
@@ -70,7 +93,7 @@ mod test {
     fn setup_fake_target_collection<T: 'static + Fn(ffx::TargetAddrInfo) + Send>(
         test: T,
     ) -> TargetCollectionProxy {
-        setup_fake_target_collection_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             ffx::TargetCollectionRequest::AddTarget {
                 ip, config: _, add_target_responder, ..
             } => {
@@ -99,7 +122,9 @@ mod test {
                 })
             )
         });
-        add(server, AddCommand { addr: "123.210.123.210".to_owned(), nowait: true }).await.unwrap();
+        add_impl(server, AddCommand { addr: "123.210.123.210".to_owned(), nowait: true })
+            .await
+            .unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -120,7 +145,7 @@ mod test {
                 })
             )
         });
-        add(server, AddCommand { addr: "123.210.123.210:2310".to_owned(), nowait: true })
+        add_impl(server, AddCommand { addr: "123.210.123.210:2310".to_owned(), nowait: true })
             .await
             .unwrap();
     }
@@ -138,7 +163,7 @@ mod test {
                 })
             )
         });
-        add(server, AddCommand { addr: "f000::1".to_owned(), nowait: true }).await.unwrap();
+        add_impl(server, AddCommand { addr: "f000::1".to_owned(), nowait: true }).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -155,7 +180,9 @@ mod test {
                 })
             )
         });
-        add(server, AddCommand { addr: "[f000::1]:65".to_owned(), nowait: true }).await.unwrap();
+        add_impl(server, AddCommand { addr: "[f000::1]:65".to_owned(), nowait: true })
+            .await
+            .unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -171,7 +198,7 @@ mod test {
                 })
             )
         });
-        add(server, AddCommand { addr: "f000::1%1".to_owned(), nowait: true }).await.unwrap();
+        add_impl(server, AddCommand { addr: "f000::1%1".to_owned(), nowait: true }).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -188,6 +215,8 @@ mod test {
                 })
             )
         });
-        add(server, AddCommand { addr: "[f000::1%1]:640".to_owned(), nowait: true }).await.unwrap();
+        add_impl(server, AddCommand { addr: "[f000::1%1]:640".to_owned(), nowait: true })
+            .await
+            .unwrap();
     }
 }

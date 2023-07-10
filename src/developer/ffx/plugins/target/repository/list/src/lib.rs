@@ -3,18 +3,31 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_target_repository_list_args::ListCommand;
+use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{RepositoryRegistryProxy, RepositoryStorageType};
 use prettytable::{cell, row, Table};
-use std::{
-    collections::HashMap,
-    io::{stdout, Write},
-};
+use std::{collections::HashMap, io::Write};
 
-#[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
-pub async fn list_cmd(cmd: ListCommand, repos: RepositoryRegistryProxy) -> Result<()> {
-    list_impl(cmd, repos, stdout()).await
+#[derive(FfxTool)]
+pub struct ListTool {
+    #[command]
+    cmd: ListCommand,
+    #[with(daemon_protocol())]
+    repos: RepositoryRegistryProxy,
+}
+
+fho::embedded_plugin!(ListTool);
+
+#[async_trait(?Send)]
+impl FfxMain for ListTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        list_impl(self.cmd, self.repos, writer).await?;
+        Ok(())
+    }
 }
 
 async fn list_impl<W: Write>(
@@ -84,7 +97,7 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn list() {
-        let repos = setup_fake_repos(move |req| {
+        let repos = fho::testing::fake_proxy(move |req| {
             fasync::Task::spawn(async move {
                 let mut sent = false;
                 match req {

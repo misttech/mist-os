@@ -3,14 +3,28 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_target_echo_args::EchoCommand;
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use std::io::{stdout, Write};
+use std::io::Write;
 
-#[ffx_plugin()]
-pub async fn echo(rcs_proxy: RemoteControlProxy, cmd: EchoCommand) -> Result<()> {
-    echo_impl(rcs_proxy, cmd, Box::new(stdout())).await
+#[derive(FfxTool)]
+pub struct EchoTool {
+    #[command]
+    cmd: EchoCommand,
+    rcs_proxy: RemoteControlProxy,
+}
+
+fho::embedded_plugin!(EchoTool);
+
+#[async_trait(?Send)]
+impl FfxMain for EchoTool {
+    type Writer = SimpleWriter;
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        echo_impl(self.rcs_proxy, self.cmd, writer).await?;
+        Ok(())
+    }
 }
 
 async fn echo_impl<W: Write>(

@@ -3,25 +3,40 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_target_remove_args::RemoveCommand;
+use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter, ToolIO};
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 
-#[ffx_plugin(TargetCollectionProxy = "daemon::protocol")]
-pub async fn remove(target_collection: TargetCollectionProxy, cmd: RemoveCommand) -> Result<()> {
-    remove_impl(target_collection, cmd, &mut std::io::stderr()).await
+#[derive(FfxTool)]
+pub struct RemoveTool {
+    #[command]
+    cmd: RemoveCommand,
+    #[with(daemon_protocol())]
+    target_collection_proxy: TargetCollectionProxy,
 }
 
-pub async fn remove_impl<W: std::io::Write>(
+fho::embedded_plugin!(RemoveTool);
+
+#[async_trait(?Send)]
+impl FfxMain for RemoveTool {
+    type Writer = SimpleWriter;
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        remove_impl(self.target_collection_proxy, self.cmd, writer).await?;
+        Ok(())
+    }
+}
+
+async fn remove_impl<W: ToolIO>(
     target_collection: TargetCollectionProxy,
     cmd: RemoveCommand,
-    err_writer: &mut W,
+    mut writer: W,
 ) -> Result<()> {
     let RemoveCommand { name_or_addr, .. } = cmd;
     if target_collection.remove_target(&name_or_addr).await? {
-        writeln!(err_writer, "Removed.")?;
+        writeln!(writer.stderr(), "Removed.")?;
     } else {
-        writeln!(err_writer, "No matching target found.")?;
+        writeln!(writer.stderr(), "No matching target found.")?;
     }
     Ok(())
 }
@@ -32,12 +47,13 @@ pub async fn remove_impl<W: std::io::Write>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use ffx_writer::TestBuffers;
     use fidl_fuchsia_developer_ffx as ffx;
 
     fn setup_fake_target_collection_proxy<T: 'static + Fn(String) -> bool + Send>(
         test: T,
     ) -> TargetCollectionProxy {
-        setup_fake_target_collection(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             ffx::TargetCollectionRequest::RemoveTarget { target_id, responder } => {
                 let result = test(target_id);
                 responder.send(result).unwrap();
@@ -52,32 +68,31 @@ mod test {
             assert_eq!(id, "correct-horse-battery-staple".to_owned());
             true
         });
-        let mut buf = Vec::new();
+        let test_buffers = TestBuffers::default();
+        let writer = SimpleWriter::new_test(&test_buffers);
         remove_impl(
             server,
             RemoveCommand { name_or_addr: "correct-horse-battery-staple".to_owned() },
-            &mut buf,
+            writer,
         )
         .await
         .unwrap();
 
-        let output = String::from_utf8(buf).unwrap();
-        assert_eq!(output, "Removed.\n");
+        assert_eq!(test_buffers.into_stderr_str(), "Removed.\n");
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_remove_nonexisting_target() {
         let server = setup_fake_target_collection_proxy(|_| false);
-        let mut buf = Vec::new();
+        let test_buffers = TestBuffers::default();
+        let writer = SimpleWriter::new_test(&test_buffers);
         remove_impl(
             server,
             RemoveCommand { name_or_addr: "incorrect-donkey-battery-jazz".to_owned() },
-            &mut buf,
+            writer,
         )
         .await
         .unwrap();
-
-        let output = String::from_utf8(buf).unwrap();
-        assert_eq!(output, "No matching target found.\n");
+        assert_eq!(test_buffers.into_stderr_str(), "No matching target found.\n");
     }
 }

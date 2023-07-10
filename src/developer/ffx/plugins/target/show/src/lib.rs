@@ -5,8 +5,10 @@
 use crate::show::{ShowEntry, ShowValue};
 use addr::TargetAddr;
 use anyhow::{anyhow, bail, Result};
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
+use errors::ffx_bail;
 use ffx_target_show_args as args;
+use fho::{deferred, moniker, Deferred, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_boot::ArgumentsProxy;
 use fidl_fuchsia_buildinfo::ProviderProxy;
 use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetProxy};
@@ -16,25 +18,71 @@ use fidl_fuchsia_hwinfo::{Architecture, BoardProxy, DeviceProxy, ProductProxy};
 use fidl_fuchsia_intl::RegulatoryDomain;
 use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
 use fuchsia_zircon_status::Status;
-use std::{
-    io::{stdout, Write},
-    time::Duration,
-};
+use std::{io::Write, time::Duration};
 use timeout::timeout;
 
 mod show;
 
-/// Main entry point for the `show` subcommand.
-#[ffx_plugin(
-    ChannelControlProxy = "core/system-update:expose:fuchsia.update.channelcontrol.ChannelControl",
-    BoardProxy = "core/hwinfo:expose:fuchsia.hwinfo.Board",
-    DeviceProxy = "core/hwinfo:expose:fuchsia.hwinfo.Device",
-    ProductProxy = "core/hwinfo:expose:fuchsia.hwinfo.Product",
-    ProviderProxy = "core/build-info:expose:fuchsia.buildinfo.Provider",
-    DeviceIdProviderProxy = "core/feedback_id:expose:fuchsia.feedback.DeviceIdProvider"
-    LastRebootInfoProviderProxy = "core/feedback:expose:fuchsia.feedback.LastRebootInfoProvider"
-)]
-pub async fn show_cmd(
+#[derive(FfxTool)]
+pub struct ShowTool {
+    #[command]
+    cmd: args::TargetShow,
+    rcs_proxy: RemoteControlProxy,
+    target_proxy: TargetProxy,
+    #[with(moniker("/core/system-update"))]
+    channel_control_proxy: ChannelControlProxy,
+    #[with(moniker("/core/hwinfo"))]
+    board_proxy: BoardProxy,
+    #[with(moniker("/core/hwinfo"))]
+    device_proxy: DeviceProxy,
+    #[with(moniker("/core/hwinfo"))]
+    product_proxy: ProductProxy,
+    #[with(moniker("/core/build-info"))]
+    build_info_proxy: ProviderProxy,
+    #[with(deferred(moniker("/core/feedback_id")))]
+    device_id_proxy: Deferred<DeviceIdProviderProxy>,
+    #[with(moniker("/core/feedback"))]
+    last_reboot_info_proxy: LastRebootInfoProviderProxy,
+}
+
+fho::embedded_plugin!(ShowTool);
+
+#[async_trait(?Send)]
+impl FfxMain for ShowTool {
+    type Writer = SimpleWriter;
+    /// Main entry point for the `show` subcommand.
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        let ShowTool {
+            cmd,
+            rcs_proxy,
+            target_proxy,
+            channel_control_proxy,
+            board_proxy,
+            device_proxy,
+            product_proxy,
+            build_info_proxy,
+            device_id_proxy,
+            last_reboot_info_proxy,
+        } = self;
+        show_cmd(
+            rcs_proxy,
+            channel_control_proxy,
+            board_proxy,
+            device_proxy,
+            product_proxy,
+            build_info_proxy,
+            device_id_proxy.await.ok(),
+            last_reboot_info_proxy,
+            target_proxy,
+            cmd,
+            &mut writer,
+        )
+        .await?;
+        Ok(())
+    }
+}
+
+async fn show_cmd<W: Write>(
     rcs_proxy: RemoteControlProxy,
     channel_control_proxy: ChannelControlProxy,
     board_proxy: BoardProxy,
@@ -45,10 +93,11 @@ pub async fn show_cmd(
     last_reboot_info_proxy: LastRebootInfoProviderProxy,
     target_proxy: TargetProxy,
     target_show_args: args::TargetShow,
+    writer: &mut W,
 ) -> Result<()> {
     let (arguments_proxy, arguments_server_end) = fidl::endpoints::create_proxy().unwrap();
     if let Err(i) = rcs_proxy.boot_arguments(arguments_server_end).await? {
-        bail!("Could not open fuchsia.boot.Arguments: {}", Status::from_raw(i));
+        ffx_bail!("Could not open fuchsia.boot.Arguments: {}", Status::from_raw(i));
     }
 
     show_cmd_impl(
@@ -62,7 +111,7 @@ pub async fn show_cmd(
         last_reboot_info_proxy,
         target_proxy,
         target_show_args,
-        &mut stdout(),
+        writer,
     )
     .await
 }
@@ -476,7 +525,7 @@ mod tests {
         \n";
 
     fn setup_fake_target_server() -> TargetProxy {
-        setup_fake_target_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             TargetRequest::GetSshAddress { responder, .. } => {
                 responder
                     .send(&TargetAddrInfo::Ip(TargetIp {
@@ -500,7 +549,7 @@ mod tests {
     }
 
     fn setup_fake_device_id_server() -> DeviceIdProviderProxy {
-        setup_fake_device_id_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             DeviceIdProviderRequest::GetId { responder } => {
                 responder.send("fake_device_id").unwrap();
             }
@@ -508,7 +557,7 @@ mod tests {
     }
 
     fn setup_fake_build_info_server() -> ProviderProxy {
-        setup_fake_build_info_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             ProviderRequest::GetBuildInfo { responder } => {
                 responder
                     .send(&BuildInfo {
@@ -524,7 +573,7 @@ mod tests {
     }
 
     fn setup_fake_board_server() -> BoardProxy {
-        setup_fake_board_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             BoardRequest::GetInfo { responder } => {
                 responder
                     .send(&BoardInfo {
@@ -539,7 +588,7 @@ mod tests {
     }
 
     fn setup_fake_last_reboot_info_server() -> LastRebootInfoProviderProxy {
-        setup_fake_last_reboot_info_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             LastRebootInfoProviderRequest::Get { responder } => {
                 responder
                     .send(&LastReboot {
@@ -653,7 +702,7 @@ mod tests {
     }
 
     fn setup_fake_device_server() -> DeviceProxy {
-        setup_fake_device_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             DeviceRequest::GetInfo { responder } => {
                 responder
                     .send(&DeviceInfo {
@@ -681,7 +730,7 @@ mod tests {
     }
 
     fn setup_fake_product_server() -> ProductProxy {
-        setup_fake_product_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             ProductRequest::GetInfo { responder } => {
                 responder
                     .send(&ProductInfo {
@@ -753,7 +802,7 @@ mod tests {
     }
 
     fn setup_fake_channel_control_server() -> ChannelControlProxy {
-        setup_fake_channel_control_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             ChannelControlRequest::GetCurrent { responder } => {
                 responder.send("fake_channel").unwrap();
             }

@@ -16,6 +16,8 @@ ffx_plugin("ffx_target_default") {
 
   deps = [
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:serde_json",
   ]
 }
