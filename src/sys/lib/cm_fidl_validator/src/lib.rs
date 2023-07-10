@@ -583,34 +583,46 @@ impl<'a> ValidationContext<'a> {
     fn validate_use_decl(&mut self, use_: &'a fdecl::Use) {
         match use_ {
             fdecl::Use::Service(u) => {
+                let decl = DeclType::UseService;
                 self.validate_use_fields(
-                    DeclType::UseService,
+                    decl,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
                     u.target_path.as_ref(),
                     u.dependency_type.as_ref(),
                     u.availability.as_ref(),
                 );
+                if u.dependency_type.is_none() {
+                    self.errors.push(Error::missing_field(decl, "dependency_type"));
+                }
             }
             fdecl::Use::Protocol(u) => {
+                let decl = DeclType::UseProtocol;
                 self.validate_use_fields(
-                    DeclType::UseProtocol,
+                    decl,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
                     u.target_path.as_ref(),
                     u.dependency_type.as_ref(),
                     u.availability.as_ref(),
                 );
+                if u.dependency_type.is_none() {
+                    self.errors.push(Error::missing_field(decl, "dependency_type"));
+                }
             }
             fdecl::Use::Directory(u) => {
+                let decl = DeclType::UseDirectory;
                 self.validate_use_fields(
-                    DeclType::UseDirectory,
+                    decl,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
                     u.target_path.as_ref(),
                     u.dependency_type.as_ref(),
                     u.availability.as_ref(),
                 );
+                if u.dependency_type.is_none() {
+                    self.errors.push(Error::missing_field(decl, "dependency_type"));
+                }
                 if u.rights.is_none() {
                     self.errors.push(Error::missing_field(DeclType::UseDirectory, "rights"));
                 }
@@ -1847,19 +1859,16 @@ impl<'a> ValidationContext<'a> {
                         DependencyNode::try_from_ref(o.source.as_ref()),
                         DependencyNode::try_from_ref(o.target.as_ref()),
                     );
-                    // If the offer source is `self`, ensure we have a corresponding
-                    // Directory.
-                    //
-                    // TODO: Consider bringing this bit into validate_offer_fields.
-                    if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) =
-                        (&o.source, &o.source_name)
-                    {
-                        if !self.all_directories.contains(&name as &str) {
-                            self.errors.push(Error::invalid_capability(decl, "source", name));
-                        }
+                }
+                // If the offer source is `self`, ensure we have a corresponding
+                // Directory.
+                //
+                // TODO: Consider bringing this bit into validate_offer_fields.
+                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
+                    if !self.all_directories.contains(&name as &str) {
+                        self.errors.push(Error::invalid_capability(decl, "source", name));
                     }
                 }
-
                 if let Some(subdir) = o.subdir.as_ref() {
                     check_relative_path(
                         Some(subdir),
@@ -2912,18 +2921,18 @@ mod tests {
                         source: None,
                         source_name: None,
                         target_path: None,
-                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        dependency_type: None,
                         ..Default::default()
                     }),
                     fdecl::Use::Protocol(fdecl::UseProtocol {
-                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        dependency_type: None,
                         source: None,
                         source_name: None,
                         target_path: None,
                         ..Default::default()
                     }),
                     fdecl::Use::Directory(fdecl::UseDirectory {
-                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        dependency_type: None,
                         source: None,
                         source_name: None,
                         target_path: None,
@@ -2949,12 +2958,15 @@ mod tests {
                 Error::missing_field(DeclType::UseService, "source"),
                 Error::missing_field(DeclType::UseService, "source_name"),
                 Error::missing_field(DeclType::UseService, "target_path"),
+                Error::missing_field(DeclType::UseService, "dependency_type"),
                 Error::missing_field(DeclType::UseProtocol, "source"),
                 Error::missing_field(DeclType::UseProtocol, "source_name"),
                 Error::missing_field(DeclType::UseProtocol, "target_path"),
+                Error::missing_field(DeclType::UseProtocol, "dependency_type"),
                 Error::missing_field(DeclType::UseDirectory, "source"),
                 Error::missing_field(DeclType::UseDirectory, "source_name"),
                 Error::missing_field(DeclType::UseDirectory, "target_path"),
+                Error::missing_field(DeclType::UseDirectory, "dependency_type"),
                 Error::missing_field(DeclType::UseDirectory, "rights"),
                 Error::missing_field(DeclType::UseStorage, "source_name"),
                 Error::missing_field(DeclType::UseStorage, "target_path"),
