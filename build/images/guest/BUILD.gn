@@ -105,7 +105,6 @@ if (labels.images == "//build/images/bringup") {
       "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
       "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice",
       "//src/connectivity/network/drivers/network-device",
-      "//src/devices/bin/lsdev",
       "//src/devices/block/drivers/virtio:virtio_block",
       "//src/devices/block/drivers/virtio:virtio_scsi",
       "//src/devices/board/drivers/machina",

@@ -95,34 +95,6 @@ group("usb-peripheral-stack") {
   ]
 }
 
-group("utils") {
-  deps = [
-    # utils should not be included in user build which does not have shell
-    # access.
-    "//build/validate:non_production_tag",
-    "//src/devices/bin/acpidump",
-    "//src/devices/bin/driver_tools:driver_tools",
-    "//src/devices/bin/lsdev",
-    "//src/devices/bin/register-util",
-    "//src/devices/block/bin/gpt",
-    "//src/devices/block/bin/lsblk",
-    "//src/devices/block/bin/sdio",
-    "//src/devices/clock/bin/clock",
-    "//src/devices/clock/bin/clock:clkctl",
-    "//src/devices/cpu/bin/cpuctl",
-    "//src/devices/gpio/bin/gpioutil",
-    "//src/devices/i2c/bin:i2cutil",
-    "//src/devices/i2c/bin:i2cutil2",
-    "//src/devices/power/bin/lspwr",
-    "//src/devices/pwm/bin/pwmctl",
-    "//src/devices/ram/bin/ram-info",
-    "//src/devices/spi/bin/spiutil",
-    "//src/devices/thermal/bin/temperature-cli",
-    "//src/devices/thermal/bin/thermal-cli",
-    "//src/devices/usb/bin/lsusb",
-  ]
-}
-
 # This is a group of tools that drivers and driver authors use.
 # It is included in //bundles/tools.
 group("tools") {

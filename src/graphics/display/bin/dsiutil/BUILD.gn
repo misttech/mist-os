@@ -2,7 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
+
 executable("dsiutil") {
+  visibility = [ ":*" ]
   sources = [ "main.cc" ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.dsiimpl:fuchsia.hardware.dsiimpl_banjo_cpp",
@@ -11,4 +14,8 @@ executable("dsiutil") {
     "//src/graphics/display/lib/mipi-dsi",
     "//src/lib/fxl",
   ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":dsiutil" ]
 }

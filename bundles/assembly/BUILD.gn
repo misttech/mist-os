@@ -78,13 +78,15 @@ group("assembly") {
 assembly_input_bundle("bootstrap") {
   bootfs_files_labels = [
     "//src/bringup:bootfs",
-    "//src/bringup/bin/debuglog:bootfs",
-    "//src/bringup/bin/dlog:bootfs",
-    "//src/bringup/bin/waitfor:bootfs",
     "//src/sys/bootstrap:bootfs",
     "//src/sys/component_manager:bootfs",
     "//build/info:bootfs",
     "//src/sys/root:bootfs",
+
+    # tools
+    "//src/bringup/bin/debuglog:bootfs",
+    "//src/bringup/bin/dlog:bootfs",
+    "//src/bringup/bin/waitfor:bootfs",
   ]
   bootfs_packages = [
     "//src/bringup/bin/svchost:pkg",
@@ -110,13 +112,13 @@ assembly_input_bundle("bootstrap") {
 #
 assembly_input_bundle("bootstrap_userdebug") {
   bootfs_files_labels = [
+    # tools
     "//src/connectivity/network/bin/ping:bootfs",
     "//src/developer/forensics/crasher/cpp:bootfs",
     "//src/devices/block/bin/disk-inspect:bootfs",
     "//src/devices/block/bin/fvm-check:bootfs",
     "//src/devices/nand/bin/nand-loader:bootfs",
     "//src/devices/nand/bin/nand-util:bootfs",
-    "//src/devices/nand/drivers/broker:bootfs",
     "//src/storage/bin/dd:bootfs",
     "//src/storage/bin/df:bootfs",
     "//src/storage/bin/storage-metrics:bootfs",
@@ -126,6 +128,11 @@ assembly_input_bundle("bootstrap_userdebug") {
     "//src/zircon/bin/kstress:bootfs",
     "//src/zircon/bin/ktrace:bootfs",
     "//src/zircon/bin/loadgen:bootfs",
+
+    # drivers
+    "//src/devices/nand/drivers/broker:bootfs",
+
+    # shell
     "//zircon/third_party/uapp/dash:bootfs",
   ]
 
@@ -139,23 +146,53 @@ assembly_input_bundle("bootstrap_userdebug") {
 assembly_input_bundle("bootstrap_eng") {
   testonly = true
   bootfs_files_labels = [
-    "//src/devices/bin/tee-test:bootfs",
+    # tools
+    "//src/devices/bin/acpidump:bootfs",
+    "//src/devices/bin/driver_tools:bootfs",
+    "//src/devices/bin/lsdev:bootfs",
+    "//src/devices/bin/register-util:bootfs",
     "//src/devices/block/bin/biotime:bootfs",
-    "//src/devices/block/bin/blktest:bootfs",
+    "//src/devices/block/bin/gpt:bootfs",
     "//src/devices/block/bin/iochk:bootfs",
     "//src/devices/block/bin/iotime:bootfs",
+    "//src/devices/block/bin/lsblk:bootfs",
+    "//src/devices/block/bin/sdio:bootfs",
+    "//src/devices/clock/bin/clock:bootfs",
+    "//src/devices/cpu/bin/cpuctl:bootfs",
+    "//src/devices/gpio/bin/gpioutil:bootfs",
+    "//src/devices/i2c/bin:bootfs",
+    "//src/devices/power/bin/lspwr:bootfs",
+    "//src/devices/ram/bin/ram-info:bootfs",
+    "//src/devices/spi/bin/spiutil:bootfs",
+    "//src/devices/thermal/bin/temperature-cli:bootfs",
+    "//src/devices/thermal/bin/thermal-cli:bootfs",
+    "//src/devices/usb/bin/lsusb:bootfs",
+    "//src/graphics/display/bin/dsiutil:bootfs",
+    "//src/media/audio/tools/audio-driver-ctl:bootfs",
+    "//src/security/bin/syscall-check:bootfs",
+    "//src/ui/backlight/bin/backlight:bootfs",
+    "//src/ui/input/bin/hid:bootfs",
+
+    # tests
+    "//src/devices/bin/tee-test:bootfs",
+    "//src/devices/block/bin/blktest:bootfs",
+    "//src/graphics/display/bin/display-test:bootfs",
+    "//src/zircon/tests/evil:bootfs",
+
+    # drivers
     "//src/devices/gpio/drivers/gpio-test:bootfs",
     "//src/devices/misc/drivers/test:bootfs",
     "//src/devices/tests/sysdev:bootfs",
     "//src/devices/usb/drivers/usb-peripheral-test:bootfs",
-    "//src/graphics/display/bin/display-test:bootfs",
-    "//src/security/bin/syscall-check:bootfs",
-    "//src/zircon/tests/evil:bootfs",
   ]
 
   # Do not automatically include these tools, but build them to keep them from
   # bit-rotting.
-  deps = [ "//src/zircon/testing/mutex_pi_exerciser:bootfs" ]
+  deps = [
+    "//src/devices/pwm/bin/pwmctl:bootfs",
+    "//src/ui/light/bin/lights-cli:bootfs",
+    "//src/zircon/testing/mutex_pi_exerciser:bootfs",
+  ]
 }
 
 # The virtcon AIB is included by all eng and userdebug products, and can be

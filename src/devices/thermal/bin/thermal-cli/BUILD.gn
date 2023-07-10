@@ -2,10 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/test.gni")
 
 executable("thermal-cli") {
+  visibility = [ ":*" ]
   sources = [ "main.cc" ]
   deps = [
     ":common",
@@ -14,6 +16,10 @@ executable("thermal-cli") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":thermal-cli" ]
 }
 
 source_set("common") {
