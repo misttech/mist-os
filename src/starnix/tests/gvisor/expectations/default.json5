@@ -914,6 +914,9 @@
                 "PselectTest.SignalMaskBlocksSignal",
                 "UnameTest.Sanity",
 
+                // https://fxbug.dev/112590
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4EphemeralPortReservedReuseAddr/*",
+
                 // TODO: These tests have different outcomes in socket_domain_test and
                 // socket_ip_tcp_loopback_test.
                 "AllUnixDomainSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
