@@ -43,6 +43,6 @@ TEST_F(VirtMagmaUnitTest, GetHandleForInvalidBuffer) {
 
   int ret = ioctl(fd_, VIRTMAGMA_IOCTL_MAGMA_COMMAND, &command);
   if (ret == -1)
-    EXPECT_EQ(errno, -EINVAL);
+    EXPECT_EQ(errno, EINVAL);
   EXPECT_EQ(response.result_return, 0u);
 }
