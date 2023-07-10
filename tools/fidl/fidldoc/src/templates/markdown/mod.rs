@@ -65,6 +65,11 @@ impl<'a> MarkdownTemplate<'a> {
                 include_str!("partials/declarations/aliases.hbs"),
                 "Failed to include aliases",
             ),
+            (
+                "services",
+                include_str!("partials/declarations/services.hbs"),
+                "Failed to include services",
+            ),
         ] {
             handlebars.register_template_string(name, template).expect(expect);
         }

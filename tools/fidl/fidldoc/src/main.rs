@@ -223,6 +223,7 @@ fn render_fidl_library(
         "config": fidl_config,
         "tag": tag,
         "url_path": url_path,
+        "service_declarations": package_fidl_json.service_declarations
     });
 
     let template = select_template(&template_type, &output_path)
@@ -410,11 +411,8 @@ mod test {
     use super::*;
     use std::fs::File;
     use std::io::Write;
-    use tempfile::{tempdir, NamedTempFile};
-
     use std::path::PathBuf;
-
-    use serde_json::Map;
+    use tempfile::{tempdir, NamedTempFile};
 
     #[test]
     fn select_template_test() {
@@ -454,18 +452,7 @@ mod test {
                     },
                     }
                 ]})],
-                library_dependencies: Vec::new(),
-                bits_declarations: Vec::new(),
-                const_declarations: Vec::new(),
-                enum_declarations: Vec::new(),
-                protocol_declarations: Vec::new(),
-                table_declarations: Vec::new(),
-                alias_declarations: Vec::new(),
-                struct_declarations: Vec::new(),
-                external_struct_declarations: Vec::new(),
-                union_declarations: Vec::new(),
-                declaration_order: Vec::new(),
-                declarations: Map::new(),
+                ..Default::default()
             },
         );
         fidl_json_map.insert(
@@ -489,18 +476,7 @@ mod test {
                     }
                   },
                 ]})],
-                library_dependencies: Vec::new(),
-                bits_declarations: Vec::new(),
-                const_declarations: Vec::new(),
-                enum_declarations: Vec::new(),
-                protocol_declarations: Vec::new(),
-                table_declarations: Vec::new(),
-                alias_declarations: Vec::new(),
-                struct_declarations: Vec::new(),
-                external_struct_declarations: Vec::new(),
-                union_declarations: Vec::new(),
-                declaration_order: Vec::new(),
-                declarations: Map::new(),
+                ..Default::default()
             },
         );
         fidl_json_map.insert(
@@ -526,18 +502,7 @@ mod test {
                     }
                 ]
                 })],
-                library_dependencies: Vec::new(),
-                bits_declarations: Vec::new(),
-                const_declarations: Vec::new(),
-                enum_declarations: Vec::new(),
-                protocol_declarations: Vec::new(),
-                table_declarations: Vec::new(),
-                alias_declarations: Vec::new(),
-                struct_declarations: Vec::new(),
-                external_struct_declarations: Vec::new(),
-                union_declarations: Vec::new(),
-                declaration_order: Vec::new(),
-                declarations: Map::new(),
+                ..Default::default()
             },
         );
 
@@ -699,18 +664,7 @@ mod test {
         let fidl_json = FidlJson {
             name: "fuchsia.camera.common".to_string(),
             maybe_attributes: vec![json!({"name": "not no_doc", "value": ""})],
-            library_dependencies: Vec::new(),
-            bits_declarations: Vec::new(),
-            const_declarations: Vec::new(),
-            enum_declarations: Vec::new(),
-            protocol_declarations: Vec::new(),
-            table_declarations: Vec::new(),
-            alias_declarations: Vec::new(),
-            struct_declarations: Vec::new(),
-            external_struct_declarations: Vec::new(),
-            union_declarations: Vec::new(),
-            declaration_order: Vec::new(),
-            declarations: Map::new(),
+            ..Default::default()
         };
         assert_eq!(should_process_fidl_json(&fidl_json), true);
     }
@@ -720,18 +674,7 @@ mod test {
         let fidl_json = FidlJson {
             name: "fuchsia.camera.common".to_string(),
             maybe_attributes: vec![json!({"name": ATTR_NAME_NO_DOC, "value": ""})],
-            library_dependencies: Vec::new(),
-            bits_declarations: Vec::new(),
-            const_declarations: Vec::new(),
-            enum_declarations: Vec::new(),
-            protocol_declarations: Vec::new(),
-            table_declarations: Vec::new(),
-            alias_declarations: Vec::new(),
-            struct_declarations: Vec::new(),
-            external_struct_declarations: Vec::new(),
-            union_declarations: Vec::new(),
-            declaration_order: Vec::new(),
-            declarations: Map::new(),
+            ..Default::default()
         };
         assert_eq!(should_process_fidl_json(&fidl_json), false);
     }

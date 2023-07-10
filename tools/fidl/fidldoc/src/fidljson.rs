@@ -55,7 +55,7 @@ pub struct TableOfContentsItem {
     pub added: String,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct FidlJson {
     pub name: String,
     #[serde(default)]
@@ -72,6 +72,7 @@ pub struct FidlJson {
     pub union_declarations: Vec<Value>,
     pub declaration_order: Vec<String>,
     pub declarations: Map<String, Value>,
+    pub service_declarations: Vec<Value>,
 }
 
 impl FidlJson {
@@ -216,6 +217,7 @@ impl FidlJson {
             union_declarations,
             declaration_order: _,
             declarations: _,
+            service_declarations,
         } = self;
         bits_declarations.sort_unstable_by(cmp_name);
         const_declarations.sort_unstable_by(cmp_name);
@@ -228,6 +230,7 @@ impl FidlJson {
         alias_declarations.sort_unstable_by(cmp_name);
         struct_declarations.sort_unstable_by(cmp_name);
         union_declarations.sort_unstable_by(cmp_name);
+        service_declarations.sort_unstable_by(cmp_name);
     }
 }
 
@@ -290,8 +293,7 @@ mod test {
             struct_declarations: serde_json::from_str("[{\"name\": \"fuchsia.test/SomeLongAnonymousPrefix1\"},{\"name\": \"fuchsia.test/Struct\"},{\"name\": \"fuchsia.test/SomeLongAnonymousPrefix0\"}]").unwrap(),
             external_struct_declarations: serde_json::from_str("[{\"name\": \"fuchsia.external/SomeLongAnonymousPrefix2\"}]").unwrap(),
             union_declarations: serde_json::from_str("[{\"name\": \"union1\"},{\"name\": \"Union1\"},{\"name\": \"UnIoN1\"}]").unwrap(),
-            declaration_order: Vec::new(),
-            declarations: Map::new(),
+            ..Default::default()
         };
 
         f.sort_declarations();

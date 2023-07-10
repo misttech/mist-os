@@ -246,3 +246,19 @@ Type: <code>uint32</code>
 </td>
         </tr>
 </table>
+
+## **SERVICES**
+
+### Service {#Service data-text="Service"}
+
+*Defined in [test.doccomments/doc_comments.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/doc_comments.test.fidl;l=127)*
+<table>
+    <tr><th>Name</th><th>Type</th><th>Transport</th></tr>
+        <tr id="interface">
+            <td><a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/doc_comments.test.fidl;l=131">interface</a></td>
+            <td>
+                <code>test.doccomments/Interface</code>
+            </td>
+            <td>Channel</td>
+        </tr>
+</table>

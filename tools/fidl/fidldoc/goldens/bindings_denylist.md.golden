@@ -864,3 +864,12 @@ Type: <code>uint32</code>
             <td></td>
         </tr>
 </table>
+
+## **SERVICES**
+
+### OnlyHlcpp {#OnlyHlcpp data-text="OnlyHlcpp"}
+
+*Defined in [test.bindingsdenylist/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl;l=47)*
+<table>
+    <tr><th>Name</th><th>Type</th><th>Transport</th></tr>
+</table>
