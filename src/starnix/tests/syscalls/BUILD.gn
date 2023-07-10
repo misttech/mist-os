@@ -108,6 +108,7 @@ test("syscalls_test_bin") {
     "task_test.cc",
     "terminal_test.cc",
     "test_helper_test.cc",
+    "time_test.cc",
     "timerfd_test.cc",
     "trivial_test.cc",
     "udev_test.cc",

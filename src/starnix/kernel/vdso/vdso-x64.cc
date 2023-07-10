@@ -47,9 +47,26 @@ extern "C" WEAK int clock_gettime(int clock_id, struct timespec* tp)
     __attribute__((alias("__vdso_clock_gettime")));
 
 extern "C" EXPORT int __vdso_clock_getres(int clock_id, struct timespec* tp) {
-  int ret = syscall(__NR_clock_getres, static_cast<intptr_t>(clock_id),
-                    reinterpret_cast<intptr_t>(tp), 0);
-  return ret;
+  if (tp == nullptr) {
+    return 0;
+  }
+  switch (clock_id) {
+    case CLOCK_REALTIME:
+    case CLOCK_MONOTONIC:
+    case CLOCK_MONOTONIC_COARSE:
+    case CLOCK_MONOTONIC_RAW:
+    case CLOCK_BOOTTIME:
+    case CLOCK_THREAD_CPUTIME_ID:
+    case CLOCK_PROCESS_CPUTIME_ID:
+      tp->tv_sec = 0;
+      tp->tv_nsec = 1;
+      return 0;
+
+    default:
+      int ret = syscall(__NR_clock_getres, static_cast<intptr_t>(clock_id),
+                        reinterpret_cast<intptr_t>(tp), 0);
+      return ret;
+  }
 }
 
 extern "C" WEAK int clock_getres(int clock_id, struct timespec* tp)
