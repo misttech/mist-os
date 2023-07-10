@@ -5,8 +5,8 @@
 #ifndef SRC_UI_INPUT_DRIVERS_CYPRESS_CY8CMBR3108_H_
 #define SRC_UI_INPUT_DRIVERS_CYPRESS_CY8CMBR3108_H_
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/hidbus/cpp/banjo.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
@@ -64,7 +64,7 @@ class Cy8cmbr3108 : public Cy8cmbr3108Type,
   zx_status_t Init();
 
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c_;
-  ddk::GpioProtocolClient touch_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> touch_gpio_;
   fbl::Array<touch_button_config_t> buttons_;
 
  private:

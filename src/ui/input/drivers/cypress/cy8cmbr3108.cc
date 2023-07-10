@@ -222,7 +222,14 @@ void Cy8cmbr3108::ShutDown() {
   zx_status_t status = port_.queue(&packet);
   ZX_ASSERT(status == ZX_OK);
   thrd_join(thread_, NULL);
-  touch_gpio_.ReleaseInterrupt();
+  fidl::WireResult result = touch_gpio_->ReleaseInterrupt();
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send ReleaseInterrupt request to touch gpio: %s",
+           result.status_string());
+  } else if (result->is_error()) {
+    zxlogf(ERROR, "Failed to release touch gpio interrupt: %s",
+           zx_status_get_string(result->error_value()));
+  }
   touch_irq_.destroy();
   fbl::AutoLock lock(&client_lock_);
   client_.clear();
@@ -244,11 +251,13 @@ zx_status_t Cy8cmbr3108::InitializeProtocols() {
 
   i2c_ = std::move(*i2c_client);
 
-  touch_gpio_ = ddk::GpioProtocolClient(parent(), "gpio");
-  if (!touch_gpio_.is_valid()) {
-    zxlogf(ERROR, "ZX_PROTOCOL_GPIO not found");
+  zx::result touch_gpio_client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(parent(), "gpio");
+  if (touch_gpio_client.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol: %s", touch_gpio_client.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
+  touch_gpio_.Bind(std::move(touch_gpio_client.value()));
 
   // Get buttons metadata.
   auto buttons = ddk::GetMetadataArray<touch_button_config_t>(parent(), DEVICE_METADATA_PRIVATE);
@@ -278,23 +287,45 @@ zx_status_t Cy8cmbr3108::Init() {
   /* Note: The default sensor configuration works for visalia and hence not configuring those
    * registers. Add those changes here if needed.*/
 
-  status = touch_gpio_.SetAltFunction(0);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to SetAltFunction touch GPIO %d", status);
-    return status;
+  {
+    fidl::WireResult result = touch_gpio_->SetAltFunction(0);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send SetAltFunction request to touch gpio: %s",
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to set touch gpio to perform alt function: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
-  status = touch_gpio_.ConfigIn(GPIO_NO_PULL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to ConfigIn touch GPIO %d", status);
-    return status;
+  {
+    fidl::WireResult result = touch_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigIn request to touch gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure touch gpio to input: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
-  status = touch_gpio_.GetInterrupt(ZX_INTERRUPT_MODE_EDGE_HIGH, &touch_irq_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to GetInterrupt touch GPIO %d", status);
-    return status;
+  fidl::WireResult touch_gpio_interrupt = touch_gpio_->GetInterrupt(ZX_INTERRUPT_MODE_EDGE_HIGH);
+  if (!touch_gpio_interrupt.ok()) {
+    zxlogf(ERROR, "Failed to send GetInterrupt request to touch gpio: %s",
+           touch_gpio_interrupt.status_string());
+    return touch_gpio_interrupt.status();
   }
+  if (touch_gpio_interrupt->is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt from touch gpio: %s",
+           zx_status_get_string(touch_gpio_interrupt->error_value()));
+    return touch_gpio_interrupt->error_value();
+  }
+  touch_irq_ = std::move(touch_gpio_interrupt.value()->irq);
 
   status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port_);
   if (status != ZX_OK) {

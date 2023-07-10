@@ -29,7 +29,7 @@ static const device_fragment_part_t ref_out_i2c_fragment[] = {
 };
 
 static const zx_bind_inst_t ref_out_touch_gpio_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_GPIO),
+    BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_GPIO),
     BI_MATCH_IF(EQ, BIND_GPIO_PIN, 5),
 };
 static const device_fragment_part_t ref_out_touch_gpio_fragment[] = {

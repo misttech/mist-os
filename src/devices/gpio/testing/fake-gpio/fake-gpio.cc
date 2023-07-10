@@ -86,6 +86,10 @@ void FakeGpio::Read(ReadCompleter::Sync& completer) {
   }
 }
 
+void FakeGpio::ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) {
+  completer.ReplySuccess();
+}
+
 uint64_t FakeGpio::GetAltFunction() const {
   const auto& state = std::get<AltFunctionState>(state_log_.back());
   return state.function;

@@ -69,6 +69,7 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   void ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) override;
   void Write(WriteRequestView request, WriteCompleter::Sync& completer) override;
   void Read(ReadCompleter::Sync& completer) override;
+  void ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) override;
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
