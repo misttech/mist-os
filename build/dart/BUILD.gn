@@ -51,8 +51,6 @@ group("dart_allowlist") {
     "//scripts/status:*",
     "//sdk/dart/fidl:*",
     "//sdk/dart/fuchsia:*",
-    "//sdk/dart/fuchsia_services:*",
-    "//sdk/dart/fuchsia_services/test_support:*",
     "//sdk/dart/fuchsia_vfs:*",
     "//sdk/dart/zircon:*",
     "//sdk/testing/fidl/protocols_tests:*",

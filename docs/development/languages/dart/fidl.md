@@ -53,14 +53,6 @@ If two FIDL targets coexist in a single BUILD file:
   `lib.foo.fidl._bar`. Depending on the top-level target `lib/foo/fidl`
   generates the package `lib.foo.fidl`, which coincides with the Dart FIDL
   binding's assumptions.
-  
-## Calling a FIDL service
-
-The generated bindings for Dart require the importing of fuchsia_services.
-
-```dart
-import 'package:fuchsia_services/services.dart';
-```
 
 In order to use the Launcher service to start services that implement a FIDL interface,
 you need to have the `fuchsia.sys.Launcher` service declared in the .cml.

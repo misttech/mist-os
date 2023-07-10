@@ -11,7 +11,6 @@ dart_package_label = {
   fuchsia = "//sdk/dart/fuchsia"
   fuchsia_scenic = "//sdk/dart/fuchsia_scenic"
   fuchsia_scenic_flutter = "//sdk/dart/fuchsia_scenic_flutter"
-  fuchsia_services = "//sdk/dart/fuchsia_services"
   fuchsia_vfs = "//sdk/dart/fuchsia_vfs"
   zircon = "//sdk/dart/zircon"
 }
@@ -24,7 +23,6 @@ dart_packages_list = [
   dart_package_label.fuchsia,
   dart_package_label.fuchsia_scenic,
   dart_package_label.fuchsia_scenic_flutter,
-  dart_package_label.fuchsia_services,
   dart_package_label.fuchsia_vfs,
   dart_package_label.zircon,
 ]

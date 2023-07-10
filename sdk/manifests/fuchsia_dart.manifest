@@ -1,6 +1,5 @@
 sdk://dart/fidl
 sdk://dart/fuchsia
-sdk://dart/fuchsia_services
 sdk://dart/fuchsia_vfs
 sdk://dart/zircon
 sdk://docs/metadata_schemas
