@@ -43,6 +43,13 @@ template("_cuckoo_kernel_zbi_test") {
   assert(current_toolchain == default_toolchain)
   assert(defined(invoker.kernel_zbi))
 
+  if (has_board) {
+    assert(images_config_label != false,
+           "Need to define images_config_label for cuckoo tests")
+  } else {
+    images_config_label = "//boards/images:default"
+  }
+
   cuckoo_target_name = target_name
 
   assembly_kernel_zbi = invoker.kernel_zbi
@@ -54,6 +61,8 @@ template("_cuckoo_kernel_zbi_test") {
   assembly_input = {
     testonly = true
     include_component_id_index = true
+    namespace = cuckoo_target_name
+    image_name = "fuchsia"
     kernel_zbi = assembly_kernel_zbi
     kernel_image_name = assembly_kernel_image_name
     bootfs_labels = board_bootfs_labels
@@ -69,6 +78,8 @@ template("_cuckoo_kernel_zbi_test") {
     system_image_deps = board_system_image_deps
     fshost_config = board_fshost_config
     core_realm_definition = "//build/testing:cuckoo-core-realm"
+    assembly_images_config_label = images_config_label
+    use_explicit_images_config_only = true
     product_assembly_config_label =
         "//build/testing:cuckoo-product-configuration"
     allow_eng_platform_bundle_use = true
