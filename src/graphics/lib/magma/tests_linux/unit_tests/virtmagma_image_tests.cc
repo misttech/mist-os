@@ -43,6 +43,9 @@ class MagmaImageTest : public ::testing::Test {
     ASSERT_GE(fd, 0) << "Failed to open device " << kDevicePath << " (" << errno << ")";
     ASSERT_EQ(MAGMA_STATUS_OK, magma_device_import(fd, &device_));
 
+    ASSERT_EQ(MAGMA_STATUS_OK,
+              magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id_));
+
     ASSERT_EQ(MAGMA_STATUS_OK, magma_device_create_connection(device_, &connection_));
   }
 
@@ -53,8 +56,15 @@ class MagmaImageTest : public ::testing::Test {
       magma_device_release(device_);
   }
 
+  bool IsIntel() const { return vendor_id_ == 0x8086; }
+
+  uint32_t GetExpectedGpuCoherencyDomain() const {
+    return IsIntel() ? MAGMA_COHERENCY_DOMAIN_CPU : MAGMA_COHERENCY_DOMAIN_RAM;
+  }
+
   magma_device_t device_ = {};
   magma_connection_t connection_ = {};
+  uint64_t vendor_id_{};
 };
 
 constexpr uint32_t kWidth = 1920;
@@ -210,7 +220,7 @@ class MagmaImageTestFormats : public MagmaImageTest, public testing::WithParamIn
       if (kDirectToDisplaySupported && (flags & MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE)) {
         EXPECT_EQ(MAGMA_COHERENCY_DOMAIN_RAM, image_info.coherency_domain);
       } else {
-        EXPECT_EQ(MAGMA_COHERENCY_DOMAIN_CPU, image_info.coherency_domain);
+        EXPECT_EQ(GetExpectedGpuCoherencyDomain(), image_info.coherency_domain);
       }
 
       MapAndWrite(image, size);
@@ -250,7 +260,7 @@ class MagmaImageTestFormats : public MagmaImageTest, public testing::WithParamIn
       if (kDirectToDisplaySupported && (flags & MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE)) {
         EXPECT_EQ(MAGMA_COHERENCY_DOMAIN_RAM, image_info.coherency_domain);
       } else {
-        EXPECT_EQ(MAGMA_COHERENCY_DOMAIN_CPU, image_info.coherency_domain);
+        EXPECT_EQ(GetExpectedGpuCoherencyDomain(), image_info.coherency_domain);
       }
 
       MapAndCompare(image, size);
@@ -275,6 +285,9 @@ TEST_P(MagmaImageTestFormats, ImportExportPresentableLinear) {
 }
 
 TEST_P(MagmaImageTestFormats, ImportExportIntel) {
+  if (!IsIntel()) {
+    GTEST_SKIP();
+  }
   constexpr uint64_t kFlags = 0;
   constexpr uint64_t kSpecifiedModifier = DRM_FORMAT_MOD_INVALID;
   constexpr uint64_t kExpectedModifier = I915_FORMAT_MOD_Y_TILED_CCS;
@@ -282,6 +295,9 @@ TEST_P(MagmaImageTestFormats, ImportExportIntel) {
 }
 
 TEST_P(MagmaImageTestFormats, ImportExportPresentableIntel) {
+  if (!IsIntel()) {
+    GTEST_SKIP();
+  }
   constexpr uint64_t kFlags = MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE;
   constexpr uint64_t kSpecifiedModifier = DRM_FORMAT_MOD_INVALID;
   constexpr uint64_t kExpectedModifier = I915_FORMAT_MOD_Y_TILED;
@@ -289,6 +305,9 @@ TEST_P(MagmaImageTestFormats, ImportExportPresentableIntel) {
 }
 
 TEST_P(MagmaImageTestFormats, ImportExportWithUsageIntel) {
+  if (!IsIntel()) {
+    GTEST_SKIP();
+  }
   constexpr uint64_t kFlags =
       (static_cast<uint64_t>(VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                              VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)

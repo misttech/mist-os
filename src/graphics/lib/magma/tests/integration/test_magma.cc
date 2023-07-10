@@ -33,6 +33,8 @@
 
 #if defined(__linux__)
 #include <sys/mman.h>
+#include <sys/resource.h>
+#include <sys/time.h>
 #include <unistd.h>
 #endif
 
@@ -1777,7 +1779,14 @@ TEST_F(Magma, MaxBufferHandle2) {
   std::unordered_set<magma_handle_t> handles;
 
   // This may fail on Linux if the open file limit is too small.
+
   constexpr size_t kMaxBufferHandles = 10000;
+#if defined(__linux__)
+  struct rlimit rlimit {};
+  rlimit.rlim_cur = kMaxBufferHandles * 2;
+  rlimit.rlim_max = rlimit.rlim_cur;
+  EXPECT_EQ(0, setrlimit(RLIMIT_NOFILE, &rlimit));
+#endif
 
   for (size_t i = 0; i < kMaxBufferHandles; i++) {
     magma_handle_t handle;
