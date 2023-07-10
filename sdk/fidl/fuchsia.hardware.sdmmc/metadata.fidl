@@ -1,0 +1,21 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.hardware.sdmmc;
+
+type SdmmcMetadata = table {
+    /// If true, the trim support block flag will be set, and the discard command will be issued to
+    /// the device when a trim block op is received. If false, an error will be returned in response
+    /// to trim block ops. The default value is true if no metadata is specified. Ignored if the
+    /// attached device or inserted card does not have storage.
+    1: enable_trim bool;
+    /// If true, utilize the on-device volatile cache. The default value is true if no metadata is
+    /// specified. Ignored if the attached device or inserted card does not have storage.
+    2: enable_cache bool;
+    /// If true, this SDMMC controller corresponds to a removable card slot that may have an
+    /// MMC/SD/SDIO card inserted or removed at any time. In this case, failure to probe during
+    /// driver initialization is not considered fatal. The default value is false if no metadata is
+    /// specified.
+    3: removable bool;
+};
