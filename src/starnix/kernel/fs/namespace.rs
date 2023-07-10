@@ -2,18 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::{HashMap, HashSet},
-    fmt,
-    hash::{Hash, Hasher},
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Weak,
-    },
-};
-
-use ref_cast::RefCast;
-
 use super::{
     devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs, *,
 };
@@ -27,6 +15,16 @@ use crate::{
     task::*,
     time::*,
     types::*,
+};
+use ref_cast::RefCast;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    hash::{Hash, Hasher},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Weak,
+    },
 };
 
 /// A mount namespace.
@@ -799,10 +797,14 @@ pub struct NamespaceNode {
 
 impl NamespaceNode {
     /// Create a namespace node that is not mounted in a namespace.
-    ///
-    /// The returned node does not have a name.
     pub fn new_anonymous(dir_entry: DirEntryHandle) -> Self {
         Self { mount: None, entry: dir_entry }
+    }
+
+    /// Create a namespace node that is not mounted in a namespace and that refers to a node that
+    /// is not rooted in a hierarchy and has no name.
+    pub fn new_anonymous_unrooted(node: Arc<FsNode>) -> Self {
+        Self::new_anonymous(DirEntry::new_unrooted(node))
     }
 
     /// Create a FileObject corresponding to this namespace node.

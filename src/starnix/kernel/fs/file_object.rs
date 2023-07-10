@@ -816,7 +816,7 @@ impl FileObject {
         flags: OpenFlags,
     ) -> FileHandle {
         assert!(!node.fs().has_permanent_entries());
-        Self::new(ops, NamespaceNode::new_anonymous(DirEntry::new_unrooted(node)), flags)
+        Self::new(ops, NamespaceNode::new_anonymous_unrooted(node), flags)
     }
 
     /// Create a FileObject with an associated NamespaceNode.

@@ -3884,7 +3884,7 @@ pub fn create_binders(kernel: &Arc<Kernel>) -> Result<(), Errno> {
 pub mod tests {
     use super::*;
     use crate::{
-        fs::{DirEntry, FdFlags},
+        fs::FdFlags,
         mm::{MemoryAccessor, PAGE_SIZE},
         testing::*,
     };
@@ -3968,9 +3968,7 @@ pub mod tests {
                 VMO_LENGTH,
                 prot_flags,
                 MappingOptions::empty(),
-                NamespaceNode::new_anonymous(DirEntry::new_unrooted(Arc::new(FsNode::new_root(
-                    PanickingFsNode,
-                )))),
+                NamespaceNode::new_anonymous_unrooted(Arc::new(FsNode::new_root(PanickingFsNode))),
             )
             .expect("mmap");
     }
