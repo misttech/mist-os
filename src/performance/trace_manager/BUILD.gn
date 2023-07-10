@@ -100,3 +100,17 @@ group("trace_manager_pkg") {
   testonly = true
   deps = [ ":trace_manager" ]
 }
+
+group("core_shard") {
+  # Temporary empty group for migration as part of fxbug.dev/112433
+  #
+  # The core shard is included in tree right now and we want to include it out of tree
+  # This sets up a migration where we remove the core shard from the assemblies
+  # and specifically reference it in the product definitions but replacing this
+  # empty group with the following:
+
+  # core_shard("core_shard") {
+  #   shard_file = "meta/trace_manager.core_shard.cml"
+  # }
+  deps = []
+}
