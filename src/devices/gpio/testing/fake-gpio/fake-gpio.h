@@ -54,6 +54,8 @@ class FakeGpio;
 
 using ReadCallback = std::function<zx::result<uint8_t>(FakeGpio&)>;
 
+using WriteCallback = std::function<zx_status_t(FakeGpio&)>;
+
 class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio> {
  public:
   FakeGpio();
@@ -89,6 +91,9 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   // Set the callback used for handling Read requests to `read_callback`.
   void SetReadCallback(ReadCallback read_callback);
 
+  // Set the callback used for responding to Write requests to `write_callback`.
+  void SetWriteCallback(WriteCallback write_callback);
+
   // Set the current state to `state`.
   void SetCurrentState(State state);
 
@@ -100,9 +105,8 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> Connect();
 
   // Returns a handler that binds incoming gpio service connections to this
-  // server implementation.
-  fuchsia_hardware_gpio::Service::InstanceHandler CreateInstanceHandler(
-      async_dispatcher_t* dispatcher);
+  // server implementation and the dispatcher of the caller.
+  fuchsia_hardware_gpio::Service::InstanceHandler CreateInstanceHandler();
 
  private:
   // Contains the states that the gpio has been set to in chronological order.
@@ -110,6 +114,9 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
 
   // Callback that provides the value to respond to `Read` requests with.
   ReadCallback read_callback_;
+
+  // Callback that provides the value to respond to `Write` requests with.
+  WriteCallback write_callback_;
 
   // Interrupt used for GetInterrupt requests.
   zx::result<zx::interrupt> interrupt_;

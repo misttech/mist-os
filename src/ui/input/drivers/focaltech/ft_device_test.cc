@@ -184,7 +184,7 @@ class FocaltechTest : public zxtest::Test, public loop_fixture::RealLoop {
 
     // Reset gpio fragment
     service_result = reset_gpio_fragment_outgoing_.AddService<fuchsia_hardware_gpio::Service>(
-        reset_gpio_.CreateInstanceHandler(dispatcher()));
+        reset_gpio_.CreateInstanceHandler());
     ZX_ASSERT(service_result.is_ok());
     endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ZX_ASSERT(endpoints.is_ok());
@@ -194,7 +194,7 @@ class FocaltechTest : public zxtest::Test, public loop_fixture::RealLoop {
 
     // Interrupt gpio fragment
     service_result = interrupt_gpio_fragment_outgoing_.AddService<fuchsia_hardware_gpio::Service>(
-        interrupt_gpio_.CreateInstanceHandler(dispatcher()));
+        interrupt_gpio_.CreateInstanceHandler());
     ZX_ASSERT(service_result.is_ok());
     endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ZX_ASSERT(endpoints.is_ok());

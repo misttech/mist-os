@@ -6,8 +6,8 @@
 #define SRC_UI_BACKLIGHT_DRIVERS_VIM3_PWM_BACKLIGHT_VIM3_PWM_BACKLIGHT_H_
 
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/vmo/types.h>
 #include <lib/zx/result.h>
@@ -120,7 +120,7 @@ class Vim3PwmBacklight : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
   inspect::Node root_;
 
   fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client_;
-  ddk::GpioProtocolClient gpio_backlight_power_{};
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_backlight_power_;
 
   State state_;
 

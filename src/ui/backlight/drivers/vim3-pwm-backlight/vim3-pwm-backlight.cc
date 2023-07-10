@@ -14,7 +14,6 @@
 
 #include <cmath>
 
-#include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 #include <soc/aml-common/aml-pwm-regs.h>
 
@@ -122,10 +121,15 @@ zx_status_t Vim3PwmBacklight::SetPwmConfig(bool enabled, float duty_cycle) {
 
 zx_status_t Vim3PwmBacklight::InitializeGpioBacklightPower(bool initially_enabled) {
   ZX_ASSERT(!gpio_initialized_);
-  zx_status_t status = gpio_backlight_power_.ConfigOut(initially_enabled);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Cannot configure GPIO pin: %s", zx_status_get_string(status));
-    return status;
+  fidl::WireResult result = gpio_backlight_power_->ConfigOut(initially_enabled);
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send ConfigOut request to gpio: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to configure gpio to output: %s",
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
   gpio_initialized_ = true;
   return ZX_OK;
@@ -133,10 +137,14 @@ zx_status_t Vim3PwmBacklight::InitializeGpioBacklightPower(bool initially_enable
 
 zx_status_t Vim3PwmBacklight::SetGpioBacklightPower(bool enabled) {
   ZX_ASSERT(gpio_initialized_);
-  zx_status_t status = gpio_backlight_power_.Write(enabled);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Cannot write to GPIO pin: %s", zx_status_get_string(status));
-    return status;
+  fidl::WireResult result = gpio_backlight_power_->Write(enabled);
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to gpio: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to write to gpio: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
   return ZX_OK;
 }
@@ -203,17 +211,25 @@ zx_status_t Vim3PwmBacklight::SetState(State target) {
 zx_status_t Vim3PwmBacklight::Bind() {
   root_ = inspector_.GetRoot().CreateChild("vim3-pwm-backlight");
 
-  zx::result client_end = DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>("pwm");
-  if (client_end.is_error()) {
-    zxlogf(ERROR, "Unable to connect to fidl protocol - status: %s", client_end.status_string());
-    return client_end.status_value();
+  zx::result pwm_client_end =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>("pwm");
+  if (pwm_client_end.is_error()) {
+    zxlogf(ERROR, "Unable to connect to fidl protocol - status: %s",
+           pwm_client_end.status_string());
+    return pwm_client_end.status_value();
   }
-  pwm_proto_client_.Bind(std::move(client_end.value()));
+  pwm_proto_client_.Bind(std::move(pwm_client_end.value()));
 
-  gpio_backlight_power_ = ddk::GpioProtocolClient(parent_, "gpio-lcd-backlight-enable");
-  if (!gpio_backlight_power_.is_valid()) {
-    return ZX_ERR_PROTOCOL_NOT_SUPPORTED;
+  const char* kGpioLcdBacklightEnableFragmentName = "gpio-lcd-backlight-enable";
+  zx::result gpio_client_end =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+          kGpioLcdBacklightEnableFragmentName);
+  if (gpio_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s",
+           kGpioLcdBacklightEnableFragmentName, gpio_client_end.status_string());
+    return gpio_client_end.status_value();
   }
+  gpio_backlight_power_.Bind(std::move(gpio_client_end.value()));
 
   if (zx_status_t status = Initialize(); status != ZX_OK) {
     return status;

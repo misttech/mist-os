@@ -19,8 +19,9 @@ bool AltFunctionState::operator==(const AltFunctionState& other) const {
 }
 
 zx::result<uint8_t> DefaultReadCallback(FakeGpio& gpio) { return zx::error(ZX_ERR_NOT_SUPPORTED); }
+zx_status_t DefaultWriteCallback(FakeGpio& gpio) { return ZX_OK; }
 
-FakeGpio::FakeGpio() : read_callback_(DefaultReadCallback) {
+FakeGpio::FakeGpio() : read_callback_(DefaultReadCallback), write_callback_(DefaultWriteCallback) {
   zx::interrupt interrupt;
   ZX_ASSERT(zx::interrupt::create(zx::resource(ZX_HANDLE_INVALID), 0, ZX_INTERRUPT_VIRTUAL,
                                   &interrupt) == ZX_OK);
@@ -67,7 +68,12 @@ void FakeGpio::Write(WriteRequestView request, WriteCompleter::Sync& completer) 
   }
 
   state_log_.emplace_back(WriteState{.value = request->value});
-  completer.ReplySuccess();
+  zx_status_t response = write_callback_(*this);
+  if (response == ZX_OK) {
+    completer.ReplySuccess();
+  } else {
+    completer.ReplyError(response);
+  }
 }
 
 void FakeGpio::Read(ReadCompleter::Sync& completer) {
@@ -104,6 +110,10 @@ void FakeGpio::SetReadCallback(ReadCallback read_callback) {
   read_callback_ = std::move(read_callback);
 }
 
+void FakeGpio::SetWriteCallback(WriteCallback write_callback) {
+  write_callback_ = std::move(write_callback);
+}
+
 void FakeGpio::SetCurrentState(State state) { state_log_.push_back(std::move(state)); }
 
 std::vector<State> FakeGpio::GetStateLog() { return state_log_; }
@@ -116,8 +126,8 @@ fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> FakeGpio::Connect() {
   return std::move(endpoints->client);
 }
 
-fuchsia_hardware_gpio::Service::InstanceHandler FakeGpio::CreateInstanceHandler(
-    async_dispatcher_t* dispatcher) {
+fuchsia_hardware_gpio::Service::InstanceHandler FakeGpio::CreateInstanceHandler() {
+  auto* dispatcher = async_get_default_dispatcher();
   Handler device_handler = [impl = this, dispatcher = dispatcher](
                                ::fidl::ServerEnd<::fuchsia_hardware_gpio::Gpio> request) {
     impl->bindings_.AddBinding(dispatcher, std::move(request), impl, fidl::kIgnoreBindingClosure);
