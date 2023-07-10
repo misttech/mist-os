@@ -196,7 +196,7 @@ impl AssemblyManifest {
                     path: path_relative_from(path, &base_path)?,
                     contents: contents.relativize(&base_path)?,
                 }),
-                Image::FxfsSparse { path, contents } => images.push(Image::Fxfs {
+                Image::FxfsSparse { path, contents } => images.push(Image::FxfsSparse {
                     path: path_relative_from(path, &base_path)?,
                     contents: contents.relativize(&base_path)?,
                 }),
@@ -243,7 +243,7 @@ impl AssemblyManifest {
                     path: manifest_dir.as_ref().join(path),
                     contents: contents.derelativize(&manifest_dir)?,
                 }),
-                Image::FxfsSparse { path, contents } => images.push(Image::Fxfs {
+                Image::FxfsSparse { path, contents } => images.push(Image::FxfsSparse {
                     path: manifest_dir.as_ref().join(path),
                     contents: contents.derelativize(&manifest_dir)?,
                 }),
@@ -645,6 +645,7 @@ mod tests {
                 Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
                 Image::VBMeta("fuchsia.vbmeta".into()),
                 Image::Fxfs { path: "fxfs.blk".into(), contents: Default::default() },
+                Image::FxfsSparse { path: "fxfs.sparse.blk".into(), contents: Default::default() },
                 Image::QemuKernel("qemu/kernel".into()),
             ],
         };
@@ -683,6 +684,7 @@ mod tests {
                 Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
                 Image::VBMeta("fuchsia.vbmeta".into()),
                 Image::Fxfs { path: "fxfs.blk".into(), contents: Default::default() },
+                Image::FxfsSparse { path: "fxfs.sparse.blk".into(), contents: Default::default() },
                 Image::QemuKernel("qemu/kernel".into()),
             ],
         };
@@ -722,6 +724,10 @@ mod tests {
                 Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: true },
                 Image::VBMeta("path/to/fuchsia.vbmeta".into()),
                 Image::Fxfs { path: "path/to/fxfs.blk".into(), contents: Default::default() },
+                Image::FxfsSparse {
+                    path: "path/to/fxfs.sparse.blk".into(),
+                    contents: Default::default(),
+                },
                 Image::QemuKernel("path/to/qemu/kernel".into()),
             ],
         };
@@ -796,7 +802,7 @@ mod tests {
     #[test]
     fn deserialize_fxfs() {
         let manifest: AssemblyManifest = generate_test_manifest_fxfs();
-        assert_eq!(manifest.images.len(), 5);
+        assert_eq!(manifest.images.len(), 6);
 
         for image in &manifest.images {
             let (expected, actual) = match image {
@@ -809,6 +815,10 @@ mod tests {
                 Image::Fxfs { path, contents } => {
                     assert_eq!(contents, &BlobfsContents::default());
                     ("path/to/fxfs.blk", path)
+                }
+                Image::FxfsSparse { path, contents } => {
+                    assert_eq!(contents, &BlobfsContents::default());
+                    ("path/to/fxfs.sparse.blk", path)
                 }
                 Image::QemuKernel(path) => ("path/to/qemu/kernel", path),
                 _ => panic!("Unexpected item {:?}", image),
@@ -1018,6 +1028,18 @@ mod tests {
                 "type": "fxfs-blk",
                 "name": "storage-full",
                 "path": "path/to/fxfs.blk",
+                "contents": {
+                    "packages": {
+                        "base": [],
+                        "cache": [],
+                    },
+                    "maximum_contents_size": None::<u64>
+                },
+            },
+            {
+                "type": "blk",
+                "name": "fxfs.fastboot",
+                "path": "path/to/fxfs.sparse.blk",
                 "contents": {
                     "packages": {
                         "base": [],
