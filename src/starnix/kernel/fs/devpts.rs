@@ -594,18 +594,23 @@ mod tests {
         file.ioctl(task, TIOCSCTTY, steal.into())
     }
 
+    fn lookup_node(
+        task: &CurrentTask,
+        fs: &FileSystemHandle,
+        name: &FsStr,
+    ) -> Result<NamespaceNode, Errno> {
+        let root = NamespaceNode::new_anonymous(fs.root().clone());
+        root.lookup_child(task, &mut Default::default(), name)
+    }
+
     fn open_file_with_flags(
         task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno> {
-        let component = fs.root().component_lookup(task, name)?;
-        Ok(FileObject::new(
-            component.node.open(task, flags, true)?,
-            NamespaceNode::new_anonymous(component.clone()),
-            flags,
-        ))
+        let node = lookup_node(task, fs, name)?;
+        node.open(task, flags, true)
     }
 
     fn open_file(
@@ -632,43 +637,40 @@ mod tests {
     async fn opening_ptmx_creates_pts() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel, Default::default());
-        let root = fs.root();
-        root.component_lookup(&task, b"0").unwrap_err();
+        lookup_node(&task, fs, b"0").unwrap_err();
         let _ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        root.component_lookup(&task, b"0").expect("pty");
+        lookup_node(&task, fs, b"0").expect("pty");
     }
 
     #[::fuchsia::test]
     async fn closing_ptmx_closes_pts() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel, Default::default());
-        let root = fs.root();
-        root.component_lookup(&task, b"0").unwrap_err();
+        lookup_node(&task, fs, b"0").unwrap_err();
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
         let _pts = open_file(&task, fs, b"0").expect("open file");
         std::mem::drop(ptmx);
-        root.component_lookup(&task, b"0").unwrap_err();
+        lookup_node(&task, fs, b"0").unwrap_err();
     }
 
     #[::fuchsia::test]
     async fn pts_are_reused() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel, Default::default());
-        let root = fs.root();
 
         let _ptmx0 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
         let mut _ptmx1 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
         let _ptmx2 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
 
-        root.component_lookup(&task, b"0").expect("component_lookup");
-        root.component_lookup(&task, b"1").expect("component_lookup");
-        root.component_lookup(&task, b"2").expect("component_lookup");
+        lookup_node(&task, fs, b"0").expect("component_lookup");
+        lookup_node(&task, fs, b"1").expect("component_lookup");
+        lookup_node(&task, fs, b"2").expect("component_lookup");
 
         std::mem::drop(_ptmx1);
-        root.component_lookup(&task, b"1").unwrap_err();
+        lookup_node(&task, fs, b"1").unwrap_err();
 
         _ptmx1 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        root.component_lookup(&task, b"1").expect("component_lookup");
+        lookup_node(&task, fs, b"1").expect("component_lookup");
     }
 
     #[::fuchsia::test]
@@ -687,7 +689,8 @@ mod tests {
                 FsCred::root(),
             )
             .expect("custom_pts");
-        assert!(pts.node.open(&task, OpenFlags::RDONLY, true).is_err());
+        let node = NamespaceNode::new_anonymous(pts.clone());
+        assert!(node.open(&task, OpenFlags::RDONLY, true).is_err());
     }
 
     #[::fuchsia::test]
@@ -747,8 +750,8 @@ mod tests {
         let fs = dev_pts_fs(&kernel, Default::default());
         let _ptmx_file = open_file(&task, fs, b"ptmx").expect("open file");
 
-        let pts = fs.root().component_lookup(&task, b"0").expect("component_lookup");
-        assert_eq!(pts.node.open(&task, OpenFlags::RDONLY, true).map(|_| ()), error!(EIO));
+        let pts = lookup_node(&task, fs, b"0").expect("component_lookup");
+        assert_eq!(pts.open(&task, OpenFlags::RDONLY, true).map(|_| ()), error!(EIO));
     }
 
     #[::fuchsia::test]
@@ -756,19 +759,19 @@ mod tests {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel, Default::default());
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        let pts = fs.root().component_lookup(&task, b"0").expect("component_lookup");
+        let pts = lookup_node(&task, fs, b"0").expect("component_lookup");
 
         // Check that the lock is not set.
         assert_eq!(ioctl::<i32>(&task, &ptmx, TIOCGPTLCK, &0), Ok(0));
         // /dev/pts/0 can be opened
-        pts.node.open(&task, OpenFlags::RDONLY, true).expect("open");
+        pts.open(&task, OpenFlags::RDONLY, true).expect("open");
 
         // Lock the terminal
         ioctl::<i32>(&task, &ptmx, TIOCSPTLCK, &42).expect("ioctl");
         // Check that the lock is set.
         assert_eq!(ioctl::<i32>(&task, &ptmx, TIOCGPTLCK, &0), Ok(1));
         // /dev/pts/0 cannot be opened
-        assert_eq!(pts.node.open(&task, OpenFlags::RDONLY, true).map(|_| ()), error!(EIO));
+        assert_eq!(pts.open(&task, OpenFlags::RDONLY, true).map(|_| ()), error!(EIO));
     }
 
     #[::fuchsia::test]
