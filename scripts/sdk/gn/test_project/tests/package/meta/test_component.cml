@@ -4,9 +4,8 @@
 // This is a v2 component manifest.
 {
     include: [
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
-        "syslog/offer.shard.cml",
-        "syslog/use.shard.cml",
     ],
     program: {
         runner: "elf",
