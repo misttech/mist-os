@@ -14,8 +14,8 @@
             environment: "#driver_manager-env",
         },
         {
-            name: "fake-boot-resolver",
-            url: "#meta/fake_boot_resolver.cm",
+            name: "fake-resolver",
+            url: "#meta/fake_resolver.cm",
         },
         {
             name: "driver-index",
@@ -44,6 +44,12 @@
             durability: "single_run",
             allowed_offers: "static_and_dynamic",
         },
+        {
+            name: "full-pkg-drivers",
+            environment: "#full-pkg-driver-env",
+            durability: "single_run",
+            allowed_offers: "static_and_dynamic",
+        },
     ],
     offer: [
         {
@@ -69,6 +75,7 @@
             from: "#driver_manager",
             to: [
                 "#boot-drivers",
+                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
         },
@@ -81,7 +88,8 @@
                 "#driver-hosts",
                 "#driver-index",
                 "#driver_manager",
-                "#fake-boot-resolver",
+                "#fake-resolver",
+                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
         },
@@ -123,6 +131,7 @@
             to: [
                 "#boot-drivers",
                 "#driver-hosts",
+                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
         },
@@ -141,7 +150,7 @@
                 "fuchsia.component.resolution.Resolver-boot",
                 "fuchsia.component.resolution.Resolver-full",
             ],
-            from: "parent",
+            from: "#fake-resolver",
             to: [
                 "#driver-index",
                 "#driver_manager",
@@ -153,7 +162,7 @@
             to: [
                 "#driver-index",
                 "#driver_manager",
-                "#fake-boot-resolver",
+                "#fake-resolver",
             ],
             rights: [ "rx*" ],
         },
@@ -198,7 +207,7 @@
             resolvers: [
                 {
                     resolver: "boot-resolver",
-                    from: "#fake-boot-resolver",
+                    from: "#fake-resolver",
                     scheme: "fuchsia-boot",
                 },
             ],
@@ -218,12 +227,37 @@
             resolvers: [
                 {
                     resolver: "boot-resolver",
-                    from: "#fake-boot-resolver",
+                    from: "#fake-resolver",
                     scheme: "fuchsia-boot",
                 },
             ],
 
             // 10 seconds
+            __stop_timeout_ms: 10000,
+        },
+        {
+            name: "full-pkg-driver-env",
+            extends: "realm",
+            runners: [
+                {
+                    runner: "driver",
+                    from: "#driver_manager",
+                },
+            ],
+            resolvers: [
+                {
+                    resolver: "boot-resolver",
+                    from: "#fake-resolver",
+                    scheme: "fuchsia-boot",
+                },
+                {
+                    resolver: "pkg-resolver",
+                    from: "#fake-resolver",
+                    scheme: "fuchsia-pkg",
+                },
+            ],
+
+            // 10 second
             __stop_timeout_ms: 10000,
         },
     ],

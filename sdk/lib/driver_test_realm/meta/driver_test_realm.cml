@@ -40,9 +40,6 @@
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
-                "fuchsia.component.resolution.Resolver-base",
-                "fuchsia.component.resolution.Resolver-boot",
-                "fuchsia.component.resolution.Resolver-full",
                 "fuchsia.driver.index.DriverIndex",
                 "fuchsia.kernel.RootJob",
             ],
@@ -72,9 +69,6 @@
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
-                "fuchsia.component.resolution.Resolver-base",
-                "fuchsia.component.resolution.Resolver-boot",
-                "fuchsia.component.resolution.Resolver-full",
                 "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.kernel.RootJob",
             ],

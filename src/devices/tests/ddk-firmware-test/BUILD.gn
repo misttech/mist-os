@@ -101,7 +101,7 @@ fuchsia_test_package("ddk-firmware-test-package") {
     ":driver-manager-realm",
     ":test-firmware-file",
     "//sdk/lib/driver_test_realm:driver_manager_test",
-    "//sdk/lib/driver_test_realm:fake_boot_resolver",
+    "//sdk/lib/driver_test_realm:fake_resolver",
     "//src/devices/bin/devfs:component",
     "//src/devices/bin/driver-index:base-driver-manifest",
     "//src/devices/bin/driver-index:component",

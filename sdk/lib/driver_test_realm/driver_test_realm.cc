@@ -212,85 +212,6 @@ class FakeRootJob final : public fidl::WireServer<fuchsia_kernel::RootJob> {
   }
 };
 
-class FakeFullComponentResolver final
-    : public fidl::WireServer<fuchsia_component_resolution::Resolver> {
-  void Resolve(ResolveRequestView request, ResolveCompleter::Sync& completer) override {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      FX_SLOG(ERROR, "FakeBaseComponentResolver failed to create directory endpoints");
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
-    }
-
-    auto status = fdio_open("/pkg",
-                            static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory |
-                                                  fuchsia_io::wire::OpenFlags::kRightReadable |
-                                                  fuchsia_io::wire::OpenFlags::kRightExecutable),
-                            endpoints->server.TakeChannel().release());
-    if (status != ZX_OK) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
-      return;
-    }
-
-    auto file = fidl::CreateEndpoints<fuchsia_io::File>();
-    if (file.is_error()) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
-      return;
-    }
-    std::string_view url = request->component_url.get();
-    auto i = url.find("meta/");
-    if (i == std::string::npos) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
-      return;
-    }
-    auto relative_path = url.substr(i);
-    status = fdio_open_at(endpoints->client.channel().get(), std::string(relative_path).data(),
-                          static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable),
-                          file->server.channel().release());
-    if (status != ZX_OK) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
-      return;
-    }
-    fidl::WireResult result =
-        fidl::WireCall(file->client)->GetBackingMemory(fuchsia_io::wire::VmoFlags::kRead);
-    if (!result.ok()) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
-      return;
-    }
-    auto& response = result.value();
-    if (response.is_error()) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
-      return;
-    }
-    zx::vmo& vmo = response.value()->vmo;
-    uint64_t size;
-    status = vmo.get_prop_content_size(&size);
-    if (status != ZX_OK) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
-    }
-
-    fidl::Arena arena;
-    auto package = fuchsia_component_resolution::wire::Package::Builder(arena)
-                       .directory(std::move(endpoints->client))
-                       .Build();
-    auto component = fuchsia_component_resolution::wire::Component::Builder(arena)
-                         .url(request->component_url)
-                         .decl(fuchsia_mem::wire::Data::WithBuffer(arena,
-                                                                   fuchsia_mem::wire::Buffer{
-                                                                       .vmo = std::move(vmo),
-                                                                       .size = size,
-                                                                   }))
-                         .package(package)
-                         .Build();
-    completer.ReplySuccess(component);
-  }
-
-  void ResolveWithContext(ResolveWithContextRequestView request,
-                          ResolveWithContextCompleter::Sync& completer) override {
-    FX_SLOG(ERROR, "ResolveWithContext is not yet implemented in FakeFullComponentResolver");
-    completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
-  }
-};
-
 std::map<std::string, std::string> CreateBootArgs(const fuchsia_driver_test::RealmArgs& args) {
   std::map<std::string, std::string> boot_args;
 
@@ -471,14 +392,6 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       return;
     }
 
-    result = outgoing_->AddProtocol<fuchsia_component_resolution::Resolver>(
-        std::make_unique<FakeFullComponentResolver>(),
-        "fuchsia.component.resolution.Resolver-full");
-    if (result.is_error()) {
-      completer.Reply(result.take_error());
-      return;
-    }
-
     fidl::ClientEnd<fuchsia_io::Directory> boot_dir;
     if (request.args().boot().has_value()) {
       boot_dir = fidl::ClientEnd<fuchsia_io::Directory>(std::move(*request.args().boot()));
@@ -508,23 +421,36 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     }
 
     // Add additional routes if specified.
-    std::unordered_map<fdt::Collection, const char*> kMap = {
-        {fdt::Collection::kBootDrivers, "boot-drivers"},
-        {fdt::Collection::kPackageDrivers, "pkg-drivers"},
+    std::unordered_map<fdt::Collection, std::vector<Ref>> kMap = {
+        {
+            fdt::Collection::kBootDrivers,
+            {
+                CollectionRef{"boot-drivers"},
+            },
+        },
+        {
+            fdt::Collection::kPackageDrivers,
+            {
+                CollectionRef{"pkg-drivers"},
+                CollectionRef{"full-pkg-drivers"},
+            },
+        },
     };
     if (request.args().offers().has_value()) {
       for (const auto& offer : *request.args().offers()) {
         realm_builder_.AddRoute(Route{.capabilities = {Protocol{offer.protocol_name()}},
                                       .source = {ParentRef()},
-                                      .targets = {CollectionRef{kMap[offer.collection()]}}});
+                                      .targets = kMap[offer.collection()]});
       }
     }
 
     if (request.args().exposes().has_value()) {
       for (const auto& expose : *request.args().exposes()) {
-        realm_builder_.AddRoute(Route{.capabilities = {Service{expose.service_name()}},
-                                      .source = {CollectionRef{kMap[expose.collection()]}},
-                                      .targets = {ParentRef()}});
+        for (const auto& ref : kMap[expose.collection()]) {
+          realm_builder_.AddRoute(Route{.capabilities = {Service{expose.service_name()}},
+                                        .source = ref,
+                                        .targets = {ParentRef()}});
+        }
       }
     }
 

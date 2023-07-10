@@ -13,7 +13,7 @@ group("driver_test_realm") {
     ":client_includes",
     ":driver_manager_test",
     ":driver_test_realm_component",
-    ":fake_boot_resolver",
+    ":fake_resolver",
     ":test_realm_manifest",
     "//src/devices/bin/devfs:component",
     "//src/devices/bin/driver-index:base-driver-manifest",
@@ -29,7 +29,7 @@ group("realm_builder_version") {
   deps = [
     ":driver_manager_test",
     ":driver_test_realm_component",
-    ":fake_boot_resolver",
+    ":fake_resolver",
     ":realm_builder_includes",
     ":test_realm_manifest",
     "//src/devices/bin/devfs:component",
@@ -106,29 +106,26 @@ fuchsia_component("driver_test_realm_component") {
   ]
 }
 
-executable("fake_boot_resolver_bin") {
-  output_name = "fake_boot_resolver"
+executable("fake_resolver_bin") {
+  output_name = "fake_resolver"
   testonly = true
-  sources = [ "fake_boot_resolver.cc" ]
+  sources = [ "fake_resolver.cc" ]
   data_deps = [ "fake_driver:driver_package" ]
   deps = [
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_cpp_wire",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/svc",
-    "//sdk/lib/sys/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/storage/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/svc",
   ]
 }
 
-fuchsia_component("fake_boot_resolver") {
+fuchsia_component("fake_resolver") {
   testonly = true
-  manifest = "meta/fake_boot_resolver.cml"
-  deps = [ ":fake_boot_resolver_bin" ]
+  manifest = "meta/fake_resolver.cml"
+  deps = [ ":fake_resolver_bin" ]
 }
 
 fuchsia_component_manifest("driver_manager_manifest") {
