@@ -1,6 +1,6 @@
 #![cfg_attr(
     async_trait_nightly_testing,
-    feature(min_specialization, type_alias_impl_trait)
+    feature(impl_trait_in_assoc_type, min_specialization)
 )]
 #![deny(rust_2021_compatibility)]
 #![allow(
@@ -9,6 +9,7 @@
     clippy::missing_panics_doc,
     clippy::missing_safety_doc,
     clippy::needless_return,
+    clippy::non_minimal_cfg,
     clippy::trivially_copy_pass_by_ref,
     clippy::unused_async
 )]

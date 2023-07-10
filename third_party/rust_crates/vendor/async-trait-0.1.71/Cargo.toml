@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.56"
 name = "async-trait"
-version = "0.1.68"
+version = "0.1.71"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 description = "Type erasure for async trait methods"
 documentation = "https://docs.rs/async-trait"
@@ -33,30 +33,30 @@ targets = ["x86_64-unknown-linux-gnu"]
 proc-macro = true
 
 [dependencies.proc-macro2]
-version = "1.0"
+version = "1.0.63"
 
 [dependencies.quote]
-version = "1.0"
+version = "1.0.29"
 
 [dependencies.syn]
-version = "2.0.9"
+version = "2.0.23"
 features = [
     "full",
     "visit-mut",
 ]
 
 [dev-dependencies.futures]
-version = "0.3"
+version = "0.3.28"
 
 [dev-dependencies.rustversion]
-version = "1.0"
+version = "1.0.13"
 
 [dev-dependencies.tracing]
-version = "0.1.14"
+version = "0.1.37"
 
 [dev-dependencies.tracing-attributes]
-version = "0.1.14"
+version = "0.1.26"
 
 [dev-dependencies.trybuild]
-version = "1.0.49"
+version = "1.0.81"
 features = ["diff"]

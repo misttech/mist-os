@@ -88,7 +88,7 @@ group("async-stream") {
 }
 
 group("async-trait") {
-  public_deps = [ ":async-trait-v0_1_68($host_toolchain)" ]
+  public_deps = [ ":async-trait-v0_1_71($host_toolchain)" ]
 }
 
 group("atty") {
@@ -1682,10 +1682,10 @@ rust_library("async-task-v4_0_3") {
   visibility = [ ":*" ]
 }
 
-rust_proc_macro("async-trait-v0_1_68") {
+rust_proc_macro("async-trait-v0_1_71") {
   crate_name = "async_trait"
-  crate_root = "//third_party/rust_crates/vendor/async-trait-0.1.68/src/lib.rs"
-  output_name = "async_trait-a643072d402bca81"
+  crate_root = "//third_party/rust_crates/vendor/async-trait-0.1.71/src/lib.rs"
+  output_name = "async_trait-1fd7cf147dfbb38f"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -1698,8 +1698,8 @@ rust_proc_macro("async-trait-v0_1_68") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=a643072d402bca81",
-    "-Cextra-filename=-a643072d402bca81",
+    "-Cmetadata=1fd7cf147dfbb38f",
+    "-Cextra-filename=-1fd7cf147dfbb38f",
   ]
 
   visibility = [ ":*" ]
@@ -4113,7 +4113,7 @@ rust_library("fuse3-v0_6_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":async-trait-v0_1_68($host_toolchain)" ]
+  deps += [ ":async-trait-v0_1_71($host_toolchain)" ]
   deps += [ ":bincode-v1_3_3" ]
   deps += [ ":bytes-v1_0_1" ]
   deps += [ ":cstr-v0_2_11($host_toolchain)" ]
@@ -11596,7 +11596,7 @@ rust_library("trust-dns-proto-v0_22_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":async-trait-v0_1_68($host_toolchain)" ]
+  deps += [ ":async-trait-v0_1_71($host_toolchain)" ]
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":data-encoding-v2_3_2" ]
   deps += [ ":enum-as-inner-v0_5_1($host_toolchain)" ]
