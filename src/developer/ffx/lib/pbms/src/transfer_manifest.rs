@@ -6,18 +6,24 @@
 //!
 //! This builds upon the lower level /src/lib/transfer_manifest lib.
 
-use crate::{
-    pbms::{fetch_from_url, GS_SCHEME},
-    string_from_url, AuthFlowChoice,
+use {
+    crate::{
+        pbms::{fetch_from_url, GS_SCHEME},
+        string_from_url, AuthFlowChoice,
+    },
+    ::gcs::{
+        client::{Client, ProgressResult, ProgressState},
+        gs_url::split_gs_url,
+    },
+    ::transfer_manifest::TransferManifest,
+    anyhow::{bail, Context, Result},
+    futures::{StreamExt as _, TryStreamExt as _},
+    std::{
+        format,
+        path::{Component, Path, PathBuf},
+    },
+    structured_ui,
 };
-use ::gcs::{
-    client::{Client, ProgressResult, ProgressState},
-    gs_url::split_gs_url,
-};
-use ::transfer_manifest::TransferManifest;
-use anyhow::{Context, Result};
-use futures::{StreamExt as _, TryStreamExt as _};
-use structured_ui;
 
 /// Download a set of files referenced in the `transfer_manifest_url`.
 ///
@@ -25,7 +31,7 @@ use structured_ui;
 /// is called.
 pub async fn transfer_download<F, I>(
     transfer_manifest_url: &url::Url,
-    local_dir: &std::path::Path,
+    local_dir: &Path,
     auth_flow: &AuthFlowChoice,
     progress: &F,
     ui: &I,
@@ -66,6 +72,34 @@ where
     Ok(())
 }
 
+/// Join `relative` onto `base` with light path normalization.
+/// Errors out if the final path is not within `base`.
+fn safe_join(base: &Path, relative: &Path) -> Result<PathBuf> {
+    let mut normalized_relative = PathBuf::new();
+    for part in relative.components() {
+        match part {
+            Component::Prefix(_) | Component::RootDir | Component::CurDir => {}
+            Component::ParentDir => {
+                if !normalized_relative.pop() {
+                    tracing::warn!("Failed to normalize path: {}", relative.to_string_lossy());
+                    break;
+                }
+            }
+            Component::Normal(part_str) => normalized_relative.push(part_str),
+        }
+    }
+
+    if normalized_relative.parent().is_some() {
+        Ok(base.join(normalized_relative))
+    } else {
+        bail!(
+            "Cannot safely concat \"{}\" onto \"{}\"",
+            relative.to_string_lossy(),
+            base.to_string_lossy()
+        )
+    }
+}
+
 /// Helper for transfer_download specifically for version 1 transfer manifests.
 ///
 /// Files will be nested under `local_dir` which must exist when this function
@@ -73,7 +107,7 @@ where
 async fn transfer_download_v1<F, I>(
     transfer_manifest_url: &url::Url,
     transfer_manifest: &transfer_manifest::TransferManifestV1,
-    local_dir: &std::path::Path,
+    local_dir: &Path,
     auth_flow: &AuthFlowChoice,
     progress: &F,
     ui: &I,
@@ -83,6 +117,15 @@ where
     F: Fn(Vec<ProgressState<'_>>) -> ProgressResult,
     I: structured_ui::Interface + Sync,
 {
+    fn malformed_warning<T>(err: T) -> T {
+        eprintln!("The specified remote transfer manifest is malformed or broken.");
+        eprintln!(
+            "This can happen when you're trying to download a broken or unsupported build/release."
+        );
+        eprintln!("Please try a different product bundle transfer url.");
+        err
+    }
+
     let base_url = match transfer_manifest_url.scheme() {
         GS_SCHEME => format!(
             "gs://{}",
@@ -98,14 +141,18 @@ where
         // Avoid using base_url.join().
         let te_remote_dir = format!("{}/{}", base_url, transfer_entry.remote.as_str());
 
-        let te_local_dir = local_dir.join(&transfer_entry.local);
+        let te_local_dir = safe_join(&local_dir, transfer_entry.local.as_std_path())
+            .context("parsing path: `entries[].local`")
+            .map_err(malformed_warning)?;
         let artifact_entry_count = transfer_entry.entries.len() as u64;
         for (k, artifact_entry) in transfer_entry.entries.iter().enumerate() {
             // Avoid using te_remote_dir.join().
             let remote_file =
                 url::Url::parse(&format!("{}/{}", te_remote_dir, artifact_entry.name.as_str()))?;
 
-            let local_file = te_local_dir.join(&artifact_entry.name);
+            let local_file = safe_join(&te_local_dir, artifact_entry.name.as_std_path())
+                .context("parsing path: `entries[].entries[].name`")
+                .map_err(malformed_warning)?;
             let local_parent = local_file.parent().context("getting local parent")?.to_path_buf();
             async_fs::create_dir_all(&local_parent)
                 .await
@@ -148,4 +195,59 @@ where
 
     while let Some(()) = stream.try_next().await? {}
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_safe_join() -> Result<()> {
+        macro_rules! assert_joined {
+            ($base:literal, $relative:literal, $result:literal) => {
+                assert_eq!(safe_join(Path::new($base), Path::new($relative))?, Path::new($result));
+            };
+        }
+
+        macro_rules! assert_cannot_join {
+            ($base:literal, $relative:literal) => {
+                assert_eq!(
+                    safe_join(Path::new($base), Path::new($relative)).unwrap_err().to_string(),
+                    concat!("Cannot safely concat \"", $relative, "\" onto \"", $base, "\""),
+                );
+            };
+        }
+
+        // absolute / relative
+        assert_joined!("/absolute", "relative", "/absolute/relative");
+
+        // relative / relative
+        assert_joined!("./relative", "./subdir", "./relative/subdir");
+        assert_joined!("relative", "subdir", "relative/subdir");
+
+        // Join with subdirs.
+        assert_joined!("/absolute/subdir", "relative/subdir", "/absolute/subdir/relative/subdir");
+
+        // Second path is normalized.
+        assert_joined!(
+            "/absolute/subdir/..",
+            "relative/subdir/../subdir",
+            "/absolute/subdir/../relative/subdir"
+        );
+
+        // Second path is treated as relative
+        assert_joined!("/absolute", "/not_absolute", "/absolute/not_absolute");
+
+        // Subpath must be non-empty.
+        assert_cannot_join!("./relative", "");
+        assert_cannot_join!("./relative", ".");
+        assert_cannot_join!("./relative", "./subdir/..");
+
+        // Subpath cannot escape the base directory.
+        assert_cannot_join!("/absolute/path", "..");
+        assert_cannot_join!("/absolute/path", "/../path");
+        assert_cannot_join!("/absolute/path", "a_dir/../..");
+
+        Ok(())
+    }
 }
