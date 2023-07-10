@@ -106,7 +106,7 @@ async fn get_all_instances_internal(
 
     match query
         .open(
-            "./core/appmgr",
+            &moniker.to_string(),
             fsys::OpenDirType::OutgoingDir,
             fio::OpenFlags::RIGHT_READABLE,
             fio::ModeType::empty(),

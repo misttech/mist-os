@@ -47,7 +47,7 @@ async fn main() {
 
     for _ in 0..2 {
         let event = EventMatcher::ok().expect_match::<DirectoryReady>(&mut event_stream).await;
-        assert_eq!(event.target_moniker(), "./child");
+        assert_eq!(event.target_moniker(), "child");
         let payload = event.result().unwrap();
 
         let expected_entries = all_expected_entries.remove(&payload.name).unwrap();

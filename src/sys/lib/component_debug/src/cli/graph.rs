@@ -209,7 +209,7 @@ pub fn create_dot_graph(instances: Vec<Instance>, orientation: GraphOrientation)
         let label = if let Some(leaf) = instance.moniker.leaf() {
             leaf.to_string()
         } else {
-            "/".to_string()
+            ".".to_string()
         };
 
         // Running components are filled.
@@ -270,7 +270,7 @@ mod test {
                 }),
             },
             Instance {
-                moniker: AbsoluteMoniker::parse_str("/appmgr").unwrap(),
+                moniker: AbsoluteMoniker::parse_str("appmgr").unwrap(),
                 url: "fuchsia-pkg://fuchsia.com/appmgr#meta/appmgr.cm".to_owned(),
                 environment: None,
                 instance_id: None,
@@ -283,7 +283,7 @@ mod test {
                 }),
             },
             Instance {
-                moniker: AbsoluteMoniker::parse_str("/sys").unwrap(),
+                moniker: AbsoluteMoniker::parse_str("sys").unwrap(),
                 url: "fuchsia-pkg://fuchsia.com/sys#meta/sys.cm".to_owned(),
                 environment: None,
                 instance_id: None,
@@ -294,7 +294,7 @@ mod test {
                 }),
             },
             Instance {
-                moniker: AbsoluteMoniker::parse_str("/sys/baz").unwrap(),
+                moniker: AbsoluteMoniker::parse_str("sys/baz").unwrap(),
                 url: "fuchsia-pkg://fuchsia.com/baz#meta/baz.cm".to_owned(),
                 environment: None,
                 instance_id: None,
@@ -307,7 +307,7 @@ mod test {
                 }),
             },
             Instance {
-                moniker: AbsoluteMoniker::parse_str("/sys/fuzz").unwrap(),
+                moniker: AbsoluteMoniker::parse_str("sys/fuzz").unwrap(),
                 url: "fuchsia-pkg://fuchsia.com/fuzz#meta/fuzz.cm".to_owned(),
                 environment: None,
                 instance_id: None,
@@ -318,7 +318,7 @@ mod test {
                 }),
             },
             Instance {
-                moniker: AbsoluteMoniker::parse_str("/sys/fuzz/hello").unwrap(),
+                moniker: AbsoluteMoniker::parse_str("sys/fuzz/hello").unwrap(),
                 url: "fuchsia-pkg://fuchsia.com/hello#meta/hello.cm".to_owned(),
                 environment: None,
                 instance_id: None,
@@ -347,17 +347,17 @@ mod test {
     edge [ color = "#37474f" penwidth = 1 arrowhead = none target = "_parent" fontname = "roboto mono" fontsize = 10 ]
     splines = "ortho"
     rankdir = "{}"
-    "/" [ label = "/"  href = "https://cs.opensource.google/search?q=f%3Aroot.cml&ss=fuchsia%2Ffuchsia" ]
-    "/appmgr" [ label = "appmgr" style = "filled" fontcolor = "#ffffff" href = "https://cs.opensource.google/search?q=f%3Aappmgr.cml&ss=fuchsia%2Ffuchsia" ]
-    "/" -> "/appmgr"
-    "/sys" [ label = "sys"  href = "https://cs.opensource.google/search?q=f%3Asys.cml&ss=fuchsia%2Ffuchsia" ]
-    "/" -> "/sys"
-    "/sys/baz" [ label = "baz" style = "filled" fontcolor = "#ffffff" href = "https://cs.opensource.google/search?q=f%3Abaz.cml&ss=fuchsia%2Ffuchsia" ]
-    "/sys" -> "/sys/baz"
-    "/sys/fuzz" [ label = "fuzz"  href = "https://cs.opensource.google/search?q=f%3Afuzz.cml&ss=fuchsia%2Ffuchsia" ]
-    "/sys" -> "/sys/fuzz"
-    "/sys/fuzz/hello" [ label = "hello"  href = "https://cs.opensource.google/search?q=f%3Ahello.cml&ss=fuchsia%2Ffuchsia" ]
-    "/sys/fuzz" -> "/sys/fuzz/hello"
+    "." [ label = "."  href = "https://cs.opensource.google/search?q=f%3Aroot.cml&ss=fuchsia%2Ffuchsia" ]
+    "appmgr" [ label = "appmgr" style = "filled" fontcolor = "#ffffff" href = "https://cs.opensource.google/search?q=f%3Aappmgr.cml&ss=fuchsia%2Ffuchsia" ]
+    "." -> "appmgr"
+    "sys" [ label = "sys"  href = "https://cs.opensource.google/search?q=f%3Asys.cml&ss=fuchsia%2Ffuchsia" ]
+    "." -> "sys"
+    "sys/baz" [ label = "baz" style = "filled" fontcolor = "#ffffff" href = "https://cs.opensource.google/search?q=f%3Abaz.cml&ss=fuchsia%2Ffuchsia" ]
+    "sys" -> "sys/baz"
+    "sys/fuzz" [ label = "fuzz"  href = "https://cs.opensource.google/search?q=f%3Afuzz.cml&ss=fuchsia%2Ffuchsia" ]
+    "sys" -> "sys/fuzz"
+    "sys/fuzz/hello" [ label = "hello"  href = "https://cs.opensource.google/search?q=f%3Ahello.cml&ss=fuchsia%2Ffuchsia" ]
+    "sys/fuzz" -> "sys/fuzz/hello"
 }}
 "##,
                 expected_rankdir

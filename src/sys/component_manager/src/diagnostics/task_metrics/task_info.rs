@@ -597,7 +597,7 @@ mod tests {
     fn histogram_non_zero_values(inspector: &inspect::Inspector) -> BucketPairs {
         let mut output = vec![];
         let hierarchy = inspector.get_diagnostics_hierarchy();
-        let histogram = hierarchy.get_property_by_path(&["/foo"]).unwrap();
+        let histogram = hierarchy.get_property_by_path(&["foo"]).unwrap();
         if let Property::UintArray(_, data) = histogram {
             if let ArrayContent::Buckets(buckets) = data {
                 for bucket in buckets {
@@ -627,7 +627,7 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let clock = FakeTime::new();
         let histogram =
-            create_cpu_histogram(&inspector.root(), &ExtendedMoniker::parse_str("/foo").unwrap());
+            create_cpu_histogram(&inspector.root(), &ExtendedMoniker::parse_str("foo").unwrap());
         //assert_data_tree!(            inspector,            root: {});
         let mut task = TaskInfo::try_from_internal(
             readings,
@@ -688,7 +688,7 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let clock = FakeTime::new();
         let histogram =
-            create_cpu_histogram(&inspector.root(), &ExtendedMoniker::parse_str("/foo").unwrap());
+            create_cpu_histogram(&inspector.root(), &ExtendedMoniker::parse_str("foo").unwrap());
         let mut task = TaskInfo::try_from_internal(
             readings,
             Some(histogram),
@@ -725,7 +725,7 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let clock = FakeTime::new();
         let histogram =
-            create_cpu_histogram(&inspector.root(), &ExtendedMoniker::parse_str("/foo").unwrap());
+            create_cpu_histogram(&inspector.root(), &ExtendedMoniker::parse_str("foo").unwrap());
         let mut task = TaskInfo::try_from_internal(
             readings,
             Some(histogram),

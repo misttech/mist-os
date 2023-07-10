@@ -77,7 +77,10 @@ mod test {
                     responder,
                     ..
                 } => {
-                    assert_eq!(expected_moniker, parent_moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&parent_moniker)
+                    );
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());
                     assert_eq!(expected_url, decl.url.unwrap());
@@ -94,14 +97,14 @@ mod test {
     async fn test_success() -> Result<()> {
         let mut output = Vec::new();
         let lifecycle_controller = setup_fake_lifecycle_controller(
-            "./core",
+            "core",
             "ffx-laboratory",
             "test",
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm",
         );
         let response = create_cmd(
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm".try_into().unwrap(),
-            "/core/ffx-laboratory:test".try_into().unwrap(),
+            "core/ffx-laboratory:test".try_into().unwrap(),
             vec![],
             lifecycle_controller,
             &mut output,

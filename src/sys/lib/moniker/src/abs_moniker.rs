@@ -8,7 +8,7 @@ use {
         error::MonikerError,
         relative_moniker::RelativeMonikerBase,
     },
-    core::cmp::{self, Ord, Ordering},
+    core::cmp::{self, Ord, Ordering, PartialEq},
     std::{fmt, hash::Hash},
 };
 
@@ -120,10 +120,11 @@ pub trait AbsoluteMonikerBase:
 
     fn format(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.path().is_empty() {
-            write!(f, "/")?;
+            write!(f, ".")?;
         } else {
-            for segment in self.path().iter() {
-                write!(f, "/{}", segment)?
+            write!(f, "{}", self.path()[0])?;
+            for segment in self.path()[1..].iter() {
+                write!(f, "/{}", segment)?;
             }
         }
         Ok(())
@@ -135,7 +136,7 @@ pub trait AbsoluteMonikerBase:
 /// tree. The constituent parts of a AbsoluteMoniker do not include the
 /// instance ID of the child.
 ///
-/// Display notation: "/", "/name1", "/name1/name2", ...
+/// Display notation: ".", "name1", "name1/name2", ...
 #[derive(Eq, PartialEq, Clone, Hash, Default)]
 pub struct AbsoluteMoniker {
     path: Vec<ChildMoniker>,
@@ -214,7 +215,7 @@ mod tests {
     fn absolute_monikers() {
         let root = AbsoluteMoniker::root();
         assert_eq!(true, root.is_root());
-        assert_eq!("/", format!("{}", root));
+        assert_eq!(".", format!("{}", root));
         assert_eq!(root, AbsoluteMoniker::new(vec![]));
         assert_eq!(root, AbsoluteMoniker::try_from(vec![]).unwrap());
 
@@ -223,7 +224,7 @@ mod tests {
             ChildMoniker::try_new("b", Some("coll")).unwrap(),
         ]);
         assert_eq!(false, m.is_root());
-        assert_eq!("/a/coll:b", format!("{}", m));
+        assert_eq!("a/coll:b", format!("{}", m));
         assert_eq!(m, AbsoluteMoniker::try_from(vec!["a", "coll:b"]).unwrap());
         assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some(&Name::new("coll").unwrap()));
         assert_eq!(m.leaf().map(|m| m.name()), Some("b"));
@@ -240,9 +241,9 @@ mod tests {
             ChildMoniker::try_new("a", None).unwrap(),
             ChildMoniker::try_new("b", None).unwrap(),
         ]);
-        assert_eq!("/a/b", format!("{}", m));
-        assert_eq!("/a", format!("{}", m.parent().unwrap()));
-        assert_eq!("/", format!("{}", m.parent().unwrap().parent().unwrap()));
+        assert_eq!("a/b", format!("{}", m));
+        assert_eq!("a", format!("{}", m.parent().unwrap()));
+        assert_eq!(".", format!("{}", m.parent().unwrap().parent().unwrap()));
         assert_eq!(None, m.parent().unwrap().parent().unwrap().parent());
         assert_eq!(m.leaf(), Some(&ChildMoniker::try_from("b").unwrap()));
     }
@@ -253,11 +254,11 @@ mod tests {
 
         let relative: RelativeMoniker = vec!["c:test3", "d:test4"].try_into().unwrap();
         let descendant = scope_root.descendant(&relative);
-        assert_eq!("/a:test1/b:test2/c:test3/d:test4", format!("{}", descendant));
+        assert_eq!("a:test1/b:test2/c:test3/d:test4", format!("{}", descendant));
 
         let relative: RelativeMoniker = vec![].try_into().unwrap();
         let descendant = scope_root.descendant(&relative);
-        assert_eq!("/a:test1/b:test2", format!("{}", descendant));
+        assert_eq!("a:test1/b:test2", format!("{}", descendant));
     }
 
     #[test]

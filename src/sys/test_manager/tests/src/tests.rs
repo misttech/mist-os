@@ -724,7 +724,7 @@ async fn custom_artifact_realm_test() {
         RunEvent::case_stopped("use_artifact", CaseStatus::Passed),
         RunEvent::case_finished("use_artifact"),
         RunEvent::suite_stopped(SuiteStatus::Passed),
-        RunEvent::suite_custom("./test_driver", "artifact.txt", "Hello, world!"),
+        RunEvent::suite_custom("test_driver", "artifact.txt", "Hello, world!"),
     ]
     .into_iter()
     .group_by_test_case_unordered();

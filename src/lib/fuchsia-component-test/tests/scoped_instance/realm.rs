@@ -57,18 +57,16 @@ async fn main() {
     EventSequence::new()
         .all_of(
             vec![
+                EventMatcher::ok().r#type(Destroyed::TYPE).moniker("coll:static_name".to_string()),
                 EventMatcher::ok()
                     .r#type(Destroyed::TYPE)
-                    .moniker("./coll:static_name".to_string()),
+                    .moniker_regex("coll:auto-.*".to_string()),
                 EventMatcher::ok()
                     .r#type(Destroyed::TYPE)
-                    .moniker_regex("./coll:auto-.*".to_string()),
+                    .moniker_regex("coll:auto-.*".to_string()),
                 EventMatcher::ok()
                     .r#type(Destroyed::TYPE)
-                    .moniker_regex("./coll:auto-.*".to_string()),
-                EventMatcher::ok()
-                    .r#type(Destroyed::TYPE)
-                    .moniker_regex("./coll:auto-.*".to_string()),
+                    .moniker_regex("coll:auto-.*".to_string()),
             ],
             Ordering::Unordered,
         )

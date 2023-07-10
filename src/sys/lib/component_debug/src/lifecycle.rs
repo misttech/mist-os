@@ -234,9 +234,13 @@ pub async fn unresolve_instance(
 #[cfg(test)]
 mod test {
     use {
-        super::*, assert_matches::assert_matches, fidl::endpoints::create_proxy_and_stream,
-        fidl::HandleBased, fidl_fuchsia_process as fprocess, futures::TryStreamExt,
-        moniker::RelativeMonikerBase,
+        super::*,
+        assert_matches::assert_matches,
+        fidl::endpoints::create_proxy_and_stream,
+        fidl::HandleBased,
+        fidl_fuchsia_process as fprocess,
+        futures::TryStreamExt,
+        moniker::{AbsoluteMoniker, AbsoluteMonikerBase, RelativeMonikerBase},
     };
 
     fn lifecycle_create_instance(
@@ -259,7 +263,10 @@ mod test {
                     responder,
                     ..
                 } => {
-                    assert_eq!(expected_moniker, parent_moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&parent_moniker)
+                    );
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());
                     assert_eq!(expected_url, decl.url.unwrap());
@@ -292,7 +299,10 @@ mod test {
                     responder,
                     ..
                 } => {
-                    assert_eq!(expected_moniker, parent_moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&parent_moniker)
+                    );
                     assert_eq!(expected_name, child.name);
                     assert_eq!(expected_collection, child.collection.unwrap());
                     responder.send(Ok(())).unwrap();
@@ -311,7 +321,10 @@ mod test {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
                 fsys::LifecycleControllerRequest::StartInstance { moniker, responder, .. } => {
-                    assert_eq!(expected_moniker, moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&moniker)
+                    );
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
@@ -328,7 +341,10 @@ mod test {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
                 fsys::LifecycleControllerRequest::StopInstance { moniker, responder, .. } => {
-                    assert_eq!(expected_moniker, moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&moniker)
+                    );
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
@@ -347,7 +363,10 @@ mod test {
                 fsys::LifecycleControllerRequest::ResolveInstance {
                     moniker, responder, ..
                 } => {
-                    assert_eq!(expected_moniker, moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&moniker)
+                    );
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
@@ -366,7 +385,10 @@ mod test {
                 fsys::LifecycleControllerRequest::UnresolveInstance {
                     moniker, responder, ..
                 } => {
-                    assert_eq!(expected_moniker, moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&moniker)
+                    );
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
@@ -410,11 +432,11 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_create_child() {
-        let parent = RelativeMoniker::parse_str("./core").unwrap();
+        let parent = RelativeMoniker::parse_str("/core").unwrap();
         let url =
             AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/test#meta/test.cm").unwrap();
         let lc = lifecycle_create_instance(
-            "./core",
+            "/core",
             "foo",
             "bar",
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm",
@@ -435,11 +457,11 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_create_child_with_numbered_handles() {
-        let parent = RelativeMoniker::parse_str("./core").unwrap();
+        let parent = RelativeMoniker::parse_str("/core").unwrap();
         let url =
             AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/test#meta/test.cm").unwrap();
         let lc = lifecycle_create_instance(
-            "./core",
+            "/core",
             "foo",
             "bar",
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm",
@@ -468,7 +490,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_create_already_exists() {
-        let parent = RelativeMoniker::parse_str("./core").unwrap();
+        let parent = RelativeMoniker::parse_str("/core").unwrap();
         let url =
             AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/test#meta/test.cm").unwrap();
         let lc = lifecycle_create_fail(fsys::CreateError::InstanceAlreadyExists);
@@ -488,42 +510,42 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_destroy_child() {
-        let parent = RelativeMoniker::parse_str("./core").unwrap();
-        let lc = lifecycle_destroy_instance("./core", "foo", "bar");
+        let parent = RelativeMoniker::parse_str("/core").unwrap();
+        let lc = lifecycle_destroy_instance("/core", "foo", "bar");
         destroy_instance_in_collection(&lc, &parent, &"foo".parse().unwrap(), "bar").await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_start() {
-        let moniker = RelativeMoniker::parse_str("./core/foo").unwrap();
-        let lc = lifecycle_start("./core/foo");
+        let moniker = RelativeMoniker::parse_str("/core/foo").unwrap();
+        let lc = lifecycle_start("/core/foo");
         start_instance(&lc, &moniker).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stop() {
-        let moniker = RelativeMoniker::parse_str("./core/foo").unwrap();
-        let lc = lifecycle_stop("./core/foo");
+        let moniker = RelativeMoniker::parse_str("/core/foo").unwrap();
+        let lc = lifecycle_stop("/core/foo");
         stop_instance(&lc, &moniker).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_resolve() {
-        let moniker = RelativeMoniker::parse_str("./core/foo").unwrap();
-        let lc = lifecycle_resolve("./core/foo");
+        let moniker = RelativeMoniker::parse_str("/core/foo").unwrap();
+        let lc = lifecycle_resolve("/core/foo");
         resolve_instance(&lc, &moniker).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_unresolve() {
-        let moniker = RelativeMoniker::parse_str("./core/foo").unwrap();
-        let lc = lifecycle_unresolve("./core/foo");
+        let moniker = RelativeMoniker::parse_str("/core/foo").unwrap();
+        let lc = lifecycle_unresolve("/core/foo");
         unresolve_instance(&lc, &moniker).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_instance_not_found() {
-        let moniker = RelativeMoniker::parse_str("./core/foo").unwrap();
+        let moniker = RelativeMoniker::parse_str("/core/foo").unwrap();
         let lc = lifecycle_start_fail(fsys::StartError::InstanceNotFound);
         match start_instance(&lc, &moniker).await {
             Ok(_) => panic!("start shouldn't succeed"),

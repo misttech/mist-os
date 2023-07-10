@@ -90,19 +90,19 @@ async fn main() {
         },
         early_start_times: {
             "0": {
-                moniker: "/",
+                moniker: ".",
                 time: AnyProperty,
             },
             "1": {
-                moniker: "/root",
+                moniker: "root",
                 time: AnyProperty,
             },
             "2": {
-                moniker: "/root/reporter",
+                moniker: "root/reporter",
                 time: AnyProperty,
             },
             "3": {
-                moniker: "/root/archivist",
+                moniker: "root/archivist",
                 time: AnyProperty,
             },
         },

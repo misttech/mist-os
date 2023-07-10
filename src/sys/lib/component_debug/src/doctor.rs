@@ -113,8 +113,10 @@ fn new_table(title: &str) -> Table {
 #[cfg(test)]
 mod test {
     use {
-        super::*, fidl::endpoints::create_proxy_and_stream, futures::TryStreamExt,
-        moniker::RelativeMonikerBase,
+        super::*,
+        fidl::endpoints::create_proxy_and_stream,
+        futures::TryStreamExt,
+        moniker::{AbsoluteMoniker, AbsoluteMonikerBase, RelativeMonikerBase},
     };
 
     fn route_validator(
@@ -126,7 +128,10 @@ mod test {
         fuchsia_async::Task::local(async move {
             match stream.try_next().await.unwrap().unwrap() {
                 fsys::RouteValidatorRequest::Validate { moniker, responder, .. } => {
-                    assert_eq!(expected_moniker, moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&moniker)
+                    );
                     responder.send(Ok(&reports)).unwrap();
                 }
                 fsys::RouteValidatorRequest::Route { .. } => {
@@ -141,7 +146,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_errors() {
         let validator = route_validator(
-            "./test",
+            "/test",
             vec![fsys::RouteReport {
                 capability: Some("fuchsia.foo.bar".to_string()),
                 decl_type: Some(fsys::DeclType::Use),
@@ -153,10 +158,9 @@ mod test {
             }],
         );
 
-        let mut reports =
-            validate_routes(&validator, RelativeMoniker::parse_str("./test").unwrap())
-                .await
-                .unwrap();
+        let mut reports = validate_routes(&validator, RelativeMoniker::parse_str("/test").unwrap())
+            .await
+            .unwrap();
         assert_eq!(reports.len(), 1);
 
         let report = reports.remove(0);
@@ -170,7 +174,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_no_errors() {
         let validator = route_validator(
-            "./test",
+            "/test",
             vec![fsys::RouteReport {
                 capability: Some("fuchsia.foo.bar".to_string()),
                 decl_type: Some(fsys::DeclType::Use),
@@ -179,10 +183,9 @@ mod test {
             }],
         );
 
-        let mut reports =
-            validate_routes(&validator, RelativeMoniker::parse_str("./test").unwrap())
-                .await
-                .unwrap();
+        let mut reports = validate_routes(&validator, RelativeMoniker::parse_str("/test").unwrap())
+            .await
+            .unwrap();
         assert_eq!(reports.len(), 1);
 
         let report = reports.remove(0);
@@ -193,9 +196,9 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_no_routes() {
-        let validator = route_validator("./test", vec![]);
+        let validator = route_validator("/test", vec![]);
 
-        let reports = validate_routes(&validator, RelativeMoniker::parse_str("./test").unwrap())
+        let reports = validate_routes(&validator, RelativeMoniker::parse_str("/test").unwrap())
             .await
             .unwrap();
         assert!(reports.is_empty());
@@ -204,7 +207,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_parse_error() {
         let validator = route_validator(
-            "./test",
+            "/test",
             vec![
                 // Don't set any fields
                 fsys::RouteReport::default(),
@@ -212,7 +215,7 @@ mod test {
         );
 
         let result =
-            validate_routes(&validator, RelativeMoniker::parse_str("./test").unwrap()).await;
+            validate_routes(&validator, RelativeMoniker::parse_str("/test").unwrap()).await;
         assert!(result.is_err());
     }
 }

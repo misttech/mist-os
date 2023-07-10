@@ -378,29 +378,29 @@ mod tests {
     async fn stopped_only() {
         let query = create_query();
 
-        let mut instances =
+        let instances =
             get_instances_matching_filter(Some(ListFilter::Stopped), &query).await.unwrap();
-        assert_eq!(instances.len(), 1);
-        assert_eq!(instances.remove(0).moniker, AbsoluteMoniker::root());
+        assert_eq!(
+            instances.iter().map(|i| i.moniker.clone()).collect::<Vec<_>>(),
+            [AbsoluteMoniker::root()]
+        );
     }
 
     #[fuchsia::test]
     async fn descendants_only() {
         let query = create_query();
 
-        let mut instances =
+        let instances =
             get_instances_matching_filter(Some(ListFilter::Descendant("core".to_string())), &query)
                 .await
                 .unwrap();
-        assert_eq!(instances.len(), 3);
-        assert_eq!(instances.remove(0).moniker, AbsoluteMoniker::parse_str("/core").unwrap());
         assert_eq!(
-            instances.remove(0).moniker,
-            AbsoluteMoniker::parse_str("/core/appmgr").unwrap()
-        );
-        assert_eq!(
-            instances.remove(0).moniker,
-            AbsoluteMoniker::parse_str("/core/appmgr/sshd.cmx").unwrap()
+            instances.iter().map(|i| i.moniker.clone()).collect::<Vec<_>>(),
+            vec![
+                AbsoluteMoniker::parse_str("/core").unwrap(),
+                AbsoluteMoniker::parse_str("/core/appmgr").unwrap(),
+                AbsoluteMoniker::parse_str("/core/appmgr/sshd.cmx").unwrap()
+            ]
         );
     }
 
@@ -408,34 +408,32 @@ mod tests {
     async fn ancestors_only() {
         let query = create_query();
 
-        let mut instances =
+        let instances =
             get_instances_matching_filter(Some(ListFilter::Ancestor("core".to_string())), &query)
                 .await
                 .unwrap();
-        assert_eq!(instances.len(), 2);
-        assert_eq!(instances.remove(0).moniker, AbsoluteMoniker::root());
-        assert_eq!(instances.remove(0).moniker, AbsoluteMoniker::parse_str("/core").unwrap());
+        assert_eq!(
+            instances.iter().map(|i| i.moniker.clone()).collect::<Vec<_>>(),
+            vec![AbsoluteMoniker::root(), AbsoluteMoniker::parse_str("/core").unwrap()]
+        );
     }
 
     #[fuchsia::test]
     async fn relative_only() {
         let query = create_query();
 
-        let mut instances =
+        let instances =
             get_instances_matching_filter(Some(ListFilter::Relative("core".to_string())), &query)
                 .await
                 .unwrap();
-        assert_eq!(instances.len(), 4);
-
-        assert_eq!(instances.remove(0).moniker, AbsoluteMoniker::root());
-        assert_eq!(instances.remove(0).moniker, AbsoluteMoniker::parse_str("/core").unwrap());
         assert_eq!(
-            instances.remove(0).moniker,
-            AbsoluteMoniker::parse_str("/core/appmgr").unwrap()
-        );
-        assert_eq!(
-            instances.remove(0).moniker,
-            AbsoluteMoniker::parse_str("/core/appmgr/sshd.cmx").unwrap()
+            instances.iter().map(|i| i.moniker.clone()).collect::<Vec<_>>(),
+            vec![
+                AbsoluteMoniker::root(),
+                AbsoluteMoniker::parse_str("/core").unwrap(),
+                AbsoluteMoniker::parse_str("/core/appmgr").unwrap(),
+                AbsoluteMoniker::parse_str("/core/appmgr/sshd.cmx").unwrap()
+            ]
         );
     }
 }

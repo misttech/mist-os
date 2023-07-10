@@ -100,7 +100,7 @@ async fn single_storage_user() {
         .unwrap();
     let instance = builder.build().await.unwrap();
     let _ = instance.root.connect_to_binder().unwrap();
-    let instance_moniker = format!("./{}:{}", DEFAULT_COLLECTION_NAME, instance.root.child_name());
+    let instance_moniker = format!("{}:{}", DEFAULT_COLLECTION_NAME, instance.root.child_name());
     let storage_user_moniker = format!("{}/storage-user", &instance_moniker);
 
     let storage_admin = connect_to_protocol::<fsys::StorageAdminMarker>().unwrap();
@@ -177,7 +177,7 @@ async fn multiple_storage_users() {
     let _ = instance.root.connect_to_binder().unwrap();
     futures::future::join_all(done_signals).await;
 
-    let instance_moniker = format!("./{}:{}", DEFAULT_COLLECTION_NAME, instance.root.child_name());
+    let instance_moniker = format!("{}:{}", DEFAULT_COLLECTION_NAME, instance.root.child_name());
     let expected_storage_users: HashSet<_> = (0..NUM_MOCKS)
         .map(|mock_idx| format!("{}/storage-user-{:?}", &instance_moniker, mock_idx))
         .collect();
@@ -215,7 +215,7 @@ async fn destroyed_storage_user() {
         .await
         .unwrap();
     let instance = builder.build().await.unwrap();
-    let instance_moniker = format!("./{}:{}", DEFAULT_COLLECTION_NAME, instance.root.child_name());
+    let instance_moniker = format!("{}:{}", DEFAULT_COLLECTION_NAME, instance.root.child_name());
     let storage_user_moniker = format!("{}/storage-user", &instance_moniker);
 
     done_signal.await;

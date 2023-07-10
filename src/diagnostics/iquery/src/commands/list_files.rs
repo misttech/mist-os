@@ -129,12 +129,12 @@ pub async fn list_files(
         get_instance_infos(&realm_query_proxy)
             .await?
             .iter()
-            .map(|e| format!(".{}", e.moniker))
+            .map(|e| e.moniker.to_string())
             .collect::<Vec<_>>()
     } else {
         let mut processed = vec![];
         for moniker in monikers.iter() {
-            processed.push(prepend_leading_moniker(moniker).await);
+            processed.push(normalize_moniker(moniker));
         }
         processed
     };
@@ -174,10 +174,7 @@ pub async fn list_files(
         files.sort();
 
         if files.len() > 0 {
-            output_vec.push(ListFilesResultItem {
-                moniker: String::from(strip_leading_relative_moniker(moniker).await),
-                files,
-            })
+            output_vec.push(ListFilesResultItem { moniker: normalize_moniker(moniker), files })
         }
     }
 

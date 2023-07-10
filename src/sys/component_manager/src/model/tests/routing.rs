@@ -294,12 +294,12 @@ async fn capability_requested_event_at_parent() {
     let event = event_stream.get_next().await.unwrap().into_iter().next().unwrap();
 
     // 'b' is the target and 'a' is receiving the event so the relative moniker
-    // is './b'.
+    // is '/b'.
     assert_matches!(&event,
         fcomponent::Event {
             header: Some(fcomponent::EventHeader {
             moniker: Some(moniker), .. }), ..
-        } if *moniker == "./b".to_string() );
+        } if *moniker == "b".to_string() );
 
     assert_matches!(&event,
         fcomponent::Event {
@@ -1888,7 +1888,7 @@ async fn use_runner_from_environment_failed() {
             ,
             ..
         }
-        if *moniker == "./b".to_string()
+        if *moniker == "b".to_string()
             && *status == zx::Status::PEER_CLOSED.into_raw() as i32
     );
 }

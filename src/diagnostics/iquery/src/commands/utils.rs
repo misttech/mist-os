@@ -11,6 +11,7 @@ use cm_rust::SourceName;
 use component_debug::realm::*;
 use fidl_fuchsia_sys2 as fsys2;
 use lazy_static::lazy_static;
+use moniker::{AbsoluteMoniker, AbsoluteMonikerBase};
 use regex::Regex;
 
 lazy_static! {
@@ -93,16 +94,10 @@ pub(crate) async fn get_instance_infos(
         .map_err(|e| Error::CommunicatingWith("RealmExplorer".to_owned(), anyhow!("{:?}", e)))
 }
 
-/// Helper method to strip the leading "./" of a relative moniker.
-/// Does nothing if the string does not start with "./".
-pub async fn strip_leading_relative_moniker(moniker: &str) -> &str {
-    return if moniker.starts_with("./") { &moniker[2..] } else { moniker };
-}
-
-/// Helper method to append a "./" to moniker. Making it a relative moniker.
-/// Does nothing if the string starts with "./".
-pub async fn prepend_leading_moniker(moniker: &str) -> String {
-    return if moniker.starts_with("./") { moniker.to_owned() } else { format!("./{}", moniker) };
+/// Helper method to normalize a moniker into its canonical string form. Returns
+/// the input moniker unchanged if it cannot be parsed.
+pub fn normalize_moniker(moniker: &str) -> String {
+    AbsoluteMoniker::parse_str(moniker).map_or(String::from(moniker), |m| m.to_string())
 }
 
 /// Get all the exposed `ArchiveAccessor` from any child component which
@@ -126,9 +121,7 @@ pub async fn get_accessor_selectors(
                     }
                     if decl.exposes.iter().any(|expose| expose.source_name() == capability.name()) {
                         let moniker = instance.moniker.to_string();
-                        let component =
-                            moniker.strip_prefix("/").expect("AbsoluteMoniker must start with /");
-                        result.push(format!("{component}:expose:{capability_name}"));
+                        result.push(format!("{moniker}:expose:{capability_name}"));
                     }
                 }
             }
@@ -165,12 +158,5 @@ mod test {
                 String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
             ]
         );
-    }
-
-    #[fuchsia::test]
-    async fn test_strip_leading_relative_moniker() {
-        assert_eq!(strip_leading_relative_moniker("./example/stuff").await, "example/stuff");
-        assert_eq!(strip_leading_relative_moniker("/example/stuff").await, "/example/stuff");
-        assert_eq!(strip_leading_relative_moniker("example/stuff").await, "example/stuff");
     }
 }

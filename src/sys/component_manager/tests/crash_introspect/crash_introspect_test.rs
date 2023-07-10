@@ -70,7 +70,7 @@ async fn crash_receiver(
 async fn crashed_component_generates_a_record() -> Result<(), Error> {
     let expected_crash_info = fsys::ComponentCrashInfo {
         url: Some("realm-builder://1/report_then_panic_on_start".to_string()),
-        moniker: Some("/report_then_panic_on_start".to_string()),
+        moniker: Some("report_then_panic_on_start".to_string()),
         ..Default::default()
     };
     let (success_sender, mut success_receiver) = mpsc::channel(1);

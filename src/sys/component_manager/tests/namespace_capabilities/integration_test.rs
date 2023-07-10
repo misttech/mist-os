@@ -76,7 +76,7 @@ async fn component_manager_namespace() {
 
     EventMatcher::ok()
         .stop(Some(ExitStatusMatcher::Clean))
-        .moniker_regex("./realm")
+        .moniker_regex("realm")
         .wait::<Stopped>(&mut event_stream)
         .await
         .unwrap();

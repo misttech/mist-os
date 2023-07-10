@@ -831,7 +831,7 @@ mod tests {
 
         model.start().await;
 
-        let instance = query.get_instance("./").await.unwrap().unwrap();
+        let instance = query.get_instance(".").await.unwrap().unwrap();
 
         assert_eq!(instance.moniker.unwrap(), ".");
         assert_eq!(instance.url.unwrap(), "test:///root");

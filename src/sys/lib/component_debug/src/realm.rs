@@ -367,7 +367,7 @@ pub async fn get_resolved_declaration(
     moniker: &AbsoluteMoniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<ComponentDecl, GetDeclarationError> {
-    let moniker_str = format!(".{}", moniker.to_string());
+    let moniker_str = moniker.to_string();
     // TODO(https://fxbug.dev/127340) switch to get_resolved_declaration once OK for ffx compat
     let iterator = match realm_query.get_manifest(&moniker_str).await? {
         Ok(iterator) => Ok(iterator),
@@ -413,7 +413,7 @@ pub async fn resolve_declaration(
     url: &str,
 ) -> Result<ComponentDecl, GetDeclarationError> {
     let iterator = realm_query
-        .resolve_declaration(&format!(".{}", parent), child_location, url)
+        .resolve_declaration(&parent.to_string(), child_location, url)
         .await?
         .map_err(|e| match e {
             fsys::GetDeclarationError::InstanceNotFound => {
@@ -445,7 +445,7 @@ pub async fn get_config_fields(
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Option<Vec<ConfigField>>, GetStructuredConfigError> {
     // Parse the runtime directory and add it into the State object
-    let moniker_str = format!(".{}", moniker.to_string());
+    let moniker_str = moniker.to_string();
     match realm_query.get_structured_config(&moniker_str).await? {
         Ok(config) => {
             let fields: Result<Vec<ConfigField>, ParseError> =
@@ -472,7 +472,7 @@ pub async fn get_runtime(
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Runtime, GetRuntimeError> {
     // Parse the runtime directory and add it into the State object
-    let moniker_str = format!(".{}", moniker.to_string());
+    let moniker_str = moniker.to_string();
     let (runtime_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
     let runtime_dir = RemoteDirectory::from_proxy(runtime_dir);
     let server_end = ServerEnd::new(server_end.into_channel());
@@ -528,7 +528,7 @@ pub async fn get_instance(
     moniker: &AbsoluteMoniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Instance, GetInstanceError> {
-    let moniker_str = format!(".{}", moniker.to_string());
+    let moniker_str = moniker.to_string();
     match realm_query.get_instance(&moniker_str).await? {
         Ok(instance) => {
             let instance = instance.try_into()?;
@@ -548,7 +548,7 @@ pub async fn get_outgoing_capabilities(
     moniker: &AbsoluteMoniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Vec<String>, GetOutgoingCapabilitiesError> {
-    let moniker_str = format!(".{}", moniker.to_string());
+    let moniker_str = moniker.to_string();
     let (out_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
     let out_dir = RemoteDirectory::from_proxy(out_dir);
     let server_end = ServerEnd::new(server_end.into_channel());
@@ -573,7 +573,7 @@ pub async fn get_merkle_root(
     moniker: &AbsoluteMoniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<String, GetMerkleRootError> {
-    let moniker_str = format!(".{}", moniker.to_string());
+    let moniker_str = moniker.to_string();
     let (meta_file, server_end) = create_proxy::<fio::FileMarker>().unwrap();
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query

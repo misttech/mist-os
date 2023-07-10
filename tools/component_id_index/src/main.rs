@@ -148,11 +148,11 @@ mod tests {
 [
   {
     "instance_id": "RANDOM_GENERATED_INSTANCE_ID",
-    "moniker": "/a/b/c"
+    "moniker": "a/b/c"
   },
   {
     "instance_id": "RANDOM_GENERATED_INSTANCE_ID",
-    "moniker": "/a/b/c"
+    "moniker": "a/b/c"
   }
 ]
 

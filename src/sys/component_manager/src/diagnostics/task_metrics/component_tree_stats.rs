@@ -259,7 +259,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
                     if *m == AbsoluteMoniker::root() {
                         "<root>".to_string()
                     } else {
-                        m.to_string().replacen("/", "", 1)
+                        m.to_string()
                     }
                 }
             };

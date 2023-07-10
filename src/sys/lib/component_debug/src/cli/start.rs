@@ -55,7 +55,10 @@ mod test {
                     binder: _,
                     responder,
                 } => {
-                    assert_eq!(expected_moniker, moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&moniker)
+                    );
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
@@ -68,9 +71,9 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_success() -> Result<()> {
         let mut output = Vec::new();
-        let lifecycle_controller = setup_fake_lifecycle_controller("./core/ffx-laboratory:test");
+        let lifecycle_controller = setup_fake_lifecycle_controller("/core/ffx-laboratory:test");
         let realm_query = serve_realm_query_instances(vec![fsys::Instance {
-            moniker: Some("./core/ffx-laboratory:test".to_string()),
+            moniker: Some("/core/ffx-laboratory:test".to_string()),
             url: Some("fuchsia-pkg://fuchsia.com/test#meta/test.cml".to_string()),
             instance_id: None,
             resolved_info: None,

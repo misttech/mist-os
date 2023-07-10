@@ -96,14 +96,14 @@ mod tests {
     fn to_string_functions() {
         let cm_moniker =
             ExtendedMoniker::parse_str(EXTENDED_MONIKER_COMPONENT_MANAGER_STR).unwrap();
-        let foobar_moniker = ExtendedMoniker::parse_str("/foo/bar").unwrap();
-        let empty_moniker = ExtendedMoniker::parse_str("/").unwrap();
+        let foobar_moniker = ExtendedMoniker::parse_str("foo/bar").unwrap();
+        let empty_moniker = ExtendedMoniker::parse_str(".").unwrap();
 
         assert_eq!(format!("{}", cm_moniker), EXTENDED_MONIKER_COMPONENT_MANAGER_STR.to_string());
         assert_eq!(cm_moniker.to_string(), EXTENDED_MONIKER_COMPONENT_MANAGER_STR.to_string());
-        assert_eq!(format!("{}", foobar_moniker), "/foo/bar".to_string());
-        assert_eq!(foobar_moniker.to_string(), "/foo/bar".to_string());
-        assert_eq!(format!("{}", empty_moniker), "/".to_string());
-        assert_eq!(empty_moniker.to_string(), "/".to_string());
+        assert_eq!(format!("{}", foobar_moniker), "foo/bar".to_string());
+        assert_eq!(foobar_moniker.to_string(), "foo/bar".to_string());
+        assert_eq!(format!("{}", empty_moniker), ".".to_string());
+        assert_eq!(empty_moniker.to_string(), ".".to_string());
     }
 }

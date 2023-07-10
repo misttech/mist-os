@@ -52,28 +52,28 @@ async fn verify_routing_failure_messages() {
             vec![
                 EventMatcher::ok()
                     .r#type(events::Stopped::TYPE)
-                    .moniker("./root/routing-tests/child")
+                    .moniker("root/routing-tests/child")
                     .stop(Some(ExitStatusMatcher::AnyCrash)),
                 EventMatcher::ok()
                     .r#type(events::Stopped::TYPE)
                     .moniker(
-                        "./root/routing-tests/offers-to-children-unavailable/child-for-offer-from-parent",
+                        "root/routing-tests/offers-to-children-unavailable/child-for-offer-from-parent",
                     )
                     .stop(Some(ExitStatusMatcher::AnyCrash)),
                 EventMatcher::ok()
                     .r#type(events::Stopped::TYPE)
                     .moniker(
-                        "./root/routing-tests/offers-to-children-unavailable/child-for-offer-from-sibling",
+                        "root/routing-tests/offers-to-children-unavailable/child-for-offer-from-sibling",
                     ).stop(Some(ExitStatusMatcher::AnyCrash)),
                 EventMatcher::ok()
                     .r#type(events::Stopped::TYPE)
                     .moniker(
-                        "./root/routing-tests/offers-to-children-unavailable/child-open-unrequested",
+                        "root/routing-tests/offers-to-children-unavailable/child-open-unrequested",
                     )
                     .stop(Some(ExitStatusMatcher::AnyCrash)),
                 EventMatcher::ok()
                     .r#type(events::Stopped::TYPE)
-                    .moniker("./root/reader")
+                    .moniker("root/reader")
                     .stop(Some(ExitStatusMatcher::Clean))
             ],
             sequence::Ordering::Unordered,

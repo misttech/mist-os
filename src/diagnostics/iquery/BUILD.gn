@@ -18,6 +18,7 @@ iquery_deps = [
   "//src/lib/fuchsia-fs",
   "//src/sys/lib/cm_rust",
   "//src/sys/lib/component_debug",
+  "//src/sys/lib/moniker",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:argh",
   "//third_party/rust_crates:async-trait",

@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 /// components are referenced by encoded relative moniker so as to minimize the amount of
 /// information which is disclosed about the overall structure of the component instance tree.
 ///
-/// Display notation: "/", "/name1:1", "/name1:1/name2:2", ...
+/// Display notation: ".", "name1:1", "name1:1/name2:2", ...
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Eq, PartialEq, Clone, Hash, Default)]
 pub struct InstancedAbsoluteMoniker {
@@ -95,7 +95,7 @@ mod tests {
     fn instanced_absolute_monikers() {
         let root = InstancedAbsoluteMoniker::root();
         assert_eq!(true, root.is_root());
-        assert_eq!("/", format!("{}", root));
+        assert_eq!(".", format!("{}", root));
         assert_eq!(root, InstancedAbsoluteMoniker::try_from(vec![]).unwrap());
 
         let m = InstancedAbsoluteMoniker::new(vec![
@@ -103,7 +103,7 @@ mod tests {
             InstancedChildMoniker::try_new("b", Some("coll"), 2).unwrap(),
         ]);
         assert_eq!(false, m.is_root());
-        assert_eq!("/a:1/coll:b:2", format!("{}", m));
+        assert_eq!("a:1/coll:b:2", format!("{}", m));
         assert_eq!(m, InstancedAbsoluteMoniker::try_from(vec!["a:1", "coll:b:2"]).unwrap());
         assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some(&Name::new("coll").unwrap()));
         assert_eq!(m.leaf().map(|m| m.name()), Some("b"));
@@ -121,9 +121,9 @@ mod tests {
             InstancedChildMoniker::try_new("a", None, 1).unwrap(),
             InstancedChildMoniker::try_new("b", None, 2).unwrap(),
         ]);
-        assert_eq!("/a:1/b:2", format!("{}", m));
-        assert_eq!("/a:1", format!("{}", m.parent().unwrap()));
-        assert_eq!("/", format!("{}", m.parent().unwrap().parent().unwrap()));
+        assert_eq!("a:1/b:2", format!("{}", m));
+        assert_eq!("a:1", format!("{}", m.parent().unwrap()));
+        assert_eq!(".", format!("{}", m.parent().unwrap().parent().unwrap()));
         assert_eq!(None, m.parent().unwrap().parent().unwrap().parent());
         assert_eq!(m.leaf(), Some(&InstancedChildMoniker::try_from("b:2").unwrap()));
     }
@@ -229,26 +229,25 @@ mod tests {
     fn instanced_absolute_moniker_parse_str() -> Result<(), MonikerError> {
         let under_test = |s| InstancedAbsoluteMoniker::parse_str(s);
 
-        assert_eq!(under_test("/")?, InstancedAbsoluteMoniker::root());
+        assert_eq!(under_test(".")?, InstancedAbsoluteMoniker::root());
 
         let a = InstancedChildMoniker::try_new("a", None, 0).unwrap();
         let bb = InstancedChildMoniker::try_new("b", Some("b"), 0).unwrap();
 
-        assert_eq!(under_test("/a:0")?, InstancedAbsoluteMoniker::new(vec![a.clone()]));
+        assert_eq!(under_test("a:0")?, InstancedAbsoluteMoniker::new(vec![a.clone()]));
         assert_eq!(
-            under_test("/a:0/b:b:0")?,
+            under_test("a:0/b:b:0")?,
             InstancedAbsoluteMoniker::new(vec![a.clone(), bb.clone()])
         );
         assert_eq!(
-            under_test("/a:0/b:b:0/a:0/b:b:0")?,
+            under_test("a:0/b:b:0/a:0/b:b:0")?,
             InstancedAbsoluteMoniker::new(vec![a.clone(), bb.clone(), a.clone(), bb.clone()])
         );
 
         assert!(under_test("").is_err(), "cannot be empty");
-        assert!(under_test("//").is_err(), "path segments cannot be empty");
-        assert!(under_test("/a:0/").is_err(), "path segments cannot be empty");
-        assert!(under_test("/a:0//b:0").is_err(), "path segments cannot be empty");
-        assert!(under_test("/a:a").is_err(), "must contain instance id");
+        assert!(under_test("a:0/").is_err(), "path segments cannot be empty");
+        assert!(under_test("a:0//b:0").is_err(), "path segments cannot be empty");
+        assert!(under_test("a:a").is_err(), "must contain instance id");
 
         Ok(())
     }

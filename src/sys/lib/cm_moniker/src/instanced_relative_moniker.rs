@@ -111,7 +111,7 @@ mod tests {
             InstancedChildMoniker::try_new("b", None, 2).unwrap(),
         ]);
         assert_eq!(false, descendant.is_self());
-        assert_eq!("./a:1/b:2", format!("{}", descendant));
+        assert_eq!("a:1/b:2", format!("{}", descendant));
     }
 
     #[test]
@@ -130,7 +130,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(true, me.is_self());
-        assert_eq!(".", format!("{}", me));
 
         InstancedRelativeMoniker::scope_down::<InstancedAbsoluteMoniker>(
             &vec!["a:1", "b:2"].try_into().unwrap(),
@@ -150,7 +149,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(false, descendant.is_self());
-        assert_eq!("./a:1/b:2", format!("{}", descendant));
+        assert_eq!("a:1/b:2", format!("{}", descendant));
 
         let descendant = InstancedRelativeMoniker::scope_down::<InstancedAbsoluteMoniker>(
             &vec!["a:1", "b:2"].try_into().unwrap(),
@@ -158,7 +157,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(false, descendant.is_self());
-        assert_eq!("./c:3/d:4", format!("{}", descendant));
+        assert_eq!("c:3/d:4", format!("{}", descendant));
 
         InstancedRelativeMoniker::scope_down::<InstancedAbsoluteMoniker>(
             &vec!["a:1"].try_into().unwrap(),
@@ -190,7 +189,7 @@ mod tests {
         for (path, string_to_parse) in vec![
             (vec![], "."),
             (vec![], "./"),
-            (vec![], "/"),
+            (vec![], "."),
             (vec!["a:1"], "./a:1"),
             (vec!["a:1", "b:2"], "./a:1/b:2"),
             (vec!["a:test:1"], "./a:test:1"),

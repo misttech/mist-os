@@ -26,7 +26,7 @@ func TestComponentShow(t *testing.T) {
 	i.Start()
 	i.WaitForLogMessage("console.shell: enabled")
 	i.RunCommand("component show archivist")
-	i.WaitForLogMessage("/bootstrap/archivist")
+	i.WaitForLogMessage("bootstrap/archivist")
 }
 
 func TestComponentList(t *testing.T) {
@@ -41,7 +41,7 @@ func TestComponentList(t *testing.T) {
 	i.Start()
 	i.WaitForLogMessage("console.shell: enabled")
 	i.RunCommand("component list")
-	i.WaitForLogMessage("/bootstrap/archivist")
+	i.WaitForLogMessage("bootstrap/archivist")
 }
 
 func execDir(t *testing.T) string {

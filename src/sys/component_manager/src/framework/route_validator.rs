@@ -630,7 +630,7 @@ mod tests {
         assert!(instance.is_some());
 
         // Validate `my_child`
-        let mut results = validator.validate("./my_child").await.unwrap().unwrap();
+        let mut results = validator.validate("my_child").await.unwrap().unwrap();
         assert_eq!(results.len(), 1);
 
         let report = results.remove(0);
@@ -875,7 +875,7 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
-            } if s == "biz.buz" && m == "./my_child"
+            } if s == "biz.buz" && m == "my_child"
         );
 
         let report = results.remove(0);
@@ -887,7 +887,7 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
-            } if s == "foo.bar" && m == "./my_child"
+            } if s == "foo.bar" && m == "my_child"
         );
 
         let report = results.remove(0);
@@ -907,7 +907,7 @@ mod tests {
             name: "biz.buz".parse().unwrap(),
             decl_type: fsys::DeclType::Expose,
         }];
-        let mut results = validator.route("./my_child", targets).await.unwrap().unwrap();
+        let mut results = validator.route("my_child", targets).await.unwrap().unwrap();
 
         assert_eq!(results.len(), 1);
 
@@ -920,7 +920,7 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
-            } if s == "biz.buz" && m == "./my_child"
+            } if s == "biz.buz" && m == "my_child"
         );
     }
 
@@ -1014,7 +1014,7 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
-            } if s == "foo.buz" && m == "./my_child"
+            } if s == "foo.buz" && m == "my_child"
         );
     }
 
@@ -1154,7 +1154,7 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
-            } if s == "foo.biz" && m == "./my_child"
+            } if s == "foo.biz" && m == "my_child"
         );
 
         let report = results.remove(0);
@@ -1166,7 +1166,7 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
-            } if s == "foo.buz" && m == "./my_child"
+            } if s == "foo.buz" && m == "my_child"
         );
     }
 
@@ -1265,7 +1265,7 @@ mod tests {
             mock_runner.add_host_fn(&format!("test:///{}_resolved", name), out_dir.host_fn());
 
             let child = model
-                .look_up(&format!("/coll:{}", name).as_str().try_into().unwrap())
+                .look_up(&format!("coll:{}", name).as_str().try_into().unwrap())
                 .await
                 .unwrap();
             child.start(&StartReason::Debug, None, vec![], vec![]).await.unwrap();
@@ -1273,7 +1273,7 @@ mod tests {
 
         // Open the service directory from `target` so that it gets instantiated.
         {
-            let target = model.look_up(&"/target".try_into().unwrap()).await.unwrap();
+            let target = model.look_up(&"target".try_into().unwrap()).await.unwrap();
             target.start(&StartReason::Debug, None, vec![], vec![]).await.unwrap();
             let ns = mock_runner.get_namespace("test:///target_resolved").unwrap();
             let mut ns = ns.lock().await;
@@ -1291,7 +1291,7 @@ mod tests {
             name: "my_service".parse().unwrap(),
             decl_type: fsys::DeclType::Use,
         }];
-        let mut results = validator.route("./target", targets).await.unwrap().unwrap();
+        let mut results = validator.route("target", targets).await.unwrap().unwrap();
 
         assert_eq!(results.len(), 1);
 

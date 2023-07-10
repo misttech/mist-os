@@ -962,7 +962,7 @@ mod tests {
             move |request: fsys::LifecycleControllerRequest| async move {
                 match request {
                     fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
-                        assert_eq!(moniker, "./core/my_component");
+                        assert_eq!(moniker, "core/my_component");
                         responder.send(Ok(())).unwrap()
                     }
                     _ => panic!("unexpected request: {:?}", request),
@@ -991,7 +991,7 @@ mod tests {
                     object,
                     responder,
                 } => {
-                    assert_eq!(moniker, "./core/my_component");
+                    assert_eq!(moniker, "core/my_component");
                     assert_eq!(dir_type, fsys::OpenDirType::ExposedDir);
                     assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE);
                     assert_eq!(mode, fio::ModeType::empty());

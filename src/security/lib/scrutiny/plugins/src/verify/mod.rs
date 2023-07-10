@@ -685,7 +685,7 @@ mod tests {
             response,
             json!({
               "deps": ["core_dep"],
-              "monikers": ["/logger"],
+              "monikers": ["logger"],
             }),
         );
         Ok(())
@@ -751,13 +751,13 @@ mod tests {
 
         let response = controller.query(
             model.clone(),
-            json!({ "scheme": "fuchsia-pkg", "moniker": "/", "protocol": "protocol"}),
+            json!({ "scheme": "fuchsia-pkg", "moniker": ".", "protocol": "protocol"}),
         )?;
         assert_json_eq(
             response,
             json!({
               "deps": ["core_dep"],
-              "monikers": ["/logger"],
+              "monikers": ["logger"],
             }),
         );
         Ok(())
@@ -843,13 +843,13 @@ mod tests {
 
         let response = controller.query(
             model.clone(),
-            json!({ "scheme": "fuchsia-pkg", "moniker": "/", "protocol": "protocol"}),
+            json!({ "scheme": "fuchsia-pkg", "moniker": ".", "protocol": "protocol"}),
         )?;
         assert_json_eq(
             response,
             json!({
               "deps": ["core_dep"],
-              "monikers": ["/logger/log-child"],
+              "monikers": ["logger/log-child"],
             }),
         );
         Ok(())
@@ -1031,13 +1031,13 @@ mod tests {
         // find the expected instances.
         let response = controller.query(
             model.clone(),
-            json!({ "scheme": "fuchsia-pkg", "moniker": "/core/custom-resolver", "protocol": "fuchsia.test.SpecialProtocol"}),
+            json!({ "scheme": "fuchsia-pkg", "moniker": "core/custom-resolver", "protocol": "fuchsia.test.SpecialProtocol"}),
         )?;
         assert_json_eq(
             response,
             json!({
               "deps": ["core_dep"],
-              "monikers": ["/core/resolved-from-custom"],
+              "monikers": ["core/resolved-from-custom"],
             }),
         );
         Ok(())
@@ -1123,12 +1123,12 @@ mod tests {
                                             "routing_error": {
                                                 "use_from_parent_not_found": {
                                                     "capability_id": "bad_dir",
-                                                    "moniker": "/child",
+                                                    "moniker": "child",
                                                 }
                                             }
                                         }
                                     },
-                                    "message": "`bad_dir` was not offered to `/child` by parent.",
+                                    "message": "`bad_dir` was not offered to `child` by parent.",
                                 },
                                 "using_node": "/child",
                                 "route": [
@@ -1144,7 +1144,7 @@ mod tests {
                                             "target_path": "/dir",
                                             "type": "directory",
                                         },
-                                        "moniker": "/child",
+                                        "moniker": "child",
                                     },
                                 ],
                             },
@@ -1170,12 +1170,12 @@ mod tests {
                                                 "offer_from_child_instance_not_found": {
                                                     "capability_id": "protocol",
                                                     "child_moniker": "missing_child",
-                                                    "moniker": "/",
+                                                    "moniker": ".",
                                                 }
                                             }
                                         }
                                     },
-                                    "message": "`/` does not have child `#missing_child`.",
+                                    "message": "`.` does not have child `#missing_child`.",
                                 },
                                 "using_node": "/child",
                                 "route": [
@@ -1189,7 +1189,7 @@ mod tests {
                                             "target_path": "/dir/svc",
                                             "type": "protocol",
                                         },
-                                        "moniker": "/child",
+                                        "moniker": "child",
                                     },
                                     {
                                         "action": "offer_by",
@@ -1212,7 +1212,7 @@ mod tests {
                                             "target_name": "protocol",
                                             "type": "protocol",
                                         },
-                                        "moniker": "/",
+                                        "moniker": ".",
                                     },
                                 ],
                             },
@@ -1253,12 +1253,12 @@ mod tests {
                                       "routing_error": {
                                           "use_from_parent_not_found": {
                                               "capability_id": "bad_dir",
-                                              "moniker": "/child",
+                                              "moniker": "child",
                                           }
                                       }
                                   }
                               },
-                              "message": "`bad_dir` was not offered to `/child` by parent.",
+                              "message": "`bad_dir` was not offered to `child` by parent.",
                           },
                           "using_node": "/child",
                           "route": [
@@ -1274,7 +1274,7 @@ mod tests {
                                       "target_path": "/dir",
                                       "type": "directory",
                                   },
-                                  "moniker": "/child",
+                                  "moniker": "child",
                               },
                           ],
                       },
@@ -1295,7 +1295,7 @@ mod tests {
                                       "target_path": "/dir",
                                       "type": "directory"
                                   },
-                                  "moniker": "/child"
+                                  "moniker": "child"
                               },
                               {
                                   "action": "offer_by",
@@ -1315,7 +1315,7 @@ mod tests {
                                       "target_name": "good_dir",
                                       "type": "directory"
                                   },
-                                  "moniker": "/"
+                                  "moniker": "."
                               },
                               {
                                   "action": "declare_by",
@@ -1325,7 +1325,7 @@ mod tests {
                                       "source_path": null,
                                       "type": "directory"
                                   },
-                                  "moniker": "/"
+                                  "moniker": "."
                               }
                           ],
                           "using_node": "/child"
@@ -1346,12 +1346,12 @@ mod tests {
                                         "offer_from_child_instance_not_found": {
                                             "capability_id": "protocol",
                                             "child_moniker": "missing_child",
-                                            "moniker": "/",
+                                            "moniker": ".",
                                         }
                                     }
                                 }
                             },
-                            "message": "`/` does not have child `#missing_child`.",
+                            "message": "`.` does not have child `#missing_child`.",
                         },
                         "using_node": "/child",
                         "route": [
@@ -1365,7 +1365,7 @@ mod tests {
                                     "target_path": "/dir/svc",
                                     "type": "protocol",
                                 },
-                                "moniker": "/child",
+                                "moniker": "child",
                             },
                             {
                                 "action": "offer_by",
@@ -1388,7 +1388,7 @@ mod tests {
                                     "target_name": "protocol",
                                     "type": "protocol",
                                 },
-                                "moniker": "/",
+                                "moniker": ".",
                             },
                         ],
                     },
@@ -1431,12 +1431,12 @@ mod tests {
                                             "routing_error": {
                                                 "use_from_parent_not_found": {
                                                     "capability_id": "bad_dir",
-                                                    "moniker": "/child",
+                                                    "moniker": "child",
                                                 },
                                             },
                                         },
                                     },
-                                    "message": "`bad_dir` was not offered to `/child` by parent.",
+                                    "message": "`bad_dir` was not offered to `child` by parent.",
                                 },
                                 "using_node": "/child",
                                 "route": [
@@ -1452,7 +1452,7 @@ mod tests {
                                             "target_path": "/dir",
                                             "type": "directory",
                                         },
-                                        "moniker": "/child",
+                                        "moniker": "child",
                                     },
                                 ],
                             },
@@ -1473,12 +1473,12 @@ mod tests {
                                                 "offer_from_child_instance_not_found": {
                                                     "capability_id": "protocol",
                                                     "child_moniker": "missing_child",
-                                                    "moniker": "/",
+                                                    "moniker": ".",
                                                 },
                                             },
                                         },
                                     },
-                                    "message": "`/` does not have child `#missing_child`.",
+                                    "message": "`.` does not have child `#missing_child`.",
                                 },
                                 "route": [
                                     {
@@ -1491,7 +1491,7 @@ mod tests {
                                             "target_path": "/dir/svc",
                                             "type": "protocol",
                                         },
-                                        "moniker": "/child",
+                                        "moniker": "child",
                                     },
                                     {
                                         "action": "offer_by",
@@ -1514,7 +1514,7 @@ mod tests {
                                             "target_name": "protocol",
                                             "type": "protocol",
                                         },
-                                        "moniker": "/",
+                                        "moniker": ".",
                                     },
                                 ],
                             },
@@ -1555,12 +1555,12 @@ mod tests {
                                       "routing_error": {
                                           "use_from_parent_not_found": {
                                               "capability_id": "bad_dir",
-                                              "moniker": "/child",
+                                              "moniker": "child",
                                           }
                                       }
                                   }
                               },
-                              "message": "`bad_dir` was not offered to `/child` by parent.",
+                              "message": "`bad_dir` was not offered to `child` by parent.",
                           },
                           "using_node": "/child",
                           "route": [
@@ -1576,7 +1576,7 @@ mod tests {
                                       "target_path": "/dir",
                                       "type": "directory",
                                   },
-                                  "moniker": "/child",
+                                  "moniker": "child",
                               },
                           ],
                       }

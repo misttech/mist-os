@@ -68,7 +68,7 @@ mod tests {
         let fidl_index = fcomponent_internal::ComponentIdIndex {
             instances: Some(vec![fcomponent_internal::InstanceIdEntry {
                 instance_id: Some("abc".to_string()),
-                moniker: Some("/a/b/c".to_string()),
+                moniker: Some("a/b/c".to_string()),
                 ..Default::default()
             }]),
             ..Default::default()
@@ -77,7 +77,7 @@ mod tests {
         let native_index = Index {
             instances: vec![InstanceIdEntry {
                 instance_id: Some("abc".to_string()),
-                moniker: Some(AbsoluteMoniker::parse_str("/a/b/c").unwrap()),
+                moniker: Some(AbsoluteMoniker::parse_str("a/b/c").unwrap()),
             }],
         };
 

@@ -16,7 +16,7 @@ use {
     anyhow::{bail, Result},
     cm_rust::ExposeDeclCommon,
     fidl_fuchsia_sys2 as fsys,
-    moniker::AbsoluteMoniker,
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
     prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
 };
 
@@ -84,14 +84,17 @@ async fn get_instance_by_query(
     query: String,
     realm_query: fsys::RealmQueryProxy,
 ) -> Result<Vec<ShowCmdInstance>> {
+    let query_moniker = AbsoluteMoniker::parse_str(&query).ok();
     let instances = get_instances_matching_filter(None, &realm_query).await?;
     let instances: Vec<Instance> = instances
         .into_iter()
         .filter(|i| {
             let url_match = i.url.contains(&query);
             let moniker_match = i.moniker.to_string().contains(&query);
+            let normalized_query_moniker_match =
+                matches!(&query_moniker, Some(m) if i.moniker.to_string().contains(&m.to_string()));
             let id_match = i.instance_id.as_ref().map_or(false, |id| id.contains(&query));
-            url_match || moniker_match || id_match
+            url_match || moniker_match || normalized_query_moniker_match || id_match
         })
         .collect();
 

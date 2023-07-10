@@ -332,10 +332,10 @@ pub async fn get_all_instances() {
             assert!(instance.resolved_info.is_some());
         } else if url.ends_with("#meta/echo_server.cm") {
             // The other test case may start this component so its state is not stable
-            assert_eq!(moniker, "./echo_server");
+            assert_eq!(moniker, "echo_server");
         } else if url == "fuchsia-pkg://fake.com" {
             // This component can never be resolved or started
-            assert_eq!(moniker, "./will_not_resolve");
+            assert_eq!(moniker, "will_not_resolve");
             assert!(instance.resolved_info.is_none());
         } else {
             panic!("Unknown instance: {}", url);

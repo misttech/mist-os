@@ -131,7 +131,7 @@ impl ComponentFacade {
             // the launched component.
             info!("Waiting for Stopped events for child {child_name}");
             let stopped_event = EventMatcher::ok()
-                .moniker_regex(format!("./{LAUNCHED_COMPONENTS_COLLECTION_NAME}:{child_name}$"))
+                .moniker(format!("{LAUNCHED_COMPONENTS_COLLECTION_NAME}:{child_name}"))
                 .wait::<Stopped>(&mut event_stream)
                 .await
                 .context(format!("failed to observe {child_name} Stopped event"))?;
@@ -158,10 +158,10 @@ impl ComponentFacade {
         }
     }
 
-    /// Search component with component's name under appmgr
+    /// Search component with component's moniker
     /// # Arguments
     /// * `args`: will be parsed to ComponentSearchRequest
-    /// * `name`: name of the component (should be like "component.cmx")
+    /// * `name`: name of the component (should be like "core/foo")
     pub async fn search(&self, args: Value) -> Result<ComponentSearchResult, Error> {
         let tag = "ComponentFacade::search";
         let req: ComponentSearchRequest = from_value(args)?;

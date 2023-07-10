@@ -71,7 +71,10 @@ mod test {
                     child,
                     responder,
                 } => {
-                    assert_eq!(expected_moniker, parent_moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&parent_moniker)
+                    );
                     assert_eq!(expected_collection, child.collection.unwrap());
                     assert_eq!(expected_name, child.name);
                     responder.send(Ok(())).unwrap();
@@ -87,9 +90,9 @@ mod test {
     async fn test_success() -> Result<()> {
         let mut output = Vec::new();
         let lifecycle_controller =
-            setup_fake_lifecycle_controller("./core", "ffx-laboratory", "test");
+            setup_fake_lifecycle_controller("/core", "ffx-laboratory", "test");
         let realm_query = serve_realm_query_instances(vec![fsys::Instance {
-            moniker: Some("./core/ffx-laboratory:test".to_string()),
+            moniker: Some("/core/ffx-laboratory:test".to_string()),
             url: Some("fuchsia-pkg://fuchsia.com/test#meta/test.cml".to_string()),
             instance_id: None,
             resolved_info: None,

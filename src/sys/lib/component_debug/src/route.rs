@@ -192,7 +192,10 @@ mod test {
                     panic!("unexpected Validate request");
                 }
                 fsys::RouteValidatorRequest::Route { moniker, targets, responder } => {
-                    assert_eq!(expected_moniker, moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker).unwrap(),
+                        AbsoluteMoniker::parse_str(&moniker).unwrap()
+                    );
                     assert_eq!(expected_targets, targets);
                     responder.send(Ok(&reports)).unwrap();
                 }
@@ -207,7 +210,7 @@ mod test {
         let targets =
             vec![fsys::RouteTarget { decl_type: fsys::DeclType::Use, name: "fuchsia.foo".into() }];
         let validator = route_validator(
-            "./test",
+            "/test",
             targets.clone(),
             vec![fsys::RouteReport {
                 capability: Some("fuchsia.foo.bar".into()),
@@ -243,20 +246,20 @@ mod test {
         let targets =
             vec![fsys::RouteTarget { decl_type: fsys::DeclType::Use, name: "fuchsia.foo".into() }];
         let validator = route_validator(
-            "./test",
+            "/test",
             targets.clone(),
             vec![
                 fsys::RouteReport {
                     capability: Some("fuchsia.foo.bar".into()),
                     decl_type: Some(fsys::DeclType::Use),
-                    source_moniker: Some("./src".into()),
+                    source_moniker: Some("/src".into()),
                     error: None,
                     ..Default::default()
                 },
                 fsys::RouteReport {
                     capability: Some("fuchsia.foo.baz".into()),
                     decl_type: Some(fsys::DeclType::Expose),
-                    source_moniker: Some("./test/src".into()),
+                    source_moniker: Some("/test/src".into()),
                     service_instances: Some(vec![
                         fsys::ServiceInstance {
                             instance_name: Some("1234abcd".into()),
@@ -291,7 +294,7 @@ mod test {
                 error_summary: None,
                 source_moniker: Some(m),
                 service_instances: None,
-            } if capability == "fuchsia.foo.bar" && m == "./src"
+            } if capability == "fuchsia.foo.bar" && m == "/src"
         );
 
         let report = reports.remove(0);
@@ -303,7 +306,7 @@ mod test {
                 error_summary: None,
                 source_moniker: Some(m),
                 service_instances: Some(v),
-            } if capability == "fuchsia.foo.baz" && m == "./test/src"
+            } if capability == "fuchsia.foo.baz" && m == "/test/src"
                 && v == vec![
                     ServiceInstance {
                         instance_name: "1234abcd".into(),
@@ -321,7 +324,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_no_routes() {
-        let validator = route_validator("./test", vec![], vec![]);
+        let validator = route_validator("/test", vec![], vec![]);
 
         let reports =
             route(&validator, RelativeMoniker::parse_str("./test").unwrap(), vec![]).await.unwrap();
@@ -331,7 +334,7 @@ mod test {
     #[fuchsia::test]
     async fn test_parse_error() {
         let validator = route_validator(
-            "./test",
+            "/test",
             vec![],
             vec![
                 // Don't set any fields

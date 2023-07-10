@@ -121,15 +121,15 @@ mod tests {
         assert_data_tree!(inspector, root: {
             start_times: {
                 "0": {
-                    moniker: "/",
+                    moniker: ".",
                     time: root_timestamp,
                 },
                 "1": {
-                    moniker: "/a",
+                    moniker: "a",
                     time: a_timestamp,
                 },
                 "2": {
-                    moniker: "/a/b",
+                    moniker: "a/b",
                     time: b_timestamp,
                 }
             }

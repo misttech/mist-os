@@ -288,8 +288,9 @@ void ZirconComponentManager::OnComponentEvent(fuchsia::component::Event event) {
       event.header().moniker().empty()) {
     return;
   }
-  // Remove the "." at the beginning of the moniker. It's safe because moniker is not empty.
-  std::string moniker = event.header().moniker().substr(1);
+
+  const auto& moniker = event.header().moniker();
+
   switch (event.header().event_type()) {
     case fuchsia::component::EventType::DEBUG_STARTED:
       if (debug_agent_) {
@@ -502,15 +503,15 @@ debug::Status ZirconComponentManager::LaunchComponent(std::string url) {
     return debug::Status("V1 components are no longer supported.");
   }
 
-  constexpr char kParentMoniker[] = "./core";
+  constexpr char kParentMoniker[] = "core";
   constexpr char kCollection[] = "ffx-laboratory";
 
   // url: fuchsia-pkg://fuchsia.com/crasher#meta/cpp_crasher.cm
   size_t name_start = url.find_last_of('/') + 1;
   // name: cpp_crasher
   std::string name = url.substr(name_start, url.find_last_of('.') - name_start);
-  // moniker: /core/ffx-laboratory:cpp_crasher
-  std::string moniker = std::string(kParentMoniker + 1) + "/" + kCollection + ":" + name;
+  // moniker: core/ffx-laboratory:cpp_crasher
+  std::string moniker = std::string(kParentMoniker) + "/" + kCollection + ":" + name;
 
   if (expected_v2_components_.count(moniker)) {
     return debug::Status(url + " is already launched");
@@ -556,8 +557,7 @@ debug::Status ZirconComponentManager::LaunchComponent(std::string url) {
 
   fuchsia::sys2::LifecycleController_StartInstance_Result start_res;
   fidl::InterfaceHandle<fuchsia::component::Binder> binder;
-  // LifecycleController::Start accepts relative monikers.
-  status = lifecycle_controller->StartInstance("." + moniker, binder.NewRequest(), &start_res);
+  status = lifecycle_controller->StartInstance(moniker, binder.NewRequest(), &start_res);
   if (status != ZX_OK)
     return debug::ZxStatus(status);
   if (start_res.is_err())

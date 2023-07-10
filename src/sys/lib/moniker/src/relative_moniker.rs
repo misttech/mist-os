@@ -8,7 +8,9 @@
 ///
 /// A self-referenced relative moniker is a moniker with an empty path.
 ///
-/// Display notation: ".", "./down1", "./down1/down2", ...
+/// Display notation: ".", "down1", "down1/down2", ...
+///
+/// TODO(fxb/126681): this is deprecated and will go away.
 use {
     crate::{
         abs_moniker::AbsoluteMonikerBase,
@@ -96,9 +98,13 @@ pub trait RelativeMonikerBase: Sized {
     }
 
     fn format(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, ".")?;
-        for segment in self.path() {
-            write!(f, "/{}", segment)?
+        if self.is_self() {
+            write!(f, ".")?;
+        } else {
+            write!(f, "{}", self.path()[0])?;
+            for segment in self.path()[1..].iter() {
+                write!(f, "/{}", segment)?;
+            }
         }
         Ok(())
     }
@@ -168,7 +174,7 @@ mod tests {
             ChildMoniker::try_new("b", None).unwrap(),
         ]);
         assert_eq!(false, descendant.is_self());
-        assert_eq!("./a/b", format!("{}", descendant));
+        assert_eq!("a/b", format!("{}", descendant));
     }
 
     #[test]
@@ -207,7 +213,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(false, descendant.is_self());
-        assert_eq!("./a:test1/b:test2", format!("{}", descendant));
+        assert_eq!("a:test1/b:test2", format!("{}", descendant));
 
         let descendant = RelativeMoniker::scope_down::<AbsoluteMoniker>(
             &vec!["a:test1", "b:test2"].try_into().unwrap(),
@@ -215,7 +221,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(false, descendant.is_self());
-        assert_eq!("./c:test3/d:test4", format!("{}", descendant));
+        assert_eq!("c:test3/d:test4", format!("{}", descendant));
 
         RelativeMoniker::scope_down::<AbsoluteMoniker>(
             &vec!["a:test1"].try_into().unwrap(),
@@ -279,7 +285,7 @@ mod tests {
         let relative =
             RelativeMoniker::scope_down::<AbsoluteMoniker>(&scope_root, &scope_child).unwrap();
         assert_eq!(false, relative.is_self());
-        assert_eq!("./c:test3/d:test4", format!("{}", relative));
+        assert_eq!("c:test3/d:test4", format!("{}", relative));
 
         assert_eq!(scope_root.descendant(&relative), scope_child);
     }

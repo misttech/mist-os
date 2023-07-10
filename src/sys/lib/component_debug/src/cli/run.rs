@@ -238,7 +238,10 @@ mod test {
                         child,
                         responder,
                     } => {
-                        assert_eq!(expected_parent_moniker, parent_moniker);
+                        assert_eq!(
+                            AbsoluteMoniker::parse_str(expected_parent_moniker),
+                            AbsoluteMoniker::parse_str(&parent_moniker)
+                        );
                         assert_eq!(expected_name, child.name);
                         assert_eq!(expected_collection, child.collection.unwrap());
                         responder.send(Ok(())).unwrap();
@@ -256,7 +259,10 @@ mod test {
                     responder,
                     args: _,
                 } => {
-                    assert_eq!(expected_parent_moniker, parent_moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_parent_moniker),
+                        AbsoluteMoniker::parse_str(&parent_moniker)
+                    );
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());
                     assert_eq!(expected_url, decl.url.unwrap());
@@ -268,7 +274,10 @@ mod test {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
                 fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
-                    assert_eq!(expected_moniker, moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&moniker)
+                    );
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
@@ -281,7 +290,10 @@ mod test {
                     binder: _,
                     responder,
                 } => {
-                    assert_eq!(expected_moniker, moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&moniker)
+                    );
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
@@ -307,7 +319,10 @@ mod test {
                     child,
                     responder,
                 } => {
-                    assert_eq!(expected_parent_moniker, parent_moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_parent_moniker),
+                        AbsoluteMoniker::parse_str(&parent_moniker)
+                    );
                     assert_eq!(expected_name, child.name);
                     assert_eq!(expected_collection, child.collection.unwrap());
                     responder.send(Ok(())).unwrap();
@@ -324,7 +339,10 @@ mod test {
                     responder,
                     args: _,
                 } => {
-                    assert_eq!(expected_parent_moniker, parent_moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_parent_moniker),
+                        AbsoluteMoniker::parse_str(&parent_moniker)
+                    );
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());
                     assert_eq!(expected_url, decl.url.unwrap());
@@ -354,7 +372,10 @@ mod test {
                     child,
                     responder,
                 } => {
-                    assert_eq!(expected_parent_moniker, parent_moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_parent_moniker),
+                        AbsoluteMoniker::parse_str(&parent_moniker)
+                    );
                     assert_eq!(expected_name, child.name);
                     assert_eq!(expected_collection, child.collection.unwrap());
                     responder.send(Ok(())).unwrap();
@@ -371,7 +392,10 @@ mod test {
                     responder,
                     args: _,
                 } => {
-                    assert_eq!(expected_parent_moniker, parent_moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_parent_moniker),
+                        AbsoluteMoniker::parse_str(&parent_moniker)
+                    );
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());
                     assert_eq!(expected_url, decl.url.unwrap());
@@ -383,7 +407,10 @@ mod test {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
                 fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
-                    assert_eq!(expected_moniker, moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&moniker)
+                    );
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
@@ -396,7 +423,10 @@ mod test {
                     binder: _,
                     responder,
                 } => {
-                    assert_eq!(expected_moniker, moniker);
+                    assert_eq!(
+                        AbsoluteMoniker::parse_str(expected_moniker),
+                        AbsoluteMoniker::parse_str(&moniker)
+                    );
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
@@ -410,11 +440,11 @@ mod test {
     async fn test_ok() -> Result<()> {
         let mut output = Vec::new();
         let lifecycle_controller = setup_fake_lifecycle_controller_ok(
-            "./some",
+            "/some",
             "collection",
             "name",
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm",
-            "./some/collection:name",
+            "/some/collection:name",
             true,
         );
         let response = run_cmd(
@@ -435,11 +465,11 @@ mod test {
     async fn test_name() -> Result<()> {
         let mut output = Vec::new();
         let lifecycle_controller = setup_fake_lifecycle_controller_ok(
-            "./core",
+            "/core",
             "ffx-laboratory",
             "foobar",
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm",
-            "./core/ffx-laboratory:foobar",
+            "/core/ffx-laboratory:foobar",
             false,
         );
         let response = run_cmd(
@@ -460,7 +490,7 @@ mod test {
     async fn test_fail() -> Result<()> {
         let mut output = Vec::new();
         let lifecycle_controller = setup_fake_lifecycle_controller_fail(
-            "./core",
+            "/core",
             "ffx-laboratory",
             "test",
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm",
@@ -483,11 +513,11 @@ mod test {
     async fn test_recreate() -> Result<()> {
         let mut output = Vec::new();
         let lifecycle_controller = setup_fake_lifecycle_controller_recreate(
-            "./core",
+            "/core",
             "ffx-laboratory",
             "test",
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm",
-            "./core/ffx-laboratory:test",
+            "/core/ffx-laboratory:test",
         );
         let response = run_cmd(
             "/core/ffx-laboratory:test".try_into().unwrap(),

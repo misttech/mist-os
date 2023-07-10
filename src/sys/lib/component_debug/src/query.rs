@@ -23,9 +23,10 @@ pub async fn get_cml_monikers_from_query(
 ) -> Result<Vec<AbsoluteMoniker>> {
     // Special-case the root moniker since it will substring match every moniker
     // below.
-    if let Ok(moniker) = AbsoluteMoniker::parse_str(&query) {
-        if moniker.is_root() {
-            return Ok(vec![moniker.clone()]);
+    let query_moniker = AbsoluteMoniker::parse_str(&query).ok();
+    if let Some(m) = &query_moniker {
+        if m.is_root() {
+            return Ok(vec![m.clone()]);
         }
     }
 
@@ -38,8 +39,10 @@ pub async fn get_cml_monikers_from_query(
         .filter(|i| {
             let url_match = i.url.contains(&query);
             let moniker_match = i.moniker.to_string().contains(&query);
+            let normalized_query_moniker_match =
+                matches!(&query_moniker, Some(m) if i.moniker.to_string().contains(&m.to_string()));
             let id_match = i.instance_id.as_ref().map_or(false, |id| id.contains(&query));
-            url_match || moniker_match || id_match
+            url_match || moniker_match || normalized_query_moniker_match || id_match
         })
         .map(|i| i.moniker)
         .collect();
@@ -49,9 +52,9 @@ pub async fn get_cml_monikers_from_query(
 
     // If the query is an exact-match of any of the results, return that
     // result only.
-    if let Ok(moniker) = AbsoluteMoniker::parse_str(&query) {
-        if monikers.contains(&moniker) {
-            return Ok(vec![moniker]);
+    if let Some(m) = query_moniker {
+        if monikers.contains(&m) {
+            return Ok(vec![m]);
         }
     }
 
@@ -228,6 +231,10 @@ mod tests {
     async fn test_get_cml_moniker_from_query_moniker_single_match() {
         let realm_query = setup_fake_realm_query();
         let moniker = get_cml_moniker_from_query("foo", &realm_query).await.unwrap();
+        assert_eq!(moniker, AbsoluteMoniker::parse_str("/core/foo").unwrap());
+
+        let realm_query = setup_fake_realm_query();
+        let moniker = get_cml_moniker_from_query("/core/foo", &realm_query).await.unwrap();
         assert_eq!(moniker, AbsoluteMoniker::parse_str("/core/foo").unwrap());
     }
 

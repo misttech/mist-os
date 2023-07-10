@@ -12,6 +12,7 @@ use {
     rand::prelude::SliceRandom,
     rand::rngs::SmallRng,
     rand::Rng,
+    std::convert::TryFrom,
     stress_test_actor::{actor_loop, Action},
     tracing::warn,
 };
@@ -67,7 +68,10 @@ pub fn destroy_child<'a>(
         let instances = stressor.get_instances_in_realm().await;
 
         // The root cannot be destroyed. Remove it.
-        let instances: Vec<String> = instances.into_iter().filter(|m| m != ".").collect();
+        let instances: Vec<String> = instances
+            .into_iter()
+            .filter(|m| !RelativeMoniker::try_from(m.as_str()).unwrap().is_self())
+            .collect();
 
         if let Some(moniker) = instances.choose(&mut rng) {
             let mut moniker = RelativeMoniker::parse_str(moniker).unwrap();

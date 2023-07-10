@@ -7,6 +7,7 @@ use {
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_sys2 as fsys,
     fuchsia_async::Task,
     futures::StreamExt,
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
     std::collections::HashMap,
     std::fs::{create_dir_all, write},
     tempfile::TempDir,
@@ -72,16 +73,41 @@ pub fn serve_realm_query(
 
     let mut instance_map = HashMap::new();
     for instance in instances {
-        let moniker = instance.moniker.as_ref().unwrap().clone();
-        let previous = instance_map.insert(moniker, instance);
+        let moniker = AbsoluteMoniker::parse_str(instance.moniker.as_ref().unwrap()).unwrap();
+        let previous = instance_map.insert(moniker.to_string(), instance);
         assert!(previous.is_none());
     }
+
+    let manifests = manifests
+        .into_iter()
+        .map(|(moniker, component)| {
+            let moniker = AbsoluteMoniker::parse_str(&moniker).unwrap().to_string();
+            (moniker, component)
+        })
+        .collect::<HashMap<_, _>>();
+
+    let configs = configs
+        .into_iter()
+        .map(|(moniker, config)| {
+            let moniker = AbsoluteMoniker::parse_str(&moniker).unwrap().to_string();
+            (moniker, config)
+        })
+        .collect::<HashMap<_, _>>();
+
+    let dirs = dirs
+        .into_iter()
+        .map(|((moniker, opentype), dir)| {
+            let moniker = AbsoluteMoniker::parse_str(&moniker).unwrap().to_string();
+            ((moniker, opentype), dir)
+        })
+        .collect::<HashMap<_, _>>();
 
     Task::spawn(async move {
         loop {
             match stream.next().await.unwrap().unwrap() {
                 fsys::RealmQueryRequest::GetInstance { moniker, responder } => {
                     eprintln!("GetInstance call for {}", moniker);
+                    let moniker = AbsoluteMoniker::parse_str(&moniker).unwrap().to_string();
                     if let Some(instance) = instance_map.get(&moniker) {
                         responder.send(Ok(instance)).unwrap();
                     } else {
@@ -90,6 +116,7 @@ pub fn serve_realm_query(
                 }
                 fsys::RealmQueryRequest::GetResolvedDeclaration { moniker, responder } => {
                     eprintln!("GetResolvedDeclaration call for {}", moniker);
+                    let moniker = AbsoluteMoniker::parse_str(&moniker).unwrap().to_string();
                     if let Some(manifest) = manifests.get(&moniker) {
                         let iterator = serve_manifest_bytes_iterator(manifest.clone());
                         responder.send(Ok(iterator)).unwrap();
@@ -99,6 +126,7 @@ pub fn serve_realm_query(
                 }
                 fsys::RealmQueryRequest::GetManifest { moniker, responder } => {
                     eprintln!("GetManifest call for {}", moniker);
+                    let moniker = AbsoluteMoniker::parse_str(&moniker).unwrap().to_string();
                     if let Some(manifest) = manifests.get(&moniker) {
                         let iterator = serve_manifest_bytes_iterator(manifest.clone());
                         responder.send(Ok(iterator)).unwrap();
@@ -108,6 +136,7 @@ pub fn serve_realm_query(
                 }
                 fsys::RealmQueryRequest::GetStructuredConfig { moniker, responder } => {
                     eprintln!("GetStructuredConfig call for {}", moniker);
+                    let moniker = AbsoluteMoniker::parse_str(&moniker).unwrap().to_string();
                     if let Some(config) = configs.get(&moniker) {
                         responder.send(Ok(config)).unwrap();
                     } else {
@@ -135,6 +164,7 @@ pub fn serve_realm_query(
                         "Open call for {} for {:?} at path '{}' with flags {:?}",
                         moniker, dir_type, path, flags
                     );
+                    let moniker = AbsoluteMoniker::parse_str(&moniker).unwrap().to_string();
                     if let Some(dir) = dirs.get(&(moniker, dir_type)) {
                         let path = dir.path().join(path).display().to_string();
                         fuchsia_fs::node::open_channel_in_namespace(&path, flags, object).unwrap();

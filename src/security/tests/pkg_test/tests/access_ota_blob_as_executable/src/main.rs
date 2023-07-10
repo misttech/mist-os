@@ -438,7 +438,7 @@ async fn access_ota_blob_as_executable() {
 
     // Setup storage capabilities.
     let ramdisk_client = mount_image_as_ramdisk("/pkg/data/assemblies/hello_world_v0/fs.blk").await;
-    let pkg_resolver_storage_proxy = get_storage_for_component_instance("./pkg-resolver").await;
+    let pkg_resolver_storage_proxy = get_storage_for_component_instance("pkg-resolver").await;
     // TODO(fxbug.dev/88453): Need a test that confirms assumption: Production
     // configuration is an empty mutable storage directory.
     assert!(readdir(&pkg_resolver_storage_proxy).await.unwrap().is_empty());
