@@ -2665,11 +2665,6 @@ impl TransactionHeader {
 bitflags! {
     /// Bitflags type for transaction header at-rest flags.
     pub struct AtRestFlags: u16 {
-        /// Empty placeholder since empty bitflags are not allowed. Should be
-        /// removed once any new header flags are defined.
-        #[deprecated = "Placeholder since empty bitflags are not allowed."]
-        const __PLACEHOLDER = 0;
-
         /// Indicates that the V2 wire format should be used instead of the V1
         /// wire format.
         /// This includes the following RFCs:
