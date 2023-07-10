@@ -1,0 +1,13 @@
+/dts-v1/;
+
+/ {
+	#address-cells = <0x02>;
+	#size-cells = <0x02>;
+	compatible = "khadas,vim3\0amlogic,a311d";
+	model = "Khadas Vim3";
+
+	clock-controller@ff63c000 {
+		compatible = "amlogic,g12b-clk";
+		reg = <0x00 0xff63c000 0x00 0x2000 0x00 0xff620000 0x00 0x10000 0x00 0xffd18000 0x00 0x1000>;
+	};
+};

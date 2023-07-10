@@ -1,0 +1,29 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+import("//boards/vim3.gni")
+
+board_description = "A generic vim3 device (using devicetree)"
+
+_removed_bootfs_deps = [ "//src/devices/board/drivers/vim3" ]
+board_bootfs_labels -= _removed_bootfs_deps
+
+# TODO(fxbug.dev/107029): uncomment these once devicetree actually works.
+#board_zedboot_bootfs_labels -= _removed_bootfs_deps
+#boord_recovery_bootfs_labels -= _removed_bootfs_deps
+
+_common_bootfs_deps = [
+  "//src/devices/bin/driver_host2",
+  "//src/devices/board/drivers/vim3-devicetree",
+]
+board_bootfs_labels += _common_bootfs_deps
+
+# TODO(fxbug.dev/107029): uncomment these once devicetree actually works.
+#board_zedboot_bootfs_labels += _common_bootfs_deps
+#boord_recovery_bootfs_labels += _common_bootfs_deps
+
+kernel_zbi_extra_deps =
+    [ "//src/devices/board/drivers/vim3-devicetree:vim3-dtb-item" ]
+
+# BoardInformation for Product Assembly
+board_information_for_assembly = "//boards/vim3/dfv2_board_information.json5"

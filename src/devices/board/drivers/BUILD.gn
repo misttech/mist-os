@@ -15,6 +15,7 @@ group("tests") {
     "qemu-riscv64:tests",
     "sherlock:tests",
     "vim3:tests",
+    "vim3-devicetree:tests",
   ]
 
   if (target_cpu == "x64") {

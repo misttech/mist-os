@@ -113,6 +113,7 @@
 //src/devices/board/drivers/qemu-riscv64:qemu-riscv64-driver
 //src/devices/board/drivers/sherlock:sherlock-driver
 //src/devices/board/drivers/sherlock:sherlock-factory-driver
+//src/devices/board/drivers/vim3-devicetree:vim3-devicetree-driver
 //src/devices/board/drivers/vim3:vim3-driver
 //src/devices/bus/drivers/pci/test:pci_fake-driver
 //src/devices/bus/drivers/pci/test:pci_protocol_test_driver-driver
