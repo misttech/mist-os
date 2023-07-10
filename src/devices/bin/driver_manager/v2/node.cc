@@ -343,7 +343,7 @@ Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_
 
 zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     std::string_view node_name, std::vector<Node*> parents, std::vector<std::string> parents_names,
-    std::vector<fuchsia_driver_framework::wire::NodeProperty> properties,
+    const std::vector<fuchsia_driver_framework::wire::NodeProperty>& properties,
     NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index) {
   ZX_ASSERT(!parents.empty());
   if (primary_index >= parents.size()) {
@@ -357,7 +357,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
                                                      dispatcher, std::move(inspect), primary_index);
   composite->parents_names_ = std::move(parents_names);
 
-  for (auto& prop : properties) {
+  for (const auto& prop : properties) {
     auto natural = fidl::ToNatural(prop);
     auto new_prop = fidl::ToWire(composite->arena_, std::move(natural));
     composite->properties_.push_back(new_prop);
@@ -848,7 +848,7 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
   }
   ZX_ASSERT(devfs_device_.topological_node().has_value());
   zx_status_t status = devfs_device_.topological_node()->add_child(
-      child->name_, std::move(devfs_class_path), std::move(devfs_target), child->devfs_device_);
+      child->name_, devfs_class_path, std::move(devfs_target), child->devfs_device_);
   ZX_ASSERT_MSG(status == ZX_OK, "%s failed to export: %s", child->MakeTopologicalPath().c_str(),
                 zx_status_get_string(status));
   ZX_ASSERT(child->devfs_device_.topological_node().has_value());
@@ -1041,8 +1041,8 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   }
   driver_component_.emplace(*this, std::string(url), std::move(controller),
                             std::move(driver_endpoints->client));
-  driver_host_.value()->Start(std::move(endpoints->client), name_, std::move(symbols),
-                              std::move(start_info), std::move(driver_endpoints->server),
+  driver_host_.value()->Start(std::move(endpoints->client), name_, symbols,
+                              start_info, std::move(driver_endpoints->server),
                               [this, cb = std::move(cb)](zx::result<> result) mutable {
                                 if (result.is_error()) {
                                   driver_component_.reset();
@@ -1057,7 +1057,7 @@ void Node::ScheduleStopComponent() {
                 State2String(node_state_));
   node_state_ = NodeState::kWaitingOnDriverComponent;
   if (!driver_component_) {
-    FinishRemoval();
+    async::PostTask(dispatcher_, fit::bind_member(this, &Node::FinishRemoval));
     return;
   }
   // Send an epitaph to the component manager and close the connection. The

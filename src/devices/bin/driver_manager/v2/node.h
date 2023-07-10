@@ -129,7 +129,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   static zx::result<std::shared_ptr<Node>> CreateCompositeNode(
       std::string_view node_name, std::vector<Node*> parents,
       std::vector<std::string> parents_names,
-      std::vector<fuchsia_driver_framework::wire::NodeProperty> properties,
+      const std::vector<fuchsia_driver_framework::wire::NodeProperty>& properties,
       NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index = 0);
 
   void OnBind() const;
