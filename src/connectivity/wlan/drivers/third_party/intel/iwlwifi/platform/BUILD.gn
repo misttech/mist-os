@@ -122,6 +122,7 @@ source_set("fuchsia_device") {
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_cpp_wire",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_bindlib_cpp",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_bindlib_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/cfg",

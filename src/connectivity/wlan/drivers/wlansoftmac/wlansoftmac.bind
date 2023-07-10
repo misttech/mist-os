@@ -2,6 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.wlan;
+using fuchsia.wlan.softmac;
 
-fuchsia.BIND_PROTOCOL == fuchsia.wlan.BIND_PROTOCOL.MAC;
+fuchsia.wlan.softmac.WlanSoftmac == fuchsia.wlan.softmac.WlanSoftmac.DriverTransport;

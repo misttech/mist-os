@@ -1,16 +1,16 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
-        },
+        "name": "Incorrect_Rule",
         "expected": "abort",
-        "name": "Incorrect_Protocol"
+        "device": {
+            "fuchsia.wlan.softmac.WlanSoftmac": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
+        }
     },
     {
-        "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.wlan.BIND_PROTOCOL.MAC"
-        },
+        "name": "Correct_Rule",
         "expected": "match",
-        "name": "Correct_Protocol"
+        "device": {
+            "fuchsia.wlan.softmac.WlanSoftmac": "fuchsia.wlan.softmac.WlanSoftmac.DriverTransport"
+        }
     }
 ]

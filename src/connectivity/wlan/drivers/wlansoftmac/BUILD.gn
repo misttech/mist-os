@@ -15,7 +15,7 @@ driver_bind_rules("wlansoftmac_bind") {
   rules = "wlansoftmac.bind"
   bind_output = "wlansoftmac.bindbc"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.wlan" ]
+  deps = [ "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_bindlib" ]
 }
 
 wlansoftmac_convert_sources = [

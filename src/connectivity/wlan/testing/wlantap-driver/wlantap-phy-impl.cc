@@ -7,6 +7,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/wlan/softmac/cpp/bind.h>
 #include <wlan/common/phy.h>
 
 #include "utils.h"
@@ -167,7 +168,8 @@ zx_status_t WlanPhyImplDevice::AddWlanSoftmacChild(
 
   FDF_LOG(INFO, "Creating Child node");
   auto properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
-  properties[0] = fdf::MakeProperty(arena, 1, ZX_PROTOCOL_WLAN_SOFTMAC);
+  properties[0] = fdf::MakeProperty(arena, bind_fuchsia_wlan_softmac::WLANSOFTMAC,
+                                    bind_fuchsia_wlan_softmac::WLANSOFTMAC_DRIVERTRANSPORT);
 
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(name)
