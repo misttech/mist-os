@@ -262,7 +262,7 @@ async fn perform_scan(
                 Err(fidl_policy::ScanErrorCode::GeneralError)
             })
             .await;
-        report_scan_defect(&sme_proxy, &scan_results).await;
+        report_scan_defect(&sme_proxy, &scan_results, &scan_request, &telemetry_sender).await;
 
         match scan_results {
             Ok(results) => {
@@ -306,11 +306,6 @@ async fn perform_scan(
                 }
             },
         }
-    }
-
-    // If the passive scan results are empty, report an empty scan results metric.
-    if bss_by_network.is_empty() {
-        telemetry_sender.send(TelemetryEvent::ScanDefect(ScanIssue::EmptyScanResults))
     }
 
     let scan_results = network_map_to_scan_result(bss_by_network);
@@ -441,11 +436,17 @@ fn log_metric_for_scan_error(reason: &fidl_sme::ScanErrorCode, telemetry_sender:
 async fn report_scan_defect(
     sme_proxy: &SmeForScan,
     scan_result: &Result<Vec<wlan_common::scan::ScanResult>, types::ScanError>,
+    scan_request: &fidl_sme::ScanRequest,
+    telemetry_sender: &TelemetrySender,
 ) {
     match scan_result {
         Ok(results) => {
+            // If passive scan results are empty, report an empty scan results metric and defect.
             if results.is_empty() {
-                sme_proxy.log_empty_scan_defect();
+                if let fidl_sme::ScanRequest::Passive(_) = scan_request {
+                    telemetry_sender.send(TelemetryEvent::ScanDefect(ScanIssue::EmptyScanResults));
+                    sme_proxy.log_empty_scan_defect();
+                }
             }
         }
         Err(types::ScanError::GeneralError) => sme_proxy.log_failed_scan_defect(),
@@ -934,7 +935,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn empty_scan_results() {
+    fn empty_passive_scan_results() {
         let mut exec = fasync::TestExecutor::new();
         let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
@@ -953,7 +954,7 @@ mod tests {
         // Progress scan handler
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
-        // Create mock scan data and send it via the SME
+        // Send back empty scan results via the SME
         assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
@@ -981,6 +982,54 @@ mod tests {
         // Verify that a defect was logged.
         let logged_defects = get_fake_defects(&mut exec, client);
         let expected_defects = vec![Defect::Iface(IfaceFailure::EmptyScanResults { iface_id: 0 })];
+        assert_eq!(logged_defects, expected_defects);
+    }
+
+    #[fuchsia::test]
+    fn empty_active_scan_results() {
+        let mut exec = fasync::TestExecutor::new();
+        let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
+        let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
+        let (telemetry_sender, mut telemetry_receiver) = create_telemetry_sender_and_receiver();
+
+        // Issue request to scan.
+        let sme_scan = active_sme_req(vec!["foo"], vec![]);
+        let scan_fut = perform_scan(
+            sme_scan.clone(),
+            client.clone(),
+            saved_networks_manager,
+            telemetry_sender,
+        );
+        pin_mut!(scan_fut);
+
+        // Progress scan handler
+        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+
+        // Send back empty scan results via the SME
+        assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
+                req, responder,
+            }))) => {
+                assert_eq!(req, sme_scan.clone());
+                let vmo = write_vmo(vec![]).expect("failed to write VMO");
+                responder.send(Ok(vmo)).expect("failed to send scan data");
+            }
+        );
+
+        // Process response from SME (which is empty) and expect the future to complete.
+        assert_variant!(exec.run_until_stalled(&mut scan_fut),  Poll::Ready((req, results)) => {
+            assert_eq!(req, sme_scan);
+            assert!(results.unwrap().is_empty());
+        });
+
+        // Verify that a scan defect has not been logged; this should only be logged for
+        // passive scans because it is common for active scans.
+        assert_variant!(telemetry_receiver.try_next(), Ok(None));
+
+        // Verify that no defect was logged.
+        let logged_defects = get_fake_defects(&mut exec, client);
+        let expected_defects = vec![];
         assert_eq!(logged_defects, expected_defects);
     }
 
@@ -1369,6 +1418,8 @@ mod tests {
     ) {
         let mut exec = fasync::TestExecutor::new();
         let (iface_manager, _) = exec.run_singlethreaded(create_iface_manager());
+        let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
+        let scan_request = passive_sme_req();
 
         // Get the SME out of the IfaceManager.
         let sme = {
@@ -1382,7 +1433,7 @@ mod tests {
         };
 
         // Report the desired scan error or success.
-        let fut = report_scan_defect(&sme, &scan_result);
+        let fut = report_scan_defect(&sme, &scan_result, &scan_request, &telemetry_sender);
         pin_mut!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
