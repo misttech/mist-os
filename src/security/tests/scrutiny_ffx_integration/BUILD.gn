@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/generated_images_config.gni")
 import("//build/components/fuchsia_package.gni")
 import("//build/config.gni")
 import("//build/testing/host_test_data.gni")
@@ -23,10 +24,38 @@ if (is_fuchsia) {
     outputs = [ "empty/{{source_file_part}}" ]
   }
 
+  generated_images_config("images_config") {
+    zbi = {
+      name = _assemble_system_target_name
+    }
+    fvm = {
+      slice_size = 1048576
+      blobfs = {
+        layout = "compact"
+      }
+    }
+  }
+
+  generated_images_config("images_config_recovery") {
+    zbi = {
+      name = _assemble_system_recovery_target_name
+    }
+    fvm = {
+      slice_size = 1048576
+      blobfs = {
+        layout = "compact"
+      }
+    }
+  }
+
   # `assembled_system` builds a zbi and blob.blk for consumption by the test.
   assembled_system(_assemble_system_target_name) {
     testonly = true
+    generate_vbmeta = false
     generate_fvm = true
+    generate_fvm_fastboot = false
+    assembly_images_config_label = ":images_config"
+    use_explicit_images_config_only = true
     product_assembly_config_label = "//build/assembly:default_product_config"
     use_bringup_platform_bundles_only = true
     bootfs_labels = []
@@ -41,7 +70,11 @@ if (is_fuchsia) {
   # extracted as part of the zbi, such as in recovery images.
   assembled_system(_assemble_system_recovery_target_name) {
     testonly = true
+    generate_vbmeta = false
     generate_fvm = true
+    generate_fvm_fastboot = false
+    assembly_images_config_label = ":images_config_recovery"
+    use_explicit_images_config_only = true
     product_assembly_config_label = "//build/assembly:default_product_config"
     use_bringup_platform_bundles_only = true
     bootfs_labels = []

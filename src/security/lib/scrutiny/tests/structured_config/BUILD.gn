@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/assembly/update_package.gni")
@@ -77,16 +78,25 @@ if (is_fuchsia) {
 
     blobfs = "${outdir}/blob.blk"
     zbi = "${outdir}/assembly.zbi"
-    zbi_signed = "${outdir}/assembly.zbi.signed"
-    vbmeta = "${outdir}/assembly.vbmeta"
     fvm = "${outdir}/fvm.blk"
     fvm_sparse = "${outdir}/fvm.sparse.blk"
     fvm_blob_sparse = "${outdir}/fvm.blob.sparse.blk"
-    fvm_fastboot = "${outdir}/fvm.fastboot.blk"
 
     qemu_kernel = qemu_boot_shim.path
 
     product_bundle = target_out_dir + "/product_bundle"
+  }
+
+  generated_images_config("images_config") {
+    zbi = {
+      name = "assembly"
+    }
+    fvm = {
+      slice_size = 8388608
+      blobfs = {
+        layout = "compact"
+      }
+    }
   }
 
   product_assembly_configuration("product_assembly_config") {
@@ -99,7 +109,11 @@ if (is_fuchsia) {
   assembled_system("assembly") {
     testonly = true
     generate_fvm = true
+    generate_fvm_fastboot = false
+    generate_vbmeta = false
 
+    assembly_images_config_label = ":images_config"
+    use_explicit_images_config_only = true
     product_assembly_config_label = ":product_assembly_config"
 
     # Needed for scrutiny to find root.cm and other component config.
@@ -158,19 +172,8 @@ if (is_fuchsia) {
       files.fvm_sparse,
       files.fvm_blob_sparse,
       files.qemu_kernel,
+      files.zbi,
     ]
-    if (fvm_emmc_partition_size != false || fvm_ftl_nand_block_count != false) {
-      _assembly_contents += [ files.fvm_fastboot ]
-    }
-    if (custom_signing_script != "" || use_vboot) {
-      _assembly_contents += [ files.zbi_signed ]
-    } else {
-      _assembly_contents += [ files.zbi ]
-    }
-    if (use_vbmeta) {
-      _assembly_contents += [ files.vbmeta ]
-    }
-
     system_a_contents = _assembly_contents
   }
 

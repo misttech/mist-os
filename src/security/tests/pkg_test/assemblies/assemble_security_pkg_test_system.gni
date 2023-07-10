@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/package_list.gni")
 import("//build/assembly/update_package.gni")
@@ -109,11 +110,18 @@ template("assemble_security_pkg_test_system") {
     not_needed(invoker, [ "packaged_assembly_directory" ])
   }
 
+  use_fxfs_blob = false
+  if (defined(invoker.use_fxfs_blob)) {
+    use_fxfs_blob = invoker.use_fxfs_blob
+  }
+
   labels = {
     assembly = assembly_name
     assembly_image_assembler = "${assembly_name}.image_assembler"
     assembly_partitions_config = "${assembly_name}_partitions_config"
     base_packages = "${assembly_name}.base_packages"
+    images_config = "${assembly_name}_images_config"
+    images_config_fxfs = "${assembly_name}_images_config_fxfs"
     build_info = "${assembly_name}_build_info"
     repository_config = "${assembly_name}_repository_config"
     packages_json = "${assembly_name}_packages_json"
@@ -182,7 +190,7 @@ template("assemble_security_pkg_test_system") {
   if (current_toolchain == target_toolchain) {
     # fxfs_blob is pulled in via assembled_system.gni which includes generated_fshost_config.gni.
     # assembled_system will generate either a fxfs.blk or fvm.blk depending on the fxfs_blob flag.
-    if (defined(invoker.use_fxfs_blob) && invoker.use_fxfs_blob) {
+    if (use_fxfs_blob) {
       fs_file_name = "fxfs"
     } else {
       fs_file_name = "fvm"
@@ -232,6 +240,34 @@ template("assemble_security_pkg_test_system") {
     minimum_utc_stamp = files.build_info_minimum_utc_stamp
   }
 
+  generated_images_config(labels.images_config) {
+    zbi = {
+      name = labels.assembly
+    }
+    fvm = {
+      slice_size = 1048576
+      blobfs = {
+        layout = "compact"
+      }
+    }
+
+    if (defined(invoker.fvm_truncate_to_length)) {
+      fvm.truncate_to_length = invoker.fvm_truncate_to_length
+    }
+  }
+
+  generated_images_config(labels.images_config_fxfs) {
+    zbi = {
+      name = labels.assembly
+    }
+    fxfs = {
+    }
+
+    if (defined(invoker.assembly_fxfs_image_size_bytes)) {
+      fxfs.size_bytes = invoker.assembly_fxfs_image_size_bytes
+    }
+  }
+
   packages_for_assembly = [
                             ":${labels.build_info}",
                             ":${labels.root_ssl_certificates}",
@@ -250,14 +286,18 @@ template("assemble_security_pkg_test_system") {
                              "fvm_truncate_to_length",
                              "assembly_fxfs_image_size_bytes",
                            ])
-    if (defined(invoker.use_fxfs_blob)) {
-      use_fxfs_blob = invoker.use_fxfs_blob
-    } else {
-      use_fxfs_blob = false
-    }
-    generate_fvm = !use_fxfs_blob
-    generate_fxfs = use_fxfs_blob
     testonly = true
+    use_explicit_images_config_only = true
+    generate_vbmeta = false
+    generate_fvm = !use_fxfs_blob
+    generate_fvm_fastboot = false
+    generate_fxfs = use_fxfs_blob
+    use_fxfs_blob = use_fxfs_blob
+    if (!use_fxfs_blob) {
+      assembly_images_config_label = ":${labels.images_config}"
+    } else {
+      assembly_images_config_label = ":${labels.images_config_fxfs}"
+    }
     product_assembly_config_label = "//build/assembly:default_product_config"
     use_bringup_platform_bundles_only = true
     board_name = invoker.board_name
