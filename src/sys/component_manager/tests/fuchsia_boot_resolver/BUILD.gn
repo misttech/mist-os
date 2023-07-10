@@ -3,8 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/generated_images_config.gni")
 import("//build/components/fuchsia_package.gni")
-import("//build/config.gni")
 import("//build/testing/host_test_data.gni")
 import("//build/zircon/tools.gni")
 
@@ -26,36 +26,24 @@ rustc_test("resolve_bootfs_package") {
   sources = [ "src/resolve_bootfs_package.rs" ]
 }
 if (current_toolchain == default_toolchain) {
-  # `assembled_system` requires a package with the name "pkgfs".
-  fuchsia_package("empty_pkgfs") {
-    testonly = true
-    package_name = "pkgfs"
-  }
-
-  # `assembled_system` needs at least one package in base_packages.
-  fuchsia_package("empty-pkg") {
-    testonly = true
-    package_name = "empty-pkg"
-  }
-
-  config_data("empty_config") {
-    for_pkg = "empty-pkg"
-    sources = [ "empty_config" ]
-    outputs = [ "empty/{{source_file_part}}" ]
+  generated_images_config("images_config") {
+    zbi = {
+      name = "test_zbi"
+    }
   }
 
   # `assembled_system` builds a zbi for consumption by the test.
   assembled_system("test_zbi") {
     testonly = true
     generate_fvm = false
+    generate_vbmeta = false
+    assembly_images_config_label = ":images_config"
+    use_explicit_images_config_only = true
     product_assembly_config_label = "//build/assembly:default_product_config"
     use_bringup_platform_bundles_only = true
     bootfs_labels = []
     bootfs_package_labels = [ "//src/security/tests/pkg_test/assemblies/hello_world_v1:hello_world-package" ]
-    base_packages = [
-      ":empty-pkg",
-      ":empty_config",
-    ]
+    base_packages = []
   }
 
   output_file = "$target_out_dir/uncompressed_bootfs"
