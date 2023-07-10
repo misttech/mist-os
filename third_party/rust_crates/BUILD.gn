@@ -1691,7 +1691,7 @@ rust_proc_macro("async-trait-v0_1_68") {
   deps = []
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v2_0_16" ]
+  deps += [ ":syn-v2_0_23" ]
 
   rustenv = []
 
@@ -10723,10 +10723,10 @@ rust_library("syn-v1_0_98") {
   visibility = [ ":*" ]
 }
 
-rust_library("syn-v2_0_16") {
+rust_library("syn-v2_0_23") {
   crate_name = "syn"
-  crate_root = "//third_party/rust_crates/vendor/syn-2.0.16/src/lib.rs"
-  output_name = "syn-ac43bca0e5876d5e"
+  crate_root = "//third_party/rust_crates/vendor/syn-2.0.23/src/lib.rs"
+  output_name = "syn-1a0b6efb85ae9366"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -10739,8 +10739,8 @@ rust_library("syn-v2_0_16") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=ac43bca0e5876d5e",
-    "-Cextra-filename=-ac43bca0e5876d5e",
+    "-Cmetadata=1a0b6efb85ae9366",
+    "-Cextra-filename=-1a0b6efb85ae9366",
     "--cfg=feature=\"clone-impls\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"derive\"",
@@ -13080,7 +13080,7 @@ rust_proc_macro("zerocopy-derive-v0_7_0-alpha_4") {
   deps = []
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v2_0_16" ]
+  deps += [ ":syn-v2_0_23" ]
 
   rustenv = []
 

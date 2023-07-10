@@ -1166,7 +1166,7 @@ mod value {
                         b'x' => {
                             let (byte, rest) = backslash_x(s);
                             s = rest;
-                            assert!(byte <= 0x80, "Invalid \\x byte in string literal");
+                            assert!(byte <= 0x7F, "Invalid \\x byte in string literal");
                             char::from_u32(u32::from(byte)).unwrap()
                         }
                         b'u' => {
@@ -1273,8 +1273,7 @@ mod value {
                         b'"' => b'"',
                         b'\r' | b'\n' => loop {
                             let byte = byte(v, 0);
-                            let ch = char::from_u32(u32::from(byte)).unwrap();
-                            if ch.is_whitespace() {
+                            if matches!(byte, b' ' | b'\t' | b'\n' | b'\r') {
                                 v = &v[1..];
                             } else {
                                 continue 'outer;
