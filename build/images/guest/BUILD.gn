@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/product_assembly_configuration.gni")
+import("//build/board.gni")
 import("//build/images/paths.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/sys/core/build/core.gni")
@@ -54,6 +55,12 @@ if (labels.images == "//build/images/bringup") {
 } else {
   # In all other builds, define the guest assembly.
 
+  if (has_board) {
+    assert(images_config_label != false, "Need to define images_config_label")
+  } else {
+    images_config_label = "//boards/images:default"
+  }
+
   # Guest's specific core realm (not based on core_realm_shards).
   core_realm_definition("core") {
     testonly = true
@@ -76,6 +83,7 @@ if (labels.images == "//build/images/bringup") {
     generate_fvm = !fxfs_blob
     generate_fxfs = fxfs_blob
 
+    assembly_images_config_label = images_config_label
     product_assembly_config_label = ":product_assembly_config"
 
     # As `:product_assembly_config` specifies an `eng` build-type, the assembly
