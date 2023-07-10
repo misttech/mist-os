@@ -7,6 +7,7 @@
 import("//build/testing/zbi_test.gni")
 import("//build/zbi/kernel_cmdline.gni")
 import("//zircon/kernel/phys/efi/efi_executable.gni")
+import("//zircon/kernel/phys/phys_executable.gni")
 import("//zircon/kernel/phys/qemu.gni")
 import("//zircon/kernel/phys/test/turducken_zbi_test.gni")
 import("//zircon/kernel/phys/zbi_executable.gni")
@@ -18,6 +19,30 @@ group("boot-shim") {
   ]
   if (current_cpu == "x64") {
     deps += [ "//zircon/kernel/arch/x86/phys/boot-shim" ]
+  }
+}
+
+template("devicetree_zbi_test") {
+  test_target = "devicetree-shim-$target_name"
+  zbi_test(test_target) {
+    qemu_kernel = "//zircon/kernel/arch/$current_cpu/phys/boot-shim:devicetree-boot-shim(${phys_toolchain})"
+    device_types = [ "QEMU" ]
+
+    forward_variables_from(invoker, "*")
+    if (!defined(timeout)) {
+      timeout = qemu_short_timeout
+    }
+  }
+}
+
+if (current_cpu == "arm64") {
+  devicetree_zbi_test("phys-unittests") {
+    deps =
+        [ "//zircon/kernel/phys/test:zbi-phys-unittests.zbi($phys_toolchain)" ]
+  }
+
+  devicetree_zbi_test("memory-test") {
+    deps = [ "//zircon/kernel/phys/test:zbi-memory-test.zbi($phys_toolchain)" ]
   }
 }
 
@@ -36,6 +61,42 @@ if (toolchain_environment == "kernel.phys") {
       "//zircon/kernel/phys:main",
       "//zircon/kernel/phys:symbolize",
       "//zircon/kernel/phys:zbi-memory",
+    ]
+  }
+
+  config("includes") {
+    visibility = [ ":*" ]
+    include_dirs = [ "include" ]
+  }
+
+  source_set("devicetree") {
+    public_configs = [ ":includes" ]
+    sources = [ "devicetree.cc" ]
+    public = [ "include/phys/boot-shim/devicetree.h" ]
+
+    public_deps = [
+      "//sdk/lib/fit",
+      "//sdk/lib/zbi-format",
+      "//src/lib/zbitl",
+      "//zircon/kernel/lib/boot-options",
+      "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/libc",
+      "//zircon/kernel/phys:allocation",
+      "//zircon/kernel/phys:stdio",
+      "//zircon/kernel/phys:zbitl-allocation",
+      "//zircon/kernel/phys:zbitl-allocation",
+      "//zircon/kernel/phys/lib/boot-shim",
+      "//zircon/system/ulib/fbl",
+    ]
+
+    deps = [
+      "//zircon/kernel/arch/$current_cpu/phys:linuxboot",
+      "//zircon/kernel/lib/arch",
+      "//zircon/kernel/phys:address-space",
+      "//zircon/kernel/phys:allocation-init",
+      "//zircon/kernel/phys:main",
+      "//zircon/kernel/phys:uart",
+      "//zircon/system/ulib/uart",
     ]
   }
 }
@@ -74,6 +135,13 @@ group("boot_tests") {
 
   if (current_cpu == "x64") {
     deps += [ "//zircon/kernel/arch/x86/phys/boot-shim:boot_tests" ]
+  }
+
+  if (current_cpu == "arm64") {
+    deps += [
+      ":devicetree-shim-memory-test",
+      ":devicetree-shim-phys-unittests",
+    ]
   }
 }
 

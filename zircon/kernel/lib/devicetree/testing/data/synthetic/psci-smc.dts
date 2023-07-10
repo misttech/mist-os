@@ -1,6 +1,9 @@
 /dts-v1/;
 
 / {
+	a {
+		compatible = "foo";
+	};
 	psci {
 		migrate = <0xc4000005>;
 		cpu_on = <0xc4000003>;

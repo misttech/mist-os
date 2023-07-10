@@ -115,7 +115,7 @@ devicetree::ScanState ArmDevicetreePsciItem::OnNode(const devicetree::NodePath& 
     }
   }
 
-  return devicetree::ScanState::kDone;
+  return devicetree::ScanState::kActive;
 }
 
 devicetree::ScanState ArmDevicetreeGicItem::HandleGicChildNode(

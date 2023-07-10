@@ -1,0 +1,25 @@
+# Copyright 2023 The Fuchsia Authors
+#
+# Use of this source code is governed by a MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT
+
+import("//zircon/kernel/phys/phys_executable.gni")
+import("//zircon/kernel/phys/qemu.gni")
+
+phys_executable("devicetree-boot-shim") {
+  sources = [ "devicetree-main.cc" ]
+
+  deps = [
+    "//zircon/kernel/lib/boot-options",
+    "//zircon/kernel/lib/libc",
+    "//zircon/kernel/phys:allocation",
+    "//zircon/kernel/phys:boot-zbi",
+    "//zircon/kernel/phys:exception",
+    "//zircon/kernel/phys:main",
+    "//zircon/kernel/phys:stdio",
+    "//zircon/kernel/phys:symbolize",
+    "//zircon/kernel/phys/boot-shim:devicetree",
+    "//zircon/kernel/phys/lib/boot-shim",
+  ]
+}
