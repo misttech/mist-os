@@ -1,0 +1,8 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+declare_args() {
+  # Set to true if a devicetree based board driver is being used.
+  devicetree_board_driver = false
+}

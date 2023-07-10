@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/devicetree/args.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
 import("//tools/cmc/build/expect_includes.gni")
@@ -46,9 +47,15 @@ test("device-enumeration") {
     "boards/qemu_riscv64.cc",
     "boards/qemu_x64.cc",
     "boards/sherlock.cc",
-    "boards/vim3.cc",
     "bootfs_main.cc",
   ]
+
+  if (devicetree_board_driver) {
+    sources += [ "boards/vim3-devicetree.cc" ]
+  } else {
+    sources += [ "boards/vim3.cc" ]
+  }
+
   deps = [
     ":common",
     "//sdk/fidl/fuchsia.acpi.tables:fuchsia.acpi.tables_cpp_wire",

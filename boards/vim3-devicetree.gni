@@ -1,9 +1,13 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 import("//boards/vim3.gni")
+import("//build/devicetree/args.gni")
 
 board_description = "A generic vim3 device (using devicetree)"
+
+devicetree_board_driver = true
 
 _removed_bootfs_deps = [ "//src/devices/board/drivers/vim3" ]
 board_bootfs_labels -= _removed_bootfs_deps
