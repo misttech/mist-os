@@ -1229,12 +1229,14 @@ fn device_class_to_link_type(device_class: fnet_interfaces::DeviceClass) -> u16 
         fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {}) => ARPHRD_LOOPBACK,
         fnet_interfaces::DeviceClass::Device(device_class) => match device_class {
             fhwnet::DeviceClass::Ethernet
+            | fhwnet::DeviceClass::Bridge
             | fhwnet::DeviceClass::Wlan
             | fhwnet::DeviceClass::WlanAp => ARPHRD_ETHER,
             fhwnet::DeviceClass::Ppp => ARPHRD_PPP,
-            // TODO(https://issuetracker.google.com/284962255): Find a better mapping for
-            // Bridge and Virtual device class
-            fhwnet::DeviceClass::Bridge | fhwnet::DeviceClass::Virtual => ARPHRD_VOID,
+            // NB: Virtual devices on fuchsia are overloaded. This may be a
+            // tun/tap/no-op interface. Return `ARPHRD_VOID` since we have
+            // insufficient information to precisely classify the link_type.
+            fhwnet::DeviceClass::Virtual => ARPHRD_VOID,
         },
     }
 }
@@ -1515,6 +1517,8 @@ pub(crate) mod testutil {
     pub(crate) const PPP_INTERFACE_ID: u64 = 4;
     pub(crate) const PPP_NAME: &str = "ppp";
 
+    pub(crate) const BRIDGE: fnet_interfaces::DeviceClass =
+        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Bridge);
     pub(crate) const ETHERNET: fnet_interfaces::DeviceClass =
         fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Ethernet);
     pub(crate) const WLAN: fnet_interfaces::DeviceClass =
@@ -2018,20 +2022,23 @@ mod tests {
             if properties.id.unwrap() == 3);
     }
 
-    #[test_case(ETHERNET, false, 0)]
-    #[test_case(ETHERNET, true, ONLINE_IF_FLAGS)]
-    #[test_case(WLAN, false, 0)]
-    #[test_case(WLAN, true, ONLINE_IF_FLAGS)]
-    #[test_case(WLAN_AP, false, 0)]
-    #[test_case(WLAN_AP, true, ONLINE_IF_FLAGS)]
-    #[test_case(PPP, false, 0)]
-    #[test_case(PPP, true, ONLINE_IF_FLAGS)]
-    #[test_case(LOOPBACK, false, IFF_LOOPBACK)]
-    #[test_case(LOOPBACK, true, ONLINE_IF_FLAGS | IFF_LOOPBACK)]
+    #[test_case(ETHERNET, false, 0, ARPHRD_ETHER)]
+    #[test_case(ETHERNET, true, ONLINE_IF_FLAGS, ARPHRD_ETHER)]
+    #[test_case(WLAN, false, 0, ARPHRD_ETHER)]
+    #[test_case(WLAN, true, ONLINE_IF_FLAGS, ARPHRD_ETHER)]
+    #[test_case(WLAN_AP, false, 0, ARPHRD_ETHER)]
+    #[test_case(WLAN_AP, true, ONLINE_IF_FLAGS, ARPHRD_ETHER)]
+    #[test_case(PPP, false, 0, ARPHRD_PPP)]
+    #[test_case(PPP, true, ONLINE_IF_FLAGS, ARPHRD_PPP)]
+    #[test_case(LOOPBACK, false, IFF_LOOPBACK, ARPHRD_LOOPBACK)]
+    #[test_case(LOOPBACK, true, ONLINE_IF_FLAGS | IFF_LOOPBACK, ARPHRD_LOOPBACK)]
+    #[test_case(BRIDGE, false, 0, ARPHRD_ETHER)]
+    #[test_case(BRIDGE, true, ONLINE_IF_FLAGS, ARPHRD_ETHER)]
     fn test_interface_conversion(
         device_class: fnet_interfaces::DeviceClass,
         online: bool,
         flags: u32,
+        expected_link_type: u16,
     ) {
         let interface_name = LO_NAME.to_string();
         let interface =
@@ -2040,9 +2047,9 @@ mod tests {
             interface_properties_to_link_message(&interface, &LO_MAC.map(|a| a.octets.to_vec()))
                 .unwrap();
 
-        let link_layer_type = device_class_to_link_type(device_class);
-        let nlas = create_nlas(interface_name, link_layer_type, online, &LO_MAC);
-        let expected = create_netlink_link_message(LO_INTERFACE_ID, link_layer_type, flags, nlas);
+        let nlas = create_nlas(interface_name, expected_link_type, online, &LO_MAC);
+        let expected =
+            create_netlink_link_message(LO_INTERFACE_ID, expected_link_type, flags, nlas);
         pretty_assertions::assert_eq!(actual, expected);
     }
 
