@@ -97,7 +97,7 @@ mod tests {
 
     #[test]
     fn test_hash_block_empty() {
-        let block = vec![];
+        let block = [];
         let hash = hash_block(&block[..], 0);
         let expected =
             "15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b".parse().unwrap();

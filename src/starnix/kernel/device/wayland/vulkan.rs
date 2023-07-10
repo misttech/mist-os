@@ -157,7 +157,7 @@ impl Loader {
             pQueuePriorities: &0.0,
         };
 
-        let extension_names = vec![cstr!(b"VK_FUCHSIA_buffer_collection\0").as_ptr()];
+        let extension_names = [cstr!(b"VK_FUCHSIA_buffer_collection\0").as_ptr()];
 
         let device_create_info = vk::DeviceCreateInfo {
             sType: vk::STRUCTURE_TYPE_DEVICE_CREATE_INFO,

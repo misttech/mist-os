@@ -344,7 +344,7 @@ mod tests {
         let first_bytes: Vec<u8> = vec![1, 2, 3];
         let second_bytes: Vec<u8> = vec![3, 4, 5];
 
-        for message in vec![first_bytes.clone().into(), second_bytes.clone().into()] {
+        for message in [first_bytes.clone().into(), second_bytes.clone().into()] {
             message_queue.write_message(message);
         }
 

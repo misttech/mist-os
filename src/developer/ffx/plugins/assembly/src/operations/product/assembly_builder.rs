@@ -1172,7 +1172,7 @@ mod tests {
 
         assert_eq!(
             result.base.iter().map(|p| p.to_owned()).sorted().collect::<Vec<_>>(),
-            vec!["driver1", "driver2", "platform_a", "platform_b"]
+            ["driver1", "driver2", "platform_a", "platform_b"]
                 .iter()
                 .map(|p| outdir.join(p))
                 .sorted()

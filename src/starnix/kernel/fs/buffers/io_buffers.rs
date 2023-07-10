@@ -494,7 +494,7 @@ mod tests {
         {
             let mut input_buffer =
                 UserBuffersInputBuffer::new(mm, input_iovec).expect("UserBuffersInputBuffer");
-            let mut buffer = vec![0; 50];
+            let mut buffer = [0; 50];
             assert_eq!(input_buffer.available(), 37);
             assert_eq!(input_buffer.bytes_read(), 0);
             assert_eq!(input_buffer.read_exact(&mut buffer[0..20]).expect("read"), 20);
