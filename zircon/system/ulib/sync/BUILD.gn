@@ -27,7 +27,7 @@ zx_library("sync") {
 }
 
 sdk_source_set("sync-cpp") {
-  category = "internal"
+  category = "partner"
   sdk_name = "sync_cpp"
   public = [
     "include/lib/sync/cpp/completion.h",

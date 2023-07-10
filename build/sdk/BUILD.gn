@@ -79,6 +79,7 @@ _sdk_versioned_source_sets_list = [
   "//zircon/system/ulib/ddk-platform-defs",
   "//zircon/system/ulib/inspect",
   "//zircon/system/ulib/mmio-ptr",
+  "//zircon/system/ulib/sync:sync-cpp",
   "//zircon/system/ulib/trace",
   "//zircon/system/ulib/zx",
 
