@@ -14,6 +14,8 @@
 #include <lib/zircon-internal/thread_annotations.h>
 
 #include <list>
+#include <memory>
+#include <stack>
 
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
@@ -143,6 +145,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // once with |removal_set| == kPackage, and once with |removal_set| == kAll.
   // Errors and disconnects that are unrecoverable should call Remove(kAll, nullptr).
   void Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker);
+  static void Remove(std::stack<std::shared_ptr<Node>> nodes, RemovalSet removal_set,
+                     NodeRemovalTracker* removal_tracker);
 
   // `callback` is invoked once the node has finished being added or an error
   // has occurred.
@@ -264,7 +268,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
                            SetPerformanceStateCompleter::Sync& completer) override;
 
   // This is called when fuchsia_driver_framework::Driver is closed.
-  void on_fidl_error(fidl::UnbindInfo error) override;
+  void on_fidl_error(fidl::UnbindInfo info) override;
   // fidl::WireServer<fuchsia_component_runner::ComponentController>
   // We ignore these signals.
   void Stop(StopCompleter::Sync& completer) override;
@@ -280,7 +284,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   // Shutdown helpers:
   // Remove a child from this parent
-  void RemoveChild(std::shared_ptr<Node> child);
+  void RemoveChild(const std::shared_ptr<Node>& child);
   // Check to see if all children have been removed.  If so, move on to stopping driver.
   void CheckForRemoval();
   // Close the component connection to signal to CF that the component has

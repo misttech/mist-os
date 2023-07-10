@@ -511,7 +511,7 @@ void Node::AddToParents() {
   }
 }
 
-void Node::RemoveChild(std::shared_ptr<Node> child) {
+void Node::RemoveChild(const std::shared_ptr<Node>& child) {
   LOGF(DEBUG, "RemoveChild %s from parent %s", child->name().c_str(), name().c_str());
   children_.erase(std::find(children_.begin(), children_.end(), child));
   // If we are waiting for children, see if that is done:
@@ -631,72 +631,80 @@ void Node::FinishRestart() {
 // a removal is taking place, but this node will not be removed yet, even if all its children
 // are removed.
 void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
-  if (!removal_tracker && removal_tracker_) {
-    // TODO(fxbug.dev/115171): Change this to an error when we track shutdown steps better.
-    LOGF(WARNING, "Untracked Node::Remove() called on %s, indicating an error during shutdown",
-         MakeTopologicalPath().c_str());
-  }
+  Remove(std::stack<std::shared_ptr<Node>>({shared_from_this()}), removal_set, removal_tracker);
+}
 
-  if (removal_tracker) {
-    if (removal_tracker_) {
-      // We should never have two competing trackers
-      ZX_ASSERT(removal_tracker_ == removal_tracker);
+void Node::Remove(std::stack<std::shared_ptr<Node>> nodes, RemovalSet removal_set,
+                  NodeRemovalTracker* removal_tracker) {
+  std::stack<std::shared_ptr<Node>> nodes_to_check_for_removal;
+  while (!nodes.empty()) {
+    std::shared_ptr<Node> node = nodes.top();
+    nodes.pop();
+    if (!removal_tracker && node->removal_tracker_) {
+      // TODO(fxbug.dev/115171): Change this to an error when we track shutdown steps better.
+      LOGF(WARNING, "Untracked Node::Remove() called on %s, indicating an error during shutdown",
+           node->MakeTopologicalPath().c_str());
+    }
+
+    if (removal_tracker) {
+      if (node->removal_tracker_) {
+        // We should never have two competing trackers
+        ZX_ASSERT(node->removal_tracker_ == removal_tracker);
+      } else {
+        // We are getting a removal tracker for the first time so register ourselves.
+        node->removal_tracker_ = removal_tracker;
+        node->removal_id_ = node->removal_tracker_->RegisterNode(NodeRemovalTracker::Node{
+            .name = node->MakeComponentMoniker(),
+            .collection = node->collection_,
+            .state = node->node_state_,
+        });
+      }
+    }
+
+    LOGF(DEBUG, "Remove called on Node: %s", node->name().c_str());
+    // Two cases where we will transition state and take action:
+    // Removing kAll, and state is Running or Prestop
+    // Removing kPkg, and state is Running
+    if ((node->node_state_ != NodeState::kPrestop && node->node_state_ != NodeState::kRunning) ||
+        (node->node_state_ == NodeState::kPrestop && removal_set == RemovalSet::kPackage)) {
+      if (node->parents_.size() <= 1) {
+        LOGF(WARNING, "Node::Remove() %s called late, already in state %s",
+             node->MakeComponentMoniker().c_str(), State2String(node->node_state_));
+      }
+      continue;
+    }
+
+    // Now, the cases where we do something:
+    // Set the new state
+    if (removal_set == RemovalSet::kPackage &&
+        (node->collection_ == Collection::kBoot || node->collection_ == Collection::kNone)) {
+      node->node_state_ = NodeState::kPrestop;
     } else {
-      // We are getting a removal tracker for the first time so register ourselves.
-      removal_tracker_ = removal_tracker;
-      removal_id_ = removal_tracker_->RegisterNode(NodeRemovalTracker::Node{
-          .name = MakeComponentMoniker(),
-          .collection = collection_,
-          .state = node_state_,
-      });
+      // Either removing kAll, or is package driver and removing kPackage.
+      node->node_state_ = NodeState::kWaitingOnChildren;
+      // All children should be removed regardless as they block removal of this node.
+      removal_set = RemovalSet::kAll;
     }
-  }
 
-  LOGF(DEBUG, "Remove called on Node: %s", name().c_str());
-  // Two cases where we will transition state and take action:
-  // Removing kAll, and state is Running or Prestop
-  // Removing kPkg, and state is Running
-  if ((node_state_ != NodeState::kPrestop && node_state_ != NodeState::kRunning) ||
-      (node_state_ == NodeState::kPrestop && removal_set == RemovalSet::kPackage)) {
-    if (parents_.size() <= 1) {
-      LOGF(WARNING, "Node::Remove() %s called late, already in state %s",
-           MakeComponentMoniker().c_str(), State2String(node_state_));
+    // Propagate removal message to children
+    if (node->removal_tracker_ && node->removal_id_.has_value()) {
+      node->removal_tracker_->Notify(node->removal_id_.value(), node->node_state_);
     }
-    return;
-  }
 
-  // Now, the cases where we do something:
-  // Set the new state
-  if (removal_set == RemovalSet::kPackage &&
-      (collection_ == Collection::kBoot || collection_ == Collection::kNone)) {
-    node_state_ = NodeState::kPrestop;
-  } else {
-    // Either removing kAll, or is package driver and removing kPackage.
-    node_state_ = NodeState::kWaitingOnChildren;
-    // All children should be removed regardless as they block removal of this node.
-    removal_set = RemovalSet::kAll;
-  }
-
-  // Propagate removal message to children
-  if (removal_tracker_ && removal_id_.has_value()) {
-    removal_tracker_->Notify(removal_id_.value(), node_state_);
-  }
-
-  // Get an extra shared_ptr to ourselves so we are not freed as we remove children.
-  std::shared_ptr this_node = shared_from_this();
-
-  // Ask each of our children to remove themselves.
-  for (auto it = children_.begin(); it != children_.end();) {
-    // We have to be careful here - Remove() could invalidate the iterator, so we increment the
-    // iterator before we call Remove().
-    LOGF(DEBUG, "Node: %s calling remove on child: %s", name().c_str(), (*it)->name().c_str());
-    Node* child = it->get();
-    ++it;
-    child->Remove(removal_set, removal_tracker);
+    // Ask each of our children to remove themselves.
+    for (auto& child : node->children_) {
+      LOGF(DEBUG, "Node: %s calling remove on child: %s", node->name().c_str(),
+           child->name().c_str());
+      nodes.push(child);
+    }
+    nodes_to_check_for_removal.push(std::move(node));
   }
 
   // In case we had no children, or they removed themselves synchronously:
-  CheckForRemoval();
+  while (!nodes_to_check_for_removal.empty()) {
+    nodes_to_check_for_removal.top()->CheckForRemoval();
+    nodes_to_check_for_removal.pop();
+  }
 }
 
 void Node::RestartNode() {
@@ -712,7 +720,7 @@ void Node::RestartNode(std::optional<std::string> restart_driver_url_suffix,
   }
 
   pending_bind_completer_ = std::move(completer);
-  restart_driver_url_suffix_ = restart_driver_url_suffix;
+  restart_driver_url_suffix_ = std::move(restart_driver_url_suffix);
   RestartNode();
 }
 
