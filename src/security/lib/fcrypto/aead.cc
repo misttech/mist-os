@@ -16,6 +16,7 @@
 // See note in //zircon/third_party/ulib/boringssl/BUILD.gn
 #define BORINGSSL_NO_CXX
 #include <openssl/aead.h>
+#include <openssl/crypto.h>
 
 #include "src/security/lib/fcrypto/aead.h"
 #include "src/security/lib/fcrypto/bytes.h"
@@ -27,7 +28,7 @@ namespace crypto {
 
 // The previously opaque crypto implementation context.  Guaranteed to clean up on destruction.
 struct AEAD::Context {
-  Context() {}
+  Context() { CRYPTO_library_init(); }
 
   ~Context() { EVP_AEAD_CTX_cleanup(&impl); }
 

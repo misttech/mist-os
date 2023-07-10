@@ -13,6 +13,7 @@
 
 // See note in //zircon/third_party/ulib/boringssl/BUILD.gn
 #define BORINGSSL_NO_CXX
+#include <openssl/crypto.h>
 #include <openssl/digest.h>
 #include <openssl/hmac.h>
 
@@ -29,7 +30,10 @@ const uint16_t kAllFlags = HMAC::ALLOW_TRUNCATION | HMAC::ALLOW_WEAK_KEY;
 }
 // The previously opaque crypto implementation context.  Guaranteed to clean up on destruction.
 struct HMAC::Context {
-  Context() { HMAC_CTX_init(&impl); }
+  Context() {
+    CRYPTO_library_init();
+    HMAC_CTX_init(&impl);
+  }
 
   ~Context() { HMAC_CTX_cleanup(&impl); }
 
