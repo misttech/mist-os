@@ -111,7 +111,6 @@ group("tests") {
     # TODO: This target should just aggregate the top-level directories and
     # most of these dependencies should be in those subdirectories.
     "//examples:tests",
-    "//sdk/dart/fuchsia_vfs:tests",
     "//sdk/dart/zircon:tests",
     "//src/fonts",
     "//src/ui/examples",
@@ -153,8 +152,6 @@ action("dart_sdk_docs") {
     # packages
     rebase_path("//sdk/dart/fidl"),
     rebase_path("//sdk/dart/fuchsia"),
-    rebase_path("//sdk/dart/fuchsia_component_test"),
-    rebase_path("//sdk/dart/fuchsia_vfs"),
     rebase_path("//sdk/dart/zircon"),
   ]
 
