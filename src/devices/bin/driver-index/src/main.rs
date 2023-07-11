@@ -128,6 +128,10 @@ struct Indexer {
     // ephemeral drivers are added after the driver index server has started
     // through the FIDL API, fuchsia.driver.registrar.Register.
     ephemeral_drivers: RefCell<HashMap<url::Url, ResolvedDriver>>,
+
+    // Contains the list of driver package urls that are disabled, which means that it should not
+    // be returned as part of future match requests.
+    disabled_driver_urls: RefCell<HashSet<fidl_fuchsia_pkg::PackageUrl>>,
 }
 
 impl Indexer {
@@ -142,6 +146,7 @@ impl Indexer {
             composite_node_spec_manager: RefCell::new(CompositeNodeSpecManager::new()),
             delay_fallback_until_base_drivers_indexed,
             ephemeral_drivers: RefCell::new(HashMap::new()),
+            disabled_driver_urls: RefCell::new(HashSet::new()),
         }
     }
 
@@ -216,6 +221,14 @@ impl Indexer {
                         if !driver.component_url.as_str().ends_with(url_suffix.as_str()) {
                             return None;
                         }
+                    }
+                    if self
+                        .disabled_driver_urls
+                        .borrow()
+                        .iter()
+                        .any(|disabled| disabled.url.as_str() == driver.component_url.as_str())
+                    {
+                        return None;
                     }
                     Some((driver.fallback, matched))
                 } else {
@@ -360,6 +373,19 @@ impl Indexer {
 
         Ok(())
     }
+
+    fn disable_driver(&self, driver_url: fidl_fuchsia_pkg::PackageUrl) {
+        self.disabled_driver_urls.borrow_mut().insert(driver_url);
+    }
+
+    fn re_enable_driver(&self, driver_url: fidl_fuchsia_pkg::PackageUrl) -> Result<(), i32> {
+        let removed = self.disabled_driver_urls.borrow_mut().remove(&driver_url);
+        if removed {
+            Ok(())
+        } else {
+            Err(Status::NOT_FOUND.into_raw())
+        }
+    }
 }
 
 async fn run_driver_info_iterator_server(
@@ -459,6 +485,20 @@ async fn run_driver_development_server(
                             .expect("Failed to run specs iterator");
                     })
                     .detach();
+                }
+                fdd::DriverIndexRequest::DisableMatchWithDriverUrl { driver_url, responder } => {
+                    indexer.disable_driver(driver_url);
+                    responder
+                        .send()
+                        .or_else(ignore_peer_closed)
+                        .context("error responding to Disable")?;
+                }
+                fdd::DriverIndexRequest::ReEnableMatchWithDriverUrl { driver_url, responder } => {
+                    let result = indexer.re_enable_driver(driver_url);
+                    responder
+                        .send(result)
+                        .or_else(ignore_peer_closed)
+                        .context("error responding to Disable")?;
                 }
             }
             Ok(())
@@ -1297,6 +1337,148 @@ mod tests {
         futures::select! {
             result = index_task => {
                 panic!("Index task finished: {:?}", result);
+            },
+            () = test_task => {},
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_match_driver_url_disabled() {
+        // Make the bind instructions.
+        let always_match = bind::compiler::BindRules {
+            instructions: vec![],
+            symbol_table: std::collections::HashMap::new(),
+            use_new_bytecode: true,
+            enable_debug: false,
+        };
+        let always_match = DecodedRules::new(
+            bind::bytecode_encoder::encode_v2::encode_to_bytecode_v2(always_match).unwrap(),
+        )
+        .unwrap();
+
+        let boot_repo = vec![
+            ResolvedDriver {
+                component_url: url::Url::parse("fuchsia-boot:///#meta/driver-1.cm").unwrap(),
+                v1_driver_path: Some("fuchsia-boot:///#driver/driver-1.so".to_owned()),
+                bind_rules: always_match.clone(),
+                bind_bytecode: vec![],
+                colocate: false,
+                device_categories: vec![],
+                fallback: false,
+                package_type: DriverPackageType::Boot,
+                package_hash: None,
+            },
+            ResolvedDriver {
+                component_url: url::Url::parse("fuchsia-boot:///#meta/driver-2.cm").unwrap(),
+                v1_driver_path: Some("fuchsia-boot:///#driver/driver-2.so".to_owned()),
+                bind_rules: always_match.clone(),
+                bind_bytecode: vec![],
+                colocate: false,
+                device_categories: vec![],
+                fallback: false,
+                package_type: DriverPackageType::Boot,
+                package_hash: None,
+            },
+        ];
+
+        let (proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+
+        let (development_proxy, development_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fdd::DriverIndexMarker>().unwrap();
+
+        let index = Rc::new(Indexer::new(boot_repo, BaseRepo::Resolved(std::vec![]), false));
+
+        let index_task = run_index_server(index.clone(), stream).fuse();
+        let development_task =
+            run_driver_development_server(index.clone(), development_stream).fuse();
+        let test_task = async move {
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(2),
+            };
+            let args = fdi::MatchDriverArgs {
+                properties: Some(vec![property.clone()]),
+                driver_url_suffix: Some("driver-1.cm".to_string()),
+                ..Default::default()
+            };
+
+            // Ask for driver-1 and it should give that to us.
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
+            match result {
+                fdi::MatchedDriver::Driver(d) => {
+                    assert_eq!("fuchsia-boot:///#meta/driver-1.cm", d.url.unwrap());
+                }
+                fdi::MatchedDriver::ParentSpec(p) => {
+                    panic!("Bad match driver: {:#?}", p);
+                }
+                _ => panic!("Bad case"),
+            }
+
+            // Disable driver-1.
+            development_proxy
+                .disable_match_with_driver_url(&fidl_fuchsia_pkg::PackageUrl {
+                    url: "fuchsia-boot:///#meta/driver-1.cm".to_string(),
+                })
+                .await
+                .unwrap();
+
+            // Ask for driver-1 again and it should return not found since its been disabled.
+            let result = proxy.match_driver(&args).await.unwrap();
+            assert_eq!(result, Err(Status::NOT_FOUND.into_raw()));
+
+            let args = fdi::MatchDriverArgs {
+                properties: Some(vec![property.clone()]),
+                ..Default::default()
+            };
+
+            // Ask for any and we should get driver-2, since driver-1 is disabled.
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
+            match result {
+                fdi::MatchedDriver::Driver(d) => {
+                    assert_eq!("fuchsia-boot:///#meta/driver-2.cm", d.url.unwrap());
+                }
+                fdi::MatchedDriver::ParentSpec(p) => {
+                    panic!("Bad match driver: {:#?}", p);
+                }
+                _ => panic!("Bad case"),
+            }
+
+            development_proxy
+                .re_enable_match_with_driver_url(&fidl_fuchsia_pkg::PackageUrl {
+                    url: "fuchsia-boot:///#meta/driver-1.cm".to_string(),
+                })
+                .await
+                .unwrap()
+                .unwrap();
+
+            let args = fdi::MatchDriverArgs {
+                properties: Some(vec![property.clone()]),
+                driver_url_suffix: Some("driver-1.cm".to_string()),
+                ..Default::default()
+            };
+
+            // Ask for driver-1 and it should give that to us since it's not disabled anymore.
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
+            match result {
+                fdi::MatchedDriver::Driver(d) => {
+                    assert_eq!("fuchsia-boot:///#meta/driver-1.cm", d.url.unwrap());
+                }
+                fdi::MatchedDriver::ParentSpec(p) => {
+                    panic!("Bad match driver: {:#?}", p);
+                }
+                _ => panic!("Bad case"),
+            }
+        }
+        .fuse();
+
+        futures::pin_mut!(index_task, development_task, test_task);
+        futures::select! {
+            result = index_task => {
+                panic!("Index task finished: {:?}", result);
+            },
+            result = development_task => {
+                panic!("Development task finished: {:?}", result);
             },
             () = test_task => {},
         }

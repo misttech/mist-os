@@ -10,6 +10,7 @@
 
 #include <deque>
 #include <unordered_set>
+#include <utility>
 
 #include "src/devices/bin/driver_manager/v2/node_removal_tracker.h"
 #include "src/devices/lib/log/log.h"
@@ -552,6 +553,7 @@ void Node::FinishRemoval() {
   LOGF(DEBUG, "Node: %s Finishing removal", name().c_str());
   ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriverComponent,
                 "FinishRemoval called in invalid node state: %s", State2String(node_state_));
+
   if (node_restarting_) {
     FinishRestart();
     return;
@@ -712,8 +714,8 @@ void Node::RestartNode() {
   Remove(RemovalSet::kAll, nullptr);
 }
 
-void Node::RestartNode(std::optional<std::string> restart_driver_url_suffix,
-                       fit::callback<void(zx::result<>)> completer) {
+void Node::RestartNodeWithRematch(std::optional<std::string> restart_driver_url_suffix,
+                                  fit::callback<void(zx::result<>)> completer) {
   if (pending_bind_completer_.has_value()) {
     completer(zx::error(ZX_ERR_ALREADY_EXISTS));
     return;
@@ -722,6 +724,10 @@ void Node::RestartNode(std::optional<std::string> restart_driver_url_suffix,
   pending_bind_completer_ = std::move(completer);
   restart_driver_url_suffix_ = std::move(restart_driver_url_suffix);
   RestartNode();
+}
+
+void Node::RestartNodeWithRematch() {
+  RestartNodeWithRematch("", [](zx::result<> result) {});
 }
 
 std::shared_ptr<BindResultTracker> Node::CreateBindResultTracker() {
@@ -959,7 +965,7 @@ void Node::RequestBind(RequestBindRequestView request, RequestBindCompleter::Syn
   };
 
   if (driver_component_.has_value()) {
-    RestartNode(driver_url_suffix, std::move(completer_wrapper));
+    RestartNodeWithRematch(driver_url_suffix, std::move(completer_wrapper));
     return;
   }
 
@@ -1167,7 +1173,7 @@ void Node::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {
     url = std::string(request->driver.get());
   }
 
-  RestartNode(url, [completer = completer.ToAsync()](zx::result<> result) mutable {
+  RestartNodeWithRematch(url, [completer = completer.ToAsync()](zx::result<> result) mutable {
     if (result.is_ok()) {
       completer.ReplySuccess();
     } else {

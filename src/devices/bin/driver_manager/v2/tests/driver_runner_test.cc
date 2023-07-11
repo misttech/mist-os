@@ -1126,6 +1126,93 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
       {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
 }
 
+// Start the second driver, and then disable and rematch it which should make it available for
+// matching. Undisable the driver and then restart with rematch, which should get the node again.
+TEST_F(DriverRunnerTest, StartSecondDriver_DisableAndRematch_UndisableAndRestart) {
+  auto driver_index = CreateDriverIndex();
+  auto driver_index_client = driver_index.Connect();
+  ASSERT_EQ(ZX_OK, driver_index_client.status_value());
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
+                             &LoaderFactory, dispatcher());
+  SetupDevfs(driver_runner);
+  auto defer = fit::defer([this] { Unbind(); });
+
+  fdf::NodeControllerPtr node_controller;
+  driver_host().SetStartHandler(
+      [this, &node_controller](fdf::DriverStartArgs start_args, auto request) {
+        realm().SetCreateChildHandler(
+            [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {});
+        realm().SetOpenExposedDirHandler([this](fdecl::ChildRef child, auto exposed_dir) {
+          driver_dir().Bind(std::move(exposed_dir));
+        });
+
+        fdf::NodePtr root_node;
+        EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
+        fdf::NodeAddArgs args;
+        args.set_name("second");
+        root_node->AddChild(std::move(args), node_controller.NewRequest(dispatcher()), {},
+                            [](auto result) { EXPECT_FALSE(result.is_err()); });
+        BindDriver(std::move(request), std::move(root_node));
+      });
+  auto root_driver = StartRootDriver("fuchsia-boot:///#meta/root-driver.cm", driver_runner);
+  ASSERT_EQ(ZX_OK, root_driver.status_value());
+
+  driver_host().SetStartHandler([this](fdf::DriverStartArgs start_args, auto request) {
+    realm().SetCreateChildHandler(
+        [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {});
+    fdf::NodePtr second_node;
+    EXPECT_EQ(ZX_OK, second_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
+    BindDriver(std::move(request), std::move(second_node));
+  });
+
+  StartDriverHost("driver-hosts");
+  auto second_driver =
+      StartDriver(driver_runner, {
+                                     .url = "fuchsia-boot:///#meta/second-driver.cm",
+                                     .binary = "driver/second-driver.so",
+                                 });
+
+  EXPECT_EQ(0u, driver_runner.bind_manager().NumOrphanedNodes());
+
+  // Disable the second-driver url, and restart with rematching of the requested.
+  driver_index.disable_driver_url("fuchsia-boot:///#meta/second-driver.cm");
+  zx::result count = driver_runner.RestartNodesColocatedWithDriverUrl(
+      "fuchsia-boot:///#meta/second-driver.cm",
+      fuchsia_driver_development::RematchFlags::kRequested);
+  EXPECT_EQ(1u, count.value());
+
+  // Our driver should get closed.
+  EXPECT_TRUE(RunLoopUntilIdle());
+  zx_signals_t signals = 0;
+  ASSERT_EQ(ZX_OK, second_driver.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(),
+                                                    &signals));
+  ASSERT_TRUE(signals & ZX_CHANNEL_PEER_CLOSED);
+
+  // Since we disabled the driver url, the rematch should have not gotten a match, and therefore
+  // the node should haver become orphaned.
+  EXPECT_EQ(1u, driver_runner.bind_manager().NumOrphanedNodes());
+
+  // Undisable the driver, and try binding all available nodes. This should cause it to get started
+  // again.
+  driver_index.un_disable_driver_url("fuchsia-boot:///#meta/second-driver.cm");
+  driver_runner.TryBindAllAvailable();
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  second_driver = StartDriver(driver_runner, {
+                                                 .url = "fuchsia-boot:///#meta/second-driver.cm",
+                                                 .binary = "driver/second-driver.so",
+                                             });
+
+  // This list should be empty now that it got bound again.
+  EXPECT_EQ(0u, driver_runner.bind_manager().NumOrphanedNodes());
+
+  StopDriverComponent(std::move(root_driver.value()));
+  // The node was destroyed twice.
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers"),
+                                   CreateChildRef("dev.second", "boot-drivers"),
+                                   CreateChildRef("dev.second", "boot-drivers")});
+}
+
 // The root driver adds a node that only binds after a RequestBind() call.
 TEST_F(DriverRunnerTest, BindThroughRequest) {
   auto driver_index = CreateDriverIndex();

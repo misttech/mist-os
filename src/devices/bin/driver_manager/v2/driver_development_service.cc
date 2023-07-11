@@ -223,9 +223,56 @@ void DriverDevelopmentService::GetCompositeNodeSpecs(
   }
 }
 
+void DriverDevelopmentService::DisableMatchWithDriverUrl(
+    DisableMatchWithDriverUrlRequestView request,
+    DisableMatchWithDriverUrlCompleter::Sync& completer) {
+  auto driver_index_client = component::Connect<fdd::DriverIndex>();
+  if (driver_index_client.is_error()) {
+    LOGF(ERROR, "Failed to connect to service '%s': %s",
+         fidl::DiscoverableProtocolName<fdd::DriverIndex>, driver_index_client.status_string());
+    completer.Close(driver_index_client.status_value());
+    return;
+  }
+
+  fidl::WireSyncClient driver_index{std::move(*driver_index_client)};
+  auto disable_result = driver_index->DisableMatchWithDriverUrl(request->driver_url);
+  if (!disable_result.ok()) {
+    LOGF(ERROR, "Failed to call DriverIndex::DisableMatchWithDriverUrl: %s\n",
+         disable_result.FormatDescription().c_str());
+    completer.Close(disable_result.error().status());
+    return;
+  }
+
+  completer.Reply();
+}
+
+void DriverDevelopmentService::ReEnableMatchWithDriverUrl(
+    ReEnableMatchWithDriverUrlRequestView request,
+    ReEnableMatchWithDriverUrlCompleter::Sync& completer) {
+  auto driver_index_client = component::Connect<fdd::DriverIndex>();
+  if (driver_index_client.is_error()) {
+    LOGF(ERROR, "Failed to connect to service '%s': %s",
+         fidl::DiscoverableProtocolName<fdd::DriverIndex>, driver_index_client.status_string());
+    completer.Close(driver_index_client.status_value());
+    return;
+  }
+
+  fidl::WireSyncClient driver_index{std::move(*driver_index_client)};
+  auto un_disable_result = driver_index->ReEnableMatchWithDriverUrl(request->driver_url);
+  if (!un_disable_result.ok()) {
+    LOGF(ERROR, "Failed to call DriverIndex::ReEnableMatchWithDriverUrl: %s\n",
+         un_disable_result.FormatDescription().c_str());
+    completer.Close(un_disable_result.error().status());
+    return;
+  }
+
+  completer.Reply(un_disable_result.value());
+}
+
 void DriverDevelopmentService::RestartDriverHosts(RestartDriverHostsRequestView request,
                                                   RestartDriverHostsCompleter::Sync& completer) {
-  auto result = driver_runner_.RestartNodesColocatedWithDriverUrl(request->driver_path.get());
+  auto result = driver_runner_.RestartNodesColocatedWithDriverUrl(request->driver_path.get(),
+                                                                  request->rematch_flags);
   if (result.is_ok()) {
     completer.ReplySuccess(result.value());
   } else {

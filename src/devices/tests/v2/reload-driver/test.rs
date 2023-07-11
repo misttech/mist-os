@@ -152,8 +152,9 @@ async fn test_reload_target() -> Result<()> {
     }
 
     // Let's restart the first target driver.
-    let restart_result =
-        driver_dev.restart_driver_hosts("fuchsia-boot:///#meta/target_1.cm").await?;
+    let restart_result = driver_dev
+        .restart_driver_hosts("fuchsia-boot:///#meta/target_1.cm", fdd::RematchFlags::empty())
+        .await?;
     if restart_result.is_err() {
         return Err(anyhow!("Failed to restart target_1."));
     }
@@ -218,8 +219,9 @@ async fn test_reload_target() -> Result<()> {
     }
 
     // Now let's restart the second target driver.
-    let restart_result =
-        driver_dev.restart_driver_hosts("fuchsia-boot:///#meta/target_2.cm").await?;
+    let restart_result = driver_dev
+        .restart_driver_hosts("fuchsia-boot:///#meta/target_2.cm", fdd::RematchFlags::empty())
+        .await?;
     if restart_result.is_err() {
         return Err(anyhow!("Failed to restart target_2."));
     }

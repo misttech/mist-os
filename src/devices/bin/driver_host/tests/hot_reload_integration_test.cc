@@ -94,7 +94,8 @@ TEST(HotReloadIntegrationTest, DISABLED_TestRestartOneDriver) {
 
   // Restart the driver host of the test driver.
   fidl::WireResult response =
-      development.value()->RestartDriverHosts(fidl::StringView::FromExternal(kDriverRestartUrl));
+      development.value()->RestartDriverHosts(fidl::StringView::FromExternal(kDriverRestartUrl),
+                                              fuchsia_driver_development::RematchFlags());
   ASSERT_OK(response);
   ASSERT_EQ(response->value()->count, 1);
 
@@ -168,8 +169,9 @@ TEST(HotReloadIntegrationTest, DISABLED_TestRestartTwoDriversParent) {
   ASSERT_OK(device_watcher::DirWatcher::Create(fd_watcher.get(), &watcher));
 
   // Restart the driver host of the parent driver.
-  fidl::WireResult response = development.value()->RestartDriverHosts(
-      fidl::StringView::FromExternal(kTestDriverRestartUrl));
+  fidl::WireResult response =
+      development.value()->RestartDriverHosts(fidl::StringView::FromExternal(kTestDriverRestartUrl),
+                                              fuchsia_driver_development::RematchFlags());
   ASSERT_OK(response);
 
   // Make sure device has shut so that it isn't opened before it is restarted.
@@ -247,7 +249,8 @@ TEST(HotReloadIntegrationTest, DISABLED_TestRestartTwoDriversChild) {
 
   // Restart the driver host of the child driver.
   fidl::WireResult response = development.value()->RestartDriverHosts(
-      fidl::StringView::FromExternal(kChildDriverRestartUrl));
+      fidl::StringView::FromExternal(kChildDriverRestartUrl),
+      fuchsia_driver_development::RematchFlags());
   ASSERT_OK(response);
 
   // Make sure device has shut so that it isn't opened before it is restarted.

@@ -29,6 +29,10 @@ class DriverDevelopmentService
                      GetDriverInfoCompleter::Sync& completer) override;
   void GetCompositeNodeSpecs(GetCompositeNodeSpecsRequestView request,
                              GetCompositeNodeSpecsCompleter::Sync& completer) override;
+  void DisableMatchWithDriverUrl(DisableMatchWithDriverUrlRequestView request,
+                                 DisableMatchWithDriverUrlCompleter::Sync& completer) override;
+  void ReEnableMatchWithDriverUrl(ReEnableMatchWithDriverUrlRequestView request,
+                                  ReEnableMatchWithDriverUrlCompleter::Sync& completer) override;
   void GetDeviceInfo(GetDeviceInfoRequestView request,
                      GetDeviceInfoCompleter::Sync& completer) override;
   void GetCompositeInfo(GetCompositeInfoRequestView request,

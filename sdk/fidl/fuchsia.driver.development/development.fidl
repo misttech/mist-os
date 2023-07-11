@@ -260,6 +260,24 @@ closed protocol DriverIndex {
         name_filter string:<MAX, optional>;
         iterator server_end:CompositeNodeSpecIterator;
     });
+
+    /// Disable the given driver url from being returned as a match. When this is called,
+    /// subsequent |fuchsia.driver.index.DriverIndex::MatchDriver| requests will not consider
+    /// the driver with the given url.
+    /// This can be used for all driver package types. The given driver url does not
+    /// have to match existing drivers, it will apply even if the driver appears afterwards,
+    /// for example through a |fuchsia.driver.registrar.Register| operation.
+    strict DisableMatchWithDriverUrl(struct {
+        driver_url fuchsia.pkg.PackageUrl;
+    }) -> ();
+
+    /// Re-enables a given driver url, that was previously disabled with
+    /// |DisableMatchWithDriverUrl|, for matching again. This must be called for driver urls that
+    /// were previously disabled.
+    /// Will return ZX_ERR_NOT_FOUND if the `driver_url` was not previously disabled.
+    strict ReEnableMatchWithDriverUrl(struct {
+        driver_url fuchsia.pkg.PackageUrl;
+    }) -> () error zx.Status;
 };
 
 closed protocol DeviceInfoIterator {
@@ -278,6 +296,25 @@ type TestNodeAddArgs = table {
             vector<fuchsia.driver.framework.NodeProperty>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
 };
 
+/// These flags indicate when a |fuchsia.driver.index.DriverIndex::MatchDriver| call should be
+/// made for a node that is restarting in order to find a new driver, instead of reusing the driver
+/// that was previously bound to the node.
+type RematchFlags = flexible bits : uint32 {
+    /// Rematch nodes that are currently bound to the requested driver. The requested driver is
+    /// the driver url that the restart operation was initiated for.
+    REQUESTED = 0x0001;
+    /// Rematch nodes that are currently bound to a driver other than the requested driver. These
+    /// are nodes that are affected by the restart of the requested driver, for example when
+    /// it is a colocated parent.
+    NON_REQUESTED = 0x0002;
+    /// Rematch nodes that are legacy composite nodes.
+    /// This is currently not supported and will return ZX_ERR_NOT_SUPPORTED when used.
+    LEGACY_COMPOSITE = 0x0004;
+    /// Rematch nodes that are created as part of a completed composite spec.
+    /// This is currently not supported and will return ZX_ERR_NOT_SUPPORTED when used.
+    COMPOSITE_SPEC = 0x0008;
+};
+
 /// Interface for developing and debugging drivers.
 /// This interface should only be used for development and disabled in release builds.
 @discoverable
@@ -288,6 +325,7 @@ closed protocol DriverDevelopment {
     /// number of driver hosts that were restarted.
     strict RestartDriverHosts(struct {
         driver_path string:fuchsia.device.manager.DEVICE_PATH_MAX;
+        rematch_flags RematchFlags;
     }) -> (struct {
         count uint32;
     }) error zx.Status;

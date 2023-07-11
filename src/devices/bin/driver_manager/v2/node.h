@@ -161,8 +161,12 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // difference being once the children are removed, and the driver stopped, we don't remove the
   // node from the topology but instead bind the node again.
   void RestartNode();
-  void RestartNode(std::optional<std::string> restart_driver_url_suffix,
-                   fit::callback<void(zx::result<>)> completer);
+
+  // Restarting a node WithRematch, means that instead of re-using the currently bound driver,
+  // another MatchDriver call will be made into the driver index to find a new driver to bind.
+  void RestartNodeWithRematch(std::optional<std::string> restart_driver_url_suffix,
+                              fit::callback<void(zx::result<>)> completer);
+  void RestartNodeWithRematch();
 
   void StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_info,
                    fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,

@@ -35,7 +35,9 @@ pub async fn register(
     }
 
     let mut existing = false;
-    let restart_result = driver_development_proxy.restart_driver_hosts(cmd.url.as_str()).await?;
+    let restart_result = driver_development_proxy
+        .restart_driver_hosts(cmd.url.as_str(), fdd::RematchFlags::empty())
+        .await?;
     match restart_result {
         Ok(count) => {
             if count > 0 {

@@ -11,6 +11,8 @@
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 
+#include <unordered_set>
+
 class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::DriverIndex> {
  public:
   struct MatchResult {
@@ -39,6 +41,11 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
     auto match = match_callback_(request->args);
     if (match.status_value() != ZX_OK) {
       completer.ReplyError(match.status_value());
+      return;
+    }
+
+    if (disabled_driver_urls_.find(match->url) != disabled_driver_urls_.end()) {
+      completer.ReplyError(ZX_ERR_NOT_FOUND);
       return;
     }
 
@@ -79,6 +86,12 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
     match_callback_ = std::move(match_callback);
   }
 
+  void disable_driver_url(std::string_view url) { disabled_driver_urls_.emplace(url); }
+
+  size_t un_disable_driver_url(std::string_view url) {
+    return disabled_driver_urls_.erase(std::string(url));
+  }
+
  private:
   static fuchsia_driver_index::wire::MatchedDriver GetMatchedDriver(fidl::AnyArena& arena,
                                                                     MatchResult match) {
@@ -113,6 +126,8 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
   // returned when FakeDriverIndex receives an AddCompositeNodeSpec() call for a matching
   // topological path.
   std::unordered_map<std::string, fuchsia_driver_index::MatchedCompositeNodeSpecInfo> spec_match_;
+
+  std::unordered_set<std::string> disabled_driver_urls_;
 };
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_TESTS_FAKE_DRIVER_INDEX_H_
