@@ -439,8 +439,11 @@
                     // This protocol is available in the serial console
                     "/bootstrap/console-launcher",
 
-                    // This protocol is used by CTS tests
+                    // This collection is used by CTS tests
                     "/core/test_manager/cts-tests:**",
+
+                    // This collection is used by CTF tests
+                    "/core/testing/ctf-tests:**",
 
                     // TODO(fxbug.dev/105828): terminal.cm instances are
                     // launched as children of the application shell, via its

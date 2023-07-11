@@ -628,6 +628,7 @@ Possible values of `test_type`:
 
 | Value | Description |
 | ----- | ----------- |
+| `ctf` | [CTF test realm] |
 | `device` | [Device tests] |
 | `drm` | [DRM tests] |
 | `starnix` | [Starnix tests] |
@@ -683,7 +684,6 @@ Possible values of `fuchsia.test.type`:
 | `hermetic` | Hermetic realm |
 | `chromium` | Chromium test realm |
 | `chromium-system` | Chromium system test realm |
-| `cts` | [CTF test realm] |
 | `google` | Google test realm |
 
 ## Restricted logs

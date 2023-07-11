@@ -5,6 +5,8 @@
 // This realm installs various testing collections.
 {
     include: [
+        // Required: Include various test collections/realms.
+        "//sdk/ctf/test_realm/meta/test-collection.shard.cml",
         "//src/devices/testing/devices_test_realm.shard.cml",
         "//src/lib/vulkan/vulkan_test_realm.shard.cml",
         "//src/media/testing/drm_test_realm.shard.cml",

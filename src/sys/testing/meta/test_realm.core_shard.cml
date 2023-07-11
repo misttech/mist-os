@@ -459,5 +459,22 @@
             from: "#network",
             to: "#testing",
         },
+
+        // Required by ctf tests
+        {
+            protocol: "fuchsia.process.Resolver",
+            from: "#process_resolver",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.settings.Intl",
+                "fuchsia.settings.Privacy",
+            ],
+            from: "#setui_service",
+            to: "#testing",
+            source_availability: "unknown",
+        },
     ],
 }

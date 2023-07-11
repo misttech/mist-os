@@ -5,6 +5,7 @@
 import("fuchsia_component.gni")
 
 _type_moniker_map = {
+  ctf = "/core/testing:ctf-tests"
   device = "/core/testing:devices-tests"
   drm = "/core/testing:drm-tests"
   starnix = "/core/testing:starnix-tests"

@@ -13,9 +13,9 @@ import("//sdk/ctf/build/internal/write_ctf_file.gni")
 #
 # Example:
 # ```
-# ctf_fuchsia_component("my-test-component") {
-#   deps = [ ":my-test" ]
-#   manifest = "meta/my-test.cml"
+# ctf_fuchsia_component("my-component") {
+#   deps = [ ":my-bin" ]
+#   manifest = "meta/my-component.cml"
 #   testonly = true
 # }
 # ```
