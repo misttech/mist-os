@@ -425,7 +425,7 @@ pub mod route {
                         Ok(args) => args,
                         Err(e) => {
                             log_debug!("received invalid `GetLink` request from {}", client);
-                            client.send_unicast(netlink_packet::new_error(e, req_header));
+                            client.send_unicast(netlink_packet::new_error(Err(e), req_header));
                             return;
                         }
                     };
@@ -442,10 +442,10 @@ pub mod route {
                             Ok(()) => if is_dump {
                                 client.send_unicast(netlink_packet::new_done(req_header))
                             } else if expects_ack {
-                                client.send_unicast(netlink_packet::new_ack(req_header))
+                                client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
                             }
                             Err(e) => client.send_unicast(
-                                netlink_packet::new_error(e.into_errno(), req_header)),
+                                netlink_packet::new_error(Err(e.into_errno()), req_header)),
                         }
                 }
                 SetLink(link_msg) => {
@@ -453,7 +453,7 @@ pub mod route {
                         Ok(args) => args,
                         Err(e) => {
                             log_debug!("received invalid `SetLink` request from {}", client);
-                            client.send_unicast(netlink_packet::new_error(e, req_header));
+                            client.send_unicast(netlink_packet::new_error(Err(e), req_header));
                             return;
                         }
                     };
@@ -469,10 +469,10 @@ pub mod route {
                         .await
                         .expect("interfaces event loop should have handled the request") {
                             Ok(()) => if expects_ack {
-                                client.send_unicast(netlink_packet::new_ack(req_header))
+                                client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
                             }
                             Err(e) => client.send_unicast(
-                                netlink_packet::new_error(e.into_errno(), req_header)),
+                                netlink_packet::new_error(Err(e.into_errno()), req_header)),
                         }
                 }
                 GetAddress(ref message) if is_dump => {
@@ -486,7 +486,7 @@ pub mod route {
                                 family, client, req,
                             );
                             client.send_unicast(
-                                netlink_packet::new_error(Errno::EINVAL, req_header));
+                                netlink_packet::new_error(Err(Errno::EINVAL), req_header));
                             return;
                         }
                     };
@@ -519,7 +519,7 @@ pub mod route {
                     ) {
                         Ok(o) => o,
                         Err(e) => {
-                            return client.send_unicast(netlink_packet::new_error(e, req_header));
+                            return client.send_unicast(netlink_packet::new_error(Err(e), req_header));
                         }
                     };
                     let result = if let Some(ExtractedAddressRequest {
@@ -550,10 +550,10 @@ pub mod route {
 
                     match result {
                         Ok(()) => if expects_ack {
-                            client.send_unicast(netlink_packet::new_ack(req_header))
+                            client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
                         },
                         Err(e) => client.send_unicast(
-                            netlink_packet::new_error(e.into_errno(), req_header)),
+                            netlink_packet::new_error(Err(e.into_errno()), req_header)),
                     }
                 }
                 DelAddress(ref message) => {
@@ -565,7 +565,7 @@ pub mod route {
                     ) {
                         Ok(o) => o,
                         Err(e) => {
-                            return client.send_unicast(netlink_packet::new_error(e, req_header));
+                            return client.send_unicast(netlink_packet::new_error(Err(e), req_header));
                         }
                     };
 
@@ -594,10 +594,10 @@ pub mod route {
                     };
                     match result {
                         Ok(()) => if expects_ack {
-                            client.send_unicast(netlink_packet::new_ack(req_header))
+                            client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
                         },
                         Err(e) => client.send_unicast(
-                            netlink_packet::new_error(e.into_errno(), req_header))
+                            netlink_packet::new_error(Err(e.into_errno()), req_header))
                     }
                 }
                 GetRoute(ref message) if is_dump => {
@@ -638,7 +638,7 @@ pub mod route {
                                 req
                             );
                             client.send_unicast(
-                                netlink_packet::new_error(Errno::EINVAL, req_header));
+                                netlink_packet::new_error(Err(Errno::EINVAL), req_header));
                             return;
                         }
                     };
@@ -680,7 +680,7 @@ pub mod route {
                             "Received unsupported NETLINK_ROUTE request; responding with an Ack: {:?}",
                             req,
                         );
-                        client.send_unicast(netlink_packet::new_ack(req_header))
+                        client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
                     } else {
                         log_warn!(
                             "Received unsupported NETLINK_ROUTE request that does not expect an Ack: {:?}",
@@ -714,7 +714,7 @@ pub mod route {
                             "Received unsupported NETLINK_ROUTE GET request: responding with Ack {:?}",
                             req
                         );
-                        client.send_unicast(netlink_packet::new_ack(req_header))
+                        client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
                     } else {
                         log_warn!(
                             "Received unsupported NETLINK_ROUTE GET request that does not expect an Ack {:?}",
@@ -993,13 +993,13 @@ mod test {
             Some(ExpectedResponse::Ack) => {
                 assert_eq!(
                     client_sink.take_messages(),
-                    [SentMessage::unicast(netlink_packet::new_ack(header))]
+                    [SentMessage::unicast(netlink_packet::new_error(Ok(()), header))]
                 )
             }
             Some(ExpectedResponse::Error(e)) => {
                 assert_eq!(
                     client_sink.take_messages(),
-                    [SentMessage::unicast(netlink_packet::new_error(e, header))]
+                    [SentMessage::unicast(netlink_packet::new_error(Err(e), header))]
                 )
             }
             Some(ExpectedResponse::Done) => {
@@ -1183,8 +1183,8 @@ mod test {
                 .into_iter()
                 .map(|expected_response| {
                     SentMessage::unicast(match expected_response {
-                        ExpectedResponse::Ack => netlink_packet::new_ack(header),
-                        ExpectedResponse::Error(e) => netlink_packet::new_error(e, header),
+                        ExpectedResponse::Ack => netlink_packet::new_error(Ok(()), header),
+                        ExpectedResponse::Error(e) => netlink_packet::new_error(Err(e), header),
                         ExpectedResponse::Done => netlink_packet::new_done(header),
                     })
                 })
@@ -1355,8 +1355,8 @@ mod test {
                 .into_iter()
                 .map(|expected_response| {
                     SentMessage::unicast(match expected_response {
-                        ExpectedResponse::Ack => netlink_packet::new_ack(header),
-                        ExpectedResponse::Error(e) => netlink_packet::new_error(e, header),
+                        ExpectedResponse::Ack => netlink_packet::new_error(Ok(()), header),
+                        ExpectedResponse::Error(e) => netlink_packet::new_error(Err(e), header),
                         ExpectedResponse::Done => netlink_packet::new_done(header),
                     })
                 })
@@ -1488,8 +1488,8 @@ mod test {
             expected_response
                 .into_iter()
                 .map(|expected_response| SentMessage::unicast(match expected_response {
-                    ExpectedResponse::Ack => netlink_packet::new_ack(header),
-                    ExpectedResponse::Error(e) => netlink_packet::new_error(e, header),
+                    ExpectedResponse::Ack => netlink_packet::new_error(Ok(()), header),
+                    ExpectedResponse::Error(e) => netlink_packet::new_error(Err(e), header),
                     ExpectedResponse::Done => netlink_packet::new_done(header),
                 }))
                 .collect::<Vec<_>>(),
@@ -2312,9 +2312,9 @@ mod test {
             expected_response
                 .into_iter()
                 .map(|response| SentMessage::unicast(match response {
-                    ExpectedResponse::Ack => netlink_packet::new_ack(header),
+                    ExpectedResponse::Ack => netlink_packet::new_error(Ok(()), header),
                     ExpectedResponse::Done => netlink_packet::new_done(header),
-                    ExpectedResponse::Error(e) => netlink_packet::new_error(e, header),
+                    ExpectedResponse::Error(e) => netlink_packet::new_error(Err(e), header),
                 }))
                 .collect::<Vec<_>>(),
         )
@@ -2482,8 +2482,8 @@ mod test {
             expected_response
                 .into_iter()
                 .map(|expected_response| SentMessage::unicast(match expected_response {
-                    ExpectedResponse::Ack => netlink_packet::new_ack(header),
-                    ExpectedResponse::Error(e) => netlink_packet::new_error(e, header),
+                    ExpectedResponse::Ack => netlink_packet::new_error(Ok(()), header),
+                    ExpectedResponse::Error(e) => netlink_packet::new_error(Err(e), header),
                     ExpectedResponse::Done => netlink_packet::new_done(header),
                 }))
                 .collect::<Vec<_>>(),

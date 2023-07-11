@@ -4,52 +4,24 @@
 
 //! Utilities for interacting with the `netlink-packet-*` suite 3p crates.
 
+use std::num::NonZeroI32;
+
 use netlink_packet_core::{
-    buffer::NETLINK_HEADER_LEN, constants::NLM_F_MULTIPART, ErrorBuffer, ErrorMessage,
+    buffer::NETLINK_HEADER_LEN, constants::NLM_F_MULTIPART, DoneMessage, ErrorMessage,
     NetlinkHeader, NetlinkMessage, NetlinkPayload, NetlinkSerializable,
 };
-use netlink_packet_utils::{Emitable as _, Parseable as _};
+use netlink_packet_utils::Emitable as _;
 
 pub(crate) const UNSPECIFIED_SEQUENCE_NUMBER: u32 = 0;
 
-/// The error code used by `Ack` messages.
-const ACK_ERROR_CODE: i32 = 0;
-
-/// Returns a newly created [`ErrorMessage`] with the given error code.
-// Note this is essentially a constructor for `ErrorMessage`, because the
-// `netlink-packet-core` crate does not expose a public method for constructing
-// the type. This isn't all that surprising, as we're probably the only user of
-// the crate acting as a "server" and typically, clients won't need to construct
-// an error. Adding such a constructor upstream may be worth looking into at a
-// later date.
-fn new_error_message(code: i32, header: NetlinkHeader) -> ErrorMessage {
-    assert_eq!(header.buffer_len(), NETLINK_HEADER_LEN);
-    let mut buffer = [0; NETLINK_HEADER_LEN];
-    header.emit(&mut buffer);
-    let buffer = code.to_ne_bytes().into_iter().chain(buffer.into_iter()).collect::<Vec<_>>();
-    ErrorMessage::parse(
-        &ErrorBuffer::new_checked(&buffer)
-            .expect("buffer should have a valid `ErrorBuffer` format"),
-    )
-    .expect("buffer should have a valid `ErrorMessage` format")
-}
-
-/// Returns an `Ack` message.
-pub(crate) fn new_ack<T: NetlinkSerializable>(req_header: NetlinkHeader) -> NetlinkMessage<T> {
-    let payload = NetlinkPayload::<T>::Ack(new_error_message(ACK_ERROR_CODE, req_header));
-    // Note that the following header fields are unset as they don't appear to
-    // be used by any of our clients: `flags`.
-    let mut resp_header = NetlinkHeader::default();
-    resp_header.sequence_number = req_header.sequence_number;
-    let mut message = NetlinkMessage::new(resp_header, payload);
-    // Sets the header `length` and `message_type` based on the payload.
-    message.finalize();
-    message
-}
+/// The error code used by `Done` messages.
+const DONE_ERROR_CODE: i32 = 0;
 
 /// Returns a `Done` message.
 pub(crate) fn new_done<T: NetlinkSerializable>(req_header: NetlinkHeader) -> NetlinkMessage<T> {
-    let payload = NetlinkPayload::<T>::Done;
+    let mut done = DoneMessage::default();
+    done.code = DONE_ERROR_CODE;
+    let payload = NetlinkPayload::<T>::Done(done);
     let mut resp_header = NetlinkHeader::default();
     resp_header.sequence_number = req_header.sequence_number;
     resp_header.flags |= NLM_F_MULTIPART;
@@ -60,6 +32,7 @@ pub(crate) fn new_done<T: NetlinkSerializable>(req_header: NetlinkHeader) -> Net
 }
 
 pub(crate) mod errno {
+    use super::*;
 
     /// Represents a Netlink Error code.
     ///
@@ -91,10 +64,16 @@ pub(crate) mod errno {
                 None
             }
         }
+    }
 
-        /// Returns the raw error code held by this [`Errno`].
-        pub(super) fn into_code(self) -> i32 {
-            let Errno(code) = self;
+    impl From<Errno> for NonZeroI32 {
+        fn from(Errno(code): Errno) -> Self {
+            NonZeroI32::new(code).expect("Errno's code must be non-zero")
+        }
+    }
+
+    impl From<Errno> for i32 {
+        fn from(Errno(code): Errno) -> Self {
             code
         }
     }
@@ -110,17 +89,35 @@ pub(crate) mod errno {
         #[test_case(10, None; "positive")]
         #[test_case(i32::MAX, None; "max")]
         fn test_new_errno(raw_code: i32, expected_code: Option<i32>) {
-            assert_eq!(Errno::new(raw_code).map(|e| e.into_code()), expected_code)
+            assert_eq!(Errno::new(raw_code).map(Into::<i32>::into), expected_code)
         }
     }
 }
 
 /// Returns an `Error` message.
+///
+/// `Ok(())` represents an ACK while `Err(Errno)` represents a NACK.
 pub(crate) fn new_error<T: NetlinkSerializable>(
-    code: errno::Errno,
+    error: Result<(), errno::Errno>,
     req_header: NetlinkHeader,
 ) -> NetlinkMessage<T> {
-    let payload = NetlinkPayload::<T>::Error(new_error_message(code.into_code(), req_header));
+    let error = {
+        assert_eq!(req_header.buffer_len(), NETLINK_HEADER_LEN);
+        let mut buffer = vec![0; NETLINK_HEADER_LEN];
+        req_header.emit(&mut buffer);
+
+        let code = match error {
+            Ok(()) => None,
+            Err(e) => Some(e.into()),
+        };
+
+        let mut error = ErrorMessage::default();
+        error.code = code;
+        error.header = buffer;
+        error
+    };
+
+    let payload = NetlinkPayload::<T>::Error(error);
     // Note that the following header fields are unset as they don't appear to
     // be used by any of our clients: `flags`.
     let mut resp_header = NetlinkHeader::default();
@@ -138,30 +135,15 @@ mod tests {
     use assert_matches::assert_matches;
     use netlink_packet_core::{constants::NLM_F_MULTIPART, NetlinkBuffer, NLMSG_DONE, NLMSG_ERROR};
     use netlink_packet_route::RtnlMessage;
+    use netlink_packet_utils::Parseable as _;
     use test_case::test_case;
 
     use crate::netlink_packet::errno::Errno;
 
-    #[test]
-    fn test_new_error_message() {
-        // Arbitrary value with different bits in each octet, which ensures the
-        // test exercises endianness.
-        let expected_code: i32 = 0x7FEDBCA9;
-        let mut expected_header = NetlinkHeader::default();
-        expected_header.length = 0x01234567;
-        expected_header.message_type = 0x89AB;
-        expected_header.flags = 0xCDEF;
-        expected_header.sequence_number = 0x55555555;
-        expected_header.port_number = 0x00000000;
-
-        let ErrorMessage { code, header, .. } = new_error_message(expected_code, expected_header);
-        assert_eq!(expected_code, code);
-        assert_eq!(expected_header, NetlinkHeader::parse(&NetlinkBuffer::new(&header)).unwrap());
-    }
-
-    #[test_case(0, Errno::EINVAL; "EINVAL")]
-    #[test_case(1, Errno::ENODEV; "ENODEV")]
-    fn test_new_error(sequence_number: u32, expected_code: Errno) {
+    #[test_case(0, Ok(()); "ACK")]
+    #[test_case(0, Err(Errno::EINVAL); "EINVAL")]
+    #[test_case(1, Err(Errno::ENODEV); "ENODEV")]
+    fn test_new_error(sequence_number: u32, expected_error: Result<(), Errno>) {
         // Header with arbitrary values
         let mut expected_header = NetlinkHeader::default();
         expected_header.length = 0x01234567;
@@ -170,7 +152,7 @@ mod tests {
         expected_header.sequence_number = sequence_number;
         expected_header.port_number = 0x00000000;
 
-        let error = new_error::<RtnlMessage>(expected_code, expected_header);
+        let error = new_error::<RtnlMessage>(expected_error, expected_header);
         // `serialize` will panic if the message is malformed.
         let mut buf = vec![0; error.buffer_len()];
         error.serialize(&mut buf);
@@ -181,38 +163,11 @@ mod tests {
         assert_matches!(
             payload,
             NetlinkPayload::Error(ErrorMessage{ code, header, .. }) => {
-                assert_eq!(code, expected_code.into_code());
-                assert_eq!(
-                    NetlinkHeader::parse(&NetlinkBuffer::new(&header)).unwrap(),
-                    expected_header,
-                );
-            }
-        );
-    }
-
-    #[test_case(0; "seq_0")]
-    #[test_case(1; "seq_1")]
-    fn test_new_ack(sequence_number: u32) {
-        // Header with arbitrary values
-        let mut expected_header = NetlinkHeader::default();
-        expected_header.length = 0x01234567;
-        expected_header.message_type = 0x89AB;
-        expected_header.flags = 0xCDEF;
-        expected_header.sequence_number = sequence_number;
-        expected_header.port_number = 0x00000000;
-
-        let ack = new_ack::<RtnlMessage>(expected_header);
-        // `serialize` will panic if the message is malformed.
-        let mut buf = vec![0; ack.buffer_len()];
-        ack.serialize(&mut buf);
-
-        let (header, payload) = ack.into_parts();
-        assert_eq!(header.message_type, NLMSG_ERROR);
-        assert_eq!(header.sequence_number, sequence_number);
-        assert_matches!(
-            payload,
-            NetlinkPayload::Ack(ErrorMessage{ code, header, .. }) => {
-                assert_eq!(code, ACK_ERROR_CODE);
+                let expected_code = match expected_error {
+                    Ok(()) => None,
+                    Err(e) => Some(e.into()),
+                };
+                assert_eq!(code, expected_code);
                 assert_eq!(
                     NetlinkHeader::parse(&NetlinkBuffer::new(&header)).unwrap(),
                     expected_header,
@@ -236,6 +191,12 @@ mod tests {
         assert_eq!(header.sequence_number, sequence_number);
         assert_eq!(header.message_type, NLMSG_DONE);
         assert_eq!(header.flags, NLM_F_MULTIPART);
-        assert_eq!(payload, NetlinkPayload::Done);
+        assert_matches!(
+            payload,
+            NetlinkPayload::Done(DoneMessage {code, extended_ack, ..}) => {
+                assert_eq!(code, DONE_ERROR_CODE);
+                assert_eq!(extended_ack, vec![]);
+            }
+        );
     }
 }

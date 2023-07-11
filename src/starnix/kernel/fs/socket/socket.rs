@@ -9,7 +9,7 @@ use std::{collections::VecDeque, ffi::CStr, mem::size_of};
 use fuchsia_zircon as zx;
 use net_types::ip::IpAddress;
 
-use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NetlinkPayload};
+use netlink_packet_core::{ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload};
 use netlink_packet_route::{
     rtnl::address::nlas::Nla as AddressNla, rtnl::link::nlas::Nla as LinkNla, AddressMessage,
     LinkMessage, RtnlMessage,
@@ -727,13 +727,13 @@ fn get_netlink_interface_info(
         let msg = NetlinkMessage::<RtnlMessage>::deserialize(&read_buf.data()[..n])
             .expect("netlink should always send well-formed messages");
         match msg.payload {
-            NetlinkPayload::Error(e) => {
+            NetlinkPayload::Error(ErrorMessage { code: Some(code), header: _, .. }) => {
                 // `e.code` is an `i32` and may hold negative values so
                 // we need to do an `as u64` cast instead of `try_into`.
                 // Note that `ErrnoCode::from_return_value` will
                 // cast the value to an `i64` to check that it is a
                 // valid (negative) errno value.
-                let code = ErrnoCode::from_return_value(e.code as u64);
+                let code = ErrnoCode::from_return_value(code.get() as u64);
                 return Err(Errno::new(code, "error code from RTM_GETLINK", None));
             }
             NetlinkPayload::InnerMessage(RtnlMessage::NewLink(msg)) => msg,
@@ -793,7 +793,7 @@ fn get_netlink_ipv4_addresses(
         let msg = NetlinkMessage::<RtnlMessage>::deserialize(&read_buf.data()[..n])
             .expect("netlink should always send well-formed messages");
         match msg.payload {
-            NetlinkPayload::Done => break,
+            NetlinkPayload::Done(_) => break,
             NetlinkPayload::InnerMessage(RtnlMessage::NewAddress(msg)) => {
                 if msg.header.index == if_index {
                     addrs.push(msg);
@@ -823,14 +823,15 @@ fn send_netlink_msg_and_wait_response(
     let msg = NetlinkMessage::<RtnlMessage>::deserialize(&read_buf.data()[..n])
         .expect("netlink should always send well-formed messages");
     match msg.payload {
-        NetlinkPayload::Ack(_) => {}
-        NetlinkPayload::Error(msg) => {
+        // Errors with a `None` code are acks.
+        NetlinkPayload::Error(ErrorMessage { code: None, header: _, .. }) => {}
+        NetlinkPayload::Error(ErrorMessage { code: Some(code), header: _, .. }) => {
             // Don't propagate the error up because its not the fault of the
             // caller - the stack state can change underneath the caller.
             log_warn!(
                 "got NACK netlink route response when handling ioctl(_, {:#x}, _): {}",
                 req,
-                msg.code
+                code
             );
         }
         payload => panic!("unexpected message = {:?}", payload),

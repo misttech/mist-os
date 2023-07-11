@@ -601,10 +601,6 @@
                 "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/*",
                 "AllUDPSockets/UDPSocketPairTest.SetAndGetReceiveOrigDstAddr/*",
 
-                // socket_ip_unbound_netlink_test
-                "IPUnboundSockets/IPv4UnboundSocketTest.ConnectToBadLocalAddress/*",
-                "IPUnboundSockets/IPv6UnboundSocketTest.ConnectToBadLocalAddress/*",
-
                 // socket_ipv4_datagram_based_socket_unbound_loopback_test
                 "IPv4Sockets/IPv4DatagramBasedUnboundSocketTest.IpMulticastIfSetShort/*",
                 "IPv4Sockets/IPv4DatagramBasedUnboundSocketTest.IpMulticastIfSetNicGetReqn/*",
@@ -631,15 +627,9 @@
                 "NetdeviceTest.InterfaceFlags",
 
                 // socket_netlink_route_test
-                // These fail because Netlink `Done` message are malformed:
-                // TODO(https://github.com/rust-netlink/netlink-packet-core/issues/11):
-                // Expect pass once fixed in-tree.
+                // TODO(https://issuetracker.google.com/290605547): support
+                // replacing addresses.
                 "NetlinkRouteTest.AddAndRemoveAddr",
-                "NetlinkRouteTest.GetAddrDump",
-                "NetlinkRouteTest.GetLinkByIndex",
-                "NetlinkRouteTest.GetLinkByName",
-                "NetlinkRouteTest.GetLinkDump",
-                "NetlinkRouteTest.GetRouteDump",
                 "NetlinkRouteTest.SpliceFromPipe",
 
                 // socket_netlink_uevent
