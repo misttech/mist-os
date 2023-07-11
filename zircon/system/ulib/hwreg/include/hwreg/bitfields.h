@@ -145,8 +145,7 @@ struct EnablePrinter;
 template <class DerivedType, class IntType, class PrinterState = void>
 class RegisterBase {
   static_assert(internal::IsSupportedInt<IntType>::value, "unsupported register access width");
-  static_assert(std::is_same<PrinterState, void>::value ||
-                    std::is_same<PrinterState, EnablePrinter>::value,
+  static_assert(std::is_same_v<PrinterState, void> || std::is_same_v<PrinterState, EnablePrinter>,
                 "unsupported printer state");
 
  public:
@@ -245,11 +244,10 @@ class RegisterAddr {
  public:
   RegisterAddr(uint32_t reg_addr) : reg_addr_(reg_addr) {}
 
-  static_assert(
-      std::is_base_of<RegisterBase<RegType, typename RegType::ValueType>, RegType>::value ||
-          std::is_base_of<RegisterBase<RegType, typename RegType::ValueType, EnablePrinter>,
-                          RegType>::value,
-      "Parameter of RegisterAddr<> should derive from RegisterBase");
+  static_assert(std::is_base_of_v<RegisterBase<RegType, typename RegType::ValueType>, RegType> ||
+                    std::is_base_of_v<
+                        RegisterBase<RegType, typename RegType::ValueType, EnablePrinter>, RegType>,
+                "Parameter of RegisterAddr<> should derive from RegisterBase");
 
   // Instantiate a RegisterBase using the value of the register read from
   // MMIO.
@@ -293,7 +291,7 @@ class BitfieldRef {
   constexpr IntType get() const { return static_cast<IntType>((*value_ptr_ >> shift_) & mask_); }
 
   constexpr void set(IntType field_val) {
-    static_assert(!std::is_const<IntType>::value, "");
+    static_assert(!std::is_const_v<IntType>);
     ZX_DEBUG_ASSERT((field_val & ~mask_) == 0);
     *value_ptr_ = static_cast<IntType>(*value_ptr_ & ~(mask_ << shift_));
     *value_ptr_ = static_cast<IntType>(*value_ptr_ | (field_val << shift_));
@@ -377,7 +375,7 @@ class BitfieldRef {
   static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");                       \
   static_assert((BIT_HIGH) < sizeof(typename SelfType::ValueType) * CHAR_BIT,                      \
                 "Upper bit is out of range");                                                      \
-  static_assert(std::is_enum<ENUM_TYPE>::value, "Field type is not an enum");                      \
+  static_assert(std::is_enum_v<ENUM_TYPE>, "Field type is not an enum");                           \
   __NO_UNIQUE_ADDRESS struct {                                                                     \
     struct NAME##Marker {};                                                                        \
     __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker, (COND)> field;              \
@@ -423,19 +421,19 @@ class BitfieldRef {
 
 // Declares "decltype(FIELD) NAME() const" and "void set_NAME(decltype(FIELD))" that
 // reads/modifies the declared bitrange.  Both bit indices are inclusive.
-#define DEF_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW, NAME)                                              \
-  HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                                         \
-  constexpr typename std::remove_reference<decltype(FIELD)>::type NAME() const {                  \
-    return hwreg::BitfieldRef<const typename std::remove_reference<decltype(FIELD)>::type>(       \
-               &FIELD, (BIT_HIGH), (BIT_LOW))                                                     \
-        .get();                                                                                   \
-  }                                                                                               \
-  constexpr auto& set_##NAME(typename std::remove_reference<decltype(FIELD)>::type val) {         \
-    hwreg::BitfieldRef<typename std::remove_reference<decltype(FIELD)>::type>(&FIELD, (BIT_HIGH), \
-                                                                              (BIT_LOW))          \
-        .set(val);                                                                                \
-    return *this;                                                                                 \
-  }                                                                                               \
+#define DEF_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW, NAME)                                          \
+  HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                                     \
+  constexpr typename std::remove_reference_t<decltype(FIELD)> NAME() const {                  \
+    return hwreg::BitfieldRef<const typename std::remove_reference_t<decltype(FIELD)>>(       \
+               &FIELD, (BIT_HIGH), (BIT_LOW))                                                 \
+        .get();                                                                               \
+  }                                                                                           \
+  constexpr auto& set_##NAME(typename std::remove_reference_t<decltype(FIELD)> val) {         \
+    hwreg::BitfieldRef<typename std::remove_reference_t<decltype(FIELD)>>(&FIELD, (BIT_HIGH), \
+                                                                          (BIT_LOW))          \
+        .set(val);                                                                            \
+    return *this;                                                                             \
+  }                                                                                           \
   static_assert(true)  // eat a ;
 
 #define DEF_COND_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW, NAME, COND)                                   \
@@ -476,19 +474,19 @@ class BitfieldRef {
 // will allow 32-bit addresses to be directly read/written to `address`. If
 // `DEF_SUBFIELD` read/written values would need to be shifted left/right by
 // 1 bit each time.
-#define DEF_UNSHIFTED_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW, NAME)                              \
-  HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                                   \
-  constexpr typename std::remove_reference<decltype(FIELD)>::type NAME() const {            \
-    return hwreg::BitfieldRef<const typename std::remove_reference<decltype(FIELD)>::type>( \
-               &FIELD, (BIT_HIGH), (BIT_LOW), /*unshifted=*/true)                           \
-        .get();                                                                             \
-  }                                                                                         \
-  constexpr auto& set_##NAME(typename std::remove_reference<decltype(FIELD)>::type val) {   \
-    hwreg::BitfieldRef<typename std::remove_reference<decltype(FIELD)>::type>(              \
-        &FIELD, (BIT_HIGH), (BIT_LOW), /*unshifted=*/true)                                  \
-        .set(val);                                                                          \
-    return *this;                                                                           \
-  }                                                                                         \
+#define DEF_UNSHIFTED_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW, NAME)                          \
+  HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                               \
+  constexpr typename std::remove_reference_t<decltype(FIELD)> NAME() const {            \
+    return hwreg::BitfieldRef<const typename std::remove_reference_t<decltype(FIELD)>>( \
+               &FIELD, (BIT_HIGH), (BIT_LOW), /*unshifted=*/true)                       \
+        .get();                                                                         \
+  }                                                                                     \
+  constexpr auto& set_##NAME(typename std::remove_reference_t<decltype(FIELD)> val) {   \
+    hwreg::BitfieldRef<typename std::remove_reference_t<decltype(FIELD)>>(              \
+        &FIELD, (BIT_HIGH), (BIT_LOW), /*unshifted=*/true)                              \
+        .set(val);                                                                      \
+    return *this;                                                                       \
+  }                                                                                     \
   static_assert(true)  // eat a ;
 
 #define DEF_COND_UNSHIFTED_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW, NAME, COND)                       \
@@ -513,26 +511,26 @@ class BitfieldRef {
 
 // Declares "TYPE NAME() const" and "void set_NAME(TYPE)" that
 // reads/modifies the declared bitrange.  Both bit indices are inclusive.
-#define DEF_ENUM_SUBFIELD(FIELD, ENUM_TYPE, BIT_HIGH, BIT_LOW, NAME)                              \
-  HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                                         \
-  static_assert(std::is_enum<ENUM_TYPE>::value, "ENUM_TYPE is not an enum");                      \
-  constexpr ENUM_TYPE NAME() const {                                                              \
-    return static_cast<ENUM_TYPE>(                                                                \
-        hwreg::BitfieldRef<const typename std::remove_reference<decltype(FIELD)>::type>(          \
-            &FIELD, (BIT_HIGH), (BIT_LOW))                                                        \
-            .get());                                                                              \
-  }                                                                                               \
-  constexpr auto& set_##NAME(ENUM_TYPE val) {                                                     \
-    hwreg::BitfieldRef<typename std::remove_reference<decltype(FIELD)>::type>(&FIELD, (BIT_HIGH), \
-                                                                              (BIT_LOW))          \
-        .set(static_cast<typename std::remove_reference<decltype(FIELD)>::type>(val));            \
-    return *this;                                                                                 \
-  }                                                                                               \
+#define DEF_ENUM_SUBFIELD(FIELD, ENUM_TYPE, BIT_HIGH, BIT_LOW, NAME)                          \
+  HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                                     \
+  static_assert(std::is_enum_v<ENUM_TYPE>, "ENUM_TYPE is not an enum");                       \
+  constexpr ENUM_TYPE NAME() const {                                                          \
+    return static_cast<ENUM_TYPE>(                                                            \
+        hwreg::BitfieldRef<const typename std::remove_reference_t<decltype(FIELD)>>(          \
+            &FIELD, (BIT_HIGH), (BIT_LOW))                                                    \
+            .get());                                                                          \
+  }                                                                                           \
+  constexpr auto& set_##NAME(ENUM_TYPE val) {                                                 \
+    hwreg::BitfieldRef<typename std::remove_reference_t<decltype(FIELD)>>(&FIELD, (BIT_HIGH), \
+                                                                          (BIT_LOW))          \
+        .set(static_cast<typename std::remove_reference_t<decltype(FIELD)>>(val));            \
+    return *this;                                                                             \
+  }                                                                                           \
   static_assert(true)  // eat a ;
 
 #define DEF_COND_ENUM_SUBFIELD(FIELD, ENUM_TYPE, BIT_HIGH, BIT_LOW, NAME, COND)                 \
   HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                                       \
-  static_assert(std::is_enum<ENUM_TYPE>::value, "ENUM_TYPE is not an enum");                    \
+  static_assert(std::is_enum_v<ENUM_TYPE>, "ENUM_TYPE is not an enum");                         \
   template <bool Cond = (COND), typename = std::enable_if_t<Cond>>                              \
   constexpr hwreg::internal::enable_if_t<Cond, ENUM_TYPE, (BIT_HIGH), (BIT_LOW)> NAME() const { \
     return static_cast<ENUM_TYPE>(                                                              \

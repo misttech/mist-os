@@ -32,11 +32,11 @@
   HWREG_INTERNAL_PASTE(field_, HWREG_INTERNAL_PASTE(NAME##_, __LINE__))
 
 // Internal macro for checking the type and range of a subfield definition.
-#define HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                    \
-  static_assert(hwreg::internal::IsSupportedInt<                                   \
-                    typename std::remove_reference<decltype(FIELD)>::type>::value, \
-                #FIELD " has unsupported type");                                   \
-  static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");       \
+#define HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                                  \
+  static_assert(                                                                                 \
+      hwreg::internal::IsSupportedInt<typename std::remove_reference_t<decltype(FIELD)>>::value, \
+      #FIELD " has unsupported type");                                                           \
+  static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");                     \
   static_assert((BIT_HIGH) < sizeof(decltype(FIELD)) * CHAR_BIT, "Upper bit is out of range");
 
 namespace hwreg {
