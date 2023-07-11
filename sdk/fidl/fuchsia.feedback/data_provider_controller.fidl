@@ -5,7 +5,9 @@ library fuchsia.feedback;
 
 /// Used to externally control the data provider, say when disk space is becoming scarce or user
 /// privacy settings change.
+// TODO(fxbug.dev/127529): delete once F13 is out of support window.
 @discoverable
+@available(removed=13, legacy=true)
 closed protocol DataProviderController {
     /// Disables persistent logging for the remainder of the boot and drops any logs that have been
     /// persisted. Returns when both have completed. Persistent logging cannot

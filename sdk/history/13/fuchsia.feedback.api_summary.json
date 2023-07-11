@@ -220,16 +220,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.feedback/DataProviderController.DisableAndDropPersistentLogs",
-        "ordinal": "2634128999881678781",
-        "type": "() -> ()"
-    },
-    {
-        "kind": "protocol",
-        "name": "fuchsia.feedback/DataProviderController"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.feedback/DeviceIdProvider.GetId",
         "ordinal": "1056079312768501980",
         "type": "() -> (string:64 feedback_id)"
