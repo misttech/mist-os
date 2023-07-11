@@ -70,6 +70,24 @@ impl Namespace {
     }
 }
 
+impl FsNodeOps for Arc<Namespace> {
+    fn create_file_ops(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        Ok(Box::new(MountNamespaceFile(self.clone())))
+    }
+}
+
+pub struct MountNamespaceFile(pub Arc<Namespace>);
+
+impl FileOps for MountNamespaceFile {
+    fileops_impl_nonseekable!();
+    fileops_impl_dataless!();
+}
+
 /// An instance of a filesystem mounted in a namespace.
 ///
 /// At a mount, path traversal switches from one filesystem to another.

@@ -216,7 +216,7 @@ impl FsNodeOps for NsDirectory {
     fn lookup(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<Arc<FsNode>, Errno> {
         // If name is a given namespace, link to the current identifier of the that namespace for
@@ -230,24 +230,26 @@ impl FsNodeOps for NsDirectory {
         if !NS_ENTRIES.contains(&ns) {
             return error!(ENOENT);
         }
+
+        let task = Task::from_weak(&self.task)?;
         if let Some(id) = elements.next() {
             // The name starts with {namespace}:, check that it matches {namespace}:[id]
             static NS_IDENTIFIER_RE: Lazy<Regex> =
                 Lazy::new(|| Regex::new("^\\[[0-9]+\\]$").unwrap());
-            if NS_IDENTIFIER_RE.is_match(id) {
-                // TODO(qsr): For now, returns an empty file. In the future, this should create a
-                // reference to to correct namespace, and ensures it keeps it alive.
-                let task = Task::from_weak(&self.task)?;
-                Ok(node.fs().create_node(
-                    BytesFile::new_node(vec![]),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), task.as_fscred()),
-                ))
-            } else {
-                error!(ENOENT)
+            if !NS_IDENTIFIER_RE.is_match(id) {
+                return error!(ENOENT);
             }
+            let node_info = FsNodeInfo::new_factory(mode!(IFREG, 0o444), task.as_fscred());
+
+            Ok(match ns {
+                "mnt" => node.fs().create_node(current_task.task.fs().namespace(), node_info),
+                _ => {
+                    // TODO(https://fxbug.dev/76946) support other kinds of namespaces
+                    node.fs().create_node(BytesFile::new_node(vec![]), node_info)
+                }
+            })
         } else {
             // The name is {namespace}, link to the correct one of the current task.
-            let task = Task::from_weak(&self.task)?;
             Ok(node.fs().create_node(
                 CallbackSymlinkNode::new(move || {
                     // For now, all namespace have the identifier 1.

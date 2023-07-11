@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use crate::{fs::*, lock::RwLock, task::CurrentTask, types::*};
+use crate::{fs::*, lock::RwLock, logging::log_trace, task::CurrentTask, types::*};
 
 /// The mutable state for an FsContext.
 ///
@@ -27,6 +27,22 @@ struct FsContextState {
 
     // See <https://man7.org/linux/man-pages/man2/umask.2.html>
     umask: FileMode,
+}
+
+impl FsContextState {
+    fn set_namespace(&mut self, new_ns: Arc<Namespace>) -> Result<(), Errno> {
+        log_trace!("updating namespace");
+        let new_root =
+            Namespace::translate_node(self.root.clone(), &new_ns).ok_or(errno!(EINVAL))?;
+        let new_cwd = Namespace::translate_node(self.cwd.clone(), &new_ns).ok_or(errno!(EINVAL))?;
+
+        // Only perform a mutation if the rebased nodes both exist in the target namespace.
+        self.root = new_root;
+        self.cwd = new_cwd;
+        self.namespace = new_ns;
+        log_trace!("namespace update succeeded");
+        Ok(())
+    }
 }
 
 /// The file system context associated with a task.
@@ -120,16 +136,19 @@ impl FsContext {
         old_umask
     }
 
+    pub fn set_namespace(&self, new_ns: Arc<Namespace>) -> Result<(), Errno> {
+        let mut state = self.state.write();
+        state.set_namespace(new_ns)?;
+        Ok(())
+    }
+
     pub fn unshare_namespace(&self) {
         let mut state = self.state.write();
-        state.namespace = state.namespace.clone_namespace();
-        // TODO(tbodt): Implement better locking to make these failures impossible. These expects
-        // can only fail if another thread changes mounts between the clone_namespace and the
-        // translate_node calls, making the cwd or root disappear or move.
-        state.root = Namespace::translate_node(state.root.clone(), &state.namespace)
-            .expect("root should exist in the new namespace");
-        state.cwd = Namespace::translate_node(state.cwd.clone(), &state.namespace)
-            .expect("cwd should exist in the new namespace");
+        // TODO(https:://fxbug.dev/130030): Implement better locking to make these failures
+        // impossible. These expects can only fail if another thread changes mounts between the
+        // clone_namespace and the translate_node calls, making the cwd or root disappear or move.
+        let cloned = state.namespace.clone_namespace();
+        state.set_namespace(cloned).expect("nodes should exist in the cloned namespace");
     }
 
     pub fn namespace(&self) -> Arc<Namespace> {

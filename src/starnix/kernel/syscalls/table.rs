@@ -236,6 +236,7 @@ pub fn dispatch_syscall(
         setdomainname[2],
         sethostname[2],
         setitimer[3],
+        setns[2],
         setpgid[2],
         setpriority[3],
         setresgid[3],

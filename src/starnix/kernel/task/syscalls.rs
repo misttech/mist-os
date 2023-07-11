@@ -1176,6 +1176,36 @@ pub fn sys_setpriority(
     Ok(())
 }
 
+pub fn sys_setns(current_task: &CurrentTask, ns_fd: FdNumber, ns_type: c_int) -> Result<(), Errno> {
+    let file_handle = current_task.task.files.get(ns_fd)?;
+
+    // From man pages this is not quite right because some namespace types require more capabilities
+    // or require this capability in multiple namespaces, but it should cover our current test
+    // cases and we can make this more nuanced once more namespace types are supported.
+    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+        return error!(EPERM);
+    }
+
+    if let Some(mount_ns) = file_handle.downcast_file::<MountNamespaceFile>() {
+        if !(ns_type == 0 || ns_type == CLONE_NEWNS as i32) {
+            log_trace!("invalid type");
+            return error!(EINVAL);
+        }
+
+        // TODO(https://fxbug.dev/130293) enforce CLONE_FS limitations
+
+        current_task.task.fs().set_namespace(mount_ns.0.clone())?;
+        return Ok(());
+    }
+
+    // TODO(https://fxbug.dev/75966) support PID fd's from pidfd_open
+
+    // If we didn't encounter a supported type of file descriptor above, then ns_fd is not a
+    // suitable namespace to set for this task.
+    log_trace!("ns_fd was not a supported namespace file");
+    error!(EINVAL)
+}
+
 pub fn sys_unshare(current_task: &CurrentTask, flags: u32) -> Result<(), Errno> {
     const IMPLEMENTED_FLAGS: u32 = CLONE_FILES | CLONE_NEWNS | CLONE_NEWUTS;
     if flags & !IMPLEMENTED_FLAGS != 0 {

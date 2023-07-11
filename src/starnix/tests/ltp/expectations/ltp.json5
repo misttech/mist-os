@@ -802,7 +802,6 @@
                 "setgroups04_16",
                 "sethostname02",
                 "setitimer02",
-                "setns01",
                 "setpgid01",
                 "setpriority01",
                 "setpriority02",
