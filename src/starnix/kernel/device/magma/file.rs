@@ -18,11 +18,12 @@ use crate::{
     device::wayland::image_file::*,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
+        fuchsia::RemoteFileObject,
         *,
     },
     lock::Mutex,
     logging::{impossible_error, log_error, log_warn},
-    mm::MemoryAccessorExt,
+    mm::{MemoryAccessorExt, ProtectionFlags},
     syscalls::*,
     task::CurrentTask,
     types::*,
@@ -169,6 +170,23 @@ impl MagmaFile {
                 file.vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?,
                 buffer,
             ))
+        } else if file.downcast_file::<RemoteFileObject>().is_some() {
+            // TODO: Currently this does not preserve BufferInfo::Image fields across allocation via
+            // HIDL/AIDL gralloc followed by import here. If that turns out to be needed, we can add
+            // to system the ability to get ImageFormatConstraints from a sysmem VMO, which could be
+            // used instead of ImageFile. Or if not needed, maybe we can remove ImageFile without
+            // any replacement.
+            //
+            // TODO: Consider if we can have binder related code in starnix use VmoFileObject for
+            // any FD wrapping a VMO, or if that's not workable, we may want to have magma related
+            // code use RemoteFileObject.
+            let buffer = BufferInfo::Default;
+            // Map any failure to EINVAL; any failure here is most likely to be an FD that isn't
+            // a gralloc buffer.
+            let vmo = file
+                .get_vmo(current_task, None, ProtectionFlags::READ | ProtectionFlags::WRITE)
+                .map_err(|_| errno!(EINVAL))?;
+            Ok((vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?, buffer))
         } else {
             error!(EINVAL)
         }
