@@ -366,7 +366,7 @@ group("config_data_template_allowlist") {
     "//src/developer/forensics:feedback_remote_device_id_provider",
     "//src/developer/forensics:feedback_user_config",
     "//src/developer/forensics:feedback_userdebug_config",
-    "//src/developer/memory/buckets:workstation_config_for_memory_monitor",
+    "//src/developer/memory/buckets",
     "//src/developer/memory/monitor:userdebug_config",
     "//src/developer/sshd-host:authorized_ssh_keys_config_data",
     "//src/developer/sshd-host:config",

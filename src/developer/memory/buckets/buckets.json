@@ -1,0 +1,212 @@
+[
+    {
+        "name": "ZBI Buffer",
+        "process": "",
+        "vmo": "uncompressed-bootfs",
+        "event_code": 1
+    },
+    {
+        "name": "Graphics",
+        "process": "",
+        "vmo": "magma_create_buffer|Mali .*|Magma.*|ImagePipe2Surface.*|GFXBufferCollection.*|ScenicImageMemory|Display.*|CompactImage.*|GFX Device Memory.*|FlatlandImageMemory.*",
+        "event_code": 2
+    },
+    {
+        "name": "ProtectedPoolUnallocated",
+        "process": "driver_host:pdev:00:00:1b",
+        "vmo": "SysmemAmlogicProtectedPool",
+        "event_code": 27
+    },
+    {
+        "name": "ContiguousPoolUnallocated",
+        "process": "driver_host:pdev:00:00:1b",
+        "vmo": "SysmemContiguousPool",
+        "event_code": 26
+    },
+    {
+        "name": "BlobfsInactive",
+        "process": "/pkg/bin/blobfs|blobfs\\.cm",
+        "vmo": "inactive-blob-.*",
+        "event_code": 29
+    },
+    {
+        "name": "Blobfs",
+        "process": "/pkg/bin/blobfs|blobfs\\.cm",
+        "vmo": "",
+        "event_code": 5
+    },
+    {
+        "name": "Storage",
+        "process": "fshost\\.cm|fxfs-crypt\\.cm|fxfs\\.cm|memfs\\.cm|decompressor-sandbox\\.cm",
+        "vmo": "",
+        "event_code": 72
+    },
+    {
+        "name": "Minfs",
+        "process": "/pkg/bin/minfs",
+        "vmo": "",
+        "event_code": 4
+    },
+    {
+        "name": "Scenic",
+        "process": "root_presenter\\.cm|scenic\\.cm",
+        "vmo": "",
+        "event_code": 9
+    },
+    {
+        "name": "Netstack",
+        "process": "dhcpd\\.cm|dhcpv6-client\\.cm|dns_resolver\\.cm|netstack\\.cm|network-tun\\.cm|mdns\\.cm|dhcpv4_server\\.cm",
+        "vmo": "",
+        "event_code": 11
+    },
+    {
+        "name": "Netsvc",
+        "process": "netsvc\\.cm|device-name-provider\\.cm",
+        "vmo": "",
+        "event_code": 71
+    },
+    {
+        "name": "Pkgfs",
+        "process": "pkgfs",
+        "vmo": "",
+        "event_code": 13
+    },
+    {
+        "name": "Archivist",
+        "process": "archivist\\.cm|sampler\\.cm",
+        "vmo": "",
+        "event_code": 22
+    },
+    {
+        "name": "Cobalt",
+        "process": "cobalt\\.cm|cobalt_system_metrics\\.cm",
+        "vmo": "",
+        "event_code": 23
+    },
+    {
+        "name": "Audio",
+        "process": "audio_core\\.cm|soundplayer\\.cm",
+        "vmo": "",
+        "event_code": 24
+    },
+    {
+        "name": "Context",
+        "process": "context_provider\\.cm",
+        "vmo": "",
+        "event_code": 25
+    },
+    {
+        "name": "AppManager",
+        "process": "appmgr\\.cm",
+        "vmo": "",
+        "event_code": 39
+    },
+    {
+        "name": "ComponentManager",
+        "process": "bin/bootsvc|bin/component_manager|miscsvc\\.cm|svchost\\.cm|sysmgr\\.cm",
+        "vmo": "",
+        "event_code": 40
+    },
+    {
+        "name": "Resolvers",
+        "process": ".*-resolver\\.cm.*",
+        "vmo": "",
+        "event_code": 42
+    },
+    {
+        "name": "Feedback",
+        "process": "exceptions\\.cm|feedback\\.cm|system_log_recorder",
+        "vmo": "",
+        "event_code": 46
+    },
+    {
+        "name": "CompositeDrivers",
+        "process": "driver_host:composite-device",
+        "vmo": "",
+        "event_code": 47
+    },
+    {
+        "name": "OtherDrivers",
+        "process": "driver_host:.*|pwrbtn-monitor\\.cm",
+        "vmo": "",
+        "event_code": 48
+    },
+    {
+        "name": "A11y",
+        "process": "a11y-manager\\.cm",
+        "vmo": "",
+        "event_code": 50
+    },
+    {
+        "name": "Bluetooth",
+        "process": "bt-.*",
+        "vmo": "",
+        "event_code": 51
+    },
+    {
+        "name": "HCI",
+        "process": "activity\\.cm|text_manager\\.cm|text_manager\\.cm",
+        "vmo": "",
+        "event_code": 52
+    },
+    {
+        "name": "I18N",
+        "process": "httpsdate_time_source\\.cm|fonts\\.cm|intl\\.cm|intl_services\\.cm|timezone\\.cm|time-zone-info-service\\.cm",
+        "vmo": "",
+        "event_code": 53
+    },
+    {
+        "name": "SetUI",
+        "process": "setui_service\\.cm|setui_service_with_camera\\.cm",
+        "vmo": "",
+        "event_code": 54
+    },
+    {
+        "name": "SoftwareDelivery",
+        "process": "omaha-client-service\\.cm|pkg-cache\\.cm|system-update.*",
+        "vmo": "",
+        "event_code": 55
+    },
+    {
+        "name": "WLAN",
+        "process": "emergency\\.cm|regulatory_region\\.cm|wlan.*",
+        "vmo": "",
+        "event_code": 58
+    },
+    {
+        "name": "NetworkPolicy",
+        "process": "http-client\\.cm|netcfg.*\\.cm|reachability\\.cm",
+        "vmo": "",
+        "event_code": 59
+    },
+    {
+        "name": "OtherProductComponents",
+        "process": "brightness_manager\\.cm|color_tint_service\\.cm|nest_policy_agent\\.cm|presence_agent\\.cm",
+        "vmo": "",
+        "event_code": 62
+    },
+    {
+        "name": "DriverFramework",
+        "process": "driver-index\\.cm|driver_manager\\.cm|sysinfo\\.cm",
+        "vmo": "",
+        "event_code": 63
+    },
+    {
+        "name": "EngTools",
+        "process": "/boot/bin/sh|/pkg/bin/sshd|memory_monitor\\.cm|overnetstack\\.cm|remote.*|sh:console|sshd-host\\.cm",
+        "vmo": "",
+        "event_code": 64
+    },
+    {
+        "name": "Power",
+        "process": "power-manager\\.cm|shutdown-shim\\.cm",
+        "vmo": "",
+        "event_code": 65
+    },
+    {
+        "name": "SceneManager",
+        "process": "input-pipeline\\.cm|scene_manager\\.cm",
+        "vmo": "",
+        "event_code": 69
+    }
+]

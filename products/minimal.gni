@@ -21,6 +21,7 @@ product_bootfs_labels += [
 legacy_base_package_labels += [
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/connectivity/network/netcfg:config-default",
+  "//src/developer/memory/buckets",
 ]
 
 # Use the product assembly config target to specify the product configuration.
