@@ -338,7 +338,7 @@
             {
                 source_moniker: "/bootstrap/fshost",
                 source: "component",
-                source_name: "minfs",
+                source_name: "data",
                 capability: "directory",
                 target_monikers: [
                     "/bootstrap",
@@ -352,6 +352,10 @@
 
                     // TODO(https://fxbug.dev/98760): Remove once fixed.
                     "/core/sl4f",
+
+                    // TODO(fxbug.dev/126266): Remove once session_manager gets autolaunch
+                    // override from structured configuration.
+                    "/core/session-manager",
                 ],
             },
             {
