@@ -7,6 +7,7 @@ using zx;
 
 /// A minimal fidl interface to allow sourcing the contents of a PoseBuffer from another service.
 @discoverable
+@available(deprecated=13, removed=14)
 closed protocol PoseBufferProvider {
     /// Sets the PoseBuffer and the parameters PoseBufferProvider will use to fill that PoseBuffer.
     /// Setting this when it is already set will replace the previously set parameters with the new

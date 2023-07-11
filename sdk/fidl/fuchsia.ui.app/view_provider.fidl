@@ -31,6 +31,7 @@ closed protocol ViewProvider {
     /// `view_ref_control` must not have the ZX_RIGHT_DUPLICATE set, or view creation
     /// will fail.
     @transitional
+    @available(deprecated=13)
     strict CreateViewWithViewRef(resource struct {
         token zx.Handle:EVENTPAIR;
         view_ref_control fuchsia.ui.views.ViewRefControl;

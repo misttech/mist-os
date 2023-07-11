@@ -7,6 +7,7 @@ using fuchsia.sysmem;
 using zx;
 
 // A maximum of 16 fences is enough for the current usage of these APIs.
+@available(deprecated=13)
 const MAX_ACQUIRE_RELEASE_FENCE_COUNT int32 = 16;
 
 /// ImagePipe is a mechanism for streaming shared images between a producer
@@ -68,6 +69,7 @@ const MAX_ACQUIRE_RELEASE_FENCE_COUNT int32 = 16;
 /// (or one of its delegates) has crashed.  The safest course of action is to
 /// close the image pipe, release all resources which were shared with the
 /// other party, and re-establish the connection to recover.
+@available(deprecated=13)
 closed protocol ImagePipe2 {
     /// Adds a BufferCollection resource to the image pipe.
     ///

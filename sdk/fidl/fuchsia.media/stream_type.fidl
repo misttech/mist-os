@@ -106,6 +106,7 @@ type AudioSampleFormat = strict enum {
 
 /// Describes the type of a video elementary stream.
 type VideoStreamType = struct {
+    @available(deprecated=13)
     pixel_format fuchsia.images.PixelFormat;
     // TODO(dalesat): Use fuchsia.images.ColorSpace.
     color_space ColorSpace;

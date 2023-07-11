@@ -14,6 +14,7 @@ type vec3 = struct {
     z float32;
 };
 
+@available(deprecated=13)
 type vec4 = struct {
     x float32;
     y float32;
@@ -28,6 +29,7 @@ type mat4 = struct {
 
 /// sRGB color space and nonlinear transfer function.
 // TODO(fxbug.dev/23484): use float32s instead of uint8.
+@available(deprecated=13)
 type ColorRgba = struct {
     red uint8;
     green uint8;
@@ -35,12 +37,14 @@ type ColorRgba = struct {
     alpha uint8;
 };
 
+@available(deprecated=13)
 type ColorRgb = struct {
     red float32;
     green float32;
     blue float32;
 };
 
+@available(deprecated=13)
 type Quaternion = struct {
     x float32;
     y float32;
@@ -50,11 +54,13 @@ type Quaternion = struct {
 
 /// Oriented plane described by a normal vector and a distance
 /// from the origin along that vector.
+@available(deprecated=13)
 type Plane3 = struct {
     dir vec3;
     dist float32;
 };
 
+@available(deprecated=13)
 type FactoredTransform = struct {
     translation vec3;
     scale vec3;
@@ -63,6 +69,7 @@ type FactoredTransform = struct {
     rotation Quaternion;
 };
 
+@available(deprecated=13)
 type Value = strict union {
     1: vector1 float32;
     2: vector2 vec2;
@@ -84,6 +91,7 @@ type Value = strict union {
 /// or is the value produced by the resource identified by `variable_id`, e.g.
 /// an animation or expression.  In the latter case, the value produced by the
 /// resource must be a float32, and `value` is ignored.
+@available(deprecated=13)
 type FloatValue = struct {
     value float32;
     variable_id uint32;
@@ -93,6 +101,7 @@ type FloatValue = struct {
 /// or is the value produced by the resource identified by `variable_id`, e.g.
 /// an animation or expression.  In the latter case, the value produced by the
 /// resource must be a vec2, and `value` is ignored.
+@available(deprecated=13)
 type Vector2Value = struct {
     value vec2;
     variable_id uint32;
@@ -102,6 +111,7 @@ type Vector2Value = struct {
 /// or is the value produced by the resource identified by `variable_id`, e.g.
 /// an animation or expression.  In the latter case, the value produced by the
 /// resource must be a vec3, and `value` is ignored.
+@available(deprecated=13)
 type Vector3Value = struct {
     value vec3;
     variable_id uint32;
@@ -111,6 +121,7 @@ type Vector3Value = struct {
 /// or is the value produced by the resource identified by `variable_id`, e.g.
 /// an animation or expression.  In the latter case, the value produced by the
 /// resource must be a vec4, and `value` is ignored.
+@available(deprecated=13)
 type Vector4Value = struct {
     value vec4;
     variable_id uint32;
@@ -120,6 +131,7 @@ type Vector4Value = struct {
 /// or is the value produced by the resource identified by `variable_id`, e.g.
 /// an animation or expression.  In the latter case, the value produced by the
 /// resource must be a vec4, and `value` is ignored.
+@available(deprecated=13)
 type Matrix4Value = struct {
     value mat4;
     variable_id uint32;
@@ -129,6 +141,7 @@ type Matrix4Value = struct {
 /// or is the value produced by the resource identified by `variable_id`, e.g.
 /// an animation or expression.  In the latter case, the value produced by the
 /// resource must be a ColorRgb, and `value` is ignored.
+@available(deprecated=13)
 type ColorRgbValue = struct {
     value ColorRgb;
     variable_id uint32;
@@ -138,6 +151,7 @@ type ColorRgbValue = struct {
 /// or is the value produced by the resource identified by `variable_id`, e.g.
 /// an animation or expression.  In the latter case, the value produced by the
 /// resource must be a ColorRgba, and `value` is ignored.
+@available(deprecated=13)
 type ColorRgbaValue = struct {
     value ColorRgba;
     variable_id uint32;
@@ -147,11 +161,13 @@ type ColorRgbaValue = struct {
 /// or is the value produced by the resource identified by `variable_id`, e.g.
 /// an animation or expression.  In the latter case, the value produced by the
 /// resource must be a Quaternion, and `value` is ignored.
+@available(deprecated=13)
 type QuaternionValue = struct {
     value Quaternion;
     variable_id uint32;
 };
 
+@available(deprecated=13)
 type ValueType = strict enum {
     kNone = 0;
     kVector1 = 1;
@@ -166,6 +182,7 @@ type ValueType = strict enum {
 };
 
 /// Describes how nodes interact with hit testings.
+@available(deprecated=13)
 type HitTestBehavior = strict enum {
     /// Apply hit testing to the node's content, its parts, and its children.
     kDefault = 0;
@@ -176,6 +193,7 @@ type HitTestBehavior = strict enum {
 
 /// Rendering target metrics associated with a node.
 /// See also `MetricsEvent`.
+@available(deprecated=13)
 type Metrics = struct {
     /// The ratio between the size of one logical pixel within the node's local
     /// coordinate system and the size of one physical pixel of the rendering
@@ -216,6 +234,7 @@ type BoundingBox = struct {
 };
 
 /// Represents the properties for a View.
+@available(deprecated=13)
 type ViewProperties = struct {
     /// The View's bounding box extents can be defined as:
     ///    { bounding_box.min, bounding_box.max }
@@ -247,12 +266,12 @@ type ViewProperties = struct {
     /// Whether the View allows geometrically underlying Views to receive input;
     /// default is true. When false, Scenic does not send input events to
     /// underlying Views.
-    // TODO(fxbug.dev/24695): not implemented yet.
     @allow_deprecated_struct_defaults
     downward_input bool = true;
 };
 
 /// Represents the state of a View in Scenic.
+@available(deprecated=13)
 type ViewState = struct {
     /// Whether the View is rendering. Default is false. Delivered to the View's
     /// corresponding ViewHolder after the View's first frame render request.

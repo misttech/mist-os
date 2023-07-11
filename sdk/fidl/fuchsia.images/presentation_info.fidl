@@ -6,6 +6,7 @@ library fuchsia.images;
 /// Information returned by methods such as `ImagePipe.PresentImage()` and
 /// `Session.Present()`, when the consumer begins preparing the first frame
 /// which includes the presented content.
+@available(deprecated=13)
 type PresentationInfo = struct {
     /// The actual time at which the enqueued operations are anticipated to take
     /// visible effect, expressed in nanoseconds in the `CLOCK_MONOTONIC`

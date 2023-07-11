@@ -369,8 +369,6 @@ type Node = table {
     ///
     ///  where Sx, Sy, and Sz are scale factors and Tx, Ty, Tz are the translation factors for
     ///  the x, y, and z components.
-    ///
-    /// TODO(fxb.dev/87181): Deprecate.
     8: transform fuchsia.ui.gfx.mat4;
 
     /// NOTE: We are deprecating `transform` in favor of `node_to_container_transform`. Clients

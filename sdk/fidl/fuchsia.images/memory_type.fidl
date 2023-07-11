@@ -4,6 +4,7 @@
 library fuchsia.images;
 
 /// Specifies the type of VMO's memory.
+@available(deprecated=13)
 type MemoryType = strict enum {
     /// VMO is regular host CPU memory.
     HOST_MEMORY = 0;
