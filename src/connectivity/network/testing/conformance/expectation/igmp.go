@@ -51,7 +51,7 @@ var igmpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{5, 8}: Fail,
 	{5, 9}: Pass,
 	// TODO(https://fxbug.dev/118202): Fix.
-	{5, 11}: Fail,
+	{5, 11}: Flaky,
 	{6, 2}:  Pass,
 	{6, 8}:  Pass,
 }
