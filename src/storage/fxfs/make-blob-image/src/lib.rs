@@ -173,10 +173,10 @@ fn create_sparse_image(
         .truncate(true)
         .open(sparse_output_image_path)
         .context(format!("Failed to create {:?}", sparse_output_image_path))?;
-    sparse::SparseImageBuilder::new()
+    sparse::builder::SparseImageBuilder::new()
         .set_block_size(block_size)
-        .add_chunk(sparse::DataSource::Reader(Box::new(image), actual_length))
-        .add_chunk(sparse::DataSource::Skip(full_length - actual_length))
+        .add_chunk(sparse::builder::DataSource::Reader(Box::new(image), actual_length))
+        .add_chunk(sparse::builder::DataSource::Skip(full_length - actual_length))
         .build(&mut output)
 }
 

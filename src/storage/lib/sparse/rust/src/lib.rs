@@ -5,34 +5,30 @@
 #[cfg(target_endian = "big")]
 assert!(false, "This library assumes little-endian!");
 
-use anyhow::{bail, ensure, Context, Result};
-use core::fmt;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    fs::File,
-    io::{Cursor, Read, Seek, SeekFrom, Write},
-    mem::{self},
-    path::Path,
+pub mod builder;
+mod format;
+
+use {
+    crate::format::{ChunkHeader, SparseHeader},
+    anyhow::{bail, ensure, Context, Result},
+    core::fmt,
+    serde::de::DeserializeOwned,
+    std::{
+        fs::File,
+        io::{Cursor, Read, Seek, SeekFrom, Write},
+        path::Path,
+    },
+    tempfile::{NamedTempFile, TempPath},
 };
-use tempfile::{NamedTempFile, TempPath};
+
+// Size of blocks to write.  Note that the format supports varied block sizes; this is the preferred
+// size by this library.
+const BLK_SIZE: usize = 0x1000;
 
 fn deserialize_from<'a, T: DeserializeOwned, R: Read>(source: &mut R) -> Result<T> {
-    let mut buf = vec![0u8; mem::size_of::<T>()];
+    let mut buf = vec![0u8; std::mem::size_of::<T>()];
     source.read_exact(&mut buf[..]).context("Failed to read bytes")?;
     Ok(bincode::deserialize(&buf[..])?)
-}
-
-// A wrapper around a Reader, which makes it seem like the underlying stream is only self.1 bytes
-// long.  The underlying reader is still advanced upon reading.
-struct LimitedReader<'a>(&'a mut dyn Reader, usize);
-
-impl<'a> Read for LimitedReader<'a> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let offset = self.0.stream_position()?;
-        let avail = self.1.saturating_sub(offset as usize);
-        let to_read = std::cmp::min(avail, buf.len());
-        self.0.read(&mut buf[..to_read])
-    }
 }
 
 /// A union trait for `Read` and `Seek`.
@@ -59,149 +55,16 @@ impl Writer for Cursor<Vec<u8>> {
     }
 }
 
-/// Input data for a SparseImageBuilder.
-pub enum DataSource {
-    Buffer(Box<[u8]>),
-    Reader(Box<dyn Reader>, u64),
-    /// Skips this many bytes.
-    Skip(u64),
-}
+// A wrapper around a Reader, which makes it seem like the underlying stream is only self.1 bytes
+// long.  The underlying reader is still advanced upon reading.
+struct LimitedReader<'a>(pub &'a mut dyn Reader, pub usize);
 
-/// Builds sparse image files from a set of input DataSources.
-pub struct SparseImageBuilder {
-    block_size: u32,
-    chunks: Vec<DataSource>,
-}
-
-impl SparseImageBuilder {
-    pub fn new() -> Self {
-        Self { block_size: BLK_SIZE as u32, chunks: vec![] }
-    }
-
-    pub fn set_block_size(mut self, block_size: u32) -> Self {
-        self.block_size = block_size;
-        self
-    }
-
-    pub fn add_chunk(mut self, source: DataSource) -> Self {
-        self.chunks.push(source);
-        self
-    }
-
-    #[tracing::instrument(skip(self, output))]
-    pub fn build<W: Writer>(self, output: &mut W) -> Result<()> {
-        // We'll fill the header in later.
-        output.seek(SeekFrom::Start(SPARSE_HEADER_SIZE))?;
-
-        let mut num_blocks = 0;
-        let num_chunks = self.chunks.len() as u32;
-        for input_chunk in self.chunks {
-            let (chunk, mut source) = match input_chunk {
-                DataSource::Buffer(buf) => {
-                    assert!(buf.len() % self.block_size as usize == 0);
-                    (
-                        Chunk::Raw { start: 0, size: buf.len() },
-                        Box::new(Cursor::new(buf)) as Box<dyn Reader>,
-                    )
-                }
-                DataSource::Reader(reader, size) => {
-                    assert!(size % self.block_size as u64 == 0);
-                    (Chunk::Raw { start: 0, size: size as usize }, reader)
-                }
-                DataSource::Skip(size) => {
-                    assert!(size % self.block_size as u64 == 0);
-                    (
-                        Chunk::DontCare { size: size as usize },
-                        Box::new(Cursor::new(vec![])) as Box<dyn Reader>,
-                    )
-                }
-            };
-            chunk.write(&mut source, output)?;
-            num_blocks += chunk.output_blocks(self.block_size as usize);
-        }
-
-        output.seek(SeekFrom::Start(0))?;
-        let header = SparseHeader::new(self.block_size, num_blocks, num_chunks);
-        let header_bytes: Vec<u8> = bincode::serialize(&header)?;
-        std::io::copy(&mut Cursor::new(header_bytes), output)?;
-
-        output.flush()?;
-        Ok(())
-    }
-}
-
-/// `SparseHeader` represents the header section of a `SparseFile`
-#[derive(Serialize, Deserialize)]
-#[repr(C)]
-struct SparseHeader {
-    /// Magic Number.
-    magic: u32,
-    /// Highest Major Version number supported.
-    major_version: u16,
-    /// Lowest Minor Version number supported.
-    minor_version: u16,
-    /// Size of the Header. (Defaults to 0)
-    file_hdr_sz: u16,
-    /// Size of the Header per-chunk. (Defaults to 0)
-    chunk_hdr_sz: u16,
-    /// Size of each block (Defaults to 4096)
-    blk_sz: u32,
-    /// Total number of blocks in the output image
-    total_blks: u32,
-    /// Total number of chunks.
-    total_chunks: u32,
-    /// Image Checksum... unused
-    image_checksum: u32,
-}
-
-const SPARSE_HEADER_SIZE: u64 = 28;
-
-impl fmt::Display for SparseHeader {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            r"SparseHeader:
-magic:          {:#X}
-major_version:  {}
-minor_version:  {}
-file_hdr_sz:    {}
-chunk_hdr_sz:   {}
-blk_sz:         {}
-total_blks:     {}
-total_chunks:   {}
-image_checksum: {}",
-            self.magic,
-            self.major_version,
-            self.minor_version,
-            self.file_hdr_sz,
-            self.chunk_hdr_sz,
-            self.blk_sz,
-            self.total_blks,
-            self.total_chunks,
-            self.image_checksum
-        )
-    }
-}
-
-impl SparseHeader {
-    fn new(blk_sz: u32, total_blks: u32, total_chunks: u32) -> SparseHeader {
-        SparseHeader {
-            magic: MAGIC,
-            major_version: MAJOR_VERSION,
-            minor_version: MINOR_VERSION,
-            file_hdr_sz: mem::size_of::<SparseHeader>() as u16,
-            chunk_hdr_sz: mem::size_of::<ChunkHeader>() as u16,
-            blk_sz,
-            total_blks,
-            total_chunks,
-            image_checksum: CHECKSUM, // Checksum verification unused
-        }
-    }
-
-    fn valid(&self) -> bool {
-        self.magic == MAGIC
-            && self.major_version == MAJOR_VERSION
-            && self.minor_version == MINOR_VERSION
+impl<'a> Read for LimitedReader<'a> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let offset = self.0.stream_position()?;
+        let avail = self.1.saturating_sub(offset as usize);
+        let to_read = std::cmp::min(avail, buf.len());
+        self.0.read(&mut buf[..to_read])
     }
 }
 
@@ -253,22 +116,22 @@ impl Chunk {
     /// to use in the ChunkHeader
     fn chunk_type(&self) -> u16 {
         match self {
-            Self::Raw { .. } => CHUNK_TYPE_RAW,
-            Self::Fill { .. } => CHUNK_TYPE_FILL,
-            Self::DontCare { .. } => CHUNK_TYPE_DONT_CARE,
-            Self::Crc32 { .. } => CHUNK_TYPE_CRC32,
+            Self::Raw { .. } => format::CHUNK_TYPE_RAW,
+            Self::Fill { .. } => format::CHUNK_TYPE_FILL,
+            Self::DontCare { .. } => format::CHUNK_TYPE_DONT_CARE,
+            Self::Crc32 { .. } => format::CHUNK_TYPE_CRC32,
         }
     }
 
     /// `chunk_data_len` returns the length of the chunk's header plus the
     /// length of the data when serialized
     fn chunk_data_len(&self) -> usize {
-        let header_size = mem::size_of::<ChunkHeader>();
+        let header_size = format::CHUNK_HEADER_SIZE;
         let data_size = match self {
             Self::Raw { size, .. } => *size,
-            Self::Fill { .. } => mem::size_of::<u32>(),
+            Self::Fill { .. } => std::mem::size_of::<u32>(),
             Self::DontCare { .. } => 0,
-            Self::Crc32 { .. } => mem::size_of::<u32>(),
+            Self::Crc32 { .. } => std::mem::size_of::<u32>(),
         };
         header_size + data_size
     }
@@ -331,56 +194,6 @@ impl fmt::Display for Chunk {
         write!(f, "{}", message)
     }
 }
-
-/// `ChunkHeader` represents the header portion of a Chunk.
-#[derive(Debug, Serialize, Deserialize)]
-#[repr(C)]
-struct ChunkHeader {
-    chunk_type: u16,
-    reserved1: u16,
-    chunk_sz: u32,
-    total_sz: u32,
-}
-
-const CHUNK_TYPE_RAW: u16 = 0xCAC1;
-const CHUNK_TYPE_FILL: u16 = 0xCAC2;
-const CHUNK_TYPE_DONT_CARE: u16 = 0xCAC3;
-const CHUNK_TYPE_CRC32: u16 = 0xCAC4;
-
-impl ChunkHeader {
-    fn new(chunk_type: u16, reserved1: u16, chunk_sz: u32, total_sz: u32) -> ChunkHeader {
-        ChunkHeader { chunk_type, reserved1, chunk_sz, total_sz }
-    }
-
-    fn valid(&self) -> bool {
-        self.chunk_type == CHUNK_TYPE_RAW
-            || self.chunk_type == CHUNK_TYPE_FILL
-            || self.chunk_type == CHUNK_TYPE_DONT_CARE
-            || self.chunk_type == CHUNK_TYPE_CRC32
-    }
-}
-
-impl fmt::Display for ChunkHeader {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "\tchunk_type: {:#X}\n\treserved1: {}\n\tchunk_sz: {}\n\ttotal_sz: {}\n",
-            self.chunk_type, self.reserved1, self.chunk_sz, self.total_sz
-        )
-    }
-}
-
-/// Size of blocks to write
-const BLK_SIZE: usize = 0x1000;
-
-// Header constants.
-const MAGIC: u32 = 0xED26FF3A;
-/// Maximum Major Version Supported.
-const MAJOR_VERSION: u16 = 0x1;
-// Minimum Minor Version Supported.
-const MINOR_VERSION: u16 = 0x0;
-/// The Checksum... hardcoded not used.
-const CHECKSUM: u32 = 0xCAFED00D;
 
 #[derive(Clone, Debug, PartialEq)]
 struct SparseFileWriter {
@@ -490,22 +303,22 @@ fn expand_chunk<R: Read + Seek, W: Write + Seek>(
     ensure!(header.valid(), "Invalid chunk header {:x?}", header);
     let size = (header.chunk_sz * block_size) as usize;
     match header.chunk_type {
-        CHUNK_TYPE_RAW => {
+        format::CHUNK_TYPE_RAW => {
             let limit = source.stream_position()? as usize + size;
             std::io::copy(&mut LimitedReader(source, limit), dest)
                 .context("Failed to copy contents")?;
         }
-        CHUNK_TYPE_FILL => {
+        format::CHUNK_TYPE_FILL => {
             let value: [u8; 4] =
                 deserialize_from(source).context("Failed to deserialize fill value")?;
             assert!(size % 4 == 0);
             let repeated = value.repeat(size / 4);
             std::io::copy(&mut Cursor::new(repeated), dest).context("Failed to fill contents")?;
         }
-        CHUNK_TYPE_DONT_CARE => {
+        format::CHUNK_TYPE_DONT_CARE => {
             dest.seek(SeekFrom::Current(size as i64)).context("Failed to skip contents")?;
         }
-        CHUNK_TYPE_CRC32 => {
+        format::CHUNK_TYPE_CRC32 => {
             let _: u32 = deserialize_from(source).context("Failed to deserialize fill value")?;
         }
         _ => bail!("Invalid type {}", header.chunk_type),
@@ -534,7 +347,7 @@ fn resparse(
 
     // File length already starts with a header for the SparseFile as
     // well as the size of a potential DontCare and Crc32 Chunk
-    let sunk_file_length = mem::size_of::<SparseHeader>()
+    let sunk_file_length = format::SPARSE_HEADER_SIZE
         + (Chunk::DontCare { size: BLK_SIZE }.chunk_data_len()
             + Chunk::Crc32 { checksum: 2345 }.chunk_data_len());
 
@@ -687,10 +500,16 @@ pub fn build_sparse_files<W: Write>(
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use rand::{rngs::SmallRng, RngCore, SeedableRng};
-    use std::io::{Cursor, Read};
-    use tempfile::TempDir;
+    use {
+        super::{
+            add_sparse_chunk,
+            builder::{DataSource, SparseImageBuilder},
+            resparse, unsparse, Chunk, SparseFileWriter, BLK_SIZE,
+        },
+        rand::{rngs::SmallRng, RngCore, SeedableRng},
+        std::io::{Cursor, Read as _, Seek as _, SeekFrom, Write as _},
+        tempfile::{NamedTempFile, TempDir},
+    };
 
     #[test]
     fn test_fill_into_bytes() {
