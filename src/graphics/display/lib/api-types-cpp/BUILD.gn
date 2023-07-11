@@ -10,6 +10,7 @@ source_set("api-types-cpp") {
     "alpha-mode.cc",
     "alpha-mode.h",
     "buffer-collection-id.h",
+    "buffer-id.h",
     "config-stamp.cc",
     "config-stamp.h",
     "driver-buffer-collection-id.h",
@@ -35,6 +36,7 @@ test("api-types-cpp-tests-bin") {
   sources = [
     "alpha-mode-test.cc",
     "buffer-collection-id-test.cc",
+    "buffer-id-test.cc",
     "config-stamp-test.cc",
     "display-id-test.cc",
     "driver-buffer-collection-id-test.cc",
