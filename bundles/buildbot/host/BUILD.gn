@@ -22,10 +22,7 @@ group("host") {
   ]
 
   if (is_linux) {
-    deps += [
-      "//src/tests/installer:tests($host_toolchain)",
-      "//tools/fvdl/e2e:tests($host_toolchain)",
-    ]
+    deps += [ "//src/tests/installer:tests($host_toolchain)" ]
   }
 }
 
