@@ -5,7 +5,7 @@
 use anyhow::{Context as _, Error};
 use async_trait::async_trait;
 use ffx_update_args as args;
-use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use fho::{deferred, moniker, AvailabilityFlag, Deferred, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_update::{
     CheckOptions, Initiator, ManagerProxy, MonitorMarker, MonitorRequest, MonitorRequestStream,
 };
@@ -25,10 +25,12 @@ pub struct UpdateTool {
     update_manager_proxy: ManagerProxy,
     #[with(moniker("/core/system-update"))]
     channel_control_proxy: ChannelControlProxy,
-    // TODO(https://fxbug.dev/123798): Connect to this at
-    // core/system-update/system-updater once that move rolls through.
-    #[with(moniker("/core"))]
-    installer_proxy: InstallerProxy,
+    // TODO(https://fxbug.dev/123798): remove the deprecated variant and the need of deferred once
+    // the move to `core/system-update/system-updater` rolls through.
+    #[with(deferred(moniker("/core/system-updater")))]
+    deprecated_installer_proxy: Deferred<InstallerProxy>,
+    #[with(deferred(moniker("/core/system-update/system-updater")))]
+    installer_proxy: Deferred<InstallerProxy>,
 }
 
 fho::embedded_plugin!(UpdateTool);
@@ -39,7 +41,19 @@ impl FfxMain for UpdateTool {
 
     /// Main entry point for the `update` subcommand.
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        let UpdateTool { cmd, update_manager_proxy, channel_control_proxy, installer_proxy } = self;
+        let UpdateTool {
+            cmd,
+            update_manager_proxy,
+            channel_control_proxy,
+            installer_proxy,
+            deprecated_installer_proxy,
+        } = self;
+        let installer_proxy = {
+            match deprecated_installer_proxy.await {
+                Ok(proxy) => proxy,
+                Err(_) => installer_proxy.await?,
+            }
+        };
         update_cmd_impl(
             update_manager_proxy,
             channel_control_proxy,

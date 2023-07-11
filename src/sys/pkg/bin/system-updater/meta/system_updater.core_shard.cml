@@ -67,10 +67,4 @@
             to: "#system-updater",
         },
     ],
-    expose: [
-        {
-            protocol: [ "fuchsia.update.installer.Installer" ],
-            from: "#system-updater",
-        },
-    ],
 }
