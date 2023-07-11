@@ -534,14 +534,28 @@ mod tests {
         include_bytes!("../test-utils/elf_x86-64_file-header.bin");
     static HEADER_DATA_AARCH64: &'static [u8] =
         include_bytes!("../test-utils/elf_aarch64_file-header.bin");
+    static HEADER_DATA_RISCV64: &'static [u8] =
+        include_bytes!("../test-utils/elf_riscv64_file-header.bin");
+
     #[cfg(target_arch = "x86_64")]
     static HEADER_DATA: &'static [u8] = HEADER_DATA_X86_64;
     #[cfg(target_arch = "aarch64")]
     static HEADER_DATA: &'static [u8] = HEADER_DATA_AARCH64;
-    #[cfg(target_arch = "x86_64")]
-    static HEADER_DATA_WRONG_ARCH: &'static [u8] = HEADER_DATA_AARCH64;
-    #[cfg(target_arch = "aarch64")]
-    static HEADER_DATA_WRONG_ARCH: &'static [u8] = HEADER_DATA_X86_64;
+    #[cfg(target_arch = "riscv64")]
+    static HEADER_DATA: &'static [u8] = HEADER_DATA_RISCV64;
+
+    // Returns a vec of file headers for different architectures that do not match the current one.
+    fn wrong_arch_file_headers() -> Vec<&'static [u8]> {
+        if cfg!(target_arch = "x86_64") {
+            vec![HEADER_DATA_AARCH64, HEADER_DATA_RISCV64]
+        } else if cfg!(target_arch = "aarch64") {
+            vec![HEADER_DATA_X86_64, HEADER_DATA_RISCV64]
+        } else if cfg!(target_arch = "riscv64") {
+            vec![HEADER_DATA_AARCH64, HEADER_DATA_X86_64]
+        } else {
+            panic!("Unrecognized arch")
+        }
+    }
 
     #[test]
     fn test_parse_file_header() -> Result<(), Error> {
@@ -582,14 +596,16 @@ mod tests {
 
     #[test]
     fn test_parse_wrong_arch() -> Result<(), Error> {
-        let vmo = zx::Vmo::create(HEADER_DATA_WRONG_ARCH.len() as u64)?;
-        vmo.write(&HEADER_DATA, 0)?;
+        for header_data in wrong_arch_file_headers() {
+            let vmo = zx::Vmo::create(header_data.len() as u64)?;
+            vmo.write(&HEADER_DATA, 0)?;
 
-        match Elf64Headers::from_vmo(&vmo) {
-            Err(ElfParseError::InvalidFileHeader(msg)) => {
-                assert_eq!(msg, "Invalid ELF architecture");
+            match Elf64Headers::from_vmo(&vmo) {
+                Err(ElfParseError::InvalidFileHeader(msg)) => {
+                    assert_eq!(msg, "Invalid ELF architecture");
+                }
+                _ => {}
             }
-            _ => {}
         }
         Ok(())
     }

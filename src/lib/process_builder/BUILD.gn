@@ -49,6 +49,7 @@ rustc_library("process_builder") {
   inputs = [
     "test-utils/elf_aarch64_file-header.bin",
     "test-utils/elf_x86-64_file-header.bin",
+    "test-utils/elf_riscv64_file-header.bin",
   ]
 }
 
