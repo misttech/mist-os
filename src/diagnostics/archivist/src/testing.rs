@@ -4,14 +4,15 @@
 
 #![cfg(test)]
 
-use crate::{events::types::ComponentIdentifier, identity::ComponentIdentity};
+use crate::identity::ComponentIdentity;
 use lazy_static::lazy_static;
+use moniker::ExtendedMoniker;
 use std::sync::Arc;
 
 lazy_static! {
     pub static ref TEST_IDENTITY: Arc<ComponentIdentity> = {
-        Arc::new(ComponentIdentity::from_identifier_and_url(
-            ComponentIdentifier::parse_from_moniker("./fake-test-env/test-component").unwrap(),
+        Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./fake-test-env/test-component").unwrap(),
             "fuchsia-pkg://fuchsia.com/testing123#test-component.cm",
         ))
     };

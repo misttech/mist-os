@@ -111,14 +111,14 @@ impl MessageFilter {
 
 #[cfg(test)]
 mod tests {
-    use diagnostics_data::Severity;
-
     use super::*;
-    use crate::{events::types::ComponentIdentifier, identity::ComponentIdentity};
+    use crate::identity::ComponentIdentity;
+    use diagnostics_data::Severity;
+    use moniker::ExtendedMoniker;
 
     fn test_message_with_tag(tag: Option<&str>) -> LogsData {
-        let identity = ComponentIdentity::from_identifier_and_url(
-            ComponentIdentifier::parse_from_moniker("./bogus/specious-at-best").unwrap(),
+        let identity = ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./bogus/specious-at-best").unwrap(),
             "fuchsia-pkg://not-a-package",
         );
         let mut builder = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {

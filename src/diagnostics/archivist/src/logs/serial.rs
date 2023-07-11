@@ -191,10 +191,7 @@ impl<'a, S: Write> SerialWriter<'a, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        events::types::ComponentIdentifier, identity::ComponentIdentity,
-        logs::stored_message::StoredMessage,
-    };
+    use crate::{identity::ComponentIdentity, logs::stored_message::StoredMessage};
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, LogsField, LogsProperty, Severity};
     use diagnostics_log_encoding::{
         encode::Encoder, Argument, Record, Severity as StreamSeverity, Value,
@@ -202,6 +199,7 @@ mod tests {
     use fuchsia_async as fasync;
     use fuchsia_zircon::Time;
     use futures::channel::mpsc;
+    use moniker::ExtendedMoniker;
     use std::io::Cursor;
 
     struct TestSink {
@@ -301,27 +299,27 @@ mod tests {
         let repo = LogsRepository::default().await;
 
         let bootstrap_foo_container = repo
-            .get_log_container(Arc::new(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::parse_from_moniker("./bootstrap/foo").unwrap(),
+            .get_log_container(Arc::new(ComponentIdentity::new(
+                ExtendedMoniker::parse_str("./bootstrap/foo").unwrap(),
                 "fuchsia-pkg://bootstrap-foo",
             )))
             .await;
         let bootstrap_bar_container = repo
-            .get_log_container(Arc::new(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::parse_from_moniker("./bootstrap/bar").unwrap(),
+            .get_log_container(Arc::new(ComponentIdentity::new(
+                ExtendedMoniker::parse_str("./bootstrap/bar").unwrap(),
                 "fuchsia-pkg://bootstrap-bar",
             )))
             .await;
 
         let core_foo_container = repo
-            .get_log_container(Arc::new(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::parse_from_moniker("./core/foo").unwrap(),
+            .get_log_container(Arc::new(ComponentIdentity::new(
+                ExtendedMoniker::parse_str("./core/foo").unwrap(),
                 "fuchsia-pkg://core-foo",
             )))
             .await;
         let core_baz_container = repo
-            .get_log_container(Arc::new(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::parse_from_moniker("./core/baz").unwrap(),
+            .get_log_container(Arc::new(ComponentIdentity::new(
+                ExtendedMoniker::parse_str("./core/baz").unwrap(),
                 "fuchsia-pkg://core-baz",
             )))
             .await;

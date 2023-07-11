@@ -40,6 +40,7 @@ pub use crate::logs_legacy::*;
 
 const SCHEMA_VERSION: u64 = 1;
 const MICROS_IN_SEC: u128 = 1000000;
+const ROOT_MONIKER_REPR: &str = "<root>";
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Hash, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -1215,7 +1216,14 @@ impl Deref for LogTextPresenter<'_> {
     }
 }
 
+fn is_root(moniker: &str) -> bool {
+    moniker == "/" || moniker == "." || moniker == "./"
+}
+
 fn strip_moniker(moniker: &str) -> &str {
+    if is_root(&moniker) {
+        return ROOT_MONIKER_REPR;
+    }
     if let Some(last_slash) = moniker.rfind('/') {
         &moniker[last_slash + 1..]
     } else {
@@ -1239,7 +1247,11 @@ impl fmt::Display for LogTextPresenter<'_> {
         }
 
         let moniker = if self.options.show_full_moniker {
-            self.moniker.as_str()
+            if is_root(&self.moniker) {
+                ROOT_MONIKER_REPR
+            } else {
+                self.moniker.as_str()
+            }
         } else {
             strip_moniker(self.moniker.as_str())
         };

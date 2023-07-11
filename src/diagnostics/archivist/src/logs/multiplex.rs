@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::identity::ComponentIdentity;
+use crate::identity::{ComponentIdentity, MonikerHelper};
 use fidl_fuchsia_diagnostics::Selector;
 use fuchsia_trace as ftrace;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -102,12 +102,11 @@ impl<I> Multiplexer<I> {
             .map(|ss| ss.iter().filter_map(|s| s.component_selector.as_ref()).collect::<Vec<_>>());
         match &component_selectors {
             None => true,
-            Some(selectors) => selectors::match_moniker_against_component_selectors(
-                identity.relative_moniker.as_slice(),
-                selectors,
-            )
-            .map(|matched_selectors| !matched_selectors.is_empty())
-            .unwrap_or(false),
+            Some(selectors) => identity
+                .moniker
+                .match_against_component_selectors(selectors)
+                .map(|matched_selectors| !matched_selectors.is_empty())
+                .unwrap_or(false),
         }
     }
 }

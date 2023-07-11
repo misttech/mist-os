@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 use {
     crate::{
-        configs, constants, diagnostics::AccessorStats, error::Error, events::types::Moniker,
+        configs, constants, diagnostics::AccessorStats, error::Error, identity::MonikerHelper,
         moniker_rewriter::MonikerRewriter,
     },
     async_lock::RwLock,
@@ -11,6 +11,7 @@ use {
     fidl::prelude::*,
     fidl_fuchsia_diagnostics::{self, ArchiveAccessorMarker, Selector},
     fuchsia_inspect as inspect,
+    moniker::ExtendedMoniker,
     std::{collections::HashMap, convert::TryInto, ops::Deref, path::Path, sync::Arc},
 };
 
@@ -187,7 +188,7 @@ pub struct PipelineMutableState {
     static_selectors: Option<Vec<Selector>>,
 
     /// A hierarchy matcher for any selector present in the static selectors.
-    moniker_to_static_matcher_map: HashMap<Moniker, Arc<HierarchyMatcher>>,
+    moniker_to_static_matcher_map: HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>,
 }
 
 impl Deref for Pipeline {
@@ -199,32 +200,33 @@ impl Deref for Pipeline {
 }
 
 impl PipelineMutableState {
-    pub fn remove(&mut self, relative_moniker: &Moniker) {
-        self.moniker_to_static_matcher_map.remove(relative_moniker);
+    pub fn remove(&mut self, moniker: &ExtendedMoniker) {
+        self.moniker_to_static_matcher_map.remove(moniker);
     }
 
-    pub fn add_inspect_artifacts(&mut self, relative_moniker: &Moniker) -> Result<(), Error> {
+    pub fn add_inspect_artifacts(&mut self, moniker: &ExtendedMoniker) -> Result<(), Error> {
         // Update the pipeline wrapper to be aware of the new inspect source if there
         // are are static selectors for the pipeline, and some of them are applicable to
         // the inspect source's relative moniker. Otherwise, ignore.
         if let Some(selectors) = &self.static_selectors {
             let matched_selectors =
-                selectors::match_component_moniker_against_selectors(relative_moniker, selectors)
-                    .map_err(Error::MatchComponentMoniker)?;
+                moniker.match_against_selectors(selectors).map_err(Error::MatchComponentMoniker)?;
 
             match &matched_selectors[..] {
                 [] => {}
                 populated_vec => {
                     let hierarchy_matcher = (populated_vec).try_into()?;
                     self.moniker_to_static_matcher_map
-                        .insert(relative_moniker.clone(), Arc::new(hierarchy_matcher));
+                        .insert(moniker.clone(), Arc::new(hierarchy_matcher));
                 }
             }
         }
         Ok(())
     }
 
-    pub fn static_selectors_matchers(&self) -> Option<HashMap<Moniker, Arc<HierarchyMatcher>>> {
+    pub fn static_selectors_matchers(
+        &self,
+    ) -> Option<HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>> {
         if self.static_selectors.is_some() {
             // TODO(fxbug.dev/78871): can we avoid cloning here? This clone is not super expensive
             // as it'll be just cloning arcs, but we could be more efficient here.

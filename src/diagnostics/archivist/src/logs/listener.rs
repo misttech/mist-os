@@ -224,8 +224,7 @@ pub enum ListenerError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{events::types::ComponentIdentifier, identity::ComponentIdentity};
-
+    use crate::identity::ComponentIdentity;
     use diagnostics_message::{fx_log_packet_t, LoggerMessage, METADATA_SIZE};
     use fidl::endpoints::ServerEnd;
     use fidl_fuchsia_logger::LogLevelFilter;
@@ -233,6 +232,7 @@ mod tests {
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
     use libc::c_char;
+    use moniker::ExtendedMoniker;
     use std::convert::TryFrom;
 
     #[fuchsia::test]
@@ -366,8 +366,8 @@ mod tests {
     }
 
     fn get_test_identity() -> ComponentIdentity {
-        ComponentIdentity::from_identifier_and_url(
-            ComponentIdentifier::parse_from_moniker("./fake-test-env/bleebloo").unwrap(),
+        ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./fake-test-env/bleebloo").unwrap(),
             "fuchsia-pkg://fuchsia.com/testing123#test-component.cm",
         )
     }

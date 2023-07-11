@@ -321,7 +321,7 @@ pub struct PopulatedInspectDataContainer {
     pub identity: Arc<ComponentIdentity>,
     /// Vector of all the snapshots of inspect hierarchies under
     /// the diagnostics directory of the component identified by
-    /// relative_moniker, along with the metadata needed to populate
+    /// moniker, along with the metadata needed to populate
     /// this snapshot's diagnostics schema.
     pub snapshot: SnapshotData,
     /// Optional hierarchy matcher. If unset, the reader is running
@@ -381,7 +381,7 @@ impl State {
                     None => {
                         self.global_stats
                             .record_component_duration(
-                                self.unpopulated.identity.relative_moniker.to_string(),
+                                self.unpopulated.identity.moniker.to_string(),
                                 self.elapsed_time + (zx::Time::get_monotonic() - start_time),
                             )
                             .await;
@@ -471,7 +471,7 @@ impl UnpopulatedInspectDataContainer {
                 None => fut.boxed(),
                 Some(timeout) => fut
                     .on_timeout((timeout - elapsed_time).after_now(), move || {
-                        warn!(identity = ?unpopulated_for_timeout.identity.relative_moniker,
+                        warn!(identity = ?unpopulated_for_timeout.identity.moniker,
                             "{}", &*TIMEOUT_MESSAGE);
                         global_stats.add_timeout();
                         let result = PopulatedInspectDataContainer {

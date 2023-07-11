@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    identity::ComponentIdentity,
+    identity::{ComponentIdentity, MonikerHelper},
     logs::{
         budget::BudgetHandle,
         buffer::{ArcList, LazyItem},
@@ -107,7 +107,7 @@ impl LogsArtifactsContainer {
         budget: BudgetHandle,
     ) -> Self {
         let stats = LogStreamStats::default()
-            .with_inspect(parent_node, identity.relative_moniker.to_string())
+            .with_inspect(parent_node, identity.moniker.to_string())
             .expect("failed to attach component log stats");
         stats.set_url(&identity.url);
         let new = Self {
@@ -409,11 +409,11 @@ impl LogsArtifactsContainer {
         let mut new_interest = FidlInterest::default();
         let mut remove_interest = FidlInterest::default();
         for selector in interest_selectors {
-            if selectors::match_moniker_against_component_selector(
-                self.identity.relative_moniker.iter(),
-                &selector.selector,
-            )
-            .unwrap_or_default()
+            if self
+                .identity
+                .moniker
+                .matches_component_selector(&selector.selector)
+                .unwrap_or_default()
             {
                 new_interest = selector.interest.clone();
                 // If there are more matches, ignore them, we'll pick the first match.
@@ -422,11 +422,7 @@ impl LogsArtifactsContainer {
         }
 
         if let Some(previous_selector) = previous_selectors.iter().find(|s| {
-            selectors::match_moniker_against_component_selector(
-                self.identity.relative_moniker.iter(),
-                &s.selector,
-            )
-            .unwrap_or_default()
+            self.identity.moniker.matches_component_selector(&s.selector).unwrap_or_default()
         }) {
             remove_interest = previous_selector.interest.clone();
         }
@@ -478,11 +474,11 @@ impl LogsArtifactsContainer {
     /// requested interests for all control handles.
     pub async fn reset_interest(&self, interest_selectors: &[LogInterestSelector]) {
         for selector in interest_selectors {
-            if selectors::match_moniker_against_component_selector(
-                self.identity.relative_moniker.iter(),
-                &selector.selector,
-            )
-            .unwrap_or_default()
+            if self
+                .identity
+                .moniker
+                .matches_component_selector(&selector.selector)
+                .unwrap_or_default()
             {
                 let mut state = self.state.lock().await;
                 state
@@ -646,14 +642,12 @@ fn compare_fidl_interest(a: &FidlInterest, b: &FidlInterest) -> Ordering {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        events::types::{ComponentIdentifier, MonikerSegment},
-        logs::budget::BudgetManager,
-    };
+    use crate::logs::budget::BudgetManager;
     use fidl_fuchsia_diagnostics::{ComponentSelector, Severity, StringSelector};
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
     use fuchsia_async::Duration;
     use futures::channel::mpsc::UnboundedReceiver;
+    use moniker::ExtendedMoniker;
 
     async fn initialize_container(
     ) -> (Arc<LogsArtifactsContainer>, LogSinkProxy, UnboundedReceiver<Task<()>>) {
@@ -662,11 +656,8 @@ mod tests {
         let budget_manager = BudgetManager::new(0, snd);
         let container = Arc::new(
             LogsArtifactsContainer::new(
-                Arc::new(ComponentIdentity::from_identifier_and_url(
-                    ComponentIdentifier::Moniker(vec![
-                        MonikerSegment { name: "foo".into(), collection: None },
-                        MonikerSegment { name: "bar".into(), collection: None },
-                    ]),
+                Arc::new(ComponentIdentity::new(
+                    ExtendedMoniker::parse_str("/foo/bar").unwrap(),
                     "fuchsia-pkg://test",
                 )),
                 std::iter::empty(),

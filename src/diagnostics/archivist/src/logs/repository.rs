@@ -393,10 +393,11 @@ impl MultiplexerBroker {
 mod tests {
     use {
         super::*,
-        crate::{events::types::ComponentIdentifier, logs::stored_message::StoredMessage},
+        crate::logs::stored_message::StoredMessage,
         diagnostics_log_encoding::{
             encode::Encoder, Argument, Record, Severity as StreamSeverity, Value,
         },
+        moniker::ExtendedMoniker,
         selectors::{self, FastError},
         std::{io::Cursor, time::Duration},
     };
@@ -405,14 +406,14 @@ mod tests {
     async fn data_repo_filters_logs_by_selectors() {
         let repo = LogsRepository::default().await;
         let foo_container = repo
-            .get_log_container(Arc::new(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::parse_from_moniker("./foo").unwrap(),
+            .get_log_container(Arc::new(ComponentIdentity::new(
+                ExtendedMoniker::parse_str("./foo").unwrap(),
                 "fuchsia-pkg://foo",
             )))
             .await;
         let bar_container = repo
-            .get_log_container(Arc::new(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::parse_from_moniker("./bar").unwrap(),
+            .get_log_container(Arc::new(ComponentIdentity::new(
+                ExtendedMoniker::parse_str("./bar").unwrap(),
                 "fuchsia-pkg://bar",
             )))
             .await;

@@ -22,9 +22,7 @@ pub use debuglog::{convert_debuglog_to_log_message, KernelDebugLog};
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        events::types::ComponentIdentifier, identity::ComponentIdentity, logs::testing::*,
-    };
+    use crate::{identity::ComponentIdentity, logs::testing::*};
     use diagnostics_data::{
         LegacySeverity, DROPPED_LABEL, MESSAGE_LABEL, PID_LABEL, TAG_LABEL, TID_LABEL,
     };
@@ -32,6 +30,7 @@ mod tests {
     use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMessage};
     use fuchsia_inspect::{assert_data_tree, testing::AnyProperty};
     use fuchsia_zircon as zx;
+    use moniker::ExtendedMoniker;
     use std::sync::Arc;
 
     #[fuchsia::test]
@@ -257,17 +256,15 @@ mod tests {
     async fn attributed_inspect_two_streams_different_identities() {
         let mut harness = TestHarness::with_retained_sinks().await;
 
-        let log_reader1 =
-            harness.create_default_reader(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::parse_from_moniker("./foo").unwrap(),
-                "http://foo.com",
-            ));
+        let log_reader1 = harness.create_default_reader(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./foo").unwrap(),
+            "http://foo.com",
+        ));
 
-        let log_reader2 =
-            harness.create_default_reader(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::parse_from_moniker("./bar").unwrap(),
-                "http://bar.com",
-            ));
+        let log_reader2 = harness.create_default_reader(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./bar").unwrap(),
+            "http://bar.com",
+        ));
 
         attributed_inspect_two_streams_different_identities_by_reader!(
             harness,
@@ -293,11 +290,10 @@ mod tests {
     async fn attributed_inspect_two_mixed_streams_different_identities() {
         let mut harness = TestHarness::with_retained_sinks().await;
         let log_reader1 = harness.create_event_stream_reader("./foo", "http://foo.com");
-        let log_reader2 =
-            harness.create_default_reader(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::parse_from_moniker("./bar").unwrap(),
-                "http://bar.com",
-            ));
+        let log_reader2 = harness.create_default_reader(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./bar").unwrap(),
+            "http://bar.com",
+        ));
 
         attributed_inspect_two_streams_different_identities_by_reader!(
             harness,
@@ -623,7 +619,7 @@ mod tests {
             klog_stats_tree,
             root: contains {
                 log_sources: {
-                    klog: {
+                    "klog": {
                         url: "fuchsia-boot://kernel",
                         last_timestamp: AnyProperty,
                         sockets_closed: 0u64,

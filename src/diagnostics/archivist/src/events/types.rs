@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    events::error::{EventError, MonikerError},
-    identity::ComponentIdentity,
-};
+use crate::{events::error::EventError, identity::ComponentIdentity};
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::prelude::*;
 use fidl_fuchsia_component as fcomponent;
@@ -13,43 +10,9 @@ use fidl_fuchsia_inspect as finspect;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_logger as flogger;
 use fidl_table_validation::ValidFidlTable;
-use flyweights::FlyStr;
 use fuchsia_zircon as zx;
-use std::{convert::TryFrom, ops::Deref, sync::Arc};
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Moniker(Vec<FlyStr>);
-
-impl Deref for Moniker {
-    type Target = Vec<FlyStr>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for Moniker {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (i, segment) in self.0.iter().enumerate() {
-            write!(f, "{segment}")?;
-            if i != self.0.len() - 1 {
-                write!(f, "/")?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl From<Vec<&str>> for Moniker {
-    fn from(other: Vec<&str>) -> Moniker {
-        Moniker(other.into_iter().map(|s| s.into()).collect())
-    }
-}
-
-impl From<Vec<String>> for Moniker {
-    fn from(other: Vec<String>) -> Moniker {
-        Moniker(other.into_iter().map(FlyStr::from).collect())
-    }
-}
+use moniker::ExtendedMoniker;
+use std::{convert::TryFrom, sync::Arc};
 
 /// Event types that contain singleton data. When these events are cloned, their singleton data
 /// won't be cloned.
@@ -132,90 +95,6 @@ impl std::fmt::Debug for LogSinkRequestedPayload {
     }
 }
 
-/// A single segment in the moniker of a component.
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
-pub struct MonikerSegment {
-    /// The name of the component's collection, if any.
-    pub collection: Option<FlyStr>,
-    /// The name of the component.
-    pub name: FlyStr,
-}
-
-impl std::fmt::Display for MonikerSegment {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(collection) = &self.collection {
-            write!(f, "{collection}:")?;
-        }
-        write!(f, "{}", self.name)
-    }
-}
-
-/// Represents the ID of a component.
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
-pub enum ComponentIdentifier {
-    Moniker(Vec<MonikerSegment>),
-}
-
-impl ComponentIdentifier {
-    /// Returns the relative moniker to be used for selectors.
-    /// For legacy components (v1), this is the relative moniker with respect to the root realm.
-    pub fn relative_moniker_for_selectors(&self) -> Moniker {
-        match self {
-            Self::Moniker(segments) => {
-                if segments.is_empty() {
-                    Moniker(vec![])
-                } else {
-                    Moniker(segments.iter().map(|s| s.to_string().into()).collect())
-                }
-            }
-        }
-    }
-
-    pub fn parse_from_moniker(moniker: &str) -> Result<Self, MonikerError> {
-        if moniker == "<component_manager>" {
-            return Ok(ComponentIdentifier::Moniker(vec![MonikerSegment {
-                collection: None,
-                name: "<component_manager>".into(),
-            }]));
-        }
-
-        if moniker == "." || moniker == "./" || moniker == "/" {
-            return Ok(ComponentIdentifier::Moniker(vec![MonikerSegment {
-                collection: None,
-                name: "<root>".into(),
-            }]));
-        }
-
-        // Optionally strip a "./" or "/" prefix from the moniker string.
-        let without_root = if moniker.starts_with('.') {
-            moniker
-                .strip_prefix("./")
-                .ok_or_else(|| MonikerError::InvalidMonikerPrefix(moniker.to_string()))?
-        } else if moniker.starts_with('/') {
-            moniker
-                .strip_prefix('/')
-                .ok_or_else(|| MonikerError::InvalidMonikerPrefix(moniker.to_string()))?
-        } else {
-            moniker
-        };
-
-        let mut segments = vec![];
-        for raw_segment in without_root.split('/') {
-            let mut parts = raw_segment.split(':');
-            let segment = match (parts.next(), parts.next()) {
-                // we have a component name and a collection
-                (Some(c), Some(n)) => MonikerSegment { collection: Some(c.into()), name: n.into() },
-                // we have a component name
-                (Some(n), None) => MonikerSegment { collection: None, name: n.into() },
-                _ => return Err(MonikerError::InvalidSegment(raw_segment.to_string())),
-            };
-            segments.push(segment);
-        }
-
-        Ok(ComponentIdentifier::Moniker(segments))
-    }
-}
-
 #[derive(Debug, ValidFidlTable)]
 #[fidl_table_src(fcomponent::EventHeader)]
 pub struct ValidatedEventHeader {
@@ -239,8 +118,8 @@ impl TryFrom<fcomponent::Event> for Event {
 
     fn try_from(event: fcomponent::Event) -> Result<Event, Self::Error> {
         if let Ok(event) = ValidatedEvent::try_from(event) {
-            let identity = ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::parse_from_moniker(&event.header.moniker)?,
+            let identity = ComponentIdentity::new(
+                ExtendedMoniker::parse_str(&event.header.moniker)?,
                 &event.header.component_url,
             );
 

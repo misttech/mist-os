@@ -5,6 +5,7 @@
 use crate::events::types::Event;
 use fidl_fuchsia_component as fcomponent;
 use futures::channel::mpsc;
+use moniker::MonikerError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -27,12 +28,6 @@ pub enum EventError {
     #[error("Error converting node to directory: {0:?}")]
     NodeToDirectory(#[source] anyhow::Error),
 
-    #[error("couldn't parse a moniker we received")]
-    ParsingMoniker {
-        #[from]
-        source: MonikerError,
-    },
-
     #[error("received an unknown event result {0:?}")]
     UnknownResult(fcomponent::EventPayload),
 
@@ -44,16 +39,7 @@ pub enum EventError {
 
     #[error(transparent)]
     SendError(#[from] mpsc::TrySendError<Event>),
-}
 
-#[derive(Debug, Error)]
-pub enum MonikerError {
-    #[error("couldn't parse `{0}` as a moniker due to incorrect prefix, expected `./`")]
-    InvalidMonikerPrefix(String),
-
-    #[error(
-        "moniker segment `{0}` couldn't be parsed, \
-                        expected either COLLECTION:NAME:INSTANCE or NAME:INSTANCE"
-    )]
-    InvalidSegment(String),
+    #[error(transparent)]
+    Moniker(#[from] MonikerError),
 }

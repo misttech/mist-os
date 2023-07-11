@@ -5,7 +5,6 @@
 // Read debug logs, convert them to LogMessages and serve them.
 
 use crate::{
-    events::types::ComponentIdentifier,
     identity::ComponentIdentity,
     logs::{error::LogsError, stored_message::StoredMessage},
 };
@@ -18,15 +17,13 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon as zx;
 use futures::stream::{unfold, Stream, TryStreamExt};
 use lazy_static::lazy_static;
+use moniker::ExtendedMoniker;
 use std::sync::Arc;
 
 pub const KERNEL_URL: &str = "fuchsia-boot://kernel";
 lazy_static! {
     pub static ref KERNEL_IDENTITY: Arc<ComponentIdentity> = {
-        Arc::new(ComponentIdentity::from_identifier_and_url(
-            ComponentIdentifier::parse_from_moniker("./klog").unwrap(),
-            KERNEL_URL,
-        ))
+        Arc::new(ComponentIdentity::new(ExtendedMoniker::parse_str("./klog").unwrap(), KERNEL_URL))
     };
 }
 

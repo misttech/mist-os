@@ -326,10 +326,7 @@ impl EventStreamLogger {
         // TODO(fxbug.dev/92374): leverage string references for the `event_name`.
         inspect_log!(self.component_log_node,
             "event" => event_name,
-            "moniker" => match &identity.instance_id {
-                Some(instance_id) => format!("{}:{}", identity.relative_moniker, instance_id),
-                None => identity.relative_moniker.to_string(),
-            }
+            "moniker" => identity.moniker.to_string(),
         );
     }
 }
@@ -380,7 +377,6 @@ pub trait EventProducer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::events::types::ComponentIdentifier;
     use assert_matches::assert_matches;
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_inspect::InspectSinkMarker;
@@ -392,15 +388,15 @@ mod tests {
     use fuchsia_zircon::AsHandleRef;
     use futures::{lock::Mutex, FutureExt, SinkExt};
     use lazy_static::lazy_static;
+    use moniker::ExtendedMoniker;
 
     const TEST_URL: &str = "NO-OP URL";
     const FAKE_TIMESTAMP: i64 = 5;
     lazy_static! {
-        static ref IDENTITY: Arc<ComponentIdentity> =
-            Arc::new(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::parse_from_moniker("./a/b").unwrap(),
-                TEST_URL
-            ));
+        static ref IDENTITY: Arc<ComponentIdentity> = Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./a/b").unwrap(),
+            TEST_URL
+        ));
     }
 
     #[derive(Default)]
@@ -730,10 +726,7 @@ mod tests {
         });
 
         let identity = |moniker| {
-            Arc::new(ComponentIdentity::from_identifier_and_url(
-                ComponentIdentifier::parse_from_moniker(moniker).unwrap(),
-                TEST_URL,
-            ))
+            Arc::new(ComponentIdentity::new(ExtendedMoniker::parse_str(moniker).unwrap(), TEST_URL))
         };
 
         producer1.emit(EventType::DiagnosticsReady, identity("./a")).await;

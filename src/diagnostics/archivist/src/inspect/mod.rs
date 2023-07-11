@@ -6,6 +6,7 @@ use {
     crate::{
         accessor::PerformanceConfig,
         diagnostics::BatchIteratorConnectionStats,
+        identity::MonikerHelper,
         inspect::container::{ReadSnapshot, SnapshotData, UnpopulatedInspectDataContainer},
         moniker_rewriter::OutputRewriter,
     },
@@ -326,13 +327,7 @@ impl ReaderServer {
         // and filtering it using the provided selector regular expressions. Each filtered
         // inspect hierarchy is then added to an accumulator as a HierarchyData to be converted
         // into a JSON string and returned.
-        let sanitized_moniker = pumped_inspect_data
-            .identity
-            .relative_moniker
-            .iter()
-            .map(|s| selectors::sanitize_string_for_selectors(s))
-            .collect::<Vec<_>>()
-            .join("/");
+        let sanitized_moniker = pumped_inspect_data.identity.moniker.sanitized();
         let sanitized_moniker = match &self.output_rewriter {
             None => sanitized_moniker,
             Some(rewriter) => rewriter.rewrite_moniker(sanitized_moniker),
@@ -340,17 +335,17 @@ impl ReaderServer {
 
         if let Some(configured_selectors) = &self.selectors {
             client_selectors = {
-                let matching_selectors = selectors::match_component_moniker_against_selectors(
-                    &pumped_inspect_data.identity.relative_moniker,
-                    configured_selectors.as_slice(),
-                )
-                .unwrap_or_else(|err| {
-                    error!(
-                        moniker = ?pumped_inspect_data.identity.relative_moniker, ?err,
-                        "Failed to evaluate client selectors",
-                    );
-                    Vec::new()
-                });
+                let matching_selectors = pumped_inspect_data
+                    .identity
+                    .moniker
+                    .match_against_selectors(configured_selectors.as_slice())
+                    .unwrap_or_else(|err| {
+                        error!(
+                            moniker = ?pumped_inspect_data.identity.moniker, ?err,
+                            "Failed to evaluate client selectors",
+                        );
+                        Vec::new()
+                    });
 
                 if matching_selectors.is_empty() {
                     None
@@ -401,7 +396,7 @@ mod tests {
             diagnostics::AccessorStats,
             events::{
                 router::EventConsumer,
-                types::{ComponentIdentifier, DiagnosticsReadyPayload, Event, EventPayload},
+                types::{DiagnosticsReadyPayload, Event, EventPayload},
             },
             identity::ComponentIdentity,
             inspect::repository::InspectRepository,
@@ -418,6 +413,7 @@ mod tests {
         fuchsia_zircon::Peered,
         futures::future::join_all,
         futures::{FutureExt, StreamExt},
+        moniker::ExtendedMoniker,
         selectors::{self, VerboseError},
         serde_json::json,
     };
@@ -753,8 +749,7 @@ mod tests {
                         let full_path = format!("{path}/{dir}");
                         let proxy = collector::find_directory_proxy(&full_path).await.unwrap();
                         let unique_cid =
-                            ComponentIdentifier::parse_from_moniker(&format!("./component_{dir}"))
-                                .unwrap();
+                            ExtendedMoniker::parse_str(&format!("./component_{dir}")).unwrap();
                         (unique_cid, proxy)
                     }))
                     .await;
@@ -764,8 +759,7 @@ mod tests {
                     Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
 
                 for (cid, proxy) in id_and_directory_proxy {
-                    let identity =
-                        Arc::new(ComponentIdentity::from_identifier_and_url(cid, TEST_URL));
+                    let identity = Arc::new(ComponentIdentity::new(cid, TEST_URL));
                     Arc::clone(&inspect_repo)
                         .handle(Event {
                             timestamp: zx::Time::get_monotonic(),
@@ -841,7 +835,7 @@ mod tests {
 
         // The absolute moniker here is made up since the selector is a glob
         // selector, so any path would match.
-        let component_id = ComponentIdentifier::parse_from_moniker("./test_component").unwrap();
+        let component_id = ExtendedMoniker::parse_str("./test_component").unwrap();
         let inspector = Inspector::default();
         let root = inspector.root();
         let test_archive_accessor_node = root.create_child("test_archive_accessor_node");
@@ -910,7 +904,7 @@ mod tests {
 
         let inspector_arc = Arc::new(inspector);
 
-        let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
+        let identity = Arc::new(ComponentIdentity::new(component_id, TEST_URL));
         Arc::clone(&inspect_repo)
             .handle(Event {
                 timestamp: zx::Time::get_monotonic(),

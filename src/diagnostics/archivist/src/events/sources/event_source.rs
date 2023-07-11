@@ -63,6 +63,7 @@ pub mod tests {
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
     use futures::{channel::mpsc::UnboundedSender, StreamExt};
+    use moniker::ExtendedMoniker;
     use std::collections::BTreeSet;
 
     #[fuchsia::test]
@@ -117,8 +118,8 @@ pub mod tests {
             })
             .expect("send diagnostics ready event ok");
 
-        let expected_component_id = ComponentIdentifier::parse_from_moniker("./foo/bar").unwrap();
-        let expected_identity = ComponentIdentity::from_identifier_and_url(
+        let expected_component_id = ExtendedMoniker::parse_str("./foo/bar").unwrap();
+        let expected_identity = ComponentIdentity::new(
             expected_component_id,
             "fuchsia-pkg://fuchsia.com/foo#meta/bar.cm",
         );

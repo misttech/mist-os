@@ -5,9 +5,9 @@
 use crate::{
     events::{
         router::EventConsumer,
-        types::{DiagnosticsReadyPayload, Event, EventPayload, Moniker},
+        types::{DiagnosticsReadyPayload, Event, EventPayload},
     },
-    identity::ComponentIdentity,
+    identity::{ComponentIdentity, MonikerHelper},
     inspect::container::{
         InspectArtifactsContainer, InspectHandle, UnpopulatedInspectDataContainer,
     },
@@ -21,6 +21,7 @@ use fuchsia_async as fasync;
 use fuchsia_zircon::Koid;
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
+use moniker::ExtendedMoniker;
 use std::{
     collections::HashMap,
     sync::{Arc, Weak},
@@ -57,7 +58,7 @@ impl InspectRepository {
     pub async fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
-        moniker_to_static_matcher_map: Option<HashMap<Moniker, Arc<HierarchyMatcher>>>,
+        moniker_to_static_matcher_map: Option<HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>>,
     ) -> Vec<UnpopulatedInspectDataContainer> {
         self.inner
             .read()
@@ -102,7 +103,7 @@ impl InspectRepository {
 
                         for pipeline_weak in &this.pipelines {
                             if let Some(pipeline) = pipeline_weak.upgrade() {
-                                pipeline.write().await.remove(&identity_clone.relative_moniker);
+                                pipeline.write().await.remove(&identity_clone.moniker);
                             }
                         }
                     }
@@ -115,14 +116,12 @@ impl InspectRepository {
         // to eagerly bucket static selectors based on that component's moniker.
         for pipeline_weak in self.pipelines.iter() {
             if let Some(pipeline) = pipeline_weak.upgrade() {
-                pipeline
-                    .write()
-                    .await
-                    .add_inspect_artifacts(&identity.relative_moniker)
-                    .unwrap_or_else(|e| {
+                pipeline.write().await.add_inspect_artifacts(&identity.moniker).unwrap_or_else(
+                    |e| {
                         warn!(%identity, ?e,
                             "Failed to add inspect artifacts to pipeline wrapper");
-                    });
+                    },
+                );
             }
         }
     }
@@ -249,13 +248,13 @@ impl InspectRepositoryInner {
     async fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
-        moniker_to_static_matcher_map: Option<HashMap<Moniker, Arc<HierarchyMatcher>>>,
+        moniker_to_static_matcher_map: Option<HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>>,
     ) -> Vec<UnpopulatedInspectDataContainer> {
         let mut containers = vec![];
         for (identity, container) in self.diagnostics_containers.iter() {
             let optional_hierarchy_matcher = match &moniker_to_static_matcher_map {
                 Some(map) => {
-                    match map.get(&identity.relative_moniker) {
+                    match map.get(&identity.moniker) {
                         Some(inspect_matcher) => Some(Arc::clone(inspect_matcher)),
                         // Return early if there were static selectors, and none were for this
                         // moniker.
@@ -268,14 +267,9 @@ impl InspectRepositoryInner {
             // Verify that the dynamic selectors contain an entry that applies to
             // this moniker as well.
             if !match component_selectors {
-                Some(component_selectors) => component_selectors.iter().any(|s| {
-                    selectors::match_component_moniker_against_selector(
-                        &identity.relative_moniker,
-                        s,
-                    )
-                    .ok()
-                    .unwrap_or(false)
-                }),
+                Some(component_selectors) => component_selectors
+                    .iter()
+                    .any(|s| matches!(identity.moniker.matches_selector(s), Ok(true))),
                 None => true,
             } {
                 continue;
@@ -311,10 +305,10 @@ impl InspectRepositoryInner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::events::types::ComponentIdentifier;
     use fidl_fuchsia_io as fio;
     use fuchsia_zircon as zx;
     use fuchsia_zircon::DurationNum;
+    use moniker::ExtendedMoniker;
     use selectors::{self, FastError};
 
     const TEST_URL: &str = "fuchsia-pkg://test";
@@ -322,8 +316,8 @@ mod tests {
     #[fuchsia::test]
     async fn inspect_repo_disallows_duplicated_dirs() {
         let inspect_repo = Arc::new(InspectRepository::default());
-        let component_id = ComponentIdentifier::parse_from_moniker("./a/b/foo").unwrap();
-        let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
+        let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
+        let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
 
         let (proxy, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
@@ -357,8 +351,8 @@ mod tests {
     #[fuchsia::test]
     async fn repo_removes_entries_when_inspect_is_disconnected() {
         let data_repo = Arc::new(InspectRepository::default());
-        let component_id = ComponentIdentifier::parse_from_moniker("./a/b/foo").unwrap();
-        let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
+        let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
+        let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
         {
@@ -385,8 +379,8 @@ mod tests {
         let static_selectors_opt = Some(vec![selector]);
         let pipeline = Arc::new(Pipeline::for_test(static_selectors_opt));
         let data_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
-        let component_id = ComponentIdentifier::parse_from_moniker("./a/b/foo").unwrap();
-        let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
+        let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
+        let identity = Arc::new(ComponentIdentity::new(moniker.clone(), TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
         {
@@ -405,7 +399,7 @@ mod tests {
                 .await
                 .static_selectors_matchers()
                 .unwrap()
-                .get(&Moniker::from(vec!["a", "b", "foo"]))
+                .get(&moniker)
                 .is_some())
         }
 
@@ -415,20 +409,14 @@ mod tests {
             fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
         }
 
-        assert!(pipeline
-            .read()
-            .await
-            .static_selectors_matchers()
-            .unwrap()
-            .get(&Moniker::from(vec!["a", "b", "foo"]))
-            .is_none())
+        assert!(pipeline.read().await.static_selectors_matchers().unwrap().get(&moniker).is_none())
     }
 
     #[fuchsia::test]
     async fn data_repo_filters_inspect_by_selectors() {
         let data_repo = Arc::new(InspectRepository::default());
-        let component_id = ComponentIdentifier::parse_from_moniker("./a/b/foo").unwrap();
-        let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
+        let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
+        let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
 
         Arc::clone(&data_repo)
             .handle(Event {
@@ -444,9 +432,8 @@ mod tests {
             })
             .await;
 
-        let component_id2 = ComponentIdentifier::parse_from_moniker("./a/b/foo2").unwrap();
-        let identity2 =
-            Arc::new(ComponentIdentity::from_identifier_and_url(component_id2, TEST_URL));
+        let moniker2 = ExtendedMoniker::parse_str("./a/b/foo2").unwrap();
+        let identity2 = Arc::new(ComponentIdentity::new(moniker2, TEST_URL));
 
         Arc::clone(&data_repo)
             .handle(Event {
