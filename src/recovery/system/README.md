@@ -30,15 +30,15 @@ The easiest way to run recovery on hardware is to boot the newly built
 recovery image with fastboot:
 
 ```sh
-$ cat out/default/obj/build/images/recovery/recovery-eng/recovery-eng.{zbi,vbmeta} > \
-      out/default/obj/build/images/recovery/recovery-eng/recovery-eng.boot
-$ fastboot boot out/default/obj/build/images/recovery/recovery-eng/recovery-eng.boot
+$ cat out/default/obj/build/images/recovery/recovery-eng/fuchsia.{zbi,vbmeta} > \
+      out/default/obj/build/images/recovery/recovery-eng/fuchsia.boot
+$ fastboot boot out/default/obj/build/images/recovery/recovery-eng/fuchsia.boot
 ```
 
 Alternatively, you can netboot a device into a newly built recovery image:
 
 ```sh
-$ out/default/host-tools/bootserver --board-name device-name --boot out/default/obj/build/images/recovery/recovery-eng/recovery-eng.zbi
+$ out/default/host-tools/bootserver --board-name device-name --boot out/default/obj/build/images/recovery/recovery-eng/fuchsia.zbi
 ```
 where `device-name` can be found with `fx list-devices`.
 
@@ -52,8 +52,8 @@ After building the recovery image, you can flash it via the following commands:
 ```sh
 fastboot erase vbmeta_a && \
   fastboot erase vbmeta_b && \
-  fastboot flash vbmeta_r recovery-eng.vbmeta && \
-  fastboot flash zircon_r recovery-eng.zbi && \
+  fastboot flash vbmeta_r fuchsia.vbmeta && \
+  fastboot flash zircon_r fuchsia.zbi && \
   fastboot stage /home/fuchsia/.ssh/authorized_keys oem add-staged-bootloader-file ssh.authorized_keys && \
   fastboot continue
 ```
@@ -89,7 +89,7 @@ make_vbmeta_image \
 --key src/firmware/avb_keys/vim3/vim3-dev-key/vim3_devkey_atx_psk.pem \
 --algorithm SHA512_RSA4096 \
 --public_key_metadata src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin \
---include_descriptors_from_image out/default/obj/build/images/recovery/recovery-eng/recovery-eng.vbmeta \
+--include_descriptors_from_image out/default/obj/build/images/recovery/recovery-eng/fuchsia.vbmeta \
 --prop_from_file zbi_image_args:out/default/recovery-omaha.zbi
 ```
 4. Flash custom vbmeta file

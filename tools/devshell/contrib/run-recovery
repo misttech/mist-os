@@ -17,5 +17,5 @@ qemu_dir="${PREBUILT_QEMU_DIR}/bin"
   -a "${FUCHSIA_ARCH}" \
   -q "${qemu_dir}" \
   -t "${FUCHSIA_BUILD_DIR}/$(fx-get-qemu-kernel)" \
-  -z "${FUCHSIA_BUILD_DIR}/obj/build/images/recovery/recovery-eng/recovery-eng.zbi" \
+  -z "${FUCHSIA_BUILD_DIR}/obj/build/images/recovery/recovery-eng/fuchsia.zbi" \
   "$@"

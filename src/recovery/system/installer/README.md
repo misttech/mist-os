@@ -11,7 +11,7 @@ You can build the recovery workstation isntaller image using the following comma
 $ fx build build/images/recovery
 ```
 
-This command builds an additional `recovery-installer.zbi` files in
+This command builds an additional `fuchsia.zbi` files in
 `obj/build/images/recovery/recovery-installer`
 
 ## Running the installer
@@ -20,7 +20,7 @@ A method of running the workstation installer on hardware is to netboot a device
 built recovery image:
 
 ```sh
-$ out/default/host-tools/bootserver --board-name device-name --boot out/default/obj/build/images/recovery/recovery-installer/recovery-installer.zbi
+$ out/default/host-tools/bootserver --board-name device-name --boot out/default/obj/build/images/recovery/recovery-installer/fuchsia.zbi
 ```
 where `device-name` can be found with `fx list-devices`.
 

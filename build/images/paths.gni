@@ -140,9 +140,12 @@ files = {
   if (use_bazel_images_only) {
     # GN and Bazel assembly should share the same recovry image config, so use
     # GN's recovery_label to determine Bazel's recovery image name.
-    _recovery_name = get_label_info(recovery_label, "name")
+    if (recovery_is_recovery_eng || recovery_is_recovery_fastboot) {
+      _recovery_name = "fuchsia"
+    } else {
+      _recovery_name = get_label_info(recovery_label, "name")
+    }
     _recovery_outdir = images_outdir + "/system_r"
-
     recovery_zbi = "${_recovery_outdir}/${_recovery_name}.${_image_suffix}"
     recovery_vbmeta = "${_recovery_outdir}/${_recovery_name}.vbmeta"
   } else {
@@ -153,12 +156,12 @@ files = {
       recovery_vbmeta = "${_recovery_outdir}/zedboot.vbmeta"
     } else if (recovery_is_recovery_eng) {
       _recovery_outdir = root_out_dir
-      recovery_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-eng/recovery-eng.${_image_suffix}"
-      recovery_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-eng/recovery-eng.vbmeta"
+      recovery_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-eng/fuchsia.${_image_suffix}"
+      recovery_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-eng/fuchsia.vbmeta"
     } else if (recovery_is_recovery_fastboot) {
       _recovery_outdir = root_out_dir
-      recovery_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-fastboot/recovery-fastboot.${_image_suffix}"
-      recovery_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-fastboot/recovery-fastboot.vbmeta"
+      recovery_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-fastboot/fuchsia.${_image_suffix}"
+      recovery_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-fastboot/fuchsia.vbmeta"
     } else {
       # The standard recovery image and vbmeta locations.
       _recovery_outdir = root_out_dir
@@ -179,8 +182,8 @@ files = {
         "${root_out_dir}/" + rebase_path(recovery_vbmeta, _recovery_outdir)
   }
 
-  installer_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-installer/recovery-installer.${_image_suffix}"
-  installer_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-installer/recovery-installer.vbmeta"
+  installer_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-installer/fuchsia.${_image_suffix}"
+  installer_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-installer/fuchsia.vbmeta"
 
   qemu_kernel = qemu_boot_shim.path
 }

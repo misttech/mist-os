@@ -18,9 +18,9 @@ if (is_host) {
   host_test_data("test_data") {
     out_dir = get_label_info(":anything($target_toolchain)", "target_out_dir")
     sources = [
-      "${out_dir}/recovery-eng/recovery-eng.zbi",
-      "${out_dir}/recovery-fdr/recovery-fdr.zbi",
-      "${out_dir}/recovery-installer/recovery-installer.zbi",
+      "${out_dir}/recovery-eng/fuchsia.zbi",
+      "${out_dir}/recovery-fdr/fuchsia.zbi",
+      "${out_dir}/recovery-installer/fuchsia.zbi",
     ]
     deps = [
       ":recovery-eng($target_toolchain)",
@@ -37,8 +37,17 @@ if (is_fuchsia) {
   # Parameters shared between recovery-eng and recovery-installer
   recovery_base = {
     testonly = true
+    image_name = "fuchsia"
     generate_fvm = !bootfs_only && !fxfs_blob
     generate_fxfs = !bootfs_only && fxfs_blob
+
+    if (generate_fvm) {
+      assembly_fvm_slice_size = fvm_slice_size
+      if (max_blob_contents_size != false) {
+        blobfs_maximum_contents_size = max_blob_contents_size
+      }
+    }
+
     ramdisk_in_zbi = true
 
     include_component_id_index = true
@@ -242,6 +251,7 @@ if (is_fuchsia) {
 
   assembled_system("recovery-eng") {
     forward_variables_from(recovery_base, "*")
+    namespace = "recovery-eng"
     allow_eng_platform_bundle_use = true
     base_packages = recovery_eng_packages
     core_realm_definition = ":core-eng"
@@ -272,6 +282,7 @@ if (is_fuchsia) {
   # A minimal recovery image that runs userspace fastboot on tcp.
   assembled_system("recovery-fastboot") {
     forward_variables_from(recovery_base, "*")
+    namespace = "recovery-fastboot"
     allow_eng_platform_bundle_use = true
     base_packages = []
     core_realm_definition = ":core-eng"
@@ -341,10 +352,21 @@ if (is_fuchsia) {
   }
 
   assembled_system("recovery-fdr") {
+    image_name = "fuchsia"
+    namespace = "recovery-fdr"
+
     base_packages = recovery_fdr_packages
     core_realm_definition = ":core"
     generate_fvm = !bootfs_only && !fxfs_blob
     generate_fxfs = !bootfs_only && fxfs_blob
+
+    if (generate_fvm) {
+      assembly_fvm_slice_size = fvm_slice_size
+      if (max_blob_contents_size != false) {
+        blobfs_maximum_contents_size = max_blob_contents_size
+      }
+    }
+
     ramdisk_in_zbi = true
 
     include_component_id_index = true
@@ -397,6 +419,7 @@ if (is_fuchsia) {
 
   assembled_system("recovery-installer") {
     forward_variables_from(recovery_base, "*")
+    namespace = "recovery-installer"
     allow_eng_platform_bundle_use = true
     base_packages = recovery_installer_packages
 
