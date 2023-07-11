@@ -245,7 +245,23 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
                 config["log.dir"] = ffx_config.logs_dir
                 config["log.level"] = "debug"
 
+            # Do not autostart the daemon if it is not running.
+            # If Fuchsia-Controller need to start a daemon then it needs to know
+            # SDK path to find FFX CLI.
+            # However, HoneyDew calls FFX CLI (and thus starts the FFX daemon)
+            # even before it instantiates Fuchsia-Controller. So tell
+            # Fuchsia-Controller to use the same daemon (by pointing to same
+            # isolate-dir and logs-dir path used to start the daemon) and set
+            # "daemon.autostart" to "false".
             config["daemon.autostart"] = "false"
+
+            # Overnet, the legacy implementation has known issues and is
+            # deprecated, but at the moment it is still active by default, for
+            # compatibility reasons. It should be disabled when those
+            # compatibility concerns are not relevant. "overnet.cso" disables
+            # legacy code in favor of its modern replacement,
+            # CSO (Circuit-Switched Overnet).
+            config["overnet.cso"] = "only"
 
             self._ctx = fuchsia_controller.Context(
                 config=config, isolate_dir=isolate_dir, target=target)

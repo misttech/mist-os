@@ -419,15 +419,20 @@ class FFX:
         if _ISOLATE_DIR:
             ffx_args.extend(["--isolate-dir", _ISOLATE_DIR.directory()])
 
+        config: Dict[str, Any] = {}
+
         # To collect FFX logs
         if _LOGS_DIR:
-            logs_config: Dict[str, Any] = {
-                "log": {
-                    "dir": _LOGS_DIR,
-                    "level": "debug"
-                }
-            }
-            ffx_args.extend(["--config", json.dumps(logs_config)])
+            config["log"] = {"dir": _LOGS_DIR, "level": "debug"}
+
+        # Overnet, the legacy implementation has known issues and is deprecated,
+        # but at the moment it is still active by default, for compatibility
+        # reasons. It should be disabled when those compatibility concerns are
+        # not relevant. "overnet.cso" disables legacy code in favor
+        # of its modern replacement, CSO (Circuit-Switched Overnet).
+        config["overnet"] = {"cso": "only"}
+
+        ffx_args.extend(["--config", json.dumps(config)])
 
         return ffx_args
 
