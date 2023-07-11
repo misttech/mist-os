@@ -226,6 +226,40 @@ fuchsia_test_package("font_provider_unit_tests") {
   validate_structured_config = false
 }
 
+## Fonts server for tests: the test fixture will supply their own tests.
+
+fuchsia_component_manifest("fonts_configurable_for_test_component_manifest") {
+  testonly = true
+  manifest = "meta/fonts.cml"
+  component_name = "fonts_configurable_for_test"
+}
+
+fuchsia_structured_config_values("fonts_configurable_for_test_config_values") {
+  testonly = true
+  cm_label = ":fonts_configurable_for_test_component_manifest"
+  values = {
+    # Tests don't need font serving diagnostics.
+    verbose_logging = false
+    font_manifest = ""
+  }
+}
+
+fuchsia_component("fonts_configurable_for_test_component") {
+  testonly = true
+  cm_label = ":fonts_configurable_for_test_component_manifest"
+  deps = [ ":font_provider" ]
+}
+
+# A font server without any bundled fonts, intended for testing only.
+# The user must route the fonts in via `config-data`.
+fuchsia_package("fonts_configurable_for_test") {
+  testonly = true
+  deps = [
+    ":fonts_configurable_for_test_component",
+    ":fonts_configurable_for_test_config_values",
+  ]
+}
+
 # Deprecated.
 # TODO(fxbug.dev/98663): Clean up after all out-of-tree dependents are fixed.
 group("open-fonts") {

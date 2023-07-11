@@ -111,5 +111,8 @@ group("chromium_test_base_deps") {
     # TODO(crbug.com/1408597): Once OOT fakes are available, this can be
     # turned into a hermetic component, or a subpackage.
     "//src/fonts:fonts_hermetic_for_test",
+
+    # A font provider without built-in font file assets.
+    "//src/fonts:fonts_configurable_for_test",
   ]
 }
