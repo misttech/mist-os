@@ -303,7 +303,7 @@ functionality, would we be navigating the same risks if we wrote the code
 ourselves? Would doing so actually produce better results, and would it be worth
 the effort of writing and maintaining that code?
 
-["Request an unsafe code review"]: #request-an-unsafe-code-review
+["Request an unsafe code review"]: #request_an_unsafe_code_review
 
 #### Verify for correctness, but don't go overboard.
 
