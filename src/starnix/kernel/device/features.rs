@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{binder::create_binders, starnix::StarnixDevice},
+    device::{binder::create_binders, starnix::create_magma_device},
     fs::{
         devtmpfs::dev_tmp_fs,
         kobject::{KObjectDeviceAttribute, KType},
@@ -58,7 +58,7 @@ pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), E
                 );
 
                 // Register a framebuffer.
-                device_registry.register_chrdev_major(kernel.framebuffer.clone(), FB_MAJOR)?;
+                device_registry.register_chrdev_major(FB_MAJOR, kernel.framebuffer.clone())?;
 
                 // Also register an input device, which can be used to read pointer events
                 // associated with the framebuffer's `View`.
@@ -69,7 +69,7 @@ pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), E
                 // TODO(quiche): When adding support for multiple input devices, ensure
                 // that the appropriate `InputFile` is associated with the appropriate
                 // `INPUT_MINOR`.
-                device_registry.register_chrdev_major(kernel.input_file.clone(), INPUT_MAJOR)?;
+                device_registry.register_chrdev_major(INPUT_MAJOR, kernel.input_file.clone())?;
             }
             "magma" => {
                 let magma_type = DeviceType::new(STARNIX_MAJOR, STARNIX_MINOR_MAGMA);
@@ -84,8 +84,13 @@ pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), E
                     KObjectDeviceAttribute::new(b"magma0", b"magma0", magma_type),
                 );
 
-                // Register the starnix device group.
-                device_registry.register_chrdev_major(StarnixDevice, STARNIX_MAJOR)?;
+                // Register the magma device.
+                device_registry.register_chrdev(
+                    STARNIX_MAJOR,
+                    STARNIX_MINOR_MAGMA,
+                    1,
+                    create_magma_device,
+                )?;
 
                 // TODO(fxb/119437): Remove after devtmpfs listens to uevent.
                 dev_tmp_fs(kernel).root().add_node_ops_dev(

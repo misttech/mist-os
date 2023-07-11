@@ -79,6 +79,7 @@ impl RemoteControllerConnector for DefaultRemoteControllerConnector {
 
 /// Device for starting a remote fuchsia component with access to the binder drivers on the starnix
 /// container.
+#[derive(Clone)]
 pub struct RemoteBinderDevice {}
 
 impl DeviceOps for RemoteBinderDevice {

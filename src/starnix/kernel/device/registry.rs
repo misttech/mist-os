@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    collections::RangeMap,
     device::loopback::create_loop_device,
     device::mem::create_mem_device,
     device::misc::create_misc_device,
@@ -18,10 +19,16 @@ use crate::{
 };
 
 use std::{
-    collections::btree_map::{BTreeMap, Entry},
+    collections::btree_map::BTreeMap,
     marker::{Send, Sync},
+    ops::Deref,
     sync::Arc,
 };
+
+use dyn_clone::{clone_trait_object, DynClone};
+
+const CHRDEV_MINOR_MAX: u32 = 256;
+const BLKDEV_MINOR_MAX: u32 = 2u32.pow(20);
 
 /// The mode or category of the device driver.
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
@@ -30,7 +37,8 @@ pub enum DeviceMode {
     Block,
 }
 
-pub trait DeviceOps: Send + Sync + 'static {
+// TODO(fxb/130452): Remove Clone in all DeviceOps impls after RangeMap refactor.
+pub trait DeviceOps: DynClone + Send + Sync + 'static {
     fn open(
         &self,
         _current_task: &CurrentTask,
@@ -40,12 +48,24 @@ pub trait DeviceOps: Send + Sync + 'static {
     ) -> Result<Box<dyn FileOps>, Errno>;
 }
 
+clone_trait_object!(DeviceOps);
+
+// TODO(fxb/130452): Remove equality comparison after RangeMap refactor.
+impl PartialEq for Box<dyn DeviceOps> {
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
+}
+impl Eq for Box<dyn DeviceOps> {}
+
 /// Allows directly using a function or closure as an implementation of DeviceOps, avoiding having
 /// to write a zero-size struct and an impl for it.
 impl<F> DeviceOps for F
 where
-    F: Send
+    F: Clone
+        + Send
         + Sync
+        + Clone
         + Fn(&CurrentTask, DeviceType, &FsNode, OpenFlags) -> Result<Box<dyn FileOps>, Errno>
         + 'static,
 {
@@ -69,29 +89,53 @@ pub trait DeviceListener: Send + Sync {
     fn on_device_event(&self, action: UEventAction, kobject: KObjectHandle, context: UEventContext);
 }
 
-#[derive(Default)]
 struct MajorDevices {
     /// Maps device major number to device implementation.
-    map: BTreeMap<u32, Box<dyn DeviceOps>>,
+    map: BTreeMap<u32, RangeMap<u32, Box<dyn DeviceOps>>>,
+    mode: DeviceMode,
 }
 
 impl MajorDevices {
-    fn register(&mut self, device: impl DeviceOps, major: u32) -> Result<(), Errno> {
-        match self.map.entry(major) {
-            Entry::Vacant(e) => {
-                e.insert(Box::new(device));
-                Ok(())
-            }
-            Entry::Occupied(_) => {
-                log_error!("major device {:?} is already registered", major);
-                error!(EINVAL)
-            }
+    fn new(mode: DeviceMode) -> Self {
+        Self { map: Default::default(), mode }
+    }
+
+    /// Register a `DeviceOps` for a range of minors [`base_minor`, `base_minor` + `minor_count`).
+    fn register(
+        &mut self,
+        major: u32,
+        base_minor: u32,
+        minor_count: u32,
+        ops: impl DeviceOps,
+    ) -> Result<(), Errno> {
+        let range = base_minor..(base_minor + minor_count);
+        let minor_map = self.map.entry(major).or_insert(RangeMap::new());
+        if minor_map.intersection(range.clone()).count() == 0 {
+            minor_map.insert(range, Box::new(ops));
+            Ok(())
+        } else {
+            log_error!("Range {:?} overlaps with existing entries in the map.", range);
+            error!(EINVAL)
         }
     }
 
-    #[allow(clippy::borrowed_box)]
-    fn get(&self, id: DeviceType) -> Result<&Box<dyn DeviceOps>, Errno> {
-        self.map.get(&id.major()).ok_or_else(|| errno!(ENODEV))
+    /// Register a `DeviceOps` for all minor devices in the `major`.
+    fn register_major(&mut self, major: u32, ops: impl DeviceOps) -> Result<(), Errno> {
+        let minor_count: u32 = match self.mode {
+            DeviceMode::Char => CHRDEV_MINOR_MAX,
+            DeviceMode::Block => BLKDEV_MINOR_MAX,
+        };
+        self.register(major, 0, minor_count, ops)
+    }
+
+    fn get(&self, id: DeviceType) -> Result<&dyn DeviceOps, Errno> {
+        match self.map.get(&id.major()) {
+            Some(minor_map) => match minor_map.get(&id.minor()) {
+                Some(entry) => Ok(entry.1.deref()),
+                None => error!(ENODEV),
+            },
+            None => error!(ENODEV),
+        }
     }
 }
 
@@ -111,9 +155,9 @@ impl DeviceRegistry {
     /// Creates a `DeviceRegistry` and populates it with common drivers such as /dev/null.
     pub fn new_with_common_devices() -> Self {
         let mut registry: DeviceRegistry = Self::default();
-        registry.register_chrdev_major(create_mem_device, MEM_MAJOR).unwrap();
-        registry.register_chrdev_major(create_misc_device, MISC_MAJOR).unwrap();
-        registry.register_blkdev_major(create_loop_device, LOOP_MAJOR).unwrap();
+        registry.register_chrdev_major(MEM_MAJOR, create_mem_device).unwrap();
+        registry.register_chrdev_major(MISC_MAJOR, create_misc_device).unwrap();
+        registry.register_blkdev_major(LOOP_MAJOR, create_loop_device).unwrap();
         registry.add_common_devices();
         registry
     }
@@ -182,20 +226,30 @@ impl DeviceRegistry {
         );
     }
 
+    pub fn register_chrdev(
+        &mut self,
+        major: u32,
+        base_minor: u32,
+        minor_count: u32,
+        ops: impl DeviceOps,
+    ) -> Result<(), Errno> {
+        self.char_devices.register(major, base_minor, minor_count, ops)
+    }
+
     pub fn register_chrdev_major(
         &mut self,
-        device: impl DeviceOps,
         major: u32,
+        device: impl DeviceOps,
     ) -> Result<(), Errno> {
-        self.char_devices.register(device, major)
+        self.char_devices.register_major(major, device)
     }
 
     pub fn register_blkdev_major(
         &mut self,
-        device: impl DeviceOps,
         major: u32,
+        device: impl DeviceOps,
     ) -> Result<(), Errno> {
-        self.block_devices.register(device, major)
+        self.block_devices.register_major(major, device)
     }
 
     pub fn register_dyn_chrdev(&mut self, device: impl DeviceOps) -> Result<DeviceType, Errno> {
@@ -258,15 +312,18 @@ impl Default for DeviceRegistry {
     fn default() -> Self {
         let mut registry = Self {
             root_kobject: KObject::new_root(),
-            char_devices: Default::default(),
-            block_devices: Default::default(),
+            char_devices: MajorDevices::new(DeviceMode::Char),
+            block_devices: MajorDevices::new(DeviceMode::Block),
             dyn_devices: Default::default(),
             next_anon_minor: 1,
             listeners: Default::default(),
             next_listener_id: 0,
             next_event_id: 0,
         };
-        registry.char_devices.map.insert(DYN_MAJOR, Box::new(Arc::clone(&registry.dyn_devices)));
+        registry
+            .char_devices
+            .register_major(DYN_MAJOR, Arc::clone(&registry.dyn_devices))
+            .expect("Failed to register DYN_MAJOR");
         registry
     }
 }
@@ -313,10 +370,10 @@ mod tests {
     #[::fuchsia::test]
     fn registry_fails_to_add_duplicate_device() {
         let mut registry = DeviceRegistry::default();
-        registry.register_chrdev_major(create_mem_device, MEM_MAJOR).expect("registers once");
-        registry.register_chrdev_major(create_mem_device, 123).expect("registers unique");
+        registry.register_chrdev_major(MEM_MAJOR, create_mem_device).expect("registers once");
+        registry.register_chrdev_major(123, create_mem_device).expect("registers unique");
         registry
-            .register_chrdev_major(create_mem_device, MEM_MAJOR)
+            .register_chrdev_major(MEM_MAJOR, create_mem_device)
             .expect_err("fail to register duplicate");
     }
 
@@ -325,7 +382,7 @@ mod tests {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let mut registry = DeviceRegistry::default();
-        registry.register_chrdev_major(create_mem_device, MEM_MAJOR).unwrap();
+        registry.register_chrdev_major(MEM_MAJOR, create_mem_device).unwrap();
 
         let node = FsNode::new_root(PanickingFsNode);
 
@@ -367,21 +424,17 @@ mod tests {
     async fn test_dynamic_misc() {
         let (_kernel, current_task) = create_kernel_and_task();
 
-        struct TestDevice;
-        impl DeviceOps for TestDevice {
-            fn open(
-                &self,
-                _current_task: &CurrentTask,
-                _id: DeviceType,
-                _node: &FsNode,
-                _flags: OpenFlags,
-            ) -> Result<Box<dyn FileOps>, Errno> {
-                Ok(Box::new(PanickingFile))
-            }
+        fn create_test_device(
+            _current_task: &CurrentTask,
+            _id: DeviceType,
+            _node: &FsNode,
+            _flags: OpenFlags,
+        ) -> Result<Box<dyn FileOps>, Errno> {
+            Ok(Box::new(PanickingFile))
         }
 
         let mut registry = DeviceRegistry::default();
-        let device_type = registry.register_dyn_chrdev(TestDevice).unwrap();
+        let device_type = registry.register_dyn_chrdev(create_test_device).unwrap();
         assert_eq!(device_type.major(), DYN_MAJOR);
 
         let node = FsNode::new_root(PanickingFsNode);
