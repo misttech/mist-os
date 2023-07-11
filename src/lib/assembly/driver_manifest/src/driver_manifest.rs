@@ -11,6 +11,14 @@ use {
     std::fs::File,
 };
 
+/// Possible driver package.
+pub enum DriverPackageType {
+    /// A base-driver package
+    Base,
+    /// A boot-driver package
+    Boot,
+}
+
 /// A driver manifest fragment.
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct DriverManifest {
@@ -55,18 +63,21 @@ impl DriverManifestBuilder {
     }
 
     /// Helper function to determine a driver's package url
-    pub fn get_package_url(path: impl AsRef<Utf8Path>) -> Result<String> {
+    pub fn get_package_url(
+        package_type: DriverPackageType,
+        path: impl AsRef<Utf8Path>,
+    ) -> Result<String> {
         // Load the PackageManifest from the given path
         let manifest = PackageManifest::try_load_from(&path).with_context(|| {
             format!("parsing driver package {} as a package manifest", path.as_ref())
         })?;
-
-        let repository = match manifest.repository() {
-            Some(x) => x,
-            None => "fuchsia.com",
-        };
-
-        Ok(format!("fuchsia-pkg://{}/{}", repository, manifest.name()))
+        match package_type {
+            DriverPackageType::Base => {
+                let repository = manifest.repository().unwrap_or("fuchsia.com");
+                Ok(format!("fuchsia-pkg://{}/{}", repository, manifest.name()))
+            }
+            DriverPackageType::Boot => Ok(format!("fuchsia-boot:///{}", manifest.name())),
+        }
     }
 }
 
@@ -99,7 +110,10 @@ mod tests {
         let mut driver_manifest_builder = DriverManifestBuilder::default();
         driver_manifest_builder.add_driver(
             driver_details,
-            &DriverManifestBuilder::get_package_url(driver_package_manifest_file_path)?,
+            &DriverManifestBuilder::get_package_url(
+                DriverPackageType::Base,
+                driver_package_manifest_file_path,
+            )?,
         )?;
 
         let manifest_path = &outdir.join(BASE_DRIVER_MANIFEST_PATH);

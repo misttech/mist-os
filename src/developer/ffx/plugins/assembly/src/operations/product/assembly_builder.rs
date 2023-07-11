@@ -12,8 +12,11 @@ use assembly_config_schema::{
     product_config::{ProductConfigData, ProductPackageDetails, ProductPackagesConfig},
     DriverDetails, FileEntry,
 };
+
 use assembly_domain_config::DomainConfigPackage;
-use assembly_driver_manifest::{DriverManifestBuilder, BASE_DRIVER_MANIFEST_PATH};
+use assembly_driver_manifest::{
+    DriverManifestBuilder, DriverPackageType, BASE_DRIVER_MANIFEST_PATH, BOOT_DRIVER_MANIFEST_PATH,
+};
 use assembly_package_set::{PackageEntry, PackageSet};
 use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf};
 use assembly_platform_configuration::{
@@ -40,6 +43,9 @@ pub struct ImageAssemblyConfigBuilder {
 
     /// The base driver packages from the AssemblyInputBundles
     base_drivers: NamedMap<DriverDetails>,
+
+    /// The boot driver packages from the AssemblyInputBundles
+    boot_drivers: NamedMap<DriverDetails>,
 
     /// The system packages from the AssemblyInputBundles
     system: PackageSet,
@@ -105,6 +111,7 @@ impl ImageAssemblyConfigBuilder {
             base: PackageSet::new("base packages"),
             cache: PackageSet::new("cache packages"),
             base_drivers: NamedMap::new("base_drivers"),
+            boot_drivers: NamedMap::new("boot_drivers"),
             system: PackageSet::new("system packages"),
             bootfs_packages: PackageSet::new("bootfs packages"),
             boot_args: BTreeSet::default(),
@@ -154,6 +161,7 @@ impl ImageAssemblyConfigBuilder {
             config_data,
             blobs: _,
             base_drivers,
+            boot_drivers,
             shell_commands,
             packages_to_compile,
             bootfs_files_package,
@@ -170,8 +178,23 @@ impl ImageAssemblyConfigBuilder {
             let driver_package_path = &bundle_path.join(&driver_details.package);
             self.add_unique_package_from_path(driver_package_path, &PackageSets::BASE)?;
 
-            let package_url = DriverManifestBuilder::get_package_url(driver_package_path)?;
+            let package_url = DriverManifestBuilder::get_package_url(
+                DriverPackageType::Base,
+                driver_package_path,
+            )?;
             self.base_drivers.try_insert_unique(package_url, driver_details)?;
+        }
+
+        // Boot drivers are added to the bootfs package set
+        for driver_details in boot_drivers {
+            let driver_package_path = &bundle_path.join(&driver_details.package);
+            self.add_unique_package_from_path(driver_package_path, &PackageSets::BOOTFS)?;
+
+            let package_url = DriverManifestBuilder::get_package_url(
+                DriverPackageType::Boot,
+                driver_package_path,
+            )?;
+            self.boot_drivers.try_insert_unique(package_url, driver_details)?;
         }
 
         self.boot_args
@@ -367,7 +390,10 @@ impl ImageAssemblyConfigBuilder {
             self.base
                 .add_package(PackageEntry { path: driver_details.package.clone(), manifest })
                 .context(format!("Adding driver {}", &driver_details.package))?;
-            let package_url = DriverManifestBuilder::get_package_url(&driver_details.package)?;
+            let package_url = DriverManifestBuilder::get_package_url(
+                DriverPackageType::Base,
+                &driver_details.package,
+            )?;
             self.base_drivers.try_insert_unique(package_url, driver_details)?;
         }
         Ok(())
@@ -505,6 +531,7 @@ impl ImageAssemblyConfigBuilder {
             mut base,
             mut cache,
             base_drivers,
+            boot_drivers,
             mut system,
             boot_args,
             mut bootfs_files,
@@ -545,6 +572,22 @@ impl ImageAssemblyConfigBuilder {
             } else {
                 // TODO(https://fxbug.dev/101556) return an error here
             }
+        }
+
+        // Generate the boot driver manifest and add to bootfs files.
+        {
+            let mut driver_manifest_builder = DriverManifestBuilder::default();
+            for (package_url, driver_details) in boot_drivers.entries {
+                driver_manifest_builder
+                    .add_driver(driver_details, &package_url)
+                    .with_context(|| format!("adding driver {}", &package_url))?;
+            }
+            let manifest_path = outdir.join(BOOT_DRIVER_MANIFEST_PATH);
+            driver_manifest_builder.create_manifest_file(&manifest_path)?;
+            bootfs_files.add_entry(FileEntry {
+                destination: BOOT_DRIVER_MANIFEST_PATH.to_string(),
+                source: manifest_path,
+            })?;
         }
 
         // Repackage any matching packages
@@ -608,7 +651,7 @@ impl ImageAssemblyConfigBuilder {
             let manifest_path = outdir.join(BASE_DRIVER_MANIFEST_PATH);
             driver_manifest_builder.create_manifest_file(&manifest_path)?;
             bootfs_files.add_entry(FileEntry {
-                destination: BASE_DRIVER_MANIFEST_PATH.trim_end_matches(".json").to_string(),
+                destination: BASE_DRIVER_MANIFEST_PATH.to_string(),
                 source: manifest_path,
             })?;
         }
@@ -799,6 +842,7 @@ mod tests {
                 bootfs_files: vec![],
             },
             base_drivers: Vec::default(),
+            boot_drivers: Vec::default(),
             config_data: BTreeMap::default(),
             blobs: Vec::default(),
             shell_commands: ShellCommands::default(),
@@ -846,6 +890,7 @@ mod tests {
                 ..assembly_config_schema::PartialImageAssemblyConfig::default()
             },
             base_drivers: Vec::default(),
+            boot_drivers: Vec::default(),
             config_data: BTreeMap::default(),
             blobs: Vec::default(),
             shell_commands: ShellCommands::default(),
@@ -884,7 +929,7 @@ mod tests {
                 .map(|f| f.destination.to_owned())
                 .sorted()
                 .collect::<Vec<_>>(),
-            vec![BASE_DRIVER_MANIFEST_PATH, "dest/file/path"]
+            vec![BASE_DRIVER_MANIFEST_PATH, BOOT_DRIVER_MANIFEST_PATH, "dest/file/path"]
         );
 
         assert_eq!(result.kernel.path, vars.outdir.join("kernel/path"));
@@ -918,6 +963,10 @@ mod tests {
         let base_driver_2 = make_test_driver("base-driver2", &vars.outdir)?;
         aib.base_drivers = vec![base_driver_1, base_driver_2];
 
+        let boot_driver_1 = make_test_driver("boot-driver1", &vars.outdir)?;
+        let boot_driver_2 = make_test_driver("boot-driver2", &vars.outdir)?;
+        aib.boot_drivers = vec![boot_driver_1, boot_driver_2];
+
         let mut builder = ImageAssemblyConfigBuilder::default();
         builder.add_parsed_bundle(&vars.bundle_path, aib).unwrap();
         let result: assembly_config_schema::ImageAssemblyConfig =
@@ -925,7 +974,7 @@ mod tests {
 
         assert_eq!(
             result.bootfs_files.iter().map(|f| f.destination.clone()).sorted().collect::<Vec<_>>(),
-            vec![BASE_DRIVER_MANIFEST_PATH, "dest/file/path"],
+            vec![BASE_DRIVER_MANIFEST_PATH, BOOT_DRIVER_MANIFEST_PATH, "dest/file/path"],
         );
 
         let base_driver_manifest: Vec<DriverManifest> = serde_json::from_reader(BufReader::new(
@@ -945,6 +994,22 @@ mod tests {
                 }
             ]
         );
+
+        let boot_driver_manifest: Vec<DriverManifest> = serde_json::from_reader(BufReader::new(
+            File::open(vars.outdir.join(BOOT_DRIVER_MANIFEST_PATH))?,
+        ))?;
+        assert_eq!(
+            boot_driver_manifest,
+            vec![
+                DriverManifest {
+                    driver_url: "fuchsia-boot:///boot-driver1#meta/foobar.cm".to_owned()
+                },
+                DriverManifest {
+                    driver_url: "fuchsia-boot:///boot-driver2#meta/foobar.cm".to_owned()
+                }
+            ]
+        );
+
         Ok(())
     }
 

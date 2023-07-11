@@ -45,10 +45,15 @@ pub struct AssemblyInputBundle {
     #[serde(default)]
     pub blobs: Vec<Utf8PathBuf>,
 
-    /// Configuration of driver packages. Driver packages should not be listed
-    /// in the base package list and will be included automatically.
+    /// Configuration of base driver packages. Driver packages should not be
+    /// listed in the base package list and will be included automatically.
     #[serde(default)]
     pub base_drivers: Vec<DriverDetails>,
+
+    /// Configuration of boot driver packages. Driver packages should not be
+    /// listed in the bootfs package list and will be included automatically.
+    #[serde(default)]
+    pub boot_drivers: Vec<DriverDetails>,
 
     /// Map of the names of packages that contain shell commands to the list of
     /// commands within each.
