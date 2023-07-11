@@ -8,7 +8,8 @@ import("//build/rust/rustc_test.gni")
 rustc_test("realm_integration_test_bin") {
   edition = "2021"
   testonly = true
-  sources = [ "src/lib.rs" ]
+  source_root = "src/integration_test.rs"
+  sources = [ "src/integration_test.rs" ]
   deps = [
     "//examples/components/routing/fidl:echo_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
@@ -21,13 +22,44 @@ rustc_test("realm_integration_test_bin") {
   ]
 }
 
-fuchsia_unittest_package("realm_integration_test") {
-  manifest = "meta/realm_integration_test.cml"
+rustc_test("realm_namespace_test_bin") {
+  edition = "2021"
+  testonly = true
+  source_root = "src/namespace_test.rs"
+  sources = [ "src/namespace_test.rs" ]
   deps = [
-    ":realm_integration_test_bin",
+    "//examples/components/routing/fidl:echo_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+  ]
+}
+
+fuchsia_component("no_program") {
+  testonly = true
+  manifest = "meta/no_program.cml"
+}
+
+fuchsia_test_component("realm_integration_test") {
+  manifest = "meta/realm_integration_test.cml"
+  deps = [ ":realm_integration_test_bin" ]
+}
+
+fuchsia_test_component("realm_namespace_test") {
+  manifest = "meta/realm_namespace_test.cml"
+  deps = [ ":realm_namespace_test_bin" ]
+}
+
+fuchsia_test_package("realm_integration_tests") {
+  test_components = [
+    ":realm_integration_test",
+    ":realm_namespace_test",
+  ]
+  deps = [
+    ":no_program",
+    "//src/sys/component_manager/testing/echo_server",
 
     # fxbug.dev/101490: Dep included for affected tests presubmit
     "//src/sys/component_manager:component-manager-realm-builder-cmp",
-    "//src/sys/component_manager/testing/echo_server",
   ]
 }

@@ -42,7 +42,7 @@ group("tests") {
   # TODO(https://fxbug.dev/99342): Fix realm_integration_test in coverage and
   # re-enable.
   if (!is_coverage) {
-    deps += [ "realm:realm_integration_test" ]
+    deps += [ "realm:realm_integration_tests" ]
   }
 }
 

@@ -51,7 +51,7 @@ pub async fn get_manifest_self() {
 
     let uses = decl.uses.unwrap();
     let exposes = decl.exposes.unwrap();
-    assert_eq!(uses.len(), 4);
+    assert_eq!(uses.len(), 3);
     assert_eq!(exposes.len(), 1);
 }
 
