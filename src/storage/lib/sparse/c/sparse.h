@@ -30,13 +30,21 @@ typedef struct SparseIoBufferOps {
   // Writes `size` bytes from `src` into the handle at `offset`.
   // Returns false if the write failed.
   bool (*write)(SparseIoBufferHandle handle, uint64_t offset, const uint8_t* src, size_t size);
+
+  // Fills the handle with repeated instances of `payload`.
+  // Returns false if the write failed.
+  bool (*fill)(SparseIoBufferHandle handle, uint32_t payload);
 } SparseIoBufferOps;
 
 typedef struct SparseIoInterface {
   void* ctx;
 
-  // A buffer which can be used by `write` as needed.
-  SparseIoBufferHandle scratch_handle;
+  // A buffer used to optimize `fill` writing.
+  //
+  // Warning: the contents of the fill handle may be reused by sparse writing code across
+  // function calls. Once the fill handle has been set up, it is NOT safe for the caller
+  // to modify it until destruction.
+  SparseIoBufferHandle fill_handle;
 
   SparseIoBufferOps handle_ops;
 

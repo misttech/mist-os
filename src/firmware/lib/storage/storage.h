@@ -37,6 +37,19 @@ typedef struct FuchsiaFirmwareStorage {
   // must be buffer aligned according to FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT.
   void* scratch_buffer;
 
+  // The size of the scratch buffer in bytes.
+  size_t scratch_buffer_size_bytes;
+
+  // A buffer used as an optimization for fill writes to storage.
+  // Its size must be a multiple of both `block_size` and FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT
+  // and must be buffer aligned according to FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT
+  void* fill_buffer;
+
+  // The size of the fill buffer in bytes.
+  // A buffer much larger than `block_size` can provide an optimization for writing fill data.
+  // Empirical testing shows good results with a buffer size of ~4MiB.
+  size_t fill_buffer_size_bytes;
+
   // Context pointer for calling the `read` callback.
   void* ctx;
 
@@ -100,8 +113,8 @@ bool FuchsiaFirmwareStorageWrite(FuchsiaFirmwareStorage* ops, size_t offset, siz
                                  void* src);
 
 // Functionally the same as FuchsiaFirmwareStorageWrite but accepts a const pointer for `src`.
-// However there's less optimization that can be done and may be slow when writing large amount of
-// data when offset, size or `src` is unaligned.
+// However there's less optimization that can be done and may be slow when writing large amount
+// of data when offset, size or `src` is unaligned.
 bool FuchsiaFirmwareStorageWriteConst(FuchsiaFirmwareStorage* ops, size_t offset, size_t size,
                                       const void* src);
 

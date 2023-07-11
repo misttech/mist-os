@@ -167,11 +167,26 @@ struct TestSparseIoBuffer {
     return true;
   }
 
+  static bool Fill(SparseIoBufferHandle handle, uint32_t payload) {
+    auto me = static_cast<TestSparseIoBuffer *>(handle);
+    if (me->data.size() % sizeof(payload) != 0) {
+      return false;
+    }
+
+    // Can't just call std::transform because the vector's
+    // allocated memory may not be 4 byte aligned.
+    for (size_t i = 0; i < me->data.size(); i += sizeof(payload)) {
+      memcpy(me->data.data() + i, &payload, sizeof(payload));
+    }
+    return true;
+  }
+
   static SparseIoBufferOps Interface() {
     return SparseIoBufferOps{
         .size = Size,
         .read = Read,
         .write = Write,
+        .fill = Fill,
     };
   }
 };
@@ -181,7 +196,7 @@ struct TestSparseIo {
   explicit TestSparseIo(size_t size)
       : buffer_(std::make_unique<uint8_t[]>((size))),
         buffer_size_(size),
-        scratch_buffer_(TestSparseIoBuffer::Create(kScratchBufferSize)) {}
+        fill_buffer_(TestSparseIoBuffer::Create(kScratchBufferSize)) {}
 
   void *data() { return buffer_.get(); }
   const void *data() const { return buffer_.get(); }
@@ -194,7 +209,7 @@ struct TestSparseIo {
   SparseIoInterface Interface() {
     return SparseIoInterface{
         .ctx = this,
-        .scratch_handle = &scratch_buffer_,
+        .fill_handle = &fill_buffer_,
         .handle_ops = TestSparseIoBuffer::Interface(),
         .write = WriteRaw,
     };
@@ -226,7 +241,7 @@ struct TestSparseIo {
 
   std::unique_ptr<uint8_t[]> buffer_;
   size_t buffer_size_;
-  TestSparseIoBuffer scratch_buffer_;
+  TestSparseIoBuffer fill_buffer_;
 };
 
 TEST(FuchsiaSparseWriterTest, TestEmptyImage) {

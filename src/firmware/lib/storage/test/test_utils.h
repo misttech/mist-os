@@ -13,7 +13,8 @@
 // A helper class that creates a buffer meeting `FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT`.
 class AlignedBuffer {
  public:
-  explicit AlignedBuffer(size_t size) : buffer_(size + FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT) {}
+  explicit AlignedBuffer(size_t size)
+      : buffer_(size + FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT - 1) {}
 
   uint8_t* get() {
     uintptr_t addr = reinterpret_cast<uintptr_t>(buffer_.data());
@@ -23,6 +24,8 @@ class AlignedBuffer {
                     addr;
     return buffer_.data() + gap;
   }
+
+  size_t size() const { return buffer_.size() - (FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT - 1); }
 
  private:
   std::vector<uint8_t> buffer_;
@@ -37,7 +40,7 @@ class AlignedBuffer {
 class TestFuchsiaFirmwareStorage {
  public:
   TestFuchsiaFirmwareStorage(size_t size, size_t block_size)
-      : scratch_buffer_(block_size), block_size_(block_size) {
+      : scratch_buffer_(block_size), fill_buffer_(2 * block_size), block_size_(block_size) {
     // Initialize buffer data;
     for (size_t i = 0; i < size; i++) {
       buffer_.push_back(static_cast<uint8_t>(i));
@@ -45,8 +48,16 @@ class TestFuchsiaFirmwareStorage {
   }
 
   FuchsiaFirmwareStorage GetFuchsiaFirmwareStorage() {
-    return {
-        block_size_, buffer_.size() / block_size_, scratch_buffer_.get(), this, Read, Write,
+    return FuchsiaFirmwareStorage{
+        .block_size = block_size_,
+        .total_blocks = buffer_.size() / block_size_,
+        .scratch_buffer = scratch_buffer_.get(),
+        .scratch_buffer_size_bytes = scratch_buffer_.size(),
+        .fill_buffer = fill_buffer_.get(),
+        .fill_buffer_size_bytes = fill_buffer_.size(),
+        .ctx = this,
+        .read = Read,
+        .write = Write,
     };
   }
 
@@ -76,6 +87,7 @@ class TestFuchsiaFirmwareStorage {
   }
 
   AlignedBuffer scratch_buffer_;
+  AlignedBuffer fill_buffer_;
   std::vector<uint8_t> buffer_;
   size_t block_size_;
 };

@@ -42,9 +42,6 @@ static inline uint16_t SWAP_16(uint16_t x) { return __builtin_bswap16(x); }
 #define LE16(val) (val)
 #endif
 
-#define kMaxBlkSize 4096
-#define kFillInts (kMaxBlkSize / sizeof(uint32_t))
-
 static void DumpStruct(SparseLogFn log, const void* s, size_t size) {
 #ifdef ENABLE_VERBOSE_SPARSE_LOG
   for (size_t i = 0; i < size; i++) {
@@ -63,14 +60,7 @@ static void DumpStruct(SparseLogFn log, const void* s, size_t size) {
 static bool IsValidFileHeader(const sparse_header_t* header) {
   return header && LE64(header->magic) == SPARSE_HEADER_MAGIC &&
          LE16(header->major_version) <= 0x1 && sizeof(*header) <= LE16(header->file_hdr_sz) &&
-         sizeof(chunk_header_t) <= LE16(header->chunk_hdr_sz) && LE32(header->blk_sz) % 4 == 0 &&
-         // This is a hack to support FILL chunks via a static buffer.
-         // Online documentation implies that blk_size is ALWAYS 4096,
-         // but if a flaky or malicious image were crafted with a larger size,
-         // this would constitute a buffer overflow and would write unexpected memory to disk.
-         // Instead of dynamically allocating a buffer or adding a complex scheme to handle
-         // arbitrarily sized blocks via a constant sized buffer, just fail on unlikely input.
-         LE32(header->blk_sz) <= kMaxBlkSize;
+         sizeof(chunk_header_t) <= LE16(header->chunk_hdr_sz) && LE32(header->blk_sz) % 4 == 0;
 }
 
 // Check that a sparse image header is valid, i.e. fields are set to reasonable values,
@@ -99,19 +89,53 @@ bool sparse_is_sparse_image(SparseIoBufferOps* handle_ops, SparseIoBufferHandle 
   return ValidateHeader(handle_ops, src, &header);
 }
 
+static bool sparse_write_fill(SparseIoInterface* io, SparseLogFn log, SparseIoBufferHandle src,
+                              uint32_t fill, size_t out_offset, size_t write_bytes) {
+  static bool fill_cache_valid = false;
+  uint32_t tmp;
+  if (!io->handle_ops.read(io->fill_handle, 0, (uint8_t*)&tmp, sizeof(tmp))) {
+    log("Failed to read fill buffer\n");
+    return false;
+  }
+
+  // Setup: populate the fill buffer with the fill data.
+  if (!fill_cache_valid || tmp != fill) {
+    // Minor optimization for repeated fill chunks with the same payload.
+    fill_cache_valid = true;
+    if (!io->handle_ops.fill(io->fill_handle, fill)) {
+      log("Failed to populate fill buffer\n");
+      return false;
+    }
+  }
+
+  // Phase 1: write the entire fill buffer, possibly multiple times.
+  // Remember that the fill buffer size must be a multiple of both the block size
+  // and the storage buffer alignment.
+  size_t fill_size = io->handle_ops.size(io->fill_handle);
+  for (size_t i = 0; i < write_bytes / fill_size; i++, out_offset += fill_size) {
+    if (!io->write(io->ctx, out_offset, io->fill_handle, 0, fill_size)) {
+      log("Failed to write sparse fill block of size %z\n", fill_size);
+      return false;
+    }
+  }
+
+  // Phase 2: write the smaller-than-fill-buffer-sized remainder.
+  size_t trailing_bytes = write_bytes % fill_size;
+  if (trailing_bytes) {
+    if (!io->write(io->ctx, out_offset, io->fill_handle, 0, trailing_bytes)) {
+      log("Failed to write sparse fill chunk of size %z\n", trailing_bytes);
+      return false;
+    }
+  }
+
+  return true;
+}
+
 bool sparse_unpack_image(SparseIoInterface* io, SparseLogFn log, SparseIoBufferHandle src) {
   if (io == NULL || log == NULL) {
     return false;
   }
-  static uint32_t fill_data[kFillInts] = {};
-  static bool first_fill = true;
-
   const size_t size = io->handle_ops.size(src);
-
-  if (io->handle_ops.size(io->scratch_handle) < sizeof(fill_data)) {
-    log("Scratch buffer too small, need %zu bytes\n", sizeof(fill_data));
-    return false;
-  }
 
   sparse_header_t file_header;
   if (!io->handle_ops.read(src, 0, (uint8_t*)(&file_header), sizeof(sparse_header_t))) {
@@ -187,26 +211,11 @@ bool sparse_unpack_image(SparseIoInterface* io, SparseLogFn log, SparseIoBufferH
         fill = LE32(fill);
         in_offset += sizeof(fill);
 
-        if (first_fill || fill != fill_data[0]) {
-          // Minor optimization if there are consecutive fill chunks with the same payload.
-          first_fill = false;
-          for (size_t j = 0; j < sizeof(fill_data) / sizeof(fill_data[0]); ++j) {
-            fill_data[j] = fill;
-          }
-          if (!io->handle_ops.write(io->scratch_handle, 0, (uint8_t*)fill_data,
-                                    sizeof(fill_data))) {
-            log("Failed to fill scratch handle\n");
-            return false;
-          }
+        size_t write_size = LE32(file_header.blk_sz) * LE32(chunk.chunk_sz);
+        if (!sparse_write_fill(io, log, src, fill, out_offset, write_size)) {
+          return false;
         }
-
-        for (size_t j = 0; j < LE32(chunk.chunk_sz); j++) {
-          if (!io->write(io->ctx, out_offset, io->scratch_handle, 0, LE32(file_header.blk_sz))) {
-            log("Failed to write from scratch buffer\n");
-            return false;
-          }
-          out_offset += LE32(file_header.blk_sz);
-        }
+        out_offset += write_size;
         break;
       case CHUNK_TYPE_CRC32:
         if (!ValidateChunkSize(&file_header, &chunk, sizeof(uint32_t))) {

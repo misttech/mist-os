@@ -47,6 +47,23 @@ static bool IoBufferWrite(SparseIoBufferHandle handle, uint64_t offset, const ui
   return true;
 }
 
+static bool IoBufferFill(SparseIoBufferHandle handle, uint32_t payload) {
+  IoBuffer* buffer = (IoBuffer*)(handle);
+
+  // Make sure the buffer fits an exact multiple of payload items
+  // and is properly aligned to be assigned via cast.
+  if (!buffer || !buffer->data || buffer->size % sizeof(payload) != 0 ||
+      (uintptr_t)buffer->data % sizeof(payload) != 0) {
+    return false;
+  }
+
+  for (size_t i = 0; i < buffer->size / sizeof(payload); i++) {
+    ((uint32_t*)buffer->data)[i] = payload;
+  }
+
+  return true;
+}
+
 typedef struct IoContext {
   FuchsiaFirmwareStorage* ops;
   const GptData* gpt_data;
@@ -69,6 +86,7 @@ bool FuchsiaIsSparseImage(const uint8_t* src, size_t size) {
       .size = IoBufferSize,
       .read = IoBufferRead,
       .write = IoBufferWrite,
+      .fill = IoBufferFill,
   };
   IoBuffer src_buffer = {
       .size = size,
@@ -80,19 +98,19 @@ bool FuchsiaIsSparseImage(const uint8_t* src, size_t size) {
 bool FuchsiaWriteSparseImage(FuchsiaFirmwareStorage* ops, const GptData* gpt_data, const char* name,
                              uint8_t* src, size_t size) {
   IoContext context = {ops, gpt_data, name};
-  static uint8_t scratch[kScratchSize] = {};
-  static IoBuffer scratch_buffer = {
-      .size = kScratchSize,
-      .data = scratch,
+  IoBuffer fill_buffer = {
+      .size = ops->fill_buffer_size_bytes,
+      .data = ops->fill_buffer,
   };
   SparseIoBufferOps handle_ops = {
       .size = IoBufferSize,
       .read = IoBufferRead,
       .write = IoBufferWrite,
+      .fill = IoBufferFill,
   };
   SparseIoInterface io = {
       .ctx = &context,
-      .scratch_handle = &scratch_buffer,
+      .fill_handle = &fill_buffer,
       .handle_ops = handle_ops,
       .write = IoWrite,
   };

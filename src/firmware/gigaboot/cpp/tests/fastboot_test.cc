@@ -13,6 +13,8 @@
 #include <lib/zircon_boot/zbi_utils.h>
 #include <sparse_format.h>
 
+#include "zircon/hw/gpt.h"
+
 #undef error  // Macro from sparse_format.h that interferes with other symbols.
 
 #include <algorithm>

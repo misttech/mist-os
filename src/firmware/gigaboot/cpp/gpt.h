@@ -64,20 +64,7 @@ class EfiGptBlockDevice {
   fit::result<efi_status> Load();
 
   // Create a FuchsiaFirmwareStorage structure for the firmware SDK storage library.
-  FuchsiaFirmwareStorage GenerateStorageOps() {
-    if (!storage_scratch_) {
-      storage_scratch_ = std::make_unique<uint8_t[]>(BlockSize());
-    }
-
-    return FuchsiaFirmwareStorage{
-        .block_size = BlockSize(),
-        .total_blocks = LastBlock() + 1,
-        .scratch_buffer = storage_scratch_.get(),
-        .ctx = this,
-        .read = RawRead,
-        .write = RawWrite,
-    };
-  }
+  FuchsiaFirmwareStorage GenerateStorageOps();
 
   // Reinitialize device's GPT.
   //
@@ -97,6 +84,7 @@ class EfiGptBlockDevice {
   uint64_t generation_id_;
 
   std::unique_ptr<uint8_t[]> storage_scratch_;
+  std::unique_ptr<uint8_t[]> storage_fill_;
 
   // The parameters we need for reading/writing partitions live in both block and disk io protocols.
   EfiProtocolPtr<efi_block_io_protocol> block_io_protocol_;

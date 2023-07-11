@@ -58,6 +58,37 @@ gpt_header_t GenerateComplementaryHeader(const gpt_header_t &good) {
 
 }  // namespace
 
+FuchsiaFirmwareStorage EfiGptBlockDevice::GenerateStorageOps() {
+  size_t scratch_size = BlockSize();
+  if (!storage_scratch_) {
+    storage_scratch_ = std::make_unique<uint8_t[]>(scratch_size);
+  }
+
+  // Make a very large scratch buffer as a possible optimization
+  // for writing fill chunks from sparse images.
+  // This is 4 MiB assuming a 4096 byte block size.
+  size_t fill_usable_size = 1024 * BlockSize();
+  size_t fill_total_size = fill_usable_size + FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT - 1;
+  if (!storage_fill_) {
+    storage_fill_ = std::make_unique<uint8_t[]>(fill_total_size);
+  }
+  void *fill_buffer = storage_fill_.get();
+  fill_buffer = std::align(FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT, fill_usable_size, fill_buffer,
+                           fill_total_size);
+
+  return FuchsiaFirmwareStorage{
+      .block_size = BlockSize(),
+      .total_blocks = LastBlock() + 1,
+      .scratch_buffer = storage_scratch_.get(),
+      .scratch_buffer_size_bytes = scratch_size,
+      .fill_buffer = fill_buffer,
+      .fill_buffer_size_bytes = fill_usable_size,
+      .ctx = this,
+      .read = RawRead,
+      .write = RawWrite,
+  };
+}
+
 fit::result<efi_status> EfiGptBlockDevice::LoadGptEntries(const gpt_header_t &header) {
   entries_.resize(header.entries_count);
   utf8_names_.resize(header.entries_count);
@@ -257,7 +288,7 @@ fit::result<efi_status> EfiGptBlockDevice::Load() {
       return res;
     }
   } else {
-    if (auto res = LoadGptEntries(gpt_header_); !res.is_ok()) {
+    if (auto res = LoadGptEntries(gpt_header_); res.is_error()) {
       return res;
     }
 

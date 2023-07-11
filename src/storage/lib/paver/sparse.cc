@@ -10,6 +10,7 @@
 #include <zircon/status.h>
 
 #include <cstddef>
+#include <vector>
 
 #include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/partition-client.h"
@@ -53,6 +54,22 @@ struct SparseIoBuffer {
     return me->Write(offset, src, size);
   }
 
+  static bool FillTo(SparseIoBufferHandle handle, uint32_t payload) {
+    auto me = static_cast<const SparseIoBuffer*>(handle);
+    size_t size = me->Size();
+    if (size % sizeof(payload) != 0) {
+      return false;
+    }
+    std::vector<uint32_t> fill(size / sizeof(payload), payload);
+
+    if (!me->Write(0, reinterpret_cast<const uint8_t*>(fill.data()),
+                   fill.size() * sizeof(payload))) {
+      return false;
+    }
+
+    return false;
+  }
+
   size_t Size() const {
     size_t size;
     return vmo.get_size(&size) == ZX_OK ? size : 0;
@@ -64,7 +81,7 @@ struct SparseIoBuffer {
   }
 
   static SparseIoBufferOps Interface() {
-    return SparseIoBufferOps{.size = SizeOf, .read = ReadFrom, .write = WriteTo};
+    return SparseIoBufferOps{.size = SizeOf, .read = ReadFrom, .write = WriteTo, .fill = FillTo};
   }
 };
 
@@ -170,14 +187,14 @@ zx::result<> WriteSparse(PartitionClient& partition, const PartitionSpec& spec, 
     ERROR("Couldn't get partition \"%s\" block size\n", spec.ToString().c_str());
     return block_size.take_error();
   }
-  const size_t block_size_bytes = block_size.value();
+  const size_t fill_size_bytes = 1024 * block_size.value();
 
   zx::vmo scratch_vmo;
-  if (zx_status_t status = zx::vmo::create(block_size_bytes, 0, &scratch_vmo); status != ZX_OK) {
+  if (zx_status_t status = zx::vmo::create(fill_size_bytes, 0, &scratch_vmo); status != ZX_OK) {
     ERROR("Failed to create scratch VMO: %s\n", zx_status_get_string(status));
     return zx::error(status);
   }
-  auto scratch_buffer = std::make_unique<SparseIoBuffer>(std::move(scratch_vmo), block_size_bytes);
+  auto fill_buffer = std::make_unique<SparseIoBuffer>(std::move(scratch_vmo), fill_size_bytes);
   zx::result context = SparseIoContext::Create(partition);
   if (context.is_error()) {
     ERROR("Failed to create I/O context: %s\n", context.status_string());
@@ -185,7 +202,7 @@ zx::result<> WriteSparse(PartitionClient& partition, const PartitionSpec& spec, 
   }
   SparseIoInterface io = {
       .ctx = &context.value(),
-      .scratch_handle = scratch_buffer.get(),
+      .fill_handle = fill_buffer.get(),
       .handle_ops = SparseIoBuffer::Interface(),
       .write = SparseIoContext::WriteTo,
   };
