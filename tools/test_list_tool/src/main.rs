@@ -349,12 +349,11 @@ fn run_tool() -> Result<(), Error> {
                 },
                 None => None,
             };
-
             // Construct the base TestListEntry.
             let mut test_list_entry = to_test_list_entry(&entry.test, realm.clone());
             let mut test_tags = FuchsiaTestTags::new();
             let pkg_manifests = entry.test.package_manifests.clone().unwrap_or(vec![]);
-
+            test_tags.realm = realm;
             // Aggregate any tags from the component manifest of the test.
             let mut inputs: Vec<Utf8PathBuf> = vec![];
             if entry.test.package_url.is_some() && pkg_manifests.len() > 0 {
@@ -373,7 +372,6 @@ fn run_tool() -> Result<(), Error> {
                 }
                 let meta_far_path = res.unwrap();
                 inputs.push(meta_far_path.clone());
-                test_tags.realm = realm;
 
                 // Find additional tags. Note that this can override existing tags (e.g. to set the test type based on realm)
                 match update_tags_from_manifest(&mut test_tags, pkg_url.clone(), &meta_far_path) {

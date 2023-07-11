@@ -11,6 +11,8 @@ import("//build/components.gni")
 # test component be defined in the same BUILD.gn file as this target, which is
 # not possible for CTF tests.
 template("fuchsia_package_with_test") {
+  assert(defined(invoker.test_component), "test_component should be defined")
+
   main_target_name = target_name
   package_name = main_target_name
   component_name = invoker.test_component_name
@@ -19,13 +21,25 @@ template("fuchsia_package_with_test") {
     testonly = true
     package_name = package_name
     subpackages = invoker.subpackages
-    deps = invoker.deps
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+      deps += [ invoker.test_component ]
+    } else {
+      deps = [ invoker.test_component ]
+    }
+    if (!defined(invoker.metadata)) {
+      metadata = {
+      }
+    }
+    metadata.test_components_barrier = [ invoker.test_component ]
   }
 
   test_spec("${target_name}_test") {
     target = get_label_info(":$target_name", "label_with_toolchain")
     package_label = get_label_info(":$package_name", "label_with_toolchain")
     package_url = "fuchsia-pkg://fuchsia.com/$package_name#meta/$component_name"
+    component_label =
+        get_label_info(invoker.test_component, "label_with_toolchain")
   }
 
   group(target_name) {

@@ -43,7 +43,7 @@ template("generate_fuchsia-element-tests") {
       test_info.target_label,
       "//sdk/ctf/tests/fidl/fuchsia.element:test-realm-proxy",
     ]
-    deps = [ "//sdk/ctf/tests/fidl/fuchsia.element:test-root" ]
+    test_component = "//sdk/ctf/tests/fidl/fuchsia.element:test-root"
   }
 }
 
@@ -52,7 +52,7 @@ template("generate_fuchsia-hwinfo-tests") {
   fuchsia_package_with_test(target_name) {
     test_component_name = "test-root.cm"
     subpackages = [ test_info.target_label ]
-    deps = [ "//sdk/ctf/tests/fidl/fuchsia.hwinfo:test-root" ]
+    test_component = "//sdk/ctf/tests/fidl/fuchsia.hwinfo:test-root"
   }
 }
 
@@ -64,7 +64,7 @@ template("generate_pkgdir-tests") {
       test_info.target_label,
       "//src/sys/pkg/tests/pkgdir/test_realm_proxy",
     ]
-    deps = [ "//src/sys/pkg/tests/pkgdir:test-root" ]
+    test_component = "//src/sys/pkg/tests/pkgdir:test-root"
   }
 }
 

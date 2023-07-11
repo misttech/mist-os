@@ -33,8 +33,9 @@ ctf_fuchsia_package("fuchsia-hwinfo-tests") {
   deps = [ ":default" ]
 }
 
-fuchsia_component("test-root") {
+fuchsia_test_component("test-root") {
   manifest = "meta/test-root.cml"
+  test_type = "ctf"
 }
 
 fuchsia_test_package("fuchsia-hwinfo-tests-package") {
