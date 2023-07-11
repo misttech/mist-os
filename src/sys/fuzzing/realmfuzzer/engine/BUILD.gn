@@ -57,6 +57,7 @@ source_set("engine-lib") {
     "//src/lib/fxl",
     "//src/sys/fuzzing/common",
     "//src/sys/fuzzing/fidl:fuchsia.fuzzer_hlcpp",
+    "//src/sys/fuzzing/libfuzzer:stats-lib",
     "//src/sys/fuzzing/realmfuzzer/target:no_hooks",
     "//zircon/system/ulib/sync",
   ]

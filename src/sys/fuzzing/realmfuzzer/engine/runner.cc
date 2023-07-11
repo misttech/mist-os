@@ -11,14 +11,17 @@
 #include <zircon/syscalls/exception.h>
 
 #include <deque>
+#include <iostream>
 
 #include "src/lib/fxl/macros.h"
+#include "src/sys/fuzzing/libfuzzer/stats.h"
 #include "src/sys/fuzzing/realmfuzzer/target/process.h"
 
 namespace fuzzing {
 
 using ::fuchsia::fuzzer::Data;
 using ::fuchsia::fuzzer::MAX_PROCESS_STATS;
+using ::fuchsia::fuzzer::OutputFlags;
 
 RunnerPtr RealmFuzzerRunner::MakePtr(ExecutorPtr executor) {
   return RunnerPtr(new RealmFuzzerRunner(std::move(executor)));
@@ -66,12 +69,23 @@ ZxPromise<> RealmFuzzerRunner::Initialize(std::string pkg_dir, std::vector<std::
 ZxPromise<> RealmFuzzerRunner::Configure() {
   return Runner::Configure()
       .and_then([this]() -> ZxResult<> {
-        seed_corpus_->Configure(options());
-        live_corpus_->Configure(options());
-        mutagen_.Configure(options());
-        adapter_.Configure(options());
+        const OptionsPtr& options = this->options();
+        if (bool(options->output_flags() & OutputFlags::CLOSE_STDOUT)) {
+          FX_LOGS(WARNING)
+              << "realmfuzzer ignored a request to close stdout: the engine does not "
+                 "currently have the ability to suppress stdout from other components being fuzzed.";
+        }
+        if (bool(options->output_flags() & OutputFlags::CLOSE_STDERR)) {
+          FX_LOGS(WARNING)
+              << "realmfuzzer ignored a request to close stderr: the engine does not "
+                 "currently have the ability to suppress stderr from other components being fuzzed.";
+        }
+        seed_corpus_->Configure(options);
+        live_corpus_->Configure(options);
+        mutagen_.Configure(options);
+        adapter_.Configure(options);
         for (auto& [target_id, process_proxy] : process_proxies_) {
-          process_proxy->Configure(options());
+          process_proxy->Configure(options);
         }
         return fpromise::ok();
       })
@@ -385,6 +399,13 @@ ZxPromise<Artifact> RealmFuzzerRunner::Merge() {
       })
       .and_then([]() -> ZxResult<Artifact> { return fpromise::ok(Artifact(FuzzResult::MERGED)); })
       .wrap_with(workflow_, Workflow::Mode::kFinish);
+}
+
+void RealmFuzzerRunner::UpdateMonitorsWithStatus(UpdateReason reason, Status status) {
+  if (bool(options()->output_flags() & OutputFlags::LIBFUZZER)) {
+    std::cerr << FormatLibFuzzerStats(reason, status) << std::endl;
+  }
+  Runner::UpdateMonitorsWithStatus(reason, std::move(status));
 }
 
 Status RealmFuzzerRunner::CollectStatus() {

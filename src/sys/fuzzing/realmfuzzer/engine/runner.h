@@ -76,6 +76,10 @@ class RealmFuzzerRunner final : public Runner {
   // done. This method is called automatically by |Workflow::Finish|.
   void FinishWorkflow() override;
 
+  // In addition to the base class's behavior, this method may produce additional output depending
+  // on the configured output mode in the options.
+  void UpdateMonitorsWithStatus(UpdateReason reason, Status status) override;
+
  private:
   // Indicates how the engine should handle inputs that don't trigger an error.
   enum PostProcessing {
