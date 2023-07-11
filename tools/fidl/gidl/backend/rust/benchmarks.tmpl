@@ -124,34 +124,38 @@ async fn {{ .Name }}_send_event_receiver_thread(receiver_fidl_chan_end: zx::Chan
 }
 
 fn benchmark_{{ .Name }}_send_event(b: &mut Bencher) {
-    let (sender_fifo, receiver_fifo) = std::sync::mpsc::sync_channel(1);
-    let (sender_fidl_chan_end, receiver_fidl_chan_end) = zx::Channel::create();
-    std::thread::spawn(|| {
+    let thread;
+    {
+        let (sender_fifo, receiver_fifo) = std::sync::mpsc::sync_channel(1);
+        let (sender_fidl_chan_end, receiver_fidl_chan_end) = zx::Channel::create();
+        thread = std::thread::spawn(|| {
+            fasync::LocalExecutor::new()
+                .run_singlethreaded(async move {
+                {{ .Name }}_send_event_receiver_thread(receiver_fidl_chan_end, sender_fifo).await;
+            });
+        });
         fasync::LocalExecutor::new()
             .run_singlethreaded(async move {
-            {{ .Name }}_send_event_receiver_thread(receiver_fidl_chan_end, sender_fifo).await;
-        });
-    });
-    fasync::LocalExecutor::new()
-        .run_singlethreaded(async move {
-            let async_sender_fidl_chan_end = fasync::Channel::from_channel(sender_fidl_chan_end).unwrap();
-            let sender = <{{ .ValueType }}EventProtocolRequestStream as fidl::endpoints::RequestStream>::from_channel(async_sender_fidl_chan_end);
-            {{- if .IsResource }}
-            b.iter_batched(|| {
-            {{- else }}
-            b.iter_batched_ref(|| {
-            {{- end }}
-                {{- if .HandleDefs }}
-                let handle_defs = create_handles(&{{ .HandleDefs }});
+                let async_sender_fidl_chan_end = fasync::Channel::from_channel(sender_fidl_chan_end).unwrap();
+                let sender = <{{ .ValueType }}EventProtocolRequestStream as fidl::endpoints::RequestStream>::from_channel(async_sender_fidl_chan_end);
+                {{- if .IsResource }}
+                b.iter_batched(|| {
+                {{- else }}
+                b.iter_batched_ref(|| {
                 {{- end }}
-                {{ .Value }}
-            },
-            |value| {
-                fidl::endpoints::RequestStream::control_handle(&sender).send_send_(value).unwrap();
-                receiver_fifo.recv().unwrap();
-            },
-            BatchSize::SmallInput);
-        });
+                    {{- if .HandleDefs }}
+                    let handle_defs = create_handles(&{{ .HandleDefs }});
+                    {{- end }}
+                    {{ .Value }}
+                },
+                |value| {
+                    fidl::endpoints::RequestStream::control_handle(&sender).send_send_(value).unwrap();
+                    receiver_fifo.recv().unwrap();
+                },
+                BatchSize::SmallInput);
+            });
+    }
+    thread.join().unwrap();
 }
 {{- end -}}
 
@@ -174,28 +178,32 @@ async fn {{ .Name }}_echo_call_server_thread(server_end: zx::Channel) {
 }
 
 fn benchmark_{{ .Name }}_echo_call(b: &mut Bencher) {
-    let (client_end, server_end) = zx::Channel::create();
-    std::thread::spawn(|| {
-        fasync::LocalExecutor::new()
-            .run_singlethreaded(async move {
-            {{ .Name }}_echo_call_server_thread(server_end).await;
+    let thread;
+    {
+        let (client_end, server_end) = zx::Channel::create();
+        thread = std::thread::spawn(|| {
+            fasync::LocalExecutor::new()
+                .run_singlethreaded(async move {
+                {{ .Name }}_echo_call_server_thread(server_end).await;
+            });
         });
-    });
-    let proxy = {{ .ValueType }}EchoCallSynchronousProxy::new(client_end);
-    {{- if .IsResource }}
-    b.iter_batched(|| {
-    {{- else }}
-    b.iter_batched_ref(|| {
-    {{- end }}
-        {{- if .HandleDefs }}
-        let handle_defs = create_handles(&{{ .HandleDefs }});
+        let proxy = {{ .ValueType }}EchoCallSynchronousProxy::new(client_end);
+        {{- if .IsResource }}
+        b.iter_batched(|| {
+        {{- else }}
+        b.iter_batched_ref(|| {
         {{- end }}
-        {{ .Value }}
-    },
-    |value| {
-        proxy.echo(value, zx::Time::after(zx::Duration::from_seconds(1))).unwrap();
-    },
-    BatchSize::SmallInput);
+            {{- if .HandleDefs }}
+            let handle_defs = create_handles(&{{ .HandleDefs }});
+            {{- end }}
+            {{ .Value }}
+        },
+        |value| {
+            proxy.echo(value, zx::Time::after(zx::Duration::from_seconds(1))).unwrap();
+        },
+        BatchSize::SmallInput);
+    }
+    thread.join().unwrap();
 }
 {{- end -}}
 {{ end }}
