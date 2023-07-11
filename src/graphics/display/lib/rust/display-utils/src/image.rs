@@ -22,7 +22,7 @@ use crate::{
     controller::Coordinator,
     error::{Error, Result},
     pixel_format::PixelFormat,
-    types::{CollectionId, ImageId},
+    types::{BufferCollectionId, ImageId},
 };
 
 /// Input parameters for constructing an image.
@@ -52,7 +52,7 @@ pub struct Image {
     pub id: ImageId,
 
     /// The ID of the sysmem buffer collection that backs this image.
-    pub collection_id: CollectionId,
+    pub collection_id: BufferCollectionId,
 
     /// The VMO that contains the shared image buffer.
     pub vmo: zx::Vmo,
@@ -128,7 +128,7 @@ impl From<ImageParameters> for fdisplay::ImageConfig {
 // the buffer collection unless `release()` is called on it. This is intended to clean up resources
 // in the early-return cases above.
 struct BufferCollection {
-    id: CollectionId,
+    id: BufferCollectionId,
     info: BufferCollectionInfo2,
     proxy: BufferCollectionProxy,
     coordinator: Coordinator,

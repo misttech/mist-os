@@ -22,7 +22,9 @@ use {
 use crate::{
     config::{DisplayConfig, LayerConfig},
     error::{ConfigError, Error, Result},
-    types::{BufferId, CollectionId, DisplayId, DisplayInfo, Event, EventId, ImageId, LayerId},
+    types::{
+        BufferCollectionId, BufferId, DisplayId, DisplayInfo, Event, EventId, ImageId, LayerId,
+    },
     INVALID_EVENT_ID,
 };
 
@@ -261,12 +263,12 @@ impl Coordinator {
         Ok(response.value)
     }
 
-    /// Import a sysmem buffer collection. The returned `CollectionId` can be used in future API
-    /// calls to refer to the imported collection.
+    /// Import a sysmem buffer collection. The returned `BufferCollectionId` can be used in future
+    /// API calls to refer to the imported collection.
     pub(crate) async fn import_buffer_collection(
         &self,
         token: ClientEnd<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>,
-    ) -> Result<CollectionId> {
+    ) -> Result<BufferCollectionId> {
         let id = self.inner.write().next_free_collection_id()?;
         let proxy = self.proxy();
 
@@ -288,14 +290,14 @@ impl Coordinator {
     }
 
     /// Notify the display driver to release its handle on a previously imported buffer collection.
-    pub(crate) fn release_buffer_collection(&self, id: CollectionId) -> Result<()> {
+    pub(crate) fn release_buffer_collection(&self, id: BufferCollectionId) -> Result<()> {
         self.inner.read().proxy.release_buffer_collection(&id.into()).map_err(Error::from)
     }
 
     /// Register a sysmem buffer collection backed image to the display driver.
     pub(crate) async fn import_image(
         &self,
-        collection_id: CollectionId,
+        collection_id: BufferCollectionId,
         image_id: ImageId,
         config: display::ImageConfig,
     ) -> Result<()> {
@@ -317,9 +319,9 @@ impl fmt::Debug for Coordinator {
 }
 
 impl CoordinatorInner {
-    fn next_free_collection_id(&mut self) -> Result<CollectionId> {
+    fn next_free_collection_id(&mut self) -> Result<BufferCollectionId> {
         self.id_counter = self.id_counter.checked_add(1).ok_or(Error::IdsExhausted)?;
-        Ok(CollectionId(self.id_counter))
+        Ok(BufferCollectionId(self.id_counter))
     }
 
     fn next_free_event_id(&mut self) -> Result<EventId> {

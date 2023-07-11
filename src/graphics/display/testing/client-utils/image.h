@@ -53,8 +53,8 @@ class Image {
 
  private:
   Image(uint32_t width, uint32_t height, int32_t stride, fuchsia_images2::wire::PixelFormat format,
-        display::BufferCollectionId collection_id, void* buf, Pattern pattern, uint32_t fg_color,
-        uint32_t bg_color, uint64_t modifier);
+        display::BufferCollectionId buffer_collection_id, void* buf, Pattern pattern,
+        uint32_t fg_color, uint32_t bg_color, uint64_t modifier);
 
   void RenderNv12(int32_t prev_step, int32_t step_num);
 
@@ -69,7 +69,7 @@ class Image {
   uint32_t stride_;
   fuchsia_images2::wire::PixelFormat format_;
 
-  display::BufferCollectionId collection_id_;
+  display::BufferCollectionId buffer_collection_id_;
   void* buf_;
 
   const Pattern pattern_;

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use display_utils::CollectionId;
+use display_utils::BufferCollectionId;
 use std::collections::BTreeSet;
 
 pub mod sysmem;
@@ -17,7 +17,7 @@ pub type ImageId = u64;
 pub struct FrameSet {
     // TODO(fxbug.dev/84729)
     #[allow(unused)]
-    collection_id: CollectionId,
+    collection_id: BufferCollectionId,
     image_count: usize,
     available: BTreeSet<ImageId>,
     pub prepared: Option<ImageId>,
@@ -25,7 +25,7 @@ pub struct FrameSet {
 }
 
 impl FrameSet {
-    pub fn new(collection_id: CollectionId, available: BTreeSet<ImageId>) -> FrameSet {
+    pub fn new(collection_id: BufferCollectionId, available: BTreeSet<ImageId>) -> FrameSet {
         FrameSet {
             collection_id,
             image_count: available.len(),
@@ -41,7 +41,7 @@ impl FrameSet {
         for image_id in r {
             available.insert(image_id);
         }
-        Self::new(CollectionId(0), available)
+        Self::new(BufferCollectionId(0), available)
     }
 
     pub fn mark_presented(&mut self, image_id: ImageId) {

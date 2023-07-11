@@ -203,7 +203,7 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
   }
 
   const display::BufferCollectionId buffer_collection_id =
-      ToBufferCollectionId(request->collection_id);
+      ToBufferCollectionId(request->buffer_collection_id);
   // TODO: Switch to .contains() when C++20.
   if (collection_map_.count(buffer_collection_id)) {
     completer.Reply(ZX_ERR_INVALID_ARGS);
@@ -215,7 +215,7 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
   const uint64_t banjo_driver_buffer_collection_id =
       display::ToBanjoDriverBufferCollectionId(driver_buffer_collection_id);
   zx_status_t import_status = controller_->dc()->ImportBufferCollection(
-      banjo_driver_buffer_collection_id, request->collection_token.TakeChannel());
+      banjo_driver_buffer_collection_id, request->buffer_collection_token.TakeChannel());
   if (import_status != ZX_OK) {
     zxlogf(WARNING, "Cannot import BufferCollection to display driver: %s",
            zx_status_get_string(import_status));
@@ -231,7 +231,7 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
 void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
                                      ReleaseBufferCollectionCompleter::Sync& /*_completer*/) {
   const display::BufferCollectionId buffer_collection_id =
-      ToBufferCollectionId(request->collection_id);
+      ToBufferCollectionId(request->buffer_collection_id);
   auto it = collection_map_.find(buffer_collection_id);
   if (it == collection_map_.end()) {
     return;
@@ -249,7 +249,7 @@ void Client::SetBufferCollectionConstraints(
     SetBufferCollectionConstraintsRequestView request,
     SetBufferCollectionConstraintsCompleter::Sync& completer) {
   const display::BufferCollectionId buffer_collection_id =
-      ToBufferCollectionId(request->collection_id);
+      ToBufferCollectionId(request->buffer_collection_id);
   auto it = collection_map_.find(buffer_collection_id);
   if (it == collection_map_.end()) {
     completer.Reply(ZX_ERR_INVALID_ARGS);

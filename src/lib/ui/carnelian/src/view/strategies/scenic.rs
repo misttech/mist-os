@@ -18,7 +18,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context, Error, Result};
 use async_trait::async_trait;
-use display_utils::CollectionId as DisplayCollectionId;
+use display_utils::BufferCollectionId as DisplayBufferCollectionId;
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_ui_gfx::{self as gfx};
 use fidl_fuchsia_ui_views::{ViewRef, ViewRefControl, ViewToken};
@@ -95,7 +95,7 @@ impl Plumber {
             images.insert(image_id as u64, image);
         }
 
-        let frame_set = FrameSet::new(DisplayCollectionId(collection_id as u64), image_ids);
+        let frame_set = FrameSet::new(DisplayBufferCollectionId(collection_id as u64), image_ids);
         Ok(Plumber {
             size,
             buffer_count,

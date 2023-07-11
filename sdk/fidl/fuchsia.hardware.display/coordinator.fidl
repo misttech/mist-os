@@ -449,18 +449,18 @@ closed protocol Coordinator {
         has_ownership bool;
     });
 
-    // Import a sysmem buffer collection token. `collection_id` must not
+    // Import a sysmem buffer collection token. `buffer_collection_id` must not
     // already be in use.
     strict ImportBufferCollection(resource struct {
-        collection_id BufferCollectionId;
-        collection_token client_end:fuchsia.sysmem.BufferCollectionToken;
+        buffer_collection_id BufferCollectionId;
+        buffer_collection_token client_end:fuchsia.sysmem.BufferCollectionToken;
     }) -> (struct {
         res zx.Status;
     });
 
     // Release an imported buffer collection.
     strict ReleaseBufferCollection(struct {
-        collection_id BufferCollectionId;
+        buffer_collection_id BufferCollectionId;
     });
 
     // Takes an imported buffer collection and sets the constraints
@@ -470,7 +470,7 @@ closed protocol Coordinator {
     // TODO(fxbug.dev/85320): Update this API to better support
     // optional fields.
     strict SetBufferCollectionConstraints(struct {
-        collection_id BufferCollectionId;
+        buffer_collection_id BufferCollectionId;
         config ImageConfig;
     }) -> (struct {
         res zx.Status;

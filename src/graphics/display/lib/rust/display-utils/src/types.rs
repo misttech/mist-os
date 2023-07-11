@@ -5,7 +5,7 @@
 use crate::{error::Result, pixel_format::PixelFormat};
 use {
     fidl_fuchsia_hardware_display::{
-        BufferCollectionId as FidlCollectionId, BufferId as FidlBufferId,
+        BufferCollectionId as FidlBufferCollectionId, BufferId as FidlBufferId,
         DisplayId as FidlDisplayId, EventId as FidlEventId, ImageId as FidlImageId, Info,
         LayerId as FidlLayerId, INVALID_DISP_ID,
     },
@@ -116,17 +116,17 @@ impl From<ImageId> for FidlImageId {
 
 /// Strongly typed wrapper around a sysmem buffer collection ID.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct CollectionId(pub u64);
+pub struct BufferCollectionId(pub u64);
 
-impl From<FidlCollectionId> for CollectionId {
-    fn from(fidl_collection_id: FidlCollectionId) -> Self {
-        CollectionId(fidl_collection_id.value)
+impl From<FidlBufferCollectionId> for BufferCollectionId {
+    fn from(fidl_buffer_collection_id: FidlBufferCollectionId) -> Self {
+        BufferCollectionId(fidl_buffer_collection_id.value)
     }
 }
 
-impl From<CollectionId> for FidlCollectionId {
-    fn from(buffer_collection_id: CollectionId) -> Self {
-        FidlCollectionId { value: buffer_collection_id.0 }
+impl From<BufferCollectionId> for FidlBufferCollectionId {
+    fn from(buffer_collection_id: BufferCollectionId) -> Self {
+        FidlBufferCollectionId { value: buffer_collection_id.0 }
     }
 }
 
@@ -136,14 +136,14 @@ impl From<CollectionId> for FidlCollectionId {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BufferId {
     /// Identifies the buffer collection.
-    pub buffer_collection_id: CollectionId,
+    pub buffer_collection_id: BufferCollectionId,
     /// Index of the buffer within the buffer collection.
     pub buffer_index: u32,
 }
 
 impl BufferId {
     /// Creates a `BufferId` using given `buffer_collection_id` and `index`.
-    pub fn new(buffer_collection_id: CollectionId, buffer_index: u32) -> Self {
+    pub fn new(buffer_collection_id: BufferCollectionId, buffer_index: u32) -> Self {
         BufferId { buffer_collection_id, buffer_index }
     }
 }
@@ -344,35 +344,53 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn collection_id_from_fidl_collection_id() {
-        assert_eq!(CollectionId(1), CollectionId::from(FidlCollectionId { value: 1 }));
-        assert_eq!(CollectionId(2), CollectionId::from(FidlCollectionId { value: 2 }));
+    fn buffer_collection_id_from_fidl_buffer_collection_id() {
+        assert_eq!(
+            BufferCollectionId(1),
+            BufferCollectionId::from(FidlBufferCollectionId { value: 1 })
+        );
+        assert_eq!(
+            BufferCollectionId(2),
+            BufferCollectionId::from(FidlBufferCollectionId { value: 2 })
+        );
         const LARGE: u64 = 1 << 63;
-        assert_eq!(CollectionId(LARGE), CollectionId::from(FidlCollectionId { value: LARGE }));
+        assert_eq!(
+            BufferCollectionId(LARGE),
+            BufferCollectionId::from(FidlBufferCollectionId { value: LARGE })
+        );
     }
 
     #[fuchsia::test]
-    fn fidl_collection_id_from_collection_id() {
-        assert_eq!(FidlCollectionId { value: 1 }, FidlCollectionId::from(CollectionId(1)));
-        assert_eq!(FidlCollectionId { value: 2 }, FidlCollectionId::from(CollectionId(2)));
+    fn fidl_buffer_collection_id_from_buffer_collection_id() {
+        assert_eq!(
+            FidlBufferCollectionId { value: 1 },
+            FidlBufferCollectionId::from(BufferCollectionId(1))
+        );
+        assert_eq!(
+            FidlBufferCollectionId { value: 2 },
+            FidlBufferCollectionId::from(BufferCollectionId(2))
+        );
         const LARGE: u64 = 1 << 63;
-        assert_eq!(FidlCollectionId { value: LARGE }, FidlCollectionId::from(CollectionId(LARGE)));
+        assert_eq!(
+            FidlBufferCollectionId { value: LARGE },
+            FidlBufferCollectionId::from(BufferCollectionId(LARGE))
+        );
     }
 
     #[fuchsia::test]
-    fn fidl_collection_id_to_collection_id() {
-        assert_eq!(CollectionId(1), FidlCollectionId { value: 1 }.into());
-        assert_eq!(CollectionId(2), FidlCollectionId { value: 2 }.into());
+    fn fidl_buffer_collection_id_to_buffer_collection_id() {
+        assert_eq!(BufferCollectionId(1), FidlBufferCollectionId { value: 1 }.into());
+        assert_eq!(BufferCollectionId(2), FidlBufferCollectionId { value: 2 }.into());
         const LARGE: u64 = 1 << 63;
-        assert_eq!(CollectionId(LARGE), FidlCollectionId { value: LARGE }.into());
+        assert_eq!(BufferCollectionId(LARGE), FidlBufferCollectionId { value: LARGE }.into());
     }
 
     #[fuchsia::test]
-    fn collection_id_to_fidl_collection_id() {
-        assert_eq!(FidlCollectionId { value: 1 }, CollectionId(1).into());
-        assert_eq!(FidlCollectionId { value: 2 }, CollectionId(2).into());
+    fn buffer_collection_id_to_fidl_buffer_collection_id() {
+        assert_eq!(FidlBufferCollectionId { value: 1 }, BufferCollectionId(1).into());
+        assert_eq!(FidlBufferCollectionId { value: 2 }, BufferCollectionId(2).into());
         const LARGE: u64 = 1 << 63;
-        assert_eq!(FidlCollectionId { value: LARGE }, CollectionId(LARGE).into());
+        assert_eq!(FidlBufferCollectionId { value: LARGE }, BufferCollectionId(LARGE).into());
     }
 
     #[fuchsia::test]
@@ -462,43 +480,43 @@ mod tests {
     #[fuchsia::test]
     fn buffer_id_new() {
         assert_eq!(
-            BufferId { buffer_collection_id: CollectionId(1), buffer_index: 2 },
-            BufferId::new(CollectionId(1), 2)
+            BufferId { buffer_collection_id: BufferCollectionId(1), buffer_index: 2 },
+            BufferId::new(BufferCollectionId(1), 2)
         );
         assert_eq!(
-            BufferId { buffer_collection_id: CollectionId(2), buffer_index: 3 },
-            BufferId::new(CollectionId(2), 3)
+            BufferId { buffer_collection_id: BufferCollectionId(2), buffer_index: 3 },
+            BufferId::new(BufferCollectionId(2), 3)
         );
         const LARGE_64: u64 = 1 << 63;
         const LARGE_32: u32 = 1 << 31;
         assert_eq!(
-            BufferId { buffer_collection_id: CollectionId(LARGE_64), buffer_index: LARGE_32 },
-            BufferId::new(CollectionId(LARGE_64), LARGE_32)
+            BufferId { buffer_collection_id: BufferCollectionId(LARGE_64), buffer_index: LARGE_32 },
+            BufferId::new(BufferCollectionId(LARGE_64), LARGE_32)
         );
     }
 
     #[fuchsia::test]
     fn buffer_id_from_fidl_buffer_id() {
         assert_eq!(
-            BufferId { buffer_collection_id: CollectionId(1), buffer_index: 2 },
+            BufferId { buffer_collection_id: BufferCollectionId(1), buffer_index: 2 },
             BufferId::from(FidlBufferId {
-                buffer_collection_id: FidlCollectionId { value: 1 },
+                buffer_collection_id: FidlBufferCollectionId { value: 1 },
                 buffer_index: 2
             })
         );
         assert_eq!(
-            BufferId { buffer_collection_id: CollectionId(2), buffer_index: 3 },
+            BufferId { buffer_collection_id: BufferCollectionId(2), buffer_index: 3 },
             BufferId::from(FidlBufferId {
-                buffer_collection_id: FidlCollectionId { value: 2 },
+                buffer_collection_id: FidlBufferCollectionId { value: 2 },
                 buffer_index: 3
             })
         );
         const LARGE_64: u64 = 1 << 63;
         const LARGE_32: u32 = 1 << 31;
         assert_eq!(
-            BufferId { buffer_collection_id: CollectionId(LARGE_64), buffer_index: LARGE_32 },
+            BufferId { buffer_collection_id: BufferCollectionId(LARGE_64), buffer_index: LARGE_32 },
             BufferId::from(FidlBufferId {
-                buffer_collection_id: FidlCollectionId { value: LARGE_64 },
+                buffer_collection_id: FidlBufferCollectionId { value: LARGE_64 },
                 buffer_index: LARGE_32
             })
         );
@@ -507,22 +525,34 @@ mod tests {
     #[fuchsia::test]
     fn fidl_buffer_id_from_buffer_id() {
         assert_eq!(
-            FidlBufferId { buffer_collection_id: FidlCollectionId { value: 1 }, buffer_index: 2 },
-            FidlBufferId::from(BufferId { buffer_collection_id: CollectionId(1), buffer_index: 2 })
+            FidlBufferId {
+                buffer_collection_id: FidlBufferCollectionId { value: 1 },
+                buffer_index: 2
+            },
+            FidlBufferId::from(BufferId {
+                buffer_collection_id: BufferCollectionId(1),
+                buffer_index: 2
+            })
         );
         assert_eq!(
-            FidlBufferId { buffer_collection_id: FidlCollectionId { value: 2 }, buffer_index: 3 },
-            FidlBufferId::from(BufferId { buffer_collection_id: CollectionId(2), buffer_index: 3 })
+            FidlBufferId {
+                buffer_collection_id: FidlBufferCollectionId { value: 2 },
+                buffer_index: 3
+            },
+            FidlBufferId::from(BufferId {
+                buffer_collection_id: BufferCollectionId(2),
+                buffer_index: 3
+            })
         );
         const LARGE_64: u64 = 1 << 63;
         const LARGE_32: u32 = 1 << 31;
         assert_eq!(
             FidlBufferId {
-                buffer_collection_id: FidlCollectionId { value: LARGE_64 },
+                buffer_collection_id: FidlBufferCollectionId { value: LARGE_64 },
                 buffer_index: LARGE_32
             },
             FidlBufferId::from(BufferId {
-                buffer_collection_id: CollectionId(LARGE_64),
+                buffer_collection_id: BufferCollectionId(LARGE_64),
                 buffer_index: LARGE_32
             })
         );
@@ -531,21 +561,27 @@ mod tests {
     #[fuchsia::test]
     fn fidl_buffer_id_to_buffer_id() {
         assert_eq!(
-            BufferId { buffer_collection_id: CollectionId(1), buffer_index: 2 },
-            FidlBufferId { buffer_collection_id: FidlCollectionId { value: 1 }, buffer_index: 2 }
-                .into()
+            BufferId { buffer_collection_id: BufferCollectionId(1), buffer_index: 2 },
+            FidlBufferId {
+                buffer_collection_id: FidlBufferCollectionId { value: 1 },
+                buffer_index: 2
+            }
+            .into()
         );
         assert_eq!(
-            BufferId { buffer_collection_id: CollectionId(2), buffer_index: 3 },
-            FidlBufferId { buffer_collection_id: FidlCollectionId { value: 2 }, buffer_index: 3 }
-                .into()
+            BufferId { buffer_collection_id: BufferCollectionId(2), buffer_index: 3 },
+            FidlBufferId {
+                buffer_collection_id: FidlBufferCollectionId { value: 2 },
+                buffer_index: 3
+            }
+            .into()
         );
         const LARGE_64: u64 = 1 << 63;
         const LARGE_32: u32 = 1 << 31;
         assert_eq!(
-            BufferId { buffer_collection_id: CollectionId(LARGE_64), buffer_index: LARGE_32 },
+            BufferId { buffer_collection_id: BufferCollectionId(LARGE_64), buffer_index: LARGE_32 },
             FidlBufferId {
-                buffer_collection_id: FidlCollectionId { value: LARGE_64 },
+                buffer_collection_id: FidlBufferCollectionId { value: LARGE_64 },
                 buffer_index: LARGE_32
             }
             .into()
@@ -555,21 +591,27 @@ mod tests {
     #[fuchsia::test]
     fn buffer_id_to_fidl_buffer_id() {
         assert_eq!(
-            FidlBufferId { buffer_collection_id: FidlCollectionId { value: 1 }, buffer_index: 2 },
-            BufferId { buffer_collection_id: CollectionId(1), buffer_index: 2 }.into()
+            FidlBufferId {
+                buffer_collection_id: FidlBufferCollectionId { value: 1 },
+                buffer_index: 2
+            },
+            BufferId { buffer_collection_id: BufferCollectionId(1), buffer_index: 2 }.into()
         );
         assert_eq!(
-            FidlBufferId { buffer_collection_id: FidlCollectionId { value: 2 }, buffer_index: 3 },
-            BufferId { buffer_collection_id: CollectionId(2), buffer_index: 3 }.into()
+            FidlBufferId {
+                buffer_collection_id: FidlBufferCollectionId { value: 2 },
+                buffer_index: 3
+            },
+            BufferId { buffer_collection_id: BufferCollectionId(2), buffer_index: 3 }.into()
         );
         const LARGE_64: u64 = 1 << 63;
         const LARGE_32: u32 = 1 << 31;
         assert_eq!(
             FidlBufferId {
-                buffer_collection_id: FidlCollectionId { value: LARGE_64 },
+                buffer_collection_id: FidlBufferCollectionId { value: LARGE_64 },
                 buffer_index: LARGE_32
             },
-            BufferId { buffer_collection_id: CollectionId(LARGE_64), buffer_index: LARGE_32 }
+            BufferId { buffer_collection_id: BufferCollectionId(LARGE_64), buffer_index: LARGE_32 }
                 .into()
         );
     }

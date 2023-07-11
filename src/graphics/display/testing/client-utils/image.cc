@@ -49,13 +49,14 @@ namespace fhd = fuchsia_hardware_display;
 namespace display_test {
 
 Image::Image(uint32_t width, uint32_t height, int32_t stride,
-             fuchsia_images2::wire::PixelFormat format, display::BufferCollectionId collection_id,
-             void* buf, Pattern pattern, uint32_t fg_color, uint32_t bg_color, uint64_t modifier)
+             fuchsia_images2::wire::PixelFormat format,
+             display::BufferCollectionId buffer_collection_id, void* buf, Pattern pattern,
+             uint32_t fg_color, uint32_t bg_color, uint64_t modifier)
     : width_(width),
       height_(height),
       stride_(stride),
       format_(format),
-      collection_id_(collection_id),
+      buffer_collection_id_(buffer_collection_id),
       buf_(buf),
       pattern_(pattern),
       fg_color_(fg_color),
@@ -105,17 +106,17 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
     display_token_handle = std::move(client);
   }
 
-  static display::BufferCollectionId next_collection_id(fhd::wire::kInvalidDispId + 1);
-  display::BufferCollectionId collection_id = next_collection_id++;
+  static display::BufferCollectionId next_buffer_collection_id(fhd::wire::kInvalidDispId + 1);
+  display::BufferCollectionId buffer_collection_id = next_buffer_collection_id++;
   if (!token->Sync().ok()) {
     fprintf(stderr, "Failed to sync token\n");
     return nullptr;
   }
 
-  fuchsia_hardware_display::wire::BufferCollectionId fidl_collection_id =
-      display::ToFidlBufferCollectionId(collection_id);
+  fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
+      display::ToFidlBufferCollectionId(buffer_collection_id);
   auto import_result =
-      dc->ImportBufferCollection(fidl_collection_id, std::move(display_token_handle));
+      dc->ImportBufferCollection(fidl_buffer_collection_id, std::move(display_token_handle));
   if (!import_result.ok() || import_result.value().res != ZX_OK) {
     fprintf(stderr, "Failed to import buffer collection\n");
     return nullptr;
@@ -126,7 +127,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
   image_config.width = width;
   image_config.type = 0;  // 0 for any image type.
   auto set_constraints_result =
-      dc->SetBufferCollectionConstraints(fidl_collection_id, image_config);
+      dc->SetBufferCollectionConstraints(fidl_buffer_collection_id, image_config);
   if (!set_constraints_result.ok() || set_constraints_result.value().res != ZX_OK) {
     fprintf(stderr, "Failed to set constraints\n");
     return nullptr;
@@ -260,8 +261,8 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
   }
   zx_cache_flush(ptr, buffer_size, ZX_CACHE_FLUSH_DATA);
 
-  return new Image(width, height, stride_pixels, format, collection_id, ptr, pattern, fg_color,
-                   bg_color, modifier);
+  return new Image(width, height, stride_pixels, format, buffer_collection_id, ptr, pattern,
+                   fg_color, bg_color, modifier);
 }
 
 #define STRIPE_SIZE 37  // prime to make movement more interesting
@@ -501,13 +502,13 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, display::Im
 
   fhd::wire::ImageConfig image_config;
   GetConfig(&image_config);
-  const fidl::WireResult import_result =
-      dc->ImportImage(image_config,
-                      fhd::wire::BufferId{
-                          .buffer_collection_id = display::ToFidlBufferCollectionId(collection_id_),
-                          .buffer_index = 0,
-                      },
-                      display::ToFidlImageId(image_id));
+  const fidl::WireResult import_result = dc->ImportImage(
+      image_config,
+      fhd::wire::BufferId{
+          .buffer_collection_id = display::ToFidlBufferCollectionId(buffer_collection_id_),
+          .buffer_index = 0,
+      },
+      display::ToFidlImageId(image_id));
   if (!import_result.ok()) {
     printf("Failed to import image: %s\n", import_result.FormatDescription().c_str());
     return false;
@@ -521,7 +522,7 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, display::Im
 
   // image has been imported. we can close the connection
   [[maybe_unused]] fidl::Status result =
-      dc->ReleaseBufferCollection(display::ToFidlBufferCollectionId(collection_id_));
+      dc->ReleaseBufferCollection(display::ToFidlBufferCollectionId(buffer_collection_id_));
   return true;
 }
 

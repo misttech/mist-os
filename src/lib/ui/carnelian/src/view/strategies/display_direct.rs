@@ -22,7 +22,7 @@ use crate::{
 use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
 use display_utils::{
-    BufferId, CollectionId, EventId, ImageId as DisplayImageId, LayerId, PixelFormat,
+    BufferCollectionId, BufferId, EventId, ImageId as DisplayImageId, LayerId, PixelFormat,
     INVALID_LAYER_ID,
 };
 use euclid::size2;
@@ -45,9 +45,9 @@ type WaitEvents = BTreeMap<ImageId, (Event, EventId)>;
 struct CollectionIdGenerator {}
 
 impl Iterator for CollectionIdGenerator {
-    type Item = CollectionId;
+    type Item = BufferCollectionId;
 
-    fn next(&mut self) -> Option<CollectionId> {
+    fn next(&mut self) -> Option<BufferCollectionId> {
         static NEXT_ID_VALUE: AtomicU64 = AtomicU64::new(100);
         // NEXT_ID_VALUE only increments so it only requires atomicity, and we
         // can use Relaxed order.
@@ -57,11 +57,11 @@ impl Iterator for CollectionIdGenerator {
         if value == 0 {
             None
         } else {
-            Some(CollectionId(value))
+            Some(BufferCollectionId(value))
         }
     }
 }
-fn next_collection_id() -> CollectionId {
+fn next_collection_id() -> BufferCollectionId {
     CollectionIdGenerator::default().next().expect("collection_id")
 }
 
@@ -171,7 +171,7 @@ pub(crate) struct DisplayDirectViewStrategy {
     vsync_phase: Time,
     vsync_interval: Duration,
     mouse_cursor_position: Option<IntPoint>,
-    pub collection_id: CollectionId,
+    pub collection_id: BufferCollectionId,
     render_frame_count: usize,
     presented: Option<u64>,
 }
@@ -284,7 +284,7 @@ impl DisplayDirectViewStrategy {
     }
 
     async fn allocate_display_resources(
-        collection_id: CollectionId,
+        collection_id: BufferCollectionId,
         size: IntSize,
         pixel_format: display_utils::PixelFormat,
         render_frame_count: usize,
@@ -615,7 +615,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
     }
 
     fn image_freed(&mut self, image_id: u64, collection_id: u32) {
-        if CollectionId(collection_id as u64) == self.collection_id {
+        if BufferCollectionId(collection_id as u64) == self.collection_id {
             instant!(
                 "gfx",
                 "DisplayDirectViewStrategy::image_freed",
