@@ -1320,15 +1320,6 @@ fn test_autoconnect_to_saved_network() {
     // Enable client connections.
     let mut iface_sme_stream = prepare_client_interface(&mut exec, &mut test_values);
 
-    // Check for a listener update saying client connections are enabled.
-    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.listener_updates_stream,
-    );
-    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
-    assert_eq!(networks.unwrap().len(), 0);
-
     // Passive scanning should start due to the idle interface and saved network.
     let expected_scan_request = fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest);
     let mutual_security_protocols = security_protocols_from_protection(Scanned::Wpa2Personal);
@@ -1457,6 +1448,15 @@ fn test_autoconnect_to_saved_network() {
         }
     );
 
+    // Check for a listener update saying client connections are enabled.
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    assert_eq!(networks.unwrap().len(), 0);
+
     // Check for listener update saying we're connecting.
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
         &mut exec,
@@ -1576,15 +1576,6 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
         // Enable client connections.
         let mut iface_sme_stream = prepare_client_interface(&mut exec, &mut test_values);
 
-        // Check for a listener update saying client connections are enabled.
-        let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
-            &mut exec,
-            &mut test_values.internal_objects.internal_futures,
-            &mut test_values.external_interfaces.listener_updates_stream,
-        );
-        assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
-        assert_eq!(networks.unwrap().len(), 0);
-
         // Generate mock scan results
         let mutual_security_protocols = security_protocols_from_protection(Scanned::Wpa2Personal);
         assert!(!mutual_security_protocols.is_empty(), "no mutual security protocols");
@@ -1698,6 +1689,15 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
                 assert!(responder.send().is_ok());
             }
         );
+
+        // Check for a listener update saying client connections are enabled.
+        let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+            &mut exec,
+            &mut test_values.internal_objects.internal_futures,
+            &mut test_values.external_interfaces.listener_updates_stream,
+        );
+        assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+        assert_eq!(networks.unwrap().len(), 0);
 
         // Check for listener update saying we're connecting.
         let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
