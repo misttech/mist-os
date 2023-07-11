@@ -107,10 +107,11 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
         name: &str,
         _attributes: &Option<Vec<Attribute>>,
         methods: &Vec<Method>,
-        _ir: &FidlIr,
+        ir: &FidlIr,
     ) -> Result<String, Error> {
         let assignments = methods
             .into_iter()
+            .filter(|m| doesnt_use_error_syntax(m, ir))
             .map(|m| {
                 format!(
                     "        {protocol_name_c}_protocol_ops_.{c_name} = {protocol_name}{cpp_name};",
@@ -138,10 +139,11 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
         name: &str,
         _attributes: &Option<Vec<Attribute>>,
         methods: &Vec<Method>,
-        _ir: &FidlIr,
+        ir: &FidlIr,
     ) -> Result<String, Error> {
         let assignments = methods
             .into_iter()
+            .filter(|m| doesnt_use_error_syntax(m, ir))
             .map(|m| {
                 format!(
                     "        {protocol_name_c}_protocol_ops_.{c_name} = {protocol_name}{cpp_name};",
@@ -163,7 +165,9 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
         methods: &Vec<Method>,
         ir: &FidlIr,
     ) -> Result<String, Error> {
-        methods.iter().map(|m| {
+        methods.iter()
+            .filter(|m| doesnt_use_error_syntax(m, ir))
+            .map(|m| {
             let mut accum = String::new();
             accum.push_str(get_doc_comment(&m.maybe_attributes, 1).as_str());
 
@@ -229,6 +233,7 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
     ) -> Result<String, Error> {
         methods
             .iter()
+            .filter(|m| doesnt_use_error_syntax(m, ir))
             .map(|m| {
                 let mut accum = String::new();
                 accum.push_str(get_doc_comment(&m.maybe_attributes, 1).as_str());
@@ -448,6 +453,7 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
                 let example_decls = data
                     .methods
                     .iter()
+                    .filter(|m| doesnt_use_error_syntax(m, ir))
                     .map(|m| {
                         let (out_params, return_param) = get_out_params(&m, name, true, ir)?;
                         let in_params = get_in_params(&m, true, false, ir)?;

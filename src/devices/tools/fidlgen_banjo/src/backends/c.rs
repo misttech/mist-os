@@ -5,9 +5,9 @@
 use {
     super::{
         util::{
-            array_bounds, for_banjo_transport, get_base_type_from_alias, get_declarations,
-            get_doc_comment, is_derive_debug, is_namespaced, name_buffer, name_size, not_callback,
-            primitive_type_to_c_str, to_c_name, Decl, ProtocolType,
+            array_bounds, doesnt_use_error_syntax, for_banjo_transport, get_base_type_from_alias,
+            get_declarations, get_doc_comment, is_derive_debug, is_namespaced, name_buffer,
+            name_size, not_callback, primitive_type_to_c_str, to_c_name, Decl, ProtocolType,
         },
         Backend,
     },
@@ -745,6 +745,7 @@ impl<'a, W: io::Write> CBackend<'a, W> {
     ) -> Result<String, Error> {
         let fns = methods
             .iter()
+            .filter(|m| doesnt_use_error_syntax(m, ir))
             .map(|m| {
                 let (out_params, return_param) = get_out_params(name, &m, ir)?;
                 let in_params = get_in_params(&m, false, ir)?;
@@ -775,6 +776,7 @@ impl<'a, W: io::Write> CBackend<'a, W> {
         let name = data.name.get_name();
         data.methods
             .iter()
+            .filter(|m| doesnt_use_error_syntax(m, ir))
             .map(|m| {
                 let mut accum = String::new();
                 accum.push_str(get_doc_comment(&m.maybe_attributes, 0).as_str());

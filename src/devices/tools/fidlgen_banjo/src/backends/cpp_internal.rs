@@ -28,6 +28,7 @@ impl<'a, W: io::Write> CppInternalBackend<'a, W> {
     ) -> Result<String, Error> {
         methods
             .iter()
+            .filter(|m| doesnt_use_error_syntax(m, ir))
             .map(|m| {
                 let (out_params, return_param) = get_out_params(&m, name, true, ir)?;
                 let in_params = get_in_params(&m, true, false, ir)?;
@@ -56,6 +57,7 @@ impl<'a, W: io::Write> CppInternalBackend<'a, W> {
     ) -> Result<String, Error> {
         methods
             .iter()
+            .filter(|m| doesnt_use_error_syntax(m, ir))
             .map(|m| {
                 let (out_params, return_param) = get_out_params(&m, name, true, ir)?;
                 let in_params = get_in_params(&m, true, false, ir)?;

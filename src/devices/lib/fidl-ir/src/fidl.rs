@@ -456,7 +456,11 @@ pub struct Method {
     pub maybe_request_payload: Option<Type>,
     pub has_response: bool,
     pub maybe_response_payload: Option<Type>,
+    pub maybe_response_result_type: Option<Type>,
+    pub maybe_response_success_type: Option<Type>,
+    pub maybe_response_err_type: Option<Type>,
     pub is_composed: bool,
+    pub has_error: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -569,6 +573,12 @@ pub struct Union {
     pub strict: bool,
     pub resource: bool,
     pub type_shape_v1: TypeShape,
+}
+
+impl Union {
+    pub fn is_anonymous(&self) -> bool {
+        self.naming_context.len() > 1
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -757,13 +767,41 @@ impl FidlIr {
                         }?;
                     }
                     if method.maybe_response_payload.is_some() {
-                        return match method.maybe_response_payload.as_ref().unwrap() {
+                        match method.maybe_response_payload.as_ref().unwrap() {
                             Type::Identifier { identifier, .. } => {
                                 message_body_type_names.insert(identifier.clone());
                                 Ok(())
                             }
                             _ => Err(anyhow!("The kind of the response payload for method {:?} must be 'identifier'", method.name)),
-                        }
+                        }?;
+                    }
+                    if method.maybe_response_result_type.is_some() {
+                        match method.maybe_response_result_type.as_ref().unwrap() {
+                            Type::Identifier { identifier, .. } => {
+                                message_body_type_names.insert(identifier.clone());
+                                Ok(())
+                            }
+                            _ => Err(anyhow!("The kind of the response result type for method {:?} must be 'identifier'", method.name)),
+                        }?;
+                    }
+                    if method.maybe_response_success_type.is_some() {
+                        match method.maybe_response_success_type.as_ref().unwrap() {
+                            Type::Identifier { identifier, .. } => {
+                                message_body_type_names.insert(identifier.clone());
+                                Ok(())
+                            }
+                            _ => Err(anyhow!("The kind of the response success type for method {:?} must be 'identifier'", method.name)),
+                        }?;
+                    }
+                    if method.maybe_response_err_type.is_some() {
+                        match method.maybe_response_err_type.as_ref().unwrap() {
+                            Type::Identifier { identifier, .. } => {
+                                message_body_type_names.insert(identifier.clone());
+                                Ok(())
+                            }
+                            Type::Primitive { .. } => Ok(()),
+                            _ => Err(anyhow!("The kind of the response err type for method {:?} must be 'identifier' or 'primitive'", method.name)),
+                        }?;
                     }
                     Ok(())
                 }).collect()

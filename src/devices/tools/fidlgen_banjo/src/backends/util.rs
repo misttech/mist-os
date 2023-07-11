@@ -42,15 +42,21 @@ pub fn get_declarations<'b>(ir: &'b FidlIr) -> Result<Vec<Decl<'b>>, Error> {
                 data: ir.protocol_declarations.iter().filter(|e| e.name == *ident).next()?,
             })),
             Declaration::Struct => {
+                // TODO(fxbug.dev/120909): Remove softmac specific hack. It is necessary to avoid
+                // migrating a lot of wlan specific drivers.
                 let matched = ir.struct_declarations.iter().find_map(|e| {
-                    match ir.is_type_used_for_message_body(ident) {
-                        Ok(is_message_body) => {
-                            match e.name == *ident && !(e.is_anonymous() && is_message_body) {
-                                true => Some(Ok(e)),
-                                false => None,
-                            }
-                        }
-                        Err(err) => Some(Err(err)),
+                    match (
+                        e.name == *ident,
+                        e.is_anonymous(),
+                        ir.is_type_used_for_message_body(ident),
+                        e.naming_context.iter().find(|n| *n == "result").is_some()
+                            && ir.name
+                                == fidl::LibraryIdentifier("fuchsia.wlan.softmac".to_string()),
+                    ) {
+                        (false, _, _, _) => None,
+                        (_, true, Ok(true), false) => None,
+                        (_, _, Err(err), _) => Some(Err(err)),
+                        (_, _, _, _) => Some(Ok(e)),
                     }
                 })?;
 
@@ -65,9 +71,27 @@ pub fn get_declarations<'b>(ir: &'b FidlIr) -> Result<Vec<Decl<'b>>, Error> {
             Declaration::Alias => Some(Ok(Decl::Alias {
                 data: ir.alias_declarations.iter().filter(|e| e.name == *ident).next()?,
             })),
-            Declaration::Union => Some(Ok(Decl::Union {
-                data: ir.union_declarations.iter().filter(|e| e.name == *ident).next()?,
-            })),
+            Declaration::Union => {
+                // TODO(fxbug.dev/120909): Remove softmac specific hack.
+                let matched = ir.union_declarations.iter().find_map(|e| {
+                    match (
+                        e.name == *ident,
+                        e.is_anonymous(),
+                        ir.is_type_used_for_message_body(ident),
+                        ir.name == fidl::LibraryIdentifier("fuchsia.wlan.softmac".to_string()),
+                    ) {
+                        (false, _, _, _) => None,
+                        (_, true, Ok(true), false) => None,
+                        (_, _, Err(err), _) => Some(Err(err)),
+                        (_, _, _, _) => Some(Ok(e)),
+                    }
+                })?;
+
+                Some(match matched {
+                    Ok(val) => Ok(Decl::Union { data: val }),
+                    Err(err) => Err(err),
+                })
+            }
             _ => None,
         })
         .collect()
@@ -600,6 +624,33 @@ pub fn get_out_params(
             _ => format!("{}* out_{}", ty_name, name)
         }
     }).collect()}), return_param))
+}
+
+pub fn doesnt_use_error_syntax(m: &Method, ir: &FidlIr) -> bool {
+    ir.name == LibraryIdentifier("fuchsia.wlan.softmac".to_string())
+        || m.response_parameters(ir).unwrap().as_ref().map_or(true, |response| {
+            !response.iter().any(|param| {
+                if let Type::Identifier { ref identifier, .. } = param._type {
+                    let is_message_body = match ir.is_type_used_for_message_body(identifier) {
+                        Ok(true) => true,
+                        _ => false,
+                    };
+                    let is_anonymous_union = ir
+                        .union_declarations
+                        .iter()
+                        .find(|e| e.name == *identifier && e.is_anonymous())
+                        .is_some();
+                    let is_anonymous_struct = ir
+                        .struct_declarations
+                        .iter()
+                        .find(|e| e.name == *identifier && e.is_anonymous())
+                        .is_some();
+                    is_message_body && (is_anonymous_struct || is_anonymous_union)
+                } else {
+                    false
+                }
+            })
+        })
 }
 
 #[cfg(test)]

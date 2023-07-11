@@ -64,6 +64,11 @@ closed protocol OtherTypes {
     }) -> (table {
         1: response_member uint32;
     });
+    strict InlineStructWithError(struct {
+        request_member uint32;
+    }) -> (struct {
+        response_member uint32;
+    }) error uint32;
 };
 
 @transport("Banjo")

@@ -55,8 +55,6 @@
 //
 //     void EchoEchoStruct(const echo_more_t* req, echo_more_t* out_response);
 //
-//     void EchoEchoEmpty(echo_echo_empty_result_t* out_result);
-//
 //     ...
 // };
 
@@ -73,7 +71,6 @@ public:
         echo_protocol_ops_.echo_handle = EchoEchoHandle;
         echo_protocol_ops_.echo_channel = EchoEchoChannel;
         echo_protocol_ops_.echo_struct = EchoEchoStruct;
-        echo_protocol_ops_.echo_empty = EchoEchoEmpty;
 
         if constexpr (internal::is_base_proto<Base>::value) {
             auto dev = static_cast<D*>(this);
@@ -112,9 +109,6 @@ private:
     }
     static void EchoEchoStruct(void* ctx, const echo_more_t* req, echo_more_t* out_response) {
         static_cast<D*>(ctx)->EchoEchoStruct(req, out_response);
-    }
-    static void EchoEchoEmpty(void* ctx, echo_echo_empty_result_t* out_result) {
-        static_cast<D*>(ctx)->EchoEchoEmpty(out_result);
     }
 };
 
@@ -211,10 +205,6 @@ public:
 
     void EchoStruct(const echo_more_t* req, echo_more_t* out_response) const {
         ops_->echo_struct(ctx_, req, out_response);
-    }
-
-    void EchoEmpty(echo_echo_empty_result_t* out_result) const {
-        ops_->echo_empty(ctx_, out_result);
     }
 
 private:

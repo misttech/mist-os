@@ -181,6 +181,7 @@ impl<'a, W: io::Write> CppMockBackend<'a, W> {
     fn codegen_mock_accessors(&self, methods: &Vec<Method>, ir: &FidlIr) -> Result<String, Error> {
         let text = methods
             .iter()
+            .filter(|m| doesnt_use_error_syntax(m, ir))
             .map(|m| {
                 Ok(format!(
                     "    mock_function::MockFunction<{param_types}>& mock_{name}() \
@@ -201,6 +202,7 @@ impl<'a, W: io::Write> CppMockBackend<'a, W> {
     ) -> Result<String, Error> {
         methods
             .iter()
+            .filter(|m| doesnt_use_error_syntax(m, ir))
             .map(|m| {
                 Ok(format!(
                     "    mock_function::MockFunction<{param_types}> mock_{name}_;",
@@ -220,6 +222,7 @@ impl<'a, W: io::Write> CppMockBackend<'a, W> {
     ) -> Result<String, Error> {
         let text = methods
             .iter()
+            .filter(|m| doesnt_use_error_syntax(m, ir))
             .map(|m| {
                 Ok(format!(
                     include_str!("templates/cpp/mock_expect.h"),
@@ -235,9 +238,10 @@ impl<'a, W: io::Write> CppMockBackend<'a, W> {
         Ok(if text.len() > 0 { "\n".to_string() + &text } else { "".to_string() })
     }
 
-    fn codegen_mock_verify(&self, methods: &Vec<Method>) -> Result<String, Error> {
+    fn codegen_mock_verify(&self, methods: &Vec<Method>, ir: &FidlIr) -> Result<String, Error> {
         Ok(methods
             .iter()
+            .filter(|m| doesnt_use_error_syntax(m, ir))
             .map(|m| format!("        mock_{}_.VerifyAndClear();", to_c_name(&m.name.0)))
             .collect::<Vec<_>>()
             .join("\n"))
@@ -369,6 +373,7 @@ impl<'a, W: io::Write> CppMockBackend<'a, W> {
     ) -> Result<String, Error> {
         let text = methods
             .iter()
+            .filter(|m| doesnt_use_error_syntax(m, ir))
             .map(|m| {
                 let (out_params, return_param) = get_out_params(&m, name, true, ir)?;
                 let in_params = get_in_params(&m, true, false, ir)?;
@@ -470,7 +475,7 @@ impl<'a, W: io::Write> CppMockBackend<'a, W> {
                     protocol_name_snake = to_c_name(data.name.get_name()).as_str(),
                     mock_expects =
                         self.codegen_mock_expects(data.name.get_name(), &data.methods, ir)?,
-                    mock_verify = self.codegen_mock_verify(&data.methods)?,
+                    mock_verify = self.codegen_mock_verify(&data.methods, ir)?,
                     protocol_definitions =
                         self.codegen_mock_protocol_defs(data.name.get_name(), &data.methods, ir)?,
                     mock_accessors = self.codegen_mock_accessors(&data.methods, ir)?,
