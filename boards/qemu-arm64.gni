@@ -8,6 +8,9 @@ _imports = {  # Import into hidden scope, to avoid importing into args.gn.
   import("//boards/emulation/virtio_drivers.gni")
 }
 
+# BoardInformation for Product Assembly
+board_information_for_assembly = "//boards/qemu-arm64/board_information.json5"
+
 board_name = "qemu-arm64"
 add_qemu_to_build_archives = true
 
