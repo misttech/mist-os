@@ -363,6 +363,8 @@ struct Config {
     pub enable_dhcpv6: bool,
     #[serde(default)]
     pub forwarded_device_classes: ForwardedDeviceClasses,
+    #[serde(default)]
+    pub install_only: bool,
 }
 
 impl Config {
@@ -580,6 +582,10 @@ pub struct NetCfg<'a> {
 
     dhcpv6_prefix_provider_handler: Option<dhcpv6::PrefixProviderHandler>,
     dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap,
+
+    // When true, only perform device enumeration and ignore all provisioning.
+    // When false, perform device enumeration and provisioning.
+    install_only: bool,
 }
 
 /// Returns a [`fnet_name::DnsServer_`] with a static source from a [`std::net::IpAddr`].
@@ -725,6 +731,45 @@ fn start_dhcpv6_client(
     Ok(Some(sockaddr))
 }
 
+enum RequestStream {
+    Virtualization(fnet_virtualization::ControlRequestStream),
+    Dhcpv6PrefixProvider(fnet_dhcpv6::PrefixProviderRequestStream),
+    Masquerade(fnet_masquerade::FactoryRequestStream),
+}
+
+impl std::fmt::Debug for RequestStream {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            RequestStream::Virtualization(_) => write!(f, "Virtualization"),
+            RequestStream::Dhcpv6PrefixProvider(_) => write!(f, "Dhcpv6PrefixProvider"),
+            RequestStream::Masquerade(_) => write!(f, "Masquerade"),
+        }
+    }
+}
+
+// Events associated with provisioning a device.
+#[derive(Debug)]
+enum ProvisioningEvent {
+    InterfaceWatcherResult(Result<Option<fidl_fuchsia_net_interfaces::Event>, fidl::Error>),
+    DnsWatcherResult(
+        Option<(
+            dns_server_watcher::DnsServersUpdateSource,
+            Result<Vec<fnet_name::DnsServer_>, fidl::Error>,
+        )>,
+    ),
+    RequestStream(Option<RequestStream>),
+    Dhcpv4Configuration(
+        Option<(NonZeroU64, Result<fnet_dhcp_ext::Configuration, fnet_dhcp_ext::Error>)>,
+    ),
+    Dhcpv6PrefixProviderRequest(Result<fnet_dhcpv6::PrefixProviderRequest, fidl::Error>),
+    Dhcpv6PrefixControlRequest(
+        Option<Result<Option<fnet_dhcpv6::PrefixControlRequest>, fidl::Error>>,
+    ),
+    Dhcpv6Prefixes(Option<(NonZeroU64, Result<Vec<fnet_dhcpv6::Prefix>, fidl::Error>)>),
+    VirtualizationEvent(virtualization::Event),
+    MasqueradeEvent(masquerade::Event),
+}
+
 impl<'a> NetCfg<'a> {
     async fn new(
         filter_enabled_interface_types: HashSet<InterfaceType>,
@@ -732,6 +777,7 @@ impl<'a> NetCfg<'a> {
         enable_dhcpv6: bool,
         forwarded_device_classes: ForwardedDeviceClasses,
         allowed_upstream_device_classes: &'a HashSet<DeviceClass>,
+        install_only: bool,
     ) -> Result<NetCfg<'a>, anyhow::Error> {
         let svc_dir = clone_namespace_svc().context("error cloning svc directory handle")?;
         let stack = svc_connect::<fnet_stack::StackMarker>(&svc_dir)
@@ -793,6 +839,7 @@ impl<'a> NetCfg<'a> {
             dhcpv6_prefix_provider_handler: None,
             dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
             allowed_upstream_device_classes,
+            install_only,
         })
     }
 
@@ -966,12 +1013,6 @@ impl<'a> NetCfg<'a> {
 
         let mut masquerade_handler = masquerade::Masquerade::new(self.filter.clone());
 
-        enum RequestStream {
-            Virtualization(fnet_virtualization::ControlRequestStream),
-            Dhcpv6PrefixProvider(fnet_dhcpv6::PrefixProviderRequestStream),
-            Masquerade(fnet_masquerade::FactoryRequestStream),
-        }
-
         // Serve fuchsia.net.virtualization/Control.
         let mut fs = ServiceFs::new_local();
         let _: &mut ServiceFsDir<'_, _> =
@@ -983,15 +1024,15 @@ impl<'a> NetCfg<'a> {
             fs.take_and_serve_directory_handle().context("take and serve directory handle")?;
         let mut fs = fs.fuse();
 
-        let mut dhcpv6_prefix_provider_requests = futures::stream::SelectAll::new();
+        let mut dhcpv6_prefix_provider_requests =
+            futures::stream::SelectAll::<fnet_dhcpv6::PrefixProviderRequestStream>::new();
 
         // Maintain a queue of virtualization events to be dispatched to the virtualization handler.
-        let mut virtualization_events = futures::stream::SelectAll::new();
+        let mut virtualization_events =
+            futures::stream::SelectAll::<virtualization::EventStream>::new();
 
         // Maintain a queue of masquerade events to be dispatched to the masquerade handler.
-        let mut masquerade_events = futures::stream::SelectAll::<
-            futures::stream::LocalBoxStream<'_, Result<_, fidl::Error>>,
-        >::new();
+        let mut masquerade_events = futures::stream::SelectAll::<masquerade::EventStream>::new();
 
         // Lifecycle handle takes no args, must be set to zero.
         // See zircon/processargs.h.
@@ -1011,28 +1052,12 @@ impl<'a> NetCfg<'a> {
 
         enum Event {
             NetworkDeviceResult(Result<Option<devices::NetworkDeviceInstance>, anyhow::Error>),
-            InterfaceWatcherResult(Result<Option<fidl_fuchsia_net_interfaces::Event>, fidl::Error>),
-            DnsWatcherResult(
-                Option<(
-                    dns_server_watcher::DnsServersUpdateSource,
-                    Result<Vec<fnet_name::DnsServer_>, fidl::Error>,
-                )>,
-            ),
-            RequestStream(Option<RequestStream>),
-            Dhcpv4Configuration(
-                Option<(NonZeroU64, Result<fnet_dhcp_ext::Configuration, fnet_dhcp_ext::Error>)>,
-            ),
-            Dhcpv6PrefixProviderRequest(Result<fnet_dhcpv6::PrefixProviderRequest, fidl::Error>),
-            Dhcpv6PrefixControlRequest(
-                Option<Result<Option<fnet_dhcpv6::PrefixControlRequest>, fidl::Error>>,
-            ),
-            Dhcpv6Prefixes(Option<(NonZeroU64, Result<Vec<fnet_dhcpv6::Prefix>, fidl::Error>)>),
-            VirtualizationEvent(virtualization::Event),
-            MasqueradeEvent(masquerade::Event),
             LifecycleRequest(
                 Result<Option<fidl_fuchsia_process_lifecycle::LifecycleRequest>, fidl::Error>,
             ),
+            ProvisioningEvent(ProvisioningEvent),
         }
+
         loop {
             let mut dhcpv6_prefix_control_fut = futures::future::OptionFuture::from(
                 self.dhcpv6_prefix_provider_handler
@@ -1043,35 +1068,54 @@ impl<'a> NetCfg<'a> {
                 netdev_res = netdev_stream.try_next() => {
                     Event::NetworkDeviceResult(netdev_res)
                 }
-                if_watcher_res = if_watcher_event_stream.try_next() => {
-                    Event::InterfaceWatcherResult(if_watcher_res)
-                }
-                dns_watchers_res = dns_watchers.next() => {
-                    Event::DnsWatcherResult(dns_watchers_res)
-                }
-                req_stream = fs.next() => {
-                    Event::RequestStream(req_stream)
-                }
-                dhcpv4_configuration = self.dhcpv4_configuration_streams.next() => {
-                    Event::Dhcpv4Configuration(dhcpv4_configuration)
-                }
-                dhcpv6_prefix_req = dhcpv6_prefix_provider_requests.select_next_some() => {
-                    Event::Dhcpv6PrefixProviderRequest(dhcpv6_prefix_req)
-                }
-                dhcpv6_prefix_control_req = dhcpv6_prefix_control_fut => {
-                    Event::Dhcpv6PrefixControlRequest(dhcpv6_prefix_control_req)
-                }
-                dhcpv6_prefixes = self.dhcpv6_prefixes_streams.next() => {
-                    Event::Dhcpv6Prefixes(dhcpv6_prefixes)
-                }
-                virt_event = virtualization_events.select_next_some() => {
-                    Event::VirtualizationEvent(virt_event)
-                }
-                masq_event = masquerade_events.select_next_some() => {
-                    Event::MasqueradeEvent(masq_event.context("error while receiving MasqueradeEvent")?)
-                }
                 req = lifecycle.try_next() => {
                     Event::LifecycleRequest(req)
+                }
+                if_watcher_res = if_watcher_event_stream.try_next() => {
+                    Event::ProvisioningEvent(
+                        ProvisioningEvent::InterfaceWatcherResult(if_watcher_res)
+                    )
+                }
+                dns_watchers_res = dns_watchers.next() => {
+                    Event::ProvisioningEvent(
+                        ProvisioningEvent::DnsWatcherResult(dns_watchers_res)
+                    )
+                }
+                req_stream = fs.next() => {
+                    Event::ProvisioningEvent(
+                        ProvisioningEvent::RequestStream(req_stream)
+                    )
+                }
+                dhcpv4_configuration = self.dhcpv4_configuration_streams.next() => {
+                    Event::ProvisioningEvent(
+                        ProvisioningEvent::Dhcpv4Configuration(dhcpv4_configuration)
+                    )
+                }
+                dhcpv6_prefix_req = dhcpv6_prefix_provider_requests.select_next_some() => {
+                    Event::ProvisioningEvent(
+                        ProvisioningEvent::Dhcpv6PrefixProviderRequest(dhcpv6_prefix_req)
+                    )
+                }
+                dhcpv6_prefix_control_req = dhcpv6_prefix_control_fut => {
+                    Event::ProvisioningEvent(
+                        ProvisioningEvent::Dhcpv6PrefixControlRequest(dhcpv6_prefix_control_req)
+                    )
+                }
+                dhcpv6_prefixes = self.dhcpv6_prefixes_streams.next() => {
+                    Event::ProvisioningEvent(
+                        ProvisioningEvent::Dhcpv6Prefixes(dhcpv6_prefixes)
+                    )
+                }
+                virt_event = virtualization_events.select_next_some() => {
+                    Event::ProvisioningEvent(
+                        ProvisioningEvent::VirtualizationEvent(virt_event)
+                    )
+                }
+                masq_event = masquerade_events.select_next_some() => {
+                    Event::ProvisioningEvent(
+                        ProvisioningEvent::MasqueradeEvent(
+                            masq_event.context("error while receiving MasqueradeEvent")?)
+                        )
                 }
                 complete => return Err(anyhow::anyhow!("eventloop ended unexpectedly")),
             };
@@ -1082,144 +1126,6 @@ impl<'a> NetCfg<'a> {
                             || anyhow::anyhow!("netdev instance watcher stream ended unexpectedly"),
                         )?;
                     self.handle_device_instance(instance).await.context("handle netdev instance")?
-                }
-                Event::InterfaceWatcherResult(if_watcher_res) => {
-                    let event = if_watcher_res
-                        .unwrap_or_else(|err| exit_with_fidl_error(err))
-                        .expect("watcher stream never returns None");
-                    trace!("got interfaces watcher event = {:?}", event);
-
-                    self.handle_interface_watcher_event(
-                        event,
-                        dns_watchers.get_mut(),
-                        &mut virtualization_handler,
-                    )
-                    .await
-                    .context("handle interface watcher event")?
-                }
-                Event::DnsWatcherResult(dns_watchers_res) => {
-                    let (source, res) = dns_watchers_res
-                        .ok_or(anyhow::anyhow!("dns watchers stream should never be exhausted"))?;
-                    let servers = match res {
-                        Ok(s) => s,
-                        Err(e) => {
-                            // TODO(fxbug.dev/57484): Restart the DNS server watcher.
-                            warn!(
-                                "non-fatal error getting next event from DNS server watcher stream
-                                with source = {:?}: {:?}",
-                                source, e
-                            );
-                            let () = self
-                                .handle_dns_server_watcher_done(source, dns_watchers.get_mut())
-                                .await
-                                .with_context(|| {
-                                    format!(
-                                        "error handling completion of DNS server watcher for \
-                                        {:?}",
-                                        source
-                                    )
-                                })?;
-                            continue;
-                        }
-                    };
-
-                    self.update_dns_servers(source, servers).await
-                }
-                Event::RequestStream(req_stream) => {
-                    match req_stream.context("ServiceFs ended unexpectedly")? {
-                        RequestStream::Virtualization(req_stream) => virtualization_handler
-                            .handle_event(
-                                virtualization::Event::ControlRequestStream(req_stream),
-                                &mut virtualization_events,
-                            )
-                            .await
-                            .context("handle virtualization event")
-                            .or_else(errors::Error::accept_non_fatal)?,
-                        RequestStream::Dhcpv6PrefixProvider(req_stream) => {
-                            dhcpv6_prefix_provider_requests.push(req_stream);
-                        }
-                        RequestStream::Masquerade(req_stream) => {
-                            masquerade_handler
-                                .handle_event(
-                                    masquerade::Event::FactoryRequestStream(req_stream),
-                                    &mut masquerade_events,
-                                    &mut self.filter_enabled_state,
-                                    &self.interface_states,
-                                )
-                                .await;
-                        }
-                    }
-                }
-                Event::Dhcpv4Configuration(config) => {
-                    let (interface_id, config) =
-                        config.expect("DHCPv4 configuration stream is never exhausted");
-                    self.handle_dhcpv4_configuration(interface_id, config).await
-                }
-                Event::Dhcpv6PrefixProviderRequest(res) => {
-                    match res {
-                        Ok(fnet_dhcpv6::PrefixProviderRequest::AcquirePrefix {
-                            config,
-                            prefix,
-                            control_handle: _,
-                        }) => {
-                            self.handle_dhcpv6_acquire_prefix(
-                                config,
-                                prefix,
-                                dns_watchers.get_mut(),
-                            )
-                            .await
-                            .or_else(errors::Error::accept_non_fatal)?;
-                        }
-                        Err(e) => {
-                            error!("fuchsia.net.dhcpv6/PrefixProvider request error: {:?}", e)
-                        }
-                    };
-                }
-                Event::Dhcpv6PrefixControlRequest(req) => {
-                    let res = req.context(
-                        "PrefixControl OptionFuture will only be selected if it is not None",
-                    )?;
-                    match res {
-                        Err(e) => {
-                            error!(
-                                "fuchsia.net.dhcpv6/PrefixControl request stream error: {:?}",
-                                e
-                            );
-                            self.on_dhcpv6_prefix_control_close(dns_watchers.get_mut()).await;
-                        }
-                        Ok(None) => {
-                            info!("fuchsia.net.dhcpv6/PrefixControl closed by client");
-                            self.on_dhcpv6_prefix_control_close(dns_watchers.get_mut()).await;
-                        }
-                        Ok(Some(fnet_dhcpv6::PrefixControlRequest::WatchPrefix { responder })) => {
-                            self.handle_watch_prefix(responder, dns_watchers.get_mut())
-                                .await
-                                .context("handle PrefixControl.WatchPrefix")
-                                .unwrap_or_else(accept_error);
-                        }
-                    }
-                }
-                Event::Dhcpv6Prefixes(prefixes) => {
-                    let (interface_id, res) = prefixes
-                        .context("DHCPv6 watch prefixes stream map can never be exhausted")?;
-                    self.handle_dhcpv6_prefixes(interface_id, res, dns_watchers.get_mut())
-                        .await
-                        .unwrap_or_else(accept_error);
-                }
-                Event::VirtualizationEvent(event) => virtualization_handler
-                    .handle_event(event, &mut virtualization_events)
-                    .await
-                    .context("handle virtualization event")
-                    .or_else(errors::Error::accept_non_fatal)?,
-                Event::MasqueradeEvent(event) => {
-                    masquerade_handler
-                        .handle_event(
-                            event,
-                            &mut masquerade_events,
-                            &mut self.filter_enabled_state,
-                            &self.interface_states,
-                        )
-                        .await
                 }
                 Event::LifecycleRequest(req) => {
                     let req = req.context("lifecycle request")?.ok_or_else(|| {
@@ -1252,8 +1158,174 @@ impl<'a> NetCfg<'a> {
                         }
                     }
                 }
+                Event::ProvisioningEvent(event) => {
+                    // With `install_only` mode on, ignore all provisioning
+                    // events, so that only device enumeration is performed.
+                    if self.install_only {
+                        debug!("ignoring event due to install only mode {event:?}")
+                    } else {
+                        self.handle_provisioning_event(
+                            event,
+                            dns_watchers.get_mut(),
+                            &mut dhcpv6_prefix_provider_requests,
+                            &mut virtualization_handler,
+                            &mut virtualization_events,
+                            &mut masquerade_handler,
+                            &mut masquerade_events,
+                        )
+                        .await?
+                    }
+                }
             }
         }
+    }
+
+    async fn handle_provisioning_event(
+        &mut self,
+        event: ProvisioningEvent,
+        dns_watchers: &mut DnsServerWatchers<'_>,
+        dhcpv6_prefix_provider_requests: &mut futures::stream::SelectAll<
+            fnet_dhcpv6::PrefixProviderRequestStream,
+        >,
+        virtualization_handler: &mut impl virtualization::Handler,
+        virtualization_events: &mut futures::stream::SelectAll<virtualization::EventStream>,
+        masquerade_handler: &mut crate::masquerade::Masquerade,
+        masquerade_events: &mut futures::stream::SelectAll<masquerade::EventStream>,
+    ) -> Result<(), anyhow::Error> {
+        match event {
+            ProvisioningEvent::InterfaceWatcherResult(if_watcher_res) => {
+                let event = if_watcher_res
+                    .unwrap_or_else(|err| exit_with_fidl_error(err))
+                    .expect("watcher stream never returns None");
+                trace!("got interfaces watcher event = {:?}", event);
+
+                self.handle_interface_watcher_event(event, dns_watchers, virtualization_handler)
+                    .await
+                    .context("handle interface watcher event")?;
+            }
+            ProvisioningEvent::DnsWatcherResult(dns_watchers_res) => {
+                let (source, res) = dns_watchers_res
+                    .ok_or(anyhow::anyhow!("dns watchers stream should never be exhausted"))?;
+                let servers = match res {
+                    Ok(s) => s,
+                    Err(e) => {
+                        // TODO(fxbug.dev/57484): Restart the DNS server watcher.
+                        warn!(
+                            "non-fatal error getting next event from DNS server watcher stream
+                            with source = {:?}: {:?}",
+                            source, e
+                        );
+                        let () = self
+                            .handle_dns_server_watcher_done(source, dns_watchers)
+                            .await
+                            .with_context(|| {
+                                format!(
+                                    "error handling completion of DNS server watcher for \
+                                    {:?}",
+                                    source
+                                )
+                            })?;
+                        return Ok(());
+                    }
+                };
+
+                self.update_dns_servers(source, servers).await;
+            }
+            // TODO(fxbug.dev/130449): Add tests to ensure we do not offer
+            // these services when `install_only` flag is enabled.
+            ProvisioningEvent::RequestStream(req_stream) => {
+                match req_stream.context("ServiceFs ended unexpectedly")? {
+                    RequestStream::Virtualization(req_stream) => virtualization_handler
+                        .handle_event(
+                            virtualization::Event::ControlRequestStream(req_stream),
+                            virtualization_events,
+                        )
+                        .await
+                        .context("handle virtualization event")
+                        .or_else(errors::Error::accept_non_fatal)?,
+                    RequestStream::Dhcpv6PrefixProvider(req_stream) => {
+                        dhcpv6_prefix_provider_requests.push(req_stream);
+                    }
+                    RequestStream::Masquerade(req_stream) => {
+                        masquerade_handler
+                            .handle_event(
+                                masquerade::Event::FactoryRequestStream(req_stream),
+                                masquerade_events,
+                                &mut self.filter_enabled_state,
+                                &self.interface_states,
+                            )
+                            .await;
+                    }
+                };
+            }
+            ProvisioningEvent::Dhcpv4Configuration(config) => {
+                let (interface_id, config) =
+                    config.expect("DHCPv4 configuration stream is never exhausted");
+                self.handle_dhcpv4_configuration(interface_id, config).await;
+            }
+            ProvisioningEvent::Dhcpv6PrefixProviderRequest(res) => {
+                match res {
+                    Ok(fnet_dhcpv6::PrefixProviderRequest::AcquirePrefix {
+                        config,
+                        prefix,
+                        control_handle: _,
+                    }) => {
+                        self.handle_dhcpv6_acquire_prefix(config, prefix, dns_watchers)
+                            .await
+                            .or_else(errors::Error::accept_non_fatal)?;
+                    }
+                    Err(e) => {
+                        error!("fuchsia.net.dhcpv6/PrefixProvider request error: {:?}", e)
+                    }
+                };
+            }
+            ProvisioningEvent::Dhcpv6PrefixControlRequest(req) => {
+                let res = req.context(
+                    "PrefixControl OptionFuture will only be selected if it is not None",
+                )?;
+                match res {
+                    Err(e) => {
+                        error!("fuchsia.net.dhcpv6/PrefixControl request stream error: {:?}", e);
+                        self.on_dhcpv6_prefix_control_close(dns_watchers).await;
+                    }
+                    Ok(None) => {
+                        info!("fuchsia.net.dhcpv6/PrefixControl closed by client");
+                        self.on_dhcpv6_prefix_control_close(dns_watchers).await;
+                    }
+                    Ok(Some(fnet_dhcpv6::PrefixControlRequest::WatchPrefix { responder })) => {
+                        self.handle_watch_prefix(responder, dns_watchers)
+                            .await
+                            .context("handle PrefixControl.WatchPrefix")
+                            .unwrap_or_else(accept_error);
+                    }
+                };
+            }
+            ProvisioningEvent::Dhcpv6Prefixes(prefixes) => {
+                let (interface_id, res) =
+                    prefixes.context("DHCPv6 watch prefixes stream map can never be exhausted")?;
+                self.handle_dhcpv6_prefixes(interface_id, res, dns_watchers)
+                    .await
+                    .unwrap_or_else(accept_error);
+            }
+            ProvisioningEvent::VirtualizationEvent(event) => {
+                virtualization_handler
+                    .handle_event(event, virtualization_events)
+                    .await
+                    .context("handle virtualization event")
+                    .or_else(errors::Error::accept_non_fatal)?;
+            }
+            ProvisioningEvent::MasqueradeEvent(event) => {
+                masquerade_handler
+                    .handle_event(
+                        event,
+                        masquerade_events,
+                        &mut self.filter_enabled_state,
+                        &self.interface_states,
+                    )
+                    .await;
+            }
+        };
+        return Ok(());
     }
 
     async fn handle_dhcpv4_client_stop(
@@ -2015,7 +2087,8 @@ impl<'a> NetCfg<'a> {
                 &self.stack,
                 interface_id,
                 info,
-                self.dhcpv4_client_provider.is_none(),
+                // Disable in-stack DHCPv4 when provisioning is ignored.
+                self.dhcpv4_client_provider.is_none() && !self.install_only,
             )
             .await
             .context("error configuring host")?;
@@ -2660,6 +2733,7 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
             AllowedDeviceClasses(allowed_bridge_upstream_device_classes),
         enable_dhcpv6,
         forwarded_device_classes,
+        install_only,
     } = Config::load(config_data)?;
 
     let mut netcfg = NetCfg::new(
@@ -2668,13 +2742,18 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
         enable_dhcpv6,
         forwarded_device_classes,
         &allowed_upstream_device_classes,
+        install_only,
     )
     .await
     .context("error creating new netcfg instance")?;
 
+    // TODO(fxbug.dev/130394): Once non-Fuchsia components can control filtering rules, disable
+    // setting filters when `install_only` flag is enabled.
     let () =
         netcfg.update_filters(filter_config).await.context("update filters based on config")?;
 
+    // TODO(fxbug.dev/129708): Once non-Fuchsia components can control DNS servers, disable
+    // setting default DNS servers when `install_only` flag is enabled.
     let servers = servers.into_iter().map(static_source_from_ip).collect();
     debug!("updating default servers to {:?}", servers);
     let () = netcfg.update_dns_servers(DnsServersUpdateSource::Default, servers).await;
@@ -2918,6 +2997,7 @@ mod tests {
                 allowed_upstream_device_classes: &DEFAULT_ALLOWED_UPSTREAM_DEVICE_CLASSES,
                 dhcpv4_configuration_streams: dhcpv4::ConfigurationStreamMap::empty(),
                 dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
+                install_only: false,
             },
             ServerEnds {
                 stack: stack_server
@@ -4387,7 +4467,8 @@ mod tests {
   "allowed_upstream_device_classes": ["ethernet", "wlan"],
   "allowed_bridge_upstream_device_classes": ["ethernet"],
   "enable_dhcpv6": true,
-  "forwarded_device_classes": { "ipv4": [ "ethernet" ], "ipv6": [ "wlan" ] }
+  "forwarded_device_classes": { "ipv4": [ "ethernet" ], "ipv6": [ "wlan" ] },
+  "install_only": false
 }
 "#;
 
@@ -4400,6 +4481,7 @@ mod tests {
             allowed_bridge_upstream_device_classes,
             enable_dhcpv6,
             forwarded_device_classes,
+            install_only,
         } = Config::load_str(config_str).unwrap();
 
         assert_eq!(vec!["8.8.8.8".parse::<std::net::IpAddr>().unwrap()], servers);
@@ -4430,6 +4512,8 @@ mod tests {
             ipv6: HashSet::from([DeviceClass::Wlan]),
         };
         assert_eq!(forwarded_device_classes, expected_classes);
+
+        assert_eq!(install_only, false);
     }
 
     #[test]
@@ -4455,12 +4539,14 @@ mod tests {
             interface_metrics,
             enable_dhcpv6,
             forwarded_device_classes: _,
+            install_only,
         } = Config::load_str(config_str).unwrap();
 
         assert_eq!(allowed_upstream_device_classes, Default::default());
         assert_eq!(allowed_bridge_upstream_device_classes, Default::default());
         assert_eq!(interface_metrics, Default::default());
         assert_eq!(enable_dhcpv6, true);
+        assert_eq!(install_only, false);
     }
 
     #[test_case(
@@ -4499,6 +4585,7 @@ mod tests {
             enable_dhcpv6: _,
             interface_metrics,
             forwarded_device_classes: _,
+            install_only: _,
         } = Config::load_str(&config_str).unwrap();
 
         let expected_metrics = InterfaceMetrics { wlan_metric, eth_metric };

@@ -170,6 +170,7 @@ pub enum ManagerConfig {
     Empty,
     Dhcpv6,
     Forwarding,
+    InstallOnly,
 }
 
 impl ManagerConfig {
@@ -178,6 +179,7 @@ impl ManagerConfig {
             ManagerConfig::Empty => "/pkg/netcfg/empty.json",
             ManagerConfig::Dhcpv6 => "/pkg/netcfg/dhcpv6.json",
             ManagerConfig::Forwarding => "/pkg/netcfg/forwarding.json",
+            ManagerConfig::InstallOnly => "/pkg/netcfg/install_only.json",
         }
     }
 }
@@ -313,7 +315,9 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
             KnownServiceProvider::Manager { agent, use_dhcp_server, config } => {
                 let enable_dhcpv6 = match config {
                     ManagerConfig::Dhcpv6 => true,
-                    ManagerConfig::Forwarding | ManagerConfig::Empty => false,
+                    ManagerConfig::Forwarding
+                    | ManagerConfig::Empty
+                    | ManagerConfig::InstallOnly => false,
                 };
 
                 fnetemul::ChildDef {

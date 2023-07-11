@@ -141,6 +141,121 @@ async fn test_oir<M: Manager, N: Netstack>(name: &str) {
     .await
 }
 
+// Test that Netcfg discovers a device, adds it to the Netstack,
+// and does not provision the device (send DHCP packets).
+#[netstack_test]
+async fn test_install_only_no_provisioning<M: Manager, N: Netstack>(name: &str) {
+    // RFC2131 and RFC8415 specify the ports that DHCP servers
+    // must use for sending messages.
+    const DHCPV4_SERVER_PORT: u16 = 67;
+    const DHCPV4_CLIENT_PORT: u16 = 68;
+    const DHCPV6_SERVER_PORT: u16 = 546;
+    const DHCPV6_CLIENT_PORT: u16 = 547;
+
+    with_netcfg_owned_device::<M, N, _>(
+        name,
+        ManagerConfig::InstallOnly,
+        true, /* with_dhcpv6_client */
+        |_if_id: u64,
+         network: &netemul::TestNetwork<'_>,
+         _: &fnet_interfaces::StateProxy,
+         _: &netemul::TestRealm<'_>| {
+            async {
+                let fake_ep = network.create_fake_endpoint().expect("error creating fake ep");
+                let stream = fake_ep
+                    .frame_stream()
+                    .map(|r| r.expect("error getting OnData event"))
+                    .filter_map(|(data, dropped)| async move {
+                        assert_eq!(dropped, 0);
+                        let mut data = &data[..];
+
+                        let eth =
+                            EthernetFrame::parse(&mut data, EthernetFrameLengthCheck::NoCheck)
+                                .expect("error parsing ethernet frame");
+
+                        match eth.ethertype().expect("ethertype missing") {
+                            packet_formats::ethernet::EtherType::Ipv4 => {
+                                let (mut ipv4_body, src_ip, dst_ip, proto, _ttl) =
+                                        packet_formats::testutil::parse_ip_packet::<
+                                            net_types::ip::Ipv4,
+                                        >(data)
+                                        .expect("error parsing IPv4 packet");
+                                if proto
+                                    != packet_formats::ip::Ipv4Proto::Proto(
+                                        packet_formats::ip::IpProto::Udp,
+                                    )
+                                {
+                                    // Ignore non-UDP packets.
+                                    return None;
+                                }
+
+                                let udp_v4_packet = packet_formats::udp::UdpPacket::parse(
+                                    &mut ipv4_body,
+                                    packet_formats::udp::UdpParseArgs::new(src_ip, dst_ip),
+                                )
+                                .expect("error parsing UDP datagram");
+
+                                // Look for packets that are sent across the DHCP-specific ports.
+                                let src_port =
+                                    udp_v4_packet.src_port().expect("missing src port").get();
+                                let dst_port = udp_v4_packet.dst_port().get();
+                                if src_port == DHCPV4_CLIENT_PORT && dst_port == DHCPV4_SERVER_PORT
+                                {
+                                    return Some(());
+                                }
+                                return None;
+                            }
+                            packet_formats::ethernet::EtherType::Ipv6 => {
+                                let (mut ipv6_body, src_ip, dst_ip, proto, _ttl) =
+                                        packet_formats::testutil::parse_ip_packet::<
+                                            net_types::ip::Ipv6,
+                                        >(data)
+                                        .expect("error parsing IPv4 packet");
+                                if proto
+                                    != packet_formats::ip::Ipv6Proto::Proto(
+                                        packet_formats::ip::IpProto::Udp,
+                                    )
+                                {
+                                    // Ignore non-UDP packets.
+                                    return None;
+                                }
+
+                                let udp_v6_packet = packet_formats::udp::UdpPacket::parse(
+                                    &mut ipv6_body,
+                                    packet_formats::udp::UdpParseArgs::new(src_ip, dst_ip),
+                                )
+                                .expect("error parsing UDP datagram");
+
+                                // Look for packets that are sent across the DHCP-specific ports.
+                                let src_port =
+                                    udp_v6_packet.src_port().expect("missing src port").get();
+                                let dst_port = udp_v6_packet.dst_port().get();
+                                if src_port == DHCPV6_CLIENT_PORT && dst_port == DHCPV6_SERVER_PORT
+                                {
+                                    return Some(());
+                                }
+                                return None;
+                            }
+                            packet_formats::ethernet::EtherType::Arp
+                            | packet_formats::ethernet::EtherType::Other(_) => {
+                                // Do nothing
+                                return None;
+                            }
+                        }
+                    });
+                futures::pin_mut!(stream);
+                assert!(stream
+                    .next()
+                    .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || None)
+                    .await
+                    .is_none());
+            }
+            .boxed_local()
+        },
+    )
+    .await
+}
+
 /// Tests that stable interface name conflicts are handled gracefully.
 #[netstack_test]
 async fn test_oir_interface_name_conflict<M: Manager, N: Netstack>(name: &str) {

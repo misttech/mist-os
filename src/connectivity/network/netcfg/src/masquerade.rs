@@ -28,6 +28,8 @@ pub(super) enum Event {
     ControlRequest(NonZeroU64, fnet_masquerade::ControlRequest),
 }
 
+pub(super) type EventStream = LocalBoxStream<'static, Result<Event, fidl::Error>>;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct ValidatedConfig {
     /// The interface carrying the network to be masqueraded.
@@ -232,9 +234,7 @@ impl<Filter: fnet_filter::FilterProxyInterface> Masquerade<Filter> {
     pub async fn handle_event<'a>(
         &mut self,
         event: Event,
-        events: &mut futures::stream::SelectAll<
-            LocalBoxStream<'static, Result<Event, fidl::Error>>,
-        >,
+        events: &mut futures::stream::SelectAll<EventStream>,
         filter_enabled_state: &mut FilterEnabledState,
         interface_states: &HashMap<NonZeroU64, InterfaceState>,
     ) {

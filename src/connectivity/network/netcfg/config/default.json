@@ -31,5 +31,6 @@
         "ethernet",
         "wlan"
     ],
-    "enable_dhcpv6": true
+    "enable_dhcpv6": true,
+    "install_only": false
 }
