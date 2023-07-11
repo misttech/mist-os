@@ -71,10 +71,17 @@ starnix_linux_test_component("virtmagma_image_tests") {
   test_type = "starnix"
 }
 
+starnix_linux_test_component("virtmagma_unit_tests") {
+  test_label =
+      "//src/graphics/lib/magma/tests_linux/unit_tests:virtmagma_unit_tests"
+  test_type = "starnix"
+}
+
 fuchsia_test_package("starnix_magma_tests") {
   test_components = [
     ":virtmagma_conformance_tests",
     ":virtmagma_image_tests",
+    ":virtmagma_unit_tests",
   ]
 
   deps = [ ":container_resources" ]
