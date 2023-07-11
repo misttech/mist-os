@@ -293,10 +293,11 @@ impl FileOps for LoopDeviceFile {
                 let user_config = UserRef::<uapi::loop_config>::from(arg);
                 let config = current_task.mm.read_object(user_config)?;
                 let fd = FdNumber::from_raw(config.fd as i32);
-                let backing_file = current_task.files.get_unless_opath(fd)?;
                 check_block_size(config.block_size)?;
                 let mut state = self.device.state.lock();
-                state.set_backing_file(backing_file)?;
+                if let Ok(backing_file) = current_task.files.get_unless_opath(fd) {
+                    state.set_backing_file(backing_file)?;
+                }
                 state.block_size = config.block_size;
                 state.set_info(&config.info);
                 std::mem::drop(state);
