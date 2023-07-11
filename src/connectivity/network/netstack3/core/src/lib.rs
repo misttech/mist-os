@@ -214,7 +214,6 @@ impl<B: BufferMut, C: NonSyncContext + BufferNonSyncContextInner<B>> BufferNonSy
 
 /// The non-synchronized context for the stack.
 pub trait NonSyncContext: CounterContext
-    + device::DeviceLayerEventDispatcher
     + BufferNonSyncContextInner<Buf<Vec<u8>>>
     + BufferNonSyncContextInner<EmptyBuf>
     + RngContext
