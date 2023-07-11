@@ -89,16 +89,6 @@
                 ],
             },
             {
-                source_moniker: "/",
-                source: "framework",
-                source_name: "hub",
-                capability: "directory",
-                target_monikers: [
-                    "/core/sshd-host",
-                    "/bootstrap/console-launcher",
-                ],
-            },
-            {
                 source_moniker: "<component_manager>",
                 source: "component",
                 source_name: "fuchsia.kernel.CpuResource",
