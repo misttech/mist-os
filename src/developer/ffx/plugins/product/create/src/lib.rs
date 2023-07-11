@@ -284,24 +284,31 @@ fn load_assembly_manifest(
         // Filter out the base package, and the blobfs contents.
         let mut images = Vec::new();
         let mut packages = Vec::new();
+        let mut extract_packages = |packages_metadata| -> Result<()> {
+            let PackagesMetadata { base, cache } = packages_metadata;
+            let all_packages = [base.0, cache.0].concat();
+            for package in all_packages {
+                let manifest = PackageManifest::try_load_from(&package.manifest)
+                    .with_context(|| format!("reading package manifest: {}", package.manifest))?;
+                packages.push((Some(package.manifest), manifest));
+            }
+            Ok(())
+        };
         for image in manifest.images.into_iter() {
             match image {
                 Image::BasePackage(..) => {}
-                Image::FxfsSparse { path, contents }
-                | Image::Fxfs { path, contents }
-                | Image::BlobFS { path, contents } => {
-                    let PackagesMetadata { base, cache } = contents.packages;
-                    let all_packages = [base.0, cache.0].concat();
-                    for package in all_packages {
-                        let manifest = PackageManifest::try_load_from(&package.manifest)
-                            .with_context(|| {
-                                format!("reading package manifest: {}", package.manifest)
-                            })?;
-                        packages.push((Some(package.manifest), manifest));
-                    }
+                Image::Fxfs { path, contents } => {
+                    extract_packages(contents.packages)?;
+                    images.push(Image::Fxfs { path, contents: BlobfsContents::default() });
+                }
+                Image::BlobFS { path, contents } => {
+                    extract_packages(contents.packages)?;
                     images.push(Image::BlobFS { path, contents: BlobfsContents::default() });
                 }
                 Image::ZBI { .. }
+                // We don't need to extract packages from `FxfsSparse`, since it exists only if
+                // `Fxfs` also exists (and always contains the same set of packages).
+                | Image::FxfsSparse { .. }
                 | Image::VBMeta(_)
                 | Image::FVM(_)
                 | Image::FVMSparse(_)
