@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <zircon/compiler.h>
 
 #include <utility>
 
@@ -121,8 +122,10 @@ zx::result<> Bcache::VerifyDeviceInfo() {
   return zx::ok();
 }
 
-void Bcache::Pause() { mutex_.lock(); }
+// TODO(fxbug.dev/130250): change this to __TA_ACQUIRE(mutex_) after clang roll.
+void Bcache::Pause() __TA_NO_THREAD_SAFETY_ANALYSIS { mutex_.lock(); }
 
-void Bcache::Resume() { mutex_.unlock(); }
+// TODO(fxbug.dev/130250): change this to __TA_RELEASE(mutex_) after clang roll.
+void Bcache::Resume() __TA_NO_THREAD_SAFETY_ANALYSIS { mutex_.unlock(); }
 
 }  // namespace minfs

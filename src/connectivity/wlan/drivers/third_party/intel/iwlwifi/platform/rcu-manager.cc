@@ -32,13 +32,13 @@ RcuManager::~RcuManager() {
 
 void RcuManager::InitForThread() { read_lock_count_ = 0; }
 
-void RcuManager::ReadLock() {
+void RcuManager::ReadLock() __TA_NO_THREAD_SAFETY_ANALYSIS {
   if (++read_lock_count_ == 1) {
     rwlock_.lock_shared();
   }
 }
 
-void RcuManager::ReadUnlock() {
+void RcuManager::ReadUnlock() __TA_NO_THREAD_SAFETY_ANALYSIS {
   ZX_DEBUG_ASSERT(read_lock_count_ > 0);
   if (--read_lock_count_ == 0) {
     rwlock_.unlock_shared();

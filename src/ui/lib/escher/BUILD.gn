@@ -117,6 +117,8 @@ source_set("vk_mem_alloc") {
     "vk/vk_mem_alloc.cc",
   ]
 
+  public_deps += [ "//zircon/system/public" ]
+
   public_configs = [
     ":vk_mem_alloc_error_suppression",
     ":vk_mem_alloc_small_heap_max_size",
@@ -435,6 +437,7 @@ template("escher_library") {
         "//sdk/lib/fidl/cpp",
         "//sdk/lib/fit",
         "//sdk/lib/vfs/cpp",
+        "//zircon/system/public",
         "//zircon/system/ulib/async-loop:async-loop-cpp",
         "//zircon/system/ulib/async-loop:async-loop-default",
         "//zircon/system/ulib/trace-vthread",

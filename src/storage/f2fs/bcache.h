@@ -9,6 +9,7 @@
 #define SRC_STORAGE_F2FS_BCACHE_H_
 
 #include <lib/zx/vmo.h>
+#include <zircon/compiler.h>
 
 #include <fbl/algorithm.h>
 #include <fbl/array.h>
@@ -44,9 +45,11 @@ class Bcache : public fs::DeviceTransactionHandler, public storage::VmoidRegistr
 
   // Blocks all I/O operations to the underlying device (that go via the RunRequests method). This
   // does *not* block operations that go directly to the device.
-  void Pause() { mutex_.lock(); }
+  // TODO(fxbug.dev/130250): change this to __TA_ACQUIRE(mutex_) after clang roll.
+  void Pause() __TA_NO_THREAD_SAFETY_ANALYSIS { mutex_.lock(); }
   // Resumes all I/O operations paused by the Pause method.
-  void Resume() { mutex_.unlock(); }
+  // TODO(fxbug.dev/130250): change this to __TA_RELEASE(mutex_) after clang roll.
+  void Resume() __TA_NO_THREAD_SAFETY_ANALYSIS { mutex_.unlock(); }
 
   uint64_t Maxblk() const { return max_blocks_; }
   block_t BlockSize() const { return block_size_; }

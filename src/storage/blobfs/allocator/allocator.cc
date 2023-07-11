@@ -9,6 +9,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
+#include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
@@ -38,7 +39,7 @@ Allocator::Allocator(SpaceManager* space_manager, RawBitmap block_map,
       space_manager_(space_manager),
       node_map_(std::move(node_map)) {}
 
-zx::result<InodePtr> Allocator::GetNode(uint32_t node_index) {
+zx::result<InodePtr> Allocator::GetNode(uint32_t node_index) __TA_NO_THREAD_SAFETY_ANALYSIS {
   if (node_index >= node_map_.size() / kBlobfsInodeSize) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
@@ -186,7 +187,11 @@ zx_status_t Allocator::GrowNodeMap(size_t size) {
   return node_map_.Grow(size);
 }
 
-void Allocator::DropInodePtr() { node_map_grow_mutex_.unlock_shared(); }
+// TODO(fxbug.dev/130250): change this to __TA_RELEASE_SHARED(node_map_grow_mutex_) after clang
+// roll.
+void Allocator::DropInodePtr() __TA_NO_THREAD_SAFETY_ANALYSIS {
+  node_map_grow_mutex_.unlock_shared();
+}
 
 zx::result<> Allocator::AddBlocks(uint64_t block_count) {
   if (zx_status_t status = space_manager_->AddBlocks(block_count, &GetBlockBitmap());
