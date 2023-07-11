@@ -22,7 +22,6 @@ core_realm_shards += [
 
 legacy_base_package_labels += [
   "//src/developer/forensics:workstation_configs",
-  "//src/developer/memory/buckets:workstation_memory_monitor_config",
   "//src/fonts",
   "//src/fonts:open-fonts-collection",
   "//src/graphics/bin/vulkan_loader",
