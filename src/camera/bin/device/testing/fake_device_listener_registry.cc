@@ -19,18 +19,13 @@ void FakeDeviceListenerRegistry::SendMediaButtonsEvent(
   for (auto& [id, listener] : listeners_) {
     fuchsia::ui::input::MediaButtonsEvent event_clone;
     ZX_ASSERT(event.Clone(&event_clone) == ZX_OK);
-    listener.events().OnMediaButtonsEvent(std::move(event_clone));
+    listener.events().OnEvent(std::move(event_clone), [] {});
   }
 }
 
 void FakeDeviceListenerRegistry::OnNewRequest(
     fidl::InterfaceRequest<fuchsia::ui::policy::DeviceListenerRegistry> request) {
   bindings_.AddBinding(this, std::move(request), dispatcher_);
-}
-
-void FakeDeviceListenerRegistry::RegisterMediaButtonsListener(
-    fuchsia::ui::policy::MediaButtonsListenerHandle listener) {
-  RegisterListener(std::move(listener), [] {});
 }
 
 void FakeDeviceListenerRegistry::RegisterListener(

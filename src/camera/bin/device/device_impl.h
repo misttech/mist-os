@@ -90,7 +90,6 @@ class DeviceImpl : public fuchsia::ui::policy::MediaButtonsListener {
                           fit::function<void(uint32_t)> max_camping_buffers_callback);
 
   // |fuchsia::ui::policy::MediaButtonsListener|
-  void OnMediaButtonsEvent(fuchsia::ui::input::MediaButtonsEvent event) override;
   void OnEvent(fuchsia::ui::input::MediaButtonsEvent event,
                fuchsia::ui::policy::MediaButtonsListener::OnEventCallback callback) override;
 

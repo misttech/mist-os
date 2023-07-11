@@ -51,11 +51,6 @@ class ButtonsListenerImpl : public fuchsia::ui::policy::MediaButtonsListener {
 
  private:
   // |MediaButtonsListener|
-  void OnMediaButtonsEvent(fuchsia::ui::input::MediaButtonsEvent event) override {
-    FX_NOTREACHED() << "unused";
-  }
-
-  // |MediaButtonsListener|
   void OnEvent(fuchsia::ui::input::MediaButtonsEvent event, OnEventCallback callback) override {
     on_event_(event);
     callback();

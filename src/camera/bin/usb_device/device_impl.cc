@@ -284,10 +284,6 @@ promise<void> DeviceImpl::OnStreamRequested(uint32_t index,
   });
 }
 
-void DeviceImpl::OnMediaButtonsEvent(fuchsia::ui::input::MediaButtonsEvent event) {
-  OnEvent(std::move(event), [] {});
-}
-
 void DeviceImpl::OnEvent(fuchsia::ui::input::MediaButtonsEvent event,
                          fuchsia::ui::policy::MediaButtonsListener::OnEventCallback callback) {
   callback();

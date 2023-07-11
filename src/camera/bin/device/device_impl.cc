@@ -394,10 +394,6 @@ void DeviceImpl::OnBuffersRequested(uint32_t index,
           .wrap_with(streams_[index]->Scope()));
 }
 
-void DeviceImpl::OnMediaButtonsEvent(fuchsia::ui::input::MediaButtonsEvent event) {
-  OnEvent(std::move(event), [] {});
-}
-
 void DeviceImpl::OnEvent(fuchsia::ui::input::MediaButtonsEvent event,
                          fuchsia::ui::policy::MediaButtonsListener::OnEventCallback callback) {
   if (event.has_mic_mute()) {

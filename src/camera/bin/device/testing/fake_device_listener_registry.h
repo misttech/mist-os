@@ -20,8 +20,6 @@ class FakeDeviceListenerRegistry : public fuchsia::ui::policy::DeviceListenerReg
   void OnNewRequest(fidl::InterfaceRequest<fuchsia::ui::policy::DeviceListenerRegistry> request);
 
   // |fuchsia::ui::policy::DeviceListenerRegistry|
-  void RegisterMediaButtonsListener(
-      fuchsia::ui::policy::MediaButtonsListenerHandle listener) override;
   void RegisterListener(
       fuchsia::ui::policy::MediaButtonsListenerHandle listener,
       fuchsia::ui::policy::DeviceListenerRegistry::RegisterListenerCallback callback) override;

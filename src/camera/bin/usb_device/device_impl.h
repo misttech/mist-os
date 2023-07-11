@@ -79,7 +79,6 @@ class DeviceImpl : public actor::ActorBase, public fuchsia::ui::policy::MediaBut
       fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection> request);
 
   // |fuchsia::ui::policy::MediaButtonsListener|
-  void OnMediaButtonsEvent(fuchsia::ui::input::MediaButtonsEvent event) override;
   void OnEvent(fuchsia::ui::input::MediaButtonsEvent event,
                fuchsia::ui::policy::MediaButtonsListener::OnEventCallback callback) override;
 
