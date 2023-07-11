@@ -1058,7 +1058,7 @@ TEST(ProcessTest, ProcessHwTraceContextIdProperty) {
     uintptr_t prop_to_set = 0;
     zx_status_t status = zx_object_set_property(
         zx_process_self(), ZX_PROP_PROCESS_HW_TRACE_CONTEXT_ID, &prop_to_set, sizeof(prop_to_set));
-    EXPECT_EQ(status, ZX_ERR_INVALID_ARGS, "unexpected status: %d", status);
+    EXPECT_EQ(status, ZX_ERR_NOT_SUPPORTED, "unexpected status: %d", status);
   }
 }
 

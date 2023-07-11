@@ -1205,7 +1205,7 @@ zx_status_t sys_object_get_property(zx_handle_t handle_value, uint32_t property,
 #endif
 
     default:
-      return ZX_ERR_INVALID_ARGS;
+      return ZX_ERR_NOT_SUPPORTED;
   }
 
   __UNREACHABLE;
@@ -1418,9 +1418,11 @@ zx_status_t sys_object_set_property(zx_handle_t handle_value, uint32_t property,
       }
       return stream->SetAppendMode(value);
     }
+    default:
+      return ZX_ERR_NOT_SUPPORTED;
   }
 
-  return ZX_ERR_INVALID_ARGS;
+  __UNREACHABLE;
 }
 
 // zx_status_t zx_object_signal

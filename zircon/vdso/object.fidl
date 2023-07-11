@@ -544,13 +544,21 @@ closed protocol Object {
     ///
     /// ### ZX_PROP_NAME
     ///
-    /// *handle* type: **(Most types)**
+    /// *handle* type: **Any of the following**
+    /// - Job
+    /// - Process
+    /// - Thread
+    /// - Resource
+    /// - Virtual Memory Object (VMO)
+    /// - Bus Transaction Initiator (BTI)
     ///
     /// *value* type: `char[ZX_MAX_NAME_LEN]`
     ///
     /// Allowed operations: **get**, **set**
     ///
     /// The name of the object, as a NUL-terminated string.
+    ///
+    /// Attempting to get or set the name of a thread that has exited will fail with **ZX_ERR_BAD_STATE**.
     ///
     /// ### ZX_PROP_REGISTER_FS and ZX_PROP_REGISTER_GS
     ///
@@ -561,7 +569,8 @@ closed protocol Object {
     /// Allowed operations: **get**, **set**
     ///
     /// The value of the x86 FS.BASE or GS.BASE register, respectively. `value` must
-    /// be a canonical address.
+    /// be a canonical address. Attempting to set a noncanonical address will fail with
+    /// **ZX_ERR_INVALID_ARGS**.
     ///
     /// This is a software substitute for the `rdfsbase`, `wrfsbase` and `rdgsbase`,
     /// `wrgsbase` instruction pairs supported on newer x86-64 CPUs, and should behave
@@ -571,7 +580,8 @@ closed protocol Object {
     /// supports these instructions (as reported by the `cpuid` instruction), it's
     /// more efficient and simpler to use the machine instructions directly.
     ///
-    /// Only defined for x86-64.
+    /// Only defined for x86-64. Returns **ZX_ERR_NOT_SUPPORTED** on other architectures.
+    /// Returns **ZX_ERR_ACCESS_DENIED** if not invoked from the current thread.
     ///
     /// ### ZX_PROP_PROCESS_DEBUG_ADDR
     ///
@@ -650,9 +660,12 @@ closed protocol Object {
     /// Allowed operations: **get**, **set**
     ///
     /// The size of the read threshold of a socket, in bytes. Setting this will
-    /// assert ZX_SOCKET_READ_THRESHOLD if the amount of data that can be read
+    /// assert `ZX_SOCKET_READ_THRESHOLD` if the amount of data that can be read
     /// is greater than or equal to the threshold. Setting this property to zero
-    /// will result in the deasserting of ZX_SOCKET_READ_THRESHOLD.
+    /// will result in the deasserting of `ZX_SOCKET_READ_THRESHOLD`.
+    ///
+    /// Setting to a value larger than the maximum permissible size supported by
+    /// sockets will fail with **ZX_ERR_INVALID_ARGS**.
     ///
     /// ### ZX_PROP_SOCKET_TX_THRESHOLD
     ///
@@ -663,11 +676,14 @@ closed protocol Object {
     /// Allowed operations: **get**, **set**
     ///
     /// The size of the write threshold of a socket, in bytes. Setting this will
-    /// assert ZX_SOCKET_WRITE_THRESHOLD if the amount of space available for writing
+    /// assert `ZX_SOCKET_WRITE_THRESHOLD` if the amount of space available for writing
     /// is greater than or equal to the threshold. Setting this property to zero
-    /// will result in the deasserting of ZX_SOCKET_WRITE_THRESHOLD. Setting the
+    /// will result in the deasserting of `ZX_SOCKET_WRITE_THRESHOLD`. Setting the
     /// write threshold after the peer has closed is an error, and results in a
-    /// ZX_ERR_PEER_CLOSED error being returned.
+    /// **ZX_ERR_PEER_CLOSED** error being returned.
+    ///
+    /// Setting to a value larger than the maximum permissible size supported by
+    /// sockets will fail with **ZX_ERR_INVALID_ARGS**.
     ///
     /// ### ZX_PROP_JOB_KILL_ON_OOM
     ///
@@ -680,7 +696,7 @@ closed protocol Object {
     /// The value of 1 means the Job and its children will be terminated if the
     /// system finds itself in a system-wide low memory situation. Called with 0
     /// (which is the default) opts out the job from being terminated in this
-    /// scenario.
+    /// scenario. Setting to any other value will fail with **ZX_ERR_INVALID_ARGS**.
     ///
     /// ### ZX_PROP_EXCEPTION_STATE
     ///
@@ -696,6 +712,7 @@ closed protocol Object {
     /// continue exception processing by trying the next handler in order.
     /// When set to `ZX_EXCEPTION_STATE_THREAD_EXIT`, closing the exception handle will
     /// cause the thread that generated the exception to exit.
+    /// Setting to any other value will fail with **ZX_ERR_INVALID_ARGS**.
     ///
     /// ### ZX_PROP_EXCEPTION_STRATEGY
     ///
@@ -707,10 +724,13 @@ closed protocol Object {
     ///
     /// If `ZX_EXCEPTION_STRATEGY_SECOND_CHANCE` is set, then the debugger gets a 'second
     /// chance' at handling the exception if the process-level handler fails to do so.
+    /// If `ZX_EXCEPTION_STRATEGY_FIRST_CHANCE` is set, then the debugger does not get a
+    /// second chance at handling the exception.
+    /// Setting to any other value will fail with **ZX_ERR_INVALID_ARGS**.
     ///
     /// This property can only be set when the handle corresponds to a debugger process
     /// exception channel. Attempting to set this property when the exception channel
-    /// is any other type will result in ZX_ERR_BAD_STATE.
+    /// is any other type will result in **ZX_ERR_BAD_STATE**.
     ///
     /// ### ZX_PROP_STREAM_MODE_APPEND
     ///
@@ -727,17 +747,8 @@ closed protocol Object {
     ///
     /// ## Rights
     ///
-    /// *handle* must have **ZX_RIGHT_GET_PROPERTY**.
-    ///
-    /// If *property* is **ZX_PROP_PROCESS_DEBUG_ADDR**, *handle* must be of type **ZX_OBJ_TYPE_PROCESS**.
-    ///
-    /// If *property* is **ZX_PROP_PROCESS_BREAK_ON_LOAD**, *handle* must be of type **ZX_OBJ_TYPE_PROCESS**.
-    ///
-    /// If *property* is **ZX_PROP_PROCESS_VDSO_BASE_ADDRESS**, *handle* must be of type **ZX_OBJ_TYPE_PROCESS**.
-    ///
-    /// If *property* is **ZX_PROP_SOCKET_RX_THRESHOLD**, *handle* must be of type **ZX_OBJ_TYPE_SOCKET**.
-    ///
-    /// If *property* is **ZX_PROP_SOCKET_TX_THRESHOLD**, *handle* must be of type **ZX_OBJ_TYPE_SOCKET**.
+    /// *handle* must have **ZX_RIGHT_GET_PROPERTY**, and must be of a supported **ZX_OBJ_TYPE_**
+    /// for the *property*, as documented above in the description of individual properties.
     ///
     /// ## Return value
     ///
@@ -746,22 +757,25 @@ closed protocol Object {
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE**: *handle* is not a valid handle
+    /// Specific errors for individual *property* values are documented in their description above.
+    /// Common errors are listed below:
     ///
-    /// **ZX_ERR_WRONG_TYPE**: *handle* is not an appropriate type for *property*
+    /// **ZX_ERR_BAD_HANDLE**: *handle* is not a valid handle.
+    ///
+    /// **ZX_ERR_WRONG_TYPE**: *handle* is not an appropriate type for *property*.
     ///
     /// **ZX_ERR_ACCESS_DENIED**: *handle* does not have the necessary rights for the
-    /// operation
+    /// operation.
     ///
-    /// **ZX_ERR_INVALID_ARGS**: *value* is an invalid pointer
+    /// **ZX_ERR_INVALID_ARGS**: *value* is an invalid pointer.
     ///
     /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
     /// There is no good way for userspace to handle this (unlikely) error.
     /// In a future build this error will no longer occur.
     ///
-    /// **ZX_ERR_BUFFER_TOO_SMALL**: *value_size* is too small for *property*
+    /// **ZX_ERR_BUFFER_TOO_SMALL**: *value_size* is too small for *property*.
     ///
-    /// **ZX_ERR_NOT_SUPPORTED**: *property* does not exist
+    /// **ZX_ERR_NOT_SUPPORTED**: *property* does not exist.
     ///
     /// ## See also
     ///
@@ -800,17 +814,8 @@ closed protocol Object {
     ///
     /// ## Rights
     ///
-    /// *handle* must have **ZX_RIGHT_SET_PROPERTY**.
-    ///
-    /// If *property* is **ZX_PROP_PROCESS_DEBUG_ADDR**, *handle* must be of type **ZX_OBJ_TYPE_PROCESS**.
-    ///
-    /// If *property* is **ZX_PROP_PROCESS_BREAK_ON_LOAD**, *handle* must be of type **ZX_OBJ_TYPE_PROCESS**.
-    ///
-    /// If *property* is **ZX_PROP_SOCKET_RX_THRESHOLD**, *handle* must be of type **ZX_OBJ_TYPE_SOCKET**.
-    ///
-    /// If *property* is **ZX_PROP_SOCKET_TX_THRESHOLD**, *handle* must be of type **ZX_OBJ_TYPE_SOCKET**.
-    ///
-    /// If *property* is **ZX_PROP_JOB_KILL_ON_OOM**, *handle* must be of type **ZX_OBJ_TYPE_JOB**.
+    /// *handle* must have **ZX_RIGHT_SET_PROPERTY**, and must be of a supported **ZX_OBJ_TYPE_**
+    /// for the *property*, as documented in [`zx_object_get_property()`].
     ///
     /// ## See also
     ///
