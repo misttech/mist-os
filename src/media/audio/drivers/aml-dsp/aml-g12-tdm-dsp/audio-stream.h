@@ -6,8 +6,8 @@
 #define SRC_MEDIA_AUDIO_DRIVERS_AML_DSP_AML_G12_TDM_DSP_AUDIO_STREAM_H_
 
 #include <fidl/fuchsia.hardware.dsp/cpp/wire.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.mailbox/cpp/wire.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -35,7 +35,7 @@ namespace aml_g12 {
 class AmlG12TdmDspStream : public SimpleAudioStream {
  public:
   AmlG12TdmDspStream(zx_device_t* parent, bool is_input, ddk::PDevFidl pdev,
-                     const ddk::GpioProtocolClient enable_gpio);
+                     fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio);
 
  protected:
   zx_status_t Init() __TA_REQUIRES(domain_token()) override;
@@ -98,7 +98,7 @@ class AmlG12TdmDspStream : public SimpleAudioStream {
   ddk::PDevFidl pdev_;
 
   zx::bti bti_;
-  const ddk::GpioProtocolClient enable_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> enable_gpio_;
   uint64_t active_channels_bitmask_max_ = std::numeric_limits<uint64_t>::max();
   uint64_t active_channels_ = std::numeric_limits<uint64_t>::max();  // Enable all.
   bool override_mute_ = true;

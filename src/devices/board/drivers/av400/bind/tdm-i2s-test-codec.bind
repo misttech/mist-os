@@ -10,7 +10,7 @@ using fuchsia.hardware.gpio;
 using fuchsia.ti.platform;
 
 primary node "gpio-enable" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a5.GPIOD_PIN_ID.PIN_9;  // RESET
 }
 

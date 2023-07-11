@@ -99,12 +99,13 @@ static const std::vector<fpbus::Bti> tdm_btis{
 };
 
 const std::vector<fdf::BindRule> kAudioEnableGpioRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                            bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
     fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SOC_AUDIO_EN)),
 };
 const std::vector<fdf::NodeProperty> kAudioEnableGpioProps = std::vector{
-    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                      bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
     fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                       bind_fuchsia_hardware_gpio::FUNCTION_SOC_AUDIO_ENABLE),
 };

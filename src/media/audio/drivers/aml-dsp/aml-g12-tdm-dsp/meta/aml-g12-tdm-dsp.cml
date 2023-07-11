@@ -17,6 +17,7 @@
     },
     use: [
         { service: "fuchsia.hardware.dsp.Service" },
+        { service: "fuchsia.hardware.gpio.Service" },
         { service: "fuchsia.hardware.mailbox.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
     ],

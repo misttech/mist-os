@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.audio/cpp/wire.h>
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -24,6 +23,7 @@
 
 #include "../audio-stream.h"
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 namespace audio::aml_g12 {
 
@@ -33,6 +33,64 @@ static constexpr float kTestGain = 2.f;
 static constexpr float kTestDeltaGain = 1.f;
 static constexpr float kTestTurnOnNsecs = 12345;
 static constexpr float kTestTurnOffNsecs = 67890;
+
+class StreamTest : public zxtest::Test {
+ public:
+  void SetUp() override {
+    ASSERT_OK(gpio_loop_.StartThread("gpio"));
+    enable_gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState, fake_gpio::WriteState{.value = 1});
+    fake_parent_ = MockDevice::FakeRootParent();
+  }
+
+ protected:
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio>& enable_gpio() { return enable_gpio_; }
+
+  std::shared_ptr<zx_device> fake_parent() const { return fake_parent_; }
+
+  template <typename T>
+  fbl::RefPtr<T> CreateController(ddk_mock::MockMmioRegRegion& mmio_reg_region,
+                                  fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec) {
+    auto enable_gpio_client = enable_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
+    auto controller =
+        audio::SimpleAudioStream::Create<T>(fake_parent_.get(), std::move(codec), mmio_reg_region,
+                                            ddk::PDevFidl(), std::move(enable_gpio_client));
+    VerifyGpioAfterCreate();
+    return controller;
+  }
+
+  template <typename T>
+  fbl::RefPtr<T> CreateController(
+      ddk_mock::MockMmioRegRegion& mmio_reg_region,
+      std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codecs) {
+    auto enable_gpio_client = enable_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
+    auto controller =
+        audio::SimpleAudioStream::Create<T>(fake_parent_.get(), std::move(codecs), mmio_reg_region,
+                                            ddk::PDevFidl(), std::move(enable_gpio_client));
+    VerifyGpioAfterCreate();
+    return controller;
+  }
+
+  template <typename T>
+  fbl::RefPtr<T> CreateController(ddk_mock::MockMmioRegRegion& mmio_reg_region) {
+    auto enable_gpio_client = enable_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
+    auto controller = audio::SimpleAudioStream::Create<T>(
+        fake_parent_.get(), mmio_reg_region, ddk::PDevFidl(), std::move(enable_gpio_client));
+    VerifyGpioAfterCreate();
+    return controller;
+  }
+
+ private:
+  void VerifyGpioAfterCreate() {
+    std::vector states = enable_gpio().SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+    ASSERT_EQ(1, states.size());
+    ASSERT_EQ(fake_gpio::WriteState{.value = 1}, states[0]);
+  }
+
+  async::Loop gpio_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> enable_gpio_{gpio_loop_.dispatcher(),
+                                                                        std::in_place};
+  std::shared_ptr<zx_device> fake_parent_;
+};
 
 audio_fidl::wire::PcmFormat GetDefaultPcmFormat() {
   audio_fidl::wire::PcmFormat format;
@@ -157,7 +215,7 @@ struct AmlG12I2sOutTest : public AmlG12TdmStream {
   AmlG12I2sOutTest(zx_device_t* parent,
                    fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end,
                    ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
-                   ddk::GpioProtocolClient enable_gpio)
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12TdmStream(parent, false, std::move(pdev), std::move(enable_gpio)) {
     SetCommonDefaults();
     codecs_.push_back(std::make_unique<SimpleCodecClient>());
@@ -172,7 +230,7 @@ struct AmlG12I2sOutTest : public AmlG12TdmStream {
   AmlG12I2sOutTest(zx_device_t* parent,
                    std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_ends,
                    ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
-                   ddk::GpioProtocolClient enable_gpio)
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12TdmStream(parent, false, std::move(pdev), std::move(enable_gpio)) {
     SetCommonDefaults();
     aml_audio_ = std::make_unique<AmlTdmConfigDevice>(metadata_, region.GetMmioBuffer());
@@ -229,11 +287,9 @@ struct AmlG12I2sOutTest : public AmlG12TdmStream {
   }
 };
 
-TEST(AmlG12Tdm, InitializeI2sOut) {
-  auto fake_parent = MockDevice::FakeRootParent();
-
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev = fake_parent->GetLatestChild();
+TEST_F(StreamTest, InitializeI2sOut) {
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end = codec->GetClient();
@@ -256,25 +312,20 @@ TEST(AmlG12Tdm, InitializeI2sOut) {
   // CLK TDMOUT CTL, enable, no sclk_inv, sclk_ws_inv, mclk_ch 2.
   mock[0x098].ExpectWrite(0).ExpectWrite(0xd2200000);
 
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
-  auto controller = audio::SimpleAudioStream::Create<AmlG12I2sOutTest>(
-      fake_parent.get(), std::move(*codec_client_end), mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12I2sOutTest>(mock, std::move(codec_client_end.value()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
 
   child_dev2->UnbindOp();
   EXPECT_TRUE(child_dev2->UnbindReplyCalled());
   mock.VerifyAll();
-  enable_gpio.VerifyAndClear();
 }
 
 struct AmlG12PcmOutTest : public AmlG12I2sOutTest {
   AmlG12PcmOutTest(zx_device_t* parent,
                    fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end,
                    ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
-                   ddk::GpioProtocolClient enable_gpio)
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12I2sOutTest(parent, std::move(codec_client_end), region, std::move(pdev),
                          std::move(enable_gpio)) {
     metadata_.bus = metadata::AmlBus::TDM_A;
@@ -289,11 +340,9 @@ struct AmlG12PcmOutTest : public AmlG12I2sOutTest {
   }
 };
 
-TEST(AmlG12Tdm, InitializePcmOut) {
-  auto fake_parent = MockDevice::FakeRootParent();
-
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev = fake_parent->GetLatestChild();
+TEST_F(StreamTest, InitializePcmOut) {
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end = codec->GetClient();
@@ -317,25 +366,20 @@ TEST(AmlG12Tdm, InitializePcmOut) {
   // CLK TDMOUT A CTL, enable, no sclk_inv, sclk_ws_inv, mclk_ch 0. EE_AUDIO_CLK_TDMOUT_A_CTRL.
   mock[0x090].ExpectWrite(0).ExpectWrite(0xd0000000);
 
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
-  auto controller = audio::SimpleAudioStream::Create<AmlG12PcmOutTest>(
-      fake_parent.get(), std::move(*codec_client_end), mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12PcmOutTest>(mock, std::move(codec_client_end.value()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
 
   child_dev2->UnbindOp();
   EXPECT_TRUE(child_dev2->UnbindReplyCalled());
   mock.VerifyAll();
-  enable_gpio.VerifyAndClear();
 }
 
 struct AmlG12LjtOutTest : public AmlG12I2sOutTest {
   AmlG12LjtOutTest(zx_device_t* parent,
                    fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end,
                    ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
-                   ddk::GpioProtocolClient enable_gpio)
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12I2sOutTest(parent, std::move(codec_client_end), region, std::move(pdev),
                          std::move(enable_gpio)) {
     metadata_.ring_buffer.number_of_channels = 2;
@@ -347,11 +391,9 @@ struct AmlG12LjtOutTest : public AmlG12I2sOutTest {
   }
 };
 
-TEST(AmlG12Tdm, InitializeLeftJustifiedOut) {
-  auto fake_parent = MockDevice::FakeRootParent();
-
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev = fake_parent->GetLatestChild();
+TEST_F(StreamTest, InitializeLeftJustifiedOut) {
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end = codec->GetClient();
@@ -374,25 +416,20 @@ TEST(AmlG12Tdm, InitializeLeftJustifiedOut) {
   // CLK TDMOUT CTL, enable, no sclk_inv, sclk_ws_inv, mclk_ch 2.
   mock[0x098].ExpectWrite(0).ExpectWrite(0xd2200000);
 
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
-  auto controller = audio::SimpleAudioStream::Create<AmlG12LjtOutTest>(
-      fake_parent.get(), std::move(*codec_client_end), mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12LjtOutTest>(mock, std::move(codec_client_end.value()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
 
   child_dev2->UnbindOp();
   EXPECT_TRUE(child_dev2->UnbindReplyCalled());
   mock.VerifyAll();
-  enable_gpio.VerifyAndClear();
 }
 
 struct AmlG12Tdm1OutTest : public AmlG12I2sOutTest {
   AmlG12Tdm1OutTest(zx_device_t* parent,
                     fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end,
                     ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
-                    ddk::GpioProtocolClient enable_gpio)
+                    fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12I2sOutTest(parent, std::move(codec_client_end), region, std::move(pdev),
                          std::move(enable_gpio)) {
     metadata_.ring_buffer.number_of_channels = 4;
@@ -404,11 +441,9 @@ struct AmlG12Tdm1OutTest : public AmlG12I2sOutTest {
   }
 };
 
-TEST(AmlG12Tdm, InitializeTdm1Out) {
-  auto fake_parent = MockDevice::FakeRootParent();
-
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev = fake_parent->GetLatestChild();
+TEST_F(StreamTest, InitializeTdm1Out) {
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end = codec->GetClient();
@@ -431,26 +466,20 @@ TEST(AmlG12Tdm, InitializeTdm1Out) {
   // CLK TDMOUT CTL, enable, no sclk_inv, sclk_ws_inv, mclk_ch 2.
   mock[0x098].ExpectWrite(0).ExpectWrite(0xd2200000);
 
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
-  auto controller = audio::SimpleAudioStream::Create<AmlG12Tdm1OutTest>(
-      fake_parent.get(), std::move(*codec_client_end), mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12Tdm1OutTest>(mock, std::move(codec_client_end.value()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
 
   child_dev2->UnbindOp();
   EXPECT_TRUE(child_dev2->UnbindReplyCalled());
   mock.VerifyAll();
-  enable_gpio.VerifyAndClear();
 }
 
-TEST(AmlG12Tdm, I2sOutCodecsStartedAndMuted) {
-  auto fake_parent = MockDevice::FakeRootParent();
+TEST_F(StreamTest, I2sOutCodecsStartedAndMuted) {
   std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_ends;
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev1 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev1 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev1);
   auto codec1 = child_dev1->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end1 =
@@ -458,8 +487,8 @@ TEST(AmlG12Tdm, I2sOutCodecsStartedAndMuted) {
   ASSERT_OK(codec_client_end1.status_value());
   codec_client_ends.push_back(std::move(*codec_client_end1));
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   auto codec2 = child_dev2->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end2 =
@@ -469,13 +498,9 @@ TEST(AmlG12Tdm, I2sOutCodecsStartedAndMuted) {
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
   ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
 
-  auto controller = audio::SimpleAudioStream::Create<AmlG12I2sOutTest>(
-      fake_parent.get(), std::move(codec_client_ends), unused_mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12I2sOutTest>(unused_mock, std::move(codec_client_ends));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   AmlG12I2sOutTest* test_dev = child_dev->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -515,15 +540,13 @@ TEST(AmlG12Tdm, I2sOutCodecsStartedAndMuted) {
 
   child_dev->UnbindOp();
   EXPECT_TRUE(child_dev->UnbindReplyCalled());
-  enable_gpio.VerifyAndClear();
 }
 
-TEST(AmlG12Tdm, I2sOutCodecsTurnOnDelay) {
-  auto fake_parent = MockDevice::FakeRootParent();
+TEST_F(StreamTest, I2sOutCodecsTurnOnDelay) {
   std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_ends;
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev1 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev1 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev1);
   auto codec1 = child_dev1->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end1 =
@@ -531,8 +554,8 @@ TEST(AmlG12Tdm, I2sOutCodecsTurnOnDelay) {
   ASSERT_OK(codec_client_end1.status_value());
   codec_client_ends.push_back(std::move(*codec_client_end1));
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   auto codec2 = child_dev2->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end2 =
@@ -542,12 +565,9 @@ TEST(AmlG12Tdm, I2sOutCodecsTurnOnDelay) {
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
   ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
-  auto controller = audio::SimpleAudioStream::Create<AmlG12I2sOutTest>(
-      fake_parent.get(), std::move(codec_client_ends), unused_mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev = fake_parent->GetLatestChild();
+
+  auto controller = CreateController<AmlG12I2sOutTest>(unused_mock, std::move(codec_client_ends));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   AmlG12I2sOutTest* test_dev = child_dev->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -577,15 +597,13 @@ TEST(AmlG12Tdm, I2sOutCodecsTurnOnDelay) {
 
   child_dev->UnbindOp();
   EXPECT_TRUE(child_dev->UnbindReplyCalled());
-  enable_gpio.VerifyAndClear();
 }
 
-TEST(AmlG12Tdm, I2sOutSetGainState) {
-  auto fake_parent = MockDevice::FakeRootParent();
+TEST_F(StreamTest, I2sOutSetGainState) {
   std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_ends;
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev1 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev1 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev1);
   auto codec1 = child_dev1->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end1 =
@@ -593,8 +611,8 @@ TEST(AmlG12Tdm, I2sOutSetGainState) {
   ASSERT_OK(codec_client_end1.status_value());
   codec_client_ends.push_back(std::move(*codec_client_end1));
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   auto codec2 = child_dev2->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end2 =
@@ -604,13 +622,9 @@ TEST(AmlG12Tdm, I2sOutSetGainState) {
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
   ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
 
-  auto controller = audio::SimpleAudioStream::Create<AmlG12I2sOutTest>(
-      fake_parent.get(), std::move(codec_client_ends), unused_mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12I2sOutTest>(unused_mock, std::move(codec_client_ends));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   AmlG12I2sOutTest* test_dev = child_dev->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -742,10 +756,9 @@ TEST(AmlG12Tdm, I2sOutSetGainState) {
 
   child_dev->UnbindOp();
   EXPECT_TRUE(child_dev->UnbindReplyCalled());
-  enable_gpio.VerifyAndClear();
 }
 
-TEST(AmlG12Tdm, I2sOutOneCodecCantAgc) {
+TEST_F(StreamTest, I2sOutOneCodecCantAgc) {
   struct CodecCantAgcTest : public CodecTest {
     explicit CodecCantAgcTest(zx_device_t* device) : CodecTest(device) {}
     GainFormat GetGainFormat() override {
@@ -757,11 +770,10 @@ TEST(AmlG12Tdm, I2sOutOneCodecCantAgc) {
     }
   };
 
-  auto fake_parent = MockDevice::FakeRootParent();
   std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_ends;
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev1 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev1 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev1);
   auto codec1 = child_dev1->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end1 =
@@ -769,8 +781,8 @@ TEST(AmlG12Tdm, I2sOutOneCodecCantAgc) {
   ASSERT_OK(codec_client_end1.status_value());
   codec_client_ends.push_back(std::move(*codec_client_end1));
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecCantAgcTest>(fake_parent.get()));
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecCantAgcTest>(fake_parent().get()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   auto codec2 = child_dev2->GetDeviceContext<CodecCantAgcTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end2 =
@@ -780,13 +792,9 @@ TEST(AmlG12Tdm, I2sOutOneCodecCantAgc) {
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
   ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
 
-  auto controller = audio::SimpleAudioStream::Create<AmlG12I2sOutTest>(
-      fake_parent.get(), std::move(codec_client_ends), unused_mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12I2sOutTest>(unused_mock, std::move(codec_client_ends));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   AmlG12I2sOutTest* test_dev = child_dev->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -807,10 +815,9 @@ TEST(AmlG12Tdm, I2sOutOneCodecCantAgc) {
 
   child_dev->UnbindOp();
   EXPECT_TRUE(child_dev->UnbindReplyCalled());
-  enable_gpio.VerifyAndClear();
 }
 
-TEST(AmlG12Tdm, I2sOutOneCodecCantMute) {
+TEST_F(StreamTest, I2sOutOneCodecCantMute) {
   struct CodecCantMuteTest : public CodecTest {
     explicit CodecCantMuteTest(zx_device_t* device) : CodecTest(device) {}
     GainFormat GetGainFormat() override {
@@ -821,12 +828,10 @@ TEST(AmlG12Tdm, I2sOutOneCodecCantMute) {
               .can_agc = true};
     }
   };
-
-  auto fake_parent = MockDevice::FakeRootParent();
   std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_ends;
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev1 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev1 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev1);
   auto codec1 = child_dev1->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end1 =
@@ -834,8 +839,8 @@ TEST(AmlG12Tdm, I2sOutOneCodecCantMute) {
   ASSERT_OK(codec_client_end1.status_value());
   codec_client_ends.push_back(std::move(*codec_client_end1));
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecCantMuteTest>(fake_parent.get()));
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecCantMuteTest>(fake_parent().get()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   auto codec2 = child_dev2->GetDeviceContext<CodecCantMuteTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end2 =
@@ -845,13 +850,9 @@ TEST(AmlG12Tdm, I2sOutOneCodecCantMute) {
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
   ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
 
-  auto controller = audio::SimpleAudioStream::Create<AmlG12I2sOutTest>(
-      fake_parent.get(), std::move(codec_client_ends), unused_mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12I2sOutTest>(unused_mock, std::move(codec_client_ends));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   AmlG12I2sOutTest* test_dev = child_dev->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -872,16 +873,14 @@ TEST(AmlG12Tdm, I2sOutOneCodecCantMute) {
 
   child_dev->UnbindOp();
   EXPECT_TRUE(child_dev->UnbindReplyCalled());
-  enable_gpio.VerifyAndClear();
 }
 
-TEST(AmlG12Tdm, I2sOutCodecsStop) {
+TEST_F(StreamTest, I2sOutCodecsStop) {
   // Setup a system with 3 codecs.
-  auto fake_parent = MockDevice::FakeRootParent();
   std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_ends;
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev1 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev1 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev1);
   auto codec1 = child_dev1->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end1 =
@@ -889,8 +888,8 @@ TEST(AmlG12Tdm, I2sOutCodecsStop) {
   ASSERT_OK(codec_client_end1.status_value());
   codec_client_ends.push_back(std::move(*codec_client_end1));
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   auto codec2 = child_dev2->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end2 =
@@ -898,8 +897,8 @@ TEST(AmlG12Tdm, I2sOutCodecsStop) {
   ASSERT_OK(codec_client_end2.status_value());
   codec_client_ends.push_back(std::move(*codec_client_end2));
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev3 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev3 = fake_parent()->GetLatestChild();
   auto codec3 = child_dev3->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end3 =
       codec3->GetClient();
@@ -908,13 +907,9 @@ TEST(AmlG12Tdm, I2sOutCodecsStop) {
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
   ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
 
-  auto controller = audio::SimpleAudioStream::Create<AmlG12I2sOutTest>(
-      fake_parent.get(), std::move(codec_client_ends), unused_mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12I2sOutTest>(unused_mock, std::move(codec_client_ends));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   AmlG12I2sOutTest* test_dev = child_dev->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -959,16 +954,14 @@ TEST(AmlG12Tdm, I2sOutCodecsStop) {
 
   child_dev->UnbindOp();
   EXPECT_TRUE(child_dev->UnbindReplyCalled());
-  enable_gpio.VerifyAndClear();
 }
 
-TEST(AmlG12Tdm, I2sOutCodecsChannelsActive) {
+TEST_F(StreamTest, I2sOutCodecsChannelsActive) {
   // Setup a system with 3 codecs.
-  auto fake_parent = MockDevice::FakeRootParent();
   std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_ends;
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev1 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev1 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev1);
   auto codec1 = child_dev1->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end1 =
@@ -976,8 +969,8 @@ TEST(AmlG12Tdm, I2sOutCodecsChannelsActive) {
   ASSERT_OK(codec_client_end1.status_value());
   codec_client_ends.push_back(std::move(*codec_client_end1));
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   auto codec2 = child_dev2->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end2 =
@@ -985,8 +978,8 @@ TEST(AmlG12Tdm, I2sOutCodecsChannelsActive) {
   ASSERT_OK(codec_client_end2.status_value());
   codec_client_ends.push_back(std::move(*codec_client_end2));
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev3 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev3 = fake_parent()->GetLatestChild();
   auto codec3 = child_dev3->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end3 =
       codec3->GetClient();
@@ -995,13 +988,9 @@ TEST(AmlG12Tdm, I2sOutCodecsChannelsActive) {
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
   ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
 
-  auto controller = audio::SimpleAudioStream::Create<AmlG12I2sOutTest>(
-      fake_parent.get(), std::move(codec_client_ends), unused_mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12I2sOutTest>(unused_mock, std::move(codec_client_ends));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   AmlG12I2sOutTest* test_dev = child_dev->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -1089,14 +1078,12 @@ TEST(AmlG12Tdm, I2sOutCodecsChannelsActive) {
 
   child_dev->UnbindOp();
   EXPECT_TRUE(child_dev->UnbindReplyCalled());
-  enable_gpio.VerifyAndClear();
 }
 
-TEST(AmlG12Tdm, I2sOutSetMclks) {
-  auto fake_parent = MockDevice::FakeRootParent();
+TEST_F(StreamTest, I2sOutSetMclks) {
   std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_ends;
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev1 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev1 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev1);
   auto codec1 = child_dev1->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end1 =
@@ -1104,8 +1091,8 @@ TEST(AmlG12Tdm, I2sOutSetMclks) {
   ASSERT_OK(codec_client_end1.status_value());
   codec_client_ends.push_back(std::move(*codec_client_end1));
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   auto codec2 = child_dev2->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end2 =
@@ -1123,27 +1110,20 @@ TEST(AmlG12Tdm, I2sOutSetMclks) {
   // Set 3 bits twice to MCLK C (2) and leave other configurations unchanged.
   mock[0x020].ExpectRead(0xffffffff).ExpectWrite(0xfafffaff);  // MCLK C for PAD 1.
 
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
-
-  auto controller = audio::SimpleAudioStream::Create<AmlG12I2sOutTest>(
-      fake_parent.get(), std::move(codec_client_ends), mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12I2sOutTest>(mock, std::move(codec_client_ends));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
 
   child_dev->UnbindOp();
   EXPECT_TRUE(child_dev->UnbindReplyCalled());
-  enable_gpio.VerifyAndClear();
   mock.VerifyAll();
 }
 
-TEST(AmlG12Tdm, I2sOutChangeRate96K) {
-  auto fake_parent = MockDevice::FakeRootParent();
+TEST_F(StreamTest, I2sOutChangeRate96K) {
   std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_ends;
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev1 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev1 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev1);
   auto codec1 = child_dev1->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end1 =
@@ -1151,8 +1131,8 @@ TEST(AmlG12Tdm, I2sOutChangeRate96K) {
   ASSERT_OK(codec_client_end1.status_value());
   codec_client_ends.push_back(std::move(*codec_client_end1));
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   auto codec2 = child_dev2->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end2 =
@@ -1181,13 +1161,8 @@ TEST(AmlG12Tdm, I2sOutChangeRate96K) {
   mock[0x00c].ExpectRead(0xffffffff).ExpectWrite(0x7fff0000);  // Disable, clear div.
   mock[0x00c].ExpectRead(0x00000000).ExpectWrite(0x84000004);  // Enabled, HIFI PLL, set div to 5.
 
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
-
-  auto controller = audio::SimpleAudioStream::Create<AmlG12I2sOutTest>(
-      fake_parent.get(), std::move(codec_client_ends), mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12I2sOutTest>(mock, std::move(codec_client_ends));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   AmlG12I2sOutTest* test_dev = child_dev->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -1248,15 +1223,12 @@ TEST(AmlG12Tdm, I2sOutChangeRate96K) {
 
   child_dev->UnbindOp();
   EXPECT_TRUE(child_dev->UnbindReplyCalled());
-  enable_gpio.VerifyAndClear();
   mock.VerifyAll();
 }
 
-TEST(AmlG12Tdm, PcmChangeRates) {
-  auto fake_parent = MockDevice::FakeRootParent();
-
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev = fake_parent->GetLatestChild();
+TEST_F(StreamTest, PcmChangeRates) {
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end = codec->GetClient();
@@ -1265,13 +1237,8 @@ TEST(AmlG12Tdm, PcmChangeRates) {
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
   ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
-
-  auto controller = audio::SimpleAudioStream::Create<AmlG12PcmOutTest>(
-      fake_parent.get(), std::move(*codec_client_end), mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12PcmOutTest>(mock, std::move(codec_client_end.value()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   AmlG12I2sOutTest* test_dev2 = child_dev2->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -1378,15 +1345,12 @@ TEST(AmlG12Tdm, PcmChangeRates) {
 
   child_dev2->UnbindOp();
   EXPECT_TRUE(child_dev2->UnbindReplyCalled());
-  enable_gpio.VerifyAndClear();
   mock.VerifyAll();
 }
 
-TEST(AmlG12Tdm, EnableAndMuteChannelsPcm1Channel) {
-  auto fake_parent = MockDevice::FakeRootParent();
-
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev = fake_parent->GetLatestChild();
+TEST_F(StreamTest, EnableAndMuteChannelsPcm1Channel) {
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end = codec->GetClient();
@@ -1395,13 +1359,8 @@ TEST(AmlG12Tdm, EnableAndMuteChannelsPcm1Channel) {
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
   ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
-
-  auto controller = audio::SimpleAudioStream::Create<AmlG12PcmOutTest>(
-      fake_parent.get(), std::move(*codec_client_end), mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12PcmOutTest>(mock, std::move(codec_client_end.value()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   AmlG12I2sOutTest* test_dev2 = child_dev2->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -1454,17 +1413,14 @@ TEST(AmlG12Tdm, EnableAndMuteChannelsPcm1Channel) {
   mock.VerifyAll();
   child_dev2->UnbindOp();
   EXPECT_TRUE(child_dev2->UnbindReplyCalled());
-  enable_gpio.VerifyAndClear();
 }
 
-TEST(AmlG12Tdm, EnableAndMuteChannelsTdm2Lanes) {
-  auto fake_parent = MockDevice::FakeRootParent();
-
+TEST_F(StreamTest, EnableAndMuteChannelsTdm2Lanes) {
   struct AmlG12Tdm2LanesOutMuteTest : public AmlG12I2sOutTest {
     AmlG12Tdm2LanesOutMuteTest(zx_device_t* parent,
                                fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end,
                                ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
-                               ddk::GpioProtocolClient enable_gpio)
+                               fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
         : AmlG12I2sOutTest(parent, std::move(codec_client_end), region, std::move(pdev),
                            std::move(enable_gpio)) {
       metadata_.ring_buffer.number_of_channels = 4;
@@ -1476,8 +1432,8 @@ TEST(AmlG12Tdm, EnableAndMuteChannelsTdm2Lanes) {
     }
   };
 
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev = fake_parent->GetLatestChild();
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end = codec->GetClient();
@@ -1486,13 +1442,9 @@ TEST(AmlG12Tdm, EnableAndMuteChannelsTdm2Lanes) {
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
   ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
-
-  auto controller = audio::SimpleAudioStream::Create<AmlG12Tdm2LanesOutMuteTest>(
-      fake_parent.get(), std::move(*codec_client_end), mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  auto controller =
+      CreateController<AmlG12Tdm2LanesOutMuteTest>(mock, std::move(codec_client_end.value()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   AmlG12I2sOutTest* test_dev2 = child_dev2->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -1543,15 +1495,12 @@ TEST(AmlG12Tdm, EnableAndMuteChannelsTdm2Lanes) {
 
   child_dev2->UnbindOp();
   EXPECT_TRUE(child_dev2->UnbindReplyCalled());
-  enable_gpio.VerifyAndClear();
   mock.VerifyAll();
 }
 
-TEST(AmlG12Tdm, EnableAndMuteChannelsTdm1Lane) {
-  auto fake_parent = MockDevice::FakeRootParent();
-
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent.get()));
-  auto* child_dev = fake_parent->GetLatestChild();
+TEST_F(StreamTest, EnableAndMuteChannelsTdm1Lane) {
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<CodecTest>(fake_parent().get()));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<CodecTest>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end = codec->GetClient();
@@ -1560,13 +1509,8 @@ TEST(AmlG12Tdm, EnableAndMuteChannelsTdm1Lane) {
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
   ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
-
-  auto controller = audio::SimpleAudioStream::Create<AmlG12Tdm1OutTest>(
-      fake_parent.get(), std::move(*codec_client_end), mock, ddk::PDevFidl(),
-      enable_gpio.GetProto());
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12Tdm1OutTest>(mock, std::move(codec_client_end.value()));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   AmlG12I2sOutTest* test_dev2 = child_dev2->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -1618,13 +1562,12 @@ TEST(AmlG12Tdm, EnableAndMuteChannelsTdm1Lane) {
 
   child_dev2->UnbindOp();
   EXPECT_TRUE(child_dev2->UnbindReplyCalled());
-  enable_gpio.VerifyAndClear();
   mock.VerifyAll();
 }
 
 struct AmlG12I2sInTest : public AmlG12TdmStream {
   AmlG12I2sInTest(zx_device_t* parent, ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
-                  ddk::GpioProtocolClient enable_gpio)
+                  fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12TdmStream(parent, true, std::move(pdev), std::move(enable_gpio)) {
     metadata_.is_input = true;
     metadata_.mClockDivFactor = 10;
@@ -1670,7 +1613,7 @@ struct AmlG12I2sInTest : public AmlG12TdmStream {
 
 struct AmlG12PcmInTest : public AmlG12I2sInTest {
   AmlG12PcmInTest(zx_device_t* parent, ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
-                  ddk::GpioProtocolClient enable_gpio)
+                  fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12I2sInTest(parent, region, std::move(pdev), std::move(enable_gpio)) {
     metadata_.ring_buffer.number_of_channels = 1;
     metadata_.dai.number_of_channels = 1;
@@ -1682,9 +1625,7 @@ struct AmlG12PcmInTest : public AmlG12I2sInTest {
   }
 };
 
-TEST(AmlG12Tdm, InitializeI2sIn) {
-  auto fake_parent = MockDevice::FakeRootParent();
-
+TEST_F(StreamTest, InitializeI2sIn) {
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
   ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
@@ -1700,23 +1641,16 @@ TEST(AmlG12Tdm, InitializeI2sIn) {
   // CLK TDMIN CTL, enable, sclk_inv, no sclk_ws_inv, mclk_ch 2.
   mock[0x088].ExpectWrite(0).ExpectWrite(0xe2200000);
 
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
-
-  auto controller = audio::SimpleAudioStream::Create<AmlG12I2sInTest>(
-      fake_parent.get(), mock, ddk::PDevFidl(), enable_gpio.GetProto());
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12I2sInTest>(mock);
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
 
   child_dev2->UnbindOp();
   EXPECT_TRUE(child_dev2->UnbindReplyCalled());
   mock.VerifyAll();
-  enable_gpio.VerifyAndClear();
 }
 
-TEST(AmlG12Tdm, InitializePcmIn) {
-  auto fake_parent = MockDevice::FakeRootParent();
-
+TEST_F(StreamTest, InitializePcmIn) {
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
   ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
@@ -1732,18 +1666,13 @@ TEST(AmlG12Tdm, InitializePcmIn) {
   // CLK TDMIN CTL, enable, sclk_inv, no sclk_ws_inv, mclk_ch 2.
   mock[0x088].ExpectWrite(0).ExpectWrite(0xe2200000);
 
-  ddk::MockGpio enable_gpio;
-  enable_gpio.ExpectWrite(ZX_OK, 0);
-
-  auto controller = audio::SimpleAudioStream::Create<AmlG12PcmInTest>(
-      fake_parent.get(), mock, ddk::PDevFidl(), enable_gpio.GetProto());
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  auto controller = CreateController<AmlG12PcmInTest>(mock);
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
 
   child_dev2->UnbindOp();
   EXPECT_TRUE(child_dev2->UnbindReplyCalled());
   mock.VerifyAll();
-  enable_gpio.VerifyAndClear();
 }
 
 class FakeMmio {
@@ -1767,7 +1696,7 @@ struct IncomingNamespace {
 class TestAmlG12TdmStream : public AmlG12TdmStream {
  public:
   explicit TestAmlG12TdmStream(zx_device_t* parent, ddk::PDevFidl pdev,
-                               const ddk::GpioProtocolClient enable_gpio)
+                               fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12TdmStream(parent, false, std::move(pdev), std::move(enable_gpio)) {}
   bool AllowNonContiguousRingBuffer() override { return true; }
   inspect::Inspector& inspect() { return AmlG12TdmStream::inspect(); }
@@ -1789,8 +1718,12 @@ metadata::AmlConfig GetDefaultMetadata() {
   return metadata;
 }
 
-struct AmlG12TdmTest : public inspect::InspectTestHelper, public zxtest::Test {
-  void SetUp() override {}
+class AmlG12TdmTest : public inspect::InspectTestHelper, public zxtest::Test {
+ public:
+  void SetUp() override {
+    ASSERT_OK(gpio_loop_.StartThread("gpio"));
+    fake_parent_ = MockDevice::FakeRootParent();
+  }
 
   zx::result<ddk::PDevFidl> StartPDev() {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_platform_device::Device>();
@@ -1822,17 +1755,15 @@ struct AmlG12TdmTest : public inspect::InspectTestHelper, public zxtest::Test {
   }
 
   void CreateRingBuffer() {
-    auto fake_parent = MockDevice::FakeRootParent();
     auto metadata = GetDefaultMetadata();
-    fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
+    fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-    ddk::GpioProtocolClient unused_gpio;
-
+    auto enable_gpio_client = enable_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
     zx::result pdev = StartPDev();
     ASSERT_OK(pdev);
     auto controller = audio::SimpleAudioStream::Create<TestAmlG12TdmStream>(
-        fake_parent.get(), std::move(pdev.value()), unused_gpio);
-    auto* child_dev = fake_parent->GetLatestChild();
+        fake_parent_.get(), std::move(pdev.value()), std::move(enable_gpio_client));
+    auto* child_dev = fake_parent_->GetLatestChild();
     ASSERT_NOT_NULL(child_dev);
     AmlG12I2sOutTest* test_dev = child_dev->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -1861,19 +1792,17 @@ struct AmlG12TdmTest : public inspect::InspectTestHelper, public zxtest::Test {
 
   void TestRingBufferSize(uint8_t number_of_channels, uint32_t frames_req,
                           uint32_t frames_expected) {
-    auto fake_parent = MockDevice::FakeRootParent();
     auto metadata = GetDefaultMetadata();
     metadata.ring_buffer.number_of_channels = number_of_channels;
     metadata.lanes_enable_mask[0] = (1 << number_of_channels) - 1;
-    fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
+    fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-    ddk::GpioProtocolClient unused_gpio;
-
+    auto enable_gpio_client = enable_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
     zx::result pdev = StartPDev();
     ASSERT_OK(pdev);
     auto controller = audio::SimpleAudioStream::Create<TestAmlG12TdmStream>(
-        fake_parent.get(), std::move(pdev.value()), unused_gpio);
-    auto* child_dev = fake_parent->GetLatestChild();
+        fake_parent_.get(), std::move(pdev.value()), std::move(enable_gpio_client));
+    auto* child_dev = fake_parent_->GetLatestChild();
     ASSERT_NOT_NULL(child_dev);
     AmlG12I2sOutTest* test_dev = child_dev->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -1907,21 +1836,19 @@ struct AmlG12TdmTest : public inspect::InspectTestHelper, public zxtest::Test {
   }
 
   void TestAttributes() {
-    auto fake_parent = MockDevice::FakeRootParent();
     metadata::AmlConfig metadata = GetDefaultMetadata();
     metadata.ring_buffer.frequency_ranges[0].min_frequency = 40;
     metadata.ring_buffer.frequency_ranges[0].max_frequency = 200;
     metadata.ring_buffer.frequency_ranges[1].min_frequency = 200;
     metadata.ring_buffer.frequency_ranges[1].max_frequency = 20'000;
-    fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
+    fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-    ddk::GpioProtocolClient unused_gpio;
-
+    auto enable_gpio_client = enable_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
     zx::result pdev = StartPDev();
     ASSERT_OK(pdev);
     auto controller = audio::SimpleAudioStream::Create<TestAmlG12TdmStream>(
-        fake_parent.get(), std::move(pdev.value()), unused_gpio);
-    auto* child_dev = fake_parent->GetLatestChild();
+        fake_parent_.get(), std::move(pdev.value()), std::move(enable_gpio_client));
+    auto* child_dev = fake_parent_->GetLatestChild();
     ASSERT_NOT_NULL(child_dev);
     AmlG12I2sOutTest* test_dev = child_dev->GetDeviceContext<AmlG12I2sOutTest>();
 
@@ -1965,6 +1892,17 @@ struct AmlG12TdmTest : public inspect::InspectTestHelper, public zxtest::Test {
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};
+
+ protected:
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio>& enable_gpio() { return enable_gpio_; }
+
+  std::shared_ptr<zx_device> fake_parent() const { return fake_parent_; }
+
+ private:
+  async::Loop gpio_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> enable_gpio_{gpio_loop_.dispatcher(),
+                                                                        std::in_place};
+  std::shared_ptr<zx_device> fake_parent_;
 };
 
 // With 16 bits samples, frame size is 2 x number of channels bytes. FIFO is 1024 bytes.
@@ -2003,17 +1941,15 @@ TEST_F(AmlG12TdmTest, Rate) {
 }
 
 TEST_F(AmlG12TdmTest, Inspect) {
-  auto fake_parent = MockDevice::FakeRootParent();
   auto metadata = GetDefaultMetadata();
-  fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
+  fake_parent()->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-  ddk::GpioProtocolClient unused_gpio;
-
+  auto enable_gpio_client = enable_gpio().SyncCall(&fake_gpio::FakeGpio::Connect);
   zx::result pdev = StartPDev();
   ASSERT_OK(pdev);
   auto controller = audio::SimpleAudioStream::Create<TestAmlG12TdmStream>(
-      fake_parent.get(), std::move(pdev.value()), unused_gpio);
-  auto* child_dev = fake_parent->GetLatestChild();
+      fake_parent().get(), std::move(pdev.value()), std::move(enable_gpio_client));
+  auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   AmlG12I2sOutTest* test_dev = child_dev->GetDeviceContext<AmlG12I2sOutTest>();
 
