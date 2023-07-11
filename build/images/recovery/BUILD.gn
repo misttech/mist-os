@@ -34,6 +34,12 @@ if (is_fuchsia) {
   assert(current_toolchain == default_toolchain,
          "//build/images/* are only valid in the Fuchsia toolchain")
 
+  if (has_board) {
+    assert(images_config_label != false, "Need to define images_config_label")
+  } else {
+    images_config_label = "//boards/images:default"
+  }
+
   # Parameters shared between recovery-eng and recovery-installer
   recovery_base = {
     testonly = true
@@ -49,6 +55,8 @@ if (is_fuchsia) {
     }
 
     ramdisk_in_zbi = true
+
+    assembly_images_config_label = images_config_label
 
     include_component_id_index = true
     additional_boot_args =
@@ -374,6 +382,7 @@ if (is_fuchsia) {
     additional_boot_args = [ "virtcon.disable=true" ]
     cmdline = []
 
+    assembly_images_config_label = images_config_label
     product_assembly_config_label = ":for-fdr"
 
     bootfs_labels = [
