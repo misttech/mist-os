@@ -5,7 +5,7 @@
 use {
     crate::{
         autorepeater::Autorepeater, display_ownership::DisplayOwnership,
-        focus_listener::FocusListener, input_device, input_handler,
+        focus_listener::FocusListener, input_device, input_handler, metrics,
     },
     anyhow::{format_err, Context, Error},
     fidl_fuchsia_input_injection, fidl_fuchsia_io as fio,
@@ -136,10 +136,14 @@ impl InputPipelineAssembly {
     /// Adds the autorepeater into the input pipeline assembly.  The autorepeater
     /// is installed after any handlers that have been already added to the
     /// assembly.
-    pub fn add_autorepeater(self, input_handlers_node: &fuchsia_inspect::Node) -> Self {
+    pub fn add_autorepeater(
+        self,
+        input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
+    ) -> Self {
         let (sender, autorepeat_receiver, mut tasks) = self.into_components();
         let (autorepeat_sender, receiver) = mpsc::unbounded();
-        let a = Autorepeater::new(autorepeat_receiver, input_handlers_node);
+        let a = Autorepeater::new(autorepeat_receiver, input_handlers_node, metrics_logger);
         tasks.push(fasync::Task::local(async move {
             a.run(autorepeat_sender)
                 .await

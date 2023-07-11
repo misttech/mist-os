@@ -38,6 +38,7 @@ use {
         keymap_handler,
         light_sensor_handler::CalibratedLightSensorHandler,
         media_buttons_handler::MediaButtonsHandler,
+        metrics,
         mouse_injector_handler::MouseInjectorHandler,
         touch_injector_handler::TouchInjectorHandler,
     },
@@ -138,6 +139,8 @@ pub async fn handle_input(
     // Create parent node of inspect nodes for device bindings.
     let injected_devices_node = node.create_child("injected_input_devices");
 
+    let metrics_logger = metrics::MetricsLogger::new();
+
     let input_pipeline = InputPipeline::new(
         supported_input_devices.clone(),
         build_input_pipeline_assembly(
@@ -152,6 +155,7 @@ pub async fn handle_input(
             HashSet::from_iter(supported_input_devices.iter()),
             focus_chain_publisher,
             input_handlers_node,
+            metrics_logger,
         )
         .await,
         node,
@@ -267,6 +271,7 @@ async fn register_keyboard_related_input_handlers(
     icu_data_loader: icu_data::Loader,
     focus_chain_publisher: FocusChainProviderPublisher,
     input_handlers_node: &inspect::Node,
+    metrics_logger: metrics::MetricsLogger,
 ) -> InputPipelineAssembly {
     // Add as early as possible, but not before inspect handlers.
     let mut assembly = add_chromebook_keyboard_handler(assembly, input_handlers_node);
@@ -280,7 +285,7 @@ async fn register_keyboard_related_input_handlers(
     assembly = add_text_settings_handler(assembly, input_handlers_node);
     assembly = add_keymap_handler(assembly, input_handlers_node);
     assembly = add_key_meaning_modifier_handler(assembly, input_handlers_node);
-    assembly = assembly.add_autorepeater(input_handlers_node);
+    assembly = assembly.add_autorepeater(input_handlers_node, metrics_logger);
     assembly = add_dead_keys_handler(assembly, icu_data_loader, input_handlers_node);
     assembly = add_ime(assembly, input_handlers_node).await;
 
@@ -365,6 +370,7 @@ async fn build_input_pipeline_assembly(
     supported_input_devices: HashSet<&input_device::InputDeviceType>,
     focus_chain_publisher: FocusChainProviderPublisher,
     input_handlers_node: inspect::Node,
+    metrics_logger: metrics::MetricsLogger,
 ) -> InputPipelineAssembly {
     let mut assembly = InputPipelineAssembly::new();
     {
@@ -384,6 +390,7 @@ async fn build_input_pipeline_assembly(
                 icu_data_loader,
                 focus_chain_publisher,
                 &input_handlers_node,
+                metrics_logger,
             )
             .await;
         }

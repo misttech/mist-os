@@ -4,6 +4,14 @@
 
 import("//build/components.gni")
 import("//build/icu/icu_rustc_library.gni")
+import("//third_party/cobalt/metrics_registry.gni")
+
+metrics_registry("metrics_registry") {
+  # This must match the ID of our Cobalt project as specified in:
+  # third_party/cobalt_config/projects.yaml
+  project_id = 19
+  generate_rust = true
+}
 
 icu_rustc_library("input_pipeline") {
   with_unit_tests = true
@@ -12,6 +20,7 @@ icu_rustc_library("input_pipeline") {
   icu_deps = [ "//src/lib/icu_data/rust/icu_data" ]
   deps = [
     ":input_pipeline_includes",
+    ":metrics_registry_rustlib",
     "//sdk/fidl/fuchsia.factory:fuchsia.factory_rust",
     "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
     "//sdk/fidl/fuchsia.input.injection:fuchsia.input.injection_rust",
@@ -20,6 +29,7 @@ icu_rustc_library("input_pipeline") {
     "//sdk/fidl/fuchsia.lightsensor:fuchsia.lightsensor_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//sdk/fidl/fuchsia.media.sounds:fuchsia.media.sounds_rust",
+    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_rust",
     "//sdk/fidl/fuchsia.recovery.policy:fuchsia.recovery.policy_rust",
     "//sdk/fidl/fuchsia.recovery.ui:fuchsia.recovery.ui_rust",
@@ -49,6 +59,7 @@ icu_rustc_library("input_pipeline") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/ui/lib/focus_chain_provider:lib_without_includes",
     "//src/ui/lib/input-device-constants:lib",
+    "//third_party/cobalt/src/lib/client/rust:cobalt-client",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
@@ -129,6 +140,7 @@ icu_rustc_library("input_pipeline") {
     "src/light_sensor/types.rs",
     "src/light_sensor/types/types_tests.rs",
     "src/media_buttons_handler.rs",
+    "src/metrics/mod.rs",
     "src/modifier_handler.rs",
     "src/mouse_binding.rs",
     "src/mouse_injector_handler.rs",

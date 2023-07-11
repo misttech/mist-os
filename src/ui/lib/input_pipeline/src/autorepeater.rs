@@ -21,6 +21,7 @@
 use crate::input_device::{self, Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent};
 use crate::input_handler::InputHandlerStatus;
 use crate::keyboard_binding::KeyboardEvent;
+use crate::metrics;
 use anyhow::{anyhow, Context, Result};
 use fidl_fuchsia_settings as fsettings;
 use fidl_fuchsia_ui_input3::{self as finput3, KeyEventType, KeyMeaning};
@@ -30,6 +31,7 @@ use fuchsia_zircon as zx;
 use fuchsia_zircon::Duration;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::StreamExt;
+use metrics_registry::*;
 use std::cell::RefCell;
 use std::convert::TryInto;
 use std::rc::Rc;
@@ -169,12 +171,20 @@ where
 ///
 /// The task will wait for the amount of time given in `delay`, and then send
 /// a [AnyEvent::Timeout] to `sink`; unless it is canceled.
-fn new_autorepeat_timer(sink: UnboundedSender<AnyEvent>, delay: Duration) -> Rc<Task<()>> {
+fn new_autorepeat_timer(
+    sink: UnboundedSender<AnyEvent>,
+    delay: Duration,
+    metrics_logger: metrics::MetricsLogger,
+) -> Rc<Task<()>> {
     let task = Task::local(async move {
         Timer::new(Time::after(delay)).await;
         tracing::debug!("autorepeat timeout");
-        unbounded_send_logged(&sink, AnyEvent::Timeout)
-            .unwrap_or_else(|e| tracing::error!("could not fire autorepeat timer: {:?}", e));
+        unbounded_send_logged(&sink, AnyEvent::Timeout).unwrap_or_else(|e| {
+            metrics_logger.log_error(
+                InputPipelineErrorMetricDimensionEvent::AutorepeatCouldNotFireTimer,
+                std::format!("could not fire autorepeat timer: {:?}", e),
+            );
+        });
     });
     Rc::new(task)
 }
@@ -202,6 +212,9 @@ pub struct Autorepeater {
 
     /// The inventory of this handler's Inspect status.
     inspect_status: InputHandlerStatus,
+
+    // The metrics logger.
+    metrics_logger: metrics::MetricsLogger,
 }
 
 impl Autorepeater {
@@ -211,14 +224,16 @@ impl Autorepeater {
     pub fn new(
         source: UnboundedReceiver<InputEvent>,
         input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Rc<Self> {
-        Self::new_with_settings(source, Default::default(), input_handlers_node)
+        Self::new_with_settings(source, Default::default(), input_handlers_node, metrics_logger)
     }
 
     fn new_with_settings(
         mut source: UnboundedReceiver<InputEvent>,
         settings: Settings,
         input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Rc<Self> {
         let (event_sink, event_source) = mpsc::unbounded();
         let inspect_status = InputHandlerStatus::new(
@@ -226,6 +241,8 @@ impl Autorepeater {
             "autorepeater",
             /* generates_events */ true,
         );
+        let cloned_metrics_logger = metrics_logger.clone();
+
         // We need a task to feed input events into the channel read by `run()`.
         // The task will run until there is at least one sender. When there
         // are no more senders, `source.next().await` will return None, and
@@ -257,7 +274,12 @@ impl Autorepeater {
                         } => unbounded_send_logged(&event_sink, AnyEvent::NonKeyboard(event))
                             .context("while forwarding a non-keyboard event"),
                     }
-                    .unwrap_or_else(|e| tracing::error!("could not run autorepeat: {:?}", e));
+                    .unwrap_or_else(|e| {
+                        cloned_metrics_logger.log_error(
+                            InputPipelineErrorMetricDimensionEvent::AutorepeatCouldNotRunAutorepeat,
+                            std::format!("could not run autorepeat: {:?}", e),
+                        );
+                    });
                 }
                 event_sink.close_channel();
             })
@@ -270,6 +292,7 @@ impl Autorepeater {
             settings,
             _event_feeder: event_feeder,
             inspect_status,
+            metrics_logger,
         })
     }
 
@@ -333,8 +356,11 @@ impl Autorepeater {
                     // Only a printable key is a candidate for repeating.
                     // We start a delay timer and go to waiting.
                     (KeyEventType::Pressed, Repeatability::Yes) => {
-                        let _delay_timer =
-                            new_autorepeat_timer(self.event_sink.clone(), self.settings.delay);
+                        let _delay_timer = new_autorepeat_timer(
+                            self.event_sink.clone(),
+                            self.settings.delay,
+                            self.metrics_logger.clone(),
+                        );
                         self.set_state(State::Armed {
                             armed_event: ev,
                             armed_descriptor: descriptor,
@@ -377,8 +403,11 @@ impl Autorepeater {
                 let ev = ev.clone();
                 match (ev.get_event_type_folded(), repeatability(ev.get_key_meaning())) {
                     (KeyEventType::Pressed, Repeatability::Yes) => {
-                        let _delay_timer =
-                            new_autorepeat_timer(self.event_sink.clone(), self.settings.delay);
+                        let _delay_timer = new_autorepeat_timer(
+                            self.event_sink.clone(),
+                            self.settings.delay,
+                            self.metrics_logger.clone(),
+                        );
                         self.set_state(State::Armed {
                             armed_event: ev,
                             armed_descriptor: descriptor,
@@ -403,8 +432,11 @@ impl Autorepeater {
 
             // The timeout triggered while we are armed.  This is an autorepeat!
             (State::Armed { armed_event, armed_descriptor, .. }, AnyEvent::Timeout) => {
-                let _delay_timer =
-                    new_autorepeat_timer(self.event_sink.clone(), self.settings.period);
+                let _delay_timer = new_autorepeat_timer(
+                    self.event_sink.clone(),
+                    self.settings.period,
+                    self.metrics_logger.clone(),
+                );
                 let new_event = armed_event
                     .clone()
                     .into_with_repeat_sequence(armed_event.get_repeat_sequence() + 1);
@@ -617,7 +649,12 @@ mod tests {
         // This API ensures that the handler is fully configured when started,
         // all the while leaving the user with an option of when and how exactly
         // to start the handler, including not immediately upon creation.
-        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
+        let handler = Autorepeater::new_with_settings(
+            receiver,
+            default_settings(),
+            &test_node,
+            metrics::MetricsLogger::default(),
+        );
 
         // `sender` is where the autorepeat handler will send processed input
         // events into.  `output` is where we will read the results of the
@@ -693,7 +730,12 @@ mod tests {
         let (input, receiver) = mpsc::unbounded();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
+        let handler = Autorepeater::new_with_settings(
+            receiver,
+            default_settings(),
+            &test_node,
+            metrics::MetricsLogger::default(),
+        );
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -749,7 +791,12 @@ mod tests {
         let (input, receiver) = mpsc::unbounded();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
+        let handler = Autorepeater::new_with_settings(
+            receiver,
+            default_settings(),
+            &test_node,
+            metrics::MetricsLogger::default(),
+        );
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -810,7 +857,12 @@ mod tests {
         let (input, receiver) = mpsc::unbounded();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
+        let handler = Autorepeater::new_with_settings(
+            receiver,
+            default_settings(),
+            &test_node,
+            metrics::MetricsLogger::default(),
+        );
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -888,7 +940,12 @@ mod tests {
         let (input, receiver) = mpsc::unbounded();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
+        let handler = Autorepeater::new_with_settings(
+            receiver,
+            default_settings(),
+            &test_node,
+            metrics::MetricsLogger::default(),
+        );
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -970,7 +1027,12 @@ mod tests {
         let (input, receiver) = mpsc::unbounded();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
+        let handler = Autorepeater::new_with_settings(
+            receiver,
+            default_settings(),
+            &test_node,
+            metrics::MetricsLogger::default(),
+        );
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -1098,7 +1160,12 @@ mod tests {
         let (input, receiver) = mpsc::unbounded();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
+        let handler = Autorepeater::new_with_settings(
+            receiver,
+            default_settings(),
+            &test_node,
+            metrics::MetricsLogger::default(),
+        );
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -1218,7 +1285,12 @@ mod tests {
         let (input, receiver) = mpsc::unbounded();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
+        let handler = Autorepeater::new_with_settings(
+            receiver,
+            default_settings(),
+            &test_node,
+            metrics::MetricsLogger::default(),
+        );
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -1282,7 +1354,12 @@ mod tests {
         let (input, receiver) = mpsc::unbounded();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
+        let handler = Autorepeater::new_with_settings(
+            receiver,
+            default_settings(),
+            &test_node,
+            metrics::MetricsLogger::default(),
+        );
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -1389,7 +1466,12 @@ mod tests {
         let (input, receiver) = mpsc::unbounded();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
+        let handler = Autorepeater::new_with_settings(
+            receiver,
+            default_settings(),
+            &test_node,
+            metrics::MetricsLogger::default(),
+        );
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -1510,7 +1592,8 @@ mod tests {
         let (_, receiver) = mpsc::unbounded();
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
-        let _autorepeater = Autorepeater::new(receiver, &fake_handlers_node);
+        let _autorepeater =
+            Autorepeater::new(receiver, &fake_handlers_node, metrics::MetricsLogger::default());
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_handlers_node: {
                 autorepeater: {
@@ -1535,8 +1618,12 @@ mod tests {
         let (input, receiver) = mpsc::unbounded();
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
-        let handler =
-            Autorepeater::new_with_settings(receiver, default_settings(), &fake_handlers_node);
+        let handler = Autorepeater::new_with_settings(
+            receiver,
+            default_settings(),
+            &fake_handlers_node,
+            metrics::MetricsLogger::default(),
+        );
         let (sender, _output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 

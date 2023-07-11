@@ -40,6 +40,7 @@
                 // Used by the input pipeline library which is linked into the
                 // scene manager.
                 "fuchsia.accessibility.scene.Provider",
+                "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.settings.Keyboard",
 
                 // Graphics protocols needed for scene management.
