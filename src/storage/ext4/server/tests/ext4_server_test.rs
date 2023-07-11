@@ -9,7 +9,6 @@ use {
     assert_matches::assert_matches,
     fdio::{SpawnAction, SpawnOptions},
     fidl_fuchsia_io as fio,
-    fidl_fuchsia_mem::Buffer,
     fidl_fuchsia_storage_ext4::{MountVmoResult, Server_Marker, ServiceMarker, Success},
     fuchsia_fs,
     fuchsia_runtime::{HandleInfo, HandleType},
@@ -164,10 +163,9 @@ async fn ext4_server_mounts_vmo_one_file() -> Result<(), Error> {
 
     let vmo = zx::Vmo::create(size)?;
     vmo.write(&temp_buf, 0)?;
-    let buf = Buffer { vmo, size };
 
     let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    let result = ext4.mount_vmo(buf, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
+    let result = ext4.mount_vmo(vmo, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
     let file = fuchsia_fs::directory::open_file_no_describe(
@@ -193,10 +191,9 @@ async fn ext4_server_mounts_vmo_nested_dirs() -> Result<(), Error> {
 
     let vmo = zx::Vmo::create(size)?;
     vmo.write(&temp_buf, 0)?;
-    let buf = Buffer { vmo, size };
 
     let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    let result = ext4.mount_vmo(buf, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
+    let result = ext4.mount_vmo(vmo, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
     let file1 = fuchsia_fs::directory::open_file_no_describe(
@@ -230,10 +227,9 @@ async fn ext4_unified_service_mounts_vmo() -> Result<(), Error> {
 
     let vmo = zx::Vmo::create(size)?;
     vmo.write(&temp_buf, 0)?;
-    let buf = Buffer { vmo, size };
 
     let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    let result = ext4.mount_vmo(buf, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
+    let result = ext4.mount_vmo(vmo, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
     let file1 = fuchsia_fs::directory::open_file_no_describe(

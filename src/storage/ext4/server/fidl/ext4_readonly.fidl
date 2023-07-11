@@ -4,7 +4,6 @@
 library fuchsia.storage.ext4;
 
 using fuchsia.io;
-using fuchsia.mem;
 using zx;
 
 type OutOfBoundsDirection = strict enum {
@@ -212,7 +211,7 @@ closed protocol Server {
     ///           case of an error one of the other values will be returned
     ///           and the `root` connection will be closed.
     strict MountVmo(resource struct {
-        source fuchsia.mem.Buffer;
+        source zx.Handle:VMO;
         flags fuchsia.io.OpenFlags;
         root server_end:fuchsia.io.Directory;
     }) -> (struct {

@@ -16,7 +16,6 @@ rustc_binary("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
@@ -40,7 +39,6 @@ rustc_test("ext4_server_integration_test") {
 
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",

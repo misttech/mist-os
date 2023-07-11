@@ -233,32 +233,32 @@ mod fuchsia {
         anyhow::Error,
         fidl::endpoints::ClientEnd,
         fidl_fuchsia_hardware_block::BlockMarker,
-        fidl_fuchsia_mem::Buffer,
+        fuchsia_zircon as zx,
         remote_block_device::{Cache, RemoteBlockClientSync},
         std::sync::{Arc, Mutex},
         tracing::error,
     };
 
     pub struct VmoReader {
-        buffer: Arc<Buffer>,
+        vmo: Arc<zx::Vmo>,
     }
 
     impl Reader for VmoReader {
         fn read(&self, offset: u64, data: &mut [u8]) -> Result<(), ReaderError> {
-            let offset_max = offset + data.len() as u64;
-            if offset_max > self.buffer.size {
-                return Err(ReaderError::OutOfBounds(offset_max, self.buffer.size));
-            }
-            match self.buffer.vmo.read(data, offset) {
+            match self.vmo.read(data, offset) {
                 Ok(_) => Ok(()),
+                Err(zx::Status::OUT_OF_RANGE) => {
+                    let size = self.vmo.get_size().map_err(|_| ReaderError::Read(std::u64::MAX))?;
+                    Err(ReaderError::OutOfBounds(offset, size))
+                }
                 Err(_) => Err(ReaderError::Read(offset)),
             }
         }
     }
 
     impl VmoReader {
-        pub fn new(filesystem: Arc<Buffer>) -> Self {
-            VmoReader { buffer: filesystem }
+        pub fn new(vmo: Arc<zx::Vmo>) -> Self {
+            VmoReader { vmo }
         }
     }
 

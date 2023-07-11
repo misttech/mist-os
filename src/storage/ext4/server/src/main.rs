@@ -18,7 +18,6 @@ use {
     ext4_read_only::structs::{InvalidAddressErrorType, ParsingError},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
-    fidl_fuchsia_mem::Buffer,
     fidl_fuchsia_storage_ext4::{
         BadDirectory, BadEntryType, BadFile, BannedFeatureIncompat, BlockNumberOutOfBounds,
         BlockSizeInvalid, DirEntry2NonUtf8, ExtentUnexpectedLength, Incompatible, InvalidAddress,
@@ -30,7 +29,7 @@ use {
     },
     fuchsia_component::server::ServiceFs,
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
-    fuchsia_zircon::Channel,
+    fuchsia_zircon::{Channel, Vmo},
     futures::{
         future::TryFutureExt,
         stream::{StreamExt, TryStreamExt},
@@ -153,7 +152,7 @@ fn construct_fs_error_to_mount_vmo_result(source: ConstructFsError) -> MountVmoR
 
 fn serve_vmo(
     scope: ExecutionScope,
-    source: Buffer,
+    source: Vmo,
     flags: fio::OpenFlags,
     root: ServerEnd<fio::DirectoryMarker>,
 ) -> MountVmoResult {
