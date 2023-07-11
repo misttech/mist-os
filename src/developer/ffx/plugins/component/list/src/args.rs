@@ -16,14 +16,6 @@ use ffx_core::ffx_command;
 
     $ ffx component list
 
-    To list all cmx components in the topology:
-
-    $ ffx component list --only cmx
-
-    To list all cml components in the topology:
-
-    $ ffx component list --only cml
-
     To list all running components in the topology:
 
     $ ffx component list --only running
@@ -47,7 +39,7 @@ use ffx_core::ffx_command;
 
 pub struct ComponentListCommand {
     #[argh(option, long = "only", short = 'o')]
-    /// filter the instance list by a criteria: cmx, cml, running, stopped, ancestors:<component_name>, descendants:<component_name>, or relatives:<component_name>
+    /// filter the instance list by a criteria: running, stopped, ancestors:<component_name>, descendants:<component_name>, or relatives:<component_name>
     pub filter: Option<ListFilter>,
 
     #[argh(switch, long = "verbose", short = 'v')]

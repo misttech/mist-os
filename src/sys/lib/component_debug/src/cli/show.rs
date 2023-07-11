@@ -4,20 +4,19 @@
 
 use {
     crate::{
-        cli::list::get_instances_matching_filter,
-        cmx,
+        query::get_single_instance_from_query,
         realm::{
             get_config_fields, get_merkle_root, get_outgoing_capabilities,
-            get_resolved_declaration, get_runtime, ConfigField, ExecutionInfo, Instance,
-            InstanceType, ResolvedInfo, Runtime,
+            get_resolved_declaration, get_runtime, ConfigField, ExecutionInfo, ResolvedInfo,
+            Runtime,
         },
     },
     ansi_term::Colour,
-    anyhow::{bail, Result},
+    anyhow::Result,
     cm_rust::ExposeDeclCommon,
     fidl_fuchsia_sys2 as fsys,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
-    prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
+    moniker::AbsoluteMoniker,
+    prettytable::{cell, format::FormatBuilder, row, Table},
 };
 
 #[cfg(feature = "serde")]
@@ -29,7 +28,6 @@ pub struct ShowCmdInstance {
     pub url: String,
     pub environment: Option<String>,
     pub instance_id: Option<String>,
-    pub is_cmx: bool,
     pub resolved: Option<ShowCmdResolvedInfo>,
 }
 
@@ -56,18 +54,10 @@ pub async fn show_cmd_print<W: std::io::Write>(
     realm_query: fsys::RealmQueryProxy,
     mut writer: W,
 ) -> Result<()> {
-    let instances = get_instance_by_query(query, realm_query).await?;
-
-    if instances.is_empty() {
-        // TODO(fxbug.dev/104031): Clarify the exit code policy of this plugin.
-        bail!("No matching components found.\nTo find a collection, use the `ffx component collection show` plugin instead.");
-    }
-
-    for instance in instances {
-        let table = create_table(instance);
-        table.print(&mut writer)?;
-        writeln!(&mut writer, "")?;
-    }
+    let instance = get_instance_by_query(query, realm_query).await?;
+    let table = create_table(instance);
+    table.print(&mut writer)?;
+    writeln!(&mut writer, "")?;
 
     Ok(())
 }
@@ -75,132 +65,70 @@ pub async fn show_cmd_print<W: std::io::Write>(
 pub async fn show_cmd_serialized(
     query: String,
     realm_query: fsys::RealmQueryProxy,
-) -> Result<Vec<ShowCmdInstance>> {
-    let states = get_instance_by_query(query, realm_query).await?;
-    Ok(states)
+) -> Result<ShowCmdInstance> {
+    let instance = get_instance_by_query(query, realm_query).await?;
+    Ok(instance)
 }
 
 async fn get_instance_by_query(
     query: String,
     realm_query: fsys::RealmQueryProxy,
-) -> Result<Vec<ShowCmdInstance>> {
-    let query_moniker = AbsoluteMoniker::parse_str(&query).ok();
-    let instances = get_instances_matching_filter(None, &realm_query).await?;
-    let instances: Vec<Instance> = instances
-        .into_iter()
-        .filter(|i| {
-            let url_match = i.url.contains(&query);
-            let moniker_match = i.moniker.to_string().contains(&query);
-            let normalized_query_moniker_match =
-                matches!(&query_moniker, Some(m) if i.moniker.to_string().contains(&m.to_string()));
-            let id_match = i.instance_id.as_ref().map_or(false, |id| id.contains(&query));
-            url_match || moniker_match || normalized_query_moniker_match || id_match
-        })
-        .collect();
+) -> Result<ShowCmdInstance> {
+    let instance = get_single_instance_from_query(&query, &realm_query).await?;
 
-    let mut show_instances = vec![];
-    // TODO(https://fxbug.dev/122378): Consider parallelizing this to get a performance speedup.
-    for instance in instances {
-        let show_instance = match instance.instance_type {
-            InstanceType::Cml => {
-                let resolved_info = match instance.resolved_info {
-                    Some(ResolvedInfo { execution_info, resolved_url }) => {
-                        // Get the manifest
-                        let manifest =
-                            get_resolved_declaration(&instance.moniker, &realm_query).await?;
-                        let structured_config =
-                            get_config_fields(&instance.moniker, &realm_query).await?;
-                        let merkle_root =
-                            get_merkle_root(&instance.moniker, &realm_query).await.ok();
-                        let incoming_capabilities = manifest
-                            .uses
-                            .into_iter()
-                            .filter_map(|u| u.path().map(|n| n.to_string()))
-                            .collect();
-                        let exposed_capabilities = manifest
-                            .exposes
-                            .into_iter()
-                            .map(|e| e.target_name().to_string())
-                            .collect();
+    let resolved_info = match instance.resolved_info {
+        Some(ResolvedInfo { execution_info, resolved_url }) => {
+            // Get the manifest
+            let manifest = get_resolved_declaration(&instance.moniker, &realm_query).await?;
+            let structured_config = get_config_fields(&instance.moniker, &realm_query).await?;
+            let merkle_root = get_merkle_root(&instance.moniker, &realm_query).await.ok();
+            let incoming_capabilities =
+                manifest.uses.into_iter().filter_map(|u| u.path().map(|n| n.to_string())).collect();
+            let exposed_capabilities =
+                manifest.exposes.into_iter().map(|e| e.target_name().to_string()).collect();
 
-                        let execution_info = match execution_info {
-                            Some(ExecutionInfo { start_reason }) => {
-                                let runtime = get_runtime(&instance.moniker, &realm_query)
-                                    .await
-                                    .unwrap_or(Runtime::Unknown);
-                                let outgoing_capabilities =
-                                    get_outgoing_capabilities(&instance.moniker, &realm_query)
-                                        .await
-                                        .unwrap_or(vec![]);
-                                Some(ShowCmdExecutionInfo {
-                                    start_reason,
-                                    runtime,
-                                    outgoing_capabilities,
-                                })
-                            }
-                            None => None,
-                        };
-
-                        let collections =
-                            manifest.collections.into_iter().map(|c| c.name.to_string()).collect();
-
-                        Some(ShowCmdResolvedInfo {
-                            resolved_url,
-                            incoming_capabilities,
-                            exposed_capabilities,
-                            merkle_root,
-                            config: structured_config,
-                            started: execution_info,
-                            collections,
-                        })
-                    }
-                    None => None,
-                };
-                ShowCmdInstance {
-                    moniker: instance.moniker,
-                    url: instance.url,
-                    environment: instance.environment,
-                    instance_id: instance.instance_id,
-                    is_cmx: false,
-                    resolved: resolved_info,
+            let execution_info = match execution_info {
+                Some(ExecutionInfo { start_reason }) => {
+                    let runtime = get_runtime(&instance.moniker, &realm_query)
+                        .await
+                        .unwrap_or(Runtime::Unknown);
+                    let outgoing_capabilities =
+                        get_outgoing_capabilities(&instance.moniker, &realm_query)
+                            .await
+                            .unwrap_or(vec![]);
+                    Some(ShowCmdExecutionInfo { start_reason, runtime, outgoing_capabilities })
                 }
-            }
-            InstanceType::Cmx(hub_dir) => {
-                let incoming_capabilities = cmx::get_namespace_capabilities(&hub_dir).await?;
-                let outgoing_capabilities = cmx::get_outgoing_capabilities(&hub_dir).await?;
-                let merkle_root = cmx::get_merkle_root(&hub_dir).await?;
-                let runtime = cmx::get_runtime(&hub_dir).await?;
-                ShowCmdInstance {
-                    moniker: instance.moniker,
-                    url: instance.url.clone(),
-                    environment: instance.environment,
-                    instance_id: instance.instance_id,
-                    is_cmx: true,
-                    resolved: Some(ShowCmdResolvedInfo {
-                        resolved_url: instance.url,
-                        incoming_capabilities,
-                        exposed_capabilities: vec![],
-                        config: None,
-                        merkle_root: Some(merkle_root),
-                        collections: vec![],
-                        started: Some(ShowCmdExecutionInfo {
-                            runtime,
-                            outgoing_capabilities,
-                            start_reason: "Unknown start reason".to_string(),
-                        }),
-                    }),
-                }
-            }
-        };
-        show_instances.push(show_instance);
-    }
+                None => None,
+            };
 
-    Ok(show_instances)
+            let collections =
+                manifest.collections.into_iter().map(|c| c.name.to_string()).collect();
+
+            Some(ShowCmdResolvedInfo {
+                resolved_url,
+                incoming_capabilities,
+                exposed_capabilities,
+                merkle_root,
+                config: structured_config,
+                started: execution_info,
+                collections,
+            })
+        }
+        None => None,
+    };
+
+    Ok(ShowCmdInstance {
+        moniker: instance.moniker,
+        url: instance.url,
+        environment: instance.environment,
+        instance_id: instance.instance_id,
+        resolved: resolved_info,
+    })
 }
 
 fn create_table(instance: ShowCmdInstance) -> Table {
     let mut table = Table::new();
-    table.set_format(*FORMAT_CLEAN);
+    table.set_format(FormatBuilder::new().padding(2, 0).build());
 
     table.add_row(row!(r->"Moniker:", instance.moniker));
     table.add_row(row!(r->"URL:", instance.url));
@@ -212,12 +140,6 @@ fn create_table(instance: ShowCmdInstance) -> Table {
         table.add_row(row!(r->"Instance ID:", instance_id));
     } else {
         table.add_row(row!(r->"Instance ID:", "None"));
-    }
-
-    if instance.is_cmx {
-        table.add_row(row!(r->"Type:", "CMX component"));
-    } else {
-        table.add_row(row!(r->"Type:", "CML component"));
     }
 
     add_resolved_info_to_table(&mut table, instance.resolved);
@@ -245,8 +167,7 @@ fn add_resolved_info_to_table(table: &mut Table, resolved: Option<ShowCmdResolve
         if let Some(config) = &resolved.config {
             if !config.is_empty() {
                 let mut config_table = Table::new();
-                let mut format = *FORMAT_CLEAN;
-                format.padding(0, 0);
+                let format = FormatBuilder::new().padding(0, 0).build();
                 config_table.set_format(format);
 
                 for field in config {
@@ -345,33 +266,11 @@ mod tests {
         temp_dir
     }
 
-    pub fn create_appmgr_out() -> TempDir {
-        let temp_dir = TempDir::new_in("/tmp").unwrap();
-        let root = temp_dir.path();
-
-        fs::create_dir_all(root.join("hub/r")).unwrap();
-
-        {
-            let sshd = root.join("hub/c/sshd.cmx/9898");
-            fs::create_dir_all(&sshd).unwrap();
-            fs::create_dir_all(sshd.join("in/pkg")).unwrap();
-            fs::create_dir_all(sshd.join("out/dev")).unwrap();
-
-            fs::write(sshd.join("url"), "fuchsia-pkg://fuchsia.com/sshd#meta/sshd.cmx").unwrap();
-            fs::write(sshd.join("in/pkg/meta"), "1234").unwrap();
-            fs::write(sshd.join("job-id"), "5454").unwrap();
-            fs::write(sshd.join("process-id"), "9898").unwrap();
-        }
-
-        temp_dir
-    }
-
     fn create_query() -> fsys::RealmQueryProxy {
         // Serve RealmQuery for CML components.
         let out_dir = create_out_dir();
         let pkg_dir = create_pkg_dir();
         let runtime_dir = create_runtime_dir();
-        let appmgr_out_dir = create_appmgr_out();
 
         let query = serve_realm_query(
             vec![
@@ -448,7 +347,6 @@ mod tests {
                 },
             )]),
             HashMap::from([
-                (("./core/appmgr".to_string(), fsys::OpenDirType::OutgoingDir), appmgr_out_dir),
                 (("./my_foo".to_string(), fsys::OpenDirType::RuntimeDir), runtime_dir),
                 (("./my_foo".to_string(), fsys::OpenDirType::PackageDir), pkg_dir),
                 (("./my_foo".to_string(), fsys::OpenDirType::OutgoingDir), out_dir),
@@ -461,14 +359,11 @@ mod tests {
     async fn basic_cml() {
         let query = create_query();
 
-        let mut instances = get_instance_by_query("foo.cm".to_string(), query).await.unwrap();
-        assert_eq!(instances.len(), 1);
-        let instance = instances.remove(0);
+        let instance = get_instance_by_query("foo.cm".to_string(), query).await.unwrap();
 
         assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/my_foo").unwrap());
         assert_eq!(instance.url, "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm");
         assert_eq!(instance.instance_id.unwrap(), "1234567890");
-        assert!(!instance.is_cmx);
         assert!(instance.resolved.is_some());
 
         let resolved = instance.resolved.unwrap();
@@ -509,55 +404,10 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn basic_cmx() {
-        let query = create_query();
-
-        let mut instances = get_instance_by_query("sshd".to_string(), query).await.unwrap();
-        assert_eq!(instances.len(), 1);
-        let instance = instances.remove(0);
-
-        assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/core/appmgr/sshd.cmx").unwrap());
-        assert_eq!(instance.url, "fuchsia-pkg://fuchsia.com/sshd#meta/sshd.cmx");
-        assert!(instance.instance_id.is_none());
-        assert!(instance.is_cmx);
-        assert!(instance.resolved.is_some());
-
-        let resolved = instance.resolved.unwrap();
-        assert_eq!(resolved.incoming_capabilities.len(), 1);
-        assert_eq!(resolved.incoming_capabilities[0], "pkg");
-
-        assert!(resolved.exposed_capabilities.is_empty());
-        assert_eq!(resolved.merkle_root.unwrap(), "1234");
-
-        assert!(resolved.config.is_none());
-
-        let started = resolved.started.unwrap();
-        assert_eq!(started.outgoing_capabilities, vec!["dev".to_string()]);
-        assert_eq!(started.start_reason, "Unknown start reason".to_string());
-
-        match started.runtime {
-            Runtime::Elf {
-                job_id,
-                process_id,
-                process_start_time,
-                process_start_time_utc_estimate,
-            } => {
-                assert_eq!(job_id, 5454);
-                assert_eq!(process_id, Some(9898));
-                assert_eq!(process_start_time, None);
-                assert_eq!(process_start_time_utc_estimate, None);
-            }
-            _ => panic!("unexpected runtime"),
-        }
-    }
-
-    #[fuchsia::test]
     async fn find_by_moniker() {
         let query = create_query();
 
-        let mut instances = get_instance_by_query("my_foo".to_string(), query).await.unwrap();
-        assert_eq!(instances.len(), 1);
-        let instance = instances.remove(0);
+        let instance = get_instance_by_query("my_foo".to_string(), query).await.unwrap();
 
         assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/my_foo").unwrap());
         assert_eq!(instance.url, "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm");
@@ -568,9 +418,7 @@ mod tests {
     async fn find_by_instance_id() {
         let query = create_query();
 
-        let mut instances = get_instance_by_query("1234567".to_string(), query).await.unwrap();
-        assert_eq!(instances.len(), 1);
-        let instance = instances.remove(0);
+        let instance = get_instance_by_query("1234567".to_string(), query).await.unwrap();
 
         assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/my_foo").unwrap());
         assert_eq!(instance.url, "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm");

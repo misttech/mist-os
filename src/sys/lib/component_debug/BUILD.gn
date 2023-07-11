@@ -81,7 +81,6 @@ rustc_library("component_debug") {
     "src/cli/start.rs",
     "src/cli/stop.rs",
     "src/cli/storage.rs",
-    "src/cmx.rs",
     "src/config.rs",
     "src/copy.rs",
     "src/dirs.rs",

@@ -168,23 +168,7 @@ pub enum GetStructuredConfigError {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[derive(Debug)]
-pub enum InstanceType {
-    Cml,
-    Cmx(#[cfg_attr(feature = "serde", serde(skip))] RemoteDirectory),
-}
-
-impl std::fmt::Display for InstanceType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Cml => write!(f, "CML component"),
-            Self::Cmx(_) => write!(f, "CMX component"),
-        }
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Instance {
     /// Moniker of the component.
     pub moniker: AbsoluteMoniker,
@@ -197,10 +181,6 @@ pub struct Instance {
 
     /// Unique identifier of component.
     pub instance_id: Option<String>,
-
-    /// Type of instance.
-    // TODO(https://fxbug.dev/102390): Remove this when CMX is deprecated.
-    pub instance_type: InstanceType,
 
     /// Information about resolved state of instance.
     pub resolved_info: Option<ResolvedInfo>,
@@ -225,7 +205,6 @@ impl TryFrom<fsys::Instance> for Instance {
             url,
             environment: instance.environment,
             instance_id: instance.instance_id,
-            instance_type: InstanceType::Cml,
             resolved_info,
         })
     }
@@ -233,7 +212,7 @@ impl TryFrom<fsys::Instance> for Instance {
 
 /// Additional information about components that are resolved.
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ResolvedInfo {
     pub resolved_url: String,
     pub execution_info: Option<ExecutionInfo>,
@@ -255,7 +234,7 @@ impl TryFrom<fsys::ResolvedInfo> for ResolvedInfo {
 
 /// Additional information about components that are running.
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExecutionInfo {
     pub start_reason: String,
 }

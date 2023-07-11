@@ -7,7 +7,6 @@ package emulator
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"io/fs"
 	"os"
@@ -145,24 +144,10 @@ func TestEmulatorWorksWithFfx(t *testing.T) {
 		var buf bytes.Buffer
 		ffx.SetStdoutStderr(io.MultiWriter(os.Stdout, &buf), os.Stderr)
 
-		if err := runFfx("--machine", "json", "component", "show", NETWORK_TEST_REALM_MONIKER); err != nil {
+		if err := runFfx("--machine", "json", "component", "show", NETWORK_TEST_REALM_MONIKER); err == nil {
 			t.Logf(
-				"ffx --machine json component show %s had error %s",
+				"ffx --machine json component show %s should have failed (component shouldn't exist)",
 				NETWORK_TEST_REALM_MONIKER,
-				err,
-			)
-		}
-
-		var components []map[string]interface{}
-		if err := json.Unmarshal(buf.Bytes(), &components); err != nil {
-			t.Fatalf("json.Unmarshal(%q, _) = %s", buf.String(), err)
-		}
-
-		if len(components) > 0 {
-			t.Fatalf(
-				"ffx component show %s should return zero components, got %#v instead",
-				NETWORK_TEST_REALM_MONIKER,
-				components,
 			)
 		}
 

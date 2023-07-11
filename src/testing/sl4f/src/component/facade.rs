@@ -163,7 +163,6 @@ impl ComponentFacade {
     /// * `args`: will be parsed to ComponentSearchRequest
     /// * `name`: name of the component (should be like "core/foo")
     pub async fn search(&self, args: Value) -> Result<ComponentSearchResult, Error> {
-        let tag = "ComponentFacade::search";
         let req: ComponentSearchRequest = from_value(args)?;
         let name = match req.name {
             Some(x) => {
@@ -173,17 +172,10 @@ impl ComponentFacade {
             None => return Err(format_err!("Need name of the component to search.")),
         };
         let query = client::connect_to_protocol::<fsys::RealmQueryMarker>()?;
-        let instances = match show_cmd_serialized(name.to_string(), query).await {
-            Ok(p) => p,
-            Err(err) => fx_err_and_bail!(
-                &with_line!(tag),
-                format_err!("Failed to find component: {}, err: {:}", name.to_string(), err)
-            ),
-        };
-        if instances.is_empty() {
-            return Ok(ComponentSearchResult::NotFound);
+        match show_cmd_serialized(name.to_string(), query).await {
+            Ok(_) => Ok(ComponentSearchResult::Success),
+            Err(_) => Ok(ComponentSearchResult::NotFound),
         }
-        Ok(ComponentSearchResult::Success)
     }
 
     /// List running components, returns a vector containing component full URL.

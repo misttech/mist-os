@@ -21,7 +21,7 @@ fho::embedded_plugin!(ShowTool);
 
 #[async_trait(?Send)]
 impl FfxMain for ShowTool {
-    type Writer = MachineWriter<Vec<ShowCmdInstance>>;
+    type Writer = MachineWriter<ShowCmdInstance>;
 
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let realm_query = connect_to_realm_query(&self.rcs).await?;

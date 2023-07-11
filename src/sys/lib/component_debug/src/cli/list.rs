@@ -3,14 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        cmx,
-        realm::{get_all_instances, Instance, InstanceType},
-    },
+    crate::realm::{get_all_instances, Instance},
     ansi_term::Colour,
     anyhow::Result,
     fidl_fuchsia_sys2 as fsys,
-    futures::future::join,
     moniker::AbsoluteMonikerBase,
     prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
     std::collections::HashSet,
@@ -20,8 +16,6 @@ use {
 /// Filters that can be applied when listing components
 #[derive(Debug, PartialEq)]
 pub enum ListFilter {
-    CMX,
-    CML,
     Running,
     Stopped,
     /// Filters components that are an ancestor of the component with the given name.
@@ -40,8 +34,6 @@ impl FromStr for ListFilter {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "cmx" => Ok(ListFilter::CMX),
-            "cml" => Ok(ListFilter::CML),
             "running" => Ok(ListFilter::Running),
             "stopped" => Ok(ListFilter::Stopped),
             filter => match filter.split_once(":") {
@@ -51,7 +43,7 @@ impl FromStr for ListFilter {
                     "relative" | "relatives" => Ok(ListFilter::Relative(arg.to_string())),
                     _ => Err("unknown function for list filter."),
                 },
-                None => Err("list filter should be 'cmx', 'cml', 'running', 'stopped', 'ancestors:<component_name>', 'descendants:<component_name>', or 'relatives:<component_name>'."),
+                None => Err("list filter should be 'running', 'stopped', 'ancestors:<component_name>', 'descendants:<component_name>', or 'relatives:<component_name>'."),
             },
         }
     }
@@ -89,18 +81,15 @@ pub async fn list_cmd_serialized(
 fn create_table(instances: Vec<Instance>) -> Table {
     let mut table = Table::new();
     table.set_format(*FORMAT_CLEAN);
-    table.set_titles(row!("Type", "State", "Moniker", "URL"));
+    table.set_titles(row!("State", "Moniker", "URL"));
 
     for instance in instances {
-        let component_type =
-            if let InstanceType::Cml = instance.instance_type { "CML" } else { "CMX" };
-
         let state = instance.resolved_info.map_or(Colour::Red.paint("Stopped"), |r| {
             r.execution_info
                 .map_or(Colour::Yellow.paint("Resolved"), |_| Colour::Green.paint("Running"))
         });
 
-        table.add_row(row!(component_type, state, instance.moniker.to_string(), instance.url));
+        table.add_row(row!(state, instance.moniker.to_string(), instance.url));
     }
     table
 }
@@ -109,22 +98,7 @@ pub async fn get_instances_matching_filter(
     filter: Option<ListFilter>,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Vec<Instance>> {
-    let instances = match filter {
-        Some(ListFilter::CML) => get_all_instances(realm_query).await?,
-        Some(ListFilter::CMX) => cmx::get_all_instances(realm_query).await?,
-        _ => {
-            // Get both CMX and CML instances.
-            let cml_future = get_all_instances(realm_query);
-            let cmx_future = cmx::get_all_instances(realm_query);
-
-            let (cml, cmx) = join(cml_future, cmx_future).await;
-            let mut cml = cml?;
-            let mut cmx = cmx?;
-
-            cml.append(&mut cmx);
-            cml
-        }
-    };
+    let instances = get_all_instances(realm_query).await?;
 
     let mut instances = match filter {
         Some(ListFilter::Running) => instances
@@ -222,34 +196,9 @@ mod tests {
     use crate::test_utils::*;
     use moniker::{AbsoluteMoniker, AbsoluteMonikerBase};
     use std::collections::HashMap;
-    use std::fs;
-    use tempfile::TempDir;
-
-    pub fn create_appmgr_out() -> TempDir {
-        let temp_dir = TempDir::new_in("/tmp").unwrap();
-        let root = temp_dir.path();
-
-        fs::create_dir_all(root.join("hub/r")).unwrap();
-
-        {
-            let sshd = root.join("hub/c/sshd.cmx/9898");
-            fs::create_dir_all(&sshd).unwrap();
-            fs::create_dir_all(sshd.join("in/pkg")).unwrap();
-            fs::create_dir_all(sshd.join("out/dev")).unwrap();
-
-            fs::write(sshd.join("url"), "fuchsia-pkg://fuchsia.com/sshd#meta/sshd.cmx").unwrap();
-            fs::write(sshd.join("in/pkg/meta"), "1234").unwrap();
-            fs::write(sshd.join("job-id"), "5454").unwrap();
-            fs::write(sshd.join("process-id"), "9898").unwrap();
-        }
-
-        temp_dir
-    }
 
     fn create_query() -> fsys::RealmQueryProxy {
         // Serve RealmQuery for CML components.
-        let appmgr_out_dir = create_appmgr_out();
-
         let query = serve_realm_query(
             vec![
                 fsys::Instance {
@@ -300,10 +249,7 @@ mod tests {
             ],
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(
-                ("./core/appmgr".to_string(), fsys::OpenDirType::OutgoingDir),
-                appmgr_out_dir,
-            )]),
+            HashMap::new(),
         );
         query
     }
@@ -312,47 +258,14 @@ mod tests {
     async fn no_filter() {
         let query = create_query();
 
-        let mut instances = get_instances_matching_filter(None, &query).await.unwrap();
-        assert_eq!(instances.len(), 4);
-
-        assert_eq!(instances.remove(0).moniker, AbsoluteMoniker::root());
-        assert_eq!(instances.remove(0).moniker, AbsoluteMoniker::parse_str("/core").unwrap());
+        let instances = get_instances_matching_filter(None, &query).await.unwrap();
         assert_eq!(
-            instances.remove(0).moniker,
-            AbsoluteMoniker::parse_str("/core/appmgr").unwrap()
-        );
-        assert_eq!(
-            instances.remove(0).moniker,
-            AbsoluteMoniker::parse_str("/core/appmgr/sshd.cmx").unwrap()
-        );
-    }
-
-    #[fuchsia::test]
-    async fn cml_only() {
-        let query = create_query();
-
-        let mut instances =
-            get_instances_matching_filter(Some(ListFilter::CML), &query).await.unwrap();
-        assert_eq!(instances.len(), 3);
-
-        assert_eq!(instances.remove(0).moniker, AbsoluteMoniker::root());
-        assert_eq!(instances.remove(0).moniker, AbsoluteMoniker::parse_str("/core").unwrap());
-        assert_eq!(
-            instances.remove(0).moniker,
-            AbsoluteMoniker::parse_str("/core/appmgr").unwrap()
-        );
-    }
-
-    #[fuchsia::test]
-    async fn cmx_only() {
-        let query = create_query();
-
-        let mut instances =
-            get_instances_matching_filter(Some(ListFilter::CMX), &query).await.unwrap();
-        assert_eq!(instances.len(), 1);
-        assert_eq!(
-            instances.remove(0).moniker,
-            AbsoluteMoniker::parse_str("/core/appmgr/sshd.cmx").unwrap()
+            instances.iter().map(|i| i.moniker.clone()).collect::<Vec<_>>(),
+            vec![
+                AbsoluteMoniker::root(),
+                AbsoluteMoniker::parse_str("/core").unwrap(),
+                AbsoluteMoniker::parse_str("/core/appmgr").unwrap(),
+            ]
         );
     }
 
@@ -360,17 +273,14 @@ mod tests {
     async fn running_only() {
         let query = create_query();
 
-        let mut instances =
+        let instances =
             get_instances_matching_filter(Some(ListFilter::Running), &query).await.unwrap();
-        assert_eq!(instances.len(), 3);
-        assert_eq!(instances.remove(0).moniker, AbsoluteMoniker::parse_str("/core").unwrap());
         assert_eq!(
-            instances.remove(0).moniker,
-            AbsoluteMoniker::parse_str("/core/appmgr").unwrap()
-        );
-        assert_eq!(
-            instances.remove(0).moniker,
-            AbsoluteMoniker::parse_str("/core/appmgr/sshd.cmx").unwrap()
+            instances.iter().map(|i| i.moniker.clone()).collect::<Vec<_>>(),
+            vec![
+                AbsoluteMoniker::parse_str("/core").unwrap(),
+                AbsoluteMoniker::parse_str("/core/appmgr").unwrap(),
+            ]
         );
     }
 
@@ -399,7 +309,6 @@ mod tests {
             vec![
                 AbsoluteMoniker::parse_str("/core").unwrap(),
                 AbsoluteMoniker::parse_str("/core/appmgr").unwrap(),
-                AbsoluteMoniker::parse_str("/core/appmgr/sshd.cmx").unwrap()
             ]
         );
     }
@@ -432,7 +341,6 @@ mod tests {
                 AbsoluteMoniker::root(),
                 AbsoluteMoniker::parse_str("/core").unwrap(),
                 AbsoluteMoniker::parse_str("/core/appmgr").unwrap(),
-                AbsoluteMoniker::parse_str("/core/appmgr/sshd.cmx").unwrap()
             ]
         );
     }

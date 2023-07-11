@@ -253,7 +253,7 @@ pub fn create_dot_graph(instances: Vec<Instance>, orientation: GraphOrientation)
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::realm::{ExecutionInfo, InstanceType, ResolvedInfo};
+    use crate::realm::{ExecutionInfo, ResolvedInfo};
     use moniker::AbsoluteMoniker;
 
     fn instances_for_test() -> Vec<Instance> {
@@ -263,7 +263,6 @@ mod test {
                 url: "fuchsia-boot:///#meta/root.cm".to_owned(),
                 environment: None,
                 instance_id: None,
-                instance_type: InstanceType::Cml,
                 resolved_info: Some(ResolvedInfo {
                     resolved_url: "fuchsia-boot:///#meta/root.cm".to_owned(),
                     execution_info: None,
@@ -274,7 +273,6 @@ mod test {
                 url: "fuchsia-pkg://fuchsia.com/appmgr#meta/appmgr.cm".to_owned(),
                 environment: None,
                 instance_id: None,
-                instance_type: InstanceType::Cml,
                 resolved_info: Some(ResolvedInfo {
                     resolved_url: "fuchsia-pkg://fuchsia.com/appmgr#meta/appmgr.cm".to_owned(),
                     execution_info: Some(ExecutionInfo {
@@ -287,7 +285,6 @@ mod test {
                 url: "fuchsia-pkg://fuchsia.com/sys#meta/sys.cm".to_owned(),
                 environment: None,
                 instance_id: None,
-                instance_type: InstanceType::Cml,
                 resolved_info: Some(ResolvedInfo {
                     resolved_url: "fuchsia-pkg://fuchsia.com/sys#meta/sys.cm".to_owned(),
                     execution_info: None,
@@ -298,7 +295,6 @@ mod test {
                 url: "fuchsia-pkg://fuchsia.com/baz#meta/baz.cm".to_owned(),
                 environment: None,
                 instance_id: None,
-                instance_type: InstanceType::Cml,
                 resolved_info: Some(ResolvedInfo {
                     resolved_url: "fuchsia-pkg://fuchsia.com/baz#meta/baz.cm".to_owned(),
                     execution_info: Some(ExecutionInfo {
@@ -311,7 +307,6 @@ mod test {
                 url: "fuchsia-pkg://fuchsia.com/fuzz#meta/fuzz.cm".to_owned(),
                 environment: None,
                 instance_id: None,
-                instance_type: InstanceType::Cml,
                 resolved_info: Some(ResolvedInfo {
                     resolved_url: "fuchsia-pkg://fuchsia.com/fuzz#meta/fuzz.cm".to_owned(),
                     execution_info: None,
@@ -322,7 +317,6 @@ mod test {
                 url: "fuchsia-pkg://fuchsia.com/hello#meta/hello.cm".to_owned(),
                 environment: None,
                 instance_id: None,
-                instance_type: InstanceType::Cml,
                 resolved_info: Some(ResolvedInfo {
                     resolved_url: "fuchsia-pkg://fuchsia.com/hello#meta/hello.cm".to_owned(),
                     execution_info: None,

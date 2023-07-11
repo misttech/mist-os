@@ -3,11 +3,79 @@
 // found in the LICENSE file.
 
 use {
-    crate::realm::get_all_instances,
+    crate::realm::{get_all_instances, Instance},
     anyhow::{bail, Result},
     fidl_fuchsia_sys2 as fsys,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
 };
+
+/// Retrieves a list of CML instances that match a given string query.
+///
+/// The string query can be a partial match on the following properties:
+/// * component moniker
+/// * component URL
+/// * component instance ID
+pub async fn get_instances_from_query(
+    query: &str,
+    realm_query: &fsys::RealmQueryProxy,
+) -> Result<Vec<Instance>> {
+    let instances = get_all_instances(realm_query).await?;
+    let query_moniker = AbsoluteMoniker::parse_str(&query).ok();
+
+    // Try and find instances that contain the query in any of the identifiers
+    // (moniker, URL, instance ID).
+    let mut filtered_instances: Vec<Instance> = instances
+        .into_iter()
+        .filter(|i| {
+            let url_match = i.url.contains(&query);
+            let moniker_match = i.moniker.to_string().contains(&query);
+            let normalized_query_moniker_match =
+                matches!(&query_moniker, Some(m) if i.moniker.to_string().contains(&m.to_string()));
+            let id_match = i.instance_id.as_ref().map_or(false, |id| id.contains(&query));
+            url_match || moniker_match || normalized_query_moniker_match || id_match
+        })
+        .collect();
+
+    // For stability sort the list by moniker.
+    filtered_instances.sort_by_key(|i| i.moniker.to_string());
+
+    // If the query is an exact-match of any of the results, return that
+    // result only.
+    if let Some(m) = query_moniker {
+        if let Some(matched) = filtered_instances.iter().find(|i| i.moniker == m) {
+            return Ok(vec![matched.clone()]);
+        }
+    }
+
+    Ok(filtered_instances)
+}
+
+/// Retrieves exactly one instance matching a given string query.
+///
+/// The string query can be a partial match on the following properties:
+/// * component moniker
+/// * component URL
+/// * component instance ID
+///
+/// If more than one instance matches the query, an error is thrown.
+/// If no instance matches the query, an error is thrown.
+pub async fn get_single_instance_from_query(
+    query: &str,
+    realm_query: &fsys::RealmQueryProxy,
+) -> Result<Instance> {
+    // Get all instance monikers that match the query and ensure there is only one.
+    let mut instances = get_instances_from_query(&query, &realm_query).await?;
+    if instances.len() > 1 {
+        let monikers: Vec<String> = instances.into_iter().map(|i| i.moniker.to_string()).collect();
+        let monikers = monikers.join("\n");
+        bail!("The query {:?} matches more than one component instance:\n{}\n\nTo avoid ambiguity, use one of the above monikers instead.", query, monikers);
+    }
+    if instances.is_empty() {
+        bail!("No matching component instance found for query {:?}.", query);
+    }
+    let instance = instances.remove(0);
+    Ok(instance)
+}
 
 /// Retrieves a list of CML instance monikers that will match a given string query.
 ///
@@ -30,25 +98,8 @@ pub async fn get_cml_monikers_from_query(
         }
     }
 
-    let instances = get_all_instances(realm_query).await?;
-
-    // Try and find instances that contain the query in any of the identifiers
-    // (moniker, URL, instance ID).
-    let mut monikers: Vec<AbsoluteMoniker> = instances
-        .into_iter()
-        .filter(|i| {
-            let url_match = i.url.contains(&query);
-            let moniker_match = i.moniker.to_string().contains(&query);
-            let normalized_query_moniker_match =
-                matches!(&query_moniker, Some(m) if i.moniker.to_string().contains(&m.to_string()));
-            let id_match = i.instance_id.as_ref().map_or(false, |id| id.contains(&query));
-            url_match || moniker_match || normalized_query_moniker_match || id_match
-        })
-        .map(|i| i.moniker)
-        .collect();
-
-    // For stability guarantees, sort the moniker list
-    monikers.sort();
+    let instances = get_instances_from_query(query, realm_query).await?;
+    let monikers: Vec<AbsoluteMoniker> = instances.into_iter().map(|i| i.moniker).collect();
 
     // If the query is an exact-match of any of the results, return that
     // result only.

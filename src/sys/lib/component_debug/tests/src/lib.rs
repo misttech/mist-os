@@ -44,11 +44,7 @@ async fn list() {
 async fn show() {
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
-    let mut instances =
-        show_cmd_serialized("test.cm".to_string(), realm_query.clone()).await.unwrap();
-
-    assert_eq!(instances.len(), 1);
-    let instance = instances.remove(0);
+    let instance = show_cmd_serialized("test.cm".to_string(), realm_query.clone()).await.unwrap();
 
     assert!(instance.url.ends_with("#meta/test.cm"));
     assert!(instance.moniker.is_root());
@@ -79,9 +75,7 @@ async fn show() {
     // the Rust Test Runner
     resolved.started.unwrap();
 
-    let mut instances = show_cmd_serialized("foo.cm".to_string(), realm_query).await.unwrap();
-    assert_eq!(instances.len(), 1);
-    let instance = instances.remove(0);
+    let instance = show_cmd_serialized("foo.cm".to_string(), realm_query).await.unwrap();
     assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/foo").unwrap());
     assert!(instance.url.ends_with("#meta/foo.cm"));
 
