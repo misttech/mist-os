@@ -11,8 +11,8 @@
     },
     children: [
         {
-            name: "scenic",
-            url: "#meta/scenic_realm.cm",
+            name: "ui",
+            url: "test-ui-stack#meta/test-ui-stack.cm",
         },
         {
             name: "netstack",
@@ -52,12 +52,23 @@
         },
         {
             protocol: [
+                "fuchsia.logger.LogSink",
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.vulkan.loader.Loader",
+            ],
+            from: "parent",
+            to: "#ui",
+        },
+        {
+            protocol: [
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.input3.Keyboard",
                 "fuchsia.ui.scenic.Scenic",
             ],
-            from: "#scenic",
+            from: "#ui",
             to: [ "#kernels" ],
         },
         {
