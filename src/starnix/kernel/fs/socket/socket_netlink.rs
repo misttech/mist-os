@@ -943,7 +943,8 @@ impl SocketOps for RouteNetlinkSocket {
     }
 
     fn close(&self, _socket: &Socket) {
-        // TODO(https://issuetracker.google.com/285013342): Support Close.
+        // Close the underlying channel to the Netlink worker.
+        self.message_sender.close_channel();
     }
 
     fn getsockname(&self, _socket: &Socket) -> Vec<u8> {

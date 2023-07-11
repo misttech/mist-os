@@ -5,6 +5,7 @@
 //! A module for managing individual clients (aka sockets) of Netlink.
 
 use std::{
+    collections::HashMap,
     fmt::{Debug, Display, Formatter},
     num::NonZeroU32,
     sync::{
@@ -13,6 +14,7 @@ use std::{
     },
 };
 
+use assert_matches::assert_matches;
 use derivative::Derivative;
 use netlink_packet_core::NetlinkMessage;
 
@@ -27,7 +29,7 @@ use crate::{
 };
 
 /// A unique identifier for a client.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct ClientId(u64);
 
 /// The aspects of a client shared by [`InternalClient`] and [`ExternalClient`].
@@ -92,6 +94,10 @@ impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> InternalClient<F, S> {
             message.header.port_number = port_number.into();
         }
         self.sender.send(message, group)
+    }
+
+    fn get_id(&self) -> ClientId {
+        self.inner.id.clone()
     }
 }
 
@@ -186,13 +192,32 @@ impl ClientIdGenerator {
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Default(bound = ""))]
 pub(crate) struct ClientTable<F: ProtocolFamily, S: Sender<F::InnerMessage>> {
-    clients: Arc<Mutex<Vec<InternalClient<F, S>>>>,
+    clients: Arc<Mutex<HashMap<ClientId, InternalClient<F, S>>>>,
 }
 
 impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> ClientTable<F, S> {
     /// Adds the given client to this [`ClientTable`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the [`ClientTable`] already contains an entry with the same
+    /// [`ClientId`].
     pub(crate) fn add_client(&self, client: InternalClient<F, S>) {
-        self.clients.lock().unwrap().push(client);
+        let id = client.get_id();
+        let prev_entry = self.clients.lock().unwrap().insert(id.clone(), client);
+        assert_matches!(prev_entry, None, "{id:?} unexpectedly already existed in the table");
+    }
+
+    /// Removes the given client from this ['ClientTable'].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the [`ClientTable`] does not contain an entry with the same
+    /// [`ClientId`].
+    pub(crate) fn remove_client(&self, client: InternalClient<F, S>) {
+        let id = client.get_id();
+        let prev_entry = self.clients.lock().unwrap().remove(&id);
+        assert_matches!(prev_entry, Some(_), "{id:?} unexpectedly did not exist in the table");
     }
 
     /// Sends the message to all clients who are members of the multicast group.
@@ -201,14 +226,15 @@ impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> ClientTable<F, S> {
         message: NetlinkMessage<F::InnerMessage>,
         group: ModernGroup,
     ) {
-        let count = self.clients.lock().unwrap().iter_mut().fold(0, |count, client| {
-            if client.member_of_group(group) {
-                client.send_multicast(message.clone(), group);
-                count + 1
-            } else {
-                count
-            }
-        });
+        let count =
+            self.clients.lock().unwrap().iter_mut().fold(0, |count, (_client_id, client)| {
+                if client.member_of_group(group) {
+                    client.send_multicast(message.clone(), group);
+                    count + 1
+                } else {
+                    count
+                }
+            });
         log_debug!(
             "Notified {} {} clients of message for group {:?}: {:?}",
             count,
@@ -229,7 +255,7 @@ pub(crate) mod testutil {
 
     pub(crate) const CLIENT_ID_1: ClientId = ClientId(1);
     pub(crate) const CLIENT_ID_2: ClientId = ClientId(2);
-    pub(crate) const CLIENT_ID_3: ClientId = ClientId(2);
+    pub(crate) const CLIENT_ID_3: ClientId = ClientId(3);
     pub(crate) const CLIENT_ID_4: ClientId = ClientId(4);
     pub(crate) const CLIENT_ID_5: ClientId = ClientId(5);
 
@@ -262,6 +288,15 @@ mod tests {
             new_fake_netlink_message, FakeProtocolFamily, MODERN_GROUP1, MODERN_GROUP2,
         },
     };
+
+    impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> ClientTable<F, S> {
+        /// Test helper to return the IDs of clients in this [`ClientTable`].
+        pub(crate) fn client_ids(&self) -> Vec<ClientId> {
+            let mut ids = self.clients.lock().unwrap().keys().cloned().collect::<Vec<_>>();
+            ids.sort();
+            ids
+        }
+    }
 
     // Verify that multicast group membership changes applied to the external
     // client are observed on the internal client.

@@ -81,6 +81,8 @@ impl<P: SenderReceiverProvider> Netlink<P> {
     ///
     /// `sender` is used by Netlink to send messages to the client.
     /// `receiver` is used by Netlink to receive messages from the client.
+    ///
+    /// Closing the `receiver` will close this client, disconnecting `sender`.
     pub fn new_route_client(
         &self,
         sender: P::Sender<RtnlMessage>,
@@ -249,13 +251,15 @@ async fn connect_new_clients<
         .for_each_concurrent(None, |ClientWithReceiver { client, receiver }| {
             client_table.add_client(client.clone());
             spawn_client_request_handler::<F, S, R>(client, receiver, request_handler_impl.clone())
-            // TODO(https://issuetracker.google.com/285013342): Close the client
-            // once the "request handler" Task finishes.
+                .then(|client| futures::future::ready(client_table.remove_client(client)))
         })
         .await
 }
 
 /// Spawns a [`Task`] to handle requests from the given client.
+///
+/// The task terminates when the underlying `Receiver` closes, yielding the
+/// original client.
 fn spawn_client_request_handler<
     F: ProtocolFamily,
     S: Sender<F::InnerMessage>,
@@ -264,7 +268,7 @@ fn spawn_client_request_handler<
     client: InternalClient<F, S>,
     receiver: R,
     handler: F::RequestHandler<S>,
-) -> fasync::Task<()> {
+) -> fasync::Task<InternalClient<F, S>> {
     // State needed to handle an individual request, that is cycled through the
     // `fold` combinator below.
     struct FoldState<C, H> {
@@ -285,7 +289,7 @@ fn spawn_client_request_handler<
                     FoldState { client, handler }
                 },
             )
-            .map(|_: FoldState<_, _>| ()),
+            .map(|FoldState { client, handler: _ }: FoldState<_, _>| client),
     )
 }
 
@@ -293,6 +297,7 @@ fn spawn_client_request_handler<
 mod tests {
     use super::*;
 
+    use assert_matches::assert_matches;
     use futures::channel::mpsc;
 
     use crate::{
@@ -316,7 +321,7 @@ mod tests {
         )
         .fuse();
 
-        assert_eq!((&mut client_task).now_or_never(), None);
+        assert_matches!((&mut client_task).now_or_never(), None);
         assert_eq!(&client_sink.take_messages()[..], &[]);
 
         // Send a message and expect to see the response on the `client_sink`.
@@ -327,7 +332,7 @@ mod tests {
         futures::pin_mut!(client_task, could_send_fut);
         futures::select!(
             res = could_send_fut => res.expect("should be able to send without error"),
-            () = client_task => panic!("client task unexpectedly finished"),
+            _client = client_task => panic!("client task unexpectedly finished"),
         );
         assert_eq!(
             &client_sink.take_messages()[..],
@@ -336,7 +341,7 @@ mod tests {
 
         // Close the sender, and expect the Task to exit.
         req_sender.close_channel();
-        client_task.await;
+        let _client = client_task.await;
         assert_eq!(&client_sink.take_messages()[..], &[]);
     }
 
@@ -346,7 +351,7 @@ mod tests {
         let (client_sender, client_receiver) = futures::channel::mpsc::unbounded();
         let mut client_acceptor_fut = Box::pin(
             connect_new_clients::<FakeProtocolFamily, _, _>(
-                client_table,
+                client_table.clone(),
                 client_receiver,
                 FakeNetlinkRequestHandler,
             )
@@ -385,6 +390,10 @@ mod tests {
             () = client_acceptor_fut => panic!("client acceptor unexpectedly finished"),
         );
         assert_eq!(
+            &client_table.client_ids()[..],
+            [client::testutil::CLIENT_ID_1, client::testutil::CLIENT_ID_2]
+        );
+        assert_eq!(
             &client_sink2.take_messages()[..],
             &[SentMessage::unicast(new_fake_netlink_message())]
         );
@@ -397,5 +406,8 @@ mod tests {
         // Close the client_sender, and verify the acceptor fut finishes.
         client_sender.close_channel();
         client_acceptor_fut.await;
+
+        // Confirm the clients have been cleaned up from the client table.
+        assert_eq!(&client_table.client_ids()[..], []);
     }
 }
