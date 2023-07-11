@@ -175,6 +175,11 @@ bool ScreenshotsSame(const Screenshot& a, const Screenshot& b) {
 }
 
 TYPED_TEST(VirtioGpuTest, DetectDisplay) {
+  // TODO(fxbug.dev/130445): Fix and re-enable this test on zircon.
+  if (this->GetGuestKernel() == GuestKernel::ZIRCON) {
+    GTEST_SKIP();
+  }
+
   std::string result;
   ASSERT_EQ(this->RunUtil(kVirtioGpuTestUtil, {"detect"}, &result), ZX_OK);
 
