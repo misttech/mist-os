@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <sys/stat.h>
 #include <zircon/types.h>
+
+#include <iostream>
 
 #include <zxtest/zxtest.h>
 
+#include "tools/fidl/fidlc/fix/command_line_options.h"
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/include/fidl/fixes.h"
@@ -14,7 +18,6 @@
 #include "tools/fidl/fidlc/include/fidl/source_manager.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 #include "tools/fidl/fidlc/tests/error_test.h"
-#include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
 
@@ -108,6 +111,33 @@ class FailingParsedFix final : public ParsedFix {
     return std::make_unique<FailingTransformer>(source_files, experimental_flags, reporter);
   }
 };
+
+TEST(FixTests, BadCommandLineFlagsEmpty) {
+  fidl::fix::CommandLineOptions options;
+  std::vector<std::string> filepaths;
+  std::unique_ptr<fidl::fix::Fix> fix;
+  auto status = ProcessCommandLine(options, filepaths, fix);
+  EXPECT_EQ(status.has_error(), true);
+}
+
+TEST(FixTests, GoodCommandLineFlags) {
+  fidl::fix::CommandLineOptions options;
+  std::vector<std::string> filepaths;
+  std::unique_ptr<fidl::fix::Fix> fix;
+
+  options.fix = "noop";
+
+  struct stat buffer;
+  if (stat("host_x64/fidlc-tests/good/fi-0001.test.fidl", &buffer) == 0) {
+    filepaths.emplace_back("host_x64/fidlc-tests/good/fi-0001.test.fidl");
+  } else if (stat("host_arm64/fidlc-tests/good/fi-0001.test.fidl", &buffer) == 0) {
+    filepaths.emplace_back("host_arm64/fidlc-tests/good/fi-0001.test.fidl");
+  }
+  // If the path is something else, there will be an error.
+
+  auto status = ProcessCommandLine(options, filepaths, fix);
+  EXPECT_EQ(false, status.has_error());
+}
 
 TEST(FixTests, BadInvalidFlags) {
   ExperimentalFlags experimental_flags;

@@ -114,14 +114,20 @@ if (is_host) {
     deps = [ ":fidl" ]
   }
 
-  executable("fidl-fix") {
-    sources = [
-      "fix/command_line_options.cc",
-      "fix/main.cc",
+  source_set("fidl-fix-cli") {
+    sources = [ "fix/command_line_options.cc" ]
+    deps = [
+      "//src/lib/fxl",
+      "//third_party/re2",
+      "//zircon/system/ulib/cmdline",
     ]
+  }
+
+  executable("fidl-fix") {
+    sources = [ "fix/main.cc" ]
     deps = [
       ":fidl",
-      "//src/lib/fxl",
+      ":fidl-fix-cli",
     ]
   }
 

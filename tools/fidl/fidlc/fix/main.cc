@@ -13,16 +13,12 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
-#include "src/lib/fxl/strings/split_string.h"
 #include "tools/fidl/fidlc/fix/command_line_options.h"
-#include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
-#include "tools/fidl/fidlc/include/fidl/fixables.h"
 #include "tools/fidl/fidlc/include/fidl/fixes.h"
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
-#include "tools/fidl/fidlc/include/fidl/source_manager.h"
-#include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
 namespace {
 
@@ -59,7 +55,6 @@ constexpr int FixStatusToExitCode(fidl::fix::Status status) {
   va_end(args);
   exit(FixStatusToExitCode(kind));
 }
-
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -71,95 +66,13 @@ int main(int argc, char* argv[]) {
     Fail(fidl::fix::Status::kErrorOther, "%s\n", status.error_message().c_str());
   }
 
-  if (options.fix.empty()) {
-    FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "No --fix argument provided\n");
-  }
-  if (filepaths.empty()) {
-    FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "No files provided\n");
-  }
-
-  // Process the fix name.
-  std::optional<fidl::Fixable> fixable = fidl::Fixable::Get(options.fix);
-  if (!fixable.has_value()) {
-    FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "Unknown --fix: %s\n", &options.fix);
-  }
-
-  // Process library filepaths.
-  auto library = std::make_unique<fidl::SourceManager>();
-  for (const auto& filepath : filepaths) {
-    if (!library->CreateSource(filepath)) {
-      Fail(fidl::fix::Status::kErrorOther, "Couldn't read in source data from %s\n",
-           filepath.c_str());
-    }
-  }
-
-  // Process dependency filepaths.
-  std::vector<std::unique_ptr<fidl::SourceManager>> dependencies;
-  for (const auto& filepaths : options.deps) {
-    dependencies.emplace_back(std::make_unique<fidl::SourceManager>());
-    std::unique_ptr<fidl::SourceManager>& dep_manager = dependencies.back();
-    std::vector<std::string> filepaths_split =
-        fxl::SplitStringCopy(filepaths, ",", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
-    for (const std::string& filepath : filepaths_split) {
-      if (!dep_manager->CreateSource(filepath)) {
-        Fail(fidl::fix::Status::kErrorOther, "Couldn't read in source data from %s\n",
-             filepath.c_str());
-      }
-    }
-  }
-
-  // Process experimental flags.
-  fidl::ExperimentalFlags experimental_flags;
-  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  for (const auto& experiment : options.experiments) {
-    if (!experimental_flags.EnableFlagByName(experiment)) {
-      FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "Unknown --experimental: %s\n",
-                    experiment.c_str());
-    }
-  }
-
-  // Process --available flags.
-  fidl::VersionSelection version_selection;
-  for (const auto& available : options.available) {
-    const auto colon_idx = available.find(':');
-    if (colon_idx == std::string::npos) {
-      FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "Invalid --available argument: %s\n",
-                    available.c_str());
-    }
-    const auto platform_str = available.substr(0, colon_idx);
-    const auto version_str = available.substr(colon_idx + 1);
-    const auto platform = fidl::Platform::Parse(platform_str);
-    const auto version = fidl::Version::Parse(version_str);
-    if (!platform.has_value()) {
-      FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "Invalid platform name: %s\n",
-                    platform_str.data());
-    }
-    if (!version.has_value()) {
-      FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "Invalid version: %s\n",
-                    version_str.data());
-    }
-    version_selection.Insert(platform.value(), version.value());
-  }
-
   std::unique_ptr<fidl::fix::Fix> fix;
-  switch (fixable.value().kind) {
-    case fidl::Fixable::Kind::kNoop: {
-      fix = std::make_unique<fidl::fix::NoopParsedFix>(std::move(library), experimental_flags);
-      break;
-    }
-    case fidl::Fixable::Kind::kProtocolModifier: {
-      fix =
-          std::make_unique<fidl::fix::ProtocolModifierFix>(std::move(library), experimental_flags);
-      break;
-    }
-    case fidl::Fixable::Kind::kEmptyStructResponse: {
-      fix = std::make_unique<fidl::fix::EmptyStructResponseFix>(
-          std::move(library), std::move(dependencies), experimental_flags);
-      break;
-    }
+  status = fidl::fix::ProcessCommandLine(options, filepaths, fix);
+  if (status.has_error()) {
+    FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "%s\n", status.error_message().c_str());
   }
-  ZX_ASSERT(fix != nullptr);
 
+  ZX_ASSERT(fix != nullptr);
   fidl::fix::Status validate = fix->ValidateFlags();
   if (validate != fidl::fix::Status::kOk) {
     FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "Required --experimental flags missing");

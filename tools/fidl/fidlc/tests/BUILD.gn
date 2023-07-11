@@ -107,6 +107,7 @@ test("fidlc-test") {
     ":errcat_other",
     "//third_party/boringssl",
     "//tools/fidl/fidlc:fidl",
+    "//tools/fidl/fidlc:fidl-fix-cli",
     "//zircon/system/ulib/zxtest",
   ]
 }

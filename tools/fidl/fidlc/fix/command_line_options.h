@@ -7,9 +7,12 @@
 
 #include <lib/cmdline/status.h>
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
+
+#include "tools/fidl/fidlc/include/fidl/fixes.h"
 
 namespace fidl::fix {
 
@@ -29,6 +32,10 @@ cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOption
 
 // Returns the fidl-fix usage string.
 std::string Usage(const std::string& argv0);
+
+// Create a fix object from the command line options
+cmdline::Status ProcessCommandLine(CommandLineOptions& options, std::vector<std::string>& filepaths,
+                                   std::unique_ptr<Fix>& fix);
 
 }  // namespace fidl::fix
 

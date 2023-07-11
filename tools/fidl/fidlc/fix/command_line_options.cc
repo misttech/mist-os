@@ -8,6 +8,8 @@
 
 #include <iostream>
 
+#include "src/lib/fxl/strings/split_string.h"
+
 namespace fidl::fix {
 
 namespace help {
@@ -83,4 +85,100 @@ cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOption
   return cmdline::Status::Ok();
 }
 
+cmdline::Status ProcessCommandLine(fidl::fix::CommandLineOptions& options,
+                                   std::vector<std::string>& filepaths,
+                                   std::unique_ptr<fidl::fix::Fix>& fix) {
+  std::ostringstream error_message;
+
+  if (options.fix.empty()) {
+    return cmdline::Status::Error("No --fix argument provided\n");
+  }
+  if (filepaths.empty()) {
+    return cmdline::Status::Error("No files provided\n");
+  }
+
+  // Process the fix name.
+  std::optional<fidl::Fixable> fixable = fidl::Fixable::Get(options.fix);
+  if (!fixable.has_value()) {
+    error_message << "Unknown --fix: " << options.fix;
+    return cmdline::Status::Error(error_message.str());
+  }
+
+  // Process library filepaths.
+  auto library = std::make_unique<fidl::SourceManager>();
+  for (const auto& filepath : filepaths) {
+    if (!library->CreateSource(filepath)) {
+      error_message << "Couldn't read in source data from " << filepath;
+      return cmdline::Status::Error(error_message.str());
+    }
+  }
+
+  // Process dependency filepaths.
+  std::vector<std::unique_ptr<fidl::SourceManager>> dependencies;
+  for (const auto& filepaths : options.deps) {
+    dependencies.emplace_back(std::make_unique<fidl::SourceManager>());
+    std::unique_ptr<fidl::SourceManager>& dep_manager = dependencies.back();
+    std::vector<std::string> filepaths_split =
+        fxl::SplitStringCopy(filepaths, ",", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+    for (const std::string& filepath : filepaths_split) {
+      if (!dep_manager->CreateSource(filepath)) {
+        error_message << "Couldn't read in source data from " << filepath;
+        return cmdline::Status::Error(error_message.str());
+      }
+    }
+  }
+
+  // Process experimental flags.
+  fidl::ExperimentalFlags experimental_flags;
+  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
+  for (const auto& experiment : options.experiments) {
+    if (!experimental_flags.EnableFlagByName(experiment)) {
+      error_message << "Unknown --experimental: " << experiment.c_str();
+      return cmdline::Status::Error(error_message.str());
+    }
+  }
+
+  // Process --available flags.
+  fidl::VersionSelection version_selection;
+  for (const auto& available : options.available) {
+    const auto colon_idx = available.find(':');
+    if (colon_idx == std::string::npos) {
+      error_message << "Invalid --available argument: " << available.c_str();
+      return cmdline::Status::Error(error_message.str());
+    }
+    const auto platform_str = available.substr(0, colon_idx);
+    const auto version_str = available.substr(colon_idx + 1);
+    const auto platform = fidl::Platform::Parse(platform_str);
+    const auto version = fidl::Version::Parse(version_str);
+    if (!platform.has_value()) {
+      error_message << "Invalid platform name: " << platform_str.c_str();
+      return cmdline::Status::Error(error_message.str());
+    }
+    if (!version.has_value()) {
+      error_message << "Invalid version: " << version_str.c_str();
+      return cmdline::Status::Error(error_message.str());
+    }
+    version_selection.Insert(platform.value(), version.value());
+  }
+
+  //  std::unique_ptr<fidl::fix::Fix> fix;
+  switch (fixable.value().kind) {
+    case fidl::Fixable::Kind::kNoop: {
+      fix = std::make_unique<fidl::fix::NoopParsedFix>(std::move(library), experimental_flags);
+      break;
+    }
+    case fidl::Fixable::Kind::kProtocolModifier: {
+      fix =
+          std::make_unique<fidl::fix::ProtocolModifierFix>(std::move(library), experimental_flags);
+      break;
+    }
+    case fidl::Fixable::Kind::kEmptyStructResponse: {
+      fix = std::make_unique<fidl::fix::EmptyStructResponseFix>(
+          std::move(library), std::move(dependencies), &version_selection, experimental_flags);
+      break;
+    }
+  }
+
+  return cmdline::Status::Ok();
+}
 }  // namespace fidl::fix
