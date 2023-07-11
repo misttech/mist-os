@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/images/zedboot/zedboot_args.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
@@ -16,11 +17,36 @@ import("//src/sys/core/build/core.gni")
 #     Additional package labels to include in the `base_packages` passed to `assembled_system`.
 #
 template("assemble_network_conformance_system") {
+  _image_name = target_name
+
+  labels = {
+    images_config_fvm = "${target_name}.images_config_fvm"
+    images_config_fxfs = "${target_name}.images_config_fxfs"
+    product_config = "${target_name}.product_assembly_config"
+  }
+
   core_realm_definition("core") {
     testonly = true
   }
 
-  product_assembly_configuration(target_name + ".product_assembly_config") {
+  generated_images_config(labels.images_config_fvm) {
+    zbi = {
+      name = _image_name
+    }
+    fvm = {
+      slice_size = 1048576
+    }
+  }
+
+  generated_images_config(labels.images_config_fxfs) {
+    zbi = {
+      name = _image_name
+    }
+    fxfs = {
+    }
+  }
+
+  product_assembly_configuration(labels.product_config) {
     platform = {
       build_type = "eng"
       feature_set_level = "utility"
@@ -29,7 +55,20 @@ template("assemble_network_conformance_system") {
 
   assembled_system(target_name) {
     testonly = true
-    product_assembly_config_label = ":${target_name}.product_assembly_config"
+
+    if (!fxfs_blob) {
+      assembly_images_config_label = ":${labels.images_config_fvm}"
+      generate_fvm = true
+    } else {
+      assembly_images_config_label = ":${labels.images_config_fxfs}"
+      generate_fxfs = true
+    }
+    use_explicit_images_config_only = true
+    generate_vbmeta = false
+    generate_fvm_fastboot = false
+    ramdisk_in_zbi = true
+
+    product_assembly_config_label = ":${labels.product_config}"
     allow_eng_platform_bundle_use = true
 
     base_packages = [
@@ -47,10 +86,6 @@ template("assemble_network_conformance_system") {
     base_packages += invoker.additional_base_packages
 
     core_realm_definition = ":core"
-
-    generate_fvm = !bootfs_only && !fxfs_blob
-    generate_fxfs = !bootfs_only && fxfs_blob
-    ramdisk_in_zbi = true
 
     include_component_id_index = true
     additional_boot_args =
