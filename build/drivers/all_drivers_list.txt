@@ -290,6 +290,8 @@
 //src/devices/tests/v2/reload-driver/root:driver
 //src/devices/tests/v2/reload-driver/target-1:driver
 //src/devices/tests/v2/reload-driver/target-2:driver
+//src/devices/tests/v2/replace-driver/target-1-replacement:driver
+//src/devices/tests/v2/replace-driver/target-2-replacement:driver
 //src/devices/tests/v2/runtime-dispatcher:leaf-driver
 //src/devices/tests/v2/runtime-dispatcher:root-driver
 //src/devices/tests/v2/runtime-protocol:leaf-driver
