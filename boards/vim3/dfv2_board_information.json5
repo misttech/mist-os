@@ -7,6 +7,7 @@
     name: "vim3-dfv2",
     provided_features: [
         "fuchsia::driver_framework_v2_support",
+        "fuchsia::fan",
         "fuchsia::usb_peripheral_support",
     ],
 }
