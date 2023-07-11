@@ -10,6 +10,11 @@
     "package_name": "fuchsia-hwinfo-tests"
   },
   {
+    "archive_gn_label": "//sdk/ctf/tests/fidl/fuchsia.settings:fuchsia-settings-tests_archive_copy",
+    "archive_name": "fuchsia-settings-tests",
+    "package_name": "fuchsia-settings-tests"
+  },
+  {
     "archive_gn_label": "//src/sys/pkg/tests/pkgdir:pkgdir-tests_archive_copy",
     "archive_name": "pkgdir-tests",
     "package_name": "pkgdir-tests"

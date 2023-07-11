@@ -19,19 +19,33 @@ ctf_executable("settings_test_bin") {
   ]
 }
 
-ctf_fuchsia_component("settings_test") {
+ctf_fuchsia_component("test-suite") {
   testonly = true
   manifest = "meta/settings_test.cml"
   deps = [ ":settings_test_bin" ]
 }
 
-ctf_fuchsia_test_package("fuchsia_settings_test") {
-  plasa_element = "fidl/fuchsia.settings/Privacy"
-  package_name = "fuchsia_settings_test"
-  test_components = [ ":settings_test" ]
+ctf_fuchsia_package("fuchsia-settings-tests") {
+  package_name = "fuchsia-settings-tests"
+  testonly = true
+  deps = [ ":test-suite" ]
+}
+
+fuchsia_test_component("test-root") {
+  testonly = true
+  manifest = "meta/test-root.cml"
+  test_type = "ctf"
+}
+
+fuchsia_test_package("fuchsia-settings-tests-package") {
+  test_components = [ ":test-root" ]
+  subpackages = [ ":fuchsia-settings-tests" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":fuchsia_settings_test" ]
+  deps = [
+    ":fuchsia-settings-tests-package",
+    ":fuchsia-settings-tests_archive",
+  ]
 }

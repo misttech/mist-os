@@ -35,6 +35,18 @@ import("//build/config/fuchsia/platform_version.gni")
 import("//sdk/ctf/build/internal/fuchsia_package_with_test.gni")
 import("//sdk/ctf/build/internal/generate_ctf_packages.gni")
 
+template("generate_fuchsia-settings-tests") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component_name = "test-root.cm"
+    subpackages = [
+      test_info.target_label,
+      # These tests do not currently use a test realm factory.
+    ]
+    test_component = "//sdk/ctf/tests/fidl/fuchsia.settings:test-root"
+  }
+}
+
 template("generate_fuchsia-element-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
