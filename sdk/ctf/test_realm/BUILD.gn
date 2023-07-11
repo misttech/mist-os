@@ -33,8 +33,3 @@ ctf_test_realm("fuchsia.driver.test_test_realm") {
     "//src/devices/misc/drivers/test-parent",
   ]
 }
-
-ctf_test_realm("fuchsia.ui.composition.flatland_test_realm") {
-  manifest = "//src/ui/testing/context/meta/context-factory.cml"
-  deps = [ "//src/ui/testing/context:ui-context-factory-component" ]
-}

@@ -19,21 +19,35 @@ ctf_rustc_test("fuchsia_ui_composition_flatland_test_bin") {
   ]
 }
 
-ctf_fuchsia_component("fuchsia_ui_composition_flatland_test_component") {
+ctf_fuchsia_component("test-suite") {
   testonly = true
-  manifest = "meta/fuchsia_ui_composition_flatland_test.cml"
+  manifest = "meta/test-suite.cml"
   deps = [ ":fuchsia_ui_composition_flatland_test_bin" ]
 }
 
-ctf_fuchsia_test_package("fuchsia_ui_composition_flatland_test_package") {
-  # TODO(fxbug.dev/118010): Release in CTF once Rust is available in the SDK
-  release_in_ctf = false
-  enable_ctf_test_realms = true
-  package_name = "fuchsia_ui_composition_flatland_test_package"
-  test_components = [ ":fuchsia_ui_composition_flatland_test_component" ]
+ctf_fuchsia_package("fuchsia-ui-composition-flatland-tests") {
+  package_name = "fuchsia-ui-composition-flatland-tests"
+  testonly = true
+  deps = [ ":test-suite" ]
+}
+
+fuchsia_test_component("test-root") {
+  testonly = true
+  manifest = "meta/test-root.cml"
+  test_type = "ctf"
+}
+
+fuchsia_test_package("fuchsia-ui-composition-flatland-tests-package") {
+  test_components = [ ":test-root" ]
+  subpackages = [ ":fuchsia-ui-composition-flatland-tests" ]
+  deps = [ "//src/ui/testing/context:ui-context-factory-component" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":fuchsia_ui_composition_flatland_test_package" ]
+  deps = [
+    ":fuchsia-ui-composition-flatland-tests-package",
+    # TODO(fxbug.dev/118010): Release in CTF once Rust is available in the SDK
+    # ":fuchsia-ui-composition-flatland-tests_archive",
+  ]
 }

@@ -1,0 +1,49 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// [START example]
+{
+    include: [ "syslog/client.shard.cml" ],
+    children: [
+        {
+            name: "ui_context_factory",
+            url: "#meta/ui-context-factory.cm",
+        },
+        {
+            name: "test_suite",
+            url: "fuchsia-ui-composition-flatland-tests#meta/test-suite.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.ui.test.context.Factory",
+            from: "#ui_context_factory",
+            to: "#test_suite",
+        },
+        {
+            protocol: [
+                "fuchsia.logger.LogSink",
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.vulkan.loader.Loader",
+            ],
+            from: "parent",
+            to: "#ui_context_factory",
+        },
+        {
+            storage: "tmp",
+            from: "parent",
+            to: "#ui_context_factory",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test_suite",
+        },
+    ],
+}
+
+// [END example]

@@ -9,5 +9,4 @@
 ctf_test_realms = [
   "//sdk/ctf/test_realm:fuchsia.driver.test_test_realm",
   "//sdk/ctf/test_realm:fuchsia.example_test_realm",
-  "//sdk/ctf/test_realm:fuchsia.ui.composition.flatland_test_realm",
 ]
