@@ -18,6 +18,7 @@
 #include <fuchsia/ui/accessibility/view/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
+#include <fuchsia/ui/composition/internal/cpp/fidl.h>
 #include <fuchsia/ui/focus/cpp/fidl.h>
 #include <fuchsia/ui/input/cpp/fidl.h>
 #include <fuchsia/ui/observation/scope/cpp/fidl.h>
@@ -391,6 +392,11 @@ void UITestRealm::ConfigureSceneOwner() {
   realm_builder_.InitMutableConfigFromPackage(kSceneProviderName);
   realm_builder_.SetConfigValue(kSceneProviderName, "use_flatland",
                                 ConfigValue::Bool(config_.use_flatland));
+
+  // Route non-public DisplayOwnership protocol from Scenic to SceneManager.
+  RouteServices({fuchsia::ui::composition::internal::DisplayOwnership::Name_},
+                /* source = */ ChildRef{kScenicName},
+                /* targets = */ {ChildRef{kSceneManagerName}});
 }
 
 void UITestRealm::Build() {

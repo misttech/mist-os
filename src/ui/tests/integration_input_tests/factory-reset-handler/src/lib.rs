@@ -96,6 +96,11 @@ async fn assemble_realm(
         &scene_manager,
     )
     .await;
+    b.route_to_peer::<fidl_fuchsia_ui_composition_internal::DisplayOwnershipMarker>(
+        &scenic_test_realm,
+        &scene_manager,
+    )
+    .await;
     b.route_to_peer::<fidl_fuchsia_accessibility_scene::ProviderMarker>(
         &a11y_test_realm,
         &scene_manager,

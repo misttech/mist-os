@@ -6,8 +6,8 @@ use crate::input_device::{self, InputEvent};
 use crate::input_handler::InputHandlerStatus;
 use crate::keyboard_binding::{KeyboardDeviceDescriptor, KeyboardEvent};
 use anyhow::{Context, Result};
+use fidl_fuchsia_ui_composition_internal as fcomp;
 use fidl_fuchsia_ui_input3::KeyEventType;
-use fidl_fuchsia_ui_scenic as fscenic;
 use fuchsia_async::{OnSignals, Task};
 use fuchsia_inspect;
 use fuchsia_zircon::{AsHandleRef, Duration, Signals, Status, Time};
@@ -22,12 +22,12 @@ use std::{cell::RefCell, rc::Rc};
 lazy_static! {
     // The signal value corresponding to the `DISPLAY_OWNED_SIGNAL`.  Same as zircon's signal
     // USER_0.
-    static ref DISPLAY_OWNED: Signals = Signals::from_bits(fscenic::DISPLAY_OWNED_SIGNAL)
+    static ref DISPLAY_OWNED: Signals = Signals::from_bits(fcomp::SIGNAL_DISPLAY_OWNED)
         .expect("static init should not fail")    ;
 
     // The signal value corresponding to the `DISPLAY_NOT_OWNED_SIGNAL`.  Same as zircon's signal
     // USER_1.
-    static ref DISPLAY_UNOWNED: Signals = Signals::from_bits(fscenic::DISPLAY_NOT_OWNED_SIGNAL)
+    static ref DISPLAY_UNOWNED: Signals = Signals::from_bits(fcomp::SIGNAL_DISPLAY_NOT_OWNED)
         .expect("static init should not fail")    ;
 
     // Any display-related signal.

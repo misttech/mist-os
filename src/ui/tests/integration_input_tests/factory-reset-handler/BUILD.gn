@@ -29,6 +29,7 @@ rustc_test("factory_reset_handler_test") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
+    "//sdk/fidl/fuchsia.ui.composition.internal:fuchsia.ui.composition.internal_rust",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_rust",
     "//sdk/fidl/fuchsia.ui.observation.scope:fuchsia.ui.observation.scope_rust",
     "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_rust",

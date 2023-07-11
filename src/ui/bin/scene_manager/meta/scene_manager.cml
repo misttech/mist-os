@@ -46,6 +46,7 @@
                 // Graphics protocols needed for scene management.
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.composition.FlatlandDisplay",
+                "fuchsia.ui.composition.internal.DisplayOwnership",
                 "fuchsia.ui.display.color.Converter",
                 "fuchsia.ui.display.singleton.Info",
                 "fuchsia.ui.input.ImeService",

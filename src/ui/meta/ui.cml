@@ -46,6 +46,11 @@
             from: "#display-coordinator-connector",
             to: [ "#scenic" ],
         },
+        {
+            protocol: [ "fuchsia.ui.composition.internal.DisplayOwnership" ],
+            from: "#scenic",
+            to: [ "#scene_manager" ],
+        },
     ],
     expose: [
         {

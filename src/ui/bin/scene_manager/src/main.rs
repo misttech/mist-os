@@ -30,8 +30,8 @@ use {
         RegistryRequestStream as A11yViewRegistryRequestStream,
     },
     fidl_fuchsia_ui_brightness::ColorAdjustmentHandlerRequestStream,
-    fidl_fuchsia_ui_composition as flatland, fidl_fuchsia_ui_display_color as color,
-    fidl_fuchsia_ui_display_singleton as singleton_display,
+    fidl_fuchsia_ui_composition as flatland, fidl_fuchsia_ui_composition_internal as fcomp,
+    fidl_fuchsia_ui_display_color as color, fidl_fuchsia_ui_display_singleton as singleton_display,
     fidl_fuchsia_ui_focus::FocusChainProviderRequestStream,
     fidl_fuchsia_ui_policy::{
         DeviceListenerRegistryRequestStream as MediaButtonsListenerRegistryRequestStream,
@@ -170,8 +170,9 @@ async fn inner_main() -> Result<(), Error> {
 
     let scenic = connect_to_protocol::<ScenicMarker>()?;
     let use_flatland = scenic.uses_flatland().await.expect("Failed to get flatland info.");
+    let ownership_proxy = connect_to_protocol::<fcomp::DisplayOwnershipMarker>()?;
     let display_ownership =
-        scenic.get_display_ownership_event().await.expect("Failed to get display ownership.");
+        ownership_proxy.get_event().await.expect("Failed to get display ownership.");
     info!(use_flatland, "Instantiating SceneManager");
 
     // Read config files to discover display attributes.
