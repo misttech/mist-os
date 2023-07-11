@@ -27,14 +27,10 @@
 ///   original protocol's data.
 /// - API evolution. Server-side can introduce new methods to these protocols,
 ///   and new fields to these tables, without breaking existing clients of the
-///   original or augmented protocol. For example, [`MouseEventWithGlobalMouse`]
-///   can be extended without consequences for
-///   [`fuchsia.ui.pointer.MouseEvent`].
+///   original or augmented protocol.
 /// - API evolution. When clients require substantially different augmentation,
 ///   new augmentation protocols representing those capabilities can (and
-///   should) be introduced. For example, if one client of [`GlobalMouse`]
-///   requires additional fields that are really about view-local hit data, it
-///   would be reasonable to mint a new augmentation.
+///   should) be introduced.
 @available(added=7)
 library fuchsia.ui.pointer.augment;
 
@@ -45,71 +41,6 @@ using zx;
 type ErrorReason = strict enum {
     /// The augmentation attempt was denied.
     DENIED = 1;
-};
-
-// GLOBAL MOUSE AUGMENTATION
-
-/// Abnormal return for global mouse.
-type ErrorForGlobalMouse = resource struct {
-    /// Abnormal reason for return.
-    error_reason ErrorReason;
-
-    /// Original protocol endpoint for client use.
-    original client_end:pointer.MouseSource;
-};
-
-/// A method for a client to receive view-global visibility for mouse behavior.
-/// - The augmented data are scoped to the view of the client.
-@discoverable
-closed protocol GlobalMouse {
-    /// An exchange from an `original` mouse protocol endpoint to an `augmented`
-    /// mouse protocol endpoint. If successful, `error` is empty, `original` is
-    /// consumed, and `augmented` is returned for the client's use. Otherwise,
-    /// the `error` carries back `original` for the client's use, and
-    /// `augmented` is null.
-    strict Upgrade(resource struct {
-        original client_end:pointer.MouseSource;
-    }) -> (resource struct {
-        augmented client_end:<MouseSourceWithGlobalMouse, optional>;
-        error box<ErrorForGlobalMouse>;
-    });
-};
-
-/// Like [`fuchsia.ui.pointer.MouseSource`], but with additional information
-/// about the global position of mouse events, and otherwise identical in
-/// operation. See [`fuchsia.ui.pointer.MouseSource`] for regular usage
-/// information.
-closed protocol MouseSourceWithGlobalMouse {
-    /// Identical usage to [`fuchsia.ui.pointer.MouseSource.Watch`], but with
-    /// augmented data.
-    strict Watch() -> (struct {
-        events vector<MouseEventWithGlobalMouse>:pointer.MOUSE_MAX_EVENT;
-    });
-};
-
-/// An augmentation of [`fuchsia.ui.pointer.MouseEvent`] to provide global
-/// visibility for mouse behavior in the injection subtree.
-/// - The augmented data is scoped to the view of the client, meaning no events
-///   will be delivered when the mouse pointer is outside the view (even when
-///   the stream is latched to this view).
-/// - Augmented data is only produced for events injected either into or above
-///   the view in the scene graph.
-///   -  This means that local events ~= global events when the view is the
-///      root of the injection subtree.
-///   -  Otherwise the client will see all events up to root of the injection
-///      subtree.
-type MouseEventWithGlobalMouse = table {
-    /// Identical usage to [`fuchsia.ui.pointer.MouseEvent`]. In particular, if
-    /// the client's view is obscured, `mouse_event` will be empty.
-    1: mouse_event pointer.MouseEvent;
-
-    /// Augmented data that describes the position of a `mouse_event` within the
-    /// client's view, regardless of obscuring or latching.
-    2: global_position pointer.MousePointerSample;
-
-    /// Augmented data that describes when the mouse stream enters or exits
-    /// the client's view.
-    3: global_stream_info pointer.MouseEventStreamInfo;
 };
 
 // LOCAL HIT AUGMENTATION

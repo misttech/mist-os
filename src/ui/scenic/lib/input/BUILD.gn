@@ -124,8 +124,6 @@ source_set("mouse") {
     "mouse_source.h",
     "mouse_source_base.cc",
     "mouse_source_base.h",
-    "mouse_source_with_global_mouse.cc",
-    "mouse_source_with_global_mouse.h",
     "mouse_system.cc",
     "mouse_system.h",
   ]
@@ -138,11 +136,6 @@ source_set("mouse") {
     "//src/lib/fsl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/trace",
-  ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_hlcpp",
-    "//sdk/fidl/fuchsia.ui.pointer.augment:fuchsia.ui.pointer.augment_hlcpp",
   ]
 }
 

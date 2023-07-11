@@ -21,13 +21,6 @@
     // TODO(fxbug.dev/103234): Remove this shard
     offer: [
         {
-            // These protocols are not available in smart products
-            protocol: [ "fuchsia.ui.pointer.augment.GlobalMouse" ],
-            from: "void",
-            to: "#session-manager",
-            availability: "optional",
-        },
-        {
             protocol: "fuchsia.lightsensor.Sensor",
             from: "#ui",
             to: "#session-manager",

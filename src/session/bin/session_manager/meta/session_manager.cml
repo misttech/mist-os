@@ -61,7 +61,7 @@
         {
             directory: "root-data",
             from: "parent",
-            rights: [ 'r*' ],
+            rights: [ "r*" ],
             path: "/data",
         },
     ],
@@ -320,7 +320,6 @@
                 "fuchsia.ui.input3.Keyboard",
                 "fuchsia.ui.input3.KeyEventInjector",
                 "fuchsia.ui.keyboard.focus.Controller",
-                "fuchsia.ui.pointer.augment.GlobalMouse",
                 "fuchsia.ui.pointerinjector.Registry",
                 "fuchsia.ui.policy.DeviceListenerRegistry",
                 "fuchsia.ui.policy.DisplayBacklight",
