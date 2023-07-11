@@ -74,12 +74,14 @@ starnix_linux_test_component("virtmagma_image_tests") {
 fuchsia_test_package("starnix_magma_tests") {
   test_components = [
     ":virtmagma_conformance_tests",
-    # TODO(fxbug.dev/104611) - enable this when all tests passing
-    #":virtmagma_image_tests",
+    ":virtmagma_image_tests",
   ]
 
   deps = [ ":container_resources" ]
-  subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+  subpackages = [
+    "//src/starnix/kernel:starnix_kernel_package",
+    "//src/ui/testing/test_ui_stack:test-ui-stack",
+  ]
 
   test_specs = {
     log_settings = {
