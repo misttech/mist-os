@@ -19,7 +19,7 @@ from rust import HOST_PLATFORM, ROOT_PATH
 
 def manifest_path_from_path_or_gn_target(arg):
     if arg.endswith("Cargo.toml"):
-        return os.path.abspath(arg)
+        return Path(arg)
     else:
         gn_target = rust.GnTarget(arg)
         gn_target.label_name += ".actual"
