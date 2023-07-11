@@ -9095,7 +9095,7 @@ pub struct futex_waitv {
     pub __reserved: __u32,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone, FromBytes, FromZeroes)]
 pub struct robust_list {
     pub next: uref<robust_list>,
 }
@@ -9109,7 +9109,7 @@ impl Default for robust_list {
     }
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone, FromBytes, FromZeroes)]
 pub struct robust_list_head {
     pub list: robust_list,
     pub futex_offset: crate::types::c_long,

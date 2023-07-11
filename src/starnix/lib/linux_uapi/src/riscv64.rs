@@ -9109,7 +9109,7 @@ pub struct futex_waitv {
     pub __reserved: __u32,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone, FromBytes, FromZeroes)]
 pub struct robust_list {
     pub next: uref<robust_list>,
 }
@@ -9123,7 +9123,7 @@ impl Default for robust_list {
     }
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone, FromBytes, FromZeroes)]
 pub struct robust_list_head {
     pub list: robust_list,
     pub futex_offset: crate::types::c_long,
@@ -11750,6 +11750,14 @@ pub struct vdso_constants {
     pub ticks_to_mono_numerator: u32,
     pub ticks_to_mono_denominator: u32,
 }
+pub const _SECCOMP_IOCTL_NOTIF_RECV: __u32 = 3226476800;
+pub const SECCOMP_IOCTL_NOTIF_RECV: __u32 = 3226476800;
+pub const _SECCOMP_IOCTL_NOTIF_SEND: __u32 = 3222806785;
+pub const SECCOMP_IOCTL_NOTIF_SEND: __u32 = 3222806785;
+pub const _SECCOMP_IOCTL_NOTIF_ID_VALID: __u32 = 1074274562;
+pub const SECCOMP_IOCTL_NOTIF_ID_VALID: __u32 = 1074274562;
+pub const _SECCOMP_IOCTL_NOTIF_ADDFD: __u32 = 1075323139;
+pub const SECCOMP_IOCTL_NOTIF_ADDFD: __u32 = 1075323139;
 pub const _TIOCSPTLCK: __u32 = 1074025521;
 pub const TIOCSPTLCK: __u32 = 1074025521;
 pub const _TIOCGPTLCK: __u32 = 2147767353;
