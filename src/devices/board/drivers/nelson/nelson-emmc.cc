@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.hardware.gpt.metadata/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
 #include <fuchsia/hardware/sdmmc/c/banjo.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
@@ -15,7 +16,6 @@
 #include <lib/zx/handle.h>
 #include <zircon/hw/gpt.h>
 
-#include <ddk/metadata/emmc.h>
 #include <soc/aml-common/aml-sdmmc.h>
 #include <soc/aml-s905d3/s905d3-gpio.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
@@ -56,13 +56,6 @@ static aml_sdmmc_config_t config = {
     .max_freq = 166'666'667,
     .version_3 = true,
     .prefs = SDMMC_HOST_PREFS_DISABLE_HS400,
-};
-
-const emmc_config_t emmc_config = {
-    // Maintain the current Nelson behavior until we determine that trim is needed.
-    .enable_trim = true,
-    // Maintain the current Nelson behavior until we determine that cache is needed.
-    .enable_cache = false,
 };
 
 static const struct {
@@ -132,6 +125,19 @@ zx_status_t Nelson::EmmcInit() {
     return encoded.error_value().status();
   }
 
+  fit::result sdmmc_metadata = fidl::Persist(
+      fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
+          // Maintain the current Nelson behavior until we determine that trim is needed.
+          .enable_trim(true)
+          // Maintain the current Nelson behavior until we determine that cache is needed.
+          .enable_cache(false)
+          .Build());
+  if (!sdmmc_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",
+           sdmmc_metadata.error_value().FormatDescription().c_str());
+    return sdmmc_metadata.error_value().status();
+  }
+
   static const std::vector<fpbus::Metadata> emmc_metadata{
       {{
           .type = DEVICE_METADATA_PRIVATE,
@@ -143,10 +149,8 @@ zx_status_t Nelson::EmmcInit() {
           .data = std::move(encoded.value()),
       }},
       {{
-          .type = DEVICE_METADATA_EMMC_CONFIG,
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&emmc_config),
-              reinterpret_cast<const uint8_t*>(&emmc_config) + sizeof(emmc_config)),
+          .type = DEVICE_METADATA_SDMMC,
+          .data = std::move(sdmmc_metadata.value()),
       }},
   };
 

@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDMMC_BLOCK_DEVICE_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDMMC_BLOCK_DEVICE_H_
 
+#include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -45,9 +46,11 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
                             std::unique_ptr<SdmmcBlockDevice>* out_dev);
 
   // Probe for SD first, then MMC.
-  zx_status_t Probe() { return ProbeSd() == ZX_OK ? ZX_OK : ProbeMmc(); }
-  zx_status_t ProbeSd();
-  zx_status_t ProbeMmc();
+  zx_status_t Probe(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
+    return ProbeSd(metadata) == ZX_OK ? ZX_OK : ProbeMmc(metadata);
+  }
+  zx_status_t ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata);
+  zx_status_t ProbeMmc(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata);
 
   zx_status_t AddDevice() TA_EXCL(lock_);
 

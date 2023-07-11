@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDIO_CONTROLLER_DEVICE_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDIO_CONTROLLER_DEVICE_H_
 
+#include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
 #include <fuchsia/hardware/sdio/c/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/sync/completion.h>
@@ -45,7 +46,7 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 
-  zx_status_t Probe();
+  zx_status_t Probe(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata);
   zx_status_t AddDevice();
 
   zx_status_t SdioGetDevHwInfo(uint8_t fn_idx, sdio_hw_info_t* out_hw_info) TA_EXCL(lock_);

@@ -108,8 +108,16 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
     }
   }
 
+  fuchsia_hardware_sdmmc::wire::SdmmcMetadata CreateMetadata() {
+    return fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena_)
+        .enable_trim(true)
+        .enable_cache(true)
+        .removable(false)
+        .Build();
+  }
+
   void AddMmcDevice(bool rpmb = false) {
-    EXPECT_OK(dut_->ProbeMmc());
+    EXPECT_OK(dut_->ProbeMmc(CreateMetadata()));
 
     EXPECT_OK(dut_->AddDevice());
     added_ = true;
@@ -154,7 +162,7 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
       out_response[3] = 0x4000'0000;  // Set CSD_STRUCTURE to indicate SDHC/SDXC.
     });
 
-    EXPECT_OK(dut_->ProbeSd());
+    EXPECT_OK(dut_->ProbeSd(CreateMetadata()));
 
     EXPECT_OK(dut_->AddDevice());
     added_ = true;
@@ -274,6 +282,7 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
   };
   static_assert(FakeSdmmcDevice::kBlockSize % sizeof(kTestData) == 0);
 
+  fidl::Arena<> arena_;
   std::vector<uint8_t> test_block_;
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_rpmb::Rpmb>> binding_;
 };
@@ -941,7 +950,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusRetry) {
   });
 
   SdmmcBlockDevice dut(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
-  EXPECT_OK(dut.ProbeMmc());
+  EXPECT_OK(dut.ProbeMmc(CreateMetadata()));
 }
 
 TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusFail) {
@@ -958,7 +967,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusFail) {
                               [](const sdmmc_req_t& req) { return ZX_ERR_IO_DATA_INTEGRITY; });
 
   SdmmcBlockDevice dut(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
-  EXPECT_NOT_OK(dut.ProbeMmc());
+  EXPECT_NOT_OK(dut.ProbeMmc(CreateMetadata()));
 }
 
 TEST_F(SdmmcBlockDeviceTest, QueryBootPartitions) {
@@ -1174,7 +1183,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHs) {
 
   SdmmcBlockDevice dut(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
   EXPECT_OK(dut.Init());
-  EXPECT_OK(dut.ProbeMmc());
+  EXPECT_OK(dut.ProbeMmc(CreateMetadata()));
 
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HS);
 }
@@ -1197,7 +1206,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHsDdr) {
 
   SdmmcBlockDevice dut(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
   EXPECT_OK(dut.Init());
-  EXPECT_OK(dut.ProbeMmc());
+  EXPECT_OK(dut.ProbeMmc(CreateMetadata()));
 
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HSDDR);
 }
@@ -1239,7 +1248,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeHs400) {
 
   SdmmcBlockDevice dut(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
   EXPECT_OK(dut.Init());
-  EXPECT_OK(dut.ProbeMmc());
+  EXPECT_OK(dut.ProbeMmc(CreateMetadata()));
 
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HS400);
 }

@@ -30,7 +30,7 @@ constexpr uint8_t kCsdStructV2 = 0x1;
 
 namespace sdmmc {
 
-zx_status_t SdmmcBlockDevice::ProbeSd() {
+zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
   sdmmc_.SetRequestRetries(0);
 
   // Issue the SEND_IF_COND command, this will tell us that we can talk to

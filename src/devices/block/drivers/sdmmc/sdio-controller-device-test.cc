@@ -73,9 +73,16 @@ class SdioControllerDeviceTest : public zxtest::Test {
   }
 
  protected:
+  fuchsia_hardware_sdmmc::wire::SdmmcMetadata CreateMetadata() {
+    return fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena_).Build();
+  }
+
   std::shared_ptr<MockDevice> parent_ = MockDevice::FakeRootParent();
   FakeSdmmcDevice sdmmc_;
   std::unique_ptr<SdioControllerDevice> dut_;
+
+ private:
+  fidl::Arena<> arena_;
 };
 
 class SdioScatterGatherTest : public zxtest::Test {
@@ -114,7 +121,9 @@ class SdioScatterGatherTest : public zxtest::Test {
     });
     EXPECT_OK(dut_->Init());
 
-    EXPECT_OK(dut_->Probe());
+    fidl::Arena arena;
+
+    EXPECT_OK(dut_->Probe(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena).Build()));
     EXPECT_OK(dut_->SdioUpdateBlockSize(function, 4, false));
 
     sdmmc_.requests().clear();
@@ -201,7 +210,7 @@ TEST_F(SdioControllerDeviceTest, MultiplexInterrupts) {
   sdmmc_.set_command_callback(SDIO_SEND_OP_COND, [](uint32_t out_response[4]) -> void {
     out_response[0] = OpCondFunctions(7);
   });
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
 
   auto stop_thread = fit::defer([&]() { dut_->StopSdioIrqThread(); });
 
@@ -302,7 +311,7 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
   });
   EXPECT_OK(dut_->Init());
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
   EXPECT_OK(dut_->SdioUpdateBlockSize(3, 0, true));
 
   uint16_t block_size = 0;
@@ -412,7 +421,7 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxnMultiBlock) {
   });
   EXPECT_OK(dut_->Init());
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
   EXPECT_OK(dut_->SdioUpdateBlockSize(7, 0, true));
 
   uint16_t block_size = 0;
@@ -490,7 +499,7 @@ TEST_F(SdioControllerDeviceTest, DdkLifecycle) {
     out_response[0] = OpCondFunctions(4);
   });
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
 
   EXPECT_OK(dut_->AddDevice());
 
@@ -566,7 +575,7 @@ TEST_F(SdioControllerDeviceTest, ProcessCccr) {
   sdmmc_.Write(0x14, std::vector<uint8_t>{0x3f}, 0);  // UHS-I support.
   sdmmc_.Write(0x15, std::vector<uint8_t>{0xb7}, 0);  // Driver strength.
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
   sdio_hw_info_t info = {};
   EXPECT_OK(dut_->SdioGetDevHwInfo(0, &info));
   EXPECT_EQ(info.dev_hw_info.caps,
@@ -579,15 +588,15 @@ TEST_F(SdioControllerDeviceTest, ProcessCccr) {
   sdmmc_.Write(0x14, std::vector<uint8_t>{0x00}, 0);
   sdmmc_.Write(0x15, std::vector<uint8_t>{0x00}, 0);
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
   EXPECT_OK(dut_->SdioGetDevHwInfo(0, &info));
   EXPECT_EQ(info.dev_hw_info.caps, 0);
 
   sdmmc_.Write(0x00, std::vector<uint8_t>{0x41}, 0);
-  EXPECT_NOT_OK(dut_->Probe());
+  EXPECT_NOT_OK(dut_->Probe(CreateMetadata()));
 
   sdmmc_.Write(0x00, std::vector<uint8_t>{0x33}, 0);
-  EXPECT_NOT_OK(dut_->Probe());
+  EXPECT_NOT_OK(dut_->Probe(CreateMetadata()));
 }
 
 TEST_F(SdioControllerDeviceTest, ProcessCis) {
@@ -612,7 +621,7 @@ TEST_F(SdioControllerDeviceTest, ProcessCis) {
   sdmmc_.Write(0x0000'c2b7, std::vector<uint8_t>{0x00, 0x01}, 0);  // Function block size.
   sdmmc_.Write(0x0000'c2d5, std::vector<uint8_t>{0x00}, 0);        // End-of-chain tuple.
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
 
   sdio_hw_info_t info = {};
   EXPECT_OK(dut_->SdioGetDevHwInfo(5, &info));
@@ -654,7 +663,7 @@ TEST_F(SdioControllerDeviceTest, ProcessCisFunction0) {
                },
                0);
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
 
   sdio_hw_info_t info = {};
   EXPECT_OK(dut_->SdioGetDevHwInfo(0, &info));
@@ -677,7 +686,7 @@ TEST_F(SdioControllerDeviceTest, ProcessFbr) {
   sdmmc_.Write(0x601, std::vector<uint8_t>{0xab}, 0);
   sdmmc_.Write(0x700, std::vector<uint8_t>{0x4e}, 0);
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
 
   sdio_hw_info_t info = {};
   EXPECT_OK(dut_->SdioGetDevHwInfo(0, &info));
@@ -705,7 +714,7 @@ TEST_F(SdioControllerDeviceTest, ProbeFail) {
   // to fail.
   sdmmc_.Write(0x0309, std::vector<uint8_t>{0x00, 0x00, 0x00}, 0);
 
-  EXPECT_NOT_OK(dut_->Probe());
+  EXPECT_NOT_OK(dut_->Probe(CreateMetadata()));
 }
 
 TEST_F(SdioControllerDeviceTest, ProbeSdr104) {
@@ -724,7 +733,7 @@ TEST_F(SdioControllerDeviceTest, ProbeSdr104) {
   });
   EXPECT_OK(dut_->Init());
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
 
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
   EXPECT_EQ(sdmmc_.bus_width(), SDMMC_BUS_WIDTH_FOUR);
@@ -747,7 +756,7 @@ TEST_F(SdioControllerDeviceTest, ProbeSdr50LimitedByHost) {
   });
   EXPECT_OK(dut_->Init());
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
 
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
   EXPECT_EQ(sdmmc_.bus_width(), SDMMC_BUS_WIDTH_FOUR);
@@ -771,7 +780,7 @@ TEST_F(SdioControllerDeviceTest, ProbeSdr50LimitedByCard) {
   });
   EXPECT_OK(dut_->Init());
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
 
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
   EXPECT_EQ(sdmmc_.bus_width(), SDMMC_BUS_WIDTH_FOUR);
@@ -797,7 +806,7 @@ TEST_F(SdioControllerDeviceTest, ProbeFallBackToHs) {
   });
   EXPECT_OK(dut_->Init());
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
 
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
   EXPECT_EQ(sdmmc_.bus_width(), SDMMC_BUS_WIDTH_FOUR);
@@ -810,7 +819,7 @@ TEST_F(SdioControllerDeviceTest, ProbeSetVoltage) {
     out_response[0] = OpCondFunctions(5);
   });
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
   // Card does not report 1.8V support so we don't request a change from the host.
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_MAX);
 
@@ -818,7 +827,7 @@ TEST_F(SdioControllerDeviceTest, ProbeSetVoltage) {
     out_response[0] = OpCondFunctions(5) | SDIO_SEND_OP_COND_RESP_S18A;
   });
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
 }
 
@@ -840,7 +849,7 @@ TEST_F(SdioControllerDeviceTest, ProbeRetriesRequests) {
 
   EXPECT_OK(dut_->Init());
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
 }
 
 TEST_F(SdioControllerDeviceTest, IoAbortSetsAbortFlag) {
@@ -848,7 +857,7 @@ TEST_F(SdioControllerDeviceTest, IoAbortSetsAbortFlag) {
     out_response[0] = OpCondFunctions(5);
   });
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
 
   sdmmc_.set_command_callback(SDIO_IO_RW_DIRECT, [](const sdmmc_req_t& req) -> void {
     EXPECT_EQ(req.cmd_idx, SDIO_IO_RW_DIRECT);
@@ -943,7 +952,7 @@ TEST_F(SdioControllerDeviceTest, DifferentManufacturerProductIds) {
                0);
   // clang-format on
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
 
   sdio_hw_info_t info = {};
   EXPECT_OK(dut_->SdioGetDevHwInfo(0, &info));
@@ -1010,7 +1019,7 @@ TEST_F(SdioControllerDeviceTest, FunctionZeroInvalidBlockSize) {
 
   sdmmc_.Write(0x0009, std::vector<uint8_t>{0x00, 0x20, 0x00}, 0);
 
-  EXPECT_NOT_OK(dut_->Probe());
+  EXPECT_NOT_OK(dut_->Probe(CreateMetadata()));
 }
 
 TEST_F(SdioControllerDeviceTest, IOFunctionInvalidBlockSize) {
@@ -1023,7 +1032,7 @@ TEST_F(SdioControllerDeviceTest, IOFunctionInvalidBlockSize) {
 
   sdmmc_.Write(0x0209, std::vector<uint8_t>{0x00, 0x30, 0x00}, 0);
 
-  EXPECT_NOT_OK(dut_->Probe());
+  EXPECT_NOT_OK(dut_->Probe(CreateMetadata()));
 }
 
 TEST_F(SdioControllerDeviceTest, FunctionZeroNoBlockSize) {
@@ -1035,7 +1044,7 @@ TEST_F(SdioControllerDeviceTest, FunctionZeroNoBlockSize) {
 
   sdmmc_.Write(0x0009, std::vector<uint8_t>{0x00, 0x30, 0x00}, 0);
 
-  EXPECT_NOT_OK(dut_->Probe());
+  EXPECT_NOT_OK(dut_->Probe(CreateMetadata()));
 }
 
 TEST_F(SdioControllerDeviceTest, IOFunctionNoBlockSize) {
@@ -1047,7 +1056,7 @@ TEST_F(SdioControllerDeviceTest, IOFunctionNoBlockSize) {
 
   sdmmc_.Write(0x0209, std::vector<uint8_t>{0x00, 0x30, 0x00}, 0);
 
-  EXPECT_NOT_OK(dut_->Probe());
+  EXPECT_NOT_OK(dut_->Probe(CreateMetadata()));
 }
 
 TEST_F(SdioControllerDeviceTest, UpdateBlockSizeMultiBlock) {
@@ -1072,7 +1081,7 @@ TEST_F(SdioControllerDeviceTest, UpdateBlockSizeMultiBlock) {
 
   sdmmc_.Write(0x210, std::vector<uint8_t>{0x00, 0x00}, 0);
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
   EXPECT_EQ(sdmmc_.Read(0x210, 2)[0], 0x00);
   EXPECT_EQ(sdmmc_.Read(0x210, 2)[1], 0x02);
 
@@ -1127,7 +1136,7 @@ TEST_F(SdioControllerDeviceTest, UpdateBlockSizeNoMultiBlock) {
   // Placeholder value that should not get written or returned.
   sdmmc_.Write(0x210, std::vector<uint8_t>{0xa5, 0xa5}, 0);
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
   EXPECT_EQ(sdmmc_.Read(0x210, 2)[0], 0xa5);
   EXPECT_EQ(sdmmc_.Read(0x210, 2)[1], 0xa5);
 
@@ -1501,7 +1510,7 @@ TEST_F(SdioControllerDeviceTest, RequestCardReset) {
   });
   EXPECT_OK(dut_->Init());
 
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
 
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
   EXPECT_EQ(sdmmc_.bus_width(), SDMMC_BUS_WIDTH_FOUR);
@@ -1534,7 +1543,7 @@ TEST_F(SdioControllerDeviceTest, PerformTuning) {
   });
 
   EXPECT_OK(dut_->Init());
-  EXPECT_OK(dut_->Probe());
+  EXPECT_OK(dut_->Probe(CreateMetadata()));
   EXPECT_OK(dut_->AddDevice());
 
   zx_status_t status = ZX_ERR_IO;

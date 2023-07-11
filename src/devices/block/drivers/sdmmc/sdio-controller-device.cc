@@ -70,7 +70,8 @@ zx_status_t SdioControllerDevice::Create(zx_device_t* parent, const SdmmcDevice&
   return ZX_OK;
 }
 
-zx_status_t SdioControllerDevice::Probe() {
+zx_status_t SdioControllerDevice::Probe(
+    const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
   fbl::AutoLock lock(&lock_);
   return ProbeLocked();
 }

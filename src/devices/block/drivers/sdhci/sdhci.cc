@@ -16,6 +16,7 @@
 #include <inttypes.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
+#include <lib/ddk/metadata.h>
 #include <lib/ddk/phys-iter.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/pmt.h>
@@ -1093,7 +1094,7 @@ zx_status_t Sdhci::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  status = dev->DdkAdd("sdhci");
+  status = dev->DdkAdd(ddk::DeviceAddArgs("sdhci").forward_metadata(parent, DEVICE_METADATA_SDMMC));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: SDMMC device_add failed.", __func__);
     dev->irq_.destroy();

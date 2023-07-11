@@ -1167,7 +1167,8 @@ zx_status_t Imx8mSdmmc::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  status = dev->DdkAdd("imx8m-sdmmc");
+  status = dev->DdkAdd(
+      ddk::DeviceAddArgs("imx8m-sdmmc").forward_metadata(parent, DEVICE_METADATA_SDMMC));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: SDMMC device_add failed.", __func__);
     return status;

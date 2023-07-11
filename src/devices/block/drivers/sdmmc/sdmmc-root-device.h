@@ -5,7 +5,9 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDMMC_ROOT_DEVICE_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDMMC_ROOT_DEVICE_H_
 
+#include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
+#include <lib/zx/result.h>
 
 #include <ddktl/device.h>
 
@@ -29,6 +31,11 @@ class SdmmcRootDevice : public SdmmcRootDeviceType {
  private:
   SdmmcRootDevice(zx_device_t* parent, const ddk::SdmmcProtocolClient& host)
       : SdmmcRootDeviceType(parent), host_(host) {}
+
+  // Returns the SDMMC metadata with default values for any fields that are not present (or if the
+  // metadata itself is not present). Returns an error if the metadata could not be decoded.
+  zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>> GetMetadata(
+      fidl::AnyArena& allocator);
 
   const ddk::SdmmcProtocolClient host_;
 };

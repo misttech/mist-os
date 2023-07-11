@@ -6,7 +6,6 @@
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/metadata.h>
 #include <lib/fit/defer.h>
 #include <lib/sdmmc/hw.h>
 #include <lib/zx/time.h>
@@ -14,7 +13,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <ddk/metadata/emmc.h>
 #include <pretty/hexdump.h>
 
 #include "sdmmc-block-device.h"
@@ -290,23 +288,16 @@ bool SdmmcBlockDevice::MmcSupportsHs400() {
   return (device_type & (1 << 6));
 }
 
-zx_status_t SdmmcBlockDevice::ProbeMmc() {
+zx_status_t SdmmcBlockDevice::ProbeMmc(
+    const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
   sdmmc_.SetRequestRetries(10);
 
   auto reset_retries = fit::defer([&sdmmc = sdmmc_]() { sdmmc.SetRequestRetries(0); });
 
-  size_t actual = 0;
-  emmc_config_t config = {};
-  zx_status_t st =
-      device_get_metadata(parent(), DEVICE_METADATA_EMMC_CONFIG, &config, sizeof(config), &actual);
-  if (st != ZX_OK || actual != sizeof(config)) {
-    config.enable_trim = true;   // Default to having trim enabled.
-    config.enable_cache = true;  // Default to having cache enabled.
-  }
-
   // Query OCR
   uint32_t ocr = 0;
-  if ((st = sdmmc_.MmcSendOpCond(ocr, &ocr)) != ZX_OK) {
+  zx_status_t st = sdmmc_.MmcSendOpCond(ocr, &ocr);
+  if (st != ZX_OK) {
     zxlogf(ERROR, "MMC_SEND_OP_COND failed: %s", zx_status_get_string(st));
     return st;
   }
@@ -440,11 +431,12 @@ zx_status_t SdmmcBlockDevice::ProbeMmc() {
          bus_width_, timing_);
 
   // The discard command was added in eMMC 4.5.
-  if (raw_ext_csd_[MMC_EXT_CSD_EXT_CSD_REV] >= MMC_EXT_CSD_EXT_CSD_REV_1_6 && config.enable_trim) {
+  if (raw_ext_csd_[MMC_EXT_CSD_EXT_CSD_REV] >= MMC_EXT_CSD_EXT_CSD_REV_1_6 &&
+      metadata.enable_trim()) {
     block_info_.flags |= FLAG_TRIM_SUPPORT;
   }
 
-  if (GetCacheSizeBits(raw_ext_csd_) && config.enable_cache) {
+  if (GetCacheSizeBits(raw_ext_csd_) && metadata.enable_cache()) {
     // Enable the cache.
     st = MmcDoSwitch(MMC_EXT_CSD_CACHE_CTRL, MMC_EXT_CSD_CACHE_EN_MASK);
     if (st != ZX_OK) {

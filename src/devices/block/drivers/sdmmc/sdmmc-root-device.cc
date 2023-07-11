@@ -7,6 +7,7 @@
 #include <inttypes.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
+#include <lib/ddk/metadata.h>
 
 #include <memory>
 
@@ -41,15 +42,16 @@ zx_status_t SdmmcRootDevice::Bind(void* ctx, zx_device_t* parent) {
 // Returns true if device was successfully added. Returns false if the probe failed (i.e., no
 // eligible device present).
 template <class DeviceType>
-static zx::result<bool> MaybeAddDevice(const std::string& name, zx_device_t* zxdev,
-                                       SdmmcDevice& sdmmc) {
+static zx::result<bool> MaybeAddDevice(
+    const std::string& name, zx_device_t* zxdev, SdmmcDevice& sdmmc,
+    const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
   std::unique_ptr<DeviceType> device;
   if (zx_status_t st = DeviceType::Create(zxdev, sdmmc, &device) != ZX_OK) {
     zxlogf(ERROR, "Failed to create %s device, retcode = %d", name.c_str(), st);
     return zx::error(st);
   }
 
-  if (zx_status_t st = device->Probe(); st != ZX_OK) {
+  if (zx_status_t st = device->Probe(metadata); st != ZX_OK) {
     return zx::ok(false);
   }
 
@@ -59,6 +61,34 @@ static zx::result<bool> MaybeAddDevice(const std::string& name, zx_device_t* zxd
 
   [[maybe_unused]] auto* placeholder = device.release();
   return zx::ok(true);
+}
+
+zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>>
+SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
+  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>(
+      parent(), DEVICE_METADATA_SDMMC);
+  if (decoded.is_error()) {
+    if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
+      zxlogf(INFO, "No metadata provided");
+      return zx::ok(fidl::ObjectView(allocator,
+                                     fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(allocator)
+                                         .enable_trim(true)
+                                         .enable_cache(true)
+                                         .removable(false)
+                                         .Build()));
+    } else {
+      zxlogf(ERROR, "Failed to decode metadata: %s", decoded.status_string());
+      return decoded.take_error();
+    }
+  }
+
+  // Default to trim and cache enabled, non-removable.
+  return zx::ok(fidl::ObjectView(
+      allocator, fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(allocator)
+                     .enable_trim(!decoded->has_enable_trim() || decoded->enable_trim())
+                     .enable_cache(!decoded->has_enable_cache() || decoded->enable_cache())
+                     .removable(decoded->has_removable() && decoded->removable())
+                     .Build()));
 }
 
 void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
@@ -73,6 +103,12 @@ void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
          sdmmc.UseDma() ? 1 : 0, (sdmmc.host_info().caps & SDMMC_HOST_CAP_BUS_WIDTH_8) ? 1 : 0,
          sdmmc.host_info().max_transfer_size);
 
+  fidl::Arena arena;
+  const zx::result metadata = GetMetadata(arena);
+  if (metadata.is_error()) {
+    return txn.Reply(metadata.status_value());
+  }
+
   // Reset the card.
   sdmmc.host().HwReset();
 
@@ -84,13 +120,14 @@ void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
   }
 
   // Probe for SDIO first, then SD/MMC.
-  zx::result<bool> result = MaybeAddDevice<SdioControllerDevice>("sdio", zxdev(), sdmmc);
+  zx::result<bool> result =
+      MaybeAddDevice<SdioControllerDevice>("sdio", zxdev(), sdmmc, **metadata);
   if (result.is_error()) {
     return txn.Reply(result.status_value());
   } else if (*result) {
     return txn.Reply(ZX_OK);
   }
-  result = MaybeAddDevice<SdmmcBlockDevice>("block", zxdev(), sdmmc);
+  result = MaybeAddDevice<SdmmcBlockDevice>("block", zxdev(), sdmmc, **metadata);
   if (result.is_error()) {
     return txn.Reply(result.status_value());
   } else if (*result) {
