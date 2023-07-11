@@ -320,10 +320,12 @@ class BitfieldRef {
   static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");                       \
   static_assert((BIT_HIGH) < sizeof(typename SelfType::ValueType) * CHAR_BIT,                      \
                 "Upper bit is out of range");                                                      \
+  /* NOLINTBEGIN(misc-non-private-member-variables-in-classes) */                                  \
   __NO_UNIQUE_ADDRESS struct {                                                                     \
     struct NAME##Marker {};                                                                        \
     __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker, (COND)> field;              \
   } HWREG_INTERNAL_MEMBER_NAME(NAME) = {{&this->params(), #NAME, (BIT_HIGH), (BIT_LOW)}};          \
+  /* NOLINTEND(misc-non-private-member-variables-in-classes) */                                    \
   template <bool Cond = (COND)>                                                                    \
   hwreg::internal::enable_if_t<Cond, typename SelfType::ValueType, (BIT_HIGH), (BIT_LOW)> NAME()   \
       const {                                                                                      \
@@ -347,10 +349,12 @@ class BitfieldRef {
   static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");                       \
   static_assert((BIT_HIGH) < sizeof(typename SelfType::ValueType) * CHAR_BIT,                      \
                 "Upper bit is out of range");                                                      \
+  /* NOLINTBEGIN(misc-non-private-member-variables-in-classes) */                                  \
   __NO_UNIQUE_ADDRESS struct {                                                                     \
     struct NAME##Marker {};                                                                        \
     __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker, (COND)> field;              \
   } HWREG_INTERNAL_MEMBER_NAME(NAME) = {{&this->params(), #NAME, (BIT_HIGH), (BIT_LOW)}};          \
+  /* NOLINTEND(misc-non-private-member-variables-in-classes) */                                    \
   template <bool Cond = (COND)>                                                                    \
   hwreg::internal::enable_if_t<Cond, typename SelfType::ValueType, (BIT_HIGH), (BIT_LOW)> NAME()   \
       const {                                                                                      \
@@ -376,10 +380,12 @@ class BitfieldRef {
   static_assert((BIT_HIGH) < sizeof(typename SelfType::ValueType) * CHAR_BIT,                      \
                 "Upper bit is out of range");                                                      \
   static_assert(std::is_enum_v<ENUM_TYPE>, "Field type is not an enum");                           \
+  /* NOLINTBEGIN(misc-non-private-member-variables-in-classes) */                                  \
   __NO_UNIQUE_ADDRESS struct {                                                                     \
     struct NAME##Marker {};                                                                        \
     __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker, (COND)> field;              \
   } HWREG_INTERNAL_MEMBER_NAME(NAME) = {{&this->params(), #NAME, (BIT_HIGH), (BIT_LOW)}};          \
+  /* NOLINTEND(misc-non-private-member-variables-in-classes) */                                    \
   template <bool Cond = (COND)>                                                                    \
   hwreg::internal::enable_if_t<Cond, ENUM_TYPE, (BIT_HIGH), (BIT_LOW)> NAME() const {              \
     return static_cast<ENUM_TYPE>(hwreg::BitfieldRef<const typename SelfType::ValueType>(          \
@@ -408,10 +414,13 @@ class BitfieldRef {
   static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");              \
   static_assert((BIT_HIGH) < sizeof(typename SelfType::ValueType) * CHAR_BIT,             \
                 "Upper bit is out of range");                                             \
+  /* NOLINTBEGIN(misc-non-private-member-variables-in-classes) */                         \
   __NO_UNIQUE_ADDRESS struct {                                                            \
     struct RsvdZMarker {};                                                                \
     __NO_UNIQUE_ADDRESS hwreg::internal::RsvdZField<SelfType, RsvdZMarker, (COND)> field; \
-  } HWREG_INTERNAL_MEMBER_NAME(RsvdZ) = {{&this->params(), (BIT_HIGH), (BIT_LOW)}}
+  } HWREG_INTERNAL_MEMBER_NAME(RsvdZ) = {                                                 \
+      {&this->params(), (BIT_HIGH),                                                       \
+       (BIT_LOW)}} /* NOLINTEND(misc-non-private-member-variables-in-classes) */
 
 // Declares single-bit reserved-zero fields in a derived class of RegisterBase<D, T>.
 // This will ensure that on RegisterBase<T>::WriteTo(), reserved-zero bits are
