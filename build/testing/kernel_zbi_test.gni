@@ -121,7 +121,11 @@ template("cuckoo_kernel_zbi_test") {
         if (use_vbmeta) {
           vbmeta = label_for_images_with_toolchain
         }
-        fvm = label_for_images_with_toolchain
+        if (fxfs_blob) {
+          fxfs = label_for_images_with_toolchain
+        } else {
+          fvm = label_for_images_with_toolchain
+        }
       }
       environments = [ emu_env ]
       isolated = true
