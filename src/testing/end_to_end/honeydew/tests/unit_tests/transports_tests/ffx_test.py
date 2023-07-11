@@ -410,7 +410,9 @@ class FfxCliTests(unittest.TestCase):
         ffx.subprocess,
         "check_output",
         side_effect=subprocess.CalledProcessError(
-            returncode=1, cmd="ffx -t fuchsia-emulator target show"),
+            returncode=1,
+            cmd="ffx -t fuchsia-emulator target show",
+            output="command output and error"),
         autospec=True)
     def test_ffx_run_ffx_command_error_exception(
             self, mock_subprocess_check_output) -> None:
@@ -452,7 +454,9 @@ class FfxCliTests(unittest.TestCase):
                         "CalledProcessError",
                     "side_effect":
                         subprocess.CalledProcessError(
-                            returncode=1, cmd="ffx target add 127.0.0.1:8082"),
+                            returncode=1,
+                            cmd="ffx target add 127.0.0.1:8082",
+                            output="command output and error"),
                     "expected":
                         errors.FfxCommandError,
                 },),

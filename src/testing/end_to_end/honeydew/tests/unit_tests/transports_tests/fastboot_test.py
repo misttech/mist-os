@@ -358,10 +358,22 @@ class FastbootTests(unittest.TestCase):
             (
                 {
                     "label":
-                        "FastbootCommandError",
+                        "FastbootCommandError_because_of_FileNotFoundError",
                     "check_output":
                         FileNotFoundError(
                             "No such file or directory: 'fastbot'"),
+                    "expected_exception":
+                        errors.FastbootCommandError
+                },),
+            (
+                {
+                    "label":
+                        "FastbootCommandError_because_of_CalledProcessError",
+                    "check_output":
+                        subprocess.CalledProcessError(
+                            returncode=1,
+                            cmd="fastboot devices",
+                            output="command output and error"),
                     "expected_exception":
                         errors.FastbootCommandError
                 },),

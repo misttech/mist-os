@@ -122,5 +122,14 @@ class SSH:
                 "Output returned by SSH command '%s' is: '%s'", ssh_command,
                 output)
             return output
+        except subprocess.CalledProcessError as err:
+            if err.stdout:
+                _LOGGER.debug(
+                    "stdout returned by the command is: %s", err.stdout)
+            if err.stderr:
+                _LOGGER.debug(
+                    "stderr returned by the command is: %s", err.stdout)
+
+            raise errors.SSHCommandError(err) from err
         except Exception as err:  # pylint: disable=broad-except
             raise errors.SSHCommandError(err) from err

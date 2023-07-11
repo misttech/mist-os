@@ -128,6 +128,10 @@ class FFX:
             _LOGGER.debug(err, exc_info=True)
             raise
         except Exception as err:  # pylint: disable=broad-except
+            if isinstance(err, subprocess.CalledProcessError) and err.stdout:
+                _LOGGER.debug(
+                    "stdout/stderr returned by the command is: %s", err.stdout)
+
             raise errors.FfxCommandError(f"`{cmd}` command failed") from err
 
     def check_connection(self, timeout: float = _TIMEOUTS["FFX_CLI"]) -> None:
@@ -392,12 +396,19 @@ class FFX:
 
             return output
         except Exception as err:  # pylint: disable=broad-except
+            # Catching all exceptions into this broad one because of
+            # `exceptions_to_skip` argument
+
             if isinstance(err, exceptions_to_skip):
                 return ""
 
             if isinstance(err, subprocess.TimeoutExpired):
                 _LOGGER.debug(err, exc_info=True)
                 raise
+
+            if isinstance(err, subprocess.CalledProcessError) and err.stdout:
+                _LOGGER.debug(
+                    "stdout/stderr returned by the command is: %s", err.stdout)
 
             raise errors.FfxCommandError(f"`{ffx_cmd}` command failed") from err
 

@@ -9,6 +9,8 @@ from typing import Any, Dict
 import unittest
 from unittest import mock
 
+from parameterized import parameterized
+
 from honeydew import custom_types
 from honeydew import errors
 from honeydew.transports import ssh
@@ -23,6 +25,16 @@ _MOCK_ARGS: Dict[str, Any] = {
     "target_ssh_address":
         custom_types.TargetSshAddress(ip="11.22.33.44", port=22),
 }
+
+
+def _custom_test_name_func(testcase_func, _, param) -> str:
+    """Custom name function method."""
+    test_func_name: str = testcase_func.__name__
+
+    params_dict: Dict[str, Any] = param.args[0]
+    test_label: str = parameterized.to_safe_name(params_dict["label"])
+
+    return f"{test_func_name}_with_{test_label}"
 
 
 class SshTests(unittest.TestCase):
@@ -79,31 +91,46 @@ class SshTests(unittest.TestCase):
     def test_ssh_run(
             self, mock_get_target_ssh_address, mock_check_output) -> None:
         """Testcase for SSH.run()"""
-        command = "some_command"
-
-        self.assertEqual(self.ssh_obj.run(command=command), "some output")
+        self.assertEqual(
+            self.ssh_obj.run(command="some_command"), "some output")
 
         mock_get_target_ssh_address.assert_called()
         mock_check_output.assert_called()
 
-    @mock.patch.object(
-        ssh.subprocess,
-        "check_output",
-        side_effect=subprocess.CalledProcessError(
-            returncode=1, cmd="ssh fuchsia@12.34.56.78:ls"),
-        autospec=True)
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label":
+                        "CalledProcessError",
+                    "side_effect":
+                        subprocess.CalledProcessError(
+                            returncode=1,
+                            cmd="ssh fuchsia@12.34.56.78:ls",
+                            output="command output",
+                            stderr="command error"),
+                },),
+            (
+                {
+                    "label": "RuntimeError",
+                    "side_effect": RuntimeError("command failed"),
+                },),
+        ],
+        name_func=_custom_test_name_func)
+    @mock.patch.object(ssh.subprocess, "check_output", autospec=True)
     @mock.patch.object(
         ssh.ffx_transport.FFX,
         "get_target_ssh_address",
         return_value=_MOCK_ARGS["target_ssh_address"],
         autospec=True)
     def test_ssh_run_exception(
-            self, mock_get_target_ssh_address, mock_check_output) -> None:
+            self, parameterized_dict, mock_get_target_ssh_address,
+            mock_check_output) -> None:
         """Testcase for SSH.run() raising errors.SSHCommandError exception"""
-        command = "some_command"
+        mock_check_output.side_effect = parameterized_dict["side_effect"]
 
         with self.assertRaises(errors.SSHCommandError):
-            self.ssh_obj.run(command=command)
+            self.ssh_obj.run(command="some_command")
 
         mock_get_target_ssh_address.assert_called()
         mock_check_output.assert_called()

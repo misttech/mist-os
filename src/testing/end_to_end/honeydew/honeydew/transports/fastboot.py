@@ -183,12 +183,19 @@ class Fastboot:
             # 'Finished. Total time: 0.001s'
             return output.split("\n")[:-1]
         except Exception as err:  # pylint: disable=broad-except
+            # Catching all exceptions into this broad one because of
+            # `exceptions_to_skip` argument
+
             if isinstance(err, exceptions_to_skip):
                 return []
 
             if isinstance(err, subprocess.TimeoutExpired):
                 _LOGGER.debug(err, exc_info=True)
                 raise
+
+            if isinstance(err, subprocess.CalledProcessError) and err.stdout:
+                _LOGGER.debug(
+                    "stdout/stderr returned by the command is: %s", err.stdout)
 
             raise errors.FastbootCommandError(
                 f"`{fastboot_cmd}` command failed") from err

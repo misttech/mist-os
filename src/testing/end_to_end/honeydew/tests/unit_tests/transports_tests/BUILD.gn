@@ -27,7 +27,10 @@ if (is_host) {
 
   python_host_test("ssh_test") {
     main_source = "ssh_test.py"
-    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
