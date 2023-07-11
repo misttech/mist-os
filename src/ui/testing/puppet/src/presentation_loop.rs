@@ -51,7 +51,7 @@ pub fn start_flatland_presentation_loop(
                         None => {}
                     }
                 }
-                flatland_event = flatland_event_stream.next().fuse() => {
+                flatland_event = flatland_event_stream.next() => {
                     match flatland_event {
                         Some(Ok(ui_comp::FlatlandEvent::OnNextFrameBegin{ values })) => {
                             let credits = values
