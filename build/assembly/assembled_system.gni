@@ -1175,7 +1175,7 @@ template("assembled_system") {
         images += [
           # ZBI
           {
-            name = image_name
+            name = namespace
             type = "zbi"
 
             forward_variables_from(_common_metadata, "*")
@@ -1194,7 +1194,7 @@ template("assembled_system") {
           images += [
             # BlobFS
             {
-              name = "${image_name}.blob"
+              name = "${namespace}.blob"
               path = rebase_path(files.blobfs, root_build_dir)
               type = "blk"
               forward_variables_from(_common_metadata, "*")
@@ -1203,7 +1203,7 @@ template("assembled_system") {
 
             # FVM
             {
-              name = "${image_name}.fvm"
+              name = "${namespace}.fvm"
               path = rebase_path(files.fvm, root_build_dir)
               type = "blk"
               forward_variables_from(_common_metadata, "*")
@@ -1212,7 +1212,7 @@ template("assembled_system") {
 
             # Sparse FVM
             {
-              name = "${image_name}.fvm_sparse"
+              name = "${namespace}.fvm_sparse"
               path = rebase_path(files.fvm_sparse, root_build_dir)
               type = "blk"
               forward_variables_from(_common_metadata, "*")
@@ -1222,13 +1222,13 @@ template("assembled_system") {
         } else if (generate_fxfs) {
           images += [
             {
-              name = "${image_name}.fxfs"
+              name = "${namespace}.fxfs"
               path = rebase_path(files.fxfs, root_build_dir)
               type = "blk"
               forward_variables_from(_image_overrides["fxfs"], "*")
             },
             {
-              name = "${image_name}.fxfs_sparse"
+              name = "${namespace}.fxfs_sparse"
               path = rebase_path(files.fxfs_sparse, root_build_dir)
               type = "blk"
               forward_variables_from(_image_overrides["fxfs_sparse"], "*")
@@ -1240,7 +1240,7 @@ template("assembled_system") {
         if (sign_zbi) {
           images += [
             {
-              name = image_name
+              name = namespace
               type = "zbi.signed"
 
               forward_variables_from(_common_metadata, "*")
@@ -1262,7 +1262,7 @@ template("assembled_system") {
         if (generate_vbmeta) {
           images += [
             {
-              name = image_name
+              name = namespace
               type = "vbmeta"
               forward_variables_from(_common_metadata, "*")
               if (defined(invoker.output_dir)) {
@@ -1283,7 +1283,7 @@ template("assembled_system") {
         if (generate_fvm && include_fvm_blob_sparse) {
           images += [
             {
-              name = "${image_name}.fvm_blob_sparse"
+              name = "${namespace}.fvm_blob_sparse"
               path = rebase_path(files.fvm_blob_sparse, root_build_dir)
               type = "blk"
               forward_variables_from(_common_metadata, "*")
@@ -1296,7 +1296,7 @@ template("assembled_system") {
         if (generate_fvm_fastboot) {
           images += [
             {
-              name = "${image_name}.fvm_fastboot"
+              name = "${namespace}.fvm_fastboot"
               path = rebase_path(files.fvm_fastboot, root_build_dir)
               type = "blk"
               forward_variables_from(_common_metadata, "*")
