@@ -12,7 +12,7 @@
         {
             type: "expect_failure",
             matchers: [
-                "accept02",
+                // Uses socketcall, which does not exist on x64 or arm.
                 "accept4_01",
                 "acct02",
                 "acl1",
