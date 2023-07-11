@@ -13,7 +13,6 @@
 #include <debug.h>
 #include <inttypes.h>
 #include <lib/arch/x86/boot-cpuid.h>
-#include <lib/arch/x86/lbr.h>
 #include <lib/backtrace/global_cpu_context_exchange.h>
 #include <lib/console.h>
 #include <lib/version.h>
@@ -54,93 +53,6 @@
 #endif
 
 namespace {
-void EnableLbrs(cpu_mask_t mask) {
-  mp_sync_exec(
-      MP_IPI_TARGET_MASK, mask,
-      [](void*) {
-        arch::LbrStack stack(arch::BootCpuidIo{});
-        if (stack.is_supported()) {
-          stack.Enable(hwreg::X86MsrIo{}, false);
-          printf("CPU-%u: LBRs enabled\n", arch_curr_cpu_num());
-        } else {
-          printf("CPU-%u: LBRs are not supported\n", arch_curr_cpu_num());
-        }
-      },
-      nullptr);
-}
-
-void DisableLbrs(cpu_mask_t mask) {
-  mp_sync_exec(
-      MP_IPI_TARGET_MASK, mask,
-      [](void*) {
-        arch::LbrStack stack(arch::BootCpuidIo{});
-        if (stack.is_supported()) {
-          stack.Disable(hwreg::X86MsrIo{});
-          printf("CPU-%u: LBRs disabled\n", arch_curr_cpu_num());
-        } else {
-          printf("CPU-%u: LBRs are not supported\n", arch_curr_cpu_num());
-        }
-      },
-      nullptr);
-}
-
-void DumpLbrs(cpu_num_t cpu_num) {
-  mp_sync_exec(
-      MP_IPI_TARGET_MASK, cpu_num_to_mask(cpu_num),
-      [](void* ctx) {
-        arch::LbrStack stack(arch::BootCpuidIo{});
-        hwreg::X86MsrIo io;
-        uint32_t cpu_num = *reinterpret_cast<uint32_t*>(ctx);
-        if (stack.is_enabled(io)) {
-          PrintSymbolizerContext(stdout);
-          printf("CPU-%u: Last Branch Records (omitting records braching to userspace)\n", cpu_num);
-          stack.ForEachRecord(io, [](const arch::LastBranchRecord& lbr) {
-            // Only include branches that end in the kernel, as we cannot make
-            // sense of any recorded userspace code; we do not know a priori at
-            // which addresses the relevant modules were loaded.
-            if (is_kernel_address(lbr.to)) {
-              printf("from: {{{pc:%#" PRIxPTR "}}}\n", lbr.from);
-              printf("to: {{{pc:%#" PRIxPTR "}}}\n", lbr.to);
-            }
-          });
-        } else {
-          printf("CPU-%u: LBRs are not enabled\n", cpu_num);
-        }
-      },
-      &cpu_num);
-}
-
-int LbrCtrl(int argc, const cmd_args* argv, uint32_t flags) {
-  auto print_usage = [&]() {
-    printf("usage:\n");
-    printf("%s lbr enable [cpu mask = CPU_MASK_ALL]\n", argv[0].str);
-    printf("%s lbr disable [cpu mask = CPU_MASK_ALL]\n", argv[0].str);
-    printf("%s lbr dump [cpu num = 0]\n", argv[0].str);
-  };
-
-  if (argc < 3) {
-    printf("not enough arguments\n");
-    print_usage();
-    return 1;
-  }
-
-  if (!strcmp(argv[2].str, "enable")) {
-    cpu_mask_t mask = (argc > 3) ? static_cast<cpu_mask_t>(argv[3].u) : CPU_MASK_ALL;
-    EnableLbrs(mask);
-  } else if (!strcmp(argv[2].str, "disable")) {
-    cpu_mask_t mask = (argc > 3) ? static_cast<cpu_mask_t>(argv[3].u) : CPU_MASK_ALL;
-    DisableLbrs(mask);
-  } else if (!strcmp(argv[2].str, "dump")) {
-    auto cpu_num = (argc > 3) ? static_cast<cpu_num_t>(argv[3].u) : 0;
-    DumpLbrs(cpu_num);
-  } else {
-    printf("unrecognized subcommand: %s\n", argv[2].str);
-    print_usage();
-    return 1;
-  }
-
-  return 0;
-}
 
 int GetContext(int argc, const cmd_args* argv, uint32_t flags) {
   auto print_usage = [&]() {
@@ -400,8 +312,6 @@ static int cmd_cpu(int argc, const cmd_args* argv, uint32_t flags) {
 
     printf("CPU %lu WRMSR %lxh val %lxh\n", argv[2].u, argv[3].u, argv[4].u);
     write_msr_on_cpu((uint)argv[2].u, (uint)argv[3].u, argv[4].u);
-  } else if (!strcmp(argv[1].str, "lbr")) {
-    return LbrCtrl(argc, argv, flags);
   } else if (!strcmp(argv[1].str, "context")) {
     return GetContext(argc, argv, flags);
   } else {

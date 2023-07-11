@@ -20,7 +20,6 @@ if (is_host) {
       "cpuid-corpus-tests.cc",
       "fake-cpuid-tests.cc",
       "fake-msr-tests.cc",
-      "lbr-tests.cc",
       "nop-tests.cc",
       "power-tests.cc",
       "speculation-tests.cc",
