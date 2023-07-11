@@ -4,7 +4,7 @@
 
 To run all of the semantics tests, build with a configuration such as
 ```
-fx set workstation.<board> --with //src/ui/a11y/bundles:tests
+fx set terminal.<board> --with //src/ui/a11y/bundles:tests
 ```
 
 And run the tests using

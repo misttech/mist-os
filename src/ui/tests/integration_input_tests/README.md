@@ -27,14 +27,6 @@ fx set ... \
   --with //bundles/tests
 ```
 
-To build and run the tests for workstation-based products, include
-the `workstation_tests` test package in your build args directly
-(`fx set ... --with //src/ui/tests/integration_input_tests:workstation_tests`).
-
-Note: Workstation tests are not built transitively via `//bundles/tests`, so
-exercising all tests in this directly requires including both types of test
-targets described above.
-
 ## Running tests
 
 To run these, we can use `fx test` with the name of the corresponding

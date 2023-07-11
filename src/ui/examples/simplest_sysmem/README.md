@@ -11,7 +11,7 @@ NOTE: Currently `ffx session add` does not support passing arguments for `.cm` c
 ## Usage
 
 ```shell
-$ fx set workstation_eng.qemu-x64 --with //src/ui/examples/simplest_sysmem
+$ fx set terminal.qemu-x64 --with //src/ui/examples/simplest_sysmem
 $ fx build
 # Start package server (ex: fx serve)
 # Start the emulator (ex: ffx emu)

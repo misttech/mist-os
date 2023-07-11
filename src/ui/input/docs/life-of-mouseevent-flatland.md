@@ -1,7 +1,7 @@
 # Life of Mouse Event
 
-This document explains how mouse events are processed on the workstation
-product. The first section describes drivers, and subsequent sections work up
+This document explains how mouse events are processed.
+The first section describes drivers, and subsequent sections work up
 the software stack.
 
 ## Driver

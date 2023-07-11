@@ -92,10 +92,10 @@ and yielding (via the `await` operator).
 
 ## Error handling (implementation code)
 
-In the `workstation` product, the input pipeline library runs in the same
-process (`scene_manager`) as the code that sets up Scenic. Hence, if an
-`InputHandler` calls `panic!()` (or methods such as `unwrap()` or `expect()` on
-`None`/`Err` variants), all graphical programs will terminate.
+The input pipeline library runs in the same process (`scene_manager`) as the code
+that sets up Scenic. Hence, if an `InputHandler` calls `panic!()` (or methods
+such as `unwrap()` or `expect()` on `None`/`Err` variants), all graphical programs
+will terminate.
 
 Hence, implementation code should avoid aborting the program, and should,
 instead, propagate errors to its caller (e.g. for callees of `handle_input_event()`),

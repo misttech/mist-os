@@ -6,8 +6,7 @@ on launch.
 Clients can connect to `fuchsia.session.scene.Manager` to interact with the scene graph. Currently,
 clients can set the root view of the scene, and focus views.
 
-The scene manager also currently provides a default input pipeline implementation for the workstation
-product.
+The scene manager also currently provides a default input pipeline implementation.
 
 ## Structured configuration
 

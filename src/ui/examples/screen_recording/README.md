@@ -2,7 +2,7 @@
 
 To run the example:
 
-    fx set workstation_eng.qemu-x64 --with-base //sdk/bundles:tools --with //src/ui/examples/screen_recording
+    fx set terminal.qemu-x64 --with-base //sdk/bundles:tools --with //src/ui/examples/screen_recording
     fx build
     // Start the emulator and log in
     ffx emu start
