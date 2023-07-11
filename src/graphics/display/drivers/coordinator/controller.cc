@@ -13,6 +13,7 @@
 #include <lib/ddk/trace/event.h>
 #include <lib/zbi-format/graphics.h>
 #include <threads.h>
+#include <zircon/assert.h>
 #include <zircon/syscalls.h>
 #include <zircon/threads.h>
 #include <zircon/time.h>
@@ -260,10 +261,12 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
           zxlogf(WARNING, "Ignoring display with no compatible edid timings");
         }
       }
-      if (virtcon_client_ != nullptr && virtcon_client_ready_) {
+      if (virtcon_client_ready_) {
+        ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
         virtcon_client_->OnDisplaysChanged(added_ids, removed_display_ids);
       }
-      if (primary_client_ != nullptr && primary_client_ready_) {
+      if (primary_client_ready_) {
+        ZX_DEBUG_ASSERT(primary_client_ != nullptr);
         primary_client_->OnDisplaysChanged(added_ids, removed_display_ids);
       }
 
@@ -286,11 +289,14 @@ void Controller::DisplayCaptureInterfaceOnCaptureComplete() {
         ReleaseCaptureImage(pending_release_capture_image_id_);
         pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
       }
+
       fbl::AutoLock lock(mtx());
-      if (virtcon_client_ != nullptr && virtcon_client_ready_) {
+      if (virtcon_client_ready_) {
+        ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
         virtcon_client_->OnCaptureComplete();
       }
-      if (primary_client_ && primary_client_ready_) {
+      if (primary_client_ready_) {
+        ZX_DEBUG_ASSERT(primary_client_ != nullptr);
         primary_client_->OnCaptureComplete();
       }
     } else {
@@ -493,8 +499,7 @@ zx_status_t Controller::DisplayControllerInterfaceGetAudioFormat(
   return ZX_OK;
 }
 
-void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
-                             ClientPriority client_priority, ConfigStamp config_stamp,
+void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStamp config_stamp,
                              uint32_t layer_stamp, ClientId client_id) {
   zx_time_t timestamp = zx_clock_get_monotonic();
   last_valid_apply_config_timestamp_ns_property_.Set(timestamp);
@@ -526,8 +531,8 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
 
   {
     fbl::AutoLock lock(mtx());
-    bool switching_client =
-        (client_priority != applied_client_priority_ || client_id != applied_client_id_);
+    bool switching_client = client_id != applied_client_id_;
+
     // The fact that there could already be a vsync waiting to be handled when a config
     // is applied means that a vsync with no handle for a layer could be interpreted as either
     // nothing in the layer has been presented or everything in the layer can be retired. To
@@ -619,7 +624,6 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
       }
     }
 
-    applied_client_priority_ = client_priority;
     applied_layer_stamp_ = layer_stamp;
     applied_client_id_ = client_id;
 
@@ -694,8 +698,10 @@ void Controller::OnClientDead(ClientProxy* client) {
   if (client == virtcon_client_) {
     virtcon_client_ = nullptr;
     virtcon_mode_ = fidl_display::wire::VirtconMode::kInactive;
+    virtcon_client_ready_ = false;
   } else if (client == primary_client_) {
     primary_client_ = nullptr;
+    primary_client_ready_ = false;
   } else {
     ZX_DEBUG_ASSERT_MSG(false, "Dead client is neither vc nor primary\n");
   }
@@ -850,12 +856,14 @@ zx_status_t Controller::CreateClient(
 
   switch (client_priority) {
     case ClientPriority::kVirtcon:
+      ZX_DEBUG_ASSERT(virtcon_client_ == nullptr);
+      ZX_DEBUG_ASSERT(!virtcon_client_ready_);
       virtcon_client_ = client_ptr;
-      virtcon_client_ready_ = false;
       break;
     case ClientPriority::kPrimary:
+      ZX_DEBUG_ASSERT(primary_client_ == nullptr);
+      ZX_DEBUG_ASSERT(!primary_client_ready_);
       primary_client_ = client_ptr;
-      primary_client_ready_ = false;
   }
   HandleClientOwnershipChanges();
 
@@ -884,8 +892,10 @@ zx_status_t Controller::CreateClient(
             }
 
             if (virtcon_client_ == client_ptr) {
+              ZX_DEBUG_ASSERT(!virtcon_client_ready_);
               virtcon_client_ready_ = true;
             } else {
+              ZX_DEBUG_ASSERT(!primary_client_ready_);
               primary_client_ready_ = true;
             }
           }

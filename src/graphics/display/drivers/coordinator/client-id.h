@@ -12,8 +12,13 @@
 namespace display {
 
 // Typesafe unique identifier for an active Coordinator client connection.
+//
+// Each value is uniquely associated with one Coordinator client connection,
+// throughout the Coordinator's entire lifetime. In other words, the Coordinator
+// does not reuse ClientId values.
 DEFINE_STRONG_INT(ClientId, uint64_t);
 
+// Sentinel value that will never be associated with a client connection.
 constexpr ClientId kInvalidClientId(0);
 
 }  // namespace display

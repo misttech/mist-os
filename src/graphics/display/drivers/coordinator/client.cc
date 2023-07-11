@@ -1120,8 +1120,8 @@ void Client::ApplyConfig() {
       dc_configs[dc_idx++] = &c;
     }
 
-    controller_->ApplyConfig(dc_configs, dc_idx, priority_, current_applied_config_stamp,
-                             client_apply_count_, id_);
+    controller_->ApplyConfig(dc_configs, dc_idx, current_applied_config_stamp, client_apply_count_,
+                             id_);
   }
 }
 

@@ -16,6 +16,8 @@
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/vmo.h>
+#include <zircon/compiler.h>
+#include <zircon/time.h>
 
 #include <cstdint>
 #include <functional>
@@ -98,9 +100,8 @@ class Controller : public DeviceType,
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
   void ShowActiveDisplay();
 
-  void ApplyConfig(DisplayConfig* configs[], int32_t count, ClientPriority client_priority,
-                   ConfigStamp config_stamp, uint32_t layer_stamp, ClientId client_id)
-      __TA_EXCLUDES(mtx());
+  void ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStamp config_stamp,
+                   uint32_t layer_stamp, ClientId client_id) __TA_EXCLUDES(mtx());
 
   void ReleaseImage(Image* image);
   void ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id);
@@ -174,7 +175,6 @@ class Controller : public DeviceType,
   bool kernel_framebuffer_released_ = false;
 
   DisplayInfo::Map displays_ __TA_GUARDED(mtx());
-  ClientPriority applied_client_priority_ = ClientPriority::kPrimary;
   uint32_t applied_layer_stamp_ = UINT32_MAX;
   ClientId applied_client_id_ = kInvalidClientId;
   DriverCaptureImageId pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
@@ -183,22 +183,27 @@ class Controller : public DeviceType,
 
   display::DriverBufferCollectionId next_driver_buffer_collection_id_ __TA_GUARDED(mtx()) =
       display::DriverBufferCollectionId(1);
+
+  std::list<std::unique_ptr<ClientProxy>> clients_ __TA_GUARDED(mtx());
   ClientId next_client_id_ __TA_GUARDED(mtx()) = ClientId(1);
+
+  // Pointers to instances owned by `clients_`.
+  ClientProxy* active_client_ __TA_GUARDED(mtx()) = nullptr;
   ClientProxy* virtcon_client_ __TA_GUARDED(mtx()) = nullptr;
-  bool virtcon_client_ready_ __TA_GUARDED(mtx());
   ClientProxy* primary_client_ __TA_GUARDED(mtx()) = nullptr;
-  bool primary_client_ready_ __TA_GUARDED(mtx());
+
+  // True iff the corresponding client can dispatch FIDL events.
+  bool virtcon_client_ready_ __TA_GUARDED(mtx()) = false;
+  bool primary_client_ready_ __TA_GUARDED(mtx()) = false;
+
   fuchsia_hardware_display::wire::VirtconMode virtcon_mode_ __TA_GUARDED(mtx()) =
       fuchsia_hardware_display::wire::VirtconMode::kInactive;
-  ClientProxy* active_client_ __TA_GUARDED(mtx()) = nullptr;
 
   async::Loop loop_;
   thrd_t loop_thread_;
   async_watchdog::Watchdog watchdog_;
   ddk::DisplayControllerImplProtocolClient dc_;
   ddk::DisplayClampRgbImplProtocolClient dc_clamp_rgb_;
-
-  std::list<std::unique_ptr<ClientProxy>> clients_ __TA_GUARDED(mtx());
 
   std::atomic<zx::time> last_vsync_timestamp_{};
   inspect::UintProperty last_vsync_ns_property_;
