@@ -13,7 +13,7 @@ executable("fuzzer-bin") {
     "//src/sys/fuzzing/common/testing:sanitizer",
     "//src/sys/fuzzing/common/tests:fuzzer-lib",
     "//src/sys/fuzzing/realmfuzzer/adapters:llvm",
-    "//src/sys/fuzzing/realmfuzzer/target",
+    "//src/sys/fuzzing/realmfuzzer/target:instrumented",
   ]
   exclude_toolchain_tags = [ "instrumented" ]
 }

@@ -2,9 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Linking this library into a target automatically connects to the engine.
-# See `target_no_hooks` for a library more suitable for testing.
-source_set("target") {
+group("target") {
+  if (is_fuzzer) {
+    deps = [ ":instrumented" ]
+  }
+}
+
+# Linking this source set into a target automatically connects to the engine.
+# See `:no_hooks` for a source set more suitable for testing.
+source_set("instrumented") {
   testonly = true
   sources = [ "instrumented-process.cc" ]
   public_deps = [ ":no_hooks" ]

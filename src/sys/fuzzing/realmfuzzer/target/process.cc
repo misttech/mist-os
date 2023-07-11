@@ -131,8 +131,6 @@ Process::Process(ExecutorPtr executor)
   gContext.process = this;
 }
 
-Process::~Process() { memset(&gContext, 0, sizeof(gContext)); }
-
 void Process::AddCounters(CountersInfo counters) {
   // Ensure the AsyncDeque is only accessed from the dispatcher thread.
   auto task =

@@ -66,7 +66,7 @@ using PCsInfo = ModuleInfo<const uintptr_t>;
 class Process final {
  public:
   explicit Process(ExecutorPtr executor);
-  ~Process();
+  ~Process() = default;
 
   // Installs the hook functions above in the process' overall global, static context. The methods
   // used, e.g. |__sanitizer_set_death_callback|, do not have corresponding methods to unset the

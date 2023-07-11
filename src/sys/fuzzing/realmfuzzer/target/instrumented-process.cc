@@ -45,7 +45,7 @@ class InstrumentedProcess final {
     }
   }
 
-  ~InstrumentedProcess() { FX_NOTREACHED(); }
+  ~InstrumentedProcess() = default;
 
  private:
   std::unique_ptr<ComponentContext> context_;
