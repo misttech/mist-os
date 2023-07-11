@@ -115,6 +115,7 @@
             to: "#feedback",
             dependency: "weak",
             source_availability: "unknown",
+            availability: "optional",
         },
         {
             protocol: "fuchsia.ui.composition.Screenshot",

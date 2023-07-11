@@ -1274,6 +1274,24 @@ assembly_input_bundle("omaha_client") {
   ]
 }
 
+# Used on builds that do not include an update checker, i.e. neither system_update_checker nor omaha_client.
+# This is needed to expose the update protocols from `void` in #system-update.
+assembly_input_bundle("no_update_checker") {
+  compiled_packages = [
+    {
+      name = "system-update-realm"
+      component_shards = [
+        {
+          component_name = "system-update-realm"
+          shards = rebase_path(
+                  [ "//src/sys/pkg/meta/no_update_checker.system_update_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # AIB to enable virtualization support.
 #
 # optional: product must specify its inclusion

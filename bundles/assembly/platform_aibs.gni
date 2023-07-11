@@ -31,6 +31,9 @@ bootstrap_user_platform_aib_names = [
 
   # Emulator Support
   "emulator_support",
+
+  # SWD (Software Delivery)
+  "no_update_checker",
 ]
 
 # These are the userdebug platform AIBs that are used by bootstrap
@@ -42,6 +45,9 @@ bootstrap_userdebug_platform_aib_names = [
 
   # Kernel args
   "kernel_args_userdebug",
+
+  # SWD (Software Delivery)
+  "no_update_checker",
 ]
 
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap
@@ -53,6 +59,9 @@ bootstrap_eng_platform_aib_names = [
 
   # Kernel args
   "kernel_args_eng",
+
+  # SWD (Software Delivery)
+  "no_update_checker",
 ]
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
