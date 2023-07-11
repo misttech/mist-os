@@ -264,17 +264,17 @@ VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, metadata_bytes, 104, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, committed_change_events, 112, 8);
 
 VALIDATE_TYPE_SIZE_ALIGNMENT(zx_info_vmo_v1_t, 104, 8);
-VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, koid, 0, 8);
-VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, name, 8, 32);
-VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, size_bytes, 40, 8);
-VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, parent_koid, 48, 8);
-VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, num_children, 56, 8);
-VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, num_mappings, 64, 8);
-VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, share_count, 72, 8);
-VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, flags, 80, 4);
-VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, committed_bytes, 88, 8);
-VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, handle_rights, 96, 4);
-VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, cache_policy, 100, 4);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_v1_t, koid, 0, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_v1_t, name, 8, 32);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_v1_t, size_bytes, 40, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_v1_t, parent_koid, 48, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_v1_t, num_children, 56, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_v1_t, num_mappings, 64, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_v1_t, share_count, 72, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_v1_t, flags, 80, 4);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_v1_t, committed_bytes, 88, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_v1_t, handle_rights, 96, 4);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_v1_t, cache_policy, 100, 4);
 
 VALIDATE_TYPE_SIZE_ALIGNMENT(zx_pci_bar_t, 24, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_pci_bar_t, id, 0, 4);
