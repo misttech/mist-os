@@ -95,10 +95,7 @@ bind_test("zxcrypt-bind-test") {
 }
 
 test("device-manager-test-bin") {
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
+  configs += [ "//build/config:all_source" ]
   output_name = "device-manager-test"
   sources = [ "device-manager-test.cc" ]
   deps = [

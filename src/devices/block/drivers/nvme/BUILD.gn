@@ -81,7 +81,6 @@ fuchsia_unittest_component("nvme-queue-tests") {
 }
 
 test("nvme-queue-pair-tests-bin") {
-  configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
   sources = [
     "queue-pair-test.cc",
     "queue-pair.cc",

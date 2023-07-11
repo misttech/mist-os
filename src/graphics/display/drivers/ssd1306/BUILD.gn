@@ -51,10 +51,7 @@ test("ssd1306-test") {
     "test.cc",
   ]
 
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
+  configs += [ "//build/config:all_source" ]
 
   deps = [
     ":ssd1306-bind",

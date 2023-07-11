@@ -18,7 +18,6 @@ group("tests") {
 }
 
 test("ddktl-test") {
-  configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
   sources = [
     "composite-node-spec-tests.cc",
     "device-tests.cc",
