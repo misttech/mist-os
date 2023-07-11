@@ -192,6 +192,10 @@ impl FileOps for LoopDeviceFile {
                 current_task.mm.write_object(user_size, &size)?;
                 Ok(SUCCESS)
             }
+            BLKFLSBUF => {
+                not_implemented!("Loop device does not implement BLKFLSBUF");
+                Ok(SUCCESS)
+            }
             LOOP_SET_FD => {
                 let fd = arg.into();
                 let backing_file = current_task.files.get_unless_opath(fd)?;
