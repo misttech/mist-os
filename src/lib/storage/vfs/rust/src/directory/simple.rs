@@ -325,32 +325,34 @@ where
                             None => TraversalPosition::End,
                             Some(first_name) => TraversalPosition::Name(first_name.clone().into()),
                         };
-                        return Ok((new_pos, sealed.into()));
+                        return Ok((new_pos, sealed));
                     }
                 }
             }
 
             TraversalPosition::Name(next_name) => {
-                // TODO(fxbug.dev/130228): TraversalPosition::Name should take Name not String.
-                let next: Name = next_name.to_owned().try_into()?;
+                // The only way to get a `TraversalPosition::Name` is if we returned it in the
+                // `AppendResult::Sealed` code path above. Therefore, the conversion from
+                // `next_name` to `Name` will never fail in practice.
+                let next: Name = next_name.to_owned().try_into().unwrap();
                 (sink, this.entries.range::<Name, _>(next..))
             }
 
             TraversalPosition::Index(_) => unreachable!(),
 
-            TraversalPosition::End => return Ok((TraversalPosition::End, sink.seal().into())),
+            TraversalPosition::End => return Ok((TraversalPosition::End, sink.seal())),
         };
 
         for (name, entry) in entries_iter {
             match sink.append(&entry.entry_info(), &name) {
                 AppendResult::Ok(new_sink) => sink = new_sink,
                 AppendResult::Sealed(sealed) => {
-                    return Ok((TraversalPosition::Name(name.clone().into()), sealed.into()));
+                    return Ok((TraversalPosition::Name(name.clone().into()), sealed));
                 }
             }
         }
 
-        Ok((TraversalPosition::End, sink.seal().into()))
+        Ok((TraversalPosition::End, sink.seal()))
     }
 
     fn register_watcher(
