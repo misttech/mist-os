@@ -403,8 +403,12 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
     const fuchsia::hardware::display::ImageId fidl_image_id =
         allocation::ToFidlImageId(metadata.identifier);
     const auto status = (*display_coordinator_)
-                            ->ImportImage(image_config, display_collection_id, fidl_image_id,
-                                          metadata.vmo_index, &import_image_status);
+                            ->ImportImage(image_config, /*buffer_id=*/
+                                          {
+                                              .buffer_collection_id = display_collection_id,
+                                              .buffer_index = metadata.vmo_index,
+                                          },
+                                          fidl_image_id, &import_image_status);
     FX_DCHECK(status == ZX_OK);
   }
 

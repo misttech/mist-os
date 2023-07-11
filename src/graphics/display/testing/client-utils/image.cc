@@ -502,8 +502,12 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, display::Im
   fhd::wire::ImageConfig image_config;
   GetConfig(&image_config);
   const fidl::WireResult import_result =
-      dc->ImportImage(image_config, display::ToFidlBufferCollectionId(collection_id_),
-                      display::ToFidlImageId(image_id), /*index=*/0);
+      dc->ImportImage(image_config,
+                      fhd::wire::BufferId{
+                          .buffer_collection_id = display::ToFidlBufferCollectionId(collection_id_),
+                          .buffer_index = 0,
+                      },
+                      display::ToFidlImageId(image_id));
   if (!import_result.ok()) {
     printf("Failed to import image: %s\n", import_result.FormatDescription().c_str());
     return false;

@@ -562,10 +562,13 @@ TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
   constexpr ImageId image_id = kInvalidImageId;
   constexpr BufferCollectionId buffer_collection_id(0xffeeeedd);
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
-      client.dc_->ImportImage(client.displays_[0].image_config_,
-                              ToFidlBufferCollectionId(buffer_collection_id),
-                              ToFidlImageId(image_id),
-                              /*index=*/0);
+      client.dc_->ImportImage(
+          client.displays_[0].image_config_,
+          fuchsia_hardware_display::wire::BufferId{
+              .buffer_collection_id = ToFidlBufferCollectionId(buffer_collection_id),
+              .buffer_index = 0,
+          },
+          ToFidlImageId(image_id));
   ASSERT_OK(import_image_reply.status());
   EXPECT_NE(ZX_OK, import_image_reply.value().res);
 }
@@ -579,10 +582,13 @@ TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
   constexpr BufferCollectionId kNonExistentCollectionId(0xffeeeedd);
   constexpr ImageId image_id(1);
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
-      client.dc_->ImportImage(client.displays_[0].image_config_,
-                              ToFidlBufferCollectionId(kNonExistentCollectionId),
-                              ToFidlImageId(image_id),
-                              /*index=*/0);
+      client.dc_->ImportImage(
+          client.displays_[0].image_config_,
+          fuchsia_hardware_display::wire::BufferId{
+              .buffer_collection_id = ToFidlBufferCollectionId(kNonExistentCollectionId),
+              .buffer_index = 0,
+          },
+          ToFidlImageId(image_id));
   ASSERT_OK(import_image_reply.status());
   EXPECT_NE(ZX_OK, import_image_reply.value().res);
 }

@@ -52,9 +52,8 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   MOCK_METHOD(void, ReleaseBufferCollection, (fuchsia::hardware::display::BufferCollectionId));
 
   MOCK_METHOD(void, ImportImage,
-              (fuchsia::hardware::display::ImageConfig,
-               fuchsia::hardware::display::BufferCollectionId, fuchsia::hardware::display::ImageId,
-               uint32_t, ImportImageCallback));
+              (fuchsia::hardware::display::ImageConfig, fuchsia::hardware::display::BufferId,
+               fuchsia::hardware::display::ImageId, ImportImageCallback));
 
   MOCK_METHOD(void, ReleaseImage, (fuchsia::hardware::display::ImageId));
 

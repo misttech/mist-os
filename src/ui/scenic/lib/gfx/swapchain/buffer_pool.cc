@@ -351,7 +351,12 @@ bool BufferPool::CreateBuffers(size_t count, BufferPool::Environment* environmen
     zx_status_t import_image_status = ZX_OK;
     zx_status_t transport_status =
         (*environment->display_coordinator)
-            ->ImportImage(image_config_, display_collection_id, buffer.id, i, &import_image_status);
+            ->ImportImage(image_config_, /*buffer_id=*/
+                          {
+                              .buffer_collection_id = display_collection_id,
+                              .buffer_index = i,
+                          },
+                          buffer.id, &import_image_status);
     if (transport_status != ZX_OK) {
       buffer.id = {.value = fuchsia::hardware::display::INVALID_DISP_ID};
       FX_PLOGS(ERROR, transport_status) << "Importing image FIDL call failed.";

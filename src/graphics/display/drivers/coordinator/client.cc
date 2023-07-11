@@ -46,6 +46,7 @@
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
@@ -103,24 +104,22 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   }
 
   if (request->image_config.type == fuchsia_hardware_display::wire::kTypeCapture) {
-    completer.Reply(ImportImageForCapture(request->image_config,
-                                          ToBufferCollectionId(request->buffer_collection_id),
-                                          request->buffer_index, image_id));
+    completer.Reply(
+        ImportImageForCapture(request->image_config, ToBufferId(request->buffer_id), image_id));
     return;
   }
-  completer.Reply(ImportImageForDisplay(request->image_config,
-                                        ToBufferCollectionId(request->buffer_collection_id),
-                                        request->buffer_index, image_id));
+  completer.Reply(
+      ImportImageForDisplay(request->image_config, ToBufferId(request->buffer_id), image_id));
 }
 
 zx_status_t Client::ImportImageForDisplay(
-    const fuchsia_hardware_display::wire::ImageConfig& image_config,
-    BufferCollectionId buffer_collection_id, uint32_t index, ImageId image_id) {
+    const fuchsia_hardware_display::wire::ImageConfig& image_config, BufferId buffer_id,
+    ImageId image_id) {
   ZX_DEBUG_ASSERT(image_config.type != fuchsia_hardware_display::wire::kTypeCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
 
-  auto collection_map_it = collection_map_.find(buffer_collection_id);
+  auto collection_map_it = collection_map_.find(buffer_id.buffer_collection_id);
   if (collection_map_it == collection_map_.end()) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -133,8 +132,8 @@ zx_status_t Client::ImportImageForDisplay(
 
   const uint64_t banjo_driver_buffer_collection_id =
       display::ToBanjoDriverBufferCollectionId(collections.driver_buffer_collection_id);
-  zx_status_t status =
-      controller_->dc()->ImportImage(&dc_image, banjo_driver_buffer_collection_id, index);
+  zx_status_t status = controller_->dc()->ImportImage(&dc_image, banjo_driver_buffer_collection_id,
+                                                      buffer_id.buffer_index);
   if (status != ZX_OK) {
     return status;
   }
@@ -765,8 +764,8 @@ void Client::IsCaptureSupported(IsCaptureSupportedCompleter::Sync& completer) {
 }
 
 zx_status_t Client::ImportImageForCapture(
-    const fuchsia_hardware_display::wire::ImageConfig& image_config,
-    BufferCollectionId buffer_collection_id, uint32_t index, ImageId image_id) {
+    const fuchsia_hardware_display::wire::ImageConfig& image_config, BufferId buffer_id,
+    ImageId image_id) {
   ZX_DEBUG_ASSERT(image_config.type == fuchsia_hardware_display::wire::kTypeCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
@@ -777,7 +776,7 @@ zx_status_t Client::ImportImageForCapture(
   }
 
   // Ensure a previously imported collection id is being used for import.
-  auto it = collection_map_.find(buffer_collection_id);
+  auto it = collection_map_.find(buffer_id.buffer_collection_id);
   if (it == collection_map_.end()) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -787,7 +786,7 @@ zx_status_t Client::ImportImageForCapture(
 
   uint64_t banjo_driver_capture_image_id = INVALID_ID;
   zx_status_t status = controller_->dc()->ImportImageForCapture(
-      banjo_driver_buffer_collection_id, index, &banjo_driver_capture_image_id);
+      banjo_driver_buffer_collection_id, buffer_id.buffer_index, &banjo_driver_capture_image_id);
   if (status != ZX_OK) {
     return status;
   }

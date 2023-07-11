@@ -50,9 +50,8 @@ closed protocol Coordinator {
     /// `ImportImage()` without a corresponding `ReleaseImage()`.
     strict ImportImage(struct {
         image_config ImageConfig;
-        buffer_collection_id BufferCollectionId;
+        buffer_id BufferId;
         image_id ImageId;
-        buffer_index uint32;
     }) -> (struct {
         res zx.Status;
     });

@@ -455,9 +455,13 @@ zx_status_t capture_setup() {
   capture_vmo = std::move(wait_resp.value().buffer_collection_info.buffers[0].vmo);
   // import image for capture
   fhd::wire::ImageConfig capture_cfg = {};  // will contain a handle
-  fidl::WireResult import_capture_result =
-      dc->ImportImage(capture_cfg, display::ToFidlBufferCollectionId(kBufferCollectionId),
-                      display::ToFidlImageId(kCaptureImageId), 0);
+  fidl::WireResult import_capture_result = dc->ImportImage(
+      capture_cfg,
+      fhd::wire::BufferId{
+          .buffer_collection_id = display::ToFidlBufferCollectionId(kBufferCollectionId),
+          .buffer_index = 0,
+      },
+      display::ToFidlImageId(kCaptureImageId));
   if (import_capture_result.status() != ZX_OK) {
     printf("Failed to start capture: %s\n", import_capture_result.FormatDescription().c_str());
     return import_capture_result.status();

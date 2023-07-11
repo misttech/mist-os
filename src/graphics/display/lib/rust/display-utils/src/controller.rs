@@ -22,7 +22,7 @@ use {
 use crate::{
     config::{DisplayConfig, LayerConfig},
     error::{ConfigError, Error, Result},
-    types::{CollectionId, DisplayId, DisplayInfo, Event, EventId, ImageId, LayerId},
+    types::{BufferId, CollectionId, DisplayId, DisplayInfo, Event, EventId, ImageId, LayerId},
     INVALID_EVENT_ID,
 };
 
@@ -299,8 +299,10 @@ impl Coordinator {
         image_id: ImageId,
         config: display::ImageConfig,
     ) -> Result<()> {
-        let result =
-            self.proxy().import_image(&config, &collection_id.into(), &image_id.into(), 0).await?;
+        let result = self
+            .proxy()
+            .import_image(&config, &BufferId::new(collection_id, 0).into(), &image_id.into())
+            .await?;
         zx::Status::ok(result)?;
         Ok(())
     }

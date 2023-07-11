@@ -196,9 +196,12 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   allocation::GlobalImageId display_image_id = allocation::GenerateUniqueImageId();
   zx_status_t import_image_status = ZX_OK;
   (*display_coordinator.get())
-      ->ImportImage(image_config, display_collection_id,
-                    allocation::ToFidlImageId(display_image_id), /*vmo_index*/ 0,
-                    &import_image_status);
+      ->ImportImage(image_config, /*buffer_id=*/
+                    {
+                        .buffer_collection_id = display_collection_id,
+                        .buffer_index = 0,
+                    },
+                    allocation::ToFidlImageId(display_image_id), &import_image_status);
   EXPECT_EQ(import_image_status, ZX_OK);
 }
 
@@ -253,8 +256,12 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
     zx_status_t import_image_status = ZX_OK;
     auto transport_status =
         (*display_coordinator.get())
-            ->ImportImage(image_config, display_collection_id,
-                          allocation::ToFidlImageId(image_ids[i]), i, &import_image_status);
+            ->ImportImage(image_config, /*buffer_id=*/
+                          {
+                              .buffer_collection_id = display_collection_id,
+                              .buffer_index = i,
+                          },
+                          allocation::ToFidlImageId(image_ids[i]), &import_image_status);
     ASSERT_EQ(transport_status, ZX_OK);
     ASSERT_EQ(import_image_status, ZX_OK);
     ASSERT_NE(image_ids[i], fuchsia::hardware::display::INVALID_DISP_ID);

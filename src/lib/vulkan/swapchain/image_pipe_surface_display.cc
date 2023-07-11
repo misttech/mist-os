@@ -489,8 +489,12 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
 
     uint32_t image_id = next_image_id();
     const fuchsia::hardware::display::ImageId fidl_image_id = ToFidlImageId(image_id);
-    display_coordinator_->ImportImage(image_config, kBufferCollectionId, fidl_image_id, i,
-                                      [this, &status](zx_status_t import_status) {
+    display_coordinator_->ImportImage(image_config, /*buffer_id=*/
+                                      {
+                                          .buffer_collection_id = kBufferCollectionId,
+                                          .buffer_index = i,
+                                      },
+                                      fidl_image_id, [this, &status](zx_status_t import_status) {
                                         status = import_status;
                                         got_message_response_ = true;
                                       });

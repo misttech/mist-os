@@ -51,6 +51,7 @@
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
@@ -288,8 +289,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // `image_id` must be unused and `image_config` contains metadata for an
   // image used for display.
   zx_status_t ImportImageForDisplay(const fuchsia_hardware_display::wire::ImageConfig& image_config,
-                                    BufferCollectionId buffer_collection_id, uint32_t buffer_index,
-                                    ImageId image_id);
+                                    BufferId buffer_id, ImageId image_id);
 
   // `fuchsia.hardware.display/Coordinator.ImportImage()` helper for capture
   // images.
@@ -297,8 +297,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // `image_id` must be unused and `image_config` contains metadata for an
   // image used for capture.
   zx_status_t ImportImageForCapture(const fuchsia_hardware_display::wire::ImageConfig& image_config,
-                                    BufferCollectionId buffer_collection_id, uint32_t buffer_index,
-                                    ImageId image_id);
+                                    BufferId buffer_id, ImageId image_id);
 
   Controller* const controller_;
   ClientProxy* const proxy_;

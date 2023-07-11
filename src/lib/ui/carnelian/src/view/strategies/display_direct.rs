@@ -22,7 +22,8 @@ use crate::{
 use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
 use display_utils::{
-    CollectionId, EventId, ImageId as DisplayImageId, LayerId, PixelFormat, INVALID_LAYER_ID,
+    BufferId, CollectionId, EventId, ImageId as DisplayImageId, LayerId, PixelFormat,
+    INVALID_LAYER_ID,
 };
 use euclid::size2;
 use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy, ImageConfig};
@@ -365,9 +366,8 @@ impl DisplayDirectViewStrategy {
                 .coordinator
                 .import_image(
                     &image_config,
-                    &collection_id.into(),
+                    &BufferId::new(collection_id, uindex).into(),
                     &display_image_id.into(),
-                    uindex,
                 )
                 .await
                 .context("coordinator import_image")?;

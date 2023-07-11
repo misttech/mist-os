@@ -431,7 +431,12 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
 
   const ImageId image_id = next_image_id_++;
   const fhd::wire::ImageId fidl_image_id = ToFidlImageId(image_id);
-  auto import_result = dc_->ImportImage(image_config, fidl_display_collection_id, fidl_image_id, 0);
+  auto import_result = dc_->ImportImage(image_config,
+                                        fhd::wire::BufferId{
+                                            .buffer_collection_id = fidl_display_collection_id,
+                                            .buffer_index = 0,
+                                        },
+                                        fidl_image_id);
   if (!import_result.ok() || import_result.value().res != ZX_OK) {
     zxlogf(ERROR, "Importing image failed (fidl=%d, res=%d)", import_result.status(),
            import_result.value().res);
