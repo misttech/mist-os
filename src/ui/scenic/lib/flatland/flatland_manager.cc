@@ -314,7 +314,6 @@ void FlatlandManager::OnFramePresented(
 
     // Skip sessions that have exited since their frame was rendered.
     if (instance_kv == flatland_instances_.end()) {
-      FX_LOGS(INFO) << "Skipping SendFramePresented(): session " << session_id << " not found.";
       continue;
     }
 
