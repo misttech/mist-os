@@ -5,9 +5,9 @@
 #ifndef SRC_UI_INPUT_DRIVERS_GT6853_GT6853_H_
 #define SRC_UI_INPUT_DRIVERS_GT6853_GT6853_H_
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <fidl/fuchsia.mem/cpp/wire.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/device-protocol/i2c-channel.h>
@@ -74,12 +74,13 @@ class Gt6853Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_IN
   Gt6853Device(zx_device_t* parent, ddk::I2cChannel i2c)
       : Gt6853Device(parent, std::move(i2c), {}, {}) {}
 
-  Gt6853Device(zx_device_t* parent, ddk::I2cChannel i2c, ddk::GpioProtocolClient interrupt_gpio,
-               ddk::GpioProtocolClient reset_gpio)
+  Gt6853Device(zx_device_t* parent, ddk::I2cChannel i2c,
+               fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> interrupt_gpio,
+               fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio)
       : DeviceType(parent),
         i2c_(std::move(i2c)),
-        interrupt_gpio_(interrupt_gpio),
-        reset_gpio_(reset_gpio),
+        interrupt_gpio_(std::move(interrupt_gpio)),
+        reset_gpio_(std::move(reset_gpio)),
         loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
   ~Gt6853Device() override = default;
 
@@ -153,8 +154,8 @@ class Gt6853Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_IN
   void Shutdown();  // Only called after thread_ has been started.
 
   ddk::I2cChannel i2c_;
-  ddk::GpioProtocolClient interrupt_gpio_;
-  ddk::GpioProtocolClient reset_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> interrupt_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> reset_gpio_;
   zx::interrupt interrupt_;
 
   thrd_t thread_ = {};

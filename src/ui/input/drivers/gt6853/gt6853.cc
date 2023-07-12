@@ -89,20 +89,27 @@ zx_status_t Gt6853Device::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  ddk::GpioProtocolClient interrupt_gpio(parent, "gpio-int");
-  if (!interrupt_gpio.is_valid()) {
-    zxlogf(ERROR, "Failed to get interrupt GPIO fragment");
+  const char* kGpioInterruptFragmentName = "gpio-int";
+  zx::result interrupt_gpio =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+          parent, kGpioInterruptFragmentName);
+  if (interrupt_gpio.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol from framgnet %s: %s", kGpioInterruptFragmentName,
+           interrupt_gpio.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
 
-  ddk::GpioProtocolClient reset_gpio(parent, "gpio-reset");
-  if (!reset_gpio.is_valid()) {
-    zxlogf(ERROR, "Failed to get reset GPIO fragment");
+  const char* kGpioResetFragmentName = "gpio-reset";
+  zx::result reset_gpio = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      parent, kGpioResetFragmentName);
+  if (reset_gpio.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol from framgnet %s: %s", kGpioResetFragmentName,
+           reset_gpio.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
 
-  std::unique_ptr<Gt6853Device> device =
-      std::make_unique<Gt6853Device>(parent, std::move(i2c), interrupt_gpio, reset_gpio);
+  std::unique_ptr<Gt6853Device> device = std::make_unique<Gt6853Device>(
+      parent, std::move(i2c), std::move(interrupt_gpio.value()), std::move(reset_gpio.value()));
   if (!device) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -224,22 +231,39 @@ zx_status_t Gt6853Device::Init() {
   total_report_count_ = metrics_root_.CreateUint("total_report_count", 0);
   last_event_timestamp_ = metrics_root_.CreateUint("last_event_timestamp", 0);
 
-  zx_status_t status = interrupt_gpio_.ConfigIn(GPIO_NO_PULL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ConfigIn failed: %d", status);
-    return status;
+  {
+    fidl::WireResult result = interrupt_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigIn request to interrupt gpio: %s",
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure interrupt gpio to input: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
-  if ((status = interrupt_gpio_.GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW, &interrupt_)) != ZX_OK) {
-    zxlogf(ERROR, "GetInterrupt failed: %d", status);
-    return status;
+  fidl::WireResult interrupt_result = interrupt_gpio_->GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW);
+  if (!interrupt_result.ok()) {
+    zxlogf(ERROR, "Failed to send GetInterrupt request to interrupt gpio: %s",
+           interrupt_result.status_string());
+    return interrupt_result.status();
   }
+  if (interrupt_result->is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt from interrupt gpio: %s",
+           zx_status_get_string(interrupt_result->error_value()));
+    return interrupt_result->error_value();
+  }
+  interrupt_ = std::move(interrupt_result.value()->irq);
 
   zx::result<fuchsia_mem::wire::Range> config = GetConfigFileVmo();
   if (config.is_error()) {
     return config.status_value();
   }
 
+  zx_status_t status;
   if (config->vmo.is_valid()) {
     if ((status = UpdateFirmwareIfNeeded()) != ZX_OK) {
       firmware_status_.Set("failed");
@@ -652,9 +676,31 @@ zx_status_t Gt6853Device::PrepareFirmwareUpdate(
     return status.error_value();
   }
 
-  reset_gpio_.ConfigOut(0);
+  {
+    fidl::WireResult result = reset_gpio_->ConfigOut(0);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigOut request to reset gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure reset gpio to output: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
   zx::nanosleep(zx::deadline_after(kResetSetupTime));
-  reset_gpio_.Write(1);
+  {
+    fidl::WireResult result = reset_gpio_->Write(1);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to write to reset gpio: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
   zx::nanosleep(zx::deadline_after(kResetHoldTime));
 
   for (int i = 0; i < kHoldSs51Tries; i++) {
@@ -897,9 +943,31 @@ zx_status_t Gt6853Device::FinishFirmwareUpdate() {
     return status.error_value();
   }
 
-  reset_gpio_.Write(0);
+  {
+    fidl::WireResult result = reset_gpio_->Write(0);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to write to reset gpio: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
   zx::nanosleep(zx::deadline_after(kResetSetupTime));
-  reset_gpio_.Write(1);
+  {
+    fidl::WireResult result = reset_gpio_->Write(1);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to write to reset gpio: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
   zx::nanosleep(zx::deadline_after(kResetHoldTime));
 
   zxlogf(INFO, "Updated firmware, reset IC");

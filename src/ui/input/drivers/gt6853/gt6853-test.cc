@@ -5,9 +5,9 @@
 #include "gt6853.h"
 
 #include <endian.h>
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/device-protocol/i2c-channel.h>
@@ -23,6 +23,7 @@
 #include <fbl/mutex.h>
 #include <zxtest/zxtest.h>
 
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
@@ -67,10 +68,8 @@ class FakeTouchDevice : public fake_i2c::FakeI2c {
     uint16_t flash_addr;
   };
 
-  void WaitForTouchDataRead() {
-    sync_completion_wait(&read_completion_, ZX_TIME_INFINITE);
-    sync_completion_reset(&read_completion_);
-  }
+  explicit FakeTouchDevice(std::shared_ptr<sync_completion_t> read_completion)
+      : read_completion_(std::move(read_completion)) {}
 
   bool ok() const { return event_reset_; }
 
@@ -120,7 +119,7 @@ class FakeTouchDevice : public fake_i2c::FakeI2c {
         memset(read_buffer, 0x00, sizeof(kTouchData));
       }
       *read_buffer_size = sizeof(kTouchData);
-      sync_completion_signal(&read_completion_);
+      sync_completion_signal(read_completion_.get());
     } else if (address == static_cast<uint16_t>(Register::kSensorIdReg)) {
       memcpy(read_buffer, &sensor_id_, sizeof(sensor_id_));
       *read_buffer_size = sizeof(sensor_id_);
@@ -274,7 +273,7 @@ class FakeTouchDevice : public fake_i2c::FakeI2c {
     kFlashingFirmwareDone,
   };
 
-  sync_completion_t read_completion_;
+  std::shared_ptr<sync_completion_t> read_completion_;
   bool event_reset_ = false;
   uint16_t sensor_id_ = UINT16_MAX;
   State current_state_ = kIdle;
@@ -287,20 +286,14 @@ class FakeTouchDevice : public fake_i2c::FakeI2c {
 
 class Gt6853Test : public zxtest::Test {
  public:
-  Gt6853Test()
-      : fake_parent_(MockDevice::FakeRootParent()),
-        loop_(&kAsyncLoopConfigNeverAttachToThread),
-        outgoing_(loop_.dispatcher()) {}
-
   void SetUp() override {
+    ASSERT_OK(fragments_loop_.StartThread("fragments"));
     ASSERT_OK(zx::interrupt::create(zx::resource(ZX_HANDLE_INVALID), 0, ZX_INTERRUPT_VIRTUAL,
                                     &gpio_interrupt_));
 
     zx::interrupt gpio_interrupt;
     ASSERT_OK(gpio_interrupt_.duplicate(ZX_RIGHT_SAME_RIGHTS, &gpio_interrupt));
-
-    mock_gpio_.ExpectConfigIn(ZX_OK, GPIO_NO_PULL);
-    mock_gpio_.ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(gpio_interrupt));
+    interrupt_gpio_.SyncCall(&fake_gpio::FakeGpio::SetInterrupt, zx::ok(std::move(gpio_interrupt)));
 
     EXPECT_OK(loop_.StartThread());
   }
@@ -319,36 +312,29 @@ class Gt6853Test : public zxtest::Test {
   zx_status_t Init(uint32_t panel_type_id = 1) {
     panel_type_id_ = panel_type_id;
 
-    fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, nullptr, nullptr, "pdev");
-    fake_parent_->AddProtocol(ZX_PROTOCOL_GPIO, mock_gpio_.GetProto()->ops,
-                              mock_gpio_.GetProto()->ctx, "gpio-int");
-    fake_parent_->AddProtocol(ZX_PROTOCOL_GPIO, mock_gpio_.GetProto()->ops,
-                              mock_gpio_.GetProto()->ctx, "gpio-reset");
-
-    auto service_result = outgoing_.AddService<fuchsia_hardware_i2c::Service>(
-        fuchsia_hardware_i2c::Service::InstanceHandler(
-            {.device = fake_i2c_.bind_handler(loop_.dispatcher())}));
-    ZX_ASSERT(service_result.is_ok());
-
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(endpoints.is_ok());
-    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
-
-    fake_parent_->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints->client),
-                                 "i2c");
-
-    fake_parent_->SetMetadata(DEVICE_METADATA_BOARD_PRIVATE, &panel_type_id_,
-                              sizeof(panel_type_id_));
+    InitParent();
 
     config_vmo = &config_vmo_;
     firmware_vmo = &firmware_vmo_;
 
     zx_status_t status = Gt6853Device::Create(nullptr, fake_parent_.get());
     device_ = fake_parent_->GetLatestChild();
+
+    std::vector interrupt_gpio_states =
+        interrupt_gpio().SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+    ZX_ASSERT(interrupt_gpio_states.size() == 1);
+    ZX_ASSERT(interrupt_gpio_states[0] ==
+              fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull});
+
     return status;
   }
 
  protected:
+  void WaitForTouchDataRead() {
+    sync_completion_wait(i2c_read_completion_.get(), ZX_TIME_INFINITE);
+    sync_completion_reset(i2c_read_completion_.get());
+  }
+
   zx_status_t WriteConfigData(const std::vector<uint8_t>& data, uint64_t offset) {
     return config_vmo_.write(data.data(), offset, data.size());
   }
@@ -380,7 +366,7 @@ class Gt6853Test : public zxtest::Test {
     ASSERT_OK(WriteConfigData({0x01}, 0x061e + 20));
     ASSERT_OK(WriteConfigString("Config number one", 0x061e + 121));
 
-    fake_i2c_.set_sensor_id(0);
+    i2c_.SyncCall(&FakeTouchDevice::set_sensor_id, 0);
   }
 
   void WaitForNextReader() { device_->GetDeviceContext<Gt6853Device>()->WaitForNextReader(); }
@@ -395,18 +381,92 @@ class Gt6853Test : public zxtest::Test {
     return std::move(endpoints->client);
   }
 
-  FakeTouchDevice fake_i2c_;
+  async_patterns::TestDispatcherBound<FakeTouchDevice>& i2c() { return i2c_; }
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio>& reset_gpio() { return reset_gpio_; }
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio>& interrupt_gpio() {
+    return interrupt_gpio_;
+  }
+
   zx::interrupt gpio_interrupt_;
   MockDevice* device_ = nullptr;
   uint32_t panel_type_id_ = 0;
   zx::vmo config_vmo_;
   zx::vmo firmware_vmo_;
-  ddk::MockGpio mock_gpio_;
 
  private:
+  void InitParent() {
+    fake_parent_ = MockDevice::FakeRootParent();
+
+    // Create i2c fragment.
+    auto i2c_handler = fuchsia_hardware_i2c::Service::InstanceHandler(
+        {.device = i2c_.SyncCall(&fidl::WireServer<fuchsia_hardware_i2c::Device>::bind_handler,
+                                 async_patterns::PassDispatcher)});
+    auto service_result = i2c_outgoing_.SyncCall(
+        [handler = std::move(i2c_handler)](component::OutgoingDirectory* outgoing) mutable {
+          return outgoing->AddService<fuchsia_hardware_i2c::Service>(std::move(handler));
+        });
+    ASSERT_TRUE(service_result.is_ok());
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_TRUE(endpoints.is_ok());
+    ASSERT_TRUE(
+        i2c_outgoing_.SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints->server))
+            .is_ok());
+    fake_parent_->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints->client),
+                                 "i2c");
+
+    // Create reset gpio fragment.
+    auto reset_gpio_handler = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::CreateInstanceHandler);
+    service_result = reset_gpio_outgoing_.SyncCall(
+        [handler = std::move(reset_gpio_handler)](component::OutgoingDirectory* outgoing) mutable {
+          return outgoing->AddService<fuchsia_hardware_gpio::Service>(std::move(handler));
+        });
+    ASSERT_TRUE(service_result.is_ok());
+    endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_TRUE(endpoints.is_ok());
+    ASSERT_TRUE(reset_gpio_outgoing_
+                    .SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints->server))
+                    .is_ok());
+    fake_parent_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(endpoints->client),
+                                 "gpio-reset");
+
+    // Create interrupt gpio fragment.
+    auto interrupt_gpio_handler =
+        interrupt_gpio_.SyncCall(&fake_gpio::FakeGpio::CreateInstanceHandler);
+    service_result =
+        interrupt_gpio_outgoing_.SyncCall([handler = std::move(interrupt_gpio_handler)](
+                                              component::OutgoingDirectory* outgoing) mutable {
+          return outgoing->AddService<fuchsia_hardware_gpio::Service>(std::move(handler));
+        });
+    ASSERT_TRUE(service_result.is_ok());
+    endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_TRUE(endpoints.is_ok());
+    ASSERT_TRUE(interrupt_gpio_outgoing_
+                    .SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints->server))
+                    .is_ok());
+    fake_parent_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(endpoints->client),
+                                 "gpio-int");
+
+    fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, nullptr, nullptr, "pdev");
+    fake_parent_->SetMetadata(DEVICE_METADATA_BOARD_PRIVATE, &panel_type_id_,
+                              sizeof(panel_type_id_));
+  }
+
+  std::shared_ptr<sync_completion_t> i2c_read_completion_ = std::make_shared<sync_completion_t>();
   std::shared_ptr<MockDevice> fake_parent_;
-  async::Loop loop_;
-  component::OutgoingDirectory outgoing_;
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  async::Loop fragments_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<FakeTouchDevice> i2c_{fragments_loop_.dispatcher(),
+                                                            std::in_place, i2c_read_completion_};
+  async_patterns::TestDispatcherBound<component::OutgoingDirectory> i2c_outgoing_{
+      fragments_loop_.dispatcher(), std::in_place, async_patterns::PassDispatcher};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> interrupt_gpio_{
+      fragments_loop_.dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<component::OutgoingDirectory> interrupt_gpio_outgoing_{
+      fragments_loop_.dispatcher(), std::in_place, async_patterns::PassDispatcher};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> reset_gpio_{fragments_loop_.dispatcher(),
+                                                                       std::in_place};
+  async_patterns::TestDispatcherBound<component::OutgoingDirectory> reset_gpio_outgoing_{
+      fragments_loop_.dispatcher(), std::in_place, async_patterns::PassDispatcher};
 };
 
 TEST_F(Gt6853Test, GetDescriptor) {
@@ -469,7 +529,7 @@ TEST_F(Gt6853Test, ReadReport) {
 
   EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_monotonic()));
 
-  fake_i2c_.WaitForTouchDataRead();
+  WaitForTouchDataRead();
 
   const auto response = reader->ReadInputReports();
   ASSERT_TRUE(response.ok());
@@ -498,7 +558,7 @@ TEST_F(Gt6853Test, ReadReport) {
   EXPECT_EQ(reports[0].touch().contacts()[3].position_x(), 0x0138);
   EXPECT_EQ(reports[0].touch().contacts()[3].position_y(), 0x00be);
 
-  EXPECT_TRUE(fake_i2c_.ok());
+  EXPECT_TRUE(i2c().SyncCall(&FakeTouchDevice::ok));
 }
 
 TEST_F(Gt6853Test, ConfigDownloadPanelType9364) {
@@ -520,14 +580,14 @@ TEST_F(Gt6853Test, ConfigDownloadPanelType9364) {
   ASSERT_OK(WriteConfigData({0x01}, 0x061e + 20));
   ASSERT_OK(WriteConfigString("Config number one", 0x061e + 121));
 
-  fake_i2c_.set_sensor_id(1);
+  i2c().SyncCall(&FakeTouchDevice::set_sensor_id, 1);
 
   ASSERT_OK(Init());
 
-  EXPECT_STREQ(reinterpret_cast<const char*>(fake_i2c_.get_config_data().data()),
-               "Config number one");
+  auto config_data = i2c().SyncCall(&FakeTouchDevice::get_config_data);
+  EXPECT_STREQ(reinterpret_cast<const char*>(config_data.data()), "Config number one");
   EXPECT_STREQ(config_path, GT6853_CONFIG_9364_PATH);
-  EXPECT_EQ(fake_i2c_.get_config_data().size(), 0x0304 - 121);
+  EXPECT_EQ(config_data.size(), 0x0304 - 121);
 }
 
 TEST_F(Gt6853Test, ConfigDownloadPanelType9365) {
@@ -549,14 +609,14 @@ TEST_F(Gt6853Test, ConfigDownloadPanelType9365) {
   ASSERT_OK(WriteConfigData({0x01}, 0x061e + 20));
   ASSERT_OK(WriteConfigString("Config number one", 0x061e + 121));
 
-  fake_i2c_.set_sensor_id(0);
+  i2c().SyncCall(&FakeTouchDevice::set_sensor_id, 0);
 
   ASSERT_OK(Init(4));  // kPanelTypeKdFiti9365
 
-  EXPECT_STREQ(reinterpret_cast<const char*>(fake_i2c_.get_config_data().data()),
-               "Config number zero");
+  auto config_data = i2c().SyncCall(&FakeTouchDevice::get_config_data);
+  EXPECT_STREQ(reinterpret_cast<const char*>(config_data.data()), "Config number zero");
   EXPECT_STREQ(config_path, GT6853_CONFIG_9365_PATH);
-  EXPECT_EQ(fake_i2c_.get_config_data().size(), 0x0304 - 121);
+  EXPECT_EQ(config_data.size(), 0x0304 - 121);
 }
 
 TEST_F(Gt6853Test, ConfigDownloadPanelType7703) {
@@ -578,14 +638,14 @@ TEST_F(Gt6853Test, ConfigDownloadPanelType7703) {
   ASSERT_OK(WriteConfigData({0x01}, 0x061e + 20));
   ASSERT_OK(WriteConfigString("Config number one", 0x061e + 121));
 
-  fake_i2c_.set_sensor_id(0);
+  i2c().SyncCall(&FakeTouchDevice::set_sensor_id, 0);
 
   ASSERT_OK(Init(6));  // kPanelTypeBoeSit7703
 
-  EXPECT_STREQ(reinterpret_cast<const char*>(fake_i2c_.get_config_data().data()),
-               "Config number zero");
+  auto config_data = i2c().SyncCall(&FakeTouchDevice::get_config_data);
+  EXPECT_STREQ(reinterpret_cast<const char*>(config_data.data()), "Config number zero");
   EXPECT_STREQ(config_path, GT6853_CONFIG_7703_PATH);
-  EXPECT_EQ(fake_i2c_.get_config_data().size(), 0x0304 - 121);
+  EXPECT_EQ(config_data.size(), 0x0304 - 121);
 }
 
 TEST_F(Gt6853Test, ConfigDownloadUnableToLoadConfig) { EXPECT_NOT_OK(Init()); }
@@ -609,7 +669,7 @@ TEST_F(Gt6853Test, NoConfigEntry) {
   ASSERT_OK(WriteConfigData({0x01}, 0x061e + 20));
   ASSERT_OK(WriteConfigString("Config number one", 0x061e + 121));
 
-  fake_i2c_.set_sensor_id(4);
+  i2c().SyncCall(&FakeTouchDevice::set_sensor_id, 4);
 
   EXPECT_NOT_OK(Init());
 }
@@ -631,7 +691,7 @@ TEST_F(Gt6853Test, InvalidConfigEntry) {
   ASSERT_OK(WriteConfigData({0x01}, 0x061e + 20));
   ASSERT_OK(WriteConfigString("Config number one", 0x061e + 121));
 
-  fake_i2c_.set_sensor_id(1);
+  i2c().SyncCall(&FakeTouchDevice::set_sensor_id, 1);
 
   config_size = 0x031a + 2;
   EXPECT_NOT_OK(Init());
@@ -656,7 +716,7 @@ TEST_F(Gt6853Test, BadConfigChecksum) {
   ASSERT_OK(WriteConfigData({0x01}, 0x061e + 20));
   ASSERT_OK(WriteConfigString("Config number one", 0x061e + 121));
 
-  fake_i2c_.set_sensor_id(1);
+  i2c().SyncCall(&FakeTouchDevice::set_sensor_id, 1);
 
   EXPECT_EQ(Init(), ZX_ERR_IO_DATA_INTEGRITY);
 }
@@ -672,22 +732,26 @@ TEST_F(Gt6853Test, FirmwareDownload) {
 
   AddDefaultConfig();
 
-  mock_gpio_.ExpectConfigOut(ZX_OK, 0);
-  mock_gpio_.ExpectWrite(ZX_OK, 1);
-  mock_gpio_.ExpectWrite(ZX_OK, 0);
-  mock_gpio_.ExpectWrite(ZX_OK, 1);
-
   EXPECT_OK(Init());
 
-  ASSERT_EQ(fake_i2c_.get_firmware_packets().size(), 2);
+  std::vector reset_gpio_states = reset_gpio().SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+  ASSERT_EQ(4, reset_gpio_states.size());
+  ASSERT_EQ(fake_gpio::WriteState{.value = 0}, reset_gpio_states[0]);
+  ASSERT_EQ(fake_gpio::WriteState{.value = 1}, reset_gpio_states[1]);
+  ASSERT_EQ(fake_gpio::WriteState{.value = 0}, reset_gpio_states[2]);
+  ASSERT_EQ(fake_gpio::WriteState{.value = 1}, reset_gpio_states[3]);
+  std::vector interrupt_gpio_states = interrupt_gpio().SyncCall(&fake_gpio::FakeGpio::GetStateLog);
 
-  EXPECT_EQ(fake_i2c_.get_firmware_packets()[0].type, 2);
-  EXPECT_EQ(fake_i2c_.get_firmware_packets()[0].size, 256);
-  EXPECT_EQ(fake_i2c_.get_firmware_packets()[0].flash_addr, 0x1234);
+  std::vector firmware_packets = i2c().SyncCall(&FakeTouchDevice::get_firmware_packets);
+  ASSERT_EQ(firmware_packets.size(), 2);
 
-  EXPECT_EQ(fake_i2c_.get_firmware_packets()[1].type, 3);
-  EXPECT_EQ(fake_i2c_.get_firmware_packets()[1].size, 256);
-  EXPECT_EQ(fake_i2c_.get_firmware_packets()[1].flash_addr, 0x5678);
+  EXPECT_EQ(firmware_packets[0].type, 2);
+  EXPECT_EQ(firmware_packets[0].size, 256);
+  EXPECT_EQ(firmware_packets[0].flash_addr, 0x1234);
+
+  EXPECT_EQ(firmware_packets[1].type, 3);
+  EXPECT_EQ(firmware_packets[1].size, 256);
+  EXPECT_EQ(firmware_packets[1].flash_addr, 0x5678);
 }
 
 TEST_F(Gt6853Test, FirmwareDownloadInvalidCrc) {
@@ -727,7 +791,7 @@ TEST_F(Gt6853Test, LatencyMeasurements) {
 
   for (int i = 0; i < 5; i++) {
     EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_monotonic()));
-    fake_i2c_.WaitForTouchDataRead();
+    WaitForTouchDataRead();
   }
 
   for (size_t reports = 0; reports < 5;) {

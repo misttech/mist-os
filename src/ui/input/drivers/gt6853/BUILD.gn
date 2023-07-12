@@ -49,8 +49,8 @@ if (internal_access) {
 group("common") {
   public_deps = [
     ":gt6853-bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp_wire",
     "//sdk/lib/input_report_reader",
@@ -112,10 +112,12 @@ test("gt6853-test") {
   ]
   deps = [
     ":common",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp_mock",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
+    "//src/devices/gpio/testing/fake-gpio",
 
     # TODO(https://fxbug.dev/113997): Fix thread unsafety and switch to
     # "//sdk/lib/component/outgoing/cpp".
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp:cpp_disable_synchronization_check",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/i2c/testing/fake-i2c",
