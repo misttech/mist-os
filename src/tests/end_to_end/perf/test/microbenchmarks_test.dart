@@ -29,6 +29,7 @@ void main() {
     await runTestComponent(
         packageName: 'fuchsia_microbenchmarks',
         componentName: 'fuchsia_microbenchmarks.cm',
+        realm: '/core/testing:system-tests',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}'
             ' --runs $iterationsPerTestPerProcess',
         processRuns: processRuns,

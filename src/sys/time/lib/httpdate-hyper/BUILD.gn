@@ -55,4 +55,7 @@ fuchsia_unittest_package("httpdate-hyper-tests") {
     "//src/connectivity/network/dns:component",
     "//src/connectivity/network/netstack:component",
   ]
+
+  # This test depends on root ssl certificate which is a system capability.
+  test_type = "system"
 }

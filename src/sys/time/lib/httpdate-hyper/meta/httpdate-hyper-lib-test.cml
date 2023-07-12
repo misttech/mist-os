@@ -6,9 +6,6 @@
         "//src/connectivity/network/meta/isolated-network.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
         "inspect/client.shard.cml",
-
-        // This test depends on root ssl certificate which is a system capability.
-        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {

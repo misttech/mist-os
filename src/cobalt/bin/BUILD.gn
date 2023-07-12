@@ -132,6 +132,7 @@ fuchsia_test_package("cobalt_tests") {
 fuchsia_test_component("cobalt-testapp") {
   manifest = "meta/cobalt_testapp.cml"
   deps = [ "testapp:cobalt_testapp" ]
+  test_type = "system"
 }
 
 # Tests that should not be run on any bot.

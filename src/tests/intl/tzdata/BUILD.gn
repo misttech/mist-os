@@ -40,6 +40,9 @@ test("bin") {
 fuchsia_test_component("component") {
   manifest = "meta/tzdata-test.cml"
   deps = [ ":bin" ]
+
+  # Depends on config_data which is a system capability.
+  test_type = "system"
 }
 
 fuchsia_test_package("pkg") {

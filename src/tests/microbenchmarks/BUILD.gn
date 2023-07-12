@@ -200,6 +200,7 @@ fuchsia_unittest_package("fuchsia_microbenchmarks") {
     ":no_op_executable",
     ":round_trips_helper",
   ]
+  test_type = "system"
 }
 
 if (is_linux) {

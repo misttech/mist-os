@@ -383,6 +383,7 @@ fuchsia_unittest_package("sl4f-service-tests") {
     ":lib_test",
     ":sl4f-server-tests-files",
   ]
+  test_type = "system"
 }
 
 components = [
