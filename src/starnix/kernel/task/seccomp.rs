@@ -39,7 +39,7 @@ pub struct SeccompFilter {
 /// The result of running a set of seccomp filters.
 pub struct SeccompFilterResult {
     /// The action indicated by the seccomp filter with the highest priority result.
-    action: u32,
+    action: SeccompAction,
 
     /// The filter that returned the highest priority result, as used by SECCOMP_RET_USER_NOTIF,
     /// which has to have access to its cookie value
@@ -179,7 +179,7 @@ impl SeccompFilterContainer {
     /// Runs all of the seccomp filters in this container, most-to-least recent.  Returns the
     /// highest priority result (which contains a reference to the filter that generated it)
     pub fn run_all(&self, current_task: &CurrentTask, syscall: &Syscall) -> SeccompFilterResult {
-        let mut r = SeccompFilterResult { action: SECCOMP_RET_ALLOW, filter: None };
+        let mut r = SeccompFilterResult { action: SeccompAction::Allow, filter: None };
 
         // VDSO calls can't be caught by seccomp, so most seccomp filters forget to declare them.
         // But our VDSO implementation is incomplete, and most of the calls forward to the actual
@@ -205,10 +205,11 @@ impl SeccompFilterContainer {
                 make_seccomp_data(syscall, current_task.registers.instruction_pointer_register());
 
             let new_result = filter.run(&mut data);
-            if ((new_result & SECCOMP_RET_ACTION_FULL) as i32)
-                < ((r.action & SECCOMP_RET_ACTION_FULL) as i32)
-            {
-                r = SeccompFilterResult { action: new_result, filter: Some(filter.clone()) };
+
+            let action = SeccompAction::from_u32(new_result).unwrap_or(SeccompAction::KillProcess);
+
+            if SeccompAction::has_prio(&action, &r.action) == std::cmp::Ordering::Less {
+                r = SeccompFilterResult { action, filter: Some(filter.clone()) };
             }
         }
         r
@@ -324,13 +325,10 @@ impl SeccompState {
         syscall: &Syscall,
     ) -> Option<Result<SyscallResult, Errno>> {
         let action = result.action;
-        match action & !SECCOMP_RET_DATA {
-            SECCOMP_RET_ALLOW => None,
-            SECCOMP_RET_ERRNO => {
-                // Linux kernel compatibility: if errno exceeds 0xfff, it is capped at 0xfff.
-                Some(Err(errno_from_code!(std::cmp::min(action & 0xffff, 0xfff) as i16)))
-            }
-            SECCOMP_RET_KILL_THREAD => {
+        match action {
+            SeccompAction::Allow => None,
+            SeccompAction::Errno(code) => Some(Err(errno_from_code!(code as i16))),
+            SeccompAction::KillThread => {
                 let siginfo = SignalInfo::default(SIGSYS);
 
                 let is_last_thread = current_task.thread_group.read().tasks_count() == 1;
@@ -344,7 +342,11 @@ impl SeccompState {
                 }
                 Some(Err(errno_from_code!(0)))
             }
-            SECCOMP_RET_LOG => {
+            SeccompAction::KillProcess => {
+                current_task.thread_group.exit(ExitStatus::CoreDump(SignalInfo::default(SIGSYS)));
+                Some(Err(errno_from_code!(0)))
+            }
+            SeccompAction::Log => {
                 let creds = current_task.creds();
                 let uid = creds.uid;
                 let gid = creds.gid;
@@ -371,11 +373,11 @@ impl SeccompState {
                 );
                 None
             }
-            SECCOMP_RET_TRACE => {
+            SeccompAction::Trace => {
                 // TODO(fxbug.dev/76810): Because there is no ptrace support, this returns ENOSYS
                 Some(Err(errno!(ENOSYS)))
             }
-            SECCOMP_RET_TRAP => {
+            SeccompAction::Trap(errno) => {
                 #[cfg(target_arch = "x86_64")]
                 let arch_val = AUDIT_ARCH_X86_64;
                 #[cfg(target_arch = "aarch64")]
@@ -385,7 +387,7 @@ impl SeccompState {
 
                 let siginfo = SignalInfo {
                     signal: SIGSYS,
-                    errno: (action & SECCOMP_RET_DATA) as i32,
+                    errno: errno as i32,
                     code: SYS_SECCOMP as i32,
                     detail: SignalDetail::SigSys {
                         call_addr: current_task.registers.instruction_pointer_register().into(),
@@ -398,7 +400,7 @@ impl SeccompState {
                 send_signal(current_task, siginfo);
                 Some(Err(errno_from_code!(-(syscall.decl.number as i16))))
             }
-            SECCOMP_RET_USER_NOTIF => {
+            SeccompAction::UserNotif => {
                 if let Some(notifier) = current_task.get_seccomp_notifier() {
                     let cookie = result.filter.unwrap().cookie.fetch_add(1, Ordering::Relaxed);
                     let msg = seccomp_notif {
@@ -459,30 +461,115 @@ impl SeccompState {
                     Some(Err(errno!(ENOSYS)))
                 }
             }
-            SECCOMP_RET_KILL_PROCESS | _ => {
-                current_task.thread_group.exit(ExitStatus::CoreDump(SignalInfo::default(SIGSYS)));
-                Some(Err(errno_from_code!(0)))
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum SeccompAction {
+    Allow,
+    Errno(u32),
+    KillProcess,
+    KillThread,
+    Log,
+    Trap(u32),
+    Trace,
+    UserNotif,
+}
+
+impl SeccompAction {
+    pub fn is_action_available(action: u32) -> Result<SyscallResult, Errno> {
+        if SeccompAction::from_u32(action).is_none() {
+            return error!(EOPNOTSUPP);
+        }
+        Ok(0.into())
+    }
+
+    pub fn from_u32(action: u32) -> Option<SeccompAction> {
+        match action & !SECCOMP_RET_DATA {
+            linux_uapi::SECCOMP_RET_ALLOW => Some(Self::Allow),
+            linux_uapi::SECCOMP_RET_ERRNO => {
+                let mut action = action & SECCOMP_RET_DATA;
+                // Linux kernel compatibility: if errno exceeds 0xfff, it is capped at 0xfff.
+                action = std::cmp::min(action & 0xffff, 0xfff);
+                Some(Self::Errno(action))
             }
+            linux_uapi::SECCOMP_RET_KILL_PROCESS => Some(Self::KillProcess),
+            linux_uapi::SECCOMP_RET_KILL_THREAD => Some(Self::KillThread),
+            linux_uapi::SECCOMP_RET_LOG => Some(Self::Log),
+            linux_uapi::SECCOMP_RET_TRACE => Some(Self::Trace),
+            linux_uapi::SECCOMP_RET_TRAP => Some(Self::Trap(action & SECCOMP_RET_DATA)),
+
+            linux_uapi::SECCOMP_RET_USER_NOTIF => Some(Self::UserNotif),
+            _ => None,
         }
     }
 
-    pub fn is_action_available(action: u32) -> Result<SyscallResult, Errno> {
-        match action & !SECCOMP_RET_DATA {
-            SECCOMP_RET_ALLOW
-            | SECCOMP_RET_ERRNO
-            | SECCOMP_RET_KILL_PROCESS
-            | SECCOMP_RET_KILL_THREAD
-            | SECCOMP_RET_LOG
-            | SECCOMP_RET_TRAP
-            | SECCOMP_RET_USER_NOTIF => Ok(().into()),
-            // TODO(fxbug.dev/126644): Implement this.
-            SECCOMP_RET_TRACE => {
-                error!(EOPNOTSUPP)
-            }
-            _ => {
-                error!(EOPNOTSUPP)
-            }
+    pub fn to_isize(self) -> isize {
+        match self {
+            Self::Allow => linux_uapi::SECCOMP_RET_ALLOW as isize,
+            Self::Errno(x) => (linux_uapi::SECCOMP_RET_ERRNO | x) as isize,
+            Self::KillProcess => linux_uapi::SECCOMP_RET_KILL_PROCESS as isize,
+            Self::KillThread => linux_uapi::SECCOMP_RET_KILL_THREAD as isize,
+            Self::Log => linux_uapi::SECCOMP_RET_LOG as isize,
+            Self::Trace => linux_uapi::SECCOMP_RET_TRACE as isize,
+            Self::Trap(x) => (linux_uapi::SECCOMP_RET_TRAP | x) as isize,
+            Self::UserNotif => linux_uapi::SECCOMP_RET_USER_NOTIF as isize,
         }
+    }
+
+    pub fn get_string(&self) -> &'static str {
+        match self {
+            Self::Allow => &"allow",
+            Self::Errno(_) => &"errno",
+            Self::KillProcess => &"kill_process",
+            Self::KillThread => &"kill_thread",
+            Self::Log => &"log",
+            Self::Trace => &"trace",
+            Self::Trap(_) => &"trap",
+            Self::UserNotif => &"user_notif",
+        }
+    }
+
+    pub fn has_prio(a: &SeccompAction, b: &SeccompAction) -> std::cmp::Ordering {
+        let anum = a.to_isize() as i32;
+        let bnum = b.to_isize() as i32;
+        let fullnum = SECCOMP_RET_ACTION_FULL as i32;
+        let aval = anum & fullnum;
+        let bval = bnum & fullnum;
+        aval.cmp(&bval)
+    }
+
+    /// Returns a vector of all available actions, sorted by priority.
+    pub fn all_actions() -> Vec<SeccompAction> {
+        let mut result = vec![
+            Self::Allow,
+            Self::Errno(0),
+            Self::KillProcess,
+            Self::KillThread,
+            Self::Log,
+            Self::Trace,
+            Self::Trap(0),
+            Self::UserNotif,
+        ];
+
+        result.sort_by(Self::has_prio);
+        result
+    }
+
+    /// Gets the contents of /proc/sys/kernel/seccomp/actions_avail
+    pub fn get_actions_avail_file() -> Vec<u8> {
+        let all_actions = Self::all_actions();
+        if all_actions.len() == 0 {
+            return vec![];
+        }
+        let mut result = String::from(all_actions[0].get_string());
+        for i in 1..all_actions.len() {
+            result.push_str(" ");
+            result.push_str(all_actions[i].get_string());
+        }
+        result.push('\n');
+        result.into_bytes()
     }
 }
 

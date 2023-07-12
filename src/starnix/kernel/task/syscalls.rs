@@ -1094,7 +1094,7 @@ pub fn sys_seccomp(
                 return error!(EINVAL);
             }
             let action: u32 = current_task.read_object(UserRef::new(args))?;
-            SeccompState::is_action_available(action)
+            SeccompAction::is_action_available(action)
         }
         SECCOMP_GET_NOTIF_SIZES => {
             if flags != 0 {

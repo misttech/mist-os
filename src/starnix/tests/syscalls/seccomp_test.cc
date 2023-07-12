@@ -10,6 +10,7 @@
 
 #include <array>
 #include <condition_variable>
+#include <fstream>
 #include <mutex>
 #include <thread>
 
@@ -317,7 +318,8 @@ TEST(SeccompTest, PrctlGetSeccomp) {
 
 TEST(SeccompTest, GetActionAvail) {
   uint32_t actions[] = {SECCOMP_RET_ALLOW,       SECCOMP_RET_ERRNO, SECCOMP_RET_KILL_PROCESS,
-                        SECCOMP_RET_KILL_THREAD, SECCOMP_RET_LOG,   SECCOMP_RET_TRAP};
+                        SECCOMP_RET_KILL_THREAD, SECCOMP_RET_LOG,   SECCOMP_RET_TRACE,
+                        SECCOMP_RET_TRAP};
 
   for (unsigned long i = 0; i < ARRAY_SIZE(actions); i++) {
     EXPECT_EQ(0, syscall(__NR_seccomp, SECCOMP_GET_ACTION_AVAIL, 0, actions + i));
@@ -326,6 +328,13 @@ TEST(SeccompTest, GetActionAvail) {
 
   EXPECT_EQ(-1, syscall(__NR_seccomp, SECCOMP_GET_ACTION_AVAIL, 0, &illegal));
   EXPECT_EQ(EOPNOTSUPP, errno);
+}
+
+TEST(SeccompTest, GetActionsAvailProc) {
+  std::ifstream t("/proc/sys/kernel/seccomp/actions_avail");
+  std::stringstream buffer;
+  buffer << t.rdbuf();
+  EXPECT_EQ("kill_process kill_thread trap errno user_notif trace log allow\n", buffer.str());
 }
 
 TEST(SeccompTest, ErrnoIsMaxFFF) {

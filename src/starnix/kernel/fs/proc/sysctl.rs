@@ -33,6 +33,13 @@ pub fn sysctl_directory(fs: &FileSystemHandle, kernel: &Arc<Kernel>) -> FsNodeHa
             ),
         );
         dir.entry(b"tainted", KernelTaintedFile::new_node(), mode);
+        dir.subdir(b"seccomp", 0o555, |dir| {
+            dir.entry(
+                b"actions_avail",
+                BytesFile::new_node(SeccompAction::get_actions_avail_file()),
+                mode!(IFREG, 0o444),
+            );
+        });
     });
     dir.node(b"net", sysctl_net_diretory(fs, kernel));
     dir.subdir(b"vm", 0o555, |dir| {
