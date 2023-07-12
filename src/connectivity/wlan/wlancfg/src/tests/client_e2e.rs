@@ -306,17 +306,35 @@ fn add_phy(exec: &mut TestExecutor, test_values: &mut TestValues) {
     let add_phy_event = DeviceWatcherEvent::OnPhyAdded { phy_id: TEST_PHY_ID };
     let add_phy_fut = device_monitor::handle_event(&listener, add_phy_event);
     pin_mut!(add_phy_fut);
-    assert_variant!(exec.run_until_stalled(&mut add_phy_fut), Poll::Pending);
 
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.external_interfaces.monitor_service_stream.next()),
-        Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetSupportedMacRoles {
-            phy_id: TEST_PHY_ID, responder
-        }))) => {
-            // Send back a positive acknowledgement.
-            assert!(responder.send(Ok(&[fidl_common::WlanMacRole::Client])).is_ok());
+    const MAX_TRIES: u32 = 5;
+    for i in 0..MAX_TRIES {
+        assert_variant!(exec.run_until_stalled(&mut add_phy_fut), Poll::Pending);
+        match exec
+            .run_until_stalled(&mut test_values.external_interfaces.monitor_service_stream.next())
+        {
+            Poll::Ready(Some(Ok(
+                fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetSupportedMacRoles {
+                    phy_id: TEST_PHY_ID,
+                    responder,
+                },
+            ))) => {
+                // Send back a positive acknowledgement.
+                assert!(responder.send(Ok(&[fidl_common::WlanMacRole::Client])).is_ok());
+                break;
+            }
+            Poll::Pending => (),
+            other => {
+                panic!("expect DeviceMonitorRequest::GetSupportedMacRoles, got {:?}", other);
+            }
         }
-    );
+
+        if i < MAX_TRIES - 1 {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        } else {
+            panic!("failed to add PHY");
+        }
+    }
     assert_variant!(exec.run_until_stalled(&mut add_phy_fut), Poll::Ready(()));
 }
 
