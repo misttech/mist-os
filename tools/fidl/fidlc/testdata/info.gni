@@ -421,11 +421,6 @@ fidl_testdata_info = [
   {
     name = "union"
     target = "//tools/fidl/fidlc/testdata:test.union"
-    build_denylist = [
-      # TODO(fxbug.dev/55889): Escape "union" keyword.
-      "fidlgen_cpp",
-      "fidlgen_libfuzzer",
-    ]
     host_build_denylist = [
       # TODO(fxbug.dev/62573): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",

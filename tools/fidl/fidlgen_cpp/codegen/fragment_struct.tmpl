@@ -9,8 +9,6 @@
 struct {{ .Name }};
 {{- end }}
 
-{{/* TODO(fxbug.dev/36441): Remove __Fuchsia__ ifdefs once we have non-Fuchsia
-     emulated handles for C++. */}}
 {{- define "Struct:WireTypesHeader" }}
 {{ EnsureNamespace . }}
 {{ if .IsResourceType }}
@@ -40,8 +38,6 @@ struct {{ .Name }} {
 {{- end }}
 {{- end }}
 
-{{/* TODO(fxbug.dev/36441): Remove __Fuchsia__ ifdefs once we have non-Fuchsia
-     emulated handles for C++. */}}
 {{- define "Struct:WireTypesSource" }}
 {{ EnsureNamespace "" }}
 {{ if .IsResourceType }}
@@ -55,8 +51,6 @@ void {{ . }}::_CloseHandles() {
 {{- end }}
 {{- end }}
 
-{{/* TODO(fxbug.dev/36441): Remove __Fuchsia__ ifdefs once we have non-Fuchsia
-     emulated handles for C++. */}}
 {{- define "Struct:Traits:WireTypesHeader" }}
 {{ if .IsResourceType }}
 {{- IfdefFuchsia -}}

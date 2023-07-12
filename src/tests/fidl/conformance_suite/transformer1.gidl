@@ -1030,15 +1030,15 @@ success("Sandwich6Case4") {
 }
 
 success("Sandwich6Case5") {
+    handle_defs = {
+        #0 = event(),
+        #1 = channel(),
+        #2 = event(),
+    },
     value = Sandwich6{
         before: 0x04030201,
         the_union: UnionWithVector{
-            // TODO(fxbug.dev/36441): Support handles in GIDL.
-            handles: [
-                0xffffffff,
-                0xffffffff,
-                0xffffffff,
-            ],
+            handles: [#0, #1, #2],
         },
         after: 0x08070605,
     },
@@ -1050,7 +1050,7 @@ success("Sandwich6Case5") {
             0x06, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (start of Sandwich6.the_union)
             0x00, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (padding)
             0x20, 0x00, 0x00, 0x00, // UnionWithVector.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.env.num_handle
+            0x03, 0x00, 0x00, 0x00, // UnionWithVector.env.num_handle
             0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence
             0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence [cont.]
 
@@ -1074,7 +1074,7 @@ success("Sandwich6Case5") {
             0x06, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (start of Sandwich6.the_union)
             0x00, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (padding)
             0x20, 0x00, 0x00, 0x00, // UnionWithVector.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.env.num_handle
+            0x03, 0x00, 0x00, 0x00, // UnionWithVector.env.num_handle
 
             0x05, 0x06, 0x07, 0x08, // Sandwich6.after
             0x00, 0x00, 0x00, 0x00, // Sandwich6.after (padding)
@@ -1089,6 +1089,9 @@ success("Sandwich6Case5") {
             0xff, 0xff, 0xff, 0xff, // vector<handle>.data
             0x00, 0x00, 0x00, 0x00, // vector<handle>.data (padding)
         ],
+    },
+    handles = {
+        v1, v2 = [#0, #1, #2],
     },
 }
 

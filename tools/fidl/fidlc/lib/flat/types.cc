@@ -217,7 +217,6 @@ bool IdentifierType::ApplyConstraints(TypeResolver* resolver, const TypeConstrai
       // they're caught earlier.
       // Cannot have resource: resource types should have resolved to the HandleTypeTemplate
       ZX_PANIC("unexpected identifier type decl kind");
-    // TODO(fxbug.dev/75837):
     // These can't be used as types. This will be caught later, in VerifyTypeCategory.
     case Decl::Kind::kService:
     case Decl::Kind::kProtocol:

@@ -2934,7 +2934,7 @@ pub fn persist_with_context<T: ValueTypeMarker>(
 /// Decodes a FIDL object from bytes following RFC-0120. Must be a non-resource
 /// struct, table, or union. See `persist` for the reverse.
 pub fn unpersist<T: Persistable>(bytes: &[u8]) -> Result<T> {
-    // TODO(fxbug.dev/45252): Only accept the new header format.
+    // TODO(fxbug.dev/99738): Only accept the new header format.
     //
     // To soft-transition component manager's use of persistent FIDL, we
     // temporarily need to accept the old 16-byte header.
@@ -3068,7 +3068,7 @@ fn decode_wire_metadata(bytes: &[u8]) -> Result<WireMetadata> {
             Decoder::decode_with_context::<WireMetadata>(context, bytes, &mut [], &mut header)?;
             Ok(header)
         }
-        // TODO(fxbug.dev/45252): Remove this.
+        // TODO(fxbug.dev/99738): Remove this.
         16 => {
             // Old 16-byte format that matches TransactionHeader.
             let mut header = new_empty!(TransactionHeader);

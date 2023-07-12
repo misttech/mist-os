@@ -9,8 +9,6 @@
 class {{ .Name }};
 {{- end }}
 
-{{/* TODO(fxbug.dev/36441): Remove __Fuchsia__ ifdefs once we have non-Fuchsia
-     emulated handles for C++. */}}
 {{- define "Union:WireTypesHeader" }}
 {{ EnsureNamespace . }}
 {{ if .IsResourceType }}
@@ -141,8 +139,6 @@ class {{ .Name }} {
 {{- end }}
 {{- end }}
 
-{{/* TODO(fxbug.dev/36441): Remove __Fuchsia__ ifdefs once we have non-Fuchsia
-     emulated handles for C++. */}}
 {{- define "Union:WireTypesSource" }}
 {{- if .IsResourceType }}
 {{- IfdefFuchsia -}}
@@ -218,8 +214,6 @@ void {{ . }}::_CloseHandles() {
 {{- end }}
 {{- end }}
 
-{{/* TODO(fxbug.dev/36441): Remove __Fuchsia__ ifdefs once we have non-Fuchsia
-     emulated handles for C++. */}}
 {{- define "Union:Traits:WireTypesHeader" }}
 {{ if .IsResourceType }}
 {{- IfdefFuchsia -}}

@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 library test.conformance;
 
+using zx;
+
 type TransactionHeader = struct {
     tx_id uint32;
     flags array<uint8, 3>;
@@ -110,20 +112,19 @@ type StructSize3Align2 = struct {
     f2 uint8;
 };
 
-type UnionWithVector = strict union {
+type UnionWithVector = strict resource union {
     1: unused uint8;
     2: vector_of_uint8 vector<uint8>;
     3: s string;
     4: vector_s3_a1 vector<StructSize3Align1>;
     5: vector_s3_a2 vector<StructSize3Align2>;
-    // 6: vector<handle> handles;  // TODO(fxbug.dev/36441): Support handles in GIDL.
-    6: handles vector<uint32>;
+    6: handles vector<zx.Handle>;
     7: array_s3_a1 array<StructSize3Align1, 2>;
     8: array_s3_a2 array<StructSize3Align2, 2>;
     9: vector_union vector<UnionSize8Align4>;
 };
 
-type Sandwich6 = struct {
+type Sandwich6 = resource struct {
     before uint32;
     the_union UnionWithVector;
     after uint32;
@@ -202,23 +203,23 @@ type TableStructWithUint32SandwichStruct = struct {
     table TableStructWithUint32Sandwich;
 };
 
-type TableUnionWithVectorReservedSandwich = table {
+type TableUnionWithVectorReservedSandwich = resource table {
     1: reserved;
     2: uv UnionWithVector;
     3: reserved;
 };
 
-type TableUnionWithVectorReservedSandwichStruct = struct {
+type TableUnionWithVectorReservedSandwichStruct = resource struct {
     table TableUnionWithVectorReservedSandwich;
 };
 
-type TableUnionWithVectorStructSandwich = table {
+type TableUnionWithVectorStructSandwich = resource table {
     1: s1 StructSize3Align1;
     2: uv UnionWithVector;
     3: s2 StructSize3Align1;
 };
 
-type TableUnionWithVectorStructSandwichStruct = struct {
+type TableUnionWithVectorStructSandwichStruct = resource struct {
     table TableUnionWithVectorStructSandwich;
 };
 
@@ -545,22 +546,22 @@ type StringUnionVector = struct {
     the_vector vector<StringUnion:optional>:3;
 };
 
-type LaunchInfo = struct {
+type LaunchInfo = resource struct {
     url string:200;
     arguments vector<string>:optional;
     out box<TransformerEmptyStruct>;
     err box<TransformerEmptyStruct>;
-    // zx.Handle:CHANNEL? directory_request; // TODO(fxbug.dev/36441): Support handles in GIDL.
-    directory_request uint32;
+    directory_request zx.Handle:<CHANNEL, optional>;
     flat_namespace box<TransformerEmptyStruct>;
     additional_services box<TransformerEmptyStruct>;
 };
 
-type CreateComponentRequest = struct {
+type CreateComponentRequest = resource struct {
     launch_info LaunchInfo;
-    // request<ComponentController>? controller;  // TODO(fxbug.dev/36441): Support handles in GIDL.
-    controller uint32;
+    controller server_end:<ComponentController, optional>;
 };
+
+closed protocol ComponentController {};
 
 type CompatUnion = strict union {
     1: s string;

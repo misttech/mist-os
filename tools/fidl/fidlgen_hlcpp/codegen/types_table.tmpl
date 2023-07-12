@@ -9,8 +9,6 @@
 class {{ .Name }};
 {{- end }}
 
-{{/* TODO(fxbug.dev/36441): Remove __Fuchsia__ ifdefs once we have non-Fuchsia
-     emulated handles for C++. */}}
 {{- define "TableDeclaration" }}
 {{ EnsureNamespace . }}
 {{ if .IsResourceType }}

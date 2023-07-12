@@ -803,10 +803,43 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-        "line": 158,
+        "line": 160,
         "column": 6,
         "length": 18
       },
+      "maybe_attributes": [
+        {
+          "name": "bindings_denylist",
+          "arguments": [
+            {
+              "name": "value",
+              "type": "string",
+              "value": {
+                "kind": "literal",
+                "value": "libfuzzer",
+                "expression": "\"libfuzzer\"",
+                "literal": {
+                  "kind": "string",
+                  "value": "libfuzzer",
+                  "expression": "\"libfuzzer\""
+                }
+              },
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/union.test.fidl",
+                "line": 159,
+                "column": 20,
+                "length": 11
+              }
+            }
+          ],
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/union.test.fidl",
+            "line": 159,
+            "column": 1,
+            "length": 31
+          }
+        }
+      ],
       "members": [],
       "strict": false,
       "resource": false,
@@ -2161,17 +2194,50 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-        "line": 160,
+        "line": 164,
         "column": 6,
         "length": 25
       },
+      "maybe_attributes": [
+        {
+          "name": "bindings_denylist",
+          "arguments": [
+            {
+              "name": "value",
+              "type": "string",
+              "value": {
+                "kind": "literal",
+                "value": "libfuzzer",
+                "expression": "\"libfuzzer\"",
+                "literal": {
+                  "kind": "string",
+                  "value": "libfuzzer",
+                  "expression": "\"libfuzzer\""
+                }
+              },
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/union.test.fidl",
+                "line": 163,
+                "column": 20,
+                "length": 11
+              }
+            }
+          ],
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/union.test.fidl",
+            "line": 163,
+            "column": 1,
+            "length": 31
+          }
+        }
+      ],
       "members": [
         {
           "ordinal": 1,
           "reserved": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-            "line": 161,
+            "line": 165,
             "column": 5,
             "length": 11
           }

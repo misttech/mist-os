@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 library test.conformance;
 
-// TODO(fxbug.dev/36441): Allow bindings to compile on host with handles.
-
 type NonnullableHandle = resource struct {
     h handle;
 };

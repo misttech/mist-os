@@ -48,8 +48,6 @@ using StructWithNullableUnion = ::test::union_::StructWithNullableUnion;
 using ExplicitFlexibleUnion = ::test::union_::ExplicitFlexibleUnion;
 using UnionSandwich = ::test::union_::UnionSandwich;
 using UnionWithAttributes = ::test::union_::UnionWithAttributes;
-using EmptyFlexibleUnion = ::test::union_::EmptyFlexibleUnion;
-using OnlyReservedFlexibleUnion = ::test::union_::OnlyReservedFlexibleUnion;
 
 template <>
 struct MinSize<Pizza> {
@@ -891,56 +889,6 @@ struct Allocate<UnionWithAttributes> {
         out.set_x(Allocate<int64_t>{}(src, size));
         break;
       }
-    }
-
-    return out;
-  }
-};
-template <>
-struct MinSize<EmptyFlexibleUnion> {
-  operator size_t() {
-    size_t sizes[] = {0};
-    return 1 + *std::max_element(sizes, sizes + 0 + 1);
-  }
-};
-template <>
-struct Allocate<EmptyFlexibleUnion> {
-  static_assert(0 > 0, "xunion must have at least one member");
-
-  EmptyFlexibleUnion operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<EmptyFlexibleUnion>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    EmptyFlexibleUnion out;
-    switch (selector % 0) {
-    }
-
-    return out;
-  }
-};
-template <>
-struct MinSize<OnlyReservedFlexibleUnion> {
-  operator size_t() {
-    size_t sizes[] = {0};
-    return 1 + *std::max_element(sizes, sizes + 0 + 1);
-  }
-};
-template <>
-struct Allocate<OnlyReservedFlexibleUnion> {
-  static_assert(0 > 0, "xunion must have at least one member");
-
-  OnlyReservedFlexibleUnion operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<OnlyReservedFlexibleUnion>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    OnlyReservedFlexibleUnion out;
-    switch (selector % 0) {
     }
 
     return out;

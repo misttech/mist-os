@@ -2085,13 +2085,16 @@ success("StringUnionStructWrapperResponse") {
 }
 
 success("RegressionNoUnionLauncherCreateComponentRequest") {
+    handle_defs = {
+        #0 = channel(),
+        #1 = channel(),
+    },
     value = CreateComponentRequest{
         launch_info: LaunchInfo{
             url: "fuchsia-pkg://fuchsia.com/fidl_compatibility_test_server_rust_write_xunion#meta/fidl_compatibility_test_server_rust_write_xunion.cmx",
-            // TODO(fxbug.dev/36441): Support handles in GIDL.
-            directory_request: 0xffffffff,
+            directory_request: #0,
         },
-        controller: 0xffffffff,
+        controller: #1,
     },
     bytes = {
         v1, v2 = [
@@ -2150,6 +2153,9 @@ success("RegressionNoUnionLauncherCreateComponentRequest") {
             0x2E, 0x63, 0x6D, 0x78,
             0x00, 0x00, 0x00, 0x00,
         ],
+    },
+    handles = {
+        v1, v2 = [#0, #1],
     },
 }
 

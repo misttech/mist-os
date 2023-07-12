@@ -7,7 +7,7 @@
 use fidl::encoding::{persist, standalone_decode_value, standalone_encode_value, unpersist};
 use fidl_test_external::{Coordinate, FlexibleValueThing, ValueRecord};
 
-// TODO(fxbug.dev/45252): Remove this.
+// TODO(fxbug.dev/99738): Remove this.
 fn transform_new_to_old_header(buf: &mut Vec<u8>) {
     //       disambiguator
     //            | magic

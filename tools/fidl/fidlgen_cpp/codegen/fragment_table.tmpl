@@ -9,8 +9,6 @@
 class {{ .Name }};
 {{- end }}
 
-{{/* TODO(fxbug.dev/36441): Remove __Fuchsia__ ifdefs once we have non-Fuchsia
-     emulated handles for C++. */}}
 {{- define "Table:WireTypesHeader" }}
 {{ if .IsResourceType }}
 {{- IfdefFuchsia -}}
@@ -298,8 +296,6 @@ inline {{ .WireTableExternalBuilder }} {{ .Name }}::ExternalBuilder(::fidl::Obje
 
 {{- define "Table:WireTypesSource" }}
 {{ if .IsResourceType }}
-{{/* TODO(fxbug.dev/36441): Remove __Fuchsia__ ifdefs once we have non-Fuchsia
-     emulated handles for C++. */}}
 {{- IfdefFuchsia -}}
 {{- end }}
 
@@ -358,8 +354,6 @@ void {{ . }}::_CloseHandles() {
 {{- end }}
 {{- end }}
 
-{{/* TODO(fxbug.dev/36441): Remove __Fuchsia__ ifdefs once we have non-Fuchsia
-     emulated handles for C++. */}}
 {{- define "Table:Traits:WireTypesHeader" }}
 {{ if .IsResourceType }}
 {{- IfdefFuchsia -}}
