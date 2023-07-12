@@ -58,19 +58,19 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   void Unbind();
 
   // Call Unbind or Suspend based on the power state.
-  fpromise::promise<void> HandleStopSignal(fuchsia_device_manager::wire::SystemPowerState state);
+  fpromise::promise<void> HandleStopSignal();
 
   // Call the Unbind op for the device.
   fpromise::promise<void> UnbindOp();
 
   // Call the Suspend op for the device.
-  fpromise::promise<void> SuspendOp(fuchsia_device_manager::wire::SystemPowerState state);
+  fpromise::promise<void> SuspendOp();
 
   // Removes all of the child devices.
   fpromise::promise<void> RemoveChildren();
 
   // Suspends all of the child devices.
-  fpromise::promise<void> SuspendChildren(fuchsia_device_manager::wire::SystemPowerState state);
+  fpromise::promise<void> SuspendChildren();
 
   const char* Name() const;
   bool HasChildren() const;
@@ -170,10 +170,12 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
     // shutdown/reboot flows to emulate DFv1 shutdown. The fdf::Node client should have been torn
     // down by the driver runtime canceling all outstanding waits by the time stop has been called,
     // allowing shutdown to proceed.
-    return parent_ && system_power_state_ == fuchsia_device_manager::SystemPowerState::kFullyOn;
+    return parent_ && system_power_state() == fuchsia_device_manager::SystemPowerState::kFullyOn;
   }
 
   bool HasChildNamed(std::string_view name) const;
+
+  fuchsia_device_manager::wire::SystemPowerState system_power_state() const;
 
   // This arena backs `properties_`.
   // This should be declared before any objects it backs so it is destructed last.
@@ -214,9 +216,6 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
 
   // Completed when suspend is replied to.
   fpromise::completer<void> suspend_completer_;
-  fuchsia_device_manager::SystemPowerState system_power_state_ =
-      fuchsia_device_manager::SystemPowerState::kFullyOn;
-
   // The default protocol of the device.
   device_t compat_symbol_;
   const zx_protocol_device_t* ops_;

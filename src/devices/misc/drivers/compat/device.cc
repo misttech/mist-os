@@ -233,15 +233,14 @@ void Device::Unbind() {
   node_ = {};
 }
 
-fpromise::promise<void> Device::HandleStopSignal(fdm::SystemPowerState state) {
-  if (state == fdm::SystemPowerState::kFullyOn) {
+fpromise::promise<void> Device::HandleStopSignal() {
+  if (system_power_state() == fdm::SystemPowerState::kFullyOn) {
     // kFullyOn means that power manager hasn't initiated a system power state transition. As a
     // result, we can assume our stop request came as a result of our parent node
     // disappearing.
     return UnbindOp();
-  } else {
-    return SuspendOp(state);
   }
+  return SuspendOp();
 }
 
 fpromise::promise<void> Device::UnbindOp() {
@@ -264,21 +263,20 @@ fpromise::promise<void> Device::UnbindOp() {
       });
 }
 
-fpromise::promise<void> Device::SuspendOp(fdm::SystemPowerState state) {
+fpromise::promise<void> Device::SuspendOp() {
   ZX_ASSERT_MSG(!suspend_completer_, "Cannot call HandleStopRequest twice");
   fpromise::bridge<void> finished_bridge;
   suspend_completer_ = std::move(finished_bridge.completer);
-  system_power_state_ = state;
 
   // If we are being suspended we have to suspend all of our children first.
-  return SuspendChildren(state)
+  return SuspendChildren()
       .then([this, bridge = std::move(finished_bridge)](fpromise::result<>& result) mutable {
         // We don't call unbind on the root parent device because it belongs to another driver.
         // We find the root parent device because it does not have parent_ set.
         if (parent_.has_value() && HasOp(ops_, &zx_protocol_device_t::suspend)) {
           // CompleteSuspend will be called from |device_suspend_reply|.
           ops_->suspend(compat_symbol_.context, DEV_POWER_STATE_D3COLD, false,
-                        PowerStateToSuspendReason(system_power_state_));
+                        PowerStateToSuspendReason(system_power_state()));
         } else {
           CompleteSuspend();
         }
@@ -313,6 +311,10 @@ void Device::CompleteSuspend() {
 const char* Device::Name() const { return name_.data(); }
 
 bool Device::HasChildren() const { return !children_.empty(); }
+
+fuchsia_device_manager::wire::SystemPowerState Device::system_power_state() const {
+  return driver_ ? driver_->system_state() : fdm::SystemPowerState::kFullyOn;
+}
 
 zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
   if (HasChildNamed(zx_args->name)) {
@@ -618,10 +620,10 @@ fpromise::promise<void> Device::RemoveChildren() {
       });
 }
 
-fpromise::promise<void> Device::SuspendChildren(fdm::SystemPowerState state) {
+fpromise::promise<void> Device::SuspendChildren() {
   std::vector<fpromise::promise<void>> promises;
   for (auto& child : children_) {
-    promises.push_back(child->SuspendOp(state));
+    promises.push_back(child->SuspendOp());
   }
   return fpromise::join_promise_vector(std::move(promises))
       .then([](fpromise::result<std::vector<fpromise::result<void>>>& results) {

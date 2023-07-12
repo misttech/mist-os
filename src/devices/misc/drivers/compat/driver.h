@@ -71,6 +71,8 @@ class Driver : public fdf::DriverBase {
 
   const std::string& driver_path() const { return driver_path_; }
 
+  fuchsia_device_manager::wire::SystemPowerState system_state() const { return system_state_; }
+
  private:
   bool IsComposite();
 

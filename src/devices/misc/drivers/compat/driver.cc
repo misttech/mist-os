@@ -366,11 +366,10 @@ void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
 
   system_state_ = result->state;
 
-  executor_.schedule_task(
-      device_.HandleStopSignal(result->state)
-          .then([completer = std::move(completer)](fpromise::result<void>& init) mutable {
-            completer(zx::ok());
-          }));
+  executor_.schedule_task(device_.HandleStopSignal().then(
+      [completer = std::move(completer)](fpromise::result<void>& init) mutable {
+        completer(zx::ok());
+      }));
 }
 
 zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
