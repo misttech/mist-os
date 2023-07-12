@@ -61,7 +61,10 @@ fuchsia_driver_component("imx8m-sdmmc") {
 
 test("imx8m-sdmmc-test-bin") {
   output_name = "imx8m-sdmmc-test"
-  configs += [ "//build/config:all_source" ]
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
   sources = [
     "imx8m-sdmmc-test.cc",
     "imx8m-sdmmc.cc",

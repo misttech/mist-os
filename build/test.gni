@@ -110,15 +110,4 @@ template("test") {
 
 set_defaults("test") {
   configs = default_executable_configs
-
-  # Debug asserts should always fire in tests.
-  configs += [
-    "//build/config/zircon:default_assert_level",
-    "//build/config/zircon:assert_level_2",
-  ]
-  configs -= [
-    "//build/config/zircon:default_assert_level",
-    "//build/config/zircon:assert_level_2",
-  ]
-  configs += [ "//build/config/zircon:assert_level_2" ]
 }
