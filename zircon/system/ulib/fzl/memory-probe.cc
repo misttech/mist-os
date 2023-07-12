@@ -97,7 +97,7 @@ zx_status_t advance_program_counter(const zx::thread& thread) {
   return thread.write_state(ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs));
 }
 
-bool do_probe(void (*op)(uintptr_t address, uintptr_t), uintptr_t addr) {
+zx_status_t do_probe(void (*op)(uintptr_t address, uintptr_t), uintptr_t addr) {
   // This function starts a new thread to perform the read/write test, and catches any exceptions
   // in this thread to see if it failed or not.
   zx::thread thread;
@@ -123,21 +123,29 @@ bool do_probe(void (*op)(uintptr_t address, uintptr_t), uintptr_t addr) {
                                      nullptr, nullptr) == ZX_OK);
     ZX_ASSERT(info.type == ZX_EXCP_FATAL_PAGE_FAULT);
     ZX_ASSERT(advance_program_counter(thread) == ZX_OK);
+
+    zx_exception_report_t report;
+    ZX_ASSERT(thread.get_info(ZX_INFO_THREAD_EXCEPTION_REPORT, &report, sizeof(report), nullptr,
+                              nullptr) == ZX_OK);
+    zx_status_t page_fault_error_code = static_cast<zx_status_t>(report.context.synth_code);
+    ZX_ASSERT_MSG(page_fault_error_code != ZX_OK, "The page fault must have generated an error");
+
     uint32_t state = ZX_EXCEPTION_STATE_HANDLED;
     exception.set_property(ZX_PROP_EXCEPTION_STATE, &state, sizeof(state));
-    return false;
+
+    return page_fault_error_code;
   }
 
   // Thread terminated normally so the memory is readable/writable.
-  return true;
+  return ZX_OK;
 }
 
 }  // namespace
 
-bool probe_for_read(const void* addr) {
+zx_status_t probe_for_read(const void* addr) {
   return do_probe(read_thread_func, reinterpret_cast<uintptr_t>(addr));
 }
 
-bool probe_for_write(void* addr) {
+zx_status_t probe_for_write(void* addr) {
   return do_probe(write_thread_func, reinterpret_cast<uintptr_t>(addr));
 }

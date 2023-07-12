@@ -1870,14 +1870,14 @@ TEST(Vmar, ProtectOverDemandPagedTest) {
   ASSERT_EQ(zx_vmar_protect(zx_vmar_root_self(), ZX_VM_PERM_READ, mapping_addr, size), ZX_OK);
 
   // Attempt to write to the mapping again
-  EXPECT_FALSE(probe_for_write(reinterpret_cast<void*>(mapping_addr)),
-               "mapping should no longer be writeable");
-  EXPECT_FALSE(probe_for_write(reinterpret_cast<void*>(mapping_addr + size / 4)),
-               "mapping should no longer be writeable");
-  EXPECT_FALSE(probe_for_write(reinterpret_cast<void*>(mapping_addr + size / 2)),
-               "mapping should no longer be writeable");
-  EXPECT_FALSE(probe_for_write(reinterpret_cast<void*>(mapping_addr + size - 1)),
-               "mapping should no longer be writeable");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(mapping_addr)), ZX_ERR_ACCESS_DENIED,
+                "mapping should no longer be writeable");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(mapping_addr + size / 4)),
+                ZX_ERR_ACCESS_DENIED, "mapping should no longer be writeable");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(mapping_addr + size / 2)),
+                ZX_ERR_ACCESS_DENIED, "mapping should no longer be writeable");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(mapping_addr + size - 1)),
+                ZX_ERR_ACCESS_DENIED, "mapping should no longer be writeable");
 
   EXPECT_EQ(zx_vmar_unmap(zx_vmar_root_self(), mapping_addr, size), ZX_OK);
 }
@@ -1911,14 +1911,14 @@ TEST(Vmar, ProtectLargeUncomittedTest) {
   ASSERT_EQ(zx_vmar_protect(zx_vmar_root_self(), ZX_VM_PERM_READ, base, protect_size), ZX_OK);
 
   // Attempt to write to the mapping again
-  EXPECT_TRUE(probe_for_write(reinterpret_cast<void*>(mapping_addr)),
-              "mapping should still be writeable");
-  EXPECT_FALSE(probe_for_write(reinterpret_cast<void*>(mapping_addr + size / 4)),
-               "mapping should no longer be writeable");
-  EXPECT_FALSE(probe_for_write(reinterpret_cast<void*>(mapping_addr + size / 2)),
-               "mapping should no longer be writeable");
-  EXPECT_FALSE(probe_for_write(reinterpret_cast<void*>(mapping_addr + size - 1)),
-               "mapping should no longer be writeable");
+  EXPECT_OK(probe_for_write(reinterpret_cast<void*>(mapping_addr)),
+            "mapping should still be writeable");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(mapping_addr + size / 4)),
+                ZX_ERR_ACCESS_DENIED, "mapping should no longer be writeable");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(mapping_addr + size / 2)),
+                ZX_ERR_ACCESS_DENIED, "mapping should no longer be writeable");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(mapping_addr + size - 1)),
+                ZX_ERR_ACCESS_DENIED, "mapping should no longer be writeable");
 
   EXPECT_EQ(zx_vmar_unmap(zx_vmar_root_self(), mapping_addr, size), ZX_OK);
 }
@@ -2153,14 +2153,14 @@ TEST(Vmar, UnmapLargeUncommittedTest) {
   ASSERT_EQ(zx_vmar_unmap(zx_vmar_root_self(), base, unmap_size), ZX_OK);
 
   // Attempt to write to the mapping again
-  EXPECT_TRUE(probe_for_write(reinterpret_cast<void*>(mapping_addr)),
-              "mapping should still be writeable");
-  EXPECT_FALSE(probe_for_write(reinterpret_cast<void*>(mapping_addr + size / 4)),
-               "mapping should no longer be writeable");
-  EXPECT_FALSE(probe_for_write(reinterpret_cast<void*>(mapping_addr + size / 2)),
-               "mapping should no longer be writeable");
-  EXPECT_FALSE(probe_for_write(reinterpret_cast<void*>(mapping_addr + size - 1)),
-               "mapping should no longer be writeable");
+  EXPECT_OK(probe_for_write(reinterpret_cast<void*>(mapping_addr)),
+            "mapping should still be writeable");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(mapping_addr + size / 4)), ZX_ERR_NOT_FOUND,
+                "mapping should no longer be writeable");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(mapping_addr + size / 2)), ZX_ERR_NOT_FOUND,
+                "mapping should no longer be writeable");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(mapping_addr + size - 1)), ZX_ERR_NOT_FOUND,
+                "mapping should no longer be writeable");
 
   EXPECT_EQ(zx_vmar_unmap(zx_vmar_root_self(), mapping_addr, size), ZX_OK);
 }
@@ -2624,7 +2624,8 @@ TEST(Vmar, MapReadIfXomUnsupported) {
   ASSERT_EQ(zx_system_get_features(ZX_FEATURE_KIND_VM, &features), ZX_OK);
   bool xomUnsupported = !(features & ZX_VM_FEATURE_CAN_MAP_XOM);
 
-  EXPECT_EQ(probe_for_read(reinterpret_cast<void*>(addr)), xomUnsupported);
+  const zx_status_t expected = xomUnsupported ? ZX_OK : ZX_ERR_ACCESS_DENIED;
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr)), expected);
 }
 
 TEST(Vmar, ProtectReadIfXomUnsupported) {
@@ -2636,7 +2637,7 @@ TEST(Vmar, ProtectReadIfXomUnsupported) {
   ASSERT_EQ(zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ, 0, vmo, 0, size, &addr), ZX_OK);
   EXPECT_EQ(zx_handle_close(vmo), ZX_OK);
 
-  ASSERT_TRUE(probe_for_read(reinterpret_cast<void*>(addr)));
+  ASSERT_OK(probe_for_read(reinterpret_cast<void*>(addr)));
 
   ASSERT_EQ(zx_vmar_protect(zx_vmar_root_self(), ZX_VM_PERM_READ_IF_XOM_UNSUPPORTED, addr, size),
             ZX_OK);
@@ -2645,7 +2646,8 @@ TEST(Vmar, ProtectReadIfXomUnsupported) {
   ASSERT_EQ(zx_system_get_features(ZX_FEATURE_KIND_VM, &features), ZX_OK);
   bool xomUnsupported = !(features & ZX_VM_FEATURE_CAN_MAP_XOM);
 
-  EXPECT_EQ(probe_for_read(reinterpret_cast<void*>(addr)), xomUnsupported);
+  const zx_status_t expected = xomUnsupported ? ZX_OK : ZX_ERR_ACCESS_DENIED;
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr)), expected);
 }
 
 }  // namespace

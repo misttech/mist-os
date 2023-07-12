@@ -357,7 +357,7 @@ TEST(VmoTestCase, ReadOnlyMap) {
   EXPECT_OK(status, "vm_map");
   EXPECT_NE(0u, ptr, "vm_map");
 
-  EXPECT_EQ(false, probe_for_write((void *)ptr), "write");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void *>(ptr)), ZX_ERR_ACCESS_DENIED, "write");
 
   status = zx_vmar_unmap(zx_vmar_root_self(), ptr, len);
   EXPECT_OK(status, "vm_unmap");
@@ -387,8 +387,8 @@ TEST(VmoTestCase, NoPermMap) {
   EXPECT_OK(status, "vm_protect");
 
   // test reading writing to the mapping
-  EXPECT_EQ(false, probe_for_read(reinterpret_cast<void *>(ptr)), "read");
-  EXPECT_EQ(false, probe_for_write(reinterpret_cast<void *>(ptr)), "write");
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void *>(ptr)), ZX_ERR_ACCESS_DENIED, "read");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void *>(ptr)), ZX_ERR_ACCESS_DENIED, "write");
 
   status = zx_vmar_unmap(zx_vmar_root_self(), ptr, len);
   EXPECT_OK(status, "vm_unmap");
@@ -413,19 +413,19 @@ TEST(VmoTestCase, NoPermProtect) {
   EXPECT_NE(0u, ptr, "vm_map");
 
   // test writing to the mapping
-  EXPECT_EQ(false, probe_for_write(reinterpret_cast<void *>(ptr)), "write");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void *>(ptr)), ZX_ERR_ACCESS_DENIED, "write");
   // test reading to the mapping
-  EXPECT_EQ(false, probe_for_read(reinterpret_cast<void *>(ptr)), "read");
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void *>(ptr)), ZX_ERR_ACCESS_DENIED, "read");
 
   // protect it to read permissions and make sure it works as expected
   status = zx_vmar_protect(zx_vmar_root_self(), ZX_VM_PERM_READ, ptr, len);
   EXPECT_OK(status, "vm_protect");
 
   // test writing to the mapping
-  EXPECT_EQ(false, probe_for_write(reinterpret_cast<void *>(ptr)), "write");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void *>(ptr)), ZX_ERR_ACCESS_DENIED, "write");
 
   // test reading from the mapping
-  EXPECT_EQ(true, probe_for_read(reinterpret_cast<void *>(ptr)), "read");
+  EXPECT_OK(probe_for_read(reinterpret_cast<void *>(ptr)), "read");
 
   status = zx_vmar_unmap(zx_vmar_root_self(), ptr, len);
   EXPECT_OK(status, "vm_unmap");
@@ -568,10 +568,12 @@ TEST(VmoTestCase, MappedVmoSmallerThanMapping) {
       fit::defer([&]() { EXPECT_OK(zx_vmar_unmap(zx_vmar_root_self(), addr, mapped_size)); });
 
   // Verify that only the first page can be accessed.
-  EXPECT_TRUE(probe_for_read(reinterpret_cast<void *>(addr)), "read before end");
-  EXPECT_TRUE(probe_for_write(reinterpret_cast<void *>(addr)), "write before end");
-  EXPECT_FALSE(probe_for_read(reinterpret_cast<void *>(addr + allocated_size)), "read past end");
-  EXPECT_FALSE(probe_for_write(reinterpret_cast<void *>(addr + allocated_size)), "write past end");
+  EXPECT_OK(probe_for_read(reinterpret_cast<void *>(addr)), "read before end");
+  EXPECT_OK(probe_for_write(reinterpret_cast<void *>(addr)), "write before end");
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void *>(addr + allocated_size)),
+                ZX_ERR_OUT_OF_RANGE, "read past end");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void *>(addr + allocated_size)),
+                ZX_ERR_OUT_OF_RANGE, "write past end");
 
   // Verify that zx_process_{read,write}_memory on the whole range complete partially.
   std::vector<uint8_t> buffer(mapped_size);
@@ -1708,8 +1710,8 @@ TEST(VmoTestCase, ResizeHazard) {
 
   EXPECT_OK(zx_vmo_set_size(vmo, 0u));
 
-  EXPECT_EQ(false, probe_for_read(&int_arr[1]), "read probe");
-  EXPECT_EQ(false, probe_for_write(&int_arr[1]), "write probe");
+  EXPECT_STATUS(probe_for_read(&int_arr[1]), ZX_ERR_OUT_OF_RANGE, "read probe");
+  EXPECT_STATUS(probe_for_write(&int_arr[1]), ZX_ERR_OUT_OF_RANGE, "write probe");
 
   EXPECT_OK(zx_handle_close(vmo));
   EXPECT_OK(zx_vmar_unmap(zx_vmar_root_self(), ptr_rw, size), "unmap");

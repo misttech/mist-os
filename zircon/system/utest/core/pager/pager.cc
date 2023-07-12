@@ -1200,8 +1200,8 @@ TEST(Pager, CloneResizeCloneHazard) {
 
   EXPECT_EQ(ZX_OK, clone_vmo.set_size(0u));
 
-  EXPECT_EQ(false, probe_for_read(&int_arr[1]), "read probe");
-  EXPECT_EQ(false, probe_for_write(&int_arr[1]), "write probe");
+  EXPECT_STATUS(probe_for_read(&int_arr[1]), ZX_ERR_OUT_OF_RANGE, "read probe");
+  EXPECT_STATUS(probe_for_write(&int_arr[1]), ZX_ERR_OUT_OF_RANGE, "write probe");
 
   EXPECT_EQ(ZX_OK, zx::vmar::root_self()->unmap(ptr_rw, kSize), "unmap");
 }
@@ -1230,8 +1230,8 @@ TEST(Pager, CloneResizeParentOK) {
 
   EXPECT_TRUE(vmo->Resize(0u));
 
-  EXPECT_EQ(true, probe_for_read(&int_arr[1]), "read probe");
-  EXPECT_EQ(true, probe_for_write(&int_arr[1]), "write probe");
+  EXPECT_OK(probe_for_read(&int_arr[1]), "read probe");
+  EXPECT_OK(probe_for_write(&int_arr[1]), "write probe");
 
   EXPECT_EQ(ZX_OK, zx::vmar::root_self()->unmap(ptr_rw, kSize), "unmap");
 }
