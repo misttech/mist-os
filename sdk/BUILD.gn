@@ -554,7 +554,6 @@ sdk("fuchsia_dart") {
     deps += [
       "//sdk/dart:gen_snapshot_sdk($dart_toolchain)",
       "//sdk/dart:kernel_compiler_sdk($dart_toolchain)",
-      "//tools/fidl/fidlgen_dart:fidlgen_dart_sdk($host_toolchain)",
     ]
 
     toolchains = []
@@ -565,9 +564,6 @@ sdk("fuchsia_dart") {
       ]
     } else if (host_os == "mac") {
       toolchains += [ host_toolchain ]
-    }
-    foreach(toolchain, toolchains) {
-      deps += [ "//tools/fidl/fidlgen_dart:fidlgen_dart_sdk($toolchain)" ]
     }
   }
 }

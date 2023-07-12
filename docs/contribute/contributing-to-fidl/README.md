@@ -528,7 +528,6 @@ for test failures. To see those, look at the `fx qemu` or `ffx log` output.
 | fidlgen golang             | `fx test fidlgen_go_{lib,golden}_tests`            | //tools/fidl/fidlgen_golang
 | fidlgen rust               | `fx test fidlgen_rust_{lib,golden}_tests`          | //tools/fidl/fidlgen_rust
 | fidlgen syzkaller          | `fx test fidlgen_syzkaller_golden_tests`           | //tools/fidl/fidlgen_syzkaller
-| fidlgen dart               | `fx test fidlgen_dart_golden_tests`                | //tools/fidl/fidlgen_dart
 
 #### Other
 
@@ -602,17 +601,17 @@ golden files. This is what `fidldev regen` uses under the hood.
 
 In some cases, GN can build many unneeded targets. You can build a specific target with `ninja` instead of GN. In most cases, you can `grep` for the binary name to determine the `ninja` invocation.
 
-For example, you can `grep` for `fidlgen_dart`:
+For example, you can `grep` for `fidlgen_cpp`:
 
 ```sh
-fx ninja -C out/default -t targets all | grep -e 'fidlgen_dart:'
+fx ninja -C out/default -t targets all | grep -e 'fidlgen_cpp:'
 ```
 
-This example outputs a list of ninja targets, including `host_x64/fidlgen_dart`. Therefore, to
-build `fidlgen_dart` run the following ninja command:
+This example outputs a list of ninja targets, including `host_x64/fidlgen_cpp`. Therefore, to
+build `fidlgen_cpp` run the following ninja command:
 
 ```sh
-fx ninja -C out/default host_x64/fidlgen_dart
+fx ninja -C out/default host_x64/fidlgen_cpp
 ```
 
 ## Debugging (host)
@@ -740,7 +739,6 @@ fidl fmt --library my_library.fidl -i
 [/tools/fidl/fidlgen_cpp]: /tools/fidl/fidlgen_cpp
 [/tools/fidl/fidlgen_go]: /tools/fidl/fidlgen_go
 [/tools/fidl/fidlgen_rust]: /tools/fidl/fidlgen_rust
-[/tools/fidl/fidlgen_dart]: /tools/fidl/fidlgen_dart
 [/sdk/lib/fidl/cpp]: /sdk/lib/fidl/cpp
 [/sdk/lib/fidl/cpp/wire]: /sdk/lib/fidl/cpp/wire
 [/src/lib/fidl/rust]: /src/lib/fidl/rust

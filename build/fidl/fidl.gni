@@ -20,7 +20,7 @@ import("//build/go/toolchain.gni")
 # Subtargets:
 #  * `${target_name}`: available only in the FIDL toolchain
 #  * `${target_name}_go`: available only in the go toolchain
-#  * `${target_name}_${backend_name}`: available in every toolchain but go.
+#  * `${target_name}_${backend_name}`: available in every toolchain but go
 #
 # Parameters
 #
