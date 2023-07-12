@@ -98,8 +98,12 @@ pub fn new_fuse_fs(
         .connection
         .clone();
 
-    let fs =
-        FileSystem::new(current_task.kernel(), CacheMode::Cached, FuseFs::new(connection.clone()), options);
+    let fs = FileSystem::new(
+        current_task.kernel(),
+        CacheMode::Cached,
+        FuseFs::new(connection.clone()),
+        options,
+    );
     let fuse_node = Arc::new(FuseNode {
         connection: connection.clone(),
         nodeid: uapi::FUSE_ROOT_ID as u64,
@@ -919,8 +923,13 @@ impl FuseConnection {
         }
         let waiter = Waiter::new();
         let is_async = operation.is_async();
-        let unique_id =
-            state.queue_operation(current_task, node, operation, configuration.clone(), Some(&waiter))?;
+        let unique_id = state.queue_operation(
+            current_task,
+            node,
+            operation,
+            configuration.clone(),
+            Some(&waiter),
+        )?;
         if is_async {
             return Ok(FuseResponse::None);
         }
