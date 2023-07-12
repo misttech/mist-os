@@ -5,8 +5,6 @@
 #ifndef SRC_DEVELOPER_DEBUG_DEBUG_AGENT_ZIRCON_SYSTEM_INTERFACE_H_
 #define SRC_DEVELOPER_DEBUG_DEBUG_AGENT_ZIRCON_SYSTEM_INTERFACE_H_
 
-#include <lib/sys/cpp/service_directory.h>
-
 #include <memory>
 
 #include "src/developer/debug/debug_agent/system_interface.h"
@@ -34,8 +32,8 @@ class ZirconSystemInterface final : public SystemInterface {
   ZirconComponentManager& zircon_component_manager() { return component_manager_; }
 
  private:
+  fidl::ClientEnd<fuchsia_io::Directory> svc_dir_;
   std::unique_ptr<ZirconJobHandle> root_job_;  // May be null.
-  std::shared_ptr<sys::ServiceDirectory> services_;
   ZirconComponentManager component_manager_;
   ZirconLimboProvider limbo_provider_;
 };

@@ -4,44 +4,40 @@
 
 #include "src/developer/debug/debug_agent/zircon_system_interface.h"
 
-#include <fuchsia/kernel/cpp/fidl.h>
+#include <fidl/fuchsia.kernel/cpp/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
 
 #include "src/developer/debug/debug_agent/zircon_binary_launcher.h"
 #include "src/developer/debug/debug_agent/zircon_job_handle.h"
-#include "src/developer/debug/debug_agent/zircon_process_handle.h"
-#include "src/developer/debug/debug_agent/zircon_utils.h"
+#include "src/developer/debug/shared/logging/logging.h"
 
 namespace debug_agent {
 
 namespace {
 
 // Returns an !is_valid() job object on failure.
-zx::job GetRootZxJob(const sys::ServiceDirectory& services) {
-  zx::job root_job;
-  fuchsia::kernel::RootJobSyncPtr root_job_ptr;
-
-  zx_status_t status = services.Connect(root_job_ptr.NewRequest());
-
-  if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Cannot connect to fuchsia.kernel.RootJob";
+zx::job GetRootZxJob() {
+  auto res = component::Connect<fuchsia_kernel::RootJob>();
+  if (res.is_error()) {
+    LOGS(Error) << "Failed to connect to fuchsia.kernel.RootJob: " << res.error_value();
     return zx::job();
   }
 
-  status = root_job_ptr->Get(&root_job);
-  if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Cannot get root job handle";
+  fidl::SyncClient root_job_ptr(std::move(*res));
+
+  auto get_res = root_job_ptr->Get();
+  if (get_res.is_error()) {
+    LOGS(Error) << "Failed to get root job: " << get_res.error_value().FormatDescription();
     return zx::job();
   }
-  return root_job;
+  return std::move(get_res->job());
 }
 
 }  // namespace
 
 ZirconSystemInterface::ZirconSystemInterface()
-    : services_(sys::ServiceDirectory::CreateFromNamespace()),
-      component_manager_(this, services_),
-      limbo_provider_(services_) {
-  if (zx::job zx_root = GetRootZxJob(*services_); zx_root.is_valid())
+    : svc_dir_(*component::OpenServiceRoot()), component_manager_(this), limbo_provider_(svc_dir_) {
+  if (zx::job zx_root = GetRootZxJob(); zx_root.is_valid())
     root_job_ = std::make_unique<ZirconJobHandle>(std::move(zx_root));
 }
 
@@ -56,7 +52,7 @@ std::unique_ptr<JobHandle> ZirconSystemInterface::GetRootJob() const {
 }
 
 std::unique_ptr<BinaryLauncher> ZirconSystemInterface::GetLauncher() const {
-  return std::make_unique<ZirconBinaryLauncher>(services_);
+  return std::make_unique<ZirconBinaryLauncher>();
 }
 
 ComponentManager& ZirconSystemInterface::GetComponentManager() { return component_manager_; }

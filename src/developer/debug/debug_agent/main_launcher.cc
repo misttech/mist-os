@@ -7,22 +7,22 @@
 // launched expects a numbered handle at PA_HND(PA_USER0, 0), which should
 // point to a zx::socket object.
 
-#include <fuchsia/debugger/cpp/fidl.h>
+#include <fidl/fuchsia.debugger/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/spawn.h>
-#include <lib/fidl/cpp/binding.h>
-#include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/process.h>
 #include <zircon/processargs.h>
 
 namespace {
 
-class DebugAgentLauncher : public fuchsia::debugger::DebugAgent {
+class DebugAgentLauncher : public fidl::Server<fuchsia_debugger::DebugAgent> {
  public:
   // Launch debug_agent on connect, passing the socket as a numbered handle.
-  void Connect(zx::socket socket, ConnectCallback callback) override {
+  void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override {
     FX_LOGS(DEBUG) << "Spawning debug_agent...";
     const char* path = "/pkg/bin/debug_agent";
     const char* argv[] = {path, "--channel-mode", nullptr};
@@ -32,7 +32,7 @@ class DebugAgentLauncher : public fuchsia::debugger::DebugAgent {
             {
                 // Must correspond to main.cc.
                 .id = PA_HND(PA_USER0, 0),
-                .handle = socket.release(),
+                .handle = request.socket().release(),
             },
     };
     zx::process process;
@@ -43,7 +43,7 @@ class DebugAgentLauncher : public fuchsia::debugger::DebugAgent {
     if (status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Failed to launch debug_agent: " << err_msg;
     }
-    callback(status);
+    completer.Reply(status);
   }
 };
 
@@ -53,14 +53,18 @@ int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   fuchsia_logging::SetLogSettings(fuchsia_logging::LogSettings{});
 
-  DebugAgentLauncher launcher;
-  fidl::Binding<fuchsia::debugger::DebugAgent> binding(&launcher);
-  fidl::InterfaceRequestHandler<fuchsia::debugger::DebugAgent> handler =
-      [&](fidl::InterfaceRequest<fuchsia::debugger::DebugAgent> request) {
-        binding.Bind(std::move(request));
-      };
-  auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-  context->outgoing()->AddPublicService(std::move(handler));
+  component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
+  zx::result res = outgoing.ServeFromStartupInfo();
+  if (res.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve outgoing directory: " << res.status_string();
+    return -1;
+  }
+
+  res = outgoing.AddProtocol<fuchsia_debugger::DebugAgent>(std::make_unique<DebugAgentLauncher>());
+  if (res.is_error()) {
+    FX_LOGS(ERROR) << "Failed to add DebugAgent protocol: " << res.status_string();
+    return -1;
+  }
 
   FX_LOGS(INFO) << "Start listening on FIDL fuchsia::debugger::DebugAgent.";
   return loop.Run();

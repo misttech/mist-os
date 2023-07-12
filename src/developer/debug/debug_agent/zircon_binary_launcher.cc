@@ -7,6 +7,7 @@
 #include <inttypes.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/io.h>
+#include <lib/sys/cpp/service_directory.h>
 #include <zircon/processargs.h>
 
 #include <utility>
@@ -16,8 +17,8 @@
 
 namespace debug_agent {
 
-ZirconBinaryLauncher::ZirconBinaryLauncher(std::shared_ptr<sys::ServiceDirectory> env_services)
-    : builder_(std::move(env_services)) {}
+ZirconBinaryLauncher::ZirconBinaryLauncher()
+    : builder_(sys::ServiceDirectory::CreateFromNamespace()) {}
 ZirconBinaryLauncher::~ZirconBinaryLauncher() = default;
 
 debug::Status ZirconBinaryLauncher::Setup(const std::vector<std::string>& argv) {

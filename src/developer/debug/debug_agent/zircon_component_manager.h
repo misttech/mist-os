@@ -5,12 +5,11 @@
 #ifndef SRC_DEVELOPER_DEBUG_DEBUG_AGENT_ZIRCON_COMPONENT_MANAGER_H_
 #define SRC_DEVELOPER_DEBUG_DEBUG_AGENT_ZIRCON_COMPONENT_MANAGER_H_
 
-#include <fuchsia/sys2/cpp/fidl.h>
-#include <lib/fidl/cpp/binding.h>
-#include <lib/sys/cpp/service_directory.h>
+#include <fidl/fuchsia.component/cpp/fidl.h>
 #include <zircon/types.h>
 
 #include <set>
+#include <string>
 
 #include "src/developer/debug/debug_agent/component_manager.h"
 #include "src/developer/debug/debug_agent/system_interface.h"
@@ -20,8 +19,7 @@ namespace debug_agent {
 
 class ZirconComponentManager : public ComponentManager {
  public:
-  ZirconComponentManager(SystemInterface* system_interface,
-                         std::shared_ptr<sys::ServiceDirectory> services);
+  explicit ZirconComponentManager(SystemInterface* system_interface);
   ~ZirconComponentManager() override = default;
 
   // ComponentManager implementation.
@@ -34,7 +32,7 @@ class ZirconComponentManager : public ComponentManager {
                       std::string* process_name_override) override;
 
   // Handles an incoming component lifecycle event.
-  void OnComponentEvent(fuchsia::component::Event event);
+  void OnComponentEvent(fuchsia_component::Event event);
 
   // (For test only) Set the callback that will be invoked when the initialization is ready.
   // If the initialization is already done, callback will still be invoked in the message loop.
@@ -51,11 +49,9 @@ class ZirconComponentManager : public ComponentManager {
 
   DebugAgent* debug_agent_ = nullptr;  // nullable.
 
-  std::shared_ptr<sys::ServiceDirectory> services_;
-
   // Information of all running components in the system, indexed by their job koids.
   std::map<zx_koid_t, debug_ipc::ComponentInfo> running_component_info_;
-  fuchsia::component::EventStreamPtr event_stream_binding_;
+  fidl::Client<fuchsia_component::EventStream> event_stream_client_;
 
   // Monikers of v2 components we're expecting.
   // There's no way to set stdio handle for v2 components yet.

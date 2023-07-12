@@ -4,64 +4,65 @@
 
 #include "src/developer/debug/debug_agent/zircon_limbo_provider.h"
 
+#include <lib/async/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <zircon/status.h>
 
-#include "src/developer/debug/debug_agent/arch.h"
 #include "src/developer/debug/debug_agent/zircon_exception_handle.h"
 #include "src/developer/debug/debug_agent/zircon_process_handle.h"
 #include "src/developer/debug/debug_agent/zircon_thread_handle.h"
-#include "src/developer/debug/debug_agent/zircon_utils.h"
 #include "src/developer/debug/shared/logging/logging.h"
-
-using namespace fuchsia::exception;
 
 namespace debug_agent {
 
 namespace {
 
-LimboProvider::Record MetadataToRecord(ProcessExceptionMetadata metadata) {
+LimboProvider::Record MetadataToRecord(fuchsia_exception::ProcessExceptionMetadata metadata) {
   return ZirconLimboProvider::Record{
-      .process = std::make_unique<ZirconProcessHandle>(std::move(*metadata.mutable_process())),
-      .thread = std::make_unique<ZirconThreadHandle>(std::move(*metadata.mutable_thread()))};
+      .process = std::make_unique<ZirconProcessHandle>(std::move(*metadata.process())),
+      .thread = std::make_unique<ZirconThreadHandle>(std::move(*metadata.thread()))};
 }
 
 }  // namespace
 
-ZirconLimboProvider::ZirconLimboProvider(std::shared_ptr<sys::ServiceDirectory> services)
-    : services_(std::move(services)) {
-  // Get the initial state of the hanging gets.
-  ProcessLimboSyncPtr process_limbo;
-  if (zx_status_t status = services_->Connect(process_limbo.NewRequest()); status != ZX_OK)
+ZirconLimboProvider::ZirconLimboProvider(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir)
+    : svc_dir_(svc_dir) {
+  // Connect to process limbo.
+  auto connect_res = component::ConnectAt<fuchsia_exception::ProcessLimbo>(svc_dir_);
+  if (connect_res.is_error()) {
+    // Connecting to a service is asynchronous and won't be handled here.
+    LOGS(Error) << "Failed to connect to ProcessLimbo: " << connect_res.error_value();
     return;
+  }
+  fidl::SyncClient process_limbo(std::move(*connect_res));
 
   // Check if the limbo is active.
-  bool is_limbo_active = false;
-  if (zx_status_t status = process_limbo->WatchActive(&is_limbo_active); status != ZX_OK)
+  auto active_res = process_limbo->WatchActive();
+  if (active_res.is_error()) {
+    if (active_res.error_value().is_peer_closed()) {
+      LOGS(Warn) << "ProcessLimbo is not available";
+      return;
+    }
+    LOGS(Error) << "Failed to WatchActive: " << active_res.error_value();
     return;
+  }
 
-  is_limbo_active_ = is_limbo_active;
+  is_limbo_active_ = active_res->is_active();
   if (is_limbo_active_) {
     // Get the current set of process in exceptions.
-    ProcessLimbo_WatchProcessesWaitingOnException_Result result;
-    if (zx_status_t status = process_limbo->WatchProcessesWaitingOnException(&result);
-        status != ZX_OK || result.is_err())
+    auto processes_res = process_limbo->WatchProcessesWaitingOnException();
+    if (processes_res.is_error()) {
+      LOGS(Error) << "Failed to WatchProcessesWaitingOnException: " << processes_res.error_value();
       return;
+    }
 
     // Add all the current exceptions.
-    for (auto& exception : result.response().exception_list)
-      limbo_[exception.info().process_koid] = MetadataToRecord(std::move(exception));
+    for (auto& exception : processes_res->exception_list())
+      limbo_[exception.info()->process_koid()] = MetadataToRecord(std::move(exception));
   }
 
   // Now that we were able to get the current state of the limbo, we move to an async binding.
-  connection_.Bind(process_limbo.Unbind().TakeChannel());
-
-  // |this| owns the connection, so it's guaranteed to outlive it.
-  connection_.set_error_handler([this](zx_status_t status) {
-    LOGS(Error) << "Got error from limbo: " << zx_status_get_string(status);
-    limbo_.clear();
-    is_limbo_active_ = false;
-    connection_ = {};
-  });
+  connection_.Bind(process_limbo.TakeClientEnd(), async_get_default_dispatcher());
 
   WatchActive();
   WatchLimbo();
@@ -71,28 +72,35 @@ ZirconLimboProvider::ZirconLimboProvider(std::shared_ptr<sys::ServiceDirectory> 
 
 void ZirconLimboProvider::WatchActive() {
   // |this| owns the connection, so it's guaranteed to outlive it.
-  connection_->WatchActive([this](bool is_active) {
-    if (!is_active)
-      limbo_.clear();
-    is_limbo_active_ = is_active;
+  connection_->WatchActive().Then(
+      [this](fidl::Result<fuchsia_exception::ProcessLimbo::WatchActive>& res) {
+        if (!res.is_ok()) {
+          LOGS(Error) << "Failed to WatchActive: " << res.error_value();
+          return;
+        }
+        is_limbo_active_ = res->is_active();
+        if (!is_limbo_active_)
+          limbo_.clear();
 
-    // Re-issue the hanging get.
-    WatchActive();
-  });
+        // Re-issue the hanging get.
+        WatchActive();
+      });
 }
 
 void ZirconLimboProvider::WatchLimbo() {
-  connection_->WatchProcessesWaitingOnException(
+  connection_->WatchProcessesWaitingOnException().Then(
       // |this| owns the connection, so we're guaranteed to outlive it.
-      [this](ProcessLimbo_WatchProcessesWaitingOnException_Result result) {
-        if (result.is_err())
-          return;  // Limbo likely not enabled, give up.
+      [this](fidl::Result<fuchsia_exception::ProcessLimbo::WatchProcessesWaitingOnException>& res) {
+        if (!res.is_ok()) {
+          LOGS(Error) << "Failed to WatchProcessesWaitingOnException: " << res.error_value();
+          return;
+        }
 
         // The callback provides the full current list every time.
         RecordMap new_limbo;
         std::vector<zx_koid_t> new_exceptions;
-        for (ProcessExceptionMetadata& exception : result.response().exception_list) {
-          zx_koid_t process_koid = exception.info().process_koid;
+        for (auto& exception : res->exception_list()) {
+          zx_koid_t process_koid = exception.info()->process_koid();
           // Record if this is a new one we don't have yet.
           if (auto it = limbo_.find(process_koid); it == limbo_.end())
             new_exceptions.push_back(process_koid);
@@ -127,47 +135,49 @@ ZirconLimboProvider::RetrieveException(zx_koid_t process_koid) {
   if (!is_limbo_active_)
     return fit::error(debug::ZxStatus(ZX_ERR_NOT_FOUND));
 
-  ProcessLimboSyncPtr process_limbo;
-  if (zx_status_t status = services_->Connect(process_limbo.NewRequest()); status != ZX_OK)
-    return fit::error(debug::ZxStatus(status));
+  // Re-connect to process limbo so we could use the sync client.
+  auto connect_res = component::ConnectAt<fuchsia_exception::ProcessLimbo>(svc_dir_);
+  if (connect_res.is_error()) {
+    LOGS(Error) << "Failed to connect to ProcessLimbo: " << connect_res.error_value();
+    return fit::error(debug::ZxStatus(connect_res.error_value()));
+  }
+  fidl::SyncClient process_limbo(std::move(*connect_res));
 
-  ProcessLimbo_RetrieveException_Result result = {};
-  if (zx_status_t status = process_limbo->RetrieveException(process_koid, &result);
-      status != ZX_OK) {
-    return fit::error(debug::ZxStatus(status));
+  auto result = process_limbo->RetrieveException(process_koid);
+  if (result.is_error()) {
+    return fit::error(debug::Status(result.error_value().FormatDescription()));
   }
 
-  if (result.is_err())
-    return fit::error(debug::ZxStatus(result.err()));
-
-  fuchsia::exception::ProcessException exception = result.response().ResultValue_();
+  fuchsia_exception::ProcessException& exception = result->process_exception();
 
   // Convert from the FIDL ExceptionInfo to the kernel zx_exception_info_t.
   const auto& source_info = exception.info();
   zx_exception_info_t info = {};
-  info.pid = source_info.process_koid;
-  info.tid = source_info.thread_koid;
-  info.type = static_cast<zx_excp_type_t>(source_info.type);
+  info.pid = source_info->process_koid();
+  info.tid = source_info->thread_koid();
+  info.type = static_cast<zx_excp_type_t>(source_info->type());
 
   RetrievedException retrieved;
-  retrieved.process =
-      std::make_unique<ZirconProcessHandle>(std::move(*exception.mutable_process()));
-  retrieved.thread = std::make_unique<ZirconThreadHandle>(std::move(*exception.mutable_thread()));
+  retrieved.process = std::make_unique<ZirconProcessHandle>(std::move(*exception.process()));
+  retrieved.thread = std::make_unique<ZirconThreadHandle>(std::move(*exception.thread()));
   retrieved.exception =
-      std::make_unique<ZirconExceptionHandle>(std::move(*exception.mutable_exception()), info);
+      std::make_unique<ZirconExceptionHandle>(std::move(*exception.exception()), info);
 
   return fit::ok(std::move(retrieved));
 }
 
 debug::Status ZirconLimboProvider::ReleaseProcess(zx_koid_t process_koid) {
-  ProcessLimboSyncPtr process_limbo;
-  if (zx_status_t status = services_->Connect(process_limbo.NewRequest()); status != ZX_OK)
-    return debug::ZxStatus(status);
+  // Re-connect to process limbo so we could use the sync client.
+  auto connect_res = component::ConnectAt<fuchsia_exception::ProcessLimbo>(svc_dir_);
+  if (connect_res.is_error()) {
+    LOGS(Error) << "Failed to connect to ProcessLimbo: " << connect_res.error_value();
+    return debug::ZxStatus(connect_res.error_value());
+  }
+  fidl::SyncClient process_limbo(std::move(*connect_res));
 
-  ProcessLimbo_ReleaseProcess_Result result;
-  if (zx_status_t status = process_limbo->ReleaseProcess(process_koid, &result);
-      status != ZX_OK || result.is_err())
-    return debug::ZxStatus(status);
+  auto result = process_limbo->ReleaseProcess(process_koid);
+  if (result.is_error())
+    return debug::Status(result.error_value().FormatDescription());
 
   limbo_.erase(process_koid);
   return debug::Status();

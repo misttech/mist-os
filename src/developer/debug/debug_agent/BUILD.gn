@@ -107,6 +107,7 @@ static_library("lib") {
   }
 
   deps = [
+    "//sdk/lib/component/incoming/cpp",
     "//src/developer/debug/third_party/libunwindstack",
     "//src/lib/diagnostics/accessor2logger",
     "//src/lib/elflib",
@@ -115,11 +116,11 @@ static_library("lib") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.exception:fuchsia.exception_hlcpp",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_hlcpp",
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_hlcpp",
-    "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_hlcpp",
+    "//sdk/fidl/fuchsia.exception:fuchsia.exception_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
+    "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_cpp",
     "//sdk/lib/fit",
     "//sdk/lib/syslog/cpp",
     "//src/developer/debug/ipc",
@@ -155,8 +156,8 @@ executable("launcher") {
   sources = [ "main_launcher.cc" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_hlcpp",
-    "//sdk/lib/sys/cpp",
+    "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -280,7 +281,8 @@ test("unit_tests") {
 
   deps = [
     ":test_lib",
-    "//sdk/lib/sys/cpp/testing:unit",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//src/developer/debug/ipc:tests",
     "//src/developer/debug/shared:tests",
     "//src/lib/fxl/test:gtest_main",

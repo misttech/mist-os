@@ -8,7 +8,6 @@
 #include <lib/zx/process.h>
 #include <lib/zx/socket.h>
 
-#include "lib/sys/cpp/service_directory.h"
 #include "src/developer/debug/debug_agent/binary_launcher.h"
 #include "src/lib/process/process_builder.h"
 
@@ -22,7 +21,7 @@ class ProcessHandle;
 // before code starts executing, and expects to own the handle its using.
 class ZirconBinaryLauncher final : public BinaryLauncher {
  public:
-  explicit ZirconBinaryLauncher(std::shared_ptr<sys::ServiceDirectory> env_services);
+  ZirconBinaryLauncher();
   ~ZirconBinaryLauncher() override;
 
   debug::Status Setup(const std::vector<std::string>& argv) override;

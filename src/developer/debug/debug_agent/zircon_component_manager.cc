@@ -4,12 +4,13 @@
 
 #include "src/developer/debug/debug_agent/zircon_component_manager.h"
 
-#include <fuchsia/diagnostics/cpp/fidl.h>
-#include <fuchsia/io/cpp/fidl.h>
-#include <fuchsia/sys2/cpp/fidl.h>
-#include <fuchsia/test/manager/cpp/fidl.h>
+#include <fidl/fuchsia.component/cpp/fidl.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
+#include <fidl/fuchsia.sys2/cpp/fidl.h>
+#include <fidl/fuchsia.test.manager/cpp/fidl.h>
+#include <lib/async/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fit/defer.h>
-#include <lib/sys/cpp/termination_reason.h>
 #include <lib/syslog/cpp/macros.h>
 #include <unistd.h>
 #include <zircon/processargs.h>
@@ -21,14 +22,10 @@
 #include <string>
 #include <utility>
 
-#include "lib/fidl/cpp/interface_handle.h"
-#include "lib/fidl/cpp/interface_request.h"
 #include "src/developer/debug/debug_agent/debug_agent.h"
 #include "src/developer/debug/debug_agent/debugged_process.h"
 #include "src/developer/debug/debug_agent/filter.h"
 #include "src/developer/debug/debug_agent/stdio_handles.h"
-#include "src/developer/debug/debug_agent/zircon_utils.h"
-#include "src/developer/debug/ipc/message_writer.h"
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/logging/file_line_function.h"
 #include "src/developer/debug/shared/logging/logging.h"
@@ -45,104 +42,58 @@ namespace {
 // Maximum time we wait for reading "elf/job_id" in the runtime directory.
 constexpr uint64_t kMaxWaitMsForJobId = 1000;
 
+// Helper to simplify request pipelining.
+template <typename Protocol>
+fidl::ServerEnd<Protocol> CreateEndpointsAndBind(fidl::Client<Protocol>& client) {
+  auto [client_end, server_end] = *fidl::CreateEndpoints<Protocol>();
+  client.Bind(std::move(client_end), async_get_default_dispatcher());
+  return std::move(server_end);
+}
+
 // Read the content of "elf/job_id" in the runtime directory of an ELF component.
 //
 // |callback| will be issued with ZX_KOID_INVALID if there's any error.
 // |moniker| is only used for error logging.
-void ReadElfJobId(fuchsia::io::DirectoryHandle runtime_dir_handle, const std::string& moniker,
+void ReadElfJobId(fidl::Client<fuchsia_io::Directory> runtime_dir, const std::string& moniker,
                   fit::callback<void(zx_koid_t)> cb) {
-  fuchsia::io::DirectoryPtr runtime_dir = runtime_dir_handle.Bind();
-  fuchsia::io::FilePtr job_id_file;
-  runtime_dir->Open(
-      fuchsia::io::OpenFlags::RIGHT_READABLE, {}, "elf/job_id",
-      fidl::InterfaceRequest<fuchsia::io::Node>(job_id_file.NewRequest().TakeChannel()));
-  job_id_file.set_error_handler(
-      [cb = cb.share()](zx_status_t err) mutable { cb(ZX_KOID_INVALID); });
-  job_id_file->Read(fuchsia::io::MAX_TRANSFER_SIZE,
-                    [cb = cb.share(), moniker](fuchsia::io::Readable_Read_Result res) mutable {
-                      if (!res.is_response()) {
-                        return cb(ZX_KOID_INVALID);
-                      }
-                      std::string job_id_str(
-                          reinterpret_cast<const char*>(res.response().data.data()),
-                          res.response().data.size());
-                      // We use std::strtoull here because std::stoull is not exception-safe.
-                      char* end;
-                      zx_koid_t job_id = std::strtoull(job_id_str.c_str(), &end, 10);
-                      if (end != job_id_str.c_str() + job_id_str.size()) {
-                        LOGS(Error) << "Invalid elf/job_id for " << moniker << ": " << job_id_str;
-                        return cb(ZX_KOID_INVALID);
-                      }
-                      cb(job_id);
-                    });
+  fidl::Client<fuchsia_io::File> job_id_file;
+  auto open_res = runtime_dir->Open(
+      {fuchsia_io::OpenFlags::kRightReadable,
+       {},
+       "elf/job_id",
+       fidl::ServerEnd<fuchsia_io::Node>(CreateEndpointsAndBind(job_id_file).TakeChannel())});
+  if (!open_res.is_ok()) {
+    LOGS(Error) << "Failed to open elf/job_id for " << moniker;
+    return cb(ZX_KOID_INVALID);
+  }
+  job_id_file->Read(fuchsia_io::kMaxTransferSize)
+      .Then([cb = cb.share(), moniker](fidl::Result<fuchsia_io::File::Read>& res) mutable {
+        if (!cb) {
+          return;
+        }
+        if (!res.is_ok()) {
+          LOGS(Error) << "Failed to read elf/job_id for " << moniker << ": " << res.error_value();
+          return cb(ZX_KOID_INVALID);
+        }
+        std::string job_id_str(reinterpret_cast<const char*>(res->data().data()),
+                               res->data().size());
+        // We use std::strtoull here because std::stoull is not exception-safe.
+        char* end;
+        zx_koid_t job_id = std::strtoull(job_id_str.c_str(), &end, 10);
+        if (end != job_id_str.c_str() + job_id_str.size()) {
+          LOGS(Error) << "Invalid elf/job_id for " << moniker << ": " << job_id_str;
+          return cb(ZX_KOID_INVALID);
+        }
+        cb(job_id);
+      });
   debug::MessageLoop::Current()->PostTimer(
       FROM_HERE, kMaxWaitMsForJobId,
       [cb = std::move(cb), file = std::move(job_id_file), moniker]() mutable {
         if (cb) {
           LOGS(Warn) << "Timeout reading elf/job_id for " << moniker;
-          file.Unbind();
           cb(ZX_KOID_INVALID);
         }
       });
-}
-
-std::string to_string(fuchsia::sys2::CreateError err) {
-  static const char* const errors[] = {
-      "INTERNAL",
-      "INSTANCE_NOT_FOUND",
-      "INSTANCE_ALREADY_EXISTS",
-      "BAD_MONIKER",
-      "BAD_CHILD_DECL",
-      "COLLECTION_NOT_FOUND",
-      "BAD_DYNAMIC_OFFER",
-      "DYNAMIC_OFFERS_FORBIDDEN",
-      "EAGER_STARTUP_FORBIDDEN",
-      "NUMBERED_HANDLES_FORBIDDEN",
-  };
-  int n = static_cast<int>(err);
-  if (n < 1 || n > 10) {
-    return "Invalid error";
-  }
-  return errors[n - 1];
-}
-
-std::string to_string(fuchsia::sys2::DestroyError err) {
-  static const char* const errors[] = {"INTERNAL", "INSTANCE_NOT_FOUND", "BAD_MONIKER",
-                                       "BAD_CHILD_REF"};
-  int n = static_cast<int>(err);
-  if (n < 1 || n > 4) {
-    return "Invalid error";
-  }
-  return errors[n - 1];
-}
-
-std::string to_string(fuchsia::sys2::StartError err) {
-  static const char* const errors[] = {
-      "INTERNAL", "INSTANCE_NOT_FOUND", "BAD_MONIKER", "PACKAGE_NOT_FOUND", "MANIFEST_NOT_FOUND",
-  };
-  int n = static_cast<int>(err);
-  if (n < 1 || n > 5) {
-    return "Invalid error";
-  }
-  return errors[n - 1];
-}
-
-std::string to_string(fuchsia::test::manager::LaunchError err) {
-  static const char* const errors[] = {
-      "RESOURCE_UNAVAILABLE",             // 1
-      "INSTANCE_CANNOT_RESOLVE",          // 2
-      "INVALID_ARGS",                     // 3
-      "FAILED_TO_CONNECT_TO_TEST_SUITE",  // 4
-      "CASE_ENUMERATION",                 // 5
-      "INTERNAL_ERROR",                   // 6
-      "NO_MATCHING_CASES",                // 7
-      "INVALID_MANIFEST",                 // 8
-  };
-  int n = static_cast<int>(err);
-  if (n < 1 || n > 8) {
-    return "Invalid error";
-  }
-  return errors[n - 1];
 }
 
 std::string SeverityToString(int32_t severity) {
@@ -193,77 +144,87 @@ void SendLogs(DebugAgent* debug_agent, std::vector<fuchsia::diagnostics::Formatt
 }  // namespace
 
 void ZirconComponentManager::GetNextComponentEvent() {
-  event_stream_binding_->GetNext([this](std::vector<fuchsia::component::Event> events) {
-    for (auto& event : events) {
-      OnComponentEvent(std::move(event));
+  event_stream_client_->GetNext().Then([this](auto& result) {
+    if (result.is_error()) {
+      LOGS(Error) << "Failed to GetNextComponentEvent: " << result.error_value();
+    } else {
+      for (auto& event : result->events()) {
+        OnComponentEvent(std::move(event));
+      }
+      GetNextComponentEvent();
     }
-    GetNextComponentEvent();
   });
 }
 
-ZirconComponentManager::ZirconComponentManager(SystemInterface* system_interface,
-                                               std::shared_ptr<sys::ServiceDirectory> services)
-    : ComponentManager(system_interface), services_(std::move(services)), weak_factory_(this) {
+ZirconComponentManager::ZirconComponentManager(SystemInterface* system_interface)
+    : ComponentManager(system_interface), weak_factory_(this) {
   // 1. Subscribe to "debug_started" and "stopped" events.
-  fuchsia::component::EventStreamSyncPtr event_stream;
-  services_->Connect(event_stream.NewRequest(), "fuchsia.component.EventStream");
-  zx_status_t subscribe_result = event_stream->WaitForReady();
-  if (subscribe_result != ZX_OK) {
-    LOGS(Error) << "Failed to Subscribe: " << static_cast<uint32_t>(subscribe_result);
+  auto event_stream_res = component::Connect<fuchsia_component::EventStream>();
+  if (!event_stream_res.is_ok()) {
+    LOGS(Error) << "Failed to connect to fuchsia.component.EventStream: "
+                << event_stream_res.status_string();
+  } else {
+    fidl::SyncClient client(std::move(*event_stream_res));
+    auto res = client->WaitForReady();
+    if (!res.is_ok()) {
+      LOGS(Error) << "Failed to WaitForReady: " << res.error_value();
+    } else {
+      event_stream_client_.Bind(client.TakeClientEnd(), async_get_default_dispatcher());
+      GetNextComponentEvent();
+    }
   }
-  auto handle = event_stream.Unbind();
-  event_stream_binding_.Bind(handle.TakeChannel());
-  GetNextComponentEvent();
 
   // 2. List existing components via fuchsia.sys2.RealmQuery.
-  fuchsia::sys2::RealmQuerySyncPtr realm_query;
-  services_->Connect(realm_query.NewRequest(), "fuchsia.sys2.RealmQuery.root");
-
-  fuchsia::sys2::RealmQuery_GetAllInstances_Result all_instances_res;
-  realm_query->GetAllInstances(&all_instances_res);
-  if (all_instances_res.is_err()) {
-    LOGS(Error) << "Failed to GetAllInstances: " << static_cast<uint32_t>(all_instances_res.err());
+  auto realm_query_res =
+      component::Connect<fuchsia_sys2::RealmQuery>("/svc/fuchsia.sys2.RealmQuery.root");
+  if (!realm_query_res.is_ok()) {
+    LOGS(Error) << "Failed to connect to fuchsia.sys2.RealmQuery.root: "
+                << realm_query_res.status_string();
     return;
   }
-  fuchsia::sys2::InstanceIteratorSyncPtr instance_it =
-      all_instances_res.response().iterator.BindSync();
+  fidl::SyncClient realm_query(std::move(*realm_query_res));
 
+  auto all_instances_res = realm_query->GetAllInstances();
+  if (!all_instances_res.is_ok()) {
+    LOGS(Error) << "Failed to GetAllInstances: " << all_instances_res.error_value();
+    return;
+  }
+
+  fidl::SyncClient instance_it(std::move(all_instances_res->iterator()));
   auto deferred_ready =
       std::make_shared<fit::deferred_callback>([weak_this = weak_factory_.GetWeakPtr()] {
         if (weak_this && weak_this->ready_callback_)
           weak_this->ready_callback_();
       });
   while (true) {
-    std::vector<fuchsia::sys2::Instance> instances;
-    instance_it->Next(&instances);
-    if (instances.empty()) {
+    auto instances_res = instance_it->Next();
+    if (!instances_res.is_ok() || instances_res->infos().empty()) {
       break;
     }
-    for (auto& instance : instances) {
-      if (!instance.has_moniker() || instance.moniker().empty()) {
+    for (auto& instance : instances_res->infos()) {
+      if (!instance.moniker() || instance.moniker()->empty() || !instance.url() ||
+          instance.url()->empty()) {
         continue;
       }
-      if (!instance.has_url() || instance.url().empty()) {
+      if (!instance.resolved_info() || !instance.resolved_info()->execution_info()) {
+        // The component is not running.
         continue;
       }
-      if (!instance.has_resolved_info() || !instance.resolved_info().has_execution_info()) {
-        continue;
-      }
-      fuchsia::sys2::RealmQuery_Open_Result open_res;
-
-      fuchsia::io::DirectoryHandle runtime_dir_handle;
-      realm_query->Open(
-          instance.moniker(), fuchsia::sys2::OpenDirType::RUNTIME_DIR,
-          fuchsia::io::OpenFlags::RIGHT_READABLE, {}, ".",
-          fidl::InterfaceRequest<fuchsia::io::Node>(runtime_dir_handle.NewRequest().TakeChannel()),
-          &open_res);
-      if (!open_res.is_response()) {
+      fidl::Client<fuchsia_io::Directory> runtime_dir;
+      auto open_res = realm_query->Open(
+          {*instance.moniker(),
+           fuchsia_sys2::OpenDirType::kRuntimeDir,
+           fuchsia_io::OpenFlags::kRightReadable,
+           {},
+           ".",
+           fidl::ServerEnd<fuchsia_io::Node>(CreateEndpointsAndBind(runtime_dir).TakeChannel())});
+      if (!open_res.is_ok()) {
         continue;
       }
       // Remove the "." at the beginning of the moniker. It's safe because moniker is not empty.
-      std::string moniker = instance.moniker().substr(1);
-      ReadElfJobId(std::move(runtime_dir_handle), moniker,
-                   [weak_this = weak_factory_.GetWeakPtr(), moniker, url = instance.url(),
+      std::string moniker = instance.moniker()->substr(1);
+      ReadElfJobId(std::move(runtime_dir), moniker,
+                   [weak_this = weak_factory_.GetWeakPtr(), moniker, url = *instance.url(),
                     deferred_ready](zx_koid_t job_id) {
                      if (weak_this && job_id != ZX_KOID_INVALID) {
                        weak_this->running_component_info_[job_id] = {.moniker = moniker,
@@ -283,42 +244,40 @@ void ZirconComponentManager::SetReadyCallback(fit::callback<void()> callback) {
   }
 }
 
-void ZirconComponentManager::OnComponentEvent(fuchsia::component::Event event) {
-  if (!event.has_payload() || !event.has_header() || !event.header().has_moniker() ||
-      event.header().moniker().empty()) {
+void ZirconComponentManager::OnComponentEvent(fuchsia_component::Event event) {
+  if (!event.payload() || !event.header() || !event.header()->event_type() ||
+      !event.header()->component_url() || !event.header()->moniker() ||
+      event.header()->moniker()->empty()) {
     return;
   }
-
-  const auto& moniker = event.header().moniker();
-
-  switch (event.header().event_type()) {
-    case fuchsia::component::EventType::DEBUG_STARTED:
+  const auto& moniker = *event.header()->moniker();
+  const auto& url = *event.header()->component_url();
+  switch (*event.header()->event_type()) {
+    case fuchsia_component::EventType::kDebugStarted:
       if (debug_agent_) {
-        debug_agent_->OnComponentStarted(moniker, event.header().component_url());
+        debug_agent_->OnComponentStarted(moniker, url);
       }
-      if (event.payload().is_debug_started() && event.payload().debug_started().has_runtime_dir()) {
-        auto& runtime_dir = *event.mutable_payload()->debug_started().mutable_runtime_dir();
-        auto& break_on_start = *event.mutable_payload()->debug_started().mutable_break_on_start();
-        ReadElfJobId(
-            std::move(runtime_dir), moniker,
-            [weak_this = weak_factory_.GetWeakPtr(), moniker, url = event.header().component_url(),
-             break_on_start = std::move(break_on_start)](zx_koid_t job_id) mutable {
-              if (weak_this && job_id != ZX_KOID_INVALID) {
-                weak_this->running_component_info_[job_id] = {.moniker = moniker, .url = url};
-                DEBUG_LOG(Process)
-                    << "Component started job_id=" << job_id
-                    << " moniker=" << weak_this->running_component_info_[job_id].moniker
-                    << " url=" << weak_this->running_component_info_[job_id].url;
-              }
-              // Explicitly reset break_on_start to indicate the component manager that processes
-              // can be spawned.
-              break_on_start.reset();
-            });
+      if (event.payload()->debug_started() && event.payload()->debug_started()->runtime_dir()) {
+        auto& runtime_dir = *event.payload()->debug_started()->runtime_dir();
+        auto& break_on_start = *event.payload()->debug_started()->break_on_start();
+        ReadElfJobId({std::move(runtime_dir), async_get_default_dispatcher()}, moniker,
+                     [weak_this = weak_factory_.GetWeakPtr(), moniker, url,
+                      break_on_start = std::move(break_on_start)](zx_koid_t job_id) mutable {
+                       if (weak_this && job_id != ZX_KOID_INVALID) {
+                         weak_this->running_component_info_[job_id] = {.moniker = moniker,
+                                                                       .url = url};
+                         DEBUG_LOG(Process) << "Component started job_id=" << job_id
+                                            << " moniker=" << moniker << " url=" << url;
+                       }
+                       // Explicitly reset break_on_start to indicate the component manager that
+                       // processes can be spawned.
+                       break_on_start.reset();
+                     });
       }
       break;
-    case fuchsia::component::EventType::STOPPED: {
+    case fuchsia_component::EventType::kStopped: {
       if (debug_agent_) {
-        debug_agent_->OnComponentExited(moniker, event.header().component_url());
+        debug_agent_->OnComponentExited(moniker, *event.header()->component_url());
       }
       for (auto it = running_component_info_.begin(); it != running_component_info_.end(); it++) {
         if (it->second.moniker == moniker) {
@@ -361,26 +320,31 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
     if (component_manager->running_tests_info_.count(test_url_))
       return debug::Status("Test " + test_url_ + " is already launched");
 
-    fuchsia::test::manager::RunBuilderSyncPtr run_builder;
-    auto status = component_manager->services_->Connect(run_builder.NewRequest());
-    if (status != ZX_OK)
-      return debug::ZxStatus(status);
+    auto run_builder_res = component::Connect<fuchsia_test_manager::RunBuilder>();
+    if (!run_builder_res.is_ok()) {
+      return debug::ZxStatus(run_builder_res.error_value());
+    }
+    fidl::SyncClient run_builder(std::move(*run_builder_res));
 
     DEBUG_LOG(Process) << "Launching test url=" << test_url_;
 
-    fuchsia::test::manager::RunOptions run_options;
-    run_options.set_case_filters_to_run(std::move(case_filters));
-    run_options.set_arguments({"--gtest_break_on_failure"});  // does no harm to rust tests.
-    status =
-        run_builder->AddSuite(test_url_, std::move(run_options), suite_controller_.NewRequest());
-    if (status != ZX_OK)
-      return debug::ZxStatus(status);
-    status = run_builder->Build(run_controller_.NewRequest());
-    if (status != ZX_OK)
-      return debug::ZxStatus(status);
-    run_controller_->GetEvents(
-        [self = fxl::RefPtr<TestLauncher>(this)](auto res) { self->OnRunEvents(std::move(res)); });
-    suite_controller_->GetEvents([self = fxl::RefPtr<TestLauncher>(this)](auto res) {
+    fuchsia_test_manager::RunOptions run_options;
+    run_options.case_filters_to_run() = std::move(case_filters);
+    run_options.arguments() = {"--gtest_break_on_failure"};  // does no harm to rust tests.
+    auto add_suite_res = run_builder->AddSuite(
+        {test_url_, std::move(run_options), CreateEndpointsAndBind(suite_controller_)});
+    if (!add_suite_res.is_ok()) {
+      return debug::ZxStatus(add_suite_res.error_value().status(),
+                             add_suite_res.error_value().FormatDescription());
+    }
+    auto build_res = run_builder->Build(CreateEndpointsAndBind(run_controller_));
+    if (!build_res.is_ok()) {
+      return debug::ZxStatus(build_res.error_value().status(),
+                             build_res.error_value().FormatDescription());
+    }
+    run_controller_->GetEvents().Then(
+        [self = fxl::RefPtr<TestLauncher>(this)](auto& res) { self->OnRunEvents(std::move(res)); });
+    suite_controller_->GetEvents().Then([self = fxl::RefPtr<TestLauncher>(this)](auto& res) {
       self->OnSuiteEvents(std::move(res));
     });
     component_manager->running_tests_info_[test_url_] = {};
@@ -397,32 +361,33 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
  private:
   // Stdout and stderr are in case_artifact. Logs are in suite_artifact. Others are ignored.
   // NOTE: custom.component_moniker in suite_artifact is NOT the moniker of the test!
-  void OnSuiteEvents(fuchsia::test::manager::SuiteController_GetEvents_Result result) {
-    if (!component_manager_ || result.is_err() || result.response().events.empty()) {
-      suite_controller_.Unbind();  // Otherwise the run_controller won't return.
-      if (result.is_err())
-        LOGS(Warn) << "Failed to launch test: " << to_string(result.err());
+  void OnSuiteEvents(fidl::Result<fuchsia_test_manager::SuiteController::GetEvents> result) {
+    if (!component_manager_ || !result.is_ok() || result->events().empty()) {
+      (void)suite_controller_.UnbindMaybeGetEndpoint();  // Otherwise run_controller won't return.
+      if (result.is_error())
+        LOGS(Warn) << "Failed to launch test: " << result.error_value();
       if (component_manager_)
         component_manager_->running_tests_info_.erase(test_url_);
       return;
     }
-    for (auto& event : result.response().events) {
-      FX_CHECK(event.has_payload());
-      if (event.payload().is_case_found()) {
+    for (auto& event : result->events()) {
+      FX_CHECK(event.payload());
+      if (event.payload()->case_found()) {
         auto& test_info = component_manager_->running_tests_info_[test_url_];
         // Test cases should come in order.
-        FX_CHECK(test_info.case_names.size() == event.payload().case_found().identifier);
-        test_info.case_names.push_back(event.payload().case_found().test_case_name);
-        if (event.payload().case_found().test_case_name.find_first_of('.') != std::string::npos) {
+        FX_CHECK(test_info.case_names.size() == event.payload()->case_found()->identifier());
+        test_info.case_names.push_back(event.payload()->case_found()->test_case_name());
+        if (event.payload()->case_found()->test_case_name().find_first_of('.') !=
+            std::string::npos) {
           test_info.ignored_process = 1;
         }
-      } else if (event.payload().is_case_artifact()) {
-        if (auto proc = GetDebuggedProcess(event.payload().case_artifact().identifier)) {
-          auto& artifact = event.mutable_payload()->case_artifact().artifact;
-          if (artifact.is_stdout_()) {
-            proc->SetStdout(std::move(artifact.stdout_()));
-          } else if (artifact.is_stderr_()) {
-            proc->SetStderr(std::move(artifact.stderr_()));
+      } else if (event.payload()->case_artifact()) {
+        if (auto proc = GetDebuggedProcess(event.payload()->case_artifact()->identifier())) {
+          auto& artifact = event.payload()->case_artifact()->artifact();
+          if (artifact.stdout_()) {
+            proc->SetStdout(std::move(artifact.stdout_().value()));
+          } else if (artifact.stderr_()) {
+            proc->SetStderr(std::move(artifact.stderr_().value()));
           }
         } else {
           // This usually happens when the process has terminated, e.g.
@@ -431,17 +396,17 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
           //
           // Don't print anything because it's very common.
         }
-      } else if (event.payload().is_suite_artifact()) {
-        auto& artifact = event.mutable_payload()->suite_artifact().artifact;
-        if (artifact.is_log()) {
-          FX_CHECK(artifact.log().is_batch());
-          log_listener_ = artifact.log().batch().Bind();
+      } else if (event.payload()->suite_artifact()) {
+        auto& artifact = event.payload()->suite_artifact()->artifact();
+        if (artifact.log()) {
+          FX_CHECK(artifact.log()->batch());
+          log_listener_.Bind(artifact.log()->batch().value().TakeChannel());
           log_listener_->GetNext(
               [self = fxl::RefPtr<TestLauncher>(this)](auto res) { self->OnLog(std::move(res)); });
         }
       }
     }
-    suite_controller_->GetEvents([self = fxl::RefPtr<TestLauncher>(this)](auto res) {
+    suite_controller_->GetEvents().Then([self = fxl::RefPtr<TestLauncher>(this)](auto& res) {
       self->OnSuiteEvents(std::move(res));
     });
   }
@@ -458,14 +423,14 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
   }
 
   // Unused but required by the test framework.
-  void OnRunEvents(std::vector<::fuchsia::test::manager::RunEvent> events) {
-    if (!events.empty()) {
+  void OnRunEvents(fidl::Result<fuchsia_test_manager::RunController::GetEvents> events) {
+    if (!events->events().empty()) {
       FX_LOGS_FIRST_N(WARNING, 1) << "Not implemented yet";
-      run_controller_->GetEvents([self = fxl::RefPtr<TestLauncher>(this)](auto res) {
+      run_controller_->GetEvents().Then([self = fxl::RefPtr<TestLauncher>(this)](auto& res) {
         self->OnRunEvents(std::move(res));
       });
     } else {
-      run_controller_.Unbind();
+      (void)run_controller_.UnbindMaybeGetEndpoint();
     }
   }
 
@@ -487,9 +452,9 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
   fxl::WeakPtr<DebugAgent> debug_agent_;
   fxl::WeakPtr<ZirconComponentManager> component_manager_;
   std::string test_url_;
-  fuchsia::test::manager::RunControllerPtr run_controller_;
-  fuchsia::test::manager::SuiteControllerPtr suite_controller_;
-  fuchsia::diagnostics::BatchIteratorPtr log_listener_;
+  fidl::Client<fuchsia_test_manager::RunController> run_controller_;
+  fidl::Client<fuchsia_test_manager::SuiteController> suite_controller_;
+  fuchsia::diagnostics::BatchIteratorPtr log_listener_;  // accessor2logger is still using hlcpp.
 };
 
 debug::Status ZirconComponentManager::LaunchTest(std::string url, std::optional<std::string> realm,
@@ -517,51 +482,46 @@ debug::Status ZirconComponentManager::LaunchComponent(std::string url) {
     return debug::Status(url + " is already launched");
   }
 
-  fuchsia::sys2::LifecycleControllerSyncPtr lifecycle_controller;
-  auto status = services_->Connect(lifecycle_controller.NewRequest(),
-                                   "fuchsia.sys2.LifecycleController.root");
-  if (status != ZX_OK)
-    return debug::ZxStatus(status);
+  auto connect_res = component::Connect<fuchsia_sys2::LifecycleController>(
+      "/svc/fuchsia.sys2.LifecycleController.root");
+  if (!connect_res.is_ok())
+    return debug::ZxStatus(connect_res.error_value());
+  fidl::SyncClient lifecycle_controller(std::move(*connect_res));
 
   DEBUG_LOG(Process) << "Launching component url=" << url << " moniker=" << moniker;
 
-  fuchsia::sys2::LifecycleController_CreateInstance_Result create_res;
   auto create_child = [&]() {
-    fuchsia::component::decl::Child child_decl;
-    child_decl.set_name(name);
-    child_decl.set_url(url);
-    child_decl.set_startup(fuchsia::component::decl::StartupMode::LAZY);
-    return lifecycle_controller->CreateInstance(kParentMoniker, {kCollection},
-                                                std::move(child_decl), {}, &create_res);
+    fuchsia_component_decl::Child child_decl;
+    child_decl.name() = name;
+    child_decl.url() = url;
+    child_decl.startup() = fuchsia_component_decl::StartupMode::kLazy;
+    return lifecycle_controller->CreateInstance(
+        {kParentMoniker, {kCollection}, std::move(child_decl), {}});
   };
-  status = create_child();
-  if (status != ZX_OK)
-    return debug::ZxStatus(status);
-
-  if (create_res.is_err() &&
-      create_res.err() == fuchsia::sys2::CreateError::INSTANCE_ALREADY_EXISTS) {
-    fuchsia::sys2::LifecycleController_DestroyInstance_Result destroy_res;
-    fuchsia::component::decl::ChildRef child_ref{.name = name, .collection = kCollection};
-    status = lifecycle_controller->DestroyInstance(kParentMoniker, child_ref, &destroy_res);
-    if (status != ZX_OK)
-      return debug::ZxStatus(status);
-    if (destroy_res.is_err())
+  auto create_res = create_child();
+  if (create_res.is_error() && create_res.error_value().is_domain_error() &&
+      create_res.error_value().domain_error() ==
+          fuchsia_sys2::CreateError::kInstanceAlreadyExists) {
+    auto destroy_res = lifecycle_controller->DestroyInstance({kParentMoniker, {name, kCollection}});
+    if (destroy_res.is_error()) {
       return debug::Status("Failed to destroy component " + moniker + ": " +
-                           to_string(destroy_res.err()));
-    status = create_child();
-    if (status != ZX_OK)
-      return debug::ZxStatus(status);
+                           destroy_res.error_value().FormatDescription());
+    }
+    create_res = create_child();
   }
-  if (create_res.is_err())
-    return debug::Status("Failed to create the component: " + to_string(create_res.err()));
+  if (create_res.is_error()) {
+    return debug::Status("Failed to create the component: " +
+                         create_res.error_value().FormatDescription());
+  }
 
-  fuchsia::sys2::LifecycleController_StartInstance_Result start_res;
-  fidl::InterfaceHandle<fuchsia::component::Binder> binder;
-  status = lifecycle_controller->StartInstance(moniker, binder.NewRequest(), &start_res);
-  if (status != ZX_OK)
-    return debug::ZxStatus(status);
-  if (start_res.is_err())
-    return debug::Status("Failed to start the component: " + to_string(start_res.err()));
+  // LifecycleController::Start accepts relative monikers.
+  fidl::Client<fuchsia_component::Binder> binder_client_end;
+  auto start_res =
+      lifecycle_controller->StartInstance({moniker, CreateEndpointsAndBind(binder_client_end)});
+  if (start_res.is_error()) {
+    return debug::Status("Failed to start the component: " +
+                         start_res.error_value().FormatDescription());
+  }
 
   expected_v2_components_.insert(moniker);
   return debug::Status();
