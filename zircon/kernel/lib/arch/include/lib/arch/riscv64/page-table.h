@@ -26,10 +26,14 @@ enum class RiscvPagingLevel {
   k0 = 0,
 };
 
+// Captures the system state influencing RISC-V paging.
+struct RiscvSystemPagingState {};
+
 static constexpr unsigned int kRiscvMaxPhysicalAddressSize = 57;
 
 // Whether the given access permission are valid for a RISC-V page.
-static constexpr bool RiscvIsValidPageAccess(const AccessPermissions& access) {
+static constexpr bool RiscvIsValidPageAccess(const RiscvSystemPagingState& state,
+                                             const AccessPermissions& access) {
   // A page is either readable or execute-only.
   return access.readable || !access.writable;
 }
@@ -105,7 +109,7 @@ class RiscvPageTableEntry : public hwreg::RegisterBase<RiscvPageTableEntry<Level
   constexpr bool executable() const { return terminal() ? x() : true; }
   constexpr bool user_accessible() const { return terminal() ? u() : true; }
 
-  constexpr SelfType& Set(const PagingSettings& settings) {
+  constexpr SelfType& Set(const RiscvSystemPagingState& state, const PagingSettings& settings) {
     set_v(settings.present);
     if (!settings.present) {
       return *this;
@@ -113,7 +117,7 @@ class RiscvPageTableEntry : public hwreg::RegisterBase<RiscvPageTableEntry<Level
 
     const AccessPermissions& access = settings.access;
     if (settings.terminal) {
-      ZX_DEBUG_ASSERT(RiscvIsValidPageAccess(access));
+      ZX_DEBUG_ASSERT(RiscvIsValidPageAccess(state, access));
       set_r(access.readable)
           .set_w(access.writable)
           .set_x(access.executable)
@@ -159,11 +163,14 @@ struct RiscvPagingTraitsBase {
   template <RiscvPagingLevel Level>
   using TableEntry = RiscvPageTableEntry<Level>;
 
+  using SystemState = RiscvSystemPagingState;
+
   static constexpr unsigned int kMaxPhysicalAddressSize = kRiscvMaxPhysicalAddressSize;
 
   static constexpr bool kNonTerminalAccessPermissions = false;
 
-  static constexpr bool (*IsValidPageAccess)(const AccessPermissions&) = RiscvIsValidPageAccess;
+  static constexpr bool (*IsValidPageAccess)(const RiscvSystemPagingState&,
+                                             const AccessPermissions&) = RiscvIsValidPageAccess;
 };
 
 struct RiscvSv39PagingTraits : public RiscvPagingTraitsBase {};

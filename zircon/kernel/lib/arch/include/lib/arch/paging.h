@@ -39,6 +39,13 @@ struct ExamplePagingTraits {
   ///
   enum class LevelType {};
 
+  /// Captures runtime system information that feeds into translation or
+  /// mapping considerations. The construction of this information is
+  /// context-dependent and so is left to the user of the API.
+  ///
+  /// SystemState is expected to be default-constructible.
+  struct SystemState {};
+
   /// The register type representing a page table entry at a given level. It
   /// must meet the defined API below.
   template <LevelType Level>
@@ -110,9 +117,9 @@ struct ExamplePagingTraits {
 
   /// Whether the given set of access permissions is generally valid for a
   /// page, as applied at the terminal level.
-  ///
-  /// TODO(fxbug.dev/129344): Should be a function of system state as well.
-  static bool IsValidPageAccess(const AccessPermissions& access) { return false; }
+  static bool IsValidPageAccess(const SystemState& state, const AccessPermissions& access) {
+    return false;
+  }
 
   // TODO(fxbug.dev/129344): ...and more to support machine-independent paging.
 };
