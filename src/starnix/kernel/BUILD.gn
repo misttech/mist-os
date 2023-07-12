@@ -401,6 +401,7 @@ fuchsia_unittest_package("starnix-tests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "system"
 }
 
 config("vdso_config") {

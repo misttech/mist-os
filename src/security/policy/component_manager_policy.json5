@@ -58,6 +58,7 @@
                 "/core/testing/elf_test_create_raw_processes_runner",
                 "/core/testing/starnix-tests:**",
                 "/core/testing/system-tests:**",
+                "/core/testing/starnix_test_runners/starnix_unit_test_runner",
             ],
         },
         capability_policy: [

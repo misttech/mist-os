@@ -79,11 +79,11 @@ rustc_library("elf_runner") {
   ]
 }
 
-fuchsia_component("elf_runner_tests_cmp") {
-  testonly = true
+fuchsia_test_component("elf_runner_tests_cmp") {
   deps = [ ":elf_runner_test" ]
   component_name = "elf_runner_tests"
   manifest = "meta/elf_runner_tests.cml"
+  test_type = "system"
 }
 
 fuchsia_test_package("elf_runner_tests") {

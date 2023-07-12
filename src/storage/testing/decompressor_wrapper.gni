@@ -81,6 +81,7 @@ template("wrap_with_decompressor") {
                              "manifest_deps",
                              "visibility",
                              "component_name",
+                             "test_type",
                            ])
     if (!defined(manifest_deps)) {
       manifest_deps = []

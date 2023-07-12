@@ -4,9 +4,6 @@
 {
     include: [
         "//src/sys/test_runners/gtest/default.shard.cml",
-
-        // Depends on `tzdata-icu-44-le` which is a system capability.
-        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
 

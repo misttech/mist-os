@@ -34,9 +34,9 @@ fuchsia_component("integration-test") {
   deps = [ ":integration_test_bin" ]
 }
 
-fuchsia_component("root") {
-  testonly = true
+fuchsia_test_component("root") {
   manifest = "meta/root.cml"
+  test_type = "system"
 }
 
 rustc_binary("fake_dependencies_bin") {

@@ -28,6 +28,7 @@ fuchsia_unittest_package("system-power-mode-template-output-test-pkg") {
     ":config",
     ":system-power-mode-template-output-test",
   ]
+  test_type = "system"
 }
 
 group("tests") {

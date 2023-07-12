@@ -35,10 +35,12 @@ rustc_test("bin") {
   sources = [ "src/lib.rs" ]
 }
 
-fuchsia_component("tz_version_parrot_rust") {
-  testonly = true
+fuchsia_test_component("tz_version_parrot_rust") {
   manifest = "meta/tz_version_parrot.cml"
   deps = [ ":bin" ]
+
+  # Depends on `tzdata-icu-44-le` which is a system capability.
+  test_type = "system"
 }
 
 fuchsia_test_package("tz-version-parrot-rust") {

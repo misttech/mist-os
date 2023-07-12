@@ -27,6 +27,7 @@ fuchsia_unittest_package("thermal-template-output-test-pkg") {
     ":config",
     ":thermal-template-output-test",
   ]
+  test_type = "system"
 }
 
 group("tests") {

@@ -88,6 +88,7 @@ test("memfs-legacy-test") {
 fuchsia_unittest_package("memfs-legacy-tests") {
   manifest = "meta/zircon-memfs-test.cml"
   deps = [ ":memfs-legacy-test" ]
+  test_type = "system"
 }
 
 group("tests") {

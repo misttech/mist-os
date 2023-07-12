@@ -476,5 +476,12 @@
             to: "#testing",
             source_availability: "unknown",
         },
+
+        // ICU timezone data
+        {
+            directory: "tzdata-icu-44-le",
+            from: "#tzdata-provider",
+            to: "#testing",
+        },
     ],
 }

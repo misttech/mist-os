@@ -329,7 +329,7 @@ wrap_with_decompressor("executable-mount") {
     "fuchsia.kernel.VmexResource",
     "fuchsia.logger.LogSink",
   ]
-  shard_includes = [ "//sdk/lib/sys/testing/system-test.shard.cml" ]
+  test_type = "system"
 }
 
 template("blobfs_large_integration_test") {
