@@ -2736,6 +2736,23 @@ flag platform_enable_user_pci in //src/devices/bus/drivers/pci/pci.gni.
 
 From //zircon/kernel/params.gni:78
 
+### discoverable_package_labels
+
+If you add package labels to this variable, the packages will be included in
+the 'discoverable' package set, as defined by RFC-0212 "Package Sets":
+https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0212_package_sets
+
+They will be compiled, and published, but not added as dependencies of the
+assembled images, and so will not be able to cause the inclusion of
+'config_data' or 'shell_command' entries.
+
+As these cannot be part of the legacy AIB for a product, there is no
+"legacy" version of this argument.
+
+**Current value (from the default):** `[]`
+
+From //BUILD.gn:77
+
 ### dont_profile_source_files
 
 List of GN paths to source files to NOT instrument by `profile` variants.
@@ -4000,7 +4017,7 @@ From //out/not-default/args.gn:8
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:78
+From //BUILD.gn:90
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -4008,7 +4025,7 @@ From //out/not-default/args.gn:8
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:78
+From //BUILD.gn:90
 
 ### host_os
 
@@ -4667,7 +4684,7 @@ From //BUILD.gn:56
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:79
+From //BUILD.gn:91
 
 ### legacy_product_bootfs_labels
 
@@ -4676,7 +4693,7 @@ product_bootfs_labels = []  (defined in product.gni)
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:69
+From //BUILD.gn:81
 
 ### legacy_product_system_image_deps
 
@@ -4685,7 +4702,7 @@ product_system_image_deps = []  (defined in product.gni)
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:73
+From //BUILD.gn:85
 
 ### legacy_universe_package_labels
 
@@ -7691,7 +7708,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:89
+From //BUILD.gn:101
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -7699,7 +7716,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:89
+From //BUILD.gn:101
 
 ### sdk_cross_compile_host_tools
 
@@ -8202,7 +8219,7 @@ afterwards.
 
 **Current value (from the default):** `""`
 
-From //BUILD.gn:85
+From //BUILD.gn:97
 
 ### testonly_in_containers
 
