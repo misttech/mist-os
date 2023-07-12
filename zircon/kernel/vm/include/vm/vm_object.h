@@ -20,6 +20,7 @@
 #include <arch/aspace.h>
 #include <fbl/array.h>
 #include <fbl/canary.h>
+#include <fbl/enum_bits.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_single_list.h>
 #include <fbl/macros.h>
@@ -265,6 +266,15 @@ class VmoCursor
   ListIteratorType vmos_iter_ TA_GUARDED(lock_);
 };
 
+enum class VmObjectReadWriteOptions : uint8_t {
+  None = 0,
+
+  // If set, attempts to read past the end of a VMO will not cause a failure and only copy the
+  // existing bytes instead (i.e. the requested length will be trimmed to the actual VMO size).
+  TrimLength = (1 << 0),
+};
+FBL_ENABLE_ENUM_BITS(VmObjectReadWriteOptions)
+
 // The base vm object that holds a range of bytes of data
 //
 // Can be created without mapping and used as a container of data, or mappable
@@ -406,7 +416,7 @@ class VmObject : public VmHierarchyBase,
   //
   // Bytes are guaranteed to be transferred in order from low to high offset.
   virtual zx_status_t ReadUser(VmAspace* current_aspace, user_out_ptr<char> ptr, uint64_t offset,
-                               size_t len, size_t* out_actual) {
+                               size_t len, VmObjectReadWriteOptions options, size_t* out_actual) {
     return ZX_ERR_NOT_SUPPORTED;
   }
   virtual zx_status_t ReadUserVector(VmAspace* current_aspace, user_out_iovec_t vec,
@@ -418,7 +428,8 @@ class VmObject : public VmHierarchyBase,
   // long-running.
   using OnWriteBytesTransferredCallback = fit::inline_function<void(uint64_t offset, size_t len)>;
   virtual zx_status_t WriteUser(VmAspace* current_aspace, user_in_ptr<const char> ptr,
-                                uint64_t offset, size_t len, size_t* out_actual,
+                                uint64_t offset, size_t len, VmObjectReadWriteOptions options,
+                                size_t* out_actual,
                                 const OnWriteBytesTransferredCallback& on_bytes_transferred) {
     return ZX_ERR_NOT_SUPPORTED;
   }

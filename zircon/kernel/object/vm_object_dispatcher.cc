@@ -113,7 +113,8 @@ zx_status_t VmObjectDispatcher::Read(VmAspace* current_aspace, user_out_ptr<char
                                      size_t length, uint64_t offset, size_t* out_actual) {
   canary_.Assert();
 
-  return vmo_->ReadUser(current_aspace, user_data, offset, length, out_actual);
+  return vmo_->ReadUser(current_aspace, user_data, offset, length, VmObjectReadWriteOptions::None,
+                        out_actual);
 }
 
 zx_status_t VmObjectDispatcher::ReadVector(VmAspace* current_aspace, user_out_iovec_t user_data,
@@ -137,8 +138,8 @@ zx_status_t VmObjectDispatcher::Write(
     size_t* out_actual, VmObject::OnWriteBytesTransferredCallback on_bytes_transferred) {
   canary_.Assert();
 
-  return vmo_->WriteUser(current_aspace, user_data, offset, length, out_actual,
-                         on_bytes_transferred);
+  return vmo_->WriteUser(current_aspace, user_data, offset, length, VmObjectReadWriteOptions::None,
+                         out_actual, on_bytes_transferred);
 }
 
 zx_status_t VmObjectDispatcher::SetSize(uint64_t size) {

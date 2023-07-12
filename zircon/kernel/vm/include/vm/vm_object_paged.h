@@ -166,9 +166,9 @@ class VmObjectPaged final : public VmObject {
   zx_status_t LookupContiguous(uint64_t offset, uint64_t len, paddr_t* out_paddr) override;
 
   zx_status_t ReadUser(VmAspace* current_aspace, user_out_ptr<char> ptr, uint64_t offset,
-                       size_t len, size_t* out_actual) override;
+                       size_t len, VmObjectReadWriteOptions options, size_t* out_actual) override;
   zx_status_t WriteUser(VmAspace* current_aspace, user_in_ptr<const char> ptr, uint64_t offset,
-                        size_t len, size_t* out_actual,
+                        size_t len, VmObjectReadWriteOptions options, size_t* out_actual,
                         const OnWriteBytesTransferredCallback& on_bytes_transferred) override;
 
   zx_status_t TakePages(uint64_t offset, uint64_t len, VmPageSpliceList* pages) override;
@@ -357,7 +357,8 @@ class VmObjectPaged final : public VmObject {
 
   // internal read/write routine that takes a templated copy function to help share some code
   template <typename T>
-  zx_status_t ReadWriteInternalLocked(uint64_t offset, size_t len, bool write, T copyfunc,
+  zx_status_t ReadWriteInternalLocked(uint64_t offset, size_t len, bool write,
+                                      VmObjectReadWriteOptions options, T copyfunc,
                                       Guard<CriticalMutex>* guard) TA_REQ(lock());
 
   // Zeroes a partial range in a page. May use CallUnlocked on the passed in guard. The page to zero

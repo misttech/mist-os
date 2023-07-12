@@ -550,6 +550,48 @@ TEST(VmoTestCase, GrowMappedVmo) {
   EXPECT_EQ(value, *reinterpret_cast<volatile std::byte *>(mapping_addr + load_offset));
 }
 
+TEST(VmoTestCase, MappedVmoSmallerThanMapping) {
+  zx_status_t status;
+  zx_vaddr_t addr;
+  zx::vmo vmo;
+
+  // Allocate a VMO with a size of 1 page but create a 2-page mapping backed by this VMO.
+  size_t allocated_size = zx_system_get_page_size();
+  size_t reserved_size = zx_system_get_page_size();
+  size_t mapped_size = allocated_size + reserved_size;
+  status = zx::vmo::create(allocated_size, ZX_VMO_RESIZABLE, &vmo);
+  ASSERT_OK(status, "vmo_create");
+  status = zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo.get(), 0,
+                       mapped_size, &addr);
+  ASSERT_OK(status, "vmar_map");
+  auto cleanup =
+      fit::defer([&]() { EXPECT_OK(zx_vmar_unmap(zx_vmar_root_self(), addr, mapped_size)); });
+
+  // Verify that only the first page can be accessed.
+  EXPECT_TRUE(probe_for_read(reinterpret_cast<void *>(addr)), "read before end");
+  EXPECT_TRUE(probe_for_write(reinterpret_cast<void *>(addr)), "write before end");
+  EXPECT_FALSE(probe_for_read(reinterpret_cast<void *>(addr + allocated_size)), "read past end");
+  EXPECT_FALSE(probe_for_write(reinterpret_cast<void *>(addr + allocated_size)), "write past end");
+
+  // Verify that zx_process_{read,write}_memory on the whole range complete partially.
+  std::vector<uint8_t> buffer(mapped_size);
+  size_t actual;
+  EXPECT_OK(zx_process_read_memory(zx_process_self(), addr, buffer.data(), mapped_size, &actual),
+            "read whole range");
+  EXPECT_EQ(allocated_size, actual, "should have only read the allocated bytes");
+  EXPECT_OK(zx_process_write_memory(zx_process_self(), addr, buffer.data(), mapped_size, &actual),
+            "write whole range");
+  EXPECT_EQ(allocated_size, actual, "should have only written the allocated bytes");
+
+  // Verify that zx_process_{read,write}_memory on the reserved part fail.
+  status =
+      zx_process_read_memory(zx_process_self(), addr + allocated_size, buffer.data(), 1, &actual);
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, status, "read reserved range");
+  status =
+      zx_process_write_memory(zx_process_self(), addr + allocated_size, buffer.data(), 1, &actual);
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, status, "write reserved range");
+}
+
 // Check that non-resizable VMOs cannot get resized.
 TEST(VmoTestCase, NoResize) {
   const size_t len = zx_system_get_page_size() * 4;

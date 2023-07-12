@@ -452,11 +452,16 @@ zx_status_t sys_process_read_memory(zx_handle_t handle, zx_vaddr_t vaddr, user_o
         ktl::min(buffer_size, vm_mapping->size_locked() - (vaddr - vm_mapping->base_locked()));
   }
   size_t out_actual = 0;
-  zx_status_t st = vmo->ReadUser(Thread::Current::Get()->aspace(), buffer.reinterpret<char>(),
-                                 offset, buffer_size, &out_actual);
+  zx_status_t st =
+      vmo->ReadUser(Thread::Current::Get()->aspace(), buffer.reinterpret<char>(), offset,
+                    buffer_size, VmObjectReadWriteOptions::TrimLength, &out_actual);
   if (st != ZX_OK) {
     // Do not write |out_actual| to |actual| on error
     return st;
+  }
+  if (out_actual == 0) {
+    // If our partial read returned 0 bytes, it means that offset is past the end of the VMO.
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   return actual.copy_to_user(out_actual);
@@ -517,12 +522,16 @@ zx_status_t sys_process_write_memory(zx_handle_t handle, zx_vaddr_t vaddr,
         ktl::min(buffer_size, vm_mapping->size_locked() - (vaddr - vm_mapping->base_locked()));
   }
   size_t out_actual = 0;
-  zx_status_t st =
-      vmo->WriteUser(Thread::Current::Get()->aspace(), buffer.reinterpret<const char>(), offset,
-                     buffer_size, &out_actual, /*on_bytes_transferred=*/nullptr);
+  zx_status_t st = vmo->WriteUser(
+      Thread::Current::Get()->aspace(), buffer.reinterpret<const char>(), offset, buffer_size,
+      VmObjectReadWriteOptions::TrimLength, &out_actual, /*on_bytes_transferred=*/nullptr);
   if (st != ZX_OK) {
     // Do not write |out_actual| to |actual| on error~
     return st;
+  }
+  if (out_actual == 0) {
+    // If our partial write returned 0 bytes, it means that offset is past the end of the VMO.
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   return actual.copy_to_user(out_actual);

@@ -171,7 +171,8 @@ zx_status_t VmObject::ReadUserVector(VmAspace* current_aspace, user_out_iovec_t 
     }
 
     size_t chunk_actual = 0;
-    zx_status_t status = ReadUser(current_aspace, ptr, offset, capacity, &chunk_actual);
+    zx_status_t status = ReadUser(current_aspace, ptr, offset, capacity,
+                                  VmObjectReadWriteOptions::None, &chunk_actual);
 
     // Always add |chunk_actual| since some bytes may have been transferred, even on error
     if (out_actual != nullptr) {
@@ -209,7 +210,8 @@ zx_status_t VmObject::WriteUserVector(VmAspace* current_aspace, user_in_iovec_t 
 
     size_t chunk_actual = 0;
     zx_status_t status =
-        WriteUser(current_aspace, ptr, offset, capacity, &chunk_actual, on_bytes_transferred);
+        WriteUser(current_aspace, ptr, offset, capacity, VmObjectReadWriteOptions::None,
+                  &chunk_actual, on_bytes_transferred);
 
     // Always add |chunk_actual| since some bytes may have been transferred, even on error
     if (out_actual != nullptr) {

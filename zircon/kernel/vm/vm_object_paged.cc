@@ -1161,6 +1161,7 @@ zx_status_t VmObjectPaged::ZeroPartialPageLocked(uint64_t page_base_offset,
   // Need to actually zero out bytes in the page.
   return ReadWriteInternalLocked(
       page_base_offset + zero_start_offset, zero_end_offset - zero_start_offset, true,
+      VmObjectReadWriteOptions::None,
       [](void* dst, size_t offset, size_t len, Guard<CriticalMutex>* guard) -> zx_status_t {
         // We're memsetting the *kernel* address of an allocated page, so we know that this
         // cannot fault. memset may not be the most efficient, but we don't expect to be doing
@@ -1332,7 +1333,8 @@ zx_status_t VmObjectPaged::Resize(uint64_t s) {
 // offsets.
 template <typename T>
 zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, bool write,
-                                                   T copyfunc, Guard<CriticalMutex>* guard) {
+                                                   VmObjectReadWriteOptions options, T copyfunc,
+                                                   Guard<CriticalMutex>* guard) {
   canary_.Assert();
 
   uint64_t end_offset;
@@ -1340,21 +1342,28 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  // Declare a lambda that will check any object properties we require to be true. We place these
-  // in a lambda so that we can perform them any time the lock is dropped.
-  auto check = [this, &end_offset]() -> zx_status_t {
+  // Declare a lambda that will check any object properties we require to be true and, if can_trim
+  // is set, reduce the requested length if it exceeds the the VMO size. We place these in a lambda
+  // so that we can perform them any time the lock is dropped.
+  const bool can_trim = !!(options & VmObjectReadWriteOptions::TrimLength);
+  auto check_and_trim = [this, can_trim, &end_offset]() -> zx_status_t {
     AssertHeld(lock_ref());
     if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
       return ZX_ERR_BAD_STATE;
     }
-    if (end_offset > size_locked()) {
-      return ZX_ERR_OUT_OF_RANGE;
+    const uint64_t size = size_locked();
+    if (end_offset > size) {
+      if (can_trim) {
+        end_offset = size;
+      } else {
+        return ZX_ERR_OUT_OF_RANGE;
+      }
     }
     return ZX_OK;
   };
 
   // Perform initial check.
-  if (zx_status_t status = check(); status != ZX_OK) {
+  if (zx_status_t status = check_and_trim(); status != ZX_OK) {
     return status;
   }
 
@@ -1374,9 +1383,9 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
   // construct and deconstruct it each iteration. It is tolerant of being reused and will
   // reinitialize itself if needed.
   __UNINITIALIZED LazyPageRequest page_request;
-  while (len > 0) {
+  while (src_offset < end_offset) {
     const size_t first_page_offset = ROUNDDOWN(src_offset, PAGE_SIZE);
-    const size_t last_page_offset = ROUNDDOWN(src_offset + len - 1, PAGE_SIZE);
+    const size_t last_page_offset = ROUNDDOWN(end_offset - 1, PAGE_SIZE);
     size_t remaining_pages = (last_page_offset - first_page_offset) / PAGE_SIZE + 1;
     __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
         GetLookupCursorLocked(first_page_offset, remaining_pages * PAGE_SIZE);
@@ -1411,7 +1420,7 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
         }
         // Recheck properties and if all is good go back to the top of the outer loop to attempt
         // to acquire a fresh cursor and try again.
-        status = check();
+        status = check_and_trim();
         if (status == ZX_OK) {
           break;
         }
@@ -1421,7 +1430,7 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
       }
       const paddr_t pa = result->page->paddr();
       const size_t page_offset = src_offset % PAGE_SIZE;
-      const size_t tocopy = ktl::min(PAGE_SIZE - page_offset, len);
+      const size_t tocopy = ktl::min(PAGE_SIZE - page_offset, end_offset - src_offset);
 
       // Compute the kernel mapping of this page.
       char* page_ptr = reinterpret_cast<char*>(paddr_to_physmap(pa));
@@ -1434,7 +1443,7 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
         // Although we can retry, as the lock was dropped we must re-check any properties, and then
         // if all is good go back to the top of the outer loop to attempt to acquire a fresh cursor
         // and try again.
-        status = check();
+        status = check_and_trim();
         if (status == ZX_OK) {
           break;
         }
@@ -1447,7 +1456,6 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
       // Advance the copy location.
       src_offset += tocopy;
       dest_offset += tocopy;
-      len -= tocopy;
       remaining_pages--;
     }
   }
@@ -1477,7 +1485,8 @@ zx_status_t VmObjectPaged::Read(void* _ptr, uint64_t offset, size_t len) {
 
   Guard<CriticalMutex> guard{lock()};
 
-  return ReadWriteInternalLocked(offset, len, false, read_routine, &guard);
+  return ReadWriteInternalLocked(offset, len, false, VmObjectReadWriteOptions::None, read_routine,
+                                 &guard);
 }
 
 zx_status_t VmObjectPaged::Write(const void* _ptr, uint64_t offset, size_t len) {
@@ -1502,7 +1511,8 @@ zx_status_t VmObjectPaged::Write(const void* _ptr, uint64_t offset, size_t len) 
 
   Guard<CriticalMutex> guard{lock()};
 
-  return ReadWriteInternalLocked(offset, len, true, write_routine, &guard);
+  return ReadWriteInternalLocked(offset, len, true, VmObjectReadWriteOptions::None, write_routine,
+                                 &guard);
 }
 
 zx_status_t VmObjectPaged::CacheOp(uint64_t offset, uint64_t len, CacheOpType type) {
@@ -1608,7 +1618,8 @@ zx_status_t VmObjectPaged::LookupContiguous(uint64_t offset, uint64_t len, paddr
 }
 
 zx_status_t VmObjectPaged::ReadUser(VmAspace* current_aspace, user_out_ptr<char> ptr,
-                                    uint64_t offset, size_t len, size_t* out_actual) {
+                                    uint64_t offset, size_t len, VmObjectReadWriteOptions options,
+                                    size_t* out_actual) {
   canary_.Assert();
 
   if (out_actual != nullptr) {
@@ -1653,11 +1664,12 @@ zx_status_t VmObjectPaged::ReadUser(VmAspace* current_aspace, user_out_ptr<char>
 
   Guard<CriticalMutex> guard{lock()};
 
-  return ReadWriteInternalLocked(offset, len, false, read_routine, &guard);
+  return ReadWriteInternalLocked(offset, len, false, options, read_routine, &guard);
 }
 
 zx_status_t VmObjectPaged::WriteUser(VmAspace* current_aspace, user_in_ptr<const char> ptr,
-                                     uint64_t offset, size_t len, size_t* out_actual,
+                                     uint64_t offset, size_t len, VmObjectReadWriteOptions options,
+                                     size_t* out_actual,
                                      const OnWriteBytesTransferredCallback& on_bytes_transferred) {
   canary_.Assert();
 
@@ -1708,7 +1720,7 @@ zx_status_t VmObjectPaged::WriteUser(VmAspace* current_aspace, user_in_ptr<const
 
   Guard<CriticalMutex> guard{lock()};
 
-  return ReadWriteInternalLocked(offset, len, true, write_routine, &guard);
+  return ReadWriteInternalLocked(offset, len, true, options, write_routine, &guard);
 }
 
 zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSpliceList* pages) {
