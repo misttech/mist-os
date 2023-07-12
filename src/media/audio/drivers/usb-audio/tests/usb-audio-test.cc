@@ -968,24 +968,19 @@ TEST_F(UsbAudioTest, Unplug) {
                                                                    kNumberOfPositionNotifications);
   ASSERT_OK(vmo.status());
 
-  std::atomic<bool> done = {};
   auto& ring_buffer = local;
   incoming_.SyncCall(
       [](IncomingNamespace<FakeDevice>* infra) { infra->fake_dev->ExpectConnectToEndpoint(1); });
-  auto th = std::thread([&ring_buffer, &done] {
+  auto th = std::thread([&ring_buffer] {
     auto start = fidl::WireCall<audio_fidl::RingBuffer>(ring_buffer)->Start();
     ASSERT_EQ(ZX_ERR_PEER_CLOSED, start.status());
-    done.store(true);
   });
 
-  // Reply until done.
-  while (!done.load()) {
-    incoming_.SyncCall([](IncomingNamespace<FakeDevice>* infra) {
+  incoming_.SyncCall([](IncomingNamespace<FakeDevice>* infra) {
+    for (size_t i = 0; i < MAX_OUTSTANDING_REQ; i++) {
       infra->fake_dev->fake_endpoint(1).RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0);
-    });
-    // Delay a bit, so there is time for non-data handling, e.g. Stop().
-    zx::nanosleep(zx::deadline_after(zx::msec(10)));
-  }
+    }
+  });
   th.join();
 
   auto properties = stream_client->GetProperties();
