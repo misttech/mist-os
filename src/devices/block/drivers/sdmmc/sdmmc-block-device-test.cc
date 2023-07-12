@@ -108,11 +108,11 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
     }
   }
 
-  fuchsia_hardware_sdmmc::wire::SdmmcMetadata CreateMetadata() {
+  fuchsia_hardware_sdmmc::wire::SdmmcMetadata CreateMetadata(bool removable = false) {
     return fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena_)
         .enable_trim(true)
         .enable_cache(true)
-        .removable(false)
+        .removable(removable)
         .Build();
   }
 
@@ -142,7 +142,7 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
     }
   }
 
-  void AddSdDevice() {
+  void AddSdDevice(bool removable = false) {
     sdmmc_.set_command_callback(SD_SEND_IF_COND,
                                 [](const sdmmc_req_t& req, uint32_t out_response[4]) {
                                   out_response[0] = req.arg & 0xfff;
@@ -162,7 +162,7 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
       out_response[3] = 0x4000'0000;  // Set CSD_STRUCTURE to indicate SDHC/SDXC.
     });
 
-    EXPECT_OK(dut_->ProbeSd(CreateMetadata()));
+    EXPECT_OK(dut_->ProbeSd(CreateMetadata(removable)));
 
     EXPECT_OK(dut_->AddDevice());
     added_ = true;
@@ -297,6 +297,19 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQuery) {
   EXPECT_EQ(info.block_count, kBlockCount);
   EXPECT_EQ(info.block_size, FakeSdmmcDevice::kBlockSize);
   EXPECT_EQ(block_op_size, kBlockOpSize);
+  EXPECT_FALSE(info.flags & FLAG_REMOVABLE);
+}
+
+TEST_F(SdmmcBlockDeviceTest, BlockImplQuerySdRemovable) {
+  AddSdDevice(/*removable=*/true);
+
+  size_t block_op_size;
+  block_info_t info;
+  user_.Query(&info, &block_op_size);
+
+  EXPECT_EQ(info.block_size, FakeSdmmcDevice::kBlockSize);
+  EXPECT_EQ(block_op_size, kBlockOpSize);
+  EXPECT_TRUE(info.flags & FLAG_REMOVABLE);
 }
 
 TEST_F(SdmmcBlockDeviceTest, BlockImplQueue) {

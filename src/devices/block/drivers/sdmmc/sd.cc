@@ -176,6 +176,10 @@ zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcM
     } while (false);
   }
 
+  if (metadata.removable()) {
+    block_info_.flags |= FLAG_REMOVABLE;
+  }
+
   is_sd_ = true;
   return ZX_OK;
 }

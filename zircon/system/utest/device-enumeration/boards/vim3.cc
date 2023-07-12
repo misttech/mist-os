@@ -27,7 +27,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       // netdevice migration.
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device",
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet",
-      "sys/platform/05:00:7/aml_sd/aml-sd-emmc",
+      "sys/platform/05:00:7/aml_sd/aml-sd-emmc/sdmmc",
       "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
       "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
       "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",

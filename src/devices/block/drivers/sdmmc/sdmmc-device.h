@@ -69,7 +69,7 @@ class SdmmcDevice {
                                cpp20::span<const sdmmc_buffer_region_t> buffers);
 
   // MMC ops
-  zx::result<uint32_t> MmcSendOpCond();
+  zx::result<uint32_t> MmcSendOpCond(bool suppress_error_messages);
   zx_status_t MmcWaitForReadyState(uint32_t ocr);
   zx_status_t MmcAllSendCid(std::array<uint8_t, SDMMC_CID_SIZE>& cid);
   zx_status_t MmcSetRelativeAddr(uint16_t rca);

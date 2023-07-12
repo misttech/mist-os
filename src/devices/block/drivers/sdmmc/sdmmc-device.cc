@@ -446,11 +446,12 @@ zx_status_t SdmmcDevice::SdioIoRwExtended(uint32_t caps, bool write, uint8_t fn_
 
 // MMC ops
 
-zx::result<uint32_t> SdmmcDevice::MmcSendOpCond() {
+zx::result<uint32_t> SdmmcDevice::MmcSendOpCond(bool suppress_error_messages) {
   const sdmmc_req_t request = {
       .cmd_idx = MMC_SEND_OP_COND,
       .cmd_flags = MMC_SEND_OP_COND_FLAGS,
       .arg = 0,  // Use zero to request the device's OCR without changing its state.
+      .suppress_error_messages = suppress_error_messages,
   };
   uint32_t response[4];
   if (zx_status_t status = Request(request, response); status != ZX_OK) {

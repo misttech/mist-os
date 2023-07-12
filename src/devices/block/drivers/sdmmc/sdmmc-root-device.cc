@@ -134,8 +134,18 @@ void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
     return txn.Reply(ZX_OK);
   }
 
-  zxlogf(INFO, "failed to probe (no eligible device present)");
-  return txn.Reply(ZX_OK);
+  if (metadata->removable()) {
+    // This controller is connected to a removable card slot, and no card was inserted. Indicate
+    // success so that our device remains available.
+    // TODO(fxbug.dev/130283): Enable detection of card insert/removal after initialization.
+    zxlogf(INFO, "failed to probe removable device");
+    return txn.Reply(ZX_OK);
+  }
+
+  // Failure to probe a hardwired device is unexpected. Reply with an error code so that our device
+  // gets removed.
+  zxlogf(ERROR, "failed to probe irremovable device");
+  return txn.Reply(ZX_ERR_NOT_FOUND);
 }
 
 void SdmmcRootDevice::DdkRelease() { delete this; }

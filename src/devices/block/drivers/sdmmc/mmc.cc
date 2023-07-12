@@ -295,9 +295,14 @@ zx_status_t SdmmcBlockDevice::ProbeMmc(
   auto reset_retries = fit::defer([&sdmmc = sdmmc_]() { sdmmc.SetRequestRetries(0); });
 
   // Query OCR
-  zx::result<uint32_t> ocr = sdmmc_.MmcSendOpCond();
+  zx::result<uint32_t> ocr = sdmmc_.MmcSendOpCond(/*suppress_error_messages=*/metadata.removable());
   if (ocr.is_error()) {
-    zxlogf(ERROR, "MMC_SEND_OP_COND failed: %s", ocr.status_string());
+    if (metadata.removable()) {
+      // This error is expected if no card is inserted.
+      zxlogf(DEBUG, "MMC_SEND_OP_COND failed: %s", ocr.status_string());
+    } else {
+      zxlogf(ERROR, "MMC_SEND_OP_COND failed: %s", ocr.status_string());
+    }
     return ocr.status_value();
   }
 
@@ -463,6 +468,10 @@ zx_status_t SdmmcBlockDevice::ProbeMmc(
       zxlogf(ERROR, "Cache is unexpectedly enabled.");
       return ZX_ERR_BAD_STATE;
     }
+  }
+
+  if (metadata.removable()) {
+    block_info_.flags |= FLAG_REMOVABLE;
   }
 
   return ZX_OK;

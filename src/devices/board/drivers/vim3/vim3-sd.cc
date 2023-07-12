@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
 #include <fuchsia/hardware/sdmmc/c/banjo.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
@@ -48,15 +49,29 @@ static aml_sdmmc_config_t config = {
     .prefs = 0,
 };
 
-static const std::vector<fpbus::Metadata> sd_metadata{
-    {{
-        .type = DEVICE_METADATA_PRIVATE,
-        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
-                                     reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
-    }},
-};
-
 zx_status_t Vim3::SdInit() {
+  fidl::Arena<> fidl_arena;
+
+  fit::result sdmmc_metadata = fidl::Persist(
+      fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena).removable(true).Build());
+  if (!sdmmc_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",
+           sdmmc_metadata.error_value().FormatDescription().c_str());
+    return sdmmc_metadata.error_value().status();
+  }
+
+  const std::vector<fpbus::Metadata> sd_metadata{
+      {{
+          .type = DEVICE_METADATA_PRIVATE,
+          .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
+                                       reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
+      }},
+      {{
+          .type = DEVICE_METADATA_SDMMC,
+          .data = std::move(sdmmc_metadata.value()),
+      }},
+  };
+
   fpbus::Node sd_dev;
   sd_dev.name() = "aml_sd";
   sd_dev.vid() = PDEV_VID_AMLOGIC;
@@ -74,7 +89,6 @@ zx_status_t Vim3::SdInit() {
   gpio_impl_.SetAltFunction(A311D_GPIOC(4), A311D_GPIOC_4_SDCARD_CLK_FN);
   gpio_impl_.SetAltFunction(A311D_GPIOC(5), A311D_GPIOC_5_SDCARD_CMD_FN);
 
-  fidl::Arena<> fidl_arena;
   fdf::Arena arena('SD__');
   auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
       fidl::ToWire(fidl_arena, sd_dev), {}, {});
