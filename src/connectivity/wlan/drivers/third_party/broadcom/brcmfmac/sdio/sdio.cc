@@ -3307,7 +3307,7 @@ int brcmf_sdio_oob_irqhandler(void* cookie) {
     // Keep going, this shouldn't stop the entire driver from working.
   }
 
-  while ((status = zx_interrupt_wait(sdiodev->irq_handle, NULL)) == ZX_OK) {
+  while ((status = sdiodev->irq_handle.wait(nullptr)) == ZX_OK) {
     bus->sdcnt.intrcount++;
     // Sleep the interrupt handling when reloading the firmware to reduce the chaos in driver caused
     // by queued interrupts.

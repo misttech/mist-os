@@ -15,7 +15,6 @@
  */
 /* ****************** SDIO CARD Interface Functions **************************/
 
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/sdio/cpp/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/device.h>
@@ -82,18 +81,35 @@ static void brcmf_sdiod_dummy_irqhandler(struct brcmf_sdio_dev* sdiodev) {}
 
 zx_status_t brcmf_sdiod_configure_oob_interrupt(struct brcmf_sdio_dev* sdiodev,
                                                 wifi_config_t* config) {
-  zx_status_t ret = gpio_config_in(&sdiodev->gpios[WIFI_OOB_IRQ_GPIO_INDEX], GPIO_NO_PULL);
-  if (ret != ZX_OK) {
-    BRCMF_ERR("brcmf_sdiod_intr_register: gpio_config failed: %d", ret);
-    return ret;
+  {
+    fidl::WireResult result = sdiodev->gpios[WIFI_OOB_IRQ_GPIO_INDEX]->ConfigIn(
+        fuchsia_hardware_gpio::GpioFlags::kNoPull);
+    if (!result.ok()) {
+      BRCMF_ERR("brcmf_sdiod_intr_register: Failed to send ConfigIn request to gpio %u: %s",
+                WIFI_OOB_IRQ_GPIO_INDEX, result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      BRCMF_ERR("brcmf_sdiod_intr_register: Failed to configure gpio %u to input: %s",
+                WIFI_OOB_IRQ_GPIO_INDEX, zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
-  ret = gpio_get_interrupt(&sdiodev->gpios[WIFI_OOB_IRQ_GPIO_INDEX], config->oob_irq_mode,
-                           &sdiodev->irq_handle);
-  if (ret != ZX_OK) {
-    BRCMF_ERR("brcmf_sdiod_intr_register: gpio_get_interrupt failed: %d", ret);
-    return ret;
+  fidl::WireResult interrupt_result =
+      sdiodev->gpios[WIFI_OOB_IRQ_GPIO_INDEX]->GetInterrupt(config->oob_irq_mode);
+  if (!interrupt_result.ok()) {
+    BRCMF_ERR("brcmf_sdiod_intr_register: Failed to send GetInterrupt request to gpio %u: %s",
+              WIFI_OOB_IRQ_GPIO_INDEX, interrupt_result.status_string());
+    return interrupt_result.status();
   }
+  if (interrupt_result->is_error()) {
+    BRCMF_ERR("brcmf_sdiod_intr_register: Failed to get interrupt from gpio %u: %s",
+              WIFI_OOB_IRQ_GPIO_INDEX, zx_status_get_string(interrupt_result->error_value()));
+    return interrupt_result->error_value();
+  }
+  sdiodev->irq_handle = std::move(interrupt_result.value()->irq);
+
   return ZX_OK;
 }
 
@@ -157,7 +173,7 @@ zx_status_t brcmf_sdiod_intr_register(struct brcmf_sdio_dev* sdiodev, bool reloa
         return ZX_ERR_INTERNAL;
       }
       sdiodev->oob_irq_requested = true;
-      ret = enable_irq_wake(sdiodev->irq_handle);
+      ret = enable_irq_wake(sdiodev->irq_handle.get());
       if (ret != ZX_OK) {
         BRCMF_ERR("enable_irq_wake failed %d", ret);
         return ret;
@@ -218,10 +234,10 @@ void brcmf_sdiod_intr_unregister(struct brcmf_sdio_dev* sdiodev) {
 
     sdiodev->oob_irq_requested = false;
     if (sdiodev->irq_wake) {
-      disable_irq_wake(sdiodev->irq_handle);
+      disable_irq_wake(sdiodev->irq_handle.get());
       sdiodev->irq_wake = false;
     }
-    zx_handle_close(sdiodev->irq_handle);
+    sdiodev->irq_handle.destroy();
     int retval = 0;
     int status = thrd_join(sdiodev->isr_thread, &retval);
     if (status != thrd_success) {
@@ -826,7 +842,6 @@ zx_status_t brcmf_sdio_register(brcmf_pub* drvr, std::unique_ptr<brcmf_bus>* out
   // One for SDIO, one or two GPIOs.
   sdio_protocol_t sdio_proto_fn1;
   sdio_protocol_t sdio_proto_fn2;
-  gpio_protocol_t gpio_protos[GPIO_COUNT];
   bool has_debug_gpio = false;
 
   ddk::SdioProtocolClient sdio_fn1(drvr->device->parent(), "sdio-function-1");
@@ -843,19 +858,26 @@ zx_status_t brcmf_sdio_register(brcmf_pub* drvr, std::unique_ptr<brcmf_bus>* out
   }
   sdio_fn2.GetProto(&sdio_proto_fn2);
 
-  ddk::GpioProtocolClient gpio(drvr->device->parent(), "gpio-oob");
-  if (!gpio.is_valid()) {
-    BRCMF_ERR("ZX_PROTOCOL_GPIO not found");
+  const char* kGpioOobFragmentName = "gpio-oob";
+  zx::result gpio_oob =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+          drvr->device->parent(), kGpioOobFragmentName);
+  if (gpio_oob.is_error()) {
+    BRCMF_ERR("Failed to get gpio protocol from fragment %s: %s", kGpioOobFragmentName,
+              gpio_oob.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
-  gpio.GetProto(&gpio_protos[WIFI_OOB_IRQ_GPIO_INDEX]);
 
-  // Debug GPIO is optional
-  gpio = ddk::GpioProtocolClient(drvr->device->parent(), "gpio-debug");
-  if (gpio.is_valid()) {
-    has_debug_gpio = true;
-    gpio.GetProto(&gpio_protos[DEBUG_GPIO_INDEX]);
+  const char* kGpioDebugFragmentName = "gpio-debug";
+  zx::result gpio_debug =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+          drvr->device->parent(), kGpioDebugFragmentName);
+  if (gpio_debug.is_error() && gpio_debug.error_value() != ZX_ERR_NOT_FOUND) {
+    BRCMF_ERR("Failed to get gpio protocol from fragment %s: %s", kGpioDebugFragmentName,
+              gpio_debug.status_string());
+    return ZX_ERR_NO_RESOURCES;
   }
+  has_debug_gpio = gpio_debug.is_ok();
 
   sdio_hw_info_t devinfo;
   sdio_get_dev_hw_info(&sdio_proto_fn1, &devinfo);
@@ -913,11 +935,9 @@ zx_status_t brcmf_sdio_register(brcmf_pub* drvr, std::unique_ptr<brcmf_bus>* out
   }
   memcpy(&sdiodev->sdio_proto_fn1, &sdio_proto_fn1, sizeof(sdiodev->sdio_proto_fn1));
   memcpy(&sdiodev->sdio_proto_fn2, &sdio_proto_fn2, sizeof(sdiodev->sdio_proto_fn2));
-  memcpy(&sdiodev->gpios[WIFI_OOB_IRQ_GPIO_INDEX], &gpio_protos[WIFI_OOB_IRQ_GPIO_INDEX],
-         sizeof(gpio_protos[WIFI_OOB_IRQ_GPIO_INDEX]));
+  sdiodev->gpios[WIFI_OOB_IRQ_GPIO_INDEX].Bind(std::move(gpio_oob.value()));
   if (has_debug_gpio) {
-    memcpy(&sdiodev->gpios[DEBUG_GPIO_INDEX], &gpio_protos[DEBUG_GPIO_INDEX],
-           sizeof(gpio_protos[DEBUG_GPIO_INDEX]));
+    sdiodev->gpios[DEBUG_GPIO_INDEX].Bind(std::move(gpio_debug.value()));
     sdiodev->has_debug_gpio = true;
   }
   sdiodev->bus_if = bus_if.get();
