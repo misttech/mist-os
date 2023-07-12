@@ -15,6 +15,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/cpp/completion.h>
 
@@ -96,10 +97,14 @@ class SimTransport : public SimMvm {
   const ::wlan::iwlwifi::SimTransIwlwifiDriver* sim_driver() const;
   async_dispatcher_t* async_driver_dispatcher();
   fdf_dispatcher_t* fdf_driver_dispatcher();
+  // This function starts a new managed dispatcher on demand of tests.
+  fdf::UnownedSynchronizedDispatcher get_unowned_synchronized_dispatcher();
 
  private:
-  fdf::Dispatcher sim_driver_dispatcher_;
-  libsync::Completion completion_;
+  // DriverRuntime maintains the foreground dispatcher and spawns the background dispatcher.
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher sim_driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
+
   std::unique_ptr<::async::Loop> task_loop_;
   std::unique_ptr<::async::Loop> irq_loop_;
   std::unique_ptr<::wlan::iwlwifi::RcuManager> rcu_manager_;

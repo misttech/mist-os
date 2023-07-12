@@ -350,19 +350,12 @@ zx_status_t sim_load_firmware_callback_entry(void* ctx, const char* name, zx_han
 }
 
 SimTransport::SimTransport() : device_{}, iwl_trans_(nullptr) {
-  auto dispatcher = fdf::SynchronizedDispatcher::Create(
-      {.value = FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS}, "iwlwifi-driver-dispatcher",
-      [&](fdf_dispatcher_t*) { completion_.Signal(); });
-  ZX_ASSERT(!dispatcher.is_error());
-
-  sim_driver_dispatcher_ = std::move(*dispatcher);
-
   task_loop_ = std::make_unique<::async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
   task_loop_->StartThread("iwlwifi-test-task-worker", nullptr);
   irq_loop_ = std::make_unique<::async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
   irq_loop_->StartThread("iwlwifi-test-irq-worker", nullptr);
   rcu_manager_ =
-      std::make_unique<::wlan::iwlwifi::RcuManager>(sim_driver_dispatcher_.async_dispatcher());
+      std::make_unique<::wlan::iwlwifi::RcuManager>(sim_driver_dispatcher_->async_dispatcher());
 
   device_.load_firmware_ctx = (void*)this;
   device_.load_firmware_callback = &sim_load_firmware_callback_entry;
@@ -377,18 +370,16 @@ SimTransport::~SimTransport() {
   task_loop_->Shutdown();
   zx_handle_close(device_.bti);
   libsync::Completion destruct_driver;
-  async::PostTask(sim_driver_dispatcher_.async_dispatcher(), [&]() {
+  async::PostTask(sim_driver_dispatcher_->async_dispatcher(), [&]() {
     sim_driver_.reset();
     destruct_driver.Signal();
   });
   destruct_driver.Wait();
-  sim_driver_dispatcher_.ShutdownAsync();
-  completion_.Wait();
 }
 
 zx_status_t SimTransport::Init() {
   return sim_transport_bind(this, &device_, &iwl_trans_, &sim_driver_,
-                            sim_driver_dispatcher_.async_dispatcher());
+                            sim_driver_dispatcher_->async_dispatcher());
 }
 
 void SimTransport::SetFirmware(std::string firmware) {
@@ -420,10 +411,14 @@ const ::wlan::iwlwifi::SimTransIwlwifiDriver* SimTransport::sim_driver() const {
   return sim_driver_.get();
 }
 
-async_dispatcher_t* SimTransport::async_driver_dispatcher() {
-  return sim_driver_dispatcher_.async_dispatcher();
+fdf::UnownedSynchronizedDispatcher SimTransport::get_unowned_synchronized_dispatcher() {
+  return runtime_.StartBackgroundDispatcher();
 }
 
-fdf_dispatcher_t* SimTransport::fdf_driver_dispatcher() { return sim_driver_dispatcher_.get(); }
+async_dispatcher_t* SimTransport::async_driver_dispatcher() {
+  return sim_driver_dispatcher_->async_dispatcher();
+}
+
+fdf_dispatcher_t* SimTransport::fdf_driver_dispatcher() { return sim_driver_dispatcher_->get(); }
 
 }  // namespace wlan::testing

@@ -73,28 +73,8 @@ class WlanSoftmacDeviceTest : public SingleApTest,
     auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmac>();
     ASSERT_FALSE(endpoints.is_error());
 
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        {}, "wlan-softmac-device-test-driver-dispatcher",
-        [&](fdf_dispatcher_t*) { driver_completion_.Signal(); });
-    ASSERT_FALSE(dispatcher.is_error());
-    driver_dispatcher_ = *std::move(dispatcher);
-
-    // `ServeWlanSoftmacProtocol` must be called in a driver dispatcher because
-    // it manipulates a `driver::OutgoingDirectory` which can only be accessed
-    // on the same fdf dispatcher that created it.
-    libsync::Completion connected;
-    async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
-      device_->ServiceConnectHandler(driver_dispatcher_.get(), std::move(endpoints->server));
-      connected.Signal();
-    });
-    connected.Wait();
-
-    // Create a dispatcher for the server end of WlansoftmacIfc protocol to wait on the runtime
-    // channel.
-    dispatcher = fdf::SynchronizedDispatcher::Create(
-        {}, "wlansoftmacifc_server_test", [&](fdf_dispatcher_t*) { server_completion_.Signal(); });
-    ASSERT_FALSE(dispatcher.is_error());
-    server_dispatcher_ = *std::move(dispatcher);
+    device_->ServiceConnectHandler(sim_trans_.fdf_driver_dispatcher(),
+                                   std::move(endpoints->server));
 
     client_ = fdf::WireSyncClient<fuchsia_wlan_softmac::WlanSoftmac>(std::move(endpoints->client));
 
@@ -103,14 +83,6 @@ class WlanSoftmacDeviceTest : public SingleApTest,
     ASSERT_FALSE(arena.is_error());
 
     test_arena_ = *std::move(arena);
-  }
-
-  ~WlanSoftmacDeviceTest() {
-    driver_dispatcher_.ShutdownAsync();
-    server_dispatcher_.ShutdownAsync();
-
-    driver_completion_.Wait();
-    server_completion_.Wait();
   }
 
   void Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) override {
@@ -133,15 +105,11 @@ class WlanSoftmacDeviceTest : public SingleApTest,
   std::unique_ptr<::wlan::iwlwifi::WlanSoftmacDevice> device_;
 
   fdf::WireSyncClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
-  // In DFv2 world, WlanSoftmacDevice doesn't maintain its own server end dispatcher for
-  // fuchsia_wlan_softmac::WlanSoftmac protocol. The dispatcher is created by driver framework in
-  // the real case, this one is the subsititution in test.
-  fdf::Dispatcher driver_dispatcher_;
-  fdf::Dispatcher server_dispatcher_;
+
+  fdf::UnownedSynchronizedDispatcher server_dispatcher_ =
+      sim_trans_.get_unowned_synchronized_dispatcher();
 
   fdf::Arena test_arena_;
-  libsync::Completion driver_completion_;
-  libsync::Completion server_completion_;
 
   // The marks of WlanSoftmacIfc function calls.
   bool recv_called_ = false;
@@ -315,7 +283,7 @@ TEST_F(WlanSoftmacDeviceTest, MacStart) {
   auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacIfc>();
   ASSERT_FALSE(endpoints.is_error());
 
-  fdf::BindServer(server_dispatcher_.get(), std::move(endpoints->server), this);
+  fdf::BindServer(server_dispatcher_->get(), std::move(endpoints->server), this);
 
   // This FIDL call should invoke mac_start() and pass the pointer of WlanSoftmacDeviceTest to it,
   // the pointer will be copied to mvmvif_->ifc.ctx.
@@ -364,7 +332,7 @@ TEST_F(WlanSoftmacDeviceTest, SingleRxPacket) {
   auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacIfc>();
   ASSERT_FALSE(endpoints.is_error());
 
-  fdf::BindServer(server_dispatcher_.get(), std::move(endpoints->server), this);
+  fdf::BindServer(server_dispatcher_->get(), std::move(endpoints->server), this);
 
   // This FIDL call should invoke mac_start() and pass the pointer of WlanSoftmacDeviceTest to it,
   // the pointer will be copied to mvmvif_->ifc.ctx.
@@ -426,7 +394,7 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
 
     // Created the end points for WlanSoftmacIfc protocol, and pass the client end to
     // WlanSoftmacDevice.
-    fdf::BindServer(server_dispatcher_.get(), std::move(endpoints->server), this);
+    fdf::BindServer(server_dispatcher_->get(), std::move(endpoints->server), this);
 
     // This FIDL call should invoke mac_start() and pass the pointer of WlanSoftmacDeviceTest to it,
     // the pointer will be copied to mvmvif_->ifc.ctx.
